@@ -1,40 +1,22 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
-  TrendingUp,
-  ShoppingCart,
-  Truck,
-  DollarSign,
-  Calendar,
-  ArrowUpRight,
-  ArrowDownRight,
-  BarChart3,
-  AlertTriangle
+  TrendingUp, ShoppingCart, DollarSign, Calendar, BarChart3, Megaphone, Target, Eye, Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { format, startOfMonth, endOfMonth, startOfYear, subDays, subMonths, parseISO } from 'date-fns';
+import { format, startOfMonth, startOfYear, subDays, subMonths, endOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  BarChart,
-  Bar
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
 } from 'recharts';
 
 interface MetricData {
   metric_date: string;
   metric_type: string;
   metric_value: number;
+  connection_id: string;
 }
 
 interface Client {
@@ -47,569 +29,326 @@ interface Connection {
   id: string;
   client_id: string;
   platform: string;
-  store_name: string | null;
-  clients?: Client;
+  shop_domain: string | null;
+  is_active: boolean;
 }
 
-interface CriterioAlert {
-  id: string;
-  rule_id: string;
-  entity_type: string;
-  entity_id: string | null;
-  actual_value: string | null;
-  expected_value: string | null;
-  details: string | null;
-  evaluated_at: string;
-  evaluated_by: string | null;
-  criterio_rules?: { name: string; severity: string; category: string } | null;
+type DatePreset = 'last7days' | 'mtd' | 'last_month' | 'ytd';
+
+const formatCLP = (value: number) =>
+  new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+
+const formatNum = (value: number) =>
+  new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 }).format(value);
+
+function getDateRange(preset: DatePreset) {
+  const today = new Date();
+  switch (preset) {
+    case 'last7days': return { from: subDays(today, 7), to: today };
+    case 'mtd': return { from: startOfMonth(today), to: today };
+    case 'last_month': { const lm = subMonths(today, 1); return { from: startOfMonth(lm), to: endOfMonth(lm) }; }
+    case 'ytd': return { from: startOfYear(today), to: today };
+  }
 }
 
-type DateRangePreset = 'today' | 'yesterday' | 'last7days' | 'mtd' | 'last_month' | 'ytd' | 'custom';
-
-const IVA_FACTOR = 1.19;
-
-const formatCLP = (value: number) => {
-  return new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-};
-
-const formatNumber = (value: number) => {
-  return new Intl.NumberFormat('es-CL').format(Math.round(value));
-};
+function KpiCard({ label, value, sub, icon: Icon, highlight }: {
+  label: string; value: string; sub?: string; icon: any; highlight?: boolean;
+}) {
+  return (
+    <Card className={highlight ? 'border-primary/20 bg-primary/5' : ''}>
+      <CardContent className="pt-5 pb-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
+          <Icon className={`w-4 h-4 ${highlight ? 'text-primary' : 'text-muted-foreground'}`} />
+        </div>
+        <div className={`text-2xl font-bold ${highlight ? 'text-primary' : ''}`}>{value}</div>
+        {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+      </CardContent>
+    </Card>
+  );
+}
 
 export function ClientMetricsPanel() {
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState('');
   const [connections, setConnections] = useState<Connection[]>([]);
-  const [selectedConnection, setSelectedConnection] = useState<string>('');
   const [metrics, setMetrics] = useState<MetricData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState<DateRangePreset>('mtd');
-  const [customDateRange, setCustomDateRange] = useState<{
-    from: Date | undefined;
-    to: Date | undefined;
-  }>({ from: undefined, to: undefined });
-  const [criterioAlerts, setCriterioAlerts] = useState<CriterioAlert[]>([]);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [datePreset, setDatePreset] = useState<DatePreset>('mtd');
 
-  // Calculate date range based on preset
-  const getDateRange = useMemo(() => {
-    const today = new Date();
-    
-    switch (dateRange) {
-      case 'today':
-        return { from: today, to: today };
-      case 'yesterday':
-        const yesterday = subDays(today, 1);
-        return { from: yesterday, to: yesterday };
-      case 'last7days':
-        return { from: subDays(today, 7), to: today };
-      case 'mtd':
-        return { from: startOfMonth(today), to: today };
-      case 'last_month':
-        const lastMonth = subMonths(today, 1);
-        return { from: startOfMonth(lastMonth), to: endOfMonth(lastMonth) };
-      case 'ytd':
-        return { from: startOfYear(today), to: today };
-      case 'custom':
-        return { 
-          from: customDateRange.from || startOfMonth(today), 
-          to: customDateRange.to || today 
-        };
-      default:
-        return { from: startOfMonth(today), to: today };
-    }
-  }, [dateRange, customDateRange]);
-
+  // Load clients
   useEffect(() => {
-    fetchConnections();
-    fetchCriterioAlerts();
+    (async () => {
+      const { data } = await supabase.from('clients').select('id, name, company').order('name');
+      if (data && data.length > 0) {
+        setClients(data);
+        setSelectedClientId(data[0].id);
+      }
+      setLoading(false);
+    })();
   }, []);
 
+  // Load connections + metrics when client or date changes
   useEffect(() => {
-    if (selectedConnection) {
-      fetchMetrics();
-    }
-  }, [selectedConnection, getDateRange]);
+    if (!selectedClientId) return;
+    (async () => {
+      setMetricsLoading(true);
 
-  const fetchConnections = async () => {
-    const { data, error } = await supabase
-      .from('platform_connections')
-      .select('id, client_id, platform, store_name, clients(id, name, company)')
-      .eq('platform', 'shopify')
-      .eq('is_active', true);
+      // Get all connections for this client
+      const { data: conns } = await supabase
+        .from('platform_connections')
+        .select('id, client_id, platform, shop_domain, is_active')
+        .eq('client_id', selectedClientId)
+        .eq('is_active', true);
 
-    if (!error && data) {
-      setConnections(data);
-      if (data.length > 0) {
-        setSelectedConnection(data[0].id);
+      setConnections(conns || []);
+
+      if (!conns || conns.length === 0) {
+        setMetrics([]);
+        setMetricsLoading(false);
+        return;
       }
-    }
-    setLoading(false);
-  };
 
-  const fetchMetrics = async () => {
-    if (!selectedConnection) return;
-    
-    const { from, to } = getDateRange;
-    
-    const { data, error } = await supabase
-      .from('platform_metrics')
-      .select('metric_date, metric_type, metric_value')
-      .eq('connection_id', selectedConnection)
-      .gte('metric_date', format(from, 'yyyy-MM-dd'))
-      .lte('metric_date', format(to, 'yyyy-MM-dd'))
-      .order('metric_date', { ascending: true });
+      const connIds = conns.map(c => c.id);
+      const { from, to } = getDateRange(datePreset);
 
-    if (!error) {
-      setMetrics(data || []);
-    }
-  };
+      const { data: metricsData } = await supabase
+        .from('platform_metrics')
+        .select('metric_date, metric_type, metric_value, connection_id')
+        .in('connection_id', connIds)
+        .gte('metric_date', format(from, 'yyyy-MM-dd'))
+        .lte('metric_date', format(to, 'yyyy-MM-dd'))
+        .order('metric_date', { ascending: true });
 
-  const fetchCriterioAlerts = async () => {
-    const { data, error } = await supabase
-      .from('criterio_results')
-      .select('id, rule_id, entity_type, entity_id, actual_value, expected_value, details, evaluated_at, evaluated_by, criterio_rules(name, severity, category)')
-      .eq('passed', false)
-      .order('evaluated_at', { ascending: false })
-      .limit(5);
+      setMetrics(metricsData || []);
+      setMetricsLoading(false);
+    })();
+  }, [selectedClientId, datePreset]);
 
-    if (!error && data) {
-      setCriterioAlerts(data as CriterioAlert[]);
-    }
-  };
+  // Connection maps
+  const shopifyConnId = connections.find(c => c.platform === 'shopify')?.id;
+  const metaConnId = connections.find(c => c.platform === 'meta')?.id;
 
-  // Calculate aggregated metrics
-  const aggregatedMetrics = useMemo(() => {
-    const grossRevenue = metrics
-      .filter(m => m.metric_type === 'gross_revenue')
-      .reduce((sum, m) => sum + m.metric_value, 0);
-    
-    const ordersCount = metrics
-      .filter(m => m.metric_type === 'orders_count')
-      .reduce((sum, m) => sum + m.metric_value, 0);
-    
-    const shippingRevenue = metrics
-      .filter(m => m.metric_type === 'shipping_revenue')
-      .reduce((sum, m) => sum + m.metric_value, 0);
+  // Aggregate metrics
+  const agg = useMemo(() => {
+    const sum = (connId: string | undefined, type: string) =>
+      metrics.filter(m => m.connection_id === connId && m.metric_type === type)
+        .reduce((s, m) => s + m.metric_value, 0);
 
-    // Net sales (without IVA)
-    const netSales = grossRevenue / IVA_FACTOR;
-    
-    // Average ticket (gross)
-    const avgTicket = ordersCount > 0 ? grossRevenue / ordersCount : 0;
-    
-    // Average shipping per order
-    const avgShipping = ordersCount > 0 ? shippingRevenue / ordersCount : 0;
-    
-    // Net sales without shipping
-    const netSalesWithoutShipping = (grossRevenue - shippingRevenue) / IVA_FACTOR;
-    
-    // Net average ticket without shipping
-    const netAvgTicketWithoutShipping = ordersCount > 0 
-      ? netSalesWithoutShipping / ordersCount 
-      : 0;
+    const avg = (connId: string | undefined, type: string) => {
+      const items = metrics.filter(m => m.connection_id === connId && m.metric_type === type);
+      if (items.length === 0) return 0;
+      return items.reduce((s, m) => s + m.metric_value, 0) / items.length;
+    };
+
+    const shopRevenue = sum(shopifyConnId, 'revenue');
+    const shopOrders = sum(shopifyConnId, 'orders');
+    const metaSpend = sum(metaConnId, 'ad_spend');
+    const metaPurchases = sum(metaConnId, 'purchases');
+    const metaPurchaseValue = sum(metaConnId, 'purchase_value');
+    const metaImpressions = sum(metaConnId, 'impressions');
+    const metaRoas = metaSpend > 0 ? metaPurchaseValue / metaSpend : 0;
+    const metaCpp = metaPurchases > 0 ? metaSpend / metaPurchases : 0;
+    const metaCpm = metaImpressions > 0 ? (metaSpend / metaImpressions) * 1000 : 0;
 
     return {
-      grossRevenue,
-      netSales,
-      ordersCount,
-      shippingRevenue,
-      avgTicket,
-      avgShipping,
-      netSalesWithoutShipping,
-      netAvgTicketWithoutShipping,
+      shopRevenue, shopOrders,
+      shopAvgTicket: shopOrders > 0 ? shopRevenue / shopOrders : 0,
+      metaSpend, metaPurchases, metaPurchaseValue,
+      metaImpressions, metaRoas, metaCpp, metaCpm,
     };
-  }, [metrics]);
+  }, [metrics, shopifyConnId, metaConnId]);
 
-  // Prepare chart data
+  // Chart data: daily revenue + ad spend
   const chartData = useMemo(() => {
-    const grouped: Record<string, { date: string; revenue: number; orders: number }> = {};
-    
+    const grouped: Record<string, { date: string; revenue: number; adSpend: number; orders: number; purchases: number }> = {};
+
     metrics.forEach(m => {
       if (!grouped[m.metric_date]) {
-        grouped[m.metric_date] = { date: m.metric_date, revenue: 0, orders: 0 };
+        grouped[m.metric_date] = { date: m.metric_date, revenue: 0, adSpend: 0, orders: 0, purchases: 0 };
       }
-      if (m.metric_type === 'gross_revenue') {
-        grouped[m.metric_date].revenue = m.metric_value / IVA_FACTOR; // Net
+      if (m.connection_id === shopifyConnId) {
+        if (m.metric_type === 'revenue') grouped[m.metric_date].revenue = m.metric_value;
+        if (m.metric_type === 'orders') grouped[m.metric_date].orders = m.metric_value;
       }
-      if (m.metric_type === 'orders_count') {
-        grouped[m.metric_date].orders = m.metric_value;
+      if (m.connection_id === metaConnId) {
+        if (m.metric_type === 'ad_spend') grouped[m.metric_date].adSpend = m.metric_value;
+        if (m.metric_type === 'purchases') grouped[m.metric_date].purchases = m.metric_value;
       }
     });
-    
-    return Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
-  }, [metrics]);
 
-  const selectedClient = connections.find(c => c.id === selectedConnection)?.clients;
+    return Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
+  }, [metrics, shopifyConnId, metaConnId]);
+
+  const selectedClient = clients.find(c => c.id === selectedClientId);
+  const platformBadges = connections.map(c => c.platform);
 
   if (loading) {
-    return (
-      <div className="space-y-4">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="animate-pulse h-32 bg-muted rounded-lg" />
-        ))}
-      </div>
-    );
+    return <div className="flex justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
   }
 
-  if (connections.length === 0) {
+  if (clients.length === 0) {
     return (
       <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
         <BarChart3 className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-        <p className="text-muted-foreground">No hay conexiones de Shopify activas</p>
-        <p className="text-sm text-muted-foreground mt-1">
-          Agrega una conexión en la pestaña "Plataformas" para ver métricas
-        </p>
+        <p className="text-muted-foreground">No hay clientes con conexiones activas</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header with filters */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
         <div>
-          <h2 className="text-xl font-medium">Métricas de Rendimiento</h2>
-          <p className="text-sm text-muted-foreground">
-            Análisis de ventas y rendimiento de Shopify
-          </p>
+          <h2 className="text-2xl font-bold">Métricas por Cliente</h2>
+          <p className="text-sm text-muted-foreground">Resultados reales de todas las plataformas</p>
         </div>
-        
-        <div className="flex flex-wrap gap-3">
-          {/* Client/Connection selector */}
-          <Select value={selectedConnection} onValueChange={setSelectedConnection}>
+        <div className="flex gap-3">
+          <Select value={selectedClientId} onValueChange={setSelectedClientId}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Seleccionar cliente" />
             </SelectTrigger>
             <SelectContent>
-              {connections.map((conn) => (
-                <SelectItem key={conn.id} value={conn.id}>
-                  {conn.clients?.name || conn.store_name || 'Sin nombre'}
-                </SelectItem>
+              {clients.map(c => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-
-          {/* Date range selector */}
-          <Select value={dateRange} onValueChange={(v: DateRangePreset) => setDateRange(v)}>
+          <Select value={datePreset} onValueChange={(v: DatePreset) => setDatePreset(v)}>
             <SelectTrigger className="w-[180px]">
               <Calendar className="w-4 h-4 mr-2" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="today">Hoy</SelectItem>
-              <SelectItem value="yesterday">Ayer</SelectItem>
               <SelectItem value="last7days">Últimos 7 días</SelectItem>
-              <SelectItem value="mtd">Mes hasta hoy</SelectItem>
+              <SelectItem value="mtd">Mes actual</SelectItem>
               <SelectItem value="last_month">Mes anterior</SelectItem>
-              <SelectItem value="ytd">Año hasta hoy</SelectItem>
-              <SelectItem value="custom">Personalizado</SelectItem>
+              <SelectItem value="ytd">Año completo</SelectItem>
             </SelectContent>
           </Select>
-
-          {/* Custom date picker */}
-          {dateRange === 'custom' && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm">
-                  {customDateRange.from && customDateRange.to
-                    ? `${format(customDateRange.from, 'dd/MM/yy')} - ${format(customDateRange.to, 'dd/MM/yy')}`
-                    : 'Seleccionar fechas'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <CalendarComponent
-                  mode="range"
-                  selected={{ from: customDateRange.from, to: customDateRange.to }}
-                  onSelect={(range) => setCustomDateRange({ from: range?.from, to: range?.to })}
-                  locale={es}
-                />
-              </PopoverContent>
-            </Popover>
-          )}
         </div>
       </div>
 
-      {/* Client badge */}
+      {/* Client + platforms */}
       {selectedClient && (
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-sm">
-            {selectedClient.name}
-          </Badge>
-          {selectedClient.company && (
-            <Badge variant="secondary" className="text-sm">
-              {selectedClient.company}
-            </Badge>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className="text-sm">{selectedClient.name}</Badge>
+          {selectedClient.company && <Badge variant="secondary" className="text-sm">{selectedClient.company}</Badge>}
+          {platformBadges.map(p => (
+            <Badge key={p} className="text-xs capitalize bg-slate-100 text-slate-700">{p}</Badge>
+          ))}
+        </div>
+      )}
+
+      {metricsLoading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+      ) : connections.length === 0 ? (
+        <Card><CardContent className="py-12 text-center text-muted-foreground">Este cliente no tiene plataformas conectadas</CardContent></Card>
+      ) : (
+        <>
+          {/* Shopify KPIs */}
+          {shopifyConnId && (
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                <ShoppingCart className="w-4 h-4" /> Shopify
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <KpiCard label="Ventas" value={formatCLP(agg.shopRevenue)} icon={DollarSign} highlight />
+                <KpiCard label="Órdenes" value={formatNum(agg.shopOrders)} icon={ShoppingCart} />
+                <KpiCard label="Ticket Promedio" value={formatCLP(agg.shopAvgTicket)} icon={BarChart3} />
+              </div>
+            </div>
           )}
-          <Badge className="bg-green-500/10 text-green-600 text-sm">
-            Shopify
-          </Badge>
-        </div>
-      )}
 
-      {/* KPI Cards - Row 1 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Ventas Brutas
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCLP(aggregatedMetrics.grossRevenue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Con IVA incluido</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-primary/20 bg-primary/5">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Ventas Netas
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{formatCLP(aggregatedMetrics.netSales)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Sin IVA (÷ 1.19)</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Órdenes
-            </CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(aggregatedMetrics.ordersCount)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Total de pedidos</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Ticket Promedio
-            </CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCLP(aggregatedMetrics.avgTicket)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Venta bruta / Órdenes</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* KPI Cards - Row 2 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Ingresos por Despacho
-            </CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCLP(aggregatedMetrics.shippingRevenue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Total cobrado por envíos</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Despacho Promedio
-            </CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCLP(aggregatedMetrics.avgShipping)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Por orden</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-green-500/20 bg-green-500/5">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Venta Neta sin Despacho
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {formatCLP(aggregatedMetrics.netSalesWithoutShipping)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Solo productos, sin IVA</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-green-500/20 bg-green-500/5">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Ticket Neto sin Despacho
-            </CardTitle>
-            <BarChart3 className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {formatCLP(aggregatedMetrics.netAvgTicketWithoutShipping)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Promedio por orden</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts */}
-      {chartData.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Revenue Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Ventas Netas por Día</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="date" 
-                      tickFormatter={(d) => format(parseISO(d), 'dd/MM', { locale: es })}
-                      className="text-xs"
-                    />
-                    <YAxis 
-                      tickFormatter={(v) => `$${(v / 1000000).toFixed(1)}M`}
-                      className="text-xs"
-                    />
-                    <Tooltip 
-                      formatter={(value: number) => [formatCLP(value), 'Ventas Netas']}
-                      labelFormatter={(label) => format(parseISO(label), 'dd MMMM yyyy', { locale: es })}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="revenue" 
-                      stroke="hsl(var(--primary))" 
-                      strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--primary))' }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+          {/* Meta KPIs */}
+          {metaConnId && (
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                <Megaphone className="w-4 h-4" /> Meta Ads
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <KpiCard label="Gasto Ads" value={formatCLP(agg.metaSpend)} icon={DollarSign} />
+                <KpiCard label="Compras Meta" value={formatNum(agg.metaPurchases)} icon={ShoppingCart} />
+                <KpiCard label="Valor Compras" value={formatCLP(agg.metaPurchaseValue)} icon={TrendingUp} highlight />
+                <KpiCard label="ROAS" value={`${agg.metaRoas.toFixed(2)}x`} sub={agg.metaRoas >= 3 ? 'Buen rendimiento' : agg.metaRoas >= 1 ? 'Rentable' : 'Bajo'} icon={Target} highlight={agg.metaRoas >= 3} />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Orders Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Órdenes por Día</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="date" 
-                      tickFormatter={(d) => format(parseISO(d), 'dd/MM', { locale: es })}
-                      className="text-xs"
-                    />
-                    <YAxis className="text-xs" />
-                    <Tooltip 
-                      formatter={(value: number) => [formatNumber(value), 'Órdenes']}
-                      labelFormatter={(label) => format(parseISO(label), 'dd MMMM yyyy', { locale: es })}
-                    />
-                    <Bar 
-                      dataKey="orders" 
-                      fill="hsl(var(--primary))" 
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
+                <KpiCard label="Costo por Compra" value={formatCLP(agg.metaCpp)} icon={DollarSign} />
+                <KpiCard label="CPM" value={formatCLP(agg.metaCpm)} icon={Eye} />
+                <KpiCard label="Impresiones" value={formatNum(agg.metaImpressions)} icon={Eye} />
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            </div>
+          )}
 
-      {/* No data message */}
-      {chartData.length === 0 && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <BarChart3 className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">No hay datos para el período seleccionado</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Intenta seleccionar un rango de fechas diferente
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Últimas 5 alertas de CRITERIO */}
-      <Card className="border-red-500/20">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-500" />
-            Últimas Alertas de CRITERIO
-          </CardTitle>
-          <Badge variant="outline" className="text-xs text-red-600 border-red-300">
-            {criterioAlerts.length} alerta{criterioAlerts.length !== 1 ? 's' : ''}
-          </Badge>
-        </CardHeader>
-        <CardContent>
-          {criterioAlerts.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Sin alertas recientes — todo en orden
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {criterioAlerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className="flex items-start gap-3 p-3 rounded-lg bg-red-50 border border-red-100"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-slate-900 truncate">
-                        {alert.criterio_rules?.name || alert.rule_id}
-                      </span>
-                      {alert.criterio_rules?.severity && (
-                        <Badge
-                          variant="secondary"
-                          className={
-                            alert.criterio_rules.severity === 'critical'
-                              ? 'bg-red-100 text-red-700 text-xs'
-                              : alert.criterio_rules.severity === 'high'
-                              ? 'bg-orange-100 text-orange-700 text-xs'
-                              : 'bg-yellow-100 text-yellow-700 text-xs'
-                          }
-                        >
-                          {alert.criterio_rules.severity}
-                        </Badge>
-                      )}
-                      <Badge variant="outline" className="text-xs">
-                        {alert.entity_type}
-                      </Badge>
-                    </div>
-                    {alert.details && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                        {alert.details}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                      <span>{format(new Date(alert.evaluated_at), 'dd/MM HH:mm', { locale: es })}</span>
-                      {alert.evaluated_by && <span>por {alert.evaluated_by}</span>}
-                    </div>
+          {/* Charts */}
+          {chartData.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Revenue vs Ad Spend */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">Ventas vs Gasto Ads (diario)</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="h-[280px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="date" tickFormatter={d => { try { return format(new Date(d + 'T12:00:00'), 'dd/MM'); } catch { return d; } }} className="text-xs" />
+                        <YAxis tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} className="text-xs" />
+                        <Tooltip
+                          formatter={(value: number, name: string) => [formatCLP(value), name === 'revenue' ? 'Ventas' : 'Gasto Ads']}
+                          labelFormatter={l => { try { return format(new Date(l + 'T12:00:00'), 'dd MMMM', { locale: es }); } catch { return l; } }}
+                        />
+                        {shopifyConnId && <Line type="monotone" dataKey="revenue" stroke="#16a34a" strokeWidth={2} name="revenue" dot={false} />}
+                        {metaConnId && <Line type="monotone" dataKey="adSpend" stroke="#dc2626" strokeWidth={2} name="adSpend" dot={false} strokeDasharray="5 5" />}
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
-                </div>
-              ))}
+                  <div className="flex gap-4 mt-2 justify-center text-xs text-muted-foreground">
+                    {shopifyConnId && <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-green-600 inline-block" /> Ventas</span>}
+                    {metaConnId && <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-red-600 inline-block border-dashed" /> Gasto Ads</span>}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Orders + Purchases */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">Órdenes y Compras Meta (diario)</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="h-[280px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="date" tickFormatter={d => { try { return format(new Date(d + 'T12:00:00'), 'dd/MM'); } catch { return d; } }} className="text-xs" />
+                        <YAxis className="text-xs" />
+                        <Tooltip
+                          formatter={(value: number, name: string) => [formatNum(value), name === 'orders' ? 'Órdenes Shopify' : 'Compras Meta']}
+                          labelFormatter={l => { try { return format(new Date(l + 'T12:00:00'), 'dd MMMM', { locale: es }); } catch { return l; } }}
+                        />
+                        {shopifyConnId && <Bar dataKey="orders" fill="#16a34a" radius={[4, 4, 0, 0]} name="orders" />}
+                        {metaConnId && <Bar dataKey="purchases" fill="#3b82f6" radius={[4, 4, 0, 0]} name="purchases" />}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex gap-4 mt-2 justify-center text-xs text-muted-foreground">
+                    {shopifyConnId && <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-600 rounded-sm inline-block" /> Órdenes Shopify</span>}
+                    {metaConnId && <span className="flex items-center gap-1"><span className="w-3 h-3 bg-blue-500 rounded-sm inline-block" /> Compras Meta</span>}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
-        </CardContent>
-      </Card>
+
+          {chartData.length === 0 && (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <BarChart3 className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No hay datos para el período seleccionado</p>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
     </div>
   );
 }
