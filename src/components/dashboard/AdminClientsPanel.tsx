@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight, ChevronDown, Eye, Edit2, Plus, Minus,
   CheckCircle2, Clock, AlertCircle, Search, X, Save, Loader2,
-  Copy, Check, ShoppingBag
+  Copy, Check, ShoppingBag, UserPlus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -54,11 +57,11 @@ function getBriefStatus(client: ClientRow): BriefStatus {
 }
 
 const PLAN_OPTIONS = [
-  { value: 'free_beta', label: 'Free Beta' },
-  { value: 'starter', label: 'Starter' },
-  { value: 'pro', label: 'Pro' },
-  { value: 'agency', label: 'Agency' },
+  { value: 'pro', label: 'Pro', tokens: 500 },
 ];
+
+const DEFAULT_PLAN = 'pro';
+const DEFAULT_TOKENS = 500;
 
 function StatusBadge({ status }: { status: BriefStatus }) {
   if (status === 'complete') return (
@@ -329,6 +332,105 @@ function ClientDetail({ client, onClose, onRefresh }: {
   );
 }
 
+function CreateClientDialog({ onCreated }: { onCreated: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({
+    name: '', email: '', password: '', company: '',
+  });
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.email.trim() || !form.password.trim()) {
+      toast.error('Nombre, email y contraseña son requeridos');
+      return;
+    }
+    if (form.password.length < 8) {
+      toast.error('La contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      // 1. Create auth user via edge function or admin API
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `https://zpswjccsxjtnhetkkqde.supabase.co/functions/v1/admin-create-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            email: form.email.trim(),
+            password: form.password,
+            name: form.name.trim(),
+            company: form.company.trim() || null,
+            plan: DEFAULT_PLAN,
+            tokens: DEFAULT_TOKENS,
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Error desconocido' }));
+        throw new Error(err.error || err.msg || 'Error al crear cliente');
+      }
+
+      toast.success(`Cliente ${form.name} creado con Plan PRO (${DEFAULT_TOKENS} tokens)`);
+      setForm({ name: '', email: '', password: '', company: '' });
+      setOpen(false);
+      onCreated();
+    } catch (err: any) {
+      toast.error(err.message || 'Error al crear cliente');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="hero">
+          <UserPlus className="w-4 h-4 mr-2" />
+          Crear Cliente
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Nuevo Cliente — Plan PRO</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div>
+            <Label>Nombre *</Label>
+            <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Nombre del cliente" required />
+          </div>
+          <div>
+            <Label>Email *</Label>
+            <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="email@empresa.cl" required />
+          </div>
+          <div>
+            <Label>Contraseña *</Label>
+            <Input type="text" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Mínimo 8 caracteres" required />
+          </div>
+          <div>
+            <Label>Empresa</Label>
+            <Input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} placeholder="Nombre de la empresa" />
+          </div>
+          <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-700">
+            Plan PRO — {DEFAULT_TOKENS} tokens incluidos
+          </div>
+          <Button type="submit" className="w-full" disabled={creating}>
+            {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
+            Crear Cliente
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function AdminClientsPanel() {
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -417,19 +519,22 @@ export function AdminClientsPanel() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-2xl font-bold">Clientes</h2>
           <p className="text-muted-foreground">{clients.length} clientes en total</p>
         </div>
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar cliente..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9"
-          />
+        <div className="flex items-center gap-3">
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar cliente..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <CreateClientDialog onCreated={() => setRefreshKey(k => k + 1)} />
         </div>
       </div>
 
