@@ -35,6 +35,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   buyer_persona: 'bg-cyan-500/15 text-cyan-700 border-cyan-300',
   keywords: 'bg-gray-500/15 text-gray-700 border-gray-300',
   analisis: 'bg-emerald-500/15 text-emerald-700 border-emerald-300',
+  prospecting: 'bg-teal-500/15 text-teal-700 border-teal-300',
 };
 
 export function KnowledgeRulesExplorer() {

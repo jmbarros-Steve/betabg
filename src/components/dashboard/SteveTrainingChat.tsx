@@ -47,6 +47,7 @@ const CATEGORIAS = [
   { value: 'anuncios', label: '🎯 Anuncios' },
   { value: 'buyer_persona', label: '👤 Buyer Persona' },
   { value: 'analisis', label: '📊 Análisis' },
+  { value: 'prospecting', label: '🎯 Prospecting' },
 ];
 
 function catLabel(cat: string) {
