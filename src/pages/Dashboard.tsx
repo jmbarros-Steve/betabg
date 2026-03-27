@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Clock, Users, FileText, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, Bot, Loader2, MessageSquare, Library } from 'lucide-react';
+import { Users, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, Loader2, MessageSquare, Library } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { AdminClientsPanel } from '@/components/dashboard/AdminClientsPanel';
-import { TimeEntryPanel } from '@/components/dashboard/TimeEntryPanel';
-import { InvoicesPanel } from '@/components/dashboard/InvoicesPanel';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { BlogPanel } from '@/components/dashboard/BlogPanel';
 import { StudyResourcesPanel } from '@/components/dashboard/StudyResourcesPanel';
@@ -21,7 +19,7 @@ import { AdminSupportPanel } from '@/components/dashboard/AdminSupportPanel';
 import { AcademyAdminPanel } from '@/components/dashboard/AcademyAdminPanel';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'overview' | 'clients' | 'time' | 'invoices' | 'blog' | 'estudios' | 'platforms' | 'metrics' | 'training' | 'support' | 'academy';
+type TabType = 'overview' | 'clients' | 'blog' | 'estudios' | 'platforms' | 'metrics' | 'training' | 'support' | 'academy';
 
 export default function Dashboard() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -69,8 +67,6 @@ export default function Dashboard() {
     { id: 'overview', label: 'Resumen', icon: LayoutDashboard },
     { id: 'metrics', label: 'Métricas', icon: BarChart3 },
     { id: 'clients', label: 'Clientes', icon: Users },
-    { id: 'time', label: 'Horas', icon: Clock },
-    { id: 'invoices', label: 'Recibos', icon: FileText },
     { id: 'platforms', label: 'Plataformas', icon: Link2 },
     { id: 'training', label: 'Steve IA', icon: Brain },
     { id: 'support', label: 'Soporte', icon: MessageSquare },
@@ -124,8 +120,6 @@ export default function Dashboard() {
           {activeTab === 'overview' && <DashboardStats userId={user.id} />}
           {activeTab === 'metrics' && <ClientMetricsPanel />}
           {activeTab === 'clients' && <AdminClientsPanel />}
-          {activeTab === 'time' && <TimeEntryPanel userId={user.id} />}
-          {activeTab === 'invoices' && <InvoicesPanel userId={user.id} />}
           {activeTab === 'platforms' && <PlatformConnectionsPanel />}
           {activeTab === 'training' && (
             <div className="space-y-10">

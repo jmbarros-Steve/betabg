@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Users, FileText, DollarSign } from 'lucide-react';
+import { Users, DollarSign, Coins } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
@@ -10,10 +10,8 @@ interface Props {
 export function DashboardStats({ userId }: Props) {
   const [stats, setStats] = useState({
     totalClients: 0,
-    totalHours: 0,
-    totalInvoices: 0,
-    totalRevenue: 0,
-    monthlyHours: 0,
+    totalTokensAvailable: 0,
+    totalTokensUsed: 0,
   });
 
   useEffect(() => {
@@ -21,48 +19,32 @@ export function DashboardStats({ userId }: Props) {
   }, [userId]);
 
   const fetchStats = async () => {
-    const [clientsRes, entriesRes, invoicesRes] = await Promise.all([
+    const [clientsRes, creditsRes] = await Promise.all([
       supabase.from('clients').select('id').eq('user_id', userId),
-      supabase.from('time_entries').select('hours, date').eq('user_id', userId),
-      supabase.from('invoices').select('total_amount, total_hours').eq('user_id', userId),
+      supabase.from('client_credits').select('creditos_disponibles, creditos_usados'),
     ]);
-
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-    
-    const monthlyHours = entriesRes.data?.reduce((acc, entry) => {
-      const entryDate = new Date(entry.date);
-      if (entryDate.getMonth() === currentMonth && entryDate.getFullYear() === currentYear) {
-        return acc + Number(entry.hours);
-      }
-      return acc;
-    }, 0) || 0;
 
     setStats({
       totalClients: clientsRes.data?.length || 0,
-      totalHours: entriesRes.data?.reduce((acc, e) => acc + Number(e.hours), 0) || 0,
-      totalInvoices: invoicesRes.data?.length || 0,
-      totalRevenue: invoicesRes.data?.reduce((acc, i) => acc + Number(i.total_amount), 0) || 0,
-      monthlyHours,
+      totalTokensAvailable: creditsRes.data?.reduce((acc, c) => acc + Number(c.creditos_disponibles), 0) || 0,
+      totalTokensUsed: creditsRes.data?.reduce((acc, c) => acc + Number(c.creditos_usados), 0) || 0,
     });
   };
 
   const statCards = [
     { label: 'Clientes', value: stats.totalClients, icon: Users, color: 'text-[#1E3A7B]', bg: 'bg-[#F0F4FA]' },
-    { label: 'Horas Totales', value: stats.totalHours.toFixed(1), icon: Clock, color: 'text-[#1E3A7B]', bg: 'bg-[#F0F4FA]' },
-    { label: 'Horas Este Mes', value: stats.monthlyHours.toFixed(1), icon: Clock, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Recibos Generados', value: stats.totalInvoices, icon: FileText, color: 'text-[#1E3A7B]', bg: 'bg-[#F0F4FA]' },
-    { label: 'Ingresos Totales', value: `€${stats.totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'Tokens Disponibles', value: stats.totalTokensAvailable.toLocaleString(), icon: Coins, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'Tokens Usados', value: stats.totalTokensUsed.toLocaleString(), icon: Coins, color: 'text-amber-600', bg: 'bg-amber-50' },
   ];
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold mb-2">Panel de Control</h1>
-        <p className="text-muted-foreground">Resumen de tu actividad de consultoría</p>
+        <p className="text-muted-foreground">Resumen de tu actividad</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {statCards.map((stat, index) => (
           <motion.div
             key={stat.label}

@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChevronRight, ChevronDown, Eye, Edit2, Plus, Minus,
+  ChevronRight, ChevronDown, Eye, Plus, Trash2,
   CheckCircle2, Clock, AlertCircle, Search, X, Save, Loader2,
-  Copy, Check, ShoppingBag, UserPlus
+  Copy, Check, ShoppingBag, UserPlus, Coins
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,11 +16,12 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 
 interface ClientCredit {
@@ -39,6 +40,8 @@ interface ClientRow {
   name: string;
   email: string | null;
   company: string | null;
+  rut: string | null;
+  razon_social: string | null;
   shop_domain: string | null;
   created_at: string;
   client_user_id: string | null;
@@ -81,10 +84,11 @@ function StatusBadge({ status }: { status: BriefStatus }) {
   );
 }
 
-function ClientDetail({ client, onClose, onRefresh }: {
+function ClientDetail({ client, onClose, onRefresh, onDelete }: {
   client: ClientRow;
   onClose: () => void;
   onRefresh: () => void;
+  onDelete: (id: string) => void;
 }) {
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
@@ -94,7 +98,9 @@ function ClientDetail({ client, onClose, onRefresh }: {
     name: client.name,
     email: client.email ?? '',
     company: client.company ?? '',
-    plan: client.credits?.plan ?? 'free_beta',
+    rut: client.rut ?? '',
+    razon_social: client.razon_social ?? '',
+    plan: client.credits?.plan ?? 'pro',
     shopDomain: client.shop_domain ?? '',
   });
   const [linkCopied, setLinkCopied] = useState(false);
@@ -108,13 +114,14 @@ function ClientDetail({ client, onClose, onRefresh }: {
           name: editForm.name,
           email: editForm.email || null,
           company: editForm.company || null,
+          rut: editForm.rut || null,
+          razon_social: editForm.razon_social || null,
           shop_domain: editForm.shopDomain || null,
         })
         .eq('id', client.id);
 
       if (error) throw error;
 
-      // Update plan if changed
       if (editForm.plan !== client.credits?.plan) {
         const { error: credErr } = await supabase
           .from('client_credits')
@@ -147,13 +154,28 @@ function ClientDetail({ client, onClose, onRefresh }: {
         .eq('client_id', client.id);
 
       if (error) throw error;
-      toast.success(`+${amount} créditos agregados`);
+      toast.success(`+${amount} tokens agregados`);
       setCreditAmount('');
       onRefresh();
-    } catch (err) {
-      toast.error('Error al agregar créditos');
+    } catch {
+      toast.error('Error al agregar tokens');
     } finally {
       setAddingCredits(false);
+    }
+  };
+
+  const handleSetCredits = async (newAmount: number) => {
+    try {
+      const { error } = await supabase
+        .from('client_credits')
+        .update({ creditos_disponibles: newAmount })
+        .eq('client_id', client.id);
+
+      if (error) throw error;
+      toast.success(`Tokens actualizados a ${newAmount}`);
+      onRefresh();
+    } catch {
+      toast.error('Error al actualizar tokens');
     }
   };
 
@@ -195,6 +217,30 @@ function ClientDetail({ client, onClose, onRefresh }: {
           <Button size="sm" variant="outline" onClick={() => navigate(`/portal/${client.id}`)}>
             <Eye className="w-4 h-4 mr-1" /> Ver Portal
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="destructive">
+                <Trash2 className="w-4 h-4 mr-1" /> Eliminar
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Eliminar cliente</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Se eliminará a <strong>{client.name}</strong> ({client.email}) y todos sus datos asociados (créditos, research, etc.). Esta acción no se puede deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => onDelete(client.id)}
+                >
+                  Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button size="sm" variant="ghost" onClick={onClose}>
             <X className="w-4 h-4" />
           </Button>
@@ -218,12 +264,20 @@ function ClientDetail({ client, onClose, onRefresh }: {
               <Label className="text-xs">Empresa</Label>
               <Input value={editForm.company} onChange={e => setEditForm({ ...editForm, company: e.target.value })} />
             </div>
+            <div>
+              <Label className="text-xs">RUT</Label>
+              <Input value={editForm.rut} onChange={e => setEditForm({ ...editForm, rut: e.target.value })} placeholder="12.345.678-9" />
+            </div>
+            <div>
+              <Label className="text-xs">Razón Social</Label>
+              <Input value={editForm.razon_social} onChange={e => setEditForm({ ...editForm, razon_social: e.target.value })} placeholder="Empresa SpA" />
+            </div>
           </div>
         </div>
 
         {/* Créditos y plan */}
         <div className="space-y-3">
-          <h4 className="text-sm font-medium text-muted-foreground">Plan y Créditos</h4>
+          <h4 className="text-sm font-medium text-muted-foreground">Plan y Tokens</h4>
 
           <div>
             <Label className="text-xs">Plan</Label>
@@ -254,10 +308,11 @@ function ClientDetail({ client, onClose, onRefresh }: {
             </div>
           )}
 
+          {/* Add tokens */}
           <div className="flex gap-2">
             <Input
               type="number"
-              placeholder="Créditos a agregar"
+              placeholder="Tokens a agregar"
               value={creditAmount}
               onChange={e => setCreditAmount(e.target.value)}
               className="flex-1"
@@ -265,6 +320,21 @@ function ClientDetail({ client, onClose, onRefresh }: {
             <Button size="sm" onClick={handleAddCredits} disabled={addingCredits}>
               {addingCredits ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             </Button>
+          </div>
+
+          {/* Quick token actions */}
+          <div className="flex gap-2 flex-wrap">
+            {[100, 250, 500, 1000].map(amount => (
+              <Button
+                key={amount}
+                size="sm"
+                variant="outline"
+                className="text-xs"
+                onClick={() => handleSetCredits(amount)}
+              >
+                <Coins className="w-3 h-3 mr-1" /> {amount}
+              </Button>
+            ))}
           </div>
         </div>
       </div>
@@ -336,7 +406,7 @@ function CreateClientDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({
-    name: '', email: '', password: '', company: '',
+    name: '', email: '', password: '', company: '', rut: '', razon_social: '',
   });
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -352,7 +422,6 @@ function CreateClientDialog({ onCreated }: { onCreated: () => void }) {
 
     setCreating(true);
     try {
-      // 1. Create auth user via edge function or admin API
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(
         `https://zpswjccsxjtnhetkkqde.supabase.co/functions/v1/admin-create-user`,
@@ -367,6 +436,8 @@ function CreateClientDialog({ onCreated }: { onCreated: () => void }) {
             password: form.password,
             name: form.name.trim(),
             company: form.company.trim() || null,
+            rut: form.rut.trim() || null,
+            razon_social: form.razon_social.trim() || null,
             plan: DEFAULT_PLAN,
             tokens: DEFAULT_TOKENS,
           }),
@@ -379,7 +450,7 @@ function CreateClientDialog({ onCreated }: { onCreated: () => void }) {
       }
 
       toast.success(`Cliente ${form.name} creado con Plan PRO (${DEFAULT_TOKENS} tokens)`);
-      setForm({ name: '', email: '', password: '', company: '' });
+      setForm({ name: '', email: '', password: '', company: '', rut: '', razon_social: '' });
       setOpen(false);
       onCreated();
     } catch (err: any) {
@@ -418,6 +489,16 @@ function CreateClientDialog({ onCreated }: { onCreated: () => void }) {
             <Label>Empresa</Label>
             <Input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} placeholder="Nombre de la empresa" />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>RUT</Label>
+              <Input value={form.rut} onChange={e => setForm({ ...form, rut: e.target.value })} placeholder="12.345.678-9" />
+            </div>
+            <div>
+              <Label>Razón Social</Label>
+              <Input value={form.razon_social} onChange={e => setForm({ ...form, razon_social: e.target.value })} placeholder="Empresa SpA" />
+            </div>
+          </div>
           <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-700">
             Plan PRO — {DEFAULT_TOKENS} tokens incluidos
           </div>
@@ -445,25 +526,21 @@ export function AdminClientsPanel() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      // Fetch all clients (super admin sees all via RLS)
       const { data: clientsData, error } = await supabase
         .from('clients')
-        .select('id, name, email, company, shop_domain, created_at, client_user_id')
+        .select('id, name, email, company, rut, razon_social, shop_domain, created_at, client_user_id')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Fetch credits for all clients
       const { data: creditsData } = await supabase
         .from('client_credits')
         .select('client_id, creditos_disponibles, creditos_usados, plan');
 
-      // Fetch research presence
       const { data: researchData } = await supabase
         .from('brand_research')
         .select('client_id, id, research_type');
 
-      // Fetch persona presence
       const { data: personaData } = await supabase
         .from('buyer_personas')
         .select('client_id, is_complete');
@@ -499,12 +576,33 @@ export function AdminClientsPanel() {
     }
   };
 
+  const handleDeleteClient = async (clientId: string) => {
+    try {
+      // Delete related data first (credits, research, personas, campaigns)
+      await supabase.from('client_credits').delete().eq('client_id', clientId);
+      await supabase.from('brand_research').delete().eq('client_id', clientId);
+      await supabase.from('buyer_personas').delete().eq('client_id', clientId);
+      await supabase.from('email_campaigns').delete().eq('client_id', clientId);
+
+      const { error } = await supabase.from('clients').delete().eq('id', clientId);
+      if (error) throw error;
+
+      toast.success('Cliente eliminado');
+      setExpandedId(null);
+      setRefreshKey(k => k + 1);
+    } catch (err: any) {
+      toast.error(err.message || 'Error al eliminar cliente');
+    }
+  };
+
   const filtered = clients.filter(c => {
     const q = search.toLowerCase();
     return (
       c.name.toLowerCase().includes(q) ||
       (c.email ?? '').toLowerCase().includes(q) ||
       (c.company ?? '').toLowerCase().includes(q) ||
+      (c.rut ?? '').toLowerCase().includes(q) ||
+      (c.razon_social ?? '').toLowerCase().includes(q) ||
       (c.shop_domain ?? '').toLowerCase().includes(q)
     );
   });
@@ -586,6 +684,9 @@ export function AdminClientsPanel() {
                         {client.company && (
                           <span className="text-sm text-muted-foreground">· {client.company}</span>
                         )}
+                        {client.rut && (
+                          <span className="text-xs text-muted-foreground font-mono">({client.rut})</span>
+                        )}
                         {client.shop_domain && (
                           <Badge variant="outline" className="text-xs">Shopify</Badge>
                         )}
@@ -594,7 +695,9 @@ export function AdminClientsPanel() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {client.email ?? 'Sin email'} · {new Date(client.created_at).toLocaleDateString('es-CL')}
+                        {client.email ?? 'Sin email'}
+                        {client.razon_social ? ` · ${client.razon_social}` : ''}
+                        {' · '}{new Date(client.created_at).toLocaleDateString('es-CL')}
                       </p>
                     </div>
                   </div>
@@ -605,7 +708,7 @@ export function AdminClientsPanel() {
                       <div className="text-right hidden sm:block">
                         <div className="text-xs text-muted-foreground">{client.credits.plan}</div>
                         <div className="text-sm font-mono font-semibold">
-                          {client.credits.creditos_disponibles.toLocaleString()} cr.
+                          {client.credits.creditos_disponibles.toLocaleString()} tokens
                         </div>
                       </div>
                     )}
@@ -620,6 +723,7 @@ export function AdminClientsPanel() {
                     client={client}
                     onClose={() => setExpandedId(null)}
                     onRefresh={() => setRefreshKey(k => k + 1)}
+                    onDelete={handleDeleteClient}
                   />
                 )}
               </AnimatePresence>

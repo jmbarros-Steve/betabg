@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     }
 
     // Parse request
-    const { email, password, name, company, plan, tokens } = await req.json();
+    const { email, password, name, company, rut, razon_social, plan, tokens } = await req.json();
     if (!email || !password || !name) {
       return new Response(JSON.stringify({ error: 'email, password y name son requeridos' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -90,6 +90,8 @@ Deno.serve(async (req) => {
         name,
         email,
         company: company || null,
+        rut: rut || null,
+        razon_social: razon_social || null,
       })
       .select('id')
       .single();
