@@ -22,6 +22,15 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveCont
 import logoMeta from '@/assets/logo-meta-clean.png';
 import logoGoogle from '@/assets/logo-google-ads.png';
 
+// Cachetón components
+import { BoldMetricCard } from '@/components/client-portal/metrics/BoldMetricCard';
+import { SpendDonutChart } from '@/components/client-portal/metrics/SpendDonutChart';
+import { TopCampaignsBarChart } from '@/components/client-portal/metrics/TopCampaignsBarChart';
+import { TrendAreaChart } from '@/components/client-portal/metrics/TrendAreaChart';
+import { DatePresetSelector } from '@/components/client-portal/metrics/DatePresetSelector';
+import { useMetricTargets } from '@/hooks/useMetricTargets';
+import type { MetricKey } from '@/lib/metric-utils';
+
 
 interface CampaignAnalyticsPanelProps {
   clientId: string;
@@ -142,9 +151,12 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   } | null>(null);
   const [charlieActionLoading, setCharlieActionLoading] = useState(false);
   const [charlieActionSuccess, setCharlieActionSuccess] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<'7d' | '14d' | '30d' | '60d' | '90d'>('30d');
+  const [dateRange, setDateRange] = useState<string>('30d');
   const [metaAccountCurrency, setMetaAccountCurrency] = useState<string>('USD');
   const [dynamicClpRate, setDynamicClpRate] = useState<number>(950); // fetched from API
+
+  // Cachetón: targets for metric comparison
+  const { getTarget } = useMetricTargets(clientId);
 
   // Rules from Meta Wizard (meta_automated_rules)
   const [automatedRules, setAutomatedRules] = useState<any[]>([]);
@@ -424,17 +436,37 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
   }, [metrics]);
 
   const totals = useMemo(() => {
-    return aggregatedCampaigns.reduce((acc, c) => ({
+    const base = aggregatedCampaigns.reduce((acc, c) => ({
       spend: acc.spend + c.total_spend,
       revenue: acc.revenue + c.total_revenue,
       conversions: acc.conversions + c.total_conversions,
       impressions: acc.impressions + c.total_impressions,
       clicks: acc.clicks + c.total_clicks,
     }), { spend: 0, revenue: 0, conversions: 0, impressions: 0, clicks: 0 });
+    return {
+      ...base,
+      cpc: base.clicks > 0 ? base.spend / base.clicks : 0,
+      cpm: base.impressions > 0 ? (base.spend / base.impressions) * 1000 : 0,
+    };
   }, [aggregatedCampaigns]);
 
   const overallRoas = totals.spend > 0 ? totals.revenue / totals.spend : 0;
   const overallCtr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+
+  // Daily data for trend chart
+  const dailyTrendData = useMemo(() => {
+    const dailyMap = new Map<string, { date: string; spend: number; revenue: number }>();
+    const filteredMetrics = selectedConnection === 'all'
+      ? metrics
+      : metrics.filter(m => (m as any).connection_id === selectedConnection);
+    filteredMetrics.forEach(m => {
+      const existing = dailyMap.get(m.metric_date) || { date: m.metric_date, spend: 0, revenue: 0 };
+      existing.spend += m.spend || 0;
+      existing.revenue += m.conversion_value || 0;
+      dailyMap.set(m.metric_date, existing);
+    });
+    return Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [metrics, selectedConnection]);
 
   // Extract scale % and CPA max from automated rules (Wizard config)
   const scalePercent = useMemo(() => {
@@ -680,76 +712,54 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Analytics por Campaña</h2>
-          <p className="text-muted-foreground text-sm">
-            Últimos {daysFromRange(dateRange)} días
-          </p>
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            {(['7d', '14d', '30d', '60d', '90d'] as const).map((range) => (
-              <Button
-                key={range}
-                variant={dateRange === range ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setDateRange(range)}
-                className="text-xs"
-              >
-                {range === '7d' ? '7 días' : range === '14d' ? '14 días' : range === '30d' ? '30 días' : range === '60d' ? '60 días' : '90 días'}
-              </Button>
-            ))}
+      {/* ═══════════════════════════════════════════════════════════════
+          CACHETÓN HEADER — Date pills + filters + sync
+         ═══════════════════════════════════════════════════════════════ */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Resumen General</h2>
+            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+              {lastSyncText && (
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {lastSyncText}
+                </span>
+              )}
+              {metaAccountCurrency && metaAccountCurrency !== 'CLP' && (
+                <span>{metaAccountCurrency} &rarr; CLP</span>
+              )}
+            </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Select value={selectedConnection} onValueChange={setSelectedConnection}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Todas las plataformas" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las plataformas</SelectItem>
-              {connections.map(conn => (
-                <SelectItem key={conn.id} value={conn.id}>
-                  <div className="flex items-center gap-2">
-                    <img 
-                      src={conn.platform === 'meta' ? logoMeta : logoGoogle} 
-                      alt={conn.platform}
-                      className="w-4 h-4"
-                    />
-                    {conn.store_name || conn.account_id || conn.platform}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={syncCampaigns}
-            disabled={syncing}
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-            Sincronizar
-          </Button>
-          {hasData && (
-            <Button variant="outline" size="sm" onClick={exportCSV}>
-              <Download className="w-4 h-4 mr-2" />
-              CSV
+          <div className="flex items-center gap-3 flex-wrap">
+            <DatePresetSelector value={dateRange} onChange={setDateRange} />
+            <Select value={selectedConnection} onValueChange={setSelectedConnection}>
+              <SelectTrigger className="w-44 h-8 text-xs">
+                <SelectValue placeholder="Plataformas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {connections.map(conn => (
+                  <SelectItem key={conn.id} value={conn.id}>
+                    <div className="flex items-center gap-2">
+                      <img src={conn.platform === 'meta' ? logoMeta : logoGoogle} alt={conn.platform} className="w-4 h-4" />
+                      {conn.store_name || conn.account_id || conn.platform}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={syncCampaigns} disabled={syncing} className="h-8 text-xs">
+              <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${syncing ? 'animate-spin' : ''}`} />
+              Sync
             </Button>
-          )}
-        </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          {lastSyncText && (
-            <span className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              Última actualización: {lastSyncText}
-            </span>
-          )}
-          {metaAccountCurrency && metaAccountCurrency !== 'CLP' && (
-            <span>Cuenta en {metaAccountCurrency} · Convertido a CLP</span>
-          )}
+            {hasData && (
+              <Button variant="outline" size="sm" onClick={exportCSV} className="h-8 text-xs">
+                <Download className="w-3.5 h-3.5 mr-1.5" />
+                CSV
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -766,168 +776,112 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
       )}
 
       {hasData && <>
-      {/* Primary KPIs - large cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <Card className="border bg-gradient-to-br from-red-500/8 to-transparent border-red-500/15">
-          <CardContent className="pt-6 pb-5 px-6">
-            <div className="flex items-start justify-between mb-3">
-              <span className="text-sm font-medium text-muted-foreground">Gasto Total</span>
-              <div className="p-2.5 rounded-xl bg-red-500/10">
-                <DollarSign className="w-5 h-5 text-red-500" />
+      {/* ═══════════════════════════════════════════════════════════════
+          8 BOLD METRIC CARDS — 4x2 grid with target comparison
+         ═══════════════════════════════════════════════════════════════ */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="grid grid-cols-2 sm:grid-cols-4 gap-4"
+      >
+        <BoldMetricCard metricKey="spend" value={totals.spend} target={getTarget('spend')} />
+        <BoldMetricCard metricKey="impressions" value={totals.impressions} target={getTarget('impressions')} />
+        <BoldMetricCard metricKey="clicks" value={totals.clicks} target={getTarget('clicks')} />
+        <BoldMetricCard metricKey="ctr" value={overallCtr} target={getTarget('ctr')} />
+        <BoldMetricCard metricKey="cpc" value={totals.cpc} target={getTarget('cpc')} />
+        <BoldMetricCard metricKey="cpm" value={totals.cpm} target={getTarget('cpm')} />
+        <BoldMetricCard metricKey="conversions" value={totals.conversions} target={getTarget('conversions')} />
+        <BoldMetricCard metricKey="roas" value={overallRoas} target={getTarget('roas')} />
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          DONUT + BAR CHARTS — side by side
+         ═══════════════════════════════════════════════════════════════ */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+        className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+      >
+        <SpendDonutChart
+          campaigns={aggregatedCampaigns.map(c => ({ campaign_name: c.campaign_name, total_spend: c.total_spend }))}
+          formatCurrency={(v) => formatCurrency(v, 'CLP')}
+        />
+        <TopCampaignsBarChart
+          campaigns={aggregatedCampaigns.map(c => ({ campaign_name: c.campaign_name, total_spend: c.total_spend }))}
+          formatCurrency={(v) => formatCurrency(v, 'CLP')}
+        />
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          TREND AREA CHART — spend + revenue with gradient fill
+         ═══════════════════════════════════════════════════════════════ */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+      >
+        <TrendAreaChart
+          data={dailyTrendData}
+          spendTarget={getTarget('spend')}
+          formatCurrency={(v) => formatCurrency(v, 'CLP')}
+        />
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          TOP 5 CAMPAÑAS — compact table preview
+         ═══════════════════════════════════════════════════════════════ */}
+      {aggregatedCampaigns.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.25 }}
+        >
+          <Card className="border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Campañas Activas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-xs text-muted-foreground">
+                      <th className="text-left py-2 pr-4 font-medium">Campaña</th>
+                      <th className="text-right py-2 px-2 font-medium">Gasto</th>
+                      <th className="text-right py-2 px-2 font-medium">CPC</th>
+                      <th className="text-right py-2 px-2 font-medium">CPM</th>
+                      <th className="text-right py-2 px-2 font-medium">CTR</th>
+                      <th className="text-right py-2 px-2 font-medium">ROAS</th>
+                      <th className="text-right py-2 pl-2 font-medium">Conv</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {aggregatedCampaigns.slice(0, 5).map((c) => (
+                      <tr key={c.campaign_id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                        <td className="py-2.5 pr-4">
+                          <div className="flex items-center gap-2">
+                            <img src={c.platform === 'meta' ? logoMeta : logoGoogle} alt={c.platform} className="w-4 h-4" />
+                            <span className="font-medium truncate max-w-[200px]">{c.campaign_name}</span>
+                          </div>
+                        </td>
+                        <td className="text-right py-2.5 px-2 tabular-nums">{formatCurrency(c.total_spend, 'CLP')}</td>
+                        <td className="text-right py-2.5 px-2 tabular-nums">{formatCurrency(c.avg_cpc, 'CLP')}</td>
+                        <td className="text-right py-2.5 px-2 tabular-nums">{formatCurrency(c.avg_cpm, 'CLP')}</td>
+                        <td className="text-right py-2.5 px-2 tabular-nums">{formatPercent(c.avg_ctr)}</td>
+                        <td className={`text-right py-2.5 px-2 tabular-nums font-medium ${c.avg_roas >= 3 ? 'text-green-600' : c.avg_roas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
+                          {c.avg_roas.toFixed(2)}x
+                        </td>
+                        <td className="text-right py-2.5 pl-2 tabular-nums">{formatNumber(c.total_conversions)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-            <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.spend, 'CLP')}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border bg-gradient-to-br from-green-500/8 to-transparent border-green-500/15">
-          <CardContent className="pt-6 pb-5 px-6">
-            <div className="flex items-start justify-between mb-3">
-              <span className="text-sm font-medium text-muted-foreground">Ingresos Totales</span>
-              <div className="p-2.5 rounded-xl bg-green-500/10">
-                <DollarSign className="w-5 h-5 text-green-500" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold tracking-tight">{formatCurrency(totals.revenue, 'CLP')}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {totals.revenue > 0 ? `ROAS: ${overallRoas.toFixed(2)}x` : 'Sin datos de conversión'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border bg-gradient-to-br from-cyan-500/8 to-transparent border-cyan-500/15">
-          <CardContent className="pt-6 pb-5 px-6">
-            <div className="flex items-start justify-between mb-3">
-              <JargonTooltip term="ROAS" className="text-sm font-medium text-muted-foreground" />
-              <div className="p-2.5 rounded-xl bg-cyan-500/10">
-                <TrendingUp className="w-5 h-5 text-cyan-500" />
-              </div>
-            </div>
-            <p className={`text-3xl font-bold tracking-tight ${overallRoas >= 3 ? 'text-green-600' : overallRoas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
-              {overallRoas.toFixed(2)}x
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border bg-gradient-to-br from-amber-500/8 to-transparent border-amber-500/15">
-          <CardContent className="pt-6 pb-5 px-6">
-            <div className="flex items-start justify-between mb-3">
-              <span className="text-sm font-medium text-muted-foreground">Conversiones</span>
-              <div className="p-2.5 rounded-xl bg-amber-500/10">
-                <Eye className="w-5 h-5 text-amber-500" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold tracking-tight">{formatNumber(totals.conversions)}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Secondary KPIs - compact row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="bg-muted/30">
-          <CardContent className="py-4 px-5">
-            <span className="text-xs font-medium text-muted-foreground">Costo/Conv</span>
-            <p className="text-xl font-bold mt-1">
-              {totals.conversions > 0 ? formatCurrency(totals.spend / totals.conversions, 'CLP') : '-'}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/30">
-          <CardContent className="py-4 px-5">
-            <JargonTooltip term="CPC" className="text-xs font-medium text-muted-foreground" />
-            <p className="text-xl font-bold mt-1">
-              {totals.clicks > 0 ? formatCurrency(totals.spend / totals.clicks, 'CLP') : '-'}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/30">
-          <CardContent className="py-4 px-5">
-            <JargonTooltip term="CPM" className="text-xs font-medium text-muted-foreground" />
-            <p className="text-xl font-bold mt-1">
-              {totals.impressions > 0 ? formatCurrency((totals.spend / totals.impressions) * 1000, 'CLP') : '-'}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/30">
-          <CardContent className="py-4 px-5">
-            <JargonTooltip term="CTR" className="text-xs font-medium text-muted-foreground" />
-            <p className="text-xl font-bold mt-1">{formatPercent(overallCtr)}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Spend vs Revenue Chart */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Gasto vs Ingresos por Día</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {(() => {
-            // Build daily data from metrics
-            const dailyMap = new Map<string, { date: string; spend: number; revenue: number; conversions: number }>();
-            const filteredMetrics = selectedConnection === 'all'
-              ? metrics
-              : metrics.filter(m => (m as any).connection_id === selectedConnection);
-            filteredMetrics.forEach(m => {
-              const existing = dailyMap.get(m.metric_date) || { date: m.metric_date, spend: 0, revenue: 0, conversions: 0 };
-              existing.spend += m.spend || 0;
-              existing.revenue += m.conversion_value || 0;
-              existing.conversions += m.conversions || 0;
-              dailyMap.set(m.metric_date, existing);
-            });
-            const chartData = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date));
-
-            if (chartData.length === 0) {
-              return (
-                <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
-                  Sin datos para el periodo seleccionado
-                </div>
-              );
-            }
-
-            return (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(v: string) => {
-                      const d = new Date(v + 'T12:00:00');
-                      return d.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
-                    }}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(v: number) => formatCurrency(v, 'CLP')}
-                    allowDecimals={false}
-                    width={80}
-                  />
-                  <RechartsTooltip
-                    formatter={(value: number, name: string) => [
-                      formatCurrency(value, 'CLP'),
-                      name === 'revenue' ? 'Ingresos' : name === 'spend' ? 'Gasto' : 'Conversiones',
-                    ]}
-                    labelFormatter={(label: string) => {
-                      const d = new Date(label + 'T12:00:00');
-                      return d.toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
-                    }}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      borderColor: 'hsl(var(--border))',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                    }}
-                  />
-                  <Legend formatter={(value: string) => (value === 'revenue' ? 'Ingresos' : 'Gasto')} />
-                  <Bar dataKey="spend" fill="#EF4444" name="spend" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="revenue" fill="#22C55E" name="revenue" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            );
-          })()}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>

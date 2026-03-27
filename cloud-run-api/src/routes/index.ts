@@ -122,6 +122,8 @@ import { taskPrioritizer } from './cron/task-prioritizer.js';
 import { taskCompleted } from './cron/task-completed.js';
 import { detectiveVisual } from './cron/detective-visual.js';
 import { skyvernDispatcher } from './cron/skyvern-dispatcher.js';
+import { prospectFollowup } from './cron/prospect-followup.js';
+import { prospectEmailNurture } from './cron/prospect-email-nurture.js';
 
 // WhatsApp
 import { steveWAChat } from './whatsapp/steve-wa-chat.js';
@@ -411,4 +413,6 @@ export function registerRoutes(app: Hono) {
   app.post('/api/task-completed', taskCompleted); // No JWT — uses X-Cron-Secret, called by Leonardo when task is done
   app.post('/api/cron/detective-visual', detectiveVisual); // No JWT — uses X-Cron-Secret, every 2h: 0 8,10,12,14,16,18,20 * * *
   app.post('/api/cron/skyvern-dispatcher', skyvernDispatcher); // No JWT — uses X-Cron-Secret, every 2min: */2 * * * *
+  app.post('/api/cron/prospect-followup', prospectFollowup); // No JWT — uses X-Cron-Secret, every 4h: 0 */4 * * *
+  app.post('/api/cron/prospect-email-nurture', prospectEmailNurture); // No JWT — uses X-Cron-Secret, daily 1pm UTC (10am Chile): 0 13 * * *
 }

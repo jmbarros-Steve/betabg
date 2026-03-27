@@ -12,8 +12,11 @@ import {
   calculateLeadScore,
   generateConversationSummary,
   pushToHubSpot,
+  detectDisqualification,
+  detectBuyingSignals,
   type ProspectRecord,
 } from '../../lib/steve-wa-brain.js';
+import { sendWhatsApp } from '../../lib/twilio-client.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 
@@ -274,11 +277,9 @@ async function handleProspect(
       contact_phone: phone,
     });
 
-    // 3. Load history (10 msgs = 5 exchanges, enough context) + build dynamic prompt
-    const [history, dynamicPrompt] = await Promise.all([
-      getProspectHistory(phone, 10),
-      buildDynamicSalesPrompt(prospect, messageBody),
-    ]);
+    // 3. Load history first, then build dynamic prompt (needs history for detections)
+    const history = await getProspectHistory(phone, 10);
+    const dynamicPrompt = await buildDynamicSalesPrompt(prospect, messageBody, history);
 
     // Build messages array
     const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [...history];
@@ -390,43 +391,132 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       } catch {} // If fix fails, use original
     }
 
-    // Truncate to 400 chars for prospects (WhatsApp = short messages)
-    if (replyText.length > 400) {
-      replyText = replyText.slice(0, 397) + '...';
+    // Paso 6: Double text — split on [SPLIT]
+    let firstReply = replyText;
+    let secondReply: string | null = null;
+    if (replyText.includes('[SPLIT]')) {
+      const parts = replyText.split('[SPLIT]').map(p => p.trim()).filter(Boolean);
+      firstReply = parts[0] || replyText;
+      secondReply = parts[1] || null;
     }
 
-    // 5. Save outbound message
+    // Truncate to 400 chars for prospects (WhatsApp = short messages)
+    if (firstReply.length > 400) {
+      firstReply = firstReply.slice(0, 397) + '...';
+    }
+    if (secondReply && secondReply.length > 400) {
+      secondReply = secondReply.slice(0, 397) + '...';
+    }
+
+    // 5. Save outbound message (first part)
     await supabase.from('wa_messages').insert({
       client_id: null,
       channel: 'prospect',
       direction: 'outbound',
       from_number: STEVE_WA_NUMBER,
       to_number: phone,
-      body: replyText,
+      body: firstReply,
       contact_name: profileName || phone,
       contact_phone: phone,
     });
 
+    // Paso 6: Send second message via Twilio (fire & forget, 2s delay)
+    if (secondReply) {
+      const secondMsg = secondReply;
+      setTimeout(async () => {
+        try {
+          await sendWhatsApp(`+${phone}`, secondMsg);
+          await supabase.from('wa_messages').insert({
+            client_id: null,
+            channel: 'prospect',
+            direction: 'outbound',
+            from_number: STEVE_WA_NUMBER,
+            to_number: phone,
+            body: secondMsg,
+            contact_name: profileName || phone,
+            contact_phone: phone,
+          });
+        } catch (err) {
+          console.error('[steve-wa-chat] Double text send error:', err);
+        }
+      }, 2000);
+    }
+
     // 6. Reply via TwiML — user gets response HERE
-    const escapedReply = replyText
+    const escapedReply = firstReply
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
 
     const twiml = `<Response><Message>${escapedReply}</Message></Response>`;
 
+    // Paso 20: Wingman — detect [GENERATE_COPY:description] and send copy as extra msg
+    const copyMatch = (firstReply + (secondReply || '')).match(/\[GENERATE_COPY:([^\]]+)\]/);
+    if (copyMatch) {
+      const copyDesc = copyMatch[1].trim();
+      // Remove the tag from the reply
+      firstReply = firstReply.replace(/\[GENERATE_COPY:[^\]]+\]/g, '').trim();
+      if (secondReply) secondReply = secondReply.replace(/\[GENERATE_COPY:[^\]]+\]/g, '').trim();
+
+      // Fire & forget: generate copy and send as extra message
+      const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+      if (ANTHROPIC_KEY) {
+        const industry = prospect.what_they_sell || 'e-commerce';
+        setTimeout(async () => {
+          try {
+            const copyRes = await fetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: {
+                'x-api-key': ANTHROPIC_KEY,
+                'anthropic-version': '2023-06-01',
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'claude-haiku-4-5-20251001',
+                max_tokens: 400,
+                messages: [{
+                  role: 'user',
+                  content: `Genera un copy de anuncio de Meta Ads para una marca de ${industry}. Descripción: ${copyDesc}. Formato:\n🎯 Headline: ...\n📝 Texto principal: ...\n🔗 Descripción: ...\n📲 CTA: ...\nMáximo 300 caracteres total. Español neutro.`,
+                }],
+              }),
+            });
+            if (!copyRes.ok) return;
+            const copyData: any = await copyRes.json();
+            const copyText = (copyData.content?.[0]?.text || '').trim();
+            if (!copyText) return;
+
+            await sendWhatsApp(`+${phone}`, `Acá te va un ejemplo de copy gratis 🎁:\n\n${copyText}`);
+            await supabase.from('wa_messages').insert({
+              client_id: null, channel: 'prospect', direction: 'outbound',
+              from_number: STEVE_WA_NUMBER, to_number: phone,
+              body: `Acá te va un ejemplo de copy gratis 🎁:\n\n${copyText}`,
+              contact_name: profileName || phone, contact_phone: phone,
+            });
+          } catch (err) {
+            console.error('[wingman-copy] Error:', err);
+          }
+        }, 4000); // 4s delay after main reply
+      }
+    }
+
     // 7. FIRE & FORGET: async extraction + scoring + HubSpot push
-    // Use the full history including this exchange
+    const fullReplyText = secondReply ? `${firstReply}\n${secondReply}` : firstReply;
     const fullHistory = [...history];
     if (fullHistory.length === 0 || fullHistory[fullHistory.length - 1].content !== messageBody) {
       fullHistory.push({ role: 'user', content: messageBody });
     }
-    fullHistory.push({ role: 'assistant', content: replyText });
+    fullHistory.push({ role: 'assistant', content: fullReplyText });
 
     // Detect if Steve sent meeting link in this reply
-    const meetingLinkSent = replyText.includes('meetings.hubspot.com');
+    const meetingLinkSent = fullReplyText.includes('meetings.hubspot.com');
 
-    processProspectAsync(prospect, fullHistory, meetingLinkSent).catch(err => {
+    // Paso 2: Detect disqualification → mark as lost
+    const disqResult = detectDisqualification(messageBody, history);
+
+    // Paso 17: Detect URL in prospect message
+    const urlMatch = messageBody.match(/https?:\/\/[^\s]+/);
+
+    processProspectAsync(prospect, fullHistory, meetingLinkSent, disqResult.disqualified ? disqResult.reason : undefined, urlMatch?.[0]).catch(err => {
       console.error('[steve-wa-chat] processProspectAsync error:', err);
     });
 
@@ -447,10 +537,32 @@ async function processProspectAsync(
   prospect: ProspectRecord,
   history: Array<{ role: 'user' | 'assistant'; content: string }>,
   meetingLinkSentInReply: boolean,
+  disqualifiedReason?: string,
+  detectedUrl?: string,
 ): Promise<void> {
   const supabase = getSupabaseAdmin();
 
   try {
+    // Paso 2 Perro Lobo: If disqualified, mark as lost immediately
+    if (disqualifiedReason) {
+      await supabase
+        .from('wa_prospects')
+        .update({
+          stage: 'lost',
+          lost_reason: disqualifiedReason,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', prospect.id);
+      console.log(`[prospect ${prospect.phone}] DISQUALIFIED: ${disqualifiedReason}`);
+      return; // No further processing needed
+    }
+
+    // Paso 17: If URL detected, fire & forget audit
+    if (detectedUrl) {
+      auditProspectUrl(detectedUrl, prospect.id).catch(err => {
+        console.error('[prospect-audit] Error:', err);
+      });
+    }
     // Paso 10: Skip extraction if < 3 inbound messages (not enough info in "Hola" and "sí")
     const inboundCount = history.filter(m => m.role === 'user').length;
 
@@ -587,6 +699,120 @@ async function processProspectAsync(
     }
   } catch (err) {
     console.error('[steve-wa-chat] processProspectAsync error:', err);
+  }
+}
+
+/**
+ * Paso 17-18: Audit a prospect's URL — scrape + AI analysis.
+ * Saves findings to wa_prospects.audit_data.
+ */
+async function auditProspectUrl(url: string, prospectId: string): Promise<void> {
+  const APIFY_TOKEN = process.env.APIFY_TOKEN;
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!APIFY_TOKEN || !ANTHROPIC_API_KEY) {
+    console.warn('[prospect-audit] Missing APIFY_TOKEN or ANTHROPIC_API_KEY');
+    return;
+  }
+
+  const supabase = getSupabaseAdmin();
+
+  try {
+    // Scrape URL with Apify website-content-crawler (lightweight run)
+    const runRes = await fetch('https://api.apify.com/v2/acts/apify~website-content-crawler/runs', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${APIFY_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        startUrls: [{ url }],
+        maxCrawlPages: 3,
+        maxCrawlDepth: 1,
+        crawlerType: 'cheerio',
+      }),
+    });
+
+    if (!runRes.ok) {
+      console.error('[prospect-audit] Apify run failed:', runRes.status);
+      return;
+    }
+
+    const runData: any = await runRes.json();
+    const runId = runData.data?.id;
+    if (!runId) return;
+
+    // Wait for completion (max 60s)
+    let attempts = 0;
+    let status = 'RUNNING';
+    while (status === 'RUNNING' && attempts < 12) {
+      await new Promise(r => setTimeout(r, 5000));
+      const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`);
+      const statusData: any = await statusRes.json();
+      status = statusData.data?.status || 'FAILED';
+      attempts++;
+    }
+
+    if (status !== 'SUCCEEDED') {
+      console.warn(`[prospect-audit] Apify run ${runId} ended with status ${status}`);
+      return;
+    }
+
+    // Get results
+    const datasetId = runData.data?.defaultDatasetId;
+    const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_TOKEN}&limit=3`);
+    const items = (await itemsRes.json()) as any[];
+
+    if (!items || items.length === 0) return;
+
+    // Build markdown from scraped pages
+    const markdown = items.map((item: any) =>
+      `## ${item.title || 'Sin título'}\n${(item.text || '').slice(0, 2000)}`
+    ).join('\n\n').slice(0, 6000);
+
+    // AI analysis with Haiku
+    const analysisRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 500,
+        messages: [{
+          role: 'user',
+          content: `Analiza esta tienda online y da 3-5 findings accionables para mejorar sus ventas. Sé directo y específico. Responde SOLO con un JSON: {"title":"título de la tienda","description":"descripción corta","findings":["finding 1","finding 2","finding 3"]}\n\nContenido:\n${markdown}`,
+        }],
+      }),
+    });
+
+    if (!analysisRes.ok) return;
+
+    const analysisData: any = await analysisRes.json();
+    const analysisText = (analysisData.content?.[0]?.text || '').trim();
+    const jsonStr = analysisText.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+    const parsed = JSON.parse(jsonStr);
+
+    // Save audit data
+    await supabase
+      .from('wa_prospects')
+      .update({
+        audit_data: {
+          url,
+          title: parsed.title || null,
+          description: parsed.description || null,
+          findings: parsed.findings || [],
+          audited_at: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', prospectId);
+
+    console.log(`[prospect-audit] Audit complete for ${url}: ${(parsed.findings || []).length} findings`);
+  } catch (err) {
+    console.error('[prospect-audit] Error:', err);
   }
 }
 

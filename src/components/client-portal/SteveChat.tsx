@@ -20,6 +20,8 @@ import avatarSteve from '@/assets/avatar-steve.png';
 import avatarChonga from '@/assets/avatar-chonga.png';
 import { StructuredFieldsForm, type QuestionField } from './StructuredFieldsForm';
 import { useAuth } from '@/hooks/useAuth';
+import { useDraftSaver } from './FormDraftSaver';
+import { SuccessCelebration } from './SuccessCelebration';
 
 interface Message {
   id: string;
@@ -80,15 +82,15 @@ const BRIEF_QUESTION_CONFIG: Array<{
   // Q2 — numbers
   { fields: [
     { key: 'price', label: '💰 Precio promedio de venta', type: 'number', prefix: '$', placeholder: 'Ej: 35.000' },
-    { key: 'cost', label: '📦 Costo del producto/servicio', type: 'number', prefix: '$', placeholder: 'Ej: 12.000' },
-    { key: 'shipping', label: '🚚 Costo de envío promedio', type: 'number', prefix: '$', placeholder: 'Ej: 4.000 (0 si es gratis)' },
+    { key: 'cost', label: '📦 Costo del producto/servicio', type: 'number', prefix: '$', placeholder: 'Ej: 12.000', hint: 'Incluye costo de produccion, empaque y cualquier costo directo' },
+    { key: 'shipping', label: '🚚 Costo de envío promedio', type: 'number', prefix: '$', placeholder: 'Ej: 4.000 (0 si es gratis)', hint: 'Si ofreces envio gratis, pon 0' },
     { key: 'fase_negocio', label: '📈 ¿Cuánto facturas mensualmente?', type: 'select', placeholder: 'Selecciona tu fase', options: [
       { value: 'Fase Inicial', label: 'Menos de $500.000 CLP — Fase Inicial' },
       { value: 'Fase Crecimiento', label: '$500.000 - $5.000.000 CLP — Fase Crecimiento' },
       { value: 'Fase Escalado', label: '$5.000.000 - $25.000.000 CLP — Fase Escalado' },
       { value: 'Fase Avanzada', label: 'Más de $25.000.000 CLP — Fase Avanzada' },
     ]},
-    { key: 'presupuesto_ads', label: '📢 ¿Cuánto tienes disponible mensualmente para publicidad?', type: 'select', placeholder: 'Selecciona tu presupuesto', options: [
+    { key: 'presupuesto_ads', label: '📢 ¿Cuánto tienes disponible mensualmente para publicidad?', type: 'select', placeholder: 'Selecciona tu presupuesto', hint: 'Es el presupuesto que inviertes en Meta, Google, etc.', options: [
       { value: 'Menos de $100.000 CLP', label: 'Menos de $100.000 CLP' },
       { value: '$100.000 - $500.000 CLP', label: '$100.000 - $500.000 CLP' },
       { value: '$500.000 - $2.000.000 CLP', label: '$500.000 - $2.000.000 CLP' },
@@ -203,10 +205,15 @@ export function SteveChat({ clientId }: SteveChatProps) {
   const [showSummary, setShowSummary] = useState(false);
   const [acceptedResponses, setAcceptedResponses] = useState<Array<{label: string; content: string}>>([]);
   const [showRestartDialog, setShowRestartDialog] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const photosInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-save brief progress as draft
+  const draftData = { input, progress, acceptedResponses };
+  useDraftSaver(`brief_${clientId}`, draftData, 30000);
 
   useEffect(() => {
     initializeConversation();
@@ -595,6 +602,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
       }, { onConflict: 'client_id,research_type' });
 
       setAnalysisPhase('done');
+      setShowCelebration(true);
       toast.success('Análisis completado');
       // Keep the "done" phase visible for a few seconds, then hide
       setTimeout(() => {
@@ -963,7 +971,16 @@ export function SteveChat({ clientId }: SteveChatProps) {
                 </p>
               </div>
             )}
-            {analysisPhase === 'done' && (
+            {analysisPhase === 'done' && showCelebration && (
+              <div className="mx-2">
+                <SuccessCelebration
+                  message="¡Análisis completo! Revisa las pestañas Brief, Competencia y SEO."
+                  onDone={() => setShowCelebration(false)}
+                  duration={5000}
+                />
+              </div>
+            )}
+            {analysisPhase === 'done' && !showCelebration && (
               <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-xl p-3 mx-2 animate-in fade-in duration-500">
                 <p className="text-sm font-medium text-green-700 dark:text-green-300">
                   ¡Análisis completo! Revisa las pestañas Brief, Competencia y SEO.

@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Send } from 'lucide-react';
+import { Send, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export interface QuestionField {
@@ -14,6 +14,7 @@ export interface QuestionField {
   suffix?: string;
   placeholder?: string;
   options?: Array<{ value: string; label: string }>;
+  hint?: string;
 }
 
 interface StructuredFieldsFormProps {
@@ -70,7 +71,17 @@ export function StructuredFieldsForm({ fields, validation, onSubmit, isLoading }
       <div className="grid gap-3">
         {fields.map((field) => (
           <div key={field.key} className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">{field.label}</label>
+            <div className="flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground">{field.label}</label>
+              {field.hint && (
+                <span className="relative group">
+                  <HelpCircle className="h-3 w-3 text-muted-foreground/60 cursor-help" />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-foreground text-background text-xs rounded px-2 py-1 whitespace-normal max-w-[220px] z-50 shadow-md">
+                    {field.hint}
+                  </span>
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               {field.prefix && (
                 <span className="text-sm text-muted-foreground font-semibold min-w-[16px]">{field.prefix}</span>

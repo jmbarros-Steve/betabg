@@ -180,6 +180,16 @@
   .chart-animate {
     animation: chart-fade-in 0.6s ease-out both;
   }
+
+  /* Success celebration pulse */
+  @keyframes success-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+  .success-pulse {
+    animation: success-pulse 0.6s ease-out;
+  }
 }
 
 [data-radix-portal] {

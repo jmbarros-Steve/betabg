@@ -333,7 +333,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   const hasKlaviyoConnection = connections.some(c => c.platform === 'klaviyo');
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="connections-page">
       {/* Onboarding removed */}
 
       <div>
@@ -352,7 +352,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
             const isMeta = connection.platform === 'meta';
             
             return (
-              <div key={connection.id} className="space-y-3">
+              <div key={connection.id} className="space-y-3" data-testid={`connection-card-${connection.platform}`}>
                 <Card>
                   <CardContent className="flex items-center justify-between py-4">
                     <div className="flex items-center gap-4">
@@ -371,7 +371,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Badge variant={connection.is_active ? 'default' : 'secondary'} className={connection.is_active ? 'bg-emerald-50 text-emerald-700 rounded-full' : ''}>
+                      <Badge data-testid={`connection-status-${connection.platform}`} variant={connection.is_active ? 'default' : 'secondary'} className={connection.is_active ? 'bg-emerald-50 text-emerald-700 rounded-full' : ''}>
                         {connection.is_active ? (
                           <><CheckCircle className="w-3.5 h-3.5 mr-1" /> Activo</>
                         ) : (
@@ -380,6 +380,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                       </Badge>
                       {!isKlaviyo && (
                         <Button
+                          data-testid={`sync-${connection.platform}-btn`}
                           variant="outline"
                           size="sm"
                           onClick={() => handleSyncConnection(connection)}
@@ -394,6 +395,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                         </Button>
                       )}
                       <Button
+                        data-testid={`disconnect-${connection.platform}-btn`}
                         variant="ghost"
                         size="sm"
                         className="text-destructive hover:text-destructive hover:bg-destructive/10"
@@ -443,7 +445,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                   </p>
                 </div>
               </div>
-              <Button onClick={handleConnectShopify} className="bg-primary text-white rounded-lg hover:bg-primary/90">
+              <Button data-testid="connect-shopify-btn" onClick={handleConnectShopify} className="bg-primary text-white rounded-lg hover:bg-primary/90">
                 <ShoppingBag className="w-4 h-4 mr-2" />
                 Conectar Shopify
               </Button>
@@ -463,6 +465,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                 </div>
               </div>
               <Button
+                data-testid="connect-meta-btn"
                 onClick={handleConnectMeta}
                 disabled={connectingMeta}
                 className="bg-primary text-white rounded-lg hover:bg-primary/90"
@@ -490,6 +493,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                 </div>
               </div>
               <Button
+                data-testid="connect-google-btn"
                 onClick={handleConnectGoogle}
                 disabled={connectingGoogle}
                 className="bg-primary text-white rounded-lg hover:bg-primary/90"
@@ -519,6 +523,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                 </div>
               </div>
               <Button
+                data-testid="connect-klaviyo-btn"
                 onClick={() => setShowKlaviyoDialog(true)}
                 disabled={connectingKlaviyo}
                 className="bg-primary text-white rounded-lg hover:bg-primary/90"

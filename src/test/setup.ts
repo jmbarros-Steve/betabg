@@ -1,5 +1,7 @@
 import "@testing-library/jest-dom";
 
+afterEach(() => { localStorage.clear(); });
+
 // matchMedia mock
 Object.defineProperty(window, "matchMedia", {
   writable: true,

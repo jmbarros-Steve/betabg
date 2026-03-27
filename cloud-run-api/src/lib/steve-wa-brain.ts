@@ -42,6 +42,25 @@ export interface ProspectRecord {
   converted_client_id?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  // Steve Perro Lobo fields
+  followup_count?: number | null;
+  last_followup_at?: string | null;
+  insights_sent?: number | null;
+  last_insight_at?: string | null;
+  resurrection_sent?: boolean | null;
+  email_sequence_step?: number | null;
+  last_email_at?: string | null;
+  audit_data?: ProspectAuditData | null;
+  lost_reason?: string | null;
+}
+
+export interface ProspectAuditData {
+  url?: string;
+  title?: string;
+  description?: string;
+  product_count?: number;
+  findings?: string[];
+  audited_at?: string;
 }
 
 export interface ExtractedProspectInfo {
@@ -367,6 +386,187 @@ export function buildEnrichedProspectContext(prospect: ProspectRecord): string {
 }
 
 // ---------------------------------------------------------------------------
+// Steve Perro Lobo — Detection & Intelligence Functions
+// ---------------------------------------------------------------------------
+
+/** Paso 2: Detect explicit disqualification (rejection, profanity). */
+export function detectDisqualification(
+  lastMessage: string,
+  history: Array<{ role: 'user' | 'assistant'; content: string }>,
+): { disqualified: boolean; reason?: string } {
+  const msg = lastMessage.toLowerCase().trim();
+
+  // Explicit rejection keywords
+  const rejectionKeywords = [
+    'no me interesa', 'no gracias', 'no quiero', 'déjame en paz',
+    'dejame en paz', 'no molestes', 'no me escribas', 'para de escribir',
+    'deja de escribir', 'no necesito nada', 'no estoy interesado',
+  ];
+  // Profanity / aggressive rejection
+  const profanityKeywords = [
+    'ctm', 'csm', 'mierda', 'chucha', 'puta', 'weón', 'weon',
+    'ándate a la', 'andate a la', 'vete a la', 'lárgate', 'largate',
+  ];
+
+  if (rejectionKeywords.some(k => msg.includes(k))) {
+    return { disqualified: true, reason: 'rejected' };
+  }
+  if (profanityKeywords.some(k => msg.includes(k))) {
+    return { disqualified: true, reason: 'rejected' };
+  }
+
+  // Pattern: 3+ rejection-like messages in last 5 user messages
+  const recentUserMsgs = history
+    .filter(m => m.role === 'user')
+    .slice(-5)
+    .map(m => m.content.toLowerCase());
+
+  const softRejections = ['no', 'nada', 'paso', 'no gracias', 'no me interesa'];
+  const rejectionCount = recentUserMsgs.filter(m =>
+    softRejections.some(r => m.trim() === r || m.includes(r))
+  ).length;
+
+  if (rejectionCount >= 3) {
+    return { disqualified: true, reason: 'rejected' };
+  }
+
+  return { disqualified: false };
+}
+
+/** Paso 3: Detect buying signals in messages. */
+export function detectBuyingSignals(
+  lastMessage: string,
+  history: Array<{ role: 'user' | 'assistant'; content: string }>,
+): boolean {
+  const buyingKeywords = [
+    'cuánto cuesta', 'cuanto cuesta', 'precio', 'planes', 'valores', 'tarifas',
+    'cómo empiezo', 'como empiezo', 'cómo parto', 'como parto',
+    'si empiezo', 'cuando conecte', 'me gustaría partir', 'me gustaria partir',
+    'prueba gratis', 'contrato', 'cómo se paga', 'como se paga',
+    'formas de pago', 'demo', 'me interesa', 'si contrato',
+    'quiero probar', 'quiero empezar', 'cómo funciona el pago', 'como funciona el pago',
+  ];
+
+  const msg = lastMessage.toLowerCase();
+
+  // 1 signal in last message → closer mode
+  if (buyingKeywords.some(k => msg.includes(k))) return true;
+
+  // 2+ signals in last 5 user messages → closer mode
+  const recentUserMsgs = history
+    .filter(m => m.role === 'user')
+    .slice(-5)
+    .map(m => m.content.toLowerCase());
+
+  let totalSignals = 0;
+  for (const userMsg of recentUserMsgs) {
+    if (buyingKeywords.some(k => userMsg.includes(k))) totalSignals++;
+  }
+
+  return totalSignals >= 2;
+}
+
+/** Paso 5: Analyze prospect's writing style for chameleon mode. */
+export function analyzeProspectStyle(
+  history: Array<{ role: 'user' | 'assistant'; content: string }>,
+): { length: 'corto' | 'medio' | 'largo'; usesEmojis: boolean; formality: 'casual' | 'formal' } {
+  const userMsgs = history.filter(m => m.role === 'user').slice(-3);
+
+  if (userMsgs.length === 0) {
+    return { length: 'medio', usesEmojis: false, formality: 'formal' };
+  }
+
+  const avgLen = userMsgs.reduce((a, m) => a + m.content.length, 0) / userMsgs.length;
+  const length = avgLen < 30 ? 'corto' : avgLen > 100 ? 'largo' : 'medio';
+
+  const allText = userMsgs.map(m => m.content).join(' ');
+  const usesEmojis = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(allText);
+
+  const casualWords = ['wea', 'po', 'weon', 'weón', 'jaja', 'xd', 'xD', 'nah', 'sip', 'sep', 'ya'];
+  const formality = casualWords.some(w => allText.toLowerCase().includes(w)) ? 'casual' : 'formal';
+
+  return { length, usesEmojis, formality };
+}
+
+/** Paso 4: Get Chile time-based tone instruction. */
+export function getChileTimeContext(): string {
+  // Chile = UTC-4 (CLT) or UTC-3 (CLST summer). Use -4 as default.
+  const now = new Date();
+  const chileHour = (now.getUTCHours() - 4 + 24) % 24;
+
+  if (chileHour >= 8 && chileHour < 12) return 'Tono energético, es de mañana en Chile. Buenos días.';
+  if (chileHour >= 12 && chileHour < 18) return 'Tono profesional, horario de trabajo.';
+  if (chileHour >= 18 && chileHour < 22) return 'Tono relajado, es tarde/noche. No lo abrumes.';
+  return 'Es muy tarde/madrugada en Chile. Sé breve y casual, no lo abrumes a esta hora.';
+}
+
+/** Paso 10: Market deadlines by month. */
+export function getMarketDeadline(): string | null {
+  const month = new Date().getMonth(); // 0-indexed
+  const deadlines: Record<number, string> = {
+    0: 'Vuelta a clases (marzo)',
+    1: 'Vuelta a clases y Día de la Mujer (marzo)',
+    2: 'Vuelta a clases terminando. Preparar Día de la Madre (mayo)',
+    3: 'Día de la Madre en mayo. Hay que preparar campañas AHORA',
+    4: 'CyberDay Chile es en mayo/junio. Las marcas que no preparan con tiempo pierden',
+    5: 'CyberDay Chile pasó. Preparar segundo semestre',
+    6: 'CyberMonday se viene en octubre. Buen momento para optimizar',
+    7: 'Fiestas Patrias Chile (septiembre). Preparar campañas temáticas',
+    8: 'Fiestas Patrias Chile AHORA. Black Friday viene en noviembre',
+    9: 'CyberMonday Chile y preparar Black Friday (noviembre)',
+    10: 'Black Friday y Cyber Monday. La semana más importante del año',
+    11: 'Navidad y Año Nuevo. Última oportunidad del año para vender fuerte',
+  };
+  return deadlines[month] || null;
+}
+
+/** Paso 12: Calculate money left on the table. */
+export function calculateLostMoney(monthlyRevenue: string | null | undefined): {
+  currentEstimate: number;
+  optimizedEstimate: number;
+  difference: number;
+} | null {
+  if (!monthlyRevenue) return null;
+
+  const rev = monthlyRevenue.toLowerCase();
+  const digits = rev.replace(/\D/g, '');
+  if (digits.length < 3) return null;
+
+  let amount = parseInt(digits, 10);
+
+  // Normalize: if contains "millón" or "mm" treat as millions
+  if (rev.includes('millón') || rev.includes('millon') || rev.includes('mm')) {
+    if (amount < 1000) amount = amount * 1_000_000;
+  }
+  // If number is too small to be CLP (likely USD or thousands)
+  if (amount < 10_000) return null;
+
+  // Assume current ROAS ~2x (industry average), optimized ~4x
+  const currentEstimate = amount;
+  const optimizedEstimate = amount * 2; // double revenue with better ROAS
+  const difference = optimizedEstimate - currentEstimate;
+
+  return { currentEstimate, optimizedEstimate, difference };
+}
+
+/** Paso 13: Load case studies from steve_knowledge matching prospect's industry. */
+export async function loadIndustryCaseStudy(whatTheySell: string | null | undefined): Promise<string | null> {
+  if (!whatTheySell) return null;
+  const supabase = getSupabaseAdmin();
+
+  const { data } = await supabase
+    .from('steve_knowledge')
+    .select('titulo, contenido')
+    .eq('activo', true)
+    .ilike('contenido', `%${whatTheySell.split(' ')[0]}%`)
+    .limit(2);
+
+  if (!data || data.length === 0) return null;
+
+  return data.map(d => `${d.titulo}: ${d.contenido}`).join('\n').slice(0, 500);
+}
+
+// ---------------------------------------------------------------------------
 // Dynamic sales prompt builder (per-stage)
 // ---------------------------------------------------------------------------
 
@@ -386,7 +586,11 @@ function scoreToStage(score: number): string {
  * @param prospect - Current prospect record with all extracted data
  * @param lastMessage - The prospect's latest message (to detect questions)
  */
-export async function buildDynamicSalesPrompt(prospect: ProspectRecord, lastMessage?: string): Promise<string> {
+export async function buildDynamicSalesPrompt(
+  prospect: ProspectRecord,
+  lastMessage?: string,
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+): Promise<string> {
   const supabase = getSupabaseAdmin();
 
   // Determine effective stage by score
@@ -402,6 +606,18 @@ export async function buildDynamicSalesPrompt(prospect: ProspectRecord, lastMess
     .order('orden', { ascending: true });
 
   const stageRule = (rules || []).find(r => r.titulo?.toLowerCase().includes(effectiveStage));
+
+  // ============================================================
+  // Perro Lobo: Run detections in parallel
+  // ============================================================
+  const historyArr = history || [];
+  const disqResult = lastMessage ? detectDisqualification(lastMessage, historyArr) : { disqualified: false };
+  const closerMode = lastMessage ? detectBuyingSignals(lastMessage, historyArr) : false;
+  const prospectStyle = analyzeProspectStyle(historyArr);
+  const chileTime = getChileTimeContext();
+  const deadline = getMarketDeadline();
+  const lostMoney = calculateLostMoney(prospect.monthly_revenue);
+  const caseStudy = await loadIndustryCaseStudy(prospect.what_they_sell);
 
   // ============================================================
   // Build KNOWN / MISSING data lists
@@ -432,6 +648,7 @@ export async function buildDynamicSalesPrompt(prospect: ProspectRecord, lastMess
   if (prospect.is_decision_maker != null) known.push(`Decisor: ${prospect.is_decision_maker ? 'Sí' : 'No'}`);
   if (prospect.integrations_used?.length) known.push(`Herramientas: ${prospect.integrations_used.join(', ')}`);
   if (prospect.actively_looking != null) known.push(`Buscando solución: ${prospect.actively_looking ? 'Sí' : 'No'}`);
+  if (prospect.audit_data?.findings?.length) known.push(`Auditoría tienda: ${prospect.audit_data.findings.join('; ')}`);
 
   known.push(`Score: ${prospect.lead_score || 0}/100`);
   known.push(`Stage: ${prospect.stage || 'discovery'}`);
@@ -456,18 +673,72 @@ export async function buildDynamicSalesPrompt(prospect: ProspectRecord, lastMess
   // 3. CONTEXT FOR THIS TURN
   prompt += `\n\n🎯 EN ESTE MENSAJE:\n`;
 
-  // Detect if prospect asked a question (Paso 12)
+  // Paso 2: Disqualification override
+  if (disqResult.disqualified) {
+    prompt += `⚠️ El prospecto NO está interesado. Despídete con respeto y cierra la conversación: "Entendido, sin problema. Si en algún momento quieres retomar, aquí estoy. Éxito!"\n`;
+    // Short-circuit — no need for other tactics
+    prompt += `\n🗣️ PERSONALIDAD:\n${WA_SALES_PROMPT_BASE}`;
+    return prompt;
+  }
+
+  // Paso 3: Closer mode — buying signals
+  if (closerMode) {
+    prompt += `🔥 SEÑAL DE COMPRA DETECTADA. Responde su duda directamente y propón agendar llamada: "Te muestro cómo se ve con tus datos → https://meetings.hubspot.com/jose-manuel15"\n`;
+  }
+
+  // Detect if prospect asked a question
   const hasQuestion = lastMessage?.includes('?');
   if (hasQuestion) {
     prompt += `El prospecto te hizo una pregunta. Respóndela primero — después si quieres puedes preguntar algo tú.\n`;
   }
 
-  // No-fit detection (Paso 15)
+  // Paso 1: No-tienda ya NO es descalificación — ofrecer armarla
   if (prospect.has_online_store === false) {
-    prompt += `Este prospecto no tiene tienda online. Si confirma que no planea tener una, cierra amablemente: "Steve es para marcas que venden online. Cuando montes tu tienda, escríbeme."\n`;
+    prompt += `No tiene tienda online. Ofrécele: "También podemos armarte una, háblalo con la consultora. Andan alrededor de 1 millón de pesos." Sigue vendiéndole Steve normalmente.\n`;
   }
 
-  // Meeting trigger — organic (Paso 14)
+  // Paso 11: Pedir URL de tienda
+  if (prospect.has_online_store === true && !prospect.audit_data?.url) {
+    prompt += `Tiene tienda online pero no tenemos su URL. Si surge, pídele: "¿Me pasas el link de tu tienda? Le echo un ojo rápido y te doy feedback gratis."\n`;
+  }
+
+  // Paso 19: Roast con datos de auditoría
+  if (prospect.audit_data?.findings?.length) {
+    prompt += `Tienes datos de su tienda: ${prospect.audit_data.findings.join('. ')}. Sé directo con el feedback constructivo. Ofrece ayuda específica.\n`;
+  }
+
+  // Paso 7: Provocador — dudas sobre agencia
+  if (prospect.current_marketing?.toLowerCase().includes('agencia')) {
+    prompt += `Usa agencia. Haz preguntas que expongan debilidades: "¿Te dan acceso al Business Manager? ¿Ves los números reales o solo reportes bonitos?"\n`;
+  }
+
+  // Paso 8: Quiz — exponer lagunas (discovery/qualifying)
+  if (effectiveStage === 'discovery' || effectiveStage === 'qualifying') {
+    prompt += `Puedes hacer quiz: "¿Sabes tu CAC? ¿Y tu LTV?" Si no sabe → "Eso Steve lo calcula automático."\n`;
+  }
+
+  // Paso 9: FOMO de cupos (pitching/closing)
+  if (effectiveStage === 'pitching' || effectiveStage === 'closing') {
+    prompt += `Steve trabaja máximo 3 marcas por categoría para no competir entre clientes. Puedes mencionarlo si es natural.\n`;
+  }
+
+  // Paso 10: Deadline real del mercado
+  if (deadline) {
+    prompt += `Deadline relevante: ${deadline}. Puedes usarlo: "Si quieres estar listo para eso, hay que empezar ahora."\n`;
+  }
+
+  // Paso 12: Calculadora de plata perdida
+  if (lostMoney) {
+    const fmt = (n: number) => `$${Math.round(n).toLocaleString('es-CL')}`;
+    prompt += `Con lo que factura (~${fmt(lostMoney.currentEstimate)}/mes), optimizando podría estar generando ~${fmt(lostMoney.difference)} más. Menciónalo si es natural.\n`;
+  }
+
+  // Paso 13: Caso de éxito por industria
+  if (caseStudy) {
+    prompt += `Caso de éxito de su industria: ${caseStudy}\n`;
+  }
+
+  // Meeting trigger — organic
   if (
     (prospect.lead_score || 0) >= 75 &&
     (prospect.message_count || 0) >= 8 &&
@@ -475,14 +746,23 @@ export async function buildDynamicSalesPrompt(prospect: ProspectRecord, lastMess
     prospect.pain_points?.length
   ) {
     prompt += `Ya tienes suficiente info y el prospecto mostró interés. Si sientes que fluye, propón una llamada corta: "¿Te tinca que nos juntemos 15 min? Te muestro cómo se ve con tus datos → https://meetings.hubspot.com/jose-manuel15"\n`;
-  } else if (missing.length > 0) {
+  } else if (!closerMode && missing.length > 0) {
     prompt += `Sigue conversando. Si puedes, averigua algo de: ${missing.slice(0, 2).join(' o ')}. Pero no fuerces — que fluya.\n`;
-  } else {
+  } else if (!closerMode) {
     prompt += `Ya sabes bastante. Muestra cómo Steve puede ayudar con lo que te contó.\n`;
   }
 
+  // Paso 4: Tono por hora (Chile)
+  prompt += `\n⏰ HORA CHILE: ${chileTime}`;
+
+  // Paso 5: Camaleón — mirror del prospecto
+  prompt += `\n🪞 ESTILO PROSPECTO: Escribe ${prospectStyle.length}, ${prospectStyle.formality}, ${prospectStyle.usesEmojis ? 'usa' : 'no usa'} emojis. Adapta tu estilo.`;
+
+  // Paso 6: Double text instruction
+  prompt += `\n\n📱 Si quieres enviar 2 mensajes separados (ej: uno con respuesta y otro con dato extra), usa [SPLIT] para dividirlos. Máximo 2 partes.`;
+
   // 4. PERSONALITY (short)
-  prompt += `\n🗣️ PERSONALIDAD:\n${WA_SALES_PROMPT_BASE}`;
+  prompt += `\n\n🗣️ PERSONALIDAD:\n${WA_SALES_PROMPT_BASE}`;
 
   // 5. FEW-SHOT EXAMPLES (conversational, not robotic)
   prompt += `\n\n📝 EJEMPLOS DE TONO CORRECTO:
@@ -648,7 +928,9 @@ export function calculateLeadScore(
   };
 
   // --- NEED (0-25): Do they have an online store / sell online? ---
+  // Paso 1 Perro Lobo: no-tienda ya no es descalificación, solo baja de 15→5
   if (prospect.has_online_store === true) breakdown.need += 15;
+  else if (prospect.has_online_store === false) breakdown.need += 5; // Still has some need
   if (prospect.what_they_sell) breakdown.need += 5;
   if (prospect.current_marketing) breakdown.need += 5;
 
@@ -713,11 +995,8 @@ export function calculateLeadScore(
     score = 50;
   }
 
-  // No-fit: if explicitly no online store → cap at 20, set stage to lost
-  if (prospect.has_online_store === false) {
-    score = Math.min(score, 20);
-    return { score, breakdown, stage: 'lost' };
-  }
+  // Paso 1 Perro Lobo: no-tienda ya NO descalifica. Score normal, need baja a 5.
+  // La descalificación real ahora viene de detectDisqualification() en el chat handler.
 
   const stage = scoreToStage(score);
 

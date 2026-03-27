@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, Circle, ChevronDown, ChevronUp, X } from "lucide-react";
+import { Check, Circle, ChevronDown, ChevronUp, X, Lightbulb } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface SetupProgressTrackerProps {
@@ -107,26 +107,45 @@ export function SetupProgressTracker({ clientId, onNavigate }: SetupProgressTrac
         </div>
       </div>
       {!collapsed && (
-        <div className="space-y-1.5">
-          {steps.map((step, i) => (
-            <button
-              key={i}
-              onClick={() => !step.done && onNavigate(step.tab)}
-              className={`flex items-center gap-2 text-sm w-full text-left px-2 py-1 rounded transition-colors ${
-                step.done ? "text-muted-foreground" : "hover:bg-muted cursor-pointer"
-              }`}
-              disabled={step.done}
-            >
-              {step.done ? (
-                <Check className="h-4 w-4 text-green-500" aria-hidden="true" />
-              ) : (
-                <Circle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              )}
-              <span className={step.done ? "line-through" : ""}>{step.label}</span>
-              <span className="sr-only">{step.done ? '(completado)' : '(pendiente)'}</span>
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="space-y-1.5">
+            {steps.map((step, i) => (
+              <button
+                key={i}
+                onClick={() => !step.done && onNavigate(step.tab)}
+                className={`flex items-center gap-2 text-sm w-full text-left px-2 py-1 rounded transition-colors ${
+                  step.done ? "text-muted-foreground" : "hover:bg-muted cursor-pointer"
+                }`}
+                disabled={step.done}
+              >
+                {step.done ? (
+                  <Check className="h-4 w-4 text-green-500" aria-hidden="true" />
+                ) : (
+                  <Circle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                )}
+                <span className={step.done ? "line-through" : ""}>{step.label}</span>
+                <span className="sr-only">{step.done ? '(completado)' : '(pendiente)'}</span>
+              </button>
+            ))}
+          </div>
+          {completedCount > 0 && (() => {
+            const hasShopify = steps[0]?.done;
+            const hasMeta = steps[1]?.done;
+            const hasBrief = steps[3]?.done;
+            const hasConfig = steps[4]?.done;
+            let tip = "";
+            if (hasShopify && !hasMeta) tip = "Conecta Meta para ver que anuncios generan ventas";
+            else if ((hasShopify || hasMeta) && !hasBrief) tip = "Completa tu Brief para que Steve entienda tu marca";
+            else if (hasBrief && !hasConfig) tip = "Configura finanzas para calcular tu ROAS real";
+            if (!tip) return null;
+            return (
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t text-xs text-muted-foreground">
+                <Lightbulb className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                <span>{tip}</span>
+              </div>
+            );
+          })()}
+        </>
       )}
     </div>
   );
