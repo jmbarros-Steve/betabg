@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
@@ -23,6 +24,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+
+const EDGE_URL = 'https://zpswjccsxjtnhetkkqde.supabase.co/functions/v1';
 
 interface ClientCredit {
   creditos_disponibles: number;
@@ -66,6 +69,28 @@ const PLAN_OPTIONS = [
 const DEFAULT_PLAN = 'pro';
 const DEFAULT_TOKENS = 500;
 
+async function getAuthToken() {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token;
+}
+
+async function deleteClientsViaEdge(clientIds: string[]): Promise<{ deleted: number; errors?: string[] }> {
+  const token = await getAuthToken();
+  const res = await fetch(`${EDGE_URL}/admin-delete-clients`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ client_ids: clientIds }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Error desconocido' }));
+    throw new Error(err.error || 'Error al eliminar');
+  }
+  return res.json();
+}
+
 function StatusBadge({ status }: { status: BriefStatus }) {
   if (status === 'complete') return (
     <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 gap-1">
@@ -92,6 +117,7 @@ function ClientDetail({ client, onClose, onRefresh, onDelete }: {
 }) {
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [addingCredits, setAddingCredits] = useState(false);
   const [creditAmount, setCreditAmount] = useState('');
   const [editForm, setEditForm] = useState({
@@ -179,6 +205,19 @@ function ClientDetail({ client, onClose, onRefresh, onDelete }: {
     }
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await deleteClientsViaEdge([client.id]);
+      toast.success(`${client.name} eliminado`);
+      onDelete(client.id);
+    } catch (err: any) {
+      toast.error(err.message || 'Error al eliminar');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const generateAndCopyLink = async () => {
     let domain = editForm.shopDomain.trim().toLowerCase();
     if (!domain) {
@@ -219,22 +258,23 @@ function ClientDetail({ client, onClose, onRefresh, onDelete }: {
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button size="sm" variant="destructive">
-                <Trash2 className="w-4 h-4 mr-1" /> Eliminar
+              <Button size="sm" variant="destructive" disabled={deleting}>
+                {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Trash2 className="w-4 h-4 mr-1" />}
+                Eliminar
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Eliminar cliente</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Se eliminará a <strong>{client.name}</strong> ({client.email}) y todos sus datos asociados (créditos, research, etc.). Esta acción no se puede deshacer.
+                  Se eliminará a <strong>{client.name}</strong> ({client.email}) y todos sus datos asociados (créditos, research, usuario auth, etc.). Esta acción no se puede deshacer.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  onClick={() => onDelete(client.id)}
+                  onClick={handleDelete}
                 >
                   Eliminar
                 </AlertDialogAction>
@@ -422,27 +462,24 @@ function CreateClientDialog({ onCreated }: { onCreated: () => void }) {
 
     setCreating(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `https://zpswjccsxjtnhetkkqde.supabase.co/functions/v1/admin-create-user`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify({
-            email: form.email.trim(),
-            password: form.password,
-            name: form.name.trim(),
-            company: form.company.trim() || null,
-            rut: form.rut.trim() || null,
-            razon_social: form.razon_social.trim() || null,
-            plan: DEFAULT_PLAN,
-            tokens: DEFAULT_TOKENS,
-          }),
-        }
-      );
+      const token = await getAuthToken();
+      const res = await fetch(`${EDGE_URL}/admin-create-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: form.email.trim(),
+          password: form.password,
+          name: form.name.trim(),
+          company: form.company.trim() || null,
+          rut: form.rut.trim() || null,
+          razon_social: form.razon_social.trim() || null,
+          plan: DEFAULT_PLAN,
+          tokens: DEFAULT_TOKENS,
+        }),
+      });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Error desconocido' }));
@@ -518,6 +555,8 @@ export function AdminClientsPanel() {
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   useEffect(() => {
     fetchAll();
@@ -569,6 +608,7 @@ export function AdminClientsPanel() {
       }));
 
       setClients(enriched);
+      setSelected(new Set());
     } catch {
       toast.error('Error cargando clientes');
     } finally {
@@ -577,21 +617,44 @@ export function AdminClientsPanel() {
   };
 
   const handleDeleteClient = async (clientId: string) => {
+    setExpandedId(null);
+    setRefreshKey(k => k + 1);
+  };
+
+  const toggleSelect = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === filtered.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map(c => c.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    setBulkDeleting(true);
     try {
-      // Delete related data first (credits, research, personas, campaigns)
-      await supabase.from('client_credits').delete().eq('client_id', clientId);
-      await supabase.from('brand_research').delete().eq('client_id', clientId);
-      await supabase.from('buyer_personas').delete().eq('client_id', clientId);
-      await supabase.from('email_campaigns').delete().eq('client_id', clientId);
-
-      const { error } = await supabase.from('clients').delete().eq('id', clientId);
-      if (error) throw error;
-
-      toast.success('Cliente eliminado');
+      const result = await deleteClientsViaEdge(Array.from(selected));
+      toast.success(`${result.deleted} cliente(s) eliminado(s)`);
+      if (result.errors?.length) {
+        console.error('Delete errors:', result.errors);
+      }
+      setSelected(new Set());
       setExpandedId(null);
       setRefreshKey(k => k + 1);
     } catch (err: any) {
-      toast.error(err.message || 'Error al eliminar cliente');
+      toast.error(err.message || 'Error al eliminar');
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -636,6 +699,47 @@ export function AdminClientsPanel() {
         </div>
       </div>
 
+      {/* Bulk actions bar */}
+      {selected.size > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 p-3 rounded-xl bg-red-50 border border-red-200"
+        >
+          <span className="text-sm font-medium text-red-700">
+            {selected.size} seleccionado(s)
+          </span>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="destructive" disabled={bulkDeleting}>
+                {bulkDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Trash2 className="w-4 h-4 mr-1" />}
+                Eliminar seleccionados
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Eliminar {selected.size} cliente(s)</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Se eliminarán {selected.size} clientes y todos sus datos asociados (créditos, research, usuarios auth, etc.). Esta acción no se puede deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={handleBulkDelete}
+                >
+                  Eliminar {selected.size}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+            Deseleccionar
+          </Button>
+        </motion.div>
+      )}
+
       {/* Stats bar */}
       <div className="grid grid-cols-3 gap-3">
         {[
@@ -650,6 +754,17 @@ export function AdminClientsPanel() {
         ))}
       </div>
 
+      {/* Select all */}
+      {filtered.length > 0 && (
+        <div className="flex items-center gap-2 px-1">
+          <Checkbox
+            checked={selected.size === filtered.length && filtered.length > 0}
+            onCheckedChange={toggleSelectAll}
+          />
+          <span className="text-xs text-muted-foreground">Seleccionar todos</span>
+        </div>
+      )}
+
       {/* Client list */}
       <div className="space-y-2">
         {filtered.length === 0 && (
@@ -658,6 +773,7 @@ export function AdminClientsPanel() {
         {filtered.map((client, index) => {
           const status = getBriefStatus(client);
           const isExpanded = expandedId === client.id;
+          const isSelected = selected.has(client.id);
 
           return (
             <div key={client.id}>
@@ -666,43 +782,55 @@ export function AdminClientsPanel() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.02 }}
                 className={`rounded-xl border transition-colors cursor-pointer ${
-                  isExpanded
+                  isSelected
+                    ? 'border-red-300 bg-red-50/50'
+                    : isExpanded
                     ? 'border-primary/40 bg-white'
                     : 'border-slate-200 bg-white hover:border-primary/20'
                 }`}
-                onClick={() => setExpandedId(isExpanded ? null : client.id)}
               >
                 <div className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    {isExpanded
-                      ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    }
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold">{client.name}</span>
-                        {client.company && (
-                          <span className="text-sm text-muted-foreground">· {client.company}</span>
-                        )}
-                        {client.rut && (
-                          <span className="text-xs text-muted-foreground font-mono">({client.rut})</span>
-                        )}
-                        {client.shop_domain && (
-                          <Badge variant="outline" className="text-xs">Shopify</Badge>
-                        )}
-                        {client.client_user_id && (
-                          <Badge variant="secondary" className="text-xs">Portal activo</Badge>
-                        )}
+                    <div onClick={(e) => toggleSelect(client.id, e)}>
+                      <Checkbox
+                        checked={isSelected}
+                        className="pointer-events-none"
+                      />
+                    </div>
+                    <div
+                      className="flex items-center gap-3 flex-1"
+                      onClick={() => setExpandedId(isExpanded ? null : client.id)}
+                    >
+                      {isExpanded
+                        ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      }
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold">{client.name}</span>
+                          {client.company && (
+                            <span className="text-sm text-muted-foreground">· {client.company}</span>
+                          )}
+                          {client.rut && (
+                            <span className="text-xs text-muted-foreground font-mono">({client.rut})</span>
+                          )}
+                          {client.shop_domain && (
+                            <Badge variant="outline" className="text-xs">Shopify</Badge>
+                          )}
+                          {client.client_user_id && (
+                            <Badge variant="secondary" className="text-xs">Portal activo</Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {client.email ?? 'Sin email'}
+                          {client.razon_social ? ` · ${client.razon_social}` : ''}
+                          {' · '}{new Date(client.created_at).toLocaleDateString('es-CL')}
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {client.email ?? 'Sin email'}
-                        {client.razon_social ? ` · ${client.razon_social}` : ''}
-                        {' · '}{new Date(client.created_at).toLocaleDateString('es-CL')}
-                      </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 flex-shrink-0">
+                  <div className="flex items-center gap-3 flex-shrink-0" onClick={() => setExpandedId(isExpanded ? null : client.id)}>
                     <StatusBadge status={status} />
                     {client.credits && (
                       <div className="text-right hidden sm:block">
