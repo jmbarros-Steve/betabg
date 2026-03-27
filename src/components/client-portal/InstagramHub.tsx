@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Instagram, Send, CalendarDays } from 'lucide-react';
+import { Instagram, Send, CalendarDays, BarChart3 } from 'lucide-react';
 import { InstagramPublisher } from './InstagramPublisher';
 import { ContentCalendar } from './ContentCalendar';
+import { IGMetricsDashboard } from './instagram/IGMetricsDashboard';
 
 interface InstagramHubProps {
   clientId: string;
@@ -45,6 +46,10 @@ export function InstagramHub({ clientId }: InstagramHubProps) {
             <CalendarDays className="w-4 h-4" />
             Calendario
           </TabsTrigger>
+          <TabsTrigger value="metrics" className="gap-1.5">
+            <BarChart3 className="w-4 h-4" />
+            Métricas
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="publish" className="mt-4">
@@ -61,6 +66,10 @@ export function InstagramHub({ clientId }: InstagramHubProps) {
             clientId={clientId}
             onNewPost={handleNewPost}
           />
+        </TabsContent>
+
+        <TabsContent value="metrics" className="mt-4">
+          <IGMetricsDashboard clientId={clientId} />
         </TabsContent>
       </Tabs>
     </div>
