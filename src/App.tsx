@@ -29,6 +29,7 @@ import GoogleAdsDesignDoc from "./pages/GoogleAdsDesignDoc";
 import Funcionalidades from "./pages/Funcionalidades";
 import AdminCerebro from "./pages/AdminCerebro";
 import AdminSkyvern from "./pages/AdminSkyvern";
+import AdminPlanes from "./pages/AdminPlanes";
 import NotFound from "./pages/NotFound";
 import { Sentry } from "./lib/sentry";
 
@@ -74,6 +75,7 @@ const App = () => (
             <Route path="/admin" element={<Navigate to="/admin/cerebro" replace />} />
             <Route path="/admin/cerebro" element={<AdminCerebro />} />
             <Route path="/admin/skyvern" element={<AdminSkyvern />} />
+            <Route path="/admin/planes" element={<AdminPlanes />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
