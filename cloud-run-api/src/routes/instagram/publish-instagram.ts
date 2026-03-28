@@ -438,6 +438,24 @@ Return ONLY a JSON object:
         }
       }
 
+      // ─── GET IG PROFILE (username + picture) ─────────────
+      case 'get_profile': {
+        const meta = await getMetaToken(supabase, client_id);
+        if (!meta) return c.json({ error: 'No Instagram connection' }, 400);
+
+        const res = await metaApiJson<{ username: string; name: string; profile_picture_url: string }>(
+          `/${meta.igUserId}`, meta.token,
+          { params: { fields: 'username,name,profile_picture_url' } },
+        );
+        if (!res.ok) return c.json({ error: 'Failed to fetch IG profile' }, 500);
+
+        return c.json({
+          username: res.data.username || '',
+          name: res.data.name || '',
+          profile_picture_url: res.data.profile_picture_url || '',
+        });
+      }
+
       default:
         return c.json({ error: `Unknown action: ${action}` }, 400);
     }

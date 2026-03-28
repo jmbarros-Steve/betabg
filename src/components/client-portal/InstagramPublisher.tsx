@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -220,6 +220,16 @@ export function InstagramPublisher({ clientId, prefillDate, onPublished }: Insta
   const [generating, setGenerating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
+
+  // IG profile for preview
+  const [igProfile, setIgProfile] = useState<{ username: string; profile_picture_url: string } | null>(null);
+  useEffect(() => {
+    callApi<{ username: string; profile_picture_url: string }>('publish-instagram', {
+      body: { action: 'get_profile', client_id: clientId },
+    }).then(({ data }) => {
+      if (data?.username) setIgProfile(data);
+    });
+  }, [clientId]);
 
   const addHashtag = useCallback(() => {
     const tag = hashtagInput.trim().replace(/^#/, '');
@@ -513,10 +523,14 @@ export function InstagramPublisher({ clientId, prefillDate, onPublished }: Insta
             <DialogTitle>Preview de Instagram</DialogTitle>
           </DialogHeader>
           <div className="border rounded-lg overflow-hidden bg-white">
-            {/* Mock IG header */}
+            {/* IG header */}
             <div className="flex items-center gap-2 p-3 border-b">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500" />
-              <span className="text-sm font-semibold">tu_marca</span>
+              {igProfile?.profile_picture_url ? (
+                <img src={igProfile.profile_picture_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500" />
+              )}
+              <span className="text-sm font-semibold">{igProfile?.username || 'tu_marca'}</span>
             </div>
             {/* Image */}
             <div className="aspect-square bg-muted flex items-center justify-center">
