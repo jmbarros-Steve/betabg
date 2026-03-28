@@ -221,14 +221,24 @@ export function InstagramPublisher({ clientId, prefillDate, onPublished }: Insta
   const [showPreview, setShowPreview] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
 
-  // IG profile for preview
+  // IG profile for preview — read ig_account_id from platform_connections to get the right account
   const [igProfile, setIgProfile] = useState<{ username: string; profile_picture_url: string } | null>(null);
   useEffect(() => {
-    callApi<{ username: string; profile_picture_url: string }>('publish-instagram', {
-      body: { action: 'get_profile', client_id: clientId },
-    }).then(({ data }) => {
+    (async () => {
+      // Get ig_account_id from the selected portfolio connection
+      const { data: conn } = await supabase
+        .from('platform_connections')
+        .select('ig_account_id')
+        .eq('client_id', clientId)
+        .eq('platform', 'meta')
+        .eq('is_active', true)
+        .maybeSingle();
+
+      const { data } = await callApi<{ username: string; profile_picture_url: string }>('publish-instagram', {
+        body: { action: 'get_profile', client_id: clientId, ig_account_id: conn?.ig_account_id || undefined },
+      });
       if (data?.username) setIgProfile(data);
-    });
+    })();
   }, [clientId]);
 
   const addHashtag = useCallback(() => {

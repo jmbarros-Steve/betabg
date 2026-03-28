@@ -443,8 +443,11 @@ Return ONLY a JSON object:
         const meta = await getMetaToken(supabase, client_id);
         if (!meta) return c.json({ error: 'No Instagram connection' }, 400);
 
+        // Allow override from frontend (e.g. when portfolio IG differs from stored ig_account_id)
+        const igId = body.ig_account_id || meta.igUserId;
+
         const res = await metaApiJson<{ username: string; name: string; profile_picture_url: string }>(
-          `/${meta.igUserId}`, meta.token,
+          `/${igId}`, meta.token,
           { params: { fields: 'username,name,profile_picture_url' } },
         );
         if (!res.ok) return c.json({ error: 'Failed to fetch IG profile' }, 500);
