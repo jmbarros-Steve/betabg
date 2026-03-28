@@ -1,17 +1,201 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   Instagram, ImagePlus, Send, CalendarClock, Sparkles, Loader2, X, Plus,
-  Eye, Hash, Clock, CheckCircle, AlertTriangle, Film, Images,
+  Eye, Hash, Clock, CheckCircle, Film, Images, Upload, Link, Wand2, Trash2,
 } from 'lucide-react';
 import { callApi } from '@/lib/api';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+type ImageSourceMode = 'upload' | 'ai' | 'url';
+
+const API_URL = import.meta.env.VITE_API_URL as string;
+
+/* ── Image Picker: upload / AI / URL ── */
+function ImagePicker({
+  value,
+  onChange,
+  clientId,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+  clientId: string;
+}) {
+  const [mode, setMode] = useState<ImageSourceMode>('upload');
+  const [uploading, setUploading] = useState(false);
+  const [generatingImg, setGeneratingImg] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [urlInput, setUrlInput] = useState(value);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = useCallback(async (file: File) => {
+    if (file.size > 5 * 1024 * 1024) { toast.error('La imagen no puede superar 5MB'); return; }
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) { toast.error('Formato no soportado. Usa JPG, PNG o WebP'); return; }
+
+    setUploading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error('Sesion expirada'); return; }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch(`${API_URL}/api/upload-email-image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: formData,
+      });
+      const result = await res.json();
+      if (result.success && result.url) {
+        onChange(result.url);
+      } else {
+        toast.error(result.error || 'Error al subir imagen');
+      }
+    } catch {
+      toast.error('Error al subir imagen');
+    } finally {
+      setUploading(false);
+    }
+  }, [onChange]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileUpload(file);
+  }, [handleFileUpload]);
+
+  const handleGenerateAI = async () => {
+    if (!aiPrompt.trim()) { toast.error('Escribe un prompt para generar la imagen'); return; }
+    setGeneratingImg(true);
+    try {
+      const { data, error } = await callApi<{ asset_url: string }>('generate-image', {
+        body: { clientId, promptGeneracion: aiPrompt },
+      });
+      if (error) { toast.error(error); return; }
+      if (data?.asset_url) {
+        onChange(data.asset_url);
+        toast.success('Imagen generada');
+      }
+    } finally {
+      setGeneratingImg(false);
+    }
+  };
+
+  const busy = uploading || generatingImg;
+
+  // If we already have an image, show preview
+  if (value) {
+    return (
+      <div className="relative group rounded-lg overflow-hidden border bg-muted">
+        <img src={value} alt="Preview" className="w-full aspect-square object-cover" />
+        <button
+          type="button"
+          onClick={() => { onChange(''); setUrlInput(''); setAiPrompt(''); }}
+          className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Mode tabs */}
+      <div className="flex gap-1 p-0.5 rounded-lg bg-muted">
+        {([
+          { m: 'upload' as ImageSourceMode, icon: Upload, label: 'Subir' },
+          { m: 'ai' as ImageSourceMode, icon: Wand2, label: 'Generar IA' },
+          { m: 'url' as ImageSourceMode, icon: Link, label: 'Pegar URL' },
+        ]).map(({ m, icon: Icon, label }) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMode(m)}
+            className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-medium py-1.5 rounded-md transition-colors ${mode === m ? 'bg-background shadow-sm' : 'hover:bg-background/50'}`}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Upload mode */}
+      {mode === 'upload' && (
+        <div
+          onDrop={handleDrop}
+          onDragOver={e => e.preventDefault()}
+          onClick={() => !busy && fileRef.current?.click()}
+          className={`flex flex-col items-center justify-center gap-2 p-6 rounded-lg border-2 border-dashed transition-colors cursor-pointer ${busy ? 'opacity-50 cursor-wait bg-muted' : 'hover:border-primary/50 hover:bg-muted/50'}`}
+        >
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ''; }}
+            disabled={busy}
+          />
+          {uploading ? (
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          ) : (
+            <Upload className="w-8 h-8 text-muted-foreground" />
+          )}
+          <p className="text-sm text-muted-foreground">
+            {uploading ? 'Subiendo...' : 'Arrastra o haz clic para subir'}
+          </p>
+          <p className="text-xs text-muted-foreground/70">JPG, PNG o WebP - Max 5MB</p>
+        </div>
+      )}
+
+      {/* AI generate mode */}
+      {mode === 'ai' && (
+        <div className="space-y-2">
+          <Input
+            placeholder="Describe la imagen (ej: modelo usando vestido rojo en la playa)"
+            value={aiPrompt}
+            onChange={e => setAiPrompt(e.target.value)}
+            disabled={generatingImg}
+          />
+          <Button
+            size="sm"
+            onClick={handleGenerateAI}
+            disabled={generatingImg || !aiPrompt.trim()}
+            className="w-full"
+          >
+            {generatingImg ? (
+              <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Generando...</>
+            ) : (
+              <><Wand2 className="w-4 h-4 mr-1.5" />Generar imagen</>
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* URL mode */}
+      {mode === 'url' && (
+        <div className="flex gap-2">
+          <Input
+            placeholder="https://... (imagen publica, min 320x320px)"
+            value={urlInput}
+            onChange={e => setUrlInput(e.target.value)}
+            className="flex-1"
+          />
+          <Button size="sm" variant="outline" onClick={() => { if (urlInput.trim()) onChange(urlInput.trim()); }} disabled={!urlInput.trim()}>
+            <CheckCircle className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface InstagramPublisherProps {
   clientId: string;
@@ -49,10 +233,9 @@ export function InstagramPublisher({ clientId, prefillDate, onPublished }: Insta
     setHashtags(prev => prev.filter(h => h !== tag));
   };
 
-  const addCarouselUrl = () => {
-    if (imageUrl.trim() && imageUrls.length < 10) {
-      setImageUrls(prev => [...prev, imageUrl.trim()]);
-      setImageUrl('');
+  const addCarouselImage = (url: string) => {
+    if (url && imageUrls.length < 10) {
+      setImageUrls(prev => [...prev, url]);
     }
   };
 
@@ -187,37 +370,35 @@ export function InstagramPublisher({ clientId, prefillDate, onPublished }: Insta
           {/* Media Input */}
           {mediaType === 'IMAGE' && (
             <div>
-              <Label>URL de la imagen</Label>
-              <Input
-                placeholder="https://... (imagen publica, min 320x320px)"
-                value={imageUrl}
-                onChange={e => setImageUrl(e.target.value)}
-              />
+              <Label>Imagen</Label>
+              <ImagePicker value={imageUrl} onChange={setImageUrl} clientId={clientId} />
             </div>
           )}
 
           {mediaType === 'CAROUSEL' && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label>Imagenes del carrusel ({imageUrls.length}/10)</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="URL de imagen"
-                  value={imageUrl}
-                  onChange={e => setImageUrl(e.target.value)}
-                  className="flex-1"
-                />
-                <Button size="sm" variant="outline" onClick={addCarouselUrl} disabled={imageUrls.length >= 10 || !imageUrl.trim()}>
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
               {imageUrls.length > 0 && (
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-5 gap-2">
                   {imageUrls.map((url, i) => (
-                    <Badge key={i} variant="secondary" className="flex items-center gap-1">
-                      Imagen {i + 1}
-                      <X className="w-3 h-3 cursor-pointer" onClick={() => removeCarouselUrl(i)} />
-                    </Badge>
+                    <div key={i} className="relative group rounded-md overflow-hidden border aspect-square bg-muted">
+                      <img src={url} alt={`Slide ${i + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeCarouselUrl(i)}
+                        className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                      <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[10px] px-1.5 rounded">{i + 1}</span>
+                    </div>
                   ))}
+                </div>
+              )}
+              {imageUrls.length < 10 && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5">Agregar imagen al carrusel:</p>
+                  <ImagePicker value="" onChange={addCarouselImage} clientId={clientId} />
                 </div>
               )}
             </div>
