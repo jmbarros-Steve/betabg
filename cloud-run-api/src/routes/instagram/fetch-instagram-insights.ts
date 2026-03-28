@@ -32,7 +32,7 @@ export async function fetchInstagramInsights(c: Context) {
   // Get Meta connection (Instagram uses Meta token)
   const { data: conn } = await supabase
     .from('platform_connections')
-    .select('id, access_token_encrypted, ig_account_id')
+    .select('id, access_token_encrypted, ig_account_id, page_id')
     .eq('client_id', client_id)
     .eq('platform', 'meta')
     .maybeSingle();
@@ -46,11 +46,28 @@ export async function fetchInstagramInsights(c: Context) {
   });
   if (!token) return c.json({ error: 'Error descifrando token' }, 500);
 
-  // Find Instagram Business Account ID — try DB first, then API discovery
+  // Find Instagram Business Account ID
   let resolvedIgId = conn.ig_account_id;
 
+  // 1. If page_id is set, resolve IG from the page directly (most reliable)
+  if (conn.page_id) {
+    const pageRes = await metaApiJson<{ instagram_business_account?: { id: string } }>(
+      `/${conn.page_id}`, token,
+      { params: { fields: 'instagram_business_account' } },
+    );
+    if (pageRes.ok && pageRes.data?.instagram_business_account?.id) {
+      const freshIgId = pageRes.data.instagram_business_account.id;
+      if (freshIgId !== resolvedIgId) {
+        resolvedIgId = freshIgId;
+        await supabase.from('platform_connections')
+          .update({ ig_account_id: resolvedIgId })
+          .eq('id', conn.id);
+      }
+    }
+  }
+
+  // 2. Fallback: discover from first page with IG
   if (!resolvedIgId) {
-    // Fallback: discover from connected pages
     const pagesRes = await metaApiJson<{ data: any[] }>('/me/accounts', token, {
       params: { fields: 'id,instagram_business_account', limit: '10' },
     });
@@ -58,10 +75,8 @@ export async function fetchInstagramInsights(c: Context) {
       for (const page of pagesRes.data.data) {
         if (page.instagram_business_account?.id) {
           resolvedIgId = page.instagram_business_account.id;
-          // Persist for future use
-          await supabase
-            .from('platform_connections')
-            .update({ ig_account_id: resolvedIgId })
+          await supabase.from('platform_connections')
+            .update({ ig_account_id: resolvedIgId, page_id: conn.page_id || page.id })
             .eq('id', conn.id);
           break;
         }

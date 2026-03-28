@@ -26,10 +26,10 @@ import { metaApiFetch, metaApiJson } from '../../lib/meta-fetch.js';
 // ---------------------------------------------------------------------------
 
 async function getMetaToken(supabase: any, clientId: string): Promise<{ token: string; igUserId: string } | null> {
-  // Get meta connection — read ig_account_id which is now persisted by hierarchy/portfolio
+  // Get meta connection — read ig_account_id + page_id from DB
   const { data: conn } = await supabase
     .from('platform_connections')
-    .select('id, access_token_encrypted, ig_account_id')
+    .select('id, access_token_encrypted, ig_account_id, page_id')
     .eq('client_id', clientId)
     .eq('platform', 'meta')
     .eq('is_active', true)
@@ -43,10 +43,29 @@ async function getMetaToken(supabase: any, clientId: string): Promise<{ token: s
 
   if (!token) return null;
 
-  // 1. Try ig_account_id from DB (populated by hierarchy + portfolio selection)
   let igUserId = conn.ig_account_id;
 
-  // 2. Fallback: discover from API
+  // 1. If page_id is set, resolve IG account from the page directly (most reliable)
+  //    This ensures we always use the IG linked to the selected page, not a stale value.
+  if (conn.page_id) {
+    const pageRes = await metaApiJson<{ instagram_business_account?: { id: string } }>(
+      `/${conn.page_id}`, token,
+      { params: { fields: 'instagram_business_account' } },
+    );
+    if (pageRes.ok && pageRes.data?.instagram_business_account?.id) {
+      const freshIgId = pageRes.data.instagram_business_account.id;
+      // Update DB if it changed
+      if (freshIgId !== igUserId) {
+        igUserId = freshIgId;
+        await supabase
+          .from('platform_connections')
+          .update({ ig_account_id: igUserId })
+          .eq('id', conn.id);
+      }
+    }
+  }
+
+  // 2. Fallback: discover from first page with IG
   if (!igUserId) {
     const pagesRes = await metaApiJson<{ data: any[] }>('/me/accounts', token, {
       params: { fields: 'id,instagram_business_account', limit: '10' },
@@ -55,10 +74,9 @@ async function getMetaToken(supabase: any, clientId: string): Promise<{ token: s
       for (const page of pagesRes.data.data) {
         if (page.instagram_business_account?.id) {
           igUserId = page.instagram_business_account.id;
-          // Persist for future use
           await supabase
             .from('platform_connections')
-            .update({ ig_account_id: igUserId })
+            .update({ ig_account_id: igUserId, page_id: conn.page_id || page.id })
             .eq('id', conn.id);
           break;
         }
