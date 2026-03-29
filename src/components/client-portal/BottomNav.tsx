@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, Bot, Link2, Settings, MoreHorizontal } from "lucide-react";
+import { BarChart3, Bot, Link2, Settings, MoreHorizontal, Lock } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -7,11 +7,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { canAccessTab, type PlanSlug } from "@/lib/plan-features";
 
 interface BottomNavProps {
   activeTab: string;
   onNavigate: (tab: string) => void;
   secondaryTabs: { id: string; label: string; icon: React.ReactNode }[];
+  planSlug?: PlanSlug;
 }
 
 const primaryItems = [
@@ -21,7 +23,7 @@ const primaryItems = [
   { id: "config", label: "Config", icon: Settings },
 ];
 
-export function BottomNav({ activeTab, onNavigate, secondaryTabs }: BottomNavProps) {
+export function BottomNav({ activeTab, onNavigate, secondaryTabs, planSlug = 'visual' }: BottomNavProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
 
   return (
@@ -30,15 +32,16 @@ export function BottomNav({ activeTab, onNavigate, secondaryTabs }: BottomNavPro
         {primaryItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
+          const locked = !canAccessTab(item.id, planSlug);
           return (
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
               className={`flex flex-col items-center justify-center gap-1 flex-1 h-full text-xs transition-colors ${
-                isActive ? "text-primary" : "text-muted-foreground"
+                isActive ? "text-primary" : locked ? "text-slate-300" : "text-muted-foreground"
               }`}
             >
-              <Icon className="h-5 w-5" />
+              {locked ? <Lock className="h-4 w-4" /> : <Icon className="h-5 w-5" />}
               <span>{item.label}</span>
             </button>
           );
@@ -57,21 +60,28 @@ export function BottomNav({ activeTab, onNavigate, secondaryTabs }: BottomNavPro
               <SheetTitle>Más secciones</SheetTitle>
             </SheetHeader>
             <div className="grid grid-cols-3 gap-3 py-4">
-              {secondaryTabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    setSheetOpen(false);
-                    onNavigate(tab.id);
-                  }}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-lg transition-colors ${
-                    activeTab === tab.id ? "bg-primary/10 text-primary" : "hover:bg-muted"
-                  }`}
-                >
-                  {tab.icon}
-                  <span className="text-xs text-center">{tab.label}</span>
-                </button>
-              ))}
+              {secondaryTabs.map((tab) => {
+                const locked = !canAccessTab(tab.id, planSlug);
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setSheetOpen(false);
+                      onNavigate(tab.id);
+                    }}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-lg transition-colors ${
+                      activeTab === tab.id
+                        ? "bg-primary/10 text-primary"
+                        : locked
+                        ? "text-slate-300"
+                        : "hover:bg-muted"
+                    }`}
+                  >
+                    {locked ? <Lock className="w-4 h-4" /> : tab.icon}
+                    <span className="text-xs text-center">{tab.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </SheetContent>
         </Sheet>

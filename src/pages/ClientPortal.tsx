@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare, Home, Instagram, GraduationCap } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare, Home, Instagram, GraduationCap, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useUserPlan } from '@/hooks/useUserPlan';
 
 import { ClientPortalMetrics } from '@/components/client-portal/ClientPortalMetrics';
 import { ClientPortalConnections } from '@/components/client-portal/ClientPortalConnections';
@@ -41,6 +42,9 @@ import {
 } from '@/components/ui/breadcrumb';
 import { SetupProgressTracker } from '@/components/client-portal/SetupProgressTracker';
 import { TabCoachmark } from '@/components/client-portal/TabCoachmark';
+import { PlanBadge } from '@/components/client-portal/PlanBadge';
+import { UpgradeOverlay } from '@/components/client-portal/UpgradeOverlay';
+import { canAccessTab, getTabRequiredPlan, type PlanSlug } from '@/lib/plan-features';
 import { KeyboardShortcutsDialog, useShortcutsDialog } from '@/components/client-portal/KeyboardShortcutsDialog';
 import { WhatsAppHub } from '@/components/client-portal/whatsapp/WhatsAppHub';
 import { IGMetricsDashboard } from '@/components/client-portal/instagram/IGMetricsDashboard';
@@ -64,6 +68,11 @@ export default function ClientPortal() {
   const { isClient, isAdmin, isSuperAdmin, isShopifyUser, loading: roleLoading, clientData } = useUserRole();
 
   const navigate = useNavigate();
+
+  // Plan gating: resolve using the effective client's user_id (admin viewing client portal uses urlClientId)
+  const planTarget = (isSuperAdmin && urlClientId) ? urlClientId : undefined;
+  const { planSlug, canAccessTab: userCanAccessTab, loading: planLoading } = useUserPlan(planTarget);
+
   const [activeTab, setActiveTab] = useState<TabType>('connections');
   const [visitedTabs, setVisitedTabs] = useState<Set<TabType>>(new Set(['connections']));
   const [adminViewClient, setAdminViewClient] = useState<ClientInfo | null>(null);
@@ -335,6 +344,7 @@ export default function ClientPortal() {
               )}
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold text-slate-900 leading-tight">{displayClient?.name}</p>
+                {!planLoading && <PlanBadge planSlug={planSlug} />}
                 {isAdminView && (
                   <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
                     Vista Admin
@@ -387,20 +397,25 @@ export default function ClientPortal() {
       <div className="container px-6 py-8 pb-20 md:pb-8 pt-4 sm:pt-6">
         {/* Tabs — hidden on mobile where BottomNav is used */}
         <div className="hidden md:flex gap-2 mb-8 overflow-x-auto pb-2 relative z-10">
-          {primaryTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => handleUserNavigate(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                activeTab === tab.id
-                  ? 'bg-primary text-white shadow-md'
-                  : 'bg-card text-slate-600 hover:bg-slate-100 border border-border'
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          ))}
+          {primaryTabs.map((tab) => {
+            const locked = !userCanAccessTab(tab.id);
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleUserNavigate(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                  activeTab === tab.id
+                    ? 'bg-primary text-white shadow-md'
+                    : locked
+                    ? 'bg-slate-50 text-slate-400 border border-slate-200 cursor-pointer'
+                    : 'bg-card text-slate-600 hover:bg-slate-100 border border-border'
+                }`}
+              >
+                {locked ? <Lock className="w-3.5 h-3.5" /> : <tab.icon className="w-4 h-4" />}
+                {tab.label}
+              </button>
+            );
+          })}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -415,16 +430,22 @@ export default function ClientPortal() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              {secondaryTabs.map((tab) => (
-                <DropdownMenuItem
-                  key={tab.id}
-                  onClick={() => handleUserNavigate(tab.id)}
-                  className={`flex items-center gap-2 text-sm ${activeTab === tab.id ? 'bg-primary/10 text-primary' : ''}`}
-                >
-                  <tab.icon className="w-4 h-4" />
-                  {tab.label}
-                </DropdownMenuItem>
-              ))}
+              {secondaryTabs.map((tab) => {
+                const locked = !userCanAccessTab(tab.id);
+                return (
+                  <DropdownMenuItem
+                    key={tab.id}
+                    onClick={() => handleUserNavigate(tab.id)}
+                    className={`flex items-center gap-2 text-sm ${
+                      activeTab === tab.id ? 'bg-primary/10 text-primary' : locked ? 'text-slate-400' : ''
+                    }`}
+                  >
+                    {locked ? <Lock className="w-3.5 h-3.5" /> : <tab.icon className="w-4 h-4" />}
+                    {tab.label}
+                    {locked && <span className="ml-auto text-xs text-slate-400">PRO</span>}
+                  </DropdownMenuItem>
+                );
+              })}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -438,37 +459,51 @@ export default function ClientPortal() {
         <TabCoachmark tabId={activeTab} />
 
         {/* Content — tabs stay mounted once visited so in-flight requests complete */}
+        {/* Locked tabs show UpgradeOverlay instead of content */}
         <div>
+          {(() => {
+            // Check if the active tab is locked
+            const tabLocked = !userCanAccessTab(activeTab);
+            if (tabLocked) {
+              const requiredPlan = getTabRequiredPlan(activeTab) as PlanSlug;
+              return (
+                <div className="relative min-h-[400px] rounded-xl border border-slate-200 bg-slate-50/50">
+                  <UpgradeOverlay requiredPlan={requiredPlan || 'estrategia'} />
+                </div>
+              );
+            }
+            return null;
+          })()}
           {visitedTabs.has('metrics') && effectiveClientId && (
-            <div className={activeTab !== 'metrics' ? 'hidden' : ''}>
+            <div className={activeTab !== 'metrics' || !userCanAccessTab('metrics') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Métricas">
                 <ClientPortalMetrics clientId={effectiveClientId} />
               </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('campaigns') && effectiveClientId && (
-            <div className={activeTab !== 'campaigns' ? 'hidden' : ''}>
+            <div className={activeTab !== 'campaigns' || !userCanAccessTab('campaigns') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Campañas">
                 <CampaignAnalyticsPanel clientId={effectiveClientId} />
               </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('shopify') && effectiveClientId && (
-            <div className={activeTab !== 'shopify' ? 'hidden' : ''}>
+            <div className={activeTab !== 'shopify' || !userCanAccessTab('shopify') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Shopify">
                 <ShopifyDashboard clientId={effectiveClientId} />
               </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('connections') && effectiveClientId && (
-            <div className={activeTab !== 'connections' ? 'hidden' : ''}>
+            <div className={activeTab !== 'connections' || !userCanAccessTab('connections') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Conexiones">
                 <ClientPortalConnections clientId={effectiveClientId} isAdmin={!!isAdminView} />
               </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('brief') && effectiveClientId && (
-            <div className={activeTab !== 'brief' ? 'hidden' : ''}>
+            <div className={activeTab !== 'brief' || !userCanAccessTab('brief') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Brief">
                 <BrandBriefView
                   clientId={effectiveClientId}
@@ -478,14 +513,14 @@ export default function ClientPortal() {
             </div>
           )}
           {visitedTabs.has('deepdive') && effectiveClientId && (
-            <div className={activeTab !== 'deepdive' ? 'hidden' : ''}>
+            <div className={activeTab !== 'deepdive' || !userCanAccessTab('deepdive') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Deep Dive">
                 <CompetitorDeepDivePanel clientId={effectiveClientId} />
               </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('steve') && effectiveClientId && (
-            <div className={activeTab !== 'steve' ? 'hidden' : ''}>
+            <div className={activeTab !== 'steve' || !userCanAccessTab('steve') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Steve">
                 <div className="max-w-2xl mx-auto">
                   <SteveChat clientId={effectiveClientId} />
@@ -494,7 +529,7 @@ export default function ClientPortal() {
             </div>
           )}
           {visitedTabs.has('estrategia') && effectiveClientId && (
-            <div className={activeTab !== 'estrategia' ? 'hidden' : ''}>
+            <div className={activeTab !== 'estrategia' || !userCanAccessTab('estrategia') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Estrategia">
                 <div className="max-w-2xl mx-auto">
                   <SteveEstrategia clientId={effectiveClientId} />
@@ -503,14 +538,14 @@ export default function ClientPortal() {
             </div>
           )}
           {visitedTabs.has('copies') && effectiveClientId && (
-            <div className={activeTab !== 'copies' ? 'hidden' : ''}>
+            <div className={activeTab !== 'copies' || !userCanAccessTab('copies') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Meta Ads">
                 <MetaAdsManager clientId={effectiveClientId} />
               </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('google') && effectiveClientId && (
-            <div className={activeTab !== 'google' ? 'hidden' : ''}>
+            <div className={activeTab !== 'google' || !userCanAccessTab('google') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Google Ads">
                 <div className="max-w-4xl mx-auto">
                   <GoogleAdsGenerator clientId={effectiveClientId} />
@@ -519,7 +554,7 @@ export default function ClientPortal() {
             </div>
           )}
           {visitedTabs.has('klaviyo') && effectiveClientId && (
-            <div className={activeTab !== 'klaviyo' ? 'hidden' : ''}>
+            <div className={activeTab !== 'klaviyo' || !userCanAccessTab('klaviyo') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Klaviyo">
                 <div className="max-w-4xl mx-auto">
                   <CampaignStudio clientId={effectiveClientId} />
@@ -528,7 +563,7 @@ export default function ClientPortal() {
             </div>
           )}
           {visitedTabs.has('email') && effectiveClientId && (
-            <div className={activeTab !== 'email' ? 'hidden' : ''}>
+            <div className={activeTab !== 'email' || !userCanAccessTab('email') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Steve Mail">
                 <div className="max-w-5xl mx-auto">
                   <EmailMarketing clientId={effectiveClientId} />
@@ -537,7 +572,7 @@ export default function ClientPortal() {
             </div>
           )}
           {visitedTabs.has('instagram') && effectiveClientId && (
-            <div className={activeTab !== 'instagram' ? 'hidden' : ''}>
+            <div className={activeTab !== 'instagram' || !userCanAccessTab('instagram') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Instagram">
                 <div className="max-w-5xl mx-auto">
                   <InstagramHub clientId={effectiveClientId} />
@@ -546,14 +581,14 @@ export default function ClientPortal() {
             </div>
           )}
           {visitedTabs.has('config') && effectiveClientId && (
-            <div className={activeTab !== 'config' ? 'hidden' : ''}>
+            <div className={activeTab !== 'config' || !userCanAccessTab('config') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Configuración">
                 <FinancialConfigPanel clientId={effectiveClientId} />
               </TabErrorBoundary>
             </div>
           )}
           {visitedTabs.has('wa_credits') && effectiveClientId && (
-            <div className={activeTab !== 'wa_credits' ? 'hidden' : ''}>
+            <div className={activeTab !== 'wa_credits' || !userCanAccessTab('wa_credits') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="WhatsApp">
                 <div className="max-w-5xl mx-auto">
                   <WhatsAppHub clientId={effectiveClientId} />
@@ -562,7 +597,7 @@ export default function ClientPortal() {
             </div>
           )}
           {visitedTabs.has('academy') && effectiveClientId && (
-            <div className={activeTab !== 'academy' ? 'hidden' : ''}>
+            <div className={activeTab !== 'academy' || !userCanAccessTab('academy') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Academy">
                 <div className="max-w-5xl mx-auto">
                   <SteveAcademy clientId={effectiveClientId} />
@@ -586,7 +621,7 @@ export default function ClientPortal() {
       {/* Onboarding Modal — disabled */}
 
       {/* Cmd+K Command Palette */}
-      <CommandPalette onNavigate={(tab) => handleUserNavigate(tab as TabType)} />
+      <CommandPalette onNavigate={(tab) => handleUserNavigate(tab as TabType)} planSlug={planSlug} />
 
       {/* Keyboard Shortcuts Dialog */}
       <KeyboardShortcutsDialog open={shortcutsDialog.open} onOpenChange={shortcutsDialog.setOpen} />
@@ -597,6 +632,7 @@ export default function ClientPortal() {
       <BottomNav
         activeTab={activeTab}
         onNavigate={(tab) => handleUserNavigate(tab as TabType)}
+        planSlug={planSlug}
         secondaryTabs={[
           { id: 'brief', label: 'Brief', icon: <FileText className="w-5 h-5" /> },
           ...secondaryTabs.map((t) => ({

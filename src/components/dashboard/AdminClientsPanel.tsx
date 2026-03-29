@@ -24,6 +24,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { PlanBadge } from '@/components/client-portal/PlanBadge';
+import { PLAN_SLUGS, PLAN_INFO, type PlanSlug } from '@/lib/plan-features';
 
 const EDGE_URL = 'https://zpswjccsxjtnhetkkqde.supabase.co/functions/v1';
 
@@ -51,6 +53,8 @@ interface ClientRow {
   credits?: ClientCredit | null;
   research?: BrandResearch[];
   hasPersona?: boolean;
+  subscriptionPlanSlug?: PlanSlug;
+  subscriptionId?: string;
 }
 
 type BriefStatus = 'complete' | 'in_progress' | 'not_started';
@@ -62,11 +66,12 @@ function getBriefStatus(client: ClientRow): BriefStatus {
   return 'not_started';
 }
 
-const PLAN_OPTIONS = [
-  { value: 'pro', label: 'Pro', tokens: 500 },
-];
+const PLAN_OPTIONS = PLAN_SLUGS.map(slug => ({
+  value: slug,
+  label: `${PLAN_INFO[slug].emoji} ${PLAN_INFO[slug].nombre}`,
+}));
 
-const DEFAULT_PLAN = 'pro';
+const DEFAULT_PLAN = 'visual';
 const DEFAULT_TOKENS = 500;
 
 async function getAuthToken() {
@@ -127,6 +132,7 @@ function ClientDetail({ client, onClose, onRefresh, onDelete }: {
     rut: client.rut ?? '',
     razon_social: client.razon_social ?? '',
     plan: client.credits?.plan ?? 'pro',
+    subscriptionPlan: client.subscriptionPlanSlug ?? 'visual' as PlanSlug,
     shopDomain: client.shop_domain ?? '',
   });
   const [linkCopied, setLinkCopied] = useState(false);
@@ -154,6 +160,36 @@ function ClientDetail({ client, onClose, onRefresh, onDelete }: {
           .update({ plan: editForm.plan })
           .eq('client_id', client.id);
         if (credErr) throw credErr;
+      }
+
+      // Update subscription plan if changed
+      if (editForm.subscriptionPlan !== client.subscriptionPlanSlug && client.client_user_id) {
+        const { data: newPlan } = await supabase
+          .from('subscription_plans')
+          .select('id')
+          .eq('slug', editForm.subscriptionPlan)
+          .single();
+
+        if (newPlan) {
+          if (client.subscriptionId) {
+            // Update existing subscription
+            await supabase
+              .from('user_subscriptions')
+              .update({ plan_id: newPlan.id })
+              .eq('id', client.subscriptionId);
+          } else {
+            // Create new subscription
+            await supabase
+              .from('user_subscriptions')
+              .insert({
+                user_id: client.client_user_id,
+                plan_id: newPlan.id,
+                status: 'active',
+                credits_used: 0,
+                credits_reset_at: new Date().toISOString(),
+              });
+          }
+        }
       }
 
       toast.success('Cliente actualizado');
@@ -320,8 +356,8 @@ function ClientDetail({ client, onClose, onRefresh, onDelete }: {
           <h4 className="text-sm font-medium text-muted-foreground">Plan y Tokens</h4>
 
           <div>
-            <Label className="text-xs">Plan</Label>
-            <Select value={editForm.plan} onValueChange={v => setEditForm({ ...editForm, plan: v })}>
+            <Label className="text-xs">Plan Steve Ads</Label>
+            <Select value={editForm.subscriptionPlan} onValueChange={v => setEditForm({ ...editForm, subscriptionPlan: v as PlanSlug })}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -486,7 +522,7 @@ function CreateClientDialog({ onCreated }: { onCreated: () => void }) {
         throw new Error(err.error || err.msg || 'Error al crear cliente');
       }
 
-      toast.success(`Cliente ${form.name} creado con Plan PRO (${DEFAULT_TOKENS} tokens)`);
+      toast.success(`Cliente ${form.name} creado con Plan Visual`);
       setForm({ name: '', email: '', password: '', company: '', rut: '', razon_social: '' });
       setOpen(false);
       onCreated();
@@ -507,7 +543,7 @@ function CreateClientDialog({ onCreated }: { onCreated: () => void }) {
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Nuevo Cliente — Plan PRO</DialogTitle>
+          <DialogTitle>Nuevo Cliente — Plan Visual</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleCreate} className="space-y-4">
           <div>
@@ -537,7 +573,7 @@ function CreateClientDialog({ onCreated }: { onCreated: () => void }) {
             </div>
           </div>
           <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-700">
-            Plan PRO — {DEFAULT_TOKENS} tokens incluidos
+            Plan Visual (por defecto) — se puede cambiar después
           </div>
           <Button type="submit" className="w-full" disabled={creating}>
             {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
@@ -584,6 +620,18 @@ export function AdminClientsPanel() {
         .from('buyer_personas')
         .select('client_id, is_complete');
 
+      // Fetch subscription plans for all users
+      const { data: subsData } = await supabase
+        .from('user_subscriptions')
+        .select('id, user_id, plan_id, subscription_plans(slug)')
+        .eq('status', 'active');
+
+      const subsMap = new Map<string, { slug: PlanSlug; subId: string }>();
+      subsData?.forEach((s: any) => {
+        const slug = s.subscription_plans?.slug as PlanSlug;
+        if (slug) subsMap.set(s.user_id, { slug, subId: s.id });
+      });
+
       const creditsMap = new Map<string, ClientCredit>();
       creditsData?.forEach(c => creditsMap.set(c.client_id, {
         creditos_disponibles: c.creditos_disponibles,
@@ -600,12 +648,17 @@ export function AdminClientsPanel() {
       const personaSet = new Set<string>();
       personaData?.forEach(p => { if (p.is_complete) personaSet.add(p.client_id); });
 
-      const enriched: ClientRow[] = (clientsData || []).map(c => ({
-        ...c,
-        credits: creditsMap.get(c.id) ?? null,
-        research: researchMap.get(c.id) ?? [],
-        hasPersona: personaSet.has(c.id),
-      }));
+      const enriched: ClientRow[] = (clientsData || []).map(c => {
+        const sub = c.client_user_id ? subsMap.get(c.client_user_id) : undefined;
+        return {
+          ...c,
+          credits: creditsMap.get(c.id) ?? null,
+          research: researchMap.get(c.id) ?? [],
+          hasPersona: personaSet.has(c.id),
+          subscriptionPlanSlug: sub?.slug,
+          subscriptionId: sub?.subId,
+        };
+      });
 
       setClients(enriched);
       setSelected(new Set());
@@ -832,6 +885,9 @@ export function AdminClientsPanel() {
 
                   <div className="flex items-center gap-3 flex-shrink-0" onClick={() => setExpandedId(isExpanded ? null : client.id)}>
                     <StatusBadge status={status} />
+                    {client.subscriptionPlanSlug && (
+                      <PlanBadge planSlug={client.subscriptionPlanSlug} />
+                    )}
                     {client.credits && (
                       <div className="text-right hidden sm:block">
                         <div className="text-xs text-muted-foreground">{client.credits.plan}</div>
