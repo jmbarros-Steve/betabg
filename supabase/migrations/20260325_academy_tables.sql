@@ -109,6 +109,25 @@ ALTER TABLE academy_lesson_progress ENABLE ROW LEVEL SECURITY;
 ALTER TABLE academy_quiz_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE academy_certificates ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (idempotent)
+DROP POLICY IF EXISTS "academy_courses_select" ON academy_courses;
+DROP POLICY IF EXISTS "academy_lessons_select" ON academy_lessons;
+DROP POLICY IF EXISTS "academy_quizzes_select" ON academy_quizzes;
+DROP POLICY IF EXISTS "academy_quiz_questions_select" ON academy_quiz_questions;
+DROP POLICY IF EXISTS "academy_enrollments_select" ON academy_enrollments;
+DROP POLICY IF EXISTS "academy_enrollments_insert" ON academy_enrollments;
+DROP POLICY IF EXISTS "academy_lesson_progress_select" ON academy_lesson_progress;
+DROP POLICY IF EXISTS "academy_lesson_progress_insert" ON academy_lesson_progress;
+DROP POLICY IF EXISTS "academy_lesson_progress_update" ON academy_lesson_progress;
+DROP POLICY IF EXISTS "academy_quiz_attempts_select" ON academy_quiz_attempts;
+DROP POLICY IF EXISTS "academy_quiz_attempts_insert" ON academy_quiz_attempts;
+DROP POLICY IF EXISTS "academy_certificates_select" ON academy_certificates;
+DROP POLICY IF EXISTS "academy_certificates_insert" ON academy_certificates;
+DROP POLICY IF EXISTS "academy_courses_admin" ON academy_courses;
+DROP POLICY IF EXISTS "academy_lessons_admin" ON academy_lessons;
+DROP POLICY IF EXISTS "academy_quizzes_admin" ON academy_quizzes;
+DROP POLICY IF EXISTS "academy_quiz_questions_admin" ON academy_quiz_questions;
+
 -- Cursos publicados: lectura para todos los autenticados
 CREATE POLICY "academy_courses_select" ON academy_courses FOR SELECT TO authenticated
   USING (is_published = true);
