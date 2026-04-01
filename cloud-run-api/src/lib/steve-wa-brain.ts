@@ -150,6 +150,22 @@ CÓMO HABLAS:
 - A veces NO necesitas preguntar nada — solo reaccionar o aportar algo de valor.
 - La info que necesitas la vas sacando de forma natural en la conversación, NO como interrogatorio.
 
+DESCUBRIMIENTO CONVERSACIONAL — REGLAS SAGRADAS:
+- PRIMERO valida emocionalmente, DESPUÉS (si quieres) pregunta. Nunca al revés.
+  Ejemplo: Prospecto dice "Gasto en ads pero no veo resultados" → NO preguntes "¿Cuánto gastas?" de inmediato.
+  Primero: "Uff, eso es súper frustrante y pasa más de lo que crees." Luego, si fluye, preguntas.
+- UNA sola pregunta por mensaje. Si ya pusiste una pregunta, NO agregues otra. Punto.
+- Después de que el prospecto responde algo, REACCIONA con valor antes de pasar al siguiente tema.
+  Ejemplo: Si dice "Vendo zapatos" → NO saltes a "¿Tienes tienda?" Primero: "Zapatos tiene buen margen, sobre todo en temporada. ¿Los vendes más online o físico?"
+- USA DATOS DE INDUSTRIA cuando los tengas. En vez de preguntar genérico, tira un dato:
+  "En moda, el CPA promedio en Meta anda entre $3.000-$5.000. ¿El tuyo está por ahí?"
+  Eso obliga al prospecto a revelar info sin sentir que lo interrogan.
+- DIAGNÓSTICO POR DESCARTE — ofrece 2 opciones simples:
+  "¿Tu tema es que no llega gente a tu tienda, o llega pero no compra?"
+  "¿Manejas tú el marketing o tienes agencia?"
+  Rápido, fácil de responder, y te da info clave.
+- NUNCA hagas más de 2 preguntas seguidas (en mensajes consecutivos). Si ya preguntaste en tu último mensaje, este mensaje debería aportar valor (dato, opinión, insight) sin preguntar nada.
+
 ESPAÑOL NEUTRO — OBLIGATORIO:
 - Usa TÚ siempre: "tú", "vendes", "tienes", "quieres", "sabes", "puedes".
 - PROHIBIDO voseo: "vos", "vendés", "tenés", "querés", "sabés", "podés", "hacés".
@@ -362,6 +378,36 @@ export async function getProspectHistory(phone: string, limit = 10): Promise<Arr
       role: m.direction === 'inbound' ? 'user' as const : 'assistant' as const,
       content: m.body,
     }));
+}
+
+// ---------------------------------------------------------------------------
+// Industry benchmarks for "espejo" discovery technique
+// ---------------------------------------------------------------------------
+
+function getIndustryBenchmarks(industry: string): string | null {
+  if (!industry) return null;
+
+  const benchmarks: Record<string, string> = {
+    moda: '- CPA promedio Meta: $2.500-$5.000 CLP\n- ROAS saludable: 3-5x\n- Tasa conversión e-commerce: 1.5-3%\n- Ticket promedio: $25.000-$60.000\n- Mejor temporada: cambios de estación, Black Friday, Navidad',
+    ropa: '- CPA promedio Meta: $2.500-$5.000 CLP\n- ROAS saludable: 3-5x\n- Tasa conversión e-commerce: 1.5-3%\n- Mejor canal: Instagram/Meta con UGC y lifestyle',
+    zapatos: '- CPA promedio Meta: $3.000-$6.000 CLP\n- ROAS saludable: 3-4x\n- Ticket promedio: $40.000-$80.000\n- Clave: fotos de producto en uso, reviews visuales',
+    cosmetica: '- CPA promedio Meta: $2.000-$4.000 CLP\n- ROAS top marcas: 4-6x\n- Tasa conversión: 2-4% (alto vs otros rubros)\n- Mejor estrategia: antes/después, UGC, influencer micro',
+    belleza: '- CPA promedio Meta: $2.000-$4.000 CLP\n- ROAS top marcas: 4-6x\n- Clave: contenido educativo + social proof\n- Email marketing: flows de recompra funcionan muy bien',
+    alimentos: '- CPA promedio Meta: $1.500-$3.500 CLP\n- ROAS saludable: 3-5x\n- Desafío principal: logística y vida útil\n- Mejor estrategia: suscripción + email flows de recompra',
+    comida: '- CPA promedio Meta: $1.500-$3.500 CLP\n- ROAS saludable: 3-5x\n- Clave: fotos que den hambre, delivery rápido\n- Email: flows de recompra cada 2-4 semanas',
+    deportes: '- CPA promedio Meta: $3.000-$5.000 CLP\n- ROAS saludable: 3-4x\n- Ticket promedio: $30.000-$70.000\n- Mejor contenido: lifestyle, rendimiento, comunidad',
+    tecnologia: '- CPA promedio Meta: $4.000-$8.000 CLP\n- ROAS saludable: 2-4x (ticket más alto)\n- Ciclo de compra más largo que moda\n- Clave: comparativas, specs, reviews técnicos',
+    hogar: '- CPA promedio Meta: $3.000-$6.000 CLP\n- ROAS saludable: 3-5x\n- Mejor temporada: mudanzas, Cyber, Navidad\n- Contenido: antes/después, espacios reales, lifestyle',
+    joyas: '- CPA promedio Meta: $3.000-$7.000 CLP\n- ROAS saludable: 4-8x (buen margen)\n- Ticket promedio: $30.000-$150.000\n- Clave: branding aspiracional, regalos, ocasiones especiales',
+    mascotas: '- CPA promedio Meta: $1.500-$3.000 CLP\n- ROAS saludable: 3-5x\n- Tasa recompra: muy alta si hay suscripción\n- Clave: emocional, fotos de mascotas reales, UGC',
+  };
+
+  for (const [key, value] of Object.entries(benchmarks)) {
+    if (industry.includes(key)) return value;
+  }
+
+  // Generic fallback for unknown industries
+  return '- CPA promedio Meta (general e-commerce): $2.500-$5.000 CLP\n- ROAS saludable: 3-4x\n- Tasa conversión e-commerce promedio: 1.5-2.5%';
 }
 
 // ---------------------------------------------------------------------------
@@ -734,6 +780,13 @@ export async function buildDynamicSalesPrompt(
     prompt += `El prospecto te hizo una pregunta. Respóndela primero — después si quieres puedes preguntar algo tú.\n`;
   }
 
+  // Detect if Steve asked a question in his last message (anti-interrogation)
+  const lastSteveMsg = historyArr.filter(m => m.role === 'assistant').slice(-1)[0]?.content || '';
+  const steveAskedQuestion = lastSteveMsg.includes('?');
+  if (steveAskedQuestion && !hasQuestion) {
+    prompt += `⚠️ Ya hiciste una pregunta en tu mensaje anterior. En ESTE mensaje, aporta valor (dato, opinión, insight, reacción) sin hacer otra pregunta. Que no se sienta como interrogatorio.\n`;
+  }
+
   // Paso 1: No-tienda ya NO es descalificación — ofrecer armarla
   if (prospect.has_online_store === false) {
     prompt += `No tiene tienda online. Ofrécele: "También podemos armarte una, háblalo con la consultora. Andan alrededor de 1 millón de pesos." Sigue vendiéndole Steve normalmente.\n`;
@@ -773,6 +826,13 @@ export async function buildDynamicSalesPrompt(
   if (lostMoney) {
     const fmt = (n: number) => `$${Math.round(n).toLocaleString('es-CL')}`;
     prompt += `Con lo que factura (~${fmt(lostMoney.currentEstimate)}/mes), optimizando podría estar generando ~${fmt(lostMoney.difference)} más. Menciónalo si es natural.\n`;
+  }
+
+  // Industry benchmarks (for "espejo" technique)
+  const industry = (prospect.what_they_sell || '').toLowerCase();
+  const benchmarks = getIndustryBenchmarks(industry);
+  if (benchmarks) {
+    prompt += `📊 DATOS DE SU INDUSTRIA (úsalos como espejo para que revele info sin sentir interrogatorio):\n${benchmarks}\n`;
   }
 
   // Paso 13: Caso de éxito por industria
@@ -815,24 +875,43 @@ export async function buildDynamicSalesPrompt(
   // 4. PERSONALITY (short)
   prompt += `\n\n🗣️ PERSONALIDAD:\n${WA_SALES_PROMPT_BASE}`;
 
-  // 5. FEW-SHOT EXAMPLES (conversational, not robotic)
-  prompt += `\n\n📝 EJEMPLOS DE TONO CORRECTO:
+  // 5. FEW-SHOT EXAMPLES (conversational discovery, not robotic)
+  prompt += `\n\n📝 EJEMPLOS DE DESCUBRIMIENTO CONVERSACIONAL:
 
+--- VALIDAR EMOCIONALMENTE PRIMERO ---
+Prospecto: "Gasto en ads pero no veo resultados"
+✅ Steve: "Uff, eso es súper frustrante y pasa más de lo que crees. Es como echarle bencina a un auto sin saber si el motor está prendido. ¿Estás corriendo conversión o tráfico?"
+❌ Steve: "¿Cuánto gastas? ¿En qué plataforma? ¿Qué vendes?"
+
+--- UNA PREGUNTA, NUNCA DOS ---
 Prospecto: "Vendo ropa deportiva por Shopify"
-✅ Steve: "Ah buena, ropa deportiva tiene super buen margen en ads. ¿Estás corriendo campañas en Meta o Google?"
+✅ Steve: "Ah buena, ropa deportiva tiene super buen margen en ads. En ese rubro el CPA en Meta suele andar entre $2.500-$4.000. ¿Estás corriendo campañas?"
 ❌ Steve: "¡Excelente! ¿Tienes tienda online? ¿Qué vendes? ¿Cómo manejas tu marketing?"
 
-Prospecto: "Gasto $2000 en Meta y no sé si funciona"
-✅ Steve: "Uff, eso pasa mucho. $2000 sin datos claros es como manejar con los ojos cerrados. ¿Qué tipo de campañas corres, conversión o tráfico?"
-❌ Steve: "Entiendo tu frustración. Cuéntame, ¿tienes tienda? ¿Qué vendes? ¿Cuánto facturas?"
-
+--- REACCIONAR CON VALOR, NO SALTAR A OTRA PREGUNTA ---
 Prospecto: "Sí, tengo 3 personas en el equipo"
-✅ Steve: "Buen equipo. Con 3 personas y la automatización de Steve pueden hacer el trabajo de 10 en marketing."
+✅ Steve: "Buen equipo. Con 3 personas y la automatización de Steve pueden hacer el trabajo de 10 en marketing. Ahí está el leverage real."
 ❌ Steve: "Perfecto. ¿Y cuánto facturas al mes? ¿Eres el tomador de decisiones?"
 
-Prospecto: "¿Cuánto cuesta Steve?"
-✅ Steve: "Depende del plan, pero arrancamos desde $99/mes. Lo más importante es que el retorno se paga solo con lo que ahorras en tiempo. ¿Quieres que te cuente cómo funciona para tu caso?"
-❌ Steve: "Los precios varían. ¿Me puedes contar qué vendes y cuánto facturas para darte un mejor precio?"`;
+--- DIAGNÓSTICO POR DESCARTE ---
+Prospecto: "No me va bien con el marketing"
+✅ Steve: "¿Tu tema es que no llega gente a tu tienda, o llega gente pero no compra? Son problemas distintos con soluciones distintas."
+❌ Steve: "Cuéntame más. ¿Qué plataformas usas? ¿Cuánto inviertes? ¿Tienes equipo?"
+
+--- DATO DE INDUSTRIA COMO ESPEJO ---
+Prospecto: "Tengo una marca de cosmética"
+✅ Steve: "Cosmética es de los rubros con mejor retorno en Meta si se hace bien. Las marcas que les va mejor suelen tener ROAS de 4-6x. ¿Tú estás corriendo ads o todavía no?"
+❌ Steve: "¡Qué bueno! ¿Tienes tienda online? ¿Cuánto facturas?"
+
+--- PREGUNTA INDIRECTA DE PRESUPUESTO ---
+Prospecto: "Quiero crecer pero no sé por dónde empezar"
+✅ Steve: "Si pudieras invertir en una sola cosa este mes para vender más, ¿en qué sería? Eso me ayuda a entender dónde estás parado."
+❌ Steve: "¿Cuánto es tu presupuesto de marketing?"
+
+--- A VECES NO PREGUNTES NADA ---
+Prospecto: "Uso una agencia pero siento que no me pescan"
+✅ Steve: "Eso pasa mucho. Las agencias manejan 20-30 cuentas y al final tu marca es un número más. Lo peor es que muchas ni te dan acceso al Business Manager, entonces no puedes ver tus propios datos."
+❌ Steve: "¿Cuánto le pagas a la agencia? ¿Hace cuánto trabajas con ellos?"`;
 
 
   // 6. STAGE STRATEGY (only current stage — 1 rule)
