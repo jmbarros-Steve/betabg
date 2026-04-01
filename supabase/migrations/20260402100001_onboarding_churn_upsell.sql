@@ -54,17 +54,17 @@ CREATE INDEX IF NOT EXISTS idx_upsell_client
 CREATE INDEX IF NOT EXISTS idx_upsell_pending
   ON merchant_upsell_opportunities (outcome) WHERE outcome = 'pending';
 
--- 4. RLS policies
+-- 4. RLS policies (drop if exists to handle partial re-runs)
 ALTER TABLE merchant_onboarding ENABLE ROW LEVEL SECURITY;
 ALTER TABLE merchant_upsell_opportunities ENABLE ROW LEVEL SECURITY;
 
--- Onboarding: service role full access
+DROP POLICY IF EXISTS "merchant_onboarding_service" ON merchant_onboarding;
 CREATE POLICY "merchant_onboarding_service"
   ON merchant_onboarding FOR ALL
   USING (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
 
--- Onboarding: clients can read their own
+DROP POLICY IF EXISTS "merchant_onboarding_client_read" ON merchant_onboarding;
 CREATE POLICY "merchant_onboarding_client_read"
   ON merchant_onboarding FOR SELECT
   USING (
@@ -73,26 +73,22 @@ CREATE POLICY "merchant_onboarding_client_read"
     )
   );
 
--- Onboarding: admins can read all
+DROP POLICY IF EXISTS "merchant_onboarding_admin_read" ON merchant_onboarding;
 CREATE POLICY "merchant_onboarding_admin_read"
   ON merchant_onboarding FOR SELECT
   USING (
-    EXISTS (
-      SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin')
-    )
+    has_role(auth.uid(), 'admin'::app_role)
   );
 
--- Upsell: service role full access
+DROP POLICY IF EXISTS "upsell_service" ON merchant_upsell_opportunities;
 CREATE POLICY "upsell_service"
   ON merchant_upsell_opportunities FOR ALL
   USING (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
 
--- Upsell: admins can read all
+DROP POLICY IF EXISTS "upsell_admin_read" ON merchant_upsell_opportunities;
 CREATE POLICY "upsell_admin_read"
   ON merchant_upsell_opportunities FOR SELECT
   USING (
-    EXISTS (
-      SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin')
-    )
+    has_role(auth.uid(), 'admin'::app_role)
   );
