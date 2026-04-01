@@ -45,6 +45,9 @@ const TRIGGER_INFO: Record<string, { icon: typeof ShoppingCart; label: string; d
   },
 };
 
+// Issue 6: Only abandoned_cart is functional — others are coming soon
+const COMING_SOON_TRIGGERS = new Set(['first_purchase', 'post_purchase', 'winback']);
+
 const DEFAULT_AUTOMATIONS = [
   {
     name: 'Carrito abandonado',
@@ -116,18 +119,24 @@ export function WAAutomations({ clientId }: Props) {
     setAutomations((data as any[]) || []);
   }
 
-  async function toggleAutomation(id: string, isActive: boolean) {
+  async function toggleAutomation(auto: Automation, isActive: boolean) {
+    // Issue 6: Block non-functional automations
+    if (COMING_SOON_TRIGGERS.has(auto.trigger_type)) {
+      toast.info('Esta automatizacion estara disponible proximamente');
+      return;
+    }
+
     const { error } = await supabase
       .from('wa_automations' as any)
       .update({ is_active: isActive })
-      .eq('id', id);
+      .eq('id', auto.id);
 
     if (error) {
       toast.error('Error al actualizar');
       return;
     }
 
-    setAutomations(prev => prev.map(a => a.id === id ? { ...a, is_active: isActive } : a));
+    setAutomations(prev => prev.map(a => a.id === auto.id ? { ...a, is_active: isActive } : a));
     toast.success(isActive ? 'Automatizacion activada' : 'Automatizacion pausada');
   }
 
@@ -154,6 +163,7 @@ export function WAAutomations({ clientId }: Props) {
         {automations.map(auto => {
           const info = TRIGGER_INFO[auto.trigger_type];
           const Icon = info?.icon || Zap;
+          const isComingSoon = COMING_SOON_TRIGGERS.has(auto.trigger_type);
           const convRate = auto.total_sent > 0
             ? Math.round((auto.total_converted / auto.total_sent) * 100)
             : 0;
@@ -171,14 +181,20 @@ export function WAAutomations({ clientId }: Props) {
                     <Icon className={`h-5 w-5 ${auto.is_active ? 'text-green-600' : 'text-gray-500'}`} />
                   </div>
                   <div>
-                    <p className="font-medium">{auto.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{auto.name}</p>
+                      {isComingSoon && (
+                        <Badge className="bg-gray-100 text-gray-500 text-xs">Proximamente</Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500">{info?.description || auto.trigger_type}</p>
                     <p className="text-xs text-gray-400 mt-1 italic">"{auto.template_body.slice(0, 80)}..."</p>
                   </div>
                 </div>
                 <Switch
                   checked={auto.is_active}
-                  onCheckedChange={(checked) => toggleAutomation(auto.id, checked)}
+                  onCheckedChange={(checked) => toggleAutomation(auto, checked)}
+                  disabled={isComingSoon}
                 />
               </div>
 

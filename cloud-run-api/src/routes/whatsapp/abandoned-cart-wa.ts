@@ -131,21 +131,18 @@ export async function abandonedCartWA(c: Context) {
         body: message,
       });
 
-      // Deduct credit
-      await supabase.from('wa_credits')
-        .update({
-          balance: credits.balance - 1,
-          total_used: (credits.total_used || 0) + 1,
-        })
-        .eq('id', credits.id);
-
-      await supabase.from('wa_credit_transactions').insert({
-        client_id: cart.client_id,
-        type: 'usage',
-        amount: -1,
-        description: `Carrito abandonado: ${productName}`,
-        balance_after: credits.balance - 1,
+      // Deduct credit atomically (Issue 1: prevents race condition)
+      const { data: deductResult } = await supabase.rpc('deduct_wa_credit', {
+        p_client_id: cart.client_id,
+        p_amount: 1,
+        p_description: `Carrito abandonado: ${productName}`,
       });
+
+      if (!(deductResult as any)?.success) {
+        console.warn(`[abandoned-cart-wa] Credit deduction failed for client ${cart.client_id}`);
+        skipped++;
+        continue;
+      }
 
       // Save message
       await supabase.from('wa_messages').insert({

@@ -6,6 +6,8 @@ import { decryptToken } from './setup-merchant.js';
 /**
  * POST /api/whatsapp/send-campaign
  * Sends a WhatsApp campaign to a segment of contacts.
+ * Returns HTTP response immediately after marking campaign as 'sending'.
+ * Actual message sending happens in background (Issue 2).
  * Auth: JWT (authMiddleware)
  *
  * Body: { campaign_id, client_id }
@@ -78,18 +80,18 @@ export async function waSendCampaign(c: Context) {
       return c.json({ error: 'No hay destinatarios para esta campaña' }, 400);
     }
 
-    // Check credits
-    const { data: credits } = await supabase
+    // Check credits (read-only pre-check)
+    const { data: creditCheck } = await supabase
       .from('wa_credits')
-      .select('id, balance, total_used')
+      .select('balance')
       .eq('client_id', client_id)
       .single();
 
-    if (!credits || credits.balance < recipients.length) {
+    if (!creditCheck || creditCheck.balance < recipients.length) {
       return c.json({
-        error: `Creditos insuficientes. Necesitas ${recipients.length}, tienes ${credits?.balance || 0}`,
+        error: `Creditos insuficientes. Necesitas ${recipients.length}, tienes ${creditCheck?.balance || 0}`,
         needed: recipients.length,
-        balance: credits?.balance || 0,
+        balance: creditCheck?.balance || 0,
       }, 402);
     }
 
@@ -102,96 +104,95 @@ export async function waSendCampaign(c: Context) {
       })
       .eq('id', campaign_id);
 
-    // Send messages (in background, return immediately)
-    const subClient = getTwilioSubClient(
-      waAccount.twilio_account_sid,
-      decryptToken(waAccount.twilio_auth_token),
-    );
-
-    const fromNorm = `whatsapp:${waAccount.phone_number.startsWith('+') ? waAccount.phone_number : '+' + waAccount.phone_number}`;
-
-    // Process in batches to avoid overwhelming Twilio
-    let sentCount = 0;
-    let failedCount = 0;
-
-    for (const recipient of recipients) {
+    // Issue 2: Return HTTP response immediately, process sends in background
+    Promise.resolve().then(async () => {
       try {
-        const personalizedBody = campaign.template_body
-          .replace(/\{\{nombre\}\}/g, recipient.name || 'Hola')
-          .replace(/\{\{customer_name\}\}/g, recipient.name || 'Hola');
+        const subClient = getTwilioSubClient(
+          waAccount.twilio_account_sid,
+          decryptToken(waAccount.twilio_auth_token),
+        );
 
-        const toNorm = `whatsapp:+${recipient.phone.replace('+', '')}`;
+        const fromNorm = `whatsapp:${waAccount.phone_number.startsWith('+') ? waAccount.phone_number : '+' + waAccount.phone_number}`;
 
-        const msg = await subClient.messages.create({
-          from: fromNorm,
-          to: toNorm,
-          body: personalizedBody,
-        });
+        let sentCount = 0;
+        let failedCount = 0;
 
-        // Save individual message
-        await supabase.from('wa_messages').insert({
-          client_id,
-          channel: 'merchant_wa',
-          direction: 'outbound',
-          from_number: waAccount.phone_number,
-          to_number: recipient.phone,
-          body: personalizedBody,
-          message_sid: msg.sid,
-          contact_phone: recipient.phone,
-          contact_name: recipient.name,
-          template_name: campaign.template_name,
-          credits_used: 1,
-          metadata: { campaign_id },
-        });
+        for (const recipient of recipients) {
+          try {
+            const personalizedBody = campaign.template_body
+              .replace(/\{\{nombre\}\}/g, recipient.name || 'Hola')
+              .replace(/\{\{customer_name\}\}/g, recipient.name || 'Hola');
 
-        sentCount++;
+            const toNorm = `whatsapp:+${recipient.phone.replace('+', '')}`;
 
-        // Rate limit: ~10 messages/second
-        if (sentCount % 10 === 0) {
-          await new Promise(r => setTimeout(r, 1000));
+            const msg = await subClient.messages.create({
+              from: fromNorm,
+              to: toNorm,
+              body: personalizedBody,
+            });
+
+            // Save individual message with campaign_id in metadata
+            await supabase.from('wa_messages').insert({
+              client_id,
+              channel: 'merchant_wa',
+              direction: 'outbound',
+              from_number: waAccount.phone_number,
+              to_number: recipient.phone,
+              body: personalizedBody,
+              message_sid: msg.sid,
+              contact_phone: recipient.phone,
+              contact_name: recipient.name,
+              template_name: campaign.template_name,
+              credits_used: 1,
+              metadata: { campaign_id },
+            });
+
+            sentCount++;
+
+            // Rate limit: ~10 messages/second
+            if (sentCount % 10 === 0) {
+              await new Promise(r => setTimeout(r, 1000));
+            }
+          } catch (err) {
+            console.error(`[wa-campaign] Failed to send to ${recipient.phone}:`, err);
+            failedCount++;
+          }
         }
-      } catch (err) {
-        console.error(`[wa-campaign] Failed to send to ${recipient.phone}:`, err);
-        failedCount++;
+
+        // Update campaign final status
+        await supabase.from('wa_campaigns')
+          .update({
+            status: 'sent',
+            sent_count: sentCount,
+            credits_used: sentCount,
+          })
+          .eq('id', campaign_id);
+
+        // Issue 1: Deduct credits atomically in one RPC call
+        if (sentCount > 0) {
+          await supabase.rpc('deduct_wa_credit', {
+            p_client_id: client_id,
+            p_amount: sentCount,
+            p_description: `Campaña "${campaign.name}": ${sentCount} mensajes`,
+          });
+        }
+
+        console.log(`[wa-campaign] Campaign ${campaign_id}: ${sentCount} sent, ${failedCount} failed`);
+      } catch (bgErr: any) {
+        console.error(`[wa-campaign] Background error for campaign ${campaign_id}:`, bgErr);
+        // Mark campaign as failed on unrecoverable error
+        await supabase.from('wa_campaigns')
+          .update({ status: 'failed' })
+          .eq('id', campaign_id);
       }
-    }
-
-    // Update campaign final status
-    await supabase.from('wa_campaigns')
-      .update({
-        status: 'sent',
-        sent_count: sentCount,
-        credits_used: sentCount,
-      })
-      .eq('id', campaign_id);
-
-    // Deduct credits
-    const newBalance = credits.balance - sentCount;
-    await supabase.from('wa_credits')
-      .update({
-        balance: newBalance,
-        total_used: (credits.total_used || 0) + sentCount,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', credits.id);
-
-    await supabase.from('wa_credit_transactions').insert({
-      client_id,
-      type: 'usage',
-      amount: -sentCount,
-      description: `Campaña "${campaign.name}": ${sentCount} mensajes`,
-      campaign_id,
-      balance_after: newBalance,
     });
 
-    console.log(`[wa-campaign] Campaign ${campaign_id}: ${sentCount} sent, ${failedCount} failed`);
-
+    // Return immediately (Issue 2)
     return c.json({
       success: true,
-      sent: sentCount,
-      failed: failedCount,
-      credits_used: sentCount,
-      credits_remaining: newBalance,
+      status: 'sending',
+      recipient_count: recipients.length,
+      message: 'Campaña en proceso de envío',
     });
 
   } catch (err: any) {

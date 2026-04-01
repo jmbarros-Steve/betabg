@@ -50,6 +50,47 @@ export function WAInbox({ clientId }: Props) {
     fetchConversations();
   }, [clientId, filter]);
 
+  // Issue 7: Supabase Realtime for live conversation updates
+  useEffect(() => {
+    const channel = supabase
+      .channel(`wa-conversations-${clientId}`)
+      .on(
+        'postgres_changes' as any,
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'wa_conversations',
+          filter: `client_id=eq.${clientId}`,
+        },
+        (payload: any) => {
+          const newConv = payload.new as Conversation;
+          if (newConv.channel === 'merchant_wa') {
+            setConversations(prev => [newConv, ...prev.filter(c => c.id !== newConv.id)]);
+          }
+        },
+      )
+      .on(
+        'postgres_changes' as any,
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'wa_conversations',
+          filter: `client_id=eq.${clientId}`,
+        },
+        (payload: any) => {
+          const updated = payload.new as Conversation;
+          setConversations(prev =>
+            prev.map(c => (c.id === updated.id ? updated : c)),
+          );
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [clientId]);
+
   async function fetchConversations() {
     setLoading(true);
     let query = supabase
@@ -186,8 +227,8 @@ export function WAInbox({ clientId }: Props) {
                         {new Date(msg.created_at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       {msg.direction === 'outbound' && (
-                        <span className="text-xs text-green-100">
-                          {msg.status === 'read' ? '✓✓' : msg.status === 'delivered' ? '✓✓' : '✓'}
+                        <span className={`text-xs ${msg.status === 'read' ? 'text-blue-300' : 'text-green-100'}`}>
+                          {msg.status === 'read' || msg.status === 'delivered' ? '✓✓' : '✓'}
                         </span>
                       )}
                     </div>

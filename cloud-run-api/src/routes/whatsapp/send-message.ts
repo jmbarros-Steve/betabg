@@ -33,15 +33,15 @@ export async function waSendMessage(c: Context) {
       return c.json({ error: 'WhatsApp no configurado para este merchant' }, 404);
     }
 
-    // Check credits
-    const { data: credits } = await supabase
+    // Check credits (read-only check before sending)
+    const { data: creditCheck } = await supabase
       .from('wa_credits')
-      .select('id, balance, total_used')
+      .select('balance')
       .eq('client_id', client_id)
       .single();
 
-    if (!credits || credits.balance < 1) {
-      return c.json({ error: 'Creditos insuficientes', balance: credits?.balance || 0 }, 402);
+    if (!creditCheck || creditCheck.balance < 1) {
+      return c.json({ error: 'Creditos insuficientes', balance: creditCheck?.balance || 0 }, 402);
     }
 
     // Send via Twilio sub-account
@@ -88,24 +88,23 @@ export async function waSendMessage(c: Context) {
       .eq('channel', 'merchant_wa')
       .eq('contact_phone', cleanPhone);
 
-    // Deduct credit
-    const newBalance = credits.balance - 1;
-    await supabase.from('wa_credits')
-      .update({ balance: newBalance, total_used: (credits.total_used || 0) + 1, updated_at: new Date().toISOString() })
-      .eq('id', credits.id);
-
-    await supabase.from('wa_credit_transactions').insert({
-      client_id,
-      type: 'usage',
-      amount: -1,
-      description: `Mensaje manual a ${cleanPhone}`,
-      balance_after: newBalance,
+    // Deduct credit atomically (Issue 1: prevents race condition)
+    const { data: deductResult } = await supabase.rpc('deduct_wa_credit', {
+      p_client_id: client_id,
+      p_amount: 1,
+      p_description: `Mensaje manual a ${cleanPhone}`,
     });
+
+    const result = deductResult as any;
+    if (!result?.success) {
+      // Message already sent but credits failed — log but don't fail
+      console.warn('[wa-send-message] Credit deduction failed after message sent');
+    }
 
     return c.json({
       success: true,
       message_sid: twilioMsg.sid,
-      credits_remaining: newBalance,
+      credits_remaining: result?.new_balance ?? (creditCheck.balance - 1),
     });
 
   } catch (err: any) {

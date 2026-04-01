@@ -170,7 +170,7 @@ export function WASetup({ clientId, onSetupComplete }: Props) {
           </Button>
 
           <p className="text-xs text-gray-400 mt-4">
-            Se asignara un numero chileno a tu tienda. Puedes desactivarlo en cualquier momento.
+            Se asignara un numero de WhatsApp a tu tienda. Puedes desactivarlo en cualquier momento.
           </p>
         </CardContent>
       </Card>

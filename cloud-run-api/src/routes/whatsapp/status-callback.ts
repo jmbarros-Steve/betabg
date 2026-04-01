@@ -28,7 +28,23 @@ export async function waStatusCallback(c: Context) {
       })
       .eq('message_sid', messageSid);
 
-    // Future: update campaign metrics via RPC if needed
+    // Issue 5: Update campaign metrics if this message belongs to a campaign
+    if (status === 'delivered' || status === 'read') {
+      const { data: msg } = await supabase
+        .from('wa_messages')
+        .select('metadata')
+        .eq('message_sid', messageSid)
+        .single();
+
+      const campaignId = (msg?.metadata as any)?.campaign_id;
+      if (campaignId) {
+        const column = status === 'delivered' ? 'delivered_count' : 'read_count';
+        await supabase.rpc('increment_campaign_counter', {
+          p_campaign_id: campaignId,
+          p_column: column,
+        });
+      }
+    }
 
     return c.text('OK');
   } catch (err) {

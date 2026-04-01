@@ -196,6 +196,31 @@ export async function merchantWAWebhook(c: Context) {
       return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
     }
 
+    // Check credits BEFORE calling Claude (Issue 3: don't waste AI credits if no WA credits)
+    const { data: creditCheck } = await supabase
+      .from('wa_credits')
+      .select('balance')
+      .eq('client_id', clientId)
+      .single();
+
+    if (!creditCheck || creditCheck.balance < 1) {
+      // No credits — send fallback without calling AI
+      const fallback = 'Gracias por tu mensaje, te responderemos pronto.';
+      await supabase.from('wa_messages').insert({
+        client_id: clientId,
+        channel: 'merchant_wa',
+        direction: 'outbound',
+        from_number: waAccount.phone_number,
+        to_number: phone,
+        body: fallback,
+        contact_name: profileName,
+        contact_phone: phone,
+        credits_used: 0,
+      });
+      const escaped = fallback.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return c.text(`<Response><Message>${escaped}</Message></Response>`, 200, { 'Content-Type': 'text/xml' });
+    }
+
     // Build context and generate response
     const [context, history] = await Promise.all([
       buildMerchantContext(clientId),
@@ -315,27 +340,12 @@ export async function merchantWAWebhook(c: Context) {
       .eq('channel', 'merchant_wa')
       .eq('contact_phone', phone);
 
-    // Deduct 1 credit
-    const { data: credits } = await supabase
-      .from('wa_credits')
-      .select('id, balance, total_used')
-      .eq('client_id', clientId)
-      .single();
-
-    if (credits && credits.balance > 0) {
-      const newBalance = credits.balance - 1;
-      await supabase.from('wa_credits')
-        .update({ balance: newBalance, total_used: (credits.total_used || 0) + 1, updated_at: new Date().toISOString() })
-        .eq('id', credits.id);
-
-      await supabase.from('wa_credit_transactions').insert({
-        client_id: clientId,
-        type: 'usage',
-        amount: -1,
-        description: `Respuesta a ${profileName || phone}`,
-        balance_after: newBalance,
-      });
-    }
+    // Deduct 1 credit atomically (Issue 1: prevents race condition)
+    await supabase.rpc('deduct_wa_credit', {
+      p_client_id: clientId,
+      p_amount: 1,
+      p_description: `Respuesta a ${profileName || phone}`,
+    });
 
     const escaped = replyText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return c.text(`<Response><Message>${escaped}</Message></Response>`, 200, { 'Content-Type': 'text/xml' });
