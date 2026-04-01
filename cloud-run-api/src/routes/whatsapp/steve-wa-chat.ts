@@ -297,7 +297,7 @@ async function handleProspect(
     });
 
     // 3. Load history
-    const history = await getProspectHistory(phone, 10);
+    const history = await getProspectHistory(phone, 20);
 
     // Build messages array for Claude
     const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [...history];
@@ -362,7 +362,7 @@ async function handleProspect(
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
-          max_tokens: 400,
+          max_tokens: 800,
           system: dynamicPrompt,
           messages: sanitized,
         }),
@@ -424,7 +424,7 @@ async function handleProspect(
           },
           body: JSON.stringify({
             model: 'claude-sonnet-4-6',
-            max_tokens: 400,
+            max_tokens: 800,
             messages: [{
               role: 'user',
               content: `Tu respuesta anterior contiene una pregunta REDUNDANTE. Ya sabemos que el prospecto vende "${prospect.what_they_sell}".
@@ -455,12 +455,12 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       secondReply = parts[1] || null;
     }
 
-    // Truncate to 400 chars for prospects (WhatsApp = short messages)
-    if (firstReply.length > 400) {
-      firstReply = firstReply.slice(0, 397) + '...';
+    // Truncate to 800 chars per part (WhatsApp supports up to 4096)
+    if (firstReply.length > 800) {
+      firstReply = firstReply.slice(0, 797) + '...';
     }
-    if (secondReply && secondReply.length > 400) {
-      secondReply = secondReply.slice(0, 397) + '...';
+    if (secondReply && secondReply.length > 800) {
+      secondReply = secondReply.slice(0, 797) + '...';
     }
 
     // 5. Save outbound message (first part)

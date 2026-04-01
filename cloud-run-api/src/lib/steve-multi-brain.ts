@@ -229,7 +229,7 @@ Responde SOLO con un JSON (sin markdown):
 
 /**
  * Generates the final WA message using the full dynamic prompt + strategist brief.
- * Max 400 tokens for short WA-style messages.
+ * Max 800 tokens for WA messages (supports [SPLIT] for long ones).
  */
 export async function runConversationalist(
   history: Array<{ role: 'user' | 'assistant'; content: string }>,
@@ -263,7 +263,7 @@ ${dynamicPrompt}`;
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 400,
+        max_tokens: 800,
         system: systemPrompt,
         messages: sanitizedMessages,
       }),
