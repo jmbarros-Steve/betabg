@@ -584,37 +584,9 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       }, 3000);
     }
 
-    // Paso: Handle [ACTIVATE_TRIAL:email] tag — create trial account
-    const trialMatch = (firstReply + (secondReply || '')).match(/\[ACTIVATE_TRIAL:([^\]]+)\]/);
-    if (trialMatch) {
-      const trialEmail = trialMatch[1].trim();
-      firstReply = firstReply.replace(/\[ACTIVATE_TRIAL:[^\]]+\]/g, '').trim();
-      if (secondReply) secondReply = secondReply.replace(/\[ACTIVATE_TRIAL:[^\]]+\]/g, '').trim();
-
-      // Fire & forget: call prospect-trial endpoint
-      const SELF_URL = process.env.SELF_URL || '';
-      if (SELF_URL) {
-        setTimeout(async () => {
-          try {
-            await fetch(`${SELF_URL}/api/whatsapp/prospect-trial`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Internal-Key': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-              },
-              body: JSON.stringify({
-                email: trialEmail,
-                phone,
-                prospect_id: prospect.id,
-                name: prospect.name || prospect.profile_name || profileName,
-              }),
-            });
-          } catch (err) {
-            console.error('[activate-trial] Error:', err);
-          }
-        }, 2000);
-      }
-    }
+    // Safety: strip any [ACTIVATE_TRIAL] tag if it leaks through (Steve NEVER creates free accounts)
+    firstReply = firstReply.replace(/\[ACTIVATE_TRIAL:[^\]]*\]/g, '').trim();
+    if (secondReply) secondReply = secondReply.replace(/\[ACTIVATE_TRIAL:[^\]]*\]/g, '').trim();
 
     // Paso: Handle [SEND_MOCKUP] tag — generate and send ad mockup
     const mockupTag = (firstReply + (secondReply || '')).includes('[SEND_MOCKUP]');

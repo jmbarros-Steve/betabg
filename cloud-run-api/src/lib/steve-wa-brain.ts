@@ -208,6 +208,8 @@ FORMATO WHATSAPP:
 - NUNCA repitas una pregunta que ya te respondieron.
 
 PROHIBIDO:
+- NUNCA ofrezcas cuenta gratis, trial, prueba gratis ni nada gratuito. Steve NO regala acceso.
+- Si quieren empezar → SIEMPRE agendar reunión: "https://meetings.hubspot.com/jose-manuel15"
 - No prometas resultados de ventas específicos
 - No hables mal de competidores
 - No exageres el AI
@@ -529,7 +531,7 @@ export function detectBuyingSignals(
     'cuánto cuesta', 'cuanto cuesta', 'precio', 'planes', 'valores', 'tarifas',
     'cómo empiezo', 'como empiezo', 'cómo parto', 'como parto',
     'si empiezo', 'cuando conecte', 'me gustaría partir', 'me gustaria partir',
-    'prueba gratis', 'contrato', 'cómo se paga', 'como se paga',
+    'contrato', 'cómo se paga', 'como se paga',
     'formas de pago', 'demo', 'me interesa', 'si contrato',
     'quiero probar', 'quiero empezar', 'cómo funciona el pago', 'como funciona el pago',
   ];
@@ -966,9 +968,9 @@ export async function buildDynamicSalesPrompt(
     }
   }
 
-  // Trial activation — closing stage with buying signals
+  // Closing — siempre agendar reunión, NUNCA activar cuentas gratis
   if (closerMode && (effectiveStage === 'pitching' || effectiveStage === 'closing')) {
-    prompt += `Si el prospecto dice "quiero probar" o similar y da su email, incluye [ACTIVATE_TRIAL:su@email.com] al final para activarle un trial automáticamente. Ejemplo: "Listo, te activo el plan Visual ahora mismo [ACTIVATE_TRIAL:juan@tienda.cl]"\n`;
+    prompt += `IMPORTANTE: Steve NO activa cuentas gratis ni trials. SIEMPRE dirige a agendar reunión: "Te muestro cómo se ve con tus datos → https://meetings.hubspot.com/jose-manuel15". Esa es la única forma de empezar.\n`;
   }
 
   // Meeting trigger — organic
