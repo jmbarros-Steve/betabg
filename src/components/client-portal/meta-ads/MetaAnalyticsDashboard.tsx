@@ -3,10 +3,27 @@ import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
+import { jsPDF } from 'jspdf';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Legend, BarChart, Bar,
@@ -15,6 +32,7 @@ import {
   TrendingUp, TrendingDown, DollarSign, Eye, MousePointerClick,
   ShoppingCart, Target, ArrowUpRight, ArrowDownRight,
   ChevronDown, ChevronRight, Sparkles, RefreshCw,
+  FileDown, CalendarClock, Loader2,
 } from 'lucide-react';
 import { useMetaBusiness } from './MetaBusinessContext';
 
@@ -508,6 +526,137 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
     return { bestCampaign, worstCampaign, budgetRec, creativeFatigue };
   }, [campaigns]);
 
+  // ------ PDF Export ------
+
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  const handleExportPdf = () => {
+    setGeneratingPdf(true);
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const w = doc.internal.pageSize.getWidth();
+      let y = 20;
+
+      // Title
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Reporte Meta Ads', 14, y);
+      y += 8;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Periodo: ${dateRange === 'custom' ? `${customFrom} - ${customTo}` : dateRange}`, 14, y);
+      doc.text(`Generado: ${new Date().toLocaleDateString('es-CL')}`, w - 60, y);
+      y += 12;
+
+      // KPIs
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('KPIs', 14, y);
+      y += 7;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+
+      const kpis = [
+        ['Gasto', formatCLP(totals.spend)],
+        ['Conversiones', String(Math.round(totals.conversions))],
+        ['Ingresos', formatCLP(totals.revenue)],
+        ['ROAS', `${totals.roas.toFixed(2)}x`],
+        ['CTR', `${totals.ctr.toFixed(2)}%`],
+        ['CPA', totals.conversions > 0 ? formatCLP(totals.spend / totals.conversions) : '--'],
+      ];
+
+      for (const [label, value] of kpis) {
+        doc.text(`${label}: ${value}`, 14, y);
+        y += 6;
+      }
+      y += 6;
+
+      // Top 5 campaigns
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Top 5 Campañas', 14, y);
+      y += 7;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+
+      const topCamps = [...campaigns].sort((a, b) => b.roas - a.roas).slice(0, 5);
+      for (const c of topCamps) {
+        const line = `${c.campaign_name.slice(0, 40)} — ROAS: ${c.roas.toFixed(2)}x | Gasto: ${formatCLP(c.spend)} | Conv: ${Math.round(c.conversions)}`;
+        doc.text(line, 14, y);
+        y += 5;
+      }
+      y += 8;
+
+      // AI Insights
+      if (insights) {
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('AI Insights', 14, y);
+        y += 7;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+
+        if (insights.bestCampaign) {
+          doc.text(`Mejor campaña: ${insights.bestCampaign.campaign_name} (ROAS ${insights.bestCampaign.roas.toFixed(2)}x)`, 14, y);
+          y += 5;
+        }
+        if (insights.budgetRec) {
+          const lines = doc.splitTextToSize(`Recomendación: ${insights.budgetRec}`, w - 28);
+          doc.text(lines, 14, y);
+          y += lines.length * 5;
+        }
+        if (insights.creativeFatigue) {
+          const lines = doc.splitTextToSize(`Alerta: ${insights.creativeFatigue}`, w - 28);
+          doc.text(lines, 14, y);
+          y += lines.length * 5;
+        }
+      }
+
+      doc.save(`reporte-meta-ads-${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success('PDF descargado');
+    } catch {
+      toast.error('Error al generar PDF');
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  // ------ Report Schedule ------
+
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleFrequency, setScheduleFrequency] = useState<'weekly' | 'monthly'>('weekly');
+  const [scheduleDay, setScheduleDay] = useState('1');
+  const [scheduleEmail, setScheduleEmail] = useState('');
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+
+  const handleSaveSchedule = async () => {
+    if (!scheduleEmail.trim() || !scheduleEmail.includes('@')) {
+      toast.error('Ingresa un email válido');
+      return;
+    }
+    setScheduleSaving(true);
+    try {
+      const { error } = await callApi('manage-report-schedule', {
+        body: {
+          action: 'save',
+          client_id: clientId,
+          report_type: 'meta_analytics',
+          frequency: scheduleFrequency,
+          day_of_week: scheduleFrequency === 'weekly' ? Number(scheduleDay) : undefined,
+          day_of_month: scheduleFrequency === 'monthly' ? Number(scheduleDay) : undefined,
+          recipient_email: scheduleEmail.trim(),
+        },
+      });
+      if (error) throw new Error(error);
+      toast.success('Programación guardada');
+      setScheduleOpen(false);
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al guardar programación');
+    } finally {
+      setScheduleSaving(false);
+    }
+  };
+
   // ------ Interaction Handlers ------
 
   function handleSort(field: SortField) {
@@ -609,15 +758,34 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
           )}
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={refreshing}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Sincronizando...' : 'Sincronizar'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPdf}
+            disabled={generatingPdf || metrics.length === 0}
+          >
+            {generatingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileDown className="w-4 h-4 mr-2" />}
+            Exportar PDF
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setScheduleOpen(true)}
+          >
+            <CalendarClock className="w-4 h-4 mr-2" />
+            Programar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Sincronizando...' : 'Sincronizar'}
+          </Button>
+        </div>
       </div>
 
       {/* ------------------------------------------------------------------ */}
@@ -961,6 +1129,83 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
           )}
         </CardContent>
       </Card>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Report Schedule Dialog                                              */}
+      {/* ------------------------------------------------------------------ */}
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Programar Envío de Reporte</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Frecuencia</Label>
+              <Select value={scheduleFrequency} onValueChange={(v) => setScheduleFrequency(v as 'weekly' | 'monthly')}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="weekly">Semanal</SelectItem>
+                  <SelectItem value="monthly">Mensual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>{scheduleFrequency === 'weekly' ? 'Día de la semana' : 'Día del mes'}</Label>
+              {scheduleFrequency === 'weekly' ? (
+                <Select value={scheduleDay} onValueChange={setScheduleDay}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Lunes</SelectItem>
+                    <SelectItem value="2">Martes</SelectItem>
+                    <SelectItem value="3">Miércoles</SelectItem>
+                    <SelectItem value="4">Jueves</SelectItem>
+                    <SelectItem value="5">Viernes</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={scheduleDay}
+                  onChange={(e) => setScheduleDay(e.target.value)}
+                  className="mt-1"
+                  placeholder="1-28"
+                />
+              )}
+            </div>
+            <div>
+              <Label>Email destinatario</Label>
+              <Input
+                type="email"
+                value={scheduleEmail}
+                onChange={(e) => setScheduleEmail(e.target.value)}
+                placeholder="correo@ejemplo.com"
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setScheduleOpen(false)} disabled={scheduleSaving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveSchedule} disabled={scheduleSaving}>
+              {scheduleSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                'Guardar'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

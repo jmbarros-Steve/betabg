@@ -203,7 +203,7 @@ interface InstagramPublisherProps {
   onPublished?: () => void;
 }
 
-type MediaType = 'IMAGE' | 'CAROUSEL' | 'REELS';
+type MediaType = 'IMAGE' | 'CAROUSEL' | 'REELS' | 'STORIES';
 
 export function InstagramPublisher({ clientId, prefillDate, onPublished }: InstagramPublisherProps) {
   const [mediaType, setMediaType] = useState<MediaType>('IMAGE');
@@ -220,6 +220,8 @@ export function InstagramPublisher({ clientId, prefillDate, onPublished }: Insta
   const [generating, setGenerating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
+  const [crossPost, setCrossPost] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
 
   // IG profile for preview — read ig_account_id from platform_connections to get the right account
   const [igProfile, setIgProfile] = useState<{ username: string; profile_picture_url: string } | null>(null);
@@ -278,20 +280,50 @@ export function InstagramPublisher({ clientId, prefillDate, onPublished }: Insta
     }
   };
 
+  const handleVideoUpload = async (file: File) => {
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    if (file.size > maxSize) {
+      toast.error('El video no puede superar 100MB');
+      return;
+    }
+    if (!file.type.startsWith('video/')) {
+      toast.error('Solo archivos de video (MP4, MOV)');
+      return;
+    }
+    setUploadingVideo(true);
+    try {
+      const ext = file.name.split('.').pop() || 'mp4';
+      const path = `${clientId}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('instagram-videos').upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from('instagram-videos').getPublicUrl(path);
+      setVideoUrl(urlData.publicUrl);
+      toast.success('Video subido');
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al subir video');
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
   const handlePublish = async () => {
     setPublishing(true);
     try {
       const body: Record<string, any> = {
         action: 'publish',
         client_id: clientId,
-        media_type: mediaType,
+        media_type: mediaType === 'STORIES' ? 'STORIES' : mediaType,
         caption,
         hashtags,
+        cross_post: crossPost,
       };
       if (mediaType === 'CAROUSEL') {
         body.image_urls = imageUrls;
       } else if (mediaType === 'REELS') {
         body.video_url = videoUrl;
+      } else if (mediaType === 'STORIES') {
+        body.image_url = imageUrl || undefined;
+        body.video_url = videoUrl || undefined;
       } else {
         body.image_url = imageUrl;
       }
@@ -313,15 +345,19 @@ export function InstagramPublisher({ clientId, prefillDate, onPublished }: Insta
       const body: Record<string, any> = {
         action: 'schedule',
         client_id: clientId,
-        media_type: mediaType,
+        media_type: mediaType === 'STORIES' ? 'STORIES' : mediaType,
         caption,
         hashtags,
         scheduled_at: new Date(scheduledAt).toISOString(),
+        cross_post: crossPost,
       };
       if (mediaType === 'CAROUSEL') {
         body.image_urls = imageUrls;
       } else if (mediaType === 'REELS') {
         body.video_url = videoUrl;
+      } else if (mediaType === 'STORIES') {
+        body.image_url = imageUrl || undefined;
+        body.video_url = videoUrl || undefined;
       } else {
         body.image_url = imageUrl;
       }
@@ -349,6 +385,7 @@ export function InstagramPublisher({ clientId, prefillDate, onPublished }: Insta
 
   const hasMedia = mediaType === 'CAROUSEL' ? imageUrls.length > 0
     : mediaType === 'REELS' ? !!videoUrl
+    : mediaType === 'STORIES' ? !!(imageUrl || videoUrl)
     : !!imageUrl;
 
   const fullCaption = hashtags.length > 0
@@ -373,6 +410,7 @@ export function InstagramPublisher({ clientId, prefillDate, onPublished }: Insta
                 { type: 'IMAGE' as MediaType, icon: ImagePlus, label: 'Imagen' },
                 { type: 'CAROUSEL' as MediaType, icon: Images, label: 'Carrusel' },
                 { type: 'REELS' as MediaType, icon: Film, label: 'Reel' },
+                { type: 'STORIES' as MediaType, icon: Clock, label: 'Story' },
               ]).map(({ type, icon: Icon, label }) => (
                 <Button
                   key={type}
@@ -425,13 +463,75 @@ export function InstagramPublisher({ clientId, prefillDate, onPublished }: Insta
           )}
 
           {mediaType === 'REELS' && (
-            <div>
-              <Label>URL del video</Label>
-              <Input
-                placeholder="https://... (MP4, max 60s, min 1080px)"
-                value={videoUrl}
-                onChange={e => setVideoUrl(e.target.value)}
-              />
+            <div className="space-y-3">
+              <Label>Video del Reel</Label>
+              {videoUrl ? (
+                <div className="flex items-center gap-2 p-2 border rounded bg-muted/30">
+                  <Film className="w-4 h-4 text-primary shrink-0" />
+                  <span className="text-xs truncate flex-1">{videoUrl}</span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => setVideoUrl('')}>
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                    <input
+                      type="file"
+                      accept="video/mp4,video/quicktime"
+                      className="hidden"
+                      id="video-upload"
+                      onChange={(e) => e.target.files?.[0] && handleVideoUpload(e.target.files[0])}
+                    />
+                    <label htmlFor="video-upload" className="cursor-pointer">
+                      {uploadingVideo ? (
+                        <Loader2 className="w-6 h-6 mx-auto animate-spin text-muted-foreground mb-1" />
+                      ) : (
+                        <Upload className="w-6 h-6 mx-auto text-muted-foreground mb-1" />
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {uploadingVideo ? 'Subiendo...' : 'Click para subir video (MP4/MOV, max 100MB)'}
+                      </p>
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">o URL:</span>
+                    <Input
+                      placeholder="https://..."
+                      value={videoUrl}
+                      onChange={e => setVideoUrl(e.target.value)}
+                      className="flex-1 h-8 text-xs"
+                    />
+                  </div>
+                </div>
+              )}
+              {/* Cross-post to Stories */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={crossPost}
+                  onChange={(e) => setCrossPost(e.target.checked)}
+                  className="rounded border-border"
+                />
+                <span className="text-xs text-muted-foreground">Publicar también en Stories</span>
+              </label>
+            </div>
+          )}
+
+          {mediaType === 'STORIES' && (
+            <div className="space-y-3">
+              <Label>Media para Story</Label>
+              <p className="text-xs text-muted-foreground">Sube una imagen o video para tu Story (desaparece en 24h)</p>
+              <ImagePicker value={imageUrl} onChange={setImageUrl} clientId={clientId} />
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">o video:</span>
+                <Input
+                  placeholder="URL del video..."
+                  value={videoUrl}
+                  onChange={e => setVideoUrl(e.target.value)}
+                  className="flex-1 h-8 text-xs"
+                />
+              </div>
             </div>
           )}
 

@@ -148,6 +148,36 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // AI suggestions
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
+  const handleAiSuggest = useCallback(async () => {
+    if (!selectedConversation || messages.length === 0) return;
+    setLoadingSuggestions(true);
+    setAiSuggestions([]);
+    try {
+      const msgContext = messages.slice(-10).map((m) => ({
+        role: m.is_page ? 'assistant' : 'user',
+        content: m.text,
+      }));
+      const { data, error } = await callApi('ai/suggest-inbox-reply', {
+        body: {
+          client_id: clientId,
+          messages: msgContext,
+          platform: selectedConversation.platform || 'instagram',
+        },
+      });
+      if (error) throw new Error(error);
+      setAiSuggestions(data?.suggestions || []);
+      if (!data?.suggestions?.length) toast.info('No se generaron sugerencias');
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al generar sugerencias');
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }, [clientId, selectedConversation, messages]);
+
   // ─── Fetch connection ─────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -885,6 +915,33 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                   <div ref={messagesEndRef} />
                 </div>
 
+                {/* AI Suggestions */}
+                {aiSuggestions.length > 0 && (
+                  <div className="px-4 py-2 border-t border-border shrink-0 space-y-1.5">
+                    <p className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> Sugerencias IA
+                    </p>
+                    {aiSuggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        className="block w-full text-left text-xs p-2 rounded border border-border hover:bg-muted/50 transition-colors"
+                        onClick={() => {
+                          setReplyText(s);
+                          setAiSuggestions([]);
+                        }}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                    <button
+                      className="text-[10px] text-muted-foreground hover:underline"
+                      onClick={() => setAiSuggestions([])}
+                    >
+                      Cerrar sugerencias
+                    </button>
+                  </div>
+                )}
+
                 {/* Reply */}
                 <div className="px-4 py-3 border-t border-border shrink-0 space-y-2">
                   <Textarea
@@ -901,6 +958,20 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                     rows={2}
                   />
                   <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAiSuggest}
+                      disabled={loadingSuggestions || messages.length === 0}
+                      className="gap-1.5"
+                    >
+                      {loadingSuggestions ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5" />
+                      )}
+                      {loadingSuggestions ? 'Pensando...' : 'Sugerir con IA'}
+                    </Button>
                     <Button
                       size="sm"
                       onClick={handleSendReply}

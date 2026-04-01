@@ -52,6 +52,8 @@ interface CompetitorAd {
   reach_upper: number | null;
   platforms: string[] | null;
   image_urls: string[] | null;
+  landing_url: string | null;
+  screenshot_url: string | null;
 }
 
 const CTA_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
@@ -852,6 +854,31 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                       Ver todos sus anuncios
                     </button>
                   </div>
+
+                  {/* Landing page */}
+                  {ad.landing_url && (
+                    <div className="border-t pt-2 space-y-1.5">
+                      <a
+                        href={ad.landing_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline flex items-center gap-1 truncate"
+                      >
+                        <Link2 className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate">{new URL(ad.landing_url).hostname}{new URL(ad.landing_url).pathname}</span>
+                      </a>
+                      {ad.screenshot_url && (
+                        <a href={ad.landing_url} target="_blank" rel="noopener noreferrer" className="block">
+                          <img
+                            src={ad.screenshot_url}
+                            alt="Landing page"
+                            className="w-full h-24 object-cover object-top rounded border hover:opacity-80 transition-opacity"
+                            loading="lazy"
+                          />
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}

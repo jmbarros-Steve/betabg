@@ -46,13 +46,14 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import MetaScopeAlert from './MetaScopeAlert';
+import AudienceOverlapViewer from './AudienceOverlapViewer';
 import { useMetaBusiness } from './MetaBusinessContext';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type AudienceTab = 'custom' | 'lookalike' | 'saved';
+type AudienceTab = 'custom' | 'lookalike' | 'saved' | 'overlap';
 type AudienceStatus = 'READY' | 'POPULATING' | 'ERROR' | 'TOO_SMALL';
 type CustomAudienceSource = 'WEBSITE' | 'CUSTOMER_LIST' | 'ENGAGEMENT' | 'APP_ACTIVITY';
 type EngagementType = 'PAGE' | 'INSTAGRAM' | 'VIDEO';
@@ -171,6 +172,7 @@ const TAB_CONFIG: { key: AudienceTab; label: string }[] = [
   { key: 'custom', label: 'Audiencias Personalizadas' },
   { key: 'lookalike', label: 'Audiencias Similares' },
   { key: 'saved', label: 'Audiencias Guardadas' },
+  { key: 'overlap', label: 'Overlap' },
 ];
 
 const COUNTRY_OPTIONS = [
@@ -1257,6 +1259,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       custom: audiences.filter((a) => a.type === 'custom').length,
       lookalike: audiences.filter((a) => a.type === 'lookalike').length,
       saved: audiences.filter((a) => a.type === 'saved').length,
+      overlap: 0,
     };
   }, [audiences]);
 
@@ -1700,9 +1703,16 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       </div>
 
       {/* ----------------------------------------------------------------- */}
+      {/* Overlap Tab — dedicated panel */}
+      {/* ----------------------------------------------------------------- */}
+      {activeTab === 'overlap' && (
+        <AudienceOverlapViewer clientId={clientId} />
+      )}
+
+      {/* ----------------------------------------------------------------- */}
       {/* Audience List */}
       {/* ----------------------------------------------------------------- */}
-      {filteredAudiences.length === 0 ? (
+      {activeTab !== 'overlap' && filteredAudiences.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center">
             <Users className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
@@ -1735,7 +1745,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
               )}
           </CardContent>
         </Card>
-      ) : (
+      ) : activeTab !== 'overlap' ? (
         <div className="space-y-3">
           {filteredAudiences.map((audience) => (
             <Card
@@ -1871,7 +1881,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
             </Card>
           ))}
         </div>
-      )}
+      ) : null}
 
       {/* ================================================================= */}
       {/* CREATE CUSTOM AUDIENCE DIALOG */}

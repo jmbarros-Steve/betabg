@@ -142,16 +142,32 @@ Cada vez que se haga `gcloud run deploy steve-api`, verificar que estas env vars
 - `GEMINI_API_KEY`
 - `SENTRY_DSN`
 
-### Pendiente: Twilio (WhatsApp)
-Cuando lleguen las credenciales, agregar a Cloud Run:
-- `TWILIO_ACCOUNT_SID`
-- `TWILIO_AUTH_TOKEN`
-- `TWILIO_PHONE_NUMBER`
+### ✅ Twilio (WhatsApp) — YA CONFIGURADO
+Las credenciales de Twilio ya están activas en Cloud Run:
+- `TWILIO_ACCOUNT_SID` = configurado
+- `TWILIO_AUTH_TOKEN` = configurado
+- `TWILIO_PHONE_NUMBER` = configurado
 
-Si alguna falta después del deploy, correr:
+### ❌ Pendiente: Google Ads
+Faltan 3 credenciales para que Google Ads funcione:
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_ADS_CLIENT_SECRET`
+- `GOOGLE_ADS_DEVELOPER_TOKEN`
+
+### ❌ Pendiente: Shopify App (instalación desde App Store)
+Faltan 3 credenciales para que la Shopify App funcione via App Store:
+- `SHOPIFY_CLIENT_ID`
+- `SHOPIFY_CLIENT_SECRET`
+- `SHOPIFY_WEBHOOK_SECRET`
+
+### ❌ Pendiente: Skyvern (browser automation)
+- `SKYVERN_API_KEY`
+- `SKYVERN_API_URL`
+
+Si alguna env var falta después del deploy, correr:
 ```bash
 gcloud run services update steve-api --region us-central1 --project steveapp-agency \
-  --set-env-vars META_APP_ID=<valor>,META_APP_SECRET=<valor>,APIFY_TOKEN=<valor>,GEMINI_API_KEY=<valor>,SENTRY_DSN=<valor>
+  --set-env-vars VARIABLE=valor
 ```
 Los valores están en el Secret Manager del proyecto o en el historial de deploys anteriores.
 

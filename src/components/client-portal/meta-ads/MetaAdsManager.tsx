@@ -71,6 +71,7 @@ import CampaignTreeView from './CampaignTreeView';
 import CampaignCreateWizard from './CampaignCreateWizard';
 import DraftsManager from './DraftsManager';
 import PixelSetupWizard from './PixelSetupWizard';
+import CreativePerformancePanel from './CreativePerformancePanel';
 import MetaConnectionWizard from './MetaConnectionWizard';
 import { PlanGate } from '@/components/client-portal/PlanGate';
 import { MetaScopeStatusPanel } from './MetaScopeAlert';
@@ -104,7 +105,8 @@ type SectionKey =
   | 'rules'
   | 'competitors'
   | 'drafts'
-  | 'pixel';
+  | 'pixel'
+  | 'creative-perf';
 
 interface NavItem {
   key: SectionKey;
@@ -164,6 +166,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'analytics', label: 'Análisis', icon: BarChart3 },
   { key: 'social-inbox', label: 'Bandeja Social', icon: MessageSquare },
   { key: 'rules', label: 'Reglas', icon: Zap },
+  { key: 'creative-perf', label: 'Creativos', icon: Sparkles },
   { key: 'competitors', label: 'Competencia', icon: Swords },
 ];
 
@@ -1007,6 +1010,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         {key === 'rules' && <MetaAutomatedRules clientId={clientId} />}
         {key === 'drafts' && <DraftsManager clientId={clientId} onEditDraft={() => { handleNavClick('create-wizard'); }} />}
         {key === 'pixel' && <PixelSetupWizard clientId={clientId} />}
+        {key === 'creative-perf' && <CreativePerformancePanel clientId={clientId} />}
         {key === 'competitors' && <CompetitorAdsPanel clientId={clientId} />}
       </div>
     );

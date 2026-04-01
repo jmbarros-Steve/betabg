@@ -8,6 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   Select,
   SelectContent,
@@ -46,6 +53,7 @@ import {
   X,
   ChevronUp,
   ChevronDown,
+  Eye,
 } from 'lucide-react';
 import { useMetaBusiness } from './MetaBusinessContext';
 
@@ -327,6 +335,13 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
 
   // Action loading states keyed by campaign_id
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+
+  // Bulk selection
+  const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set());
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+
+  // Quick-view sheet
+  const [quickViewCampaign, setQuickViewCampaign] = useState<CampaignRow | null>(null);
 
   // ----- Data fetching -----
   const fetchCampaigns = useCallback(async () => {
@@ -850,6 +865,73 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
     dateFrom !== '' ||
     dateTo !== '';
 
+  // ----- Bulk selection handlers -----
+
+  const toggleSelectCampaign = (campaignId: string) => {
+    setSelectedCampaigns((prev) => {
+      const next = new Set(prev);
+      if (next.has(campaignId)) {
+        next.delete(campaignId);
+      } else {
+        next.add(campaignId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedCampaigns.size === filteredCampaigns.length) {
+      setSelectedCampaigns(new Set());
+    } else {
+      setSelectedCampaigns(new Set(filteredCampaigns.map((c) => c.campaign_id)));
+    }
+  };
+
+  const handleBulkAction = async (action: 'pause' | 'resume' | 'archive') => {
+    if (selectedCampaigns.size === 0 || !connectionIds[0]) return;
+    setBulkActionLoading(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const campaignId of selectedCampaigns) {
+      try {
+        const apiAction = action === 'archive' ? 'archive' : action === 'pause' ? 'pause' : 'resume';
+        const { error: fnErr } = await callApi('manage-meta-campaign', {
+          body: {
+            action: apiAction,
+            campaign_id: campaignId,
+            connection_id: connectionIds[0],
+          },
+        });
+        if (fnErr) throw new Error(fnErr);
+        successCount++;
+      } catch {
+        errorCount++;
+      }
+    }
+
+    // Optimistic update
+    const newStatus: CampaignStatus = action === 'pause' ? 'PAUSED' : action === 'resume' ? 'ACTIVE' : 'ARCHIVED';
+    setCampaigns((prev) =>
+      prev.map((c) =>
+        selectedCampaigns.has(c.campaign_id) ? { ...c, status: newStatus } : c,
+      ),
+    );
+
+    setSelectedCampaigns(new Set());
+    setBulkActionLoading(false);
+
+    const actionLabel = action === 'pause' ? 'pausadas' : action === 'resume' ? 'reanudadas' : 'archivadas';
+    if (successCount > 0) toast.success(`${successCount} campaña(s) ${actionLabel}`);
+    if (errorCount > 0) toast.error(`${errorCount} campaña(s) con error`);
+  };
+
+  // Determine bulk action options based on selected campaigns' statuses
+  const selectedCampaignRows = filteredCampaigns.filter((c) => selectedCampaigns.has(c.campaign_id));
+  const hasActiveSelected = selectedCampaignRows.some((c) => c.status === 'ACTIVE');
+  const hasPausedSelected = selectedCampaignRows.some((c) => c.status === 'PAUSED');
+  const hasNonArchivedSelected = selectedCampaignRows.some((c) => c.status !== 'ARCHIVED');
+
   // ----- Rendering -----
 
   // Loading skeleton
@@ -1171,6 +1253,14 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-muted backdrop-blur-sm">
                   <tr className="border-b-2 border-border">
+                    {/* Checkbox Select All */}
+                    <th className="py-3 px-3 w-10">
+                      <Checkbox
+                        checked={filteredCampaigns.length > 0 && selectedCampaigns.size === filteredCampaigns.length}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Seleccionar todas"
+                      />
+                    </th>
                     {/* Campaign Name */}
                     <th className="text-left py-3 px-4">
                       <button
@@ -1312,12 +1402,24 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                           ${isLoading ? 'opacity-60 pointer-events-none' : ''}
                         `}
                       >
+                        {/* Checkbox */}
+                        <td className="py-4 px-3">
+                          <Checkbox
+                            checked={selectedCampaigns.has(campaign.campaign_id)}
+                            onCheckedChange={() => toggleSelectCampaign(campaign.campaign_id)}
+                            aria-label={`Seleccionar ${campaign.campaign_name}`}
+                          />
+                        </td>
                         {/* Campaign Name */}
                         <td className="py-4 px-4">
                           <div className="flex flex-col">
-                            <span className="font-medium text-sm truncate max-w-[280px]">
+                            <button
+                              className="font-medium text-sm truncate max-w-[280px] text-left hover:text-primary hover:underline transition-colors cursor-pointer"
+                              onClick={() => setQuickViewCampaign(campaign)}
+                              title="Ver detalle rápido"
+                            >
                               {campaign.campaign_name}
-                            </span>
+                            </button>
                             <span className="text-xs text-muted-foreground">
                               {OBJECTIVE_LABELS[campaign.objective]}
                             </span>
@@ -1489,6 +1591,203 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           </CardContent>
         </Card>
       )}
+
+      {/* ----------------------------------------------------------------- */}
+      {/* Bulk Actions Floating Bar */}
+      {/* ----------------------------------------------------------------- */}
+      {selectedCampaigns.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-background border-2 border-primary/30 shadow-2xl rounded-xl px-6 py-3 flex items-center gap-4 animate-in slide-in-from-bottom-4">
+          <span className="text-sm font-medium">
+            {selectedCampaigns.size} campaña{selectedCampaigns.size !== 1 ? 's' : ''} seleccionada{selectedCampaigns.size !== 1 ? 's' : ''}
+          </span>
+          <div className="h-5 w-px bg-border" />
+          {hasActiveSelected && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleBulkAction('pause')}
+              disabled={bulkActionLoading}
+            >
+              {bulkActionLoading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Pause className="w-3.5 h-3.5 mr-1.5" />}
+              Pausar ({selectedCampaignRows.filter((c) => c.status === 'ACTIVE').length})
+            </Button>
+          )}
+          {hasPausedSelected && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleBulkAction('resume')}
+              disabled={bulkActionLoading}
+            >
+              {bulkActionLoading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Play className="w-3.5 h-3.5 mr-1.5" />}
+              Reactivar ({selectedCampaignRows.filter((c) => c.status === 'PAUSED').length})
+            </Button>
+          )}
+          {hasNonArchivedSelected && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              onClick={() => handleBulkAction('archive')}
+              disabled={bulkActionLoading}
+            >
+              {bulkActionLoading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Archive className="w-3.5 h-3.5 mr-1.5" />}
+              Archivar ({selectedCampaignRows.filter((c) => c.status !== 'ARCHIVED').length})
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedCampaigns(new Set())}
+            disabled={bulkActionLoading}
+          >
+            <X className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )}
+
+      {/* ----------------------------------------------------------------- */}
+      {/* Quick-View Sheet */}
+      {/* ----------------------------------------------------------------- */}
+      <Sheet open={!!quickViewCampaign} onOpenChange={(open) => !open && setQuickViewCampaign(null)}>
+        <SheetContent className="sm:max-w-[480px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="text-lg">Detalle Rápido</SheetTitle>
+          </SheetHeader>
+          {quickViewCampaign && (
+            <div className="space-y-6 mt-4">
+              {/* Name & Status */}
+              <div>
+                <h3 className="text-base font-semibold mb-2">{quickViewCampaign.campaign_name}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <StatusBadge status={quickViewCampaign.status} />
+                  <Badge variant="secondary" className="text-xs">
+                    {OBJECTIVE_LABELS[quickViewCampaign.objective]}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Key Info */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Presupuesto/Día</p>
+                  <p className="text-lg font-bold">{formatCLP(quickViewCampaign.daily_budget)}</p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Optimización</p>
+                  <p className="text-sm font-medium">{OPTIMIZATION_LABELS[quickViewCampaign.optimization_goal]}</p>
+                </div>
+              </div>
+
+              {/* Period */}
+              {(quickViewCampaign.start_date || quickViewCampaign.end_date) && (
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Periodo:</span>{' '}
+                  <span className="font-medium">
+                    {quickViewCampaign.start_date || '?'} — {quickViewCampaign.end_date || 'En curso'}
+                  </span>
+                </div>
+              )}
+
+              {/* Placements */}
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">Ubicaciones</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {quickViewCampaign.placements.map((p) => (
+                    <Badge key={p} variant="secondary" className="text-xs">
+                      {PLACEMENT_LABELS[p]}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Metrics Table */}
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">Métricas (últimos 30 días)</p>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <tbody>
+                      <tr className="border-b">
+                        <td className="py-2.5 px-3 text-muted-foreground">Gasto</td>
+                        <td className="py-2.5 px-3 text-right font-medium">{formatCLP(quickViewCampaign.spend_30d)}</td>
+                      </tr>
+                      <tr className="border-b bg-muted/30">
+                        <td className="py-2.5 px-3 text-muted-foreground">Ingresos</td>
+                        <td className="py-2.5 px-3 text-right font-medium">{formatCLP(quickViewCampaign.revenue)}</td>
+                      </tr>
+                      <tr className="border-b">
+                        <td className="py-2.5 px-3 text-muted-foreground">ROAS</td>
+                        <td className={`py-2.5 px-3 text-right font-bold ${
+                          quickViewCampaign.roas >= 3 ? 'text-green-600' : quickViewCampaign.roas >= 2 ? 'text-yellow-600' : quickViewCampaign.roas > 0 ? 'text-red-500' : 'text-muted-foreground'
+                        }`}>
+                          {quickViewCampaign.roas > 0 ? formatRoas(quickViewCampaign.roas) : '--'}
+                        </td>
+                      </tr>
+                      <tr className="border-b bg-muted/30">
+                        <td className="py-2.5 px-3 text-muted-foreground">CPA</td>
+                        <td className="py-2.5 px-3 text-right font-medium">{quickViewCampaign.cpa > 0 ? formatCLP(quickViewCampaign.cpa) : '--'}</td>
+                      </tr>
+                      <tr className="border-b">
+                        <td className="py-2.5 px-3 text-muted-foreground">CTR</td>
+                        <td className="py-2.5 px-3 text-right font-medium">{quickViewCampaign.ctr > 0 ? formatPercent(quickViewCampaign.ctr) : '--'}</td>
+                      </tr>
+                      <tr className="border-b bg-muted/30">
+                        <td className="py-2.5 px-3 text-muted-foreground">Impresiones</td>
+                        <td className="py-2.5 px-3 text-right font-medium">{formatNumber(quickViewCampaign.impressions)}</td>
+                      </tr>
+                      <tr className="border-b">
+                        <td className="py-2.5 px-3 text-muted-foreground">Clics</td>
+                        <td className="py-2.5 px-3 text-right font-medium">{formatNumber(quickViewCampaign.clicks)}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 text-muted-foreground">Conversiones</td>
+                        <td className="py-2.5 px-3 text-right font-medium">{formatNumber(quickViewCampaign.conversions)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    openEditDialog(quickViewCampaign);
+                    setQuickViewCampaign(null);
+                  }}
+                >
+                  <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                  Editar
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    openBudgetDialog(quickViewCampaign);
+                    setQuickViewCampaign(null);
+                  }}
+                >
+                  <DollarSign className="w-3.5 h-3.5 mr-1.5" />
+                  Presupuesto
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    openAnalyticsDialog(quickViewCampaign);
+                    setQuickViewCampaign(null);
+                  }}
+                >
+                  <BarChart3 className="w-3.5 h-3.5 mr-1.5" />
+                  Analítica
+                </Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* ================================================================= */}
       {/* CREATE CAMPAIGN DIALOG */}

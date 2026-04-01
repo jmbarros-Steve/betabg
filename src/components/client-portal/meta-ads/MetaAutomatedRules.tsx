@@ -48,6 +48,7 @@ import {
   Info,
   Sparkles,
   Loader2,
+  Eye,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -332,6 +333,14 @@ const getActionDotColor = (actionType: RuleAction): string => {
 // Initial form state
 // ---------------------------------------------------------------------------
 
+interface ExtraCondition {
+  metric: RuleMetric;
+  operator: RuleOperator;
+  value: string;
+  valueTo: string;
+  timeWindow: TimeWindow;
+}
+
 const EMPTY_FORM: {
   name: string;
   metric: RuleMetric;
@@ -346,6 +355,8 @@ const EMPTY_FORM: {
   applyTo: ApplyTo;
   specificCampaignIds: string[];
   checkFrequency: CheckFrequency;
+  conditionOperator: 'AND' | 'OR';
+  extraConditions: ExtraCondition[];
 } = {
   name: '',
   metric: 'CPA',
@@ -360,6 +371,8 @@ const EMPTY_FORM: {
   applyTo: 'ACTIVE_ONLY',
   specificCampaignIds: [],
   checkFrequency: 'EVERY_1_HOUR',
+  conditionOperator: 'AND',
+  extraConditions: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -515,6 +528,15 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<AutomatedRule | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // Simulate / dry-run
+  const [simulating, setSimulating] = useState(false);
+  const [simulationResults, setSimulationResults] = useState<Array<{
+    campaign_name: string;
+    current_value: number;
+    would_trigger: boolean;
+    proposed_action: string;
+  }> | null>(null);
 
   // Form state
   const [form, setForm] = useState(EMPTY_FORM);
@@ -723,13 +745,28 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
       return;
     }
 
-    const condition: RuleCondition = {
+    const primaryCondition: RuleCondition = {
       metric: form.metric,
       operator: form.operator,
       value: numericValue,
       ...(form.operator === 'BETWEEN' ? { valueTo: parseFloat(form.valueTo) } : {}),
       timeWindow: form.timeWindow,
     };
+
+    // Build compound condition if extra conditions exist
+    let condition: any;
+    if (form.extraConditions.length > 0) {
+      const allConditions = [primaryCondition, ...form.extraConditions.map((ec) => ({
+        metric: ec.metric,
+        operator: ec.operator,
+        value: parseFloat(ec.value),
+        ...(ec.operator === 'BETWEEN' ? { valueTo: parseFloat(ec.valueTo) } : {}),
+        timeWindow: ec.timeWindow,
+      }))];
+      condition = { operator: form.conditionOperator, conditions: allConditions };
+    } else {
+      condition = primaryCondition;
+    }
 
     const action: RuleActionConfig = {
       type: form.actionType,
@@ -1365,6 +1402,150 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Extra conditions */}
+                {form.extraConditions.length > 0 && (
+                  <div className="space-y-3 pt-2 border-t border-border/50">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">Operador lógico:</span>
+                      <div className="flex gap-1 bg-muted p-0.5 rounded">
+                        {(['AND', 'OR'] as const).map((op) => (
+                          <button
+                            key={op}
+                            type="button"
+                            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                              form.conditionOperator === op
+                                ? 'bg-background text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                            onClick={() => setForm((prev) => ({ ...prev, conditionOperator: op }))}
+                          >
+                            {op}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {form.extraConditions.map((ec, idx) => (
+                      <div key={idx} className="grid grid-cols-5 gap-2 items-end">
+                        <div className="space-y-1">
+                          <Label className="text-[10px]">Métrica</Label>
+                          <Select
+                            value={ec.metric}
+                            onValueChange={(val) => {
+                              setForm((prev) => {
+                                const next = [...prev.extraConditions];
+                                next[idx] = { ...next[idx], metric: val as RuleMetric };
+                                return { ...prev, extraConditions: next };
+                              });
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {METRIC_OPTIONS.map((m) => (
+                                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px]">Operador</Label>
+                          <Select
+                            value={ec.operator}
+                            onValueChange={(val) => {
+                              setForm((prev) => {
+                                const next = [...prev.extraConditions];
+                                next[idx] = { ...next[idx], operator: val as RuleOperator };
+                                return { ...prev, extraConditions: next };
+                              });
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {OPERATOR_OPTIONS.map((o) => (
+                                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px]">Valor</Label>
+                          <Input
+                            type="number"
+                            className="h-8 text-xs"
+                            value={ec.value}
+                            onChange={(e) => {
+                              setForm((prev) => {
+                                const next = [...prev.extraConditions];
+                                next[idx] = { ...next[idx], value: e.target.value };
+                                return { ...prev, extraConditions: next };
+                              });
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px]">Ventana</Label>
+                          <Select
+                            value={ec.timeWindow}
+                            onValueChange={(val) => {
+                              setForm((prev) => {
+                                const next = [...prev.extraConditions];
+                                next[idx] = { ...next[idx], timeWindow: val as TimeWindow };
+                                return { ...prev, extraConditions: next };
+                              });
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {TIME_WINDOW_OPTIONS.map((tw) => (
+                                <SelectItem key={tw.value} value={tw.value}>{tw.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            setForm((prev) => ({
+                              ...prev,
+                              extraConditions: prev.extraConditions.filter((_, i) => i !== idx),
+                            }));
+                          }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add condition button */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => {
+                    setForm((prev) => ({
+                      ...prev,
+                      extraConditions: [
+                        ...prev.extraConditions,
+                        { metric: 'CPA' as RuleMetric, operator: 'GREATER_THAN' as RuleOperator, value: '', valueTo: '', timeWindow: 'LAST_7_DAYS' as TimeWindow },
+                      ],
+                    }));
+                  }}
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  Agregar condición
+                </Button>
               </CardContent>
             </Card>
 
@@ -1543,6 +1724,41 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
             )}
           </div>
 
+          {/* Simulation Results */}
+          {simulationResults && simulationResults.length > 0 && (
+            <Card className="border-blue-200 bg-blue-50/30">
+              <CardContent className="pt-4 pb-3">
+                <p className="text-xs font-medium text-blue-700 mb-2">Resultado de simulación</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b text-[10px] text-muted-foreground uppercase">
+                        <th className="text-left py-1.5 px-2">Campaña</th>
+                        <th className="text-right py-1.5 px-2">Valor Actual</th>
+                        <th className="text-center py-1.5 px-2">¿Triggerea?</th>
+                        <th className="text-left py-1.5 px-2">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {simulationResults.map((r, i) => (
+                        <tr key={i} className="border-b border-border/30">
+                          <td className="py-1.5 px-2 truncate max-w-[150px]">{r.campaign_name}</td>
+                          <td className="py-1.5 px-2 text-right font-medium">{r.current_value}</td>
+                          <td className="py-1.5 px-2 text-center">
+                            <Badge variant="outline" className={r.would_trigger ? 'bg-red-500/10 text-red-600 border-red-500/30' : 'bg-green-500/10 text-green-600 border-green-500/30'}>
+                              {r.would_trigger ? 'Sí' : 'No'}
+                            </Badge>
+                          </td>
+                          <td className="py-1.5 px-2">{r.proposed_action}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
@@ -1550,9 +1766,55 @@ export default function MetaAutomatedRules({ clientId }: MetaAutomatedRulesProps
                 setIsCreateOpen(false);
                 setEditingRule(null);
                 resetForm();
+                setSimulationResults(null);
               }}
             >
               Cancelar
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                if (!form.value || !ctxConnectionId) return;
+                setSimulating(true);
+                setSimulationResults(null);
+                try {
+                  const primaryCond = {
+                    metric: form.metric,
+                    operator: form.operator,
+                    value: parseFloat(form.value),
+                    timeWindow: form.timeWindow,
+                  };
+                  const condition = form.extraConditions.length > 0
+                    ? { operator: form.conditionOperator, conditions: [primaryCond, ...form.extraConditions.map((ec) => ({
+                        metric: ec.metric, operator: ec.operator, value: parseFloat(ec.value), timeWindow: ec.timeWindow,
+                      }))] }
+                    : primaryCond;
+
+                  const { data, error } = await callApi('manage-meta-rules', {
+                    body: {
+                      action: 'simulate',
+                      client_id: clientId,
+                      connection_id: ctxConnectionId,
+                      data: {
+                        condition,
+                        action: { type: form.actionType },
+                        apply_to: form.applyTo,
+                      },
+                    },
+                  });
+                  if (error) throw new Error(error);
+                  setSimulationResults(data?.results || []);
+                  if (!data?.results?.length) toast.info('Sin campañas para simular');
+                } catch (err: any) {
+                  toast.error(err?.message || 'Error al simular');
+                } finally {
+                  setSimulating(false);
+                }
+              }}
+              disabled={simulating || !form.value}
+            >
+              {simulating ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Eye className="w-4 h-4 mr-1" />}
+              {simulating ? 'Simulando...' : 'Simular'}
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? 'Guardando...' : editingRule ? 'Guardar cambios' : 'Crear regla'}

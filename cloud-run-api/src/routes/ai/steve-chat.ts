@@ -1262,6 +1262,8 @@ ${commitments && commitments.length > 0
     ).join('\n')}\nSi es relevante, pregunta por el progreso de estos compromisos.\n`
   : ''}
 ${creativeHistoryCtx}
+Tienes herramientas para buscar información. Si el usuario pregunta algo que no sabes o sobre lo que no tienes reglas, usa buscar_youtube o buscar_web para encontrar información actualizada antes de responder. Si aprendes algo nuevo y valioso durante la búsqueda, usa guardar_regla para guardarlo.
+
 Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accionables. Cuando hables de métricas, cita los números reales que tienes.`;
 
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -1275,48 +1277,261 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
       ? estrategiaSystemPrompt.slice(0, maxSystemLen) + '\n\n[...contexto truncado por límite de tamaño]'
       : estrategiaSystemPrompt;
 
-    timelog('estrategia-pre-anthropic');
-    const anthropicController = new AbortController();
-    const anthropicTimeout = setTimeout(() => anthropicController.abort(), 120000); // 2 minutes
-    let aiResponse: Response;
-    try {
-      aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
+    // === TOOLS for agentic search loop ===
+    const steveTools = [
+      {
+        name: 'buscar_youtube',
+        description: 'Busca videos en YouTube sobre un tema de marketing. Úsalo cuando no tengas suficiente conocimiento sobre el tema que pregunta el usuario.',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            query: { type: 'string' as const, description: 'Tema a buscar en YouTube' },
+          },
+          required: ['query'],
         },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 2000,
-          system: truncatedSystem,
-          messages: aiMessages,
-        }),
-        signal: anthropicController.signal,
-      });
-    } catch (fetchErr: any) {
-      clearTimeout(anthropicTimeout);
-      if (fetchErr.name === 'AbortError') {
-        console.error('[EST] Anthropic API timed out after 120s');
-        return c.json({ error: 'La respuesta tardó demasiado. Intenta de nuevo.' }, 504);
+      },
+      {
+        name: 'buscar_web',
+        description: 'Busca información en la web sobre un tema. Úsalo para datos actualizados o temas que no están en tu base de conocimiento.',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            query: { type: 'string' as const, description: 'Tema a buscar en la web' },
+          },
+          required: ['query'],
+        },
+      },
+      {
+        name: 'guardar_regla',
+        description: 'Guarda una regla nueva que aprendiste durante la búsqueda para usarla en futuras conversaciones.',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            titulo: { type: 'string' as const, description: 'Título corto de la regla (máx 60 chars)' },
+            contenido: { type: 'string' as const, description: 'Contenido de la regla en formato CUANDO/HAZ/PORQUE' },
+            categoria: { type: 'string' as const, description: 'Categoría: meta_ads, google, seo, klaviyo, shopify, brief, anuncios, buyer_persona, analisis' },
+          },
+          required: ['titulo', 'contenido', 'categoria'],
+        },
+      },
+    ];
+
+    timelog('estrategia-pre-anthropic');
+
+    // === AGENTIC LOOP — Steve can search before responding ===
+    let agentMessages: any[] = [...aiMessages]; // copy the messages array (any[] for tool_use/tool_result shapes)
+    let finalResponse = '';
+    let toolCallCount = 0;
+    const MAX_TOOL_CALLS = 3; // Max 3 searches per question
+    const maxTokens = 2000;
+
+    while (toolCallCount < MAX_TOOL_CALLS) {
+      const agentController = new AbortController();
+      const agentTimeout = setTimeout(() => agentController.abort(), 120000); // 2 minutes
+      let agentRes: Response;
+      try {
+        agentRes = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-6',
+            max_tokens: maxTokens,
+            system: truncatedSystem,
+            messages: agentMessages,
+            tools: steveTools,
+          }),
+          signal: agentController.signal,
+        });
+      } catch (fetchErr: any) {
+        clearTimeout(agentTimeout);
+        if (fetchErr.name === 'AbortError') {
+          console.error('[EST] Anthropic API timed out after 120s');
+          return c.json({ error: 'La respuesta tardó demasiado. Intenta de nuevo.' }, 504);
+        }
+        throw fetchErr;
+      } finally {
+        clearTimeout(agentTimeout);
       }
-      throw fetchErr;
-    } finally {
-      clearTimeout(anthropicTimeout);
+
+      if (!agentRes.ok) {
+        const errorText = await agentRes.text().catch(() => '');
+        console.error('AI API error (estrategia agentic):', agentRes.status, errorText);
+        if (agentRes.status === 429) return c.json({ error: 'Rate limit' }, 429);
+        return c.json({ error: `AI service error (${agentRes.status})`, details: errorText.slice(0, 200) }, 502);
+      }
+
+      const agentData: any = await agentRes.json();
+
+      if (agentData.stop_reason === 'tool_use') {
+        // Claude wants to use a tool
+        const toolUseBlock = agentData.content.find((b: any) => b.type === 'tool_use');
+        if (!toolUseBlock) break;
+
+        toolCallCount++;
+        let toolResult = '';
+        console.log(`[EST] Tool call #${toolCallCount}: ${toolUseBlock.name}(${JSON.stringify(toolUseBlock.input).slice(0, 100)})`);
+
+        switch (toolUseBlock.name) {
+          case 'buscar_youtube': {
+            const query = toolUseBlock.input.query;
+            try {
+              const searchRes = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, {
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+              });
+              if (searchRes.ok) {
+                const html = await searchRes.text();
+                // Extract video titles and descriptions
+                const titles = [...html.matchAll(/"title":\{"runs":\[\{"text":"([^"]{10,80})"/g)]
+                  .map(m => m[1])
+                  .slice(0, 5);
+
+                // Try to get transcript of first video
+                const videoIds = [...html.matchAll(/"videoId":"([a-zA-Z0-9_-]{11})"/g)]
+                  .map(m => m[1])
+                  .filter((v, i, arr) => arr.indexOf(v) === i)
+                  .slice(0, 1);
+
+                let transcript = '';
+                if (videoIds.length > 0) {
+                  const ytRes = await fetch(`https://www.youtube.com/watch?v=${videoIds[0]}`, {
+                    headers: { 'User-Agent': 'Mozilla/5.0' },
+                  });
+                  if (ytRes.ok) {
+                    const ytHtml = await ytRes.text();
+                    const captionMatch = ytHtml.match(/"captionTracks"\s*:\s*(\[.*?\])/);
+                    if (captionMatch) {
+                      try {
+                        const tracks = JSON.parse(captionMatch[1]);
+                        const preferred = tracks.find((t: any) => t.languageCode === 'es') || tracks.find((t: any) => t.languageCode === 'en') || tracks[0];
+                        if (preferred?.baseUrl) {
+                          const capRes = await fetch(preferred.baseUrl);
+                          if (capRes.ok) {
+                            const capXml = await capRes.text();
+                            transcript = [...capXml.matchAll(/<text[^>]*>(.*?)<\/text>/gs)]
+                              .map(m => m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").trim())
+                              .filter(Boolean)
+                              .join(' ')
+                              .slice(0, 5000);
+                          }
+                        }
+                      } catch {}
+                    }
+                  }
+                }
+
+                toolResult = transcript
+                  ? `Videos encontrados sobre "${query}":\n${titles.join('\n')}\n\nTranscripción del primer video:\n${transcript}`
+                  : `Videos encontrados sobre "${query}":\n${titles.join('\n')}\n\n(No se pudo obtener transcripción)`;
+              } else {
+                toolResult = 'No se pudieron buscar videos en YouTube.';
+              }
+            } catch (e) {
+              toolResult = `Error buscando en YouTube: ${e}`;
+            }
+            break;
+          }
+
+          case 'buscar_web': {
+            const query = toolUseBlock.input.query;
+            try {
+              // Use a simple web search via DuckDuckGo HTML
+              const searchRes = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query + ' marketing ecommerce')}`, {
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+              });
+              if (searchRes.ok) {
+                const html = await searchRes.text();
+                const results = [...html.matchAll(/<a[^>]*class="result__a"[^>]*>(.*?)<\/a>[\s\S]*?<a[^>]*class="result__snippet"[^>]*>(.*?)<\/a>/g)]
+                  .slice(0, 5)
+                  .map(m => `${m[1].replace(/<[^>]+>/g, '')}: ${m[2].replace(/<[^>]+>/g, '')}`)
+                  .join('\n\n');
+                toolResult = results || 'No se encontraron resultados.';
+              } else {
+                toolResult = 'No se pudo realizar la búsqueda web.';
+              }
+            } catch (e) {
+              toolResult = `Error en búsqueda web: ${e}`;
+            }
+            break;
+          }
+
+          case 'guardar_regla': {
+            const { titulo, contenido, categoria } = toolUseBlock.input;
+            try {
+              await supabase.from('steve_knowledge').insert({
+                categoria,
+                titulo: titulo.slice(0, 80),
+                contenido: contenido.slice(0, 600),
+                activo: true,
+                orden: 80,
+                approval_status: 'pending',
+                industria: 'general',
+              });
+              toolResult = `Regla "${titulo}" guardada exitosamente (pendiente de aprobación).`;
+            } catch (e) {
+              toolResult = `Error guardando regla: ${e}`;
+            }
+            break;
+          }
+
+          default:
+            toolResult = 'Herramienta no reconocida.';
+        }
+
+        // Add assistant message with tool use and tool result to conversation
+        agentMessages.push({ role: 'assistant', content: agentData.content });
+        agentMessages.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUseBlock.id, content: toolResult }] });
+
+      } else {
+        // Claude is done — extract text response
+        finalResponse = agentData.content
+          ?.filter((b: any) => b.type === 'text')
+          .map((b: any) => b.text)
+          .join('') || '';
+        break;
+      }
+    }
+
+    // If loop exited without response (max tools reached), make one final call without tools
+    if (!finalResponse) {
+      const fallbackController = new AbortController();
+      const fallbackTimeout = setTimeout(() => fallbackController.abort(), 120000);
+      try {
+        const fallbackRes = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-6',
+            max_tokens: maxTokens,
+            system: truncatedSystem,
+            messages: agentMessages,
+          }),
+          signal: fallbackController.signal,
+        });
+        if (fallbackRes.ok) {
+          const fallbackData: any = await fallbackRes.json();
+          finalResponse = fallbackData.content
+            ?.filter((b: any) => b.type === 'text')
+            .map((b: any) => b.text)
+            .join('') || '';
+        }
+      } catch (fallbackErr: any) {
+        console.error('[EST] Fallback API call failed:', fallbackErr?.message);
+      } finally {
+        clearTimeout(fallbackTimeout);
+      }
     }
 
     timelog('estrategia-post-anthropic');
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text().catch(() => '');
-      console.error('AI API error (estrategia):', aiResponse.status, errorText);
-      if (aiResponse.status === 429) return c.json({ error: 'Rate limit' }, 429);
-      return c.json({ error: `AI service error (${aiResponse.status})`, details: errorText.slice(0, 200) }, 502);
-    }
-
-    const aiData: any = await aiResponse.json();
-    const rawMsg = aiData.content?.[0]?.text || 'Lo siento, hubo un error. ¿Podrías repetir tu pregunta?';
+    const rawMsg = finalResponse || 'Lo siento, hubo un error. ¿Podrías repetir tu pregunta?';
     // Strip <thinking>...</thinking> blocks from chain-of-thought models
     const assistantMsg = rawMsg.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '').trim();
 

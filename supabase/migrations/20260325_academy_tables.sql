@@ -197,7 +197,8 @@ VALUES (
   4.5,
   true,
   1
-);
+)
+ON CONFLICT DO NOTHING;
 
 -- Curso 2: Google Ads para e-commerce
 INSERT INTO academy_courses (title, description, slug, category, difficulty, estimated_hours, is_published, sort_order)
@@ -210,7 +211,8 @@ VALUES (
   5.0,
   true,
   2
-);
+)
+ON CONFLICT DO NOTHING;
 
 -- Curso 3: Email Marketing con Klaviyo
 INSERT INTO academy_courses (title, description, slug, category, difficulty, estimated_hours, is_published, sort_order)
@@ -223,7 +225,8 @@ VALUES (
   3.5,
   true,
   3
-);
+)
+ON CONFLICT DO NOTHING;
 
 -- Curso 4: Shopify Analytics
 INSERT INTO academy_courses (title, description, slug, category, difficulty, estimated_hours, is_published, sort_order)
@@ -236,7 +239,8 @@ VALUES (
   3.0,
   true,
   4
-);
+)
+ON CONFLICT DO NOTHING;
 
 -- Curso 5: Estrategia de Marketing Digital
 INSERT INTO academy_courses (title, description, slug, category, difficulty, estimated_hours, is_published, sort_order)
@@ -249,7 +253,8 @@ VALUES (
   6.0,
   true,
   5
-);
+)
+ON CONFLICT DO NOTHING;
 
 -- Lecciones para Curso 1: Meta Ads desde cero
 INSERT INTO academy_lessons (course_id, title, description, youtube_video_id, duration_minutes, sort_order, is_free_preview)

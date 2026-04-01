@@ -19,6 +19,7 @@ import { SmartInsightsPanel } from './metrics/SmartInsightsPanel';
 import { BusinessHealthScore } from './metrics/BusinessHealthScore';
 import { DayOfWeekChart } from './metrics/DayOfWeekChart';
 import { ConversionFunnelPanel } from './metrics/ConversionFunnelPanel';
+import { ReportGeneratorButton } from './metrics/ReportGeneratorButton';
 
 interface ClientPortalMetricsProps {
   clientId: string;
@@ -739,6 +740,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             customRange={customDateRange}
             onCustomRangeChange={setCustomDateRange}
           />
+          <ReportGeneratorButton clientId={clientId} />
           <Button variant="outline" size="sm" onClick={exportToCSV} title="Exportar métricas a CSV" aria-label="Exportar métricas a CSV">
             <Download className="w-4 h-4" />
           </Button>
