@@ -130,6 +130,13 @@ import { knowledgeDedup } from './cron/knowledge-dedup.js';
 import { onboardingWA } from './cron/onboarding-wa.js';
 import { merchantUpsell } from './cron/merchant-upsell.js';
 import { churnDetector } from './cron/churn-detector.js';
+import { funnelDiagnosis } from './cron/funnel-diagnosis.js';
+import { predictiveAlerts } from './cron/predictive-alerts.js';
+import { anomalyDetector } from './cron/anomaly-detector.js';
+import { autoBriefGenerator } from './cron/auto-brief-generator.js';
+import { crossClientLearning } from './cron/cross-client-learning.js';
+import { revenueAttribution } from './cron/revenue-attribution.js';
+import { knowledgeQualityScore } from './cron/knowledge-quality-score.js';
 
 // WhatsApp
 import { steveWAChat } from './whatsapp/steve-wa-chat.js';
@@ -433,4 +440,11 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/onboarding-wa', onboardingWA); // No JWT — uses X-Cron-Secret, every 4h: 0 */4 * * *
   app.post('/api/cron/merchant-upsell', merchantUpsell); // No JWT — uses X-Cron-Secret, weekly: 0 11 * * 0 (Sun 11am UTC)
   app.post('/api/cron/churn-detector', churnDetector); // No JWT — uses X-Cron-Secret, daily: 0 14 * * *
+  app.post('/api/cron/funnel-diagnosis', funnelDiagnosis); // No JWT — uses X-Cron-Secret, weekly: 0 5 * * 1 (Mon 5am)
+  app.post('/api/cron/predictive-alerts', predictiveAlerts); // No JWT — uses X-Cron-Secret, every 6h: 0 */6 * * *
+  app.post('/api/cron/anomaly-detector', anomalyDetector); // No JWT — uses X-Cron-Secret, daily: 0 22 * * *
+  app.post('/api/cron/auto-brief-generator', autoBriefGenerator); // No JWT — uses X-Cron-Secret, daily: 0 7 * * *
+  app.post('/api/cron/cross-client-learning', crossClientLearning); // No JWT — uses X-Cron-Secret, monthly: 0 3 1 * *
+  app.post('/api/cron/revenue-attribution', revenueAttribution); // No JWT — uses X-Cron-Secret, weekly: 0 4 * * 0 (Sun 4am)
+  app.post('/api/cron/knowledge-quality-score', knowledgeQualityScore); // No JWT — uses X-Cron-Secret, weekly: 0 5 * * 0 (Sun 5am)
 }

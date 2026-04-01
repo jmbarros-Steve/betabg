@@ -912,6 +912,21 @@ Responde SOLO en JSON válido sin markdown ni backticks:
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     try {
       const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(raw);
+
+      // Track as A/B test if multiple variants generated (Mejora #6)
+      const variants = parsed?.variaciones;
+      if (variants && variants.length > 1 && resolvedClientId) {
+        supabase.from('steve_ab_tests').insert({
+          client_id: resolvedClientId,
+          variants: variants.map((v: any, i: number) => ({
+            index: i,
+            headline: v.titulo || '',
+            body: v.texto_principal || '',
+          })),
+          status: 'running',
+        }).then(() => {});
+      }
+
       return c.json(parsed);
     } catch (e: any) {
       console.error('[generate-meta-copy] JSON parse error (variaciones):', e.message, 'raw:', raw.slice(0, 500));

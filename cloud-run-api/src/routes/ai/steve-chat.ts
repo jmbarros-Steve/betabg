@@ -857,6 +857,8 @@ export async function steveChat(c: Context) {
       { data: research },
       { data: knowledge },
       { data: connections },
+      { data: clientKnowledgeData },
+      { data: commitments },
     ] = await Promise.all([
       // 1. Fetch last messages for context
       supabase
@@ -876,7 +878,7 @@ export async function steveChat(c: Context) {
         .from('brand_research')
         .select('research_type, research_data')
         .eq('client_id', client_id),
-      // 4. Load knowledge base
+      // 4. Load knowledge base (global rules)
       // TODO (Mejora #4 - Industry filter): Once clients have industria assigned, add
       // .in('industria', ['general', clientIndustry]) to filter rules by client's industry.
       supabase
@@ -892,14 +894,34 @@ export async function steveChat(c: Context) {
         .select('id, platform')
         .eq('client_id', client_id)
         .eq('is_active', true),
+      // 6. Fetch client-specific knowledge (Mejora #1)
+      supabase
+        .from('steve_knowledge')
+        .select('categoria, titulo, contenido, orden')
+        .eq('client_id', client_id)
+        .eq('activo', true)
+        .order('orden', { ascending: false })
+        .limit(10),
+      // 7. Load pending commitments for this client (Mejora #8)
+      supabase
+        .from('steve_commitments')
+        .select('commitment, context, follow_up_date, agreed_date')
+        .eq('client_id', client_id)
+        .eq('status', 'pending')
+        .order('agreed_date', { ascending: false })
+        .limit(5),
     ]);
+
+    // Merge client-specific + global knowledge (client first for priority)
+    const mergedKnowledge = [...(clientKnowledgeData || []), ...(knowledge || [])];
     timelog('estrategia-parallel-queries');
 
     // Smart rule selection (Mejora #10): use Haiku to pick most relevant rules for this question
-    let filteredKnowledge = knowledge;
-    if (knowledge && knowledge.length > 5 && process.env.ANTHROPIC_API_KEY) {
+    // Uses mergedKnowledge (client-specific + global, client first for priority)
+    let filteredKnowledge = mergedKnowledge;
+    if (mergedKnowledge && mergedKnowledge.length > 5 && process.env.ANTHROPIC_API_KEY) {
       try {
-        const ruleTitles = knowledge.map((k: any, i: number) => `[${i}] ${k.titulo}`).join('\n');
+        const ruleTitles = mergedKnowledge.map((k: any, i: number) => `[${i}] ${k.titulo}`).join('\n');
         const filterRes = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -919,9 +941,9 @@ export async function steveChat(c: Context) {
         if (filterRes.ok) {
           const filterData: any = await filterRes.json();
           const indices = (filterData.content?.[0]?.text || '')
-            .match(/\d+/g)?.map(Number).filter((n: number) => n < knowledge.length) || [];
+            .match(/\d+/g)?.map(Number).filter((n: number) => n < mergedKnowledge.length) || [];
           if (indices.length > 0) {
-            filteredKnowledge = indices.map((i: number) => knowledge![i]).filter(Boolean);
+            filteredKnowledge = indices.map((i: number) => mergedKnowledge![i]).filter(Boolean);
           }
         }
       } catch (e) {
@@ -1234,6 +1256,11 @@ ${briefSummary}
 
 ${researchContext ? `INVESTIGACIÓN DE MARCA:\n${researchContext}\n` : ''}
 ${knowledgeCtx ? `CONOCIMIENTO APRENDIDO:\n${knowledgeCtx}\n` : ''}
+${commitments && commitments.length > 0
+  ? `\nCOMPROMISOS PENDIENTES CON ESTE CLIENTE:\n${commitments.map((c: any) =>
+      `- "${c.commitment}" (acordado: ${new Date(c.agreed_date).toLocaleDateString('es-CL')}${c.follow_up_date ? `, seguimiento: ${new Date(c.follow_up_date).toLocaleDateString('es-CL')}` : ''})`
+    ).join('\n')}\nSi es relevante, pregunta por el progreso de estos compromisos.\n`
+  : ''}
 ${creativeHistoryCtx}
 Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accionables. Cuando hables de métricas, cita los números reales que tienes.`;
 
@@ -1312,6 +1339,32 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
           .update({ ultima_vez_usada: new Date().toISOString() })
           .in('titulo', usedTitles)
           .then(() => {});
+      }
+    }
+
+    // Detect commitments in Steve's response (Mejora #8)
+    if (assistantMsg && client_id) {
+      const commitmentPatterns = [
+        /(?:vamos a|te sugiero|te recomiendo|deberías|hay que|el plan es)\s+(.{20,100})/i,
+        /(?:próximo paso|siguiente paso|acción|tarea):\s*(.{20,100})/i,
+        /(?:quedamos en|acordamos)\s+(.{20,100})/i,
+      ];
+
+      for (const pattern of commitmentPatterns) {
+        const match = assistantMsg.match(pattern);
+        if (match) {
+          const commitmentText = match[1].replace(/[.!?,;]$/, '').trim();
+          if (commitmentText.length > 20) {
+            supabase.from('steve_commitments').insert({
+              client_id,
+              commitment: commitmentText.slice(0, 200),
+              context: message.slice(0, 200),
+              follow_up_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              status: 'pending',
+            }).then(() => {});
+            break; // Only save first commitment per response
+          }
+        }
       }
     }
 
@@ -1574,7 +1627,7 @@ REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de re
 
   // TODO (Mejora #4 - Industry filter): Once clients have industria assigned, add
   // .in('industria', ['general', clientIndustry]) to the steve_knowledge query below.
-  const [{ data: knowledge }, { data: bugs }] = await Promise.all([
+  const [{ data: knowledge }, { data: bugs }, { data: briefClientKnowledge }] = await Promise.all([
     supabase
       .from('steve_knowledge')
       .select('categoria, titulo, contenido, orden')
@@ -1589,13 +1642,25 @@ REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de re
       .eq('categoria', categoriaRelevante)
       .eq('activo', true)
       .limit(5),
+    // Fetch client-specific knowledge (Mejora #1)
+    supabase
+      .from('steve_knowledge')
+      .select('categoria, titulo, contenido, orden')
+      .eq('client_id', client_id)
+      .eq('activo', true)
+      .order('orden', { ascending: false })
+      .limit(10),
   ]);
 
+  // Merge client-specific + global knowledge (client first for priority)
+  const mergedBriefKnowledge = [...(briefClientKnowledge || []), ...(knowledge || [])];
+
   // Smart rule selection (Mejora #10): use Haiku to pick most relevant rules for this question
-  let filteredBriefKnowledge = knowledge;
-  if (knowledge && knowledge.length > 5 && process.env.ANTHROPIC_API_KEY) {
+  // Uses mergedBriefKnowledge (client-specific + global, client first for priority)
+  let filteredBriefKnowledge = mergedBriefKnowledge;
+  if (mergedBriefKnowledge && mergedBriefKnowledge.length > 5 && process.env.ANTHROPIC_API_KEY) {
     try {
-      const ruleTitles = knowledge.map((k: any, i: number) => `[${i}] ${k.titulo}`).join('\n');
+      const ruleTitles = mergedBriefKnowledge.map((k: any, i: number) => `[${i}] ${k.titulo}`).join('\n');
       const filterRes = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -1615,9 +1680,9 @@ REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de re
       if (filterRes.ok) {
         const filterData: any = await filterRes.json();
         const indices = (filterData.content?.[0]?.text || '')
-          .match(/\d+/g)?.map(Number).filter((n: number) => n < knowledge.length) || [];
+          .match(/\d+/g)?.map(Number).filter((n: number) => n < mergedBriefKnowledge.length) || [];
         if (indices.length > 0) {
-          filteredBriefKnowledge = indices.map((i: number) => knowledge![i]).filter(Boolean);
+          filteredBriefKnowledge = indices.map((i: number) => mergedBriefKnowledge![i]).filter(Boolean);
         }
       }
     } catch (e) {
