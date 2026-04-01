@@ -4,3 +4,4 @@ dist
 *.md
 .env
 .env.*
+src/test
