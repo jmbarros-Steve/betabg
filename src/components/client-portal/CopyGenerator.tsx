@@ -18,6 +18,7 @@ import { AdCreativesLibrary } from './AdCreativesLibrary';
 import { MetaAdCreator } from './MetaAdCreator';
 import { MetaAdsConfigPanel } from './MetaAdsConfigPanel';
 import { useBriefContext } from '@/hooks/useBriefContext';
+import { PlanGate } from './PlanGate';
 
 interface CopyGeneratorProps { clientId: string; }
 
@@ -470,6 +471,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
 
         {/* ─── GENERATE TAB ─── */}
         <TabsContent value="generate" className="mt-6">
+          <PlanGate feature="copies.generate">
           <ClientAssetsGallery clientId={clientId} compact onAssetsLoaded={setAssets} />
 
           {/* Progress */}
@@ -861,10 +863,13 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
               </motion.div>
             )}
           </AnimatePresence>
+          </PlanGate>
         </TabsContent>
 
         <TabsContent value="crear" className="mt-6">
-          <MetaAdCreator clientId={clientId} onBack={() => setActiveTab('crear')} onGoToLibrary={() => setActiveTab('biblioteca')} />
+          <PlanGate feature="meta_ads.create">
+            <MetaAdCreator clientId={clientId} onBack={() => setActiveTab('crear')} onGoToLibrary={() => setActiveTab('biblioteca')} />
+          </PlanGate>
         </TabsContent>
 
         <TabsContent value="assets" className="mt-6">

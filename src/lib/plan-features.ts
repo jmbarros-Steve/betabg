@@ -65,13 +65,15 @@ export const FEATURE_ACCESS: Record<FeatureKey, PlanSlug> = {
   'shopify.view': 'visual',
   'shopify.orders': 'visual',
   'shopify.metrics': 'visual',
-  'shopify.sync': 'estrategia',
+  'shopify.sync': 'visual',
+  'shopify.edit': 'full',
+  'shopify.discounts': 'full',
 
-  // Steve Chat
-  'steve_chat.basic': 'visual',
-  'steve_chat.brand_research': 'estrategia',
-  'steve_chat.recommendations': 'estrategia',
-  'steve_chat.execute': 'full',
+  // Steve Chat (merchant habla con Steve por WhatsApp)
+  'steve_chat.basic': 'visual',            // Preguntar, consultar métricas
+  'steve_chat.brand_research': 'estrategia', // Análisis de marca
+  'steve_chat.recommendations': 'estrategia', // Recomendaciones estratégicas
+  'steve_chat.execute': 'full',            // Ejecutar acciones desde el chat
 
   // Steve Estrategia
   'estrategia.diagnosis': 'estrategia',
@@ -84,7 +86,7 @@ export const FEATURE_ACCESS: Record<FeatureKey, PlanSlug> = {
   'deepdive.insights': 'estrategia',
 
   // Brief
-  'brief.view': 'visual',
+  'brief.view': 'estrategia',
   'brief.generate': 'estrategia',
 
   // Copies
@@ -93,6 +95,7 @@ export const FEATURE_ACCESS: Record<FeatureKey, PlanSlug> = {
   'copies.publish': 'full',
 
   // Meta Ads
+  'meta_ads.sync': 'visual',
   'meta_ads.view': 'visual',
   'meta_ads.analysis': 'estrategia',
   'meta_ads.create': 'full',
@@ -121,7 +124,7 @@ export const FEATURE_ACCESS: Record<FeatureKey, PlanSlug> = {
   'email.create': 'full',
   'email.editor': 'full',
 
-  // WhatsApp
+  // WhatsApp a Clientes (enviar mensajes a clientes finales del merchant)
   'whatsapp.view': 'full',
   'whatsapp.send': 'full',
   'whatsapp.automations': 'full',
@@ -143,8 +146,8 @@ export const FEATURE_ACCESS: Record<FeatureKey, PlanSlug> = {
   'config.profile': 'visual',
   'config.user_management': 'estrategia',
 
-  // Chonga
-  'chonga.assistant': 'estrategia',
+  // Chonga (soporte — disponible en todos los planes)
+  'chonga.assistant': 'visual',
   'chonga.images': 'full',
 
   // Discount Button
@@ -155,7 +158,7 @@ export const FEATURE_ACCESS: Record<FeatureKey, PlanSlug> = {
 // ─── Tab → Minimum Plan ─────────────────────────────────────
 export const TAB_MIN_PLAN: Record<string, PlanSlug> = {
   steve: 'visual',
-  brief: 'visual',
+  brief: 'estrategia',
   metrics: 'visual',
   connections: 'visual',
   config: 'visual',
@@ -224,16 +227,18 @@ export const COMPARATIVA: ModuloSection[] = [
       { nombre: 'Vista de productos', visual: true, estrategia: true, full: true },
       { nombre: 'Vista de órdenes', visual: true, estrategia: true, full: true },
       { nombre: 'Métricas de ventas', visual: true, estrategia: true, full: true },
-      { nombre: 'Sync automático', visual: false, estrategia: true, full: true },
+      { nombre: 'Sync automático', visual: true, estrategia: true, full: true },
+      { nombre: 'Editar productos', visual: false, estrategia: false, full: true },
+      { nombre: 'Crear descuentos', visual: false, estrategia: false, full: true },
     ],
   },
   {
-    modulo: 'Steve Chat',
+    modulo: 'Steve Chat (WhatsApp con Steve)',
     features: [
-      { nombre: 'Chat básico (preguntas)', visual: true, estrategia: true, full: true },
+      { nombre: 'Consultar métricas y preguntas', visual: true, estrategia: true, full: true },
       { nombre: 'Análisis de marca (brand research)', visual: false, estrategia: true, full: true },
       { nombre: 'Recomendaciones estratégicas', visual: false, estrategia: true, full: true },
-      { nombre: 'Ejecución de acciones desde chat', visual: false, estrategia: false, full: true },
+      { nombre: 'Ejecutar acciones desde WhatsApp', visual: false, estrategia: false, full: true },
     ],
   },
   {
@@ -255,7 +260,7 @@ export const COMPARATIVA: ModuloSection[] = [
   {
     modulo: 'Brief View',
     features: [
-      { nombre: 'Ver briefs de campaña', visual: true, estrategia: true, full: true },
+      { nombre: 'Ver briefs de campaña', visual: false, estrategia: true, full: true },
       { nombre: 'Generar briefs con IA', visual: false, estrategia: true, full: true },
     ],
   },
@@ -312,11 +317,11 @@ export const COMPARATIVA: ModuloSection[] = [
     ],
   },
   {
-    modulo: 'WhatsApp',
+    modulo: 'WhatsApp a Clientes',
     features: [
-      { nombre: 'Ver conversaciones', visual: true, estrategia: true, full: true },
-      { nombre: 'Enviar mensajes', visual: false, estrategia: false, full: true },
-      { nombre: 'Automatizaciones', visual: false, estrategia: false, full: true },
+      { nombre: 'Ver conversaciones con clientes', visual: true, estrategia: true, full: true },
+      { nombre: 'Enviar mensajes a clientes', visual: false, estrategia: false, full: true },
+      { nombre: 'Automatizaciones (carritos abandonados)', visual: false, estrategia: false, full: true },
     ],
   },
   {
@@ -349,9 +354,9 @@ export const COMPARATIVA: ModuloSection[] = [
     ],
   },
   {
-    modulo: 'Chonga',
+    modulo: 'Chonga (Soporte)',
     features: [
-      { nombre: 'Asistente de contenido IA', visual: false, estrategia: true, full: true },
+      { nombre: 'Asistente de soporte IA', visual: true, estrategia: true, full: true },
       { nombre: 'Generación de imágenes', visual: false, estrategia: false, full: true },
     ],
   },

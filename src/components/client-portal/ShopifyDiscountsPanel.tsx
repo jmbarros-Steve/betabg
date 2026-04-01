@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { callApi } from '@/lib/api';
 import { ShopifyDiscountDialog } from './ShopifyDiscountDialog';
+import { useUserPlan } from '@/hooks/useUserPlan';
 
 interface DiscountCode {
   id: number;
@@ -57,6 +58,8 @@ function formatDate(iso: string | null) {
 }
 
 export function ShopifyDiscountsPanel({ clientId, connectionId, discountPerformance = [] }: ShopifyDiscountsPanelProps) {
+  const { canAccess } = useUserPlan();
+  const canCreateDiscount = canAccess('shopify.discounts');
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -140,7 +143,7 @@ export function ShopifyDiscountsPanel({ clientId, connectionId, discountPerforma
             <Button variant="ghost" size="icon" onClick={fetchDiscounts}>
               <RefreshCw className="w-4 h-4" />
             </Button>
-            <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
+            <Button size="sm" onClick={() => setCreateDialogOpen(true)} disabled={!canCreateDiscount} title={!canCreateDiscount ? 'Requiere plan Full' : 'Crear descuento'}>
               <Plus className="w-4 h-4 mr-1" />
               Crear
             </Button>

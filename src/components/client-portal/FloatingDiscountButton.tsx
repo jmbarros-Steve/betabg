@@ -5,12 +5,14 @@ import { Button } from '@/components/ui/button';
 import { ShopifyDiscountDialog } from './ShopifyDiscountDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { useUserPlan } from '@/hooks/useUserPlan';
 
 interface FloatingDiscountButtonProps {
   clientId: string;
 }
 
 export function FloatingDiscountButton({ clientId }: FloatingDiscountButtonProps) {
+  const { canAccess } = useUserPlan();
   const [isOpen, setIsOpen] = useState(false);
   const [hasShopify, setHasShopify] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -39,8 +41,8 @@ export function FloatingDiscountButton({ clientId }: FloatingDiscountButtonProps
     }
   }
 
-  // Don't show if no Shopify connection or still loading
-  if (loading || !hasShopify) {
+  // Don't show if no Shopify connection, still loading, or plan doesn't allow
+  if (loading || !hasShopify || !canAccess('shopify.discounts')) {
     return null;
   }
 

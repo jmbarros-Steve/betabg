@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SteveFeedbackDialog } from './SteveFeedbackDialog';
 import { PDFDownloader } from './PDFDownloader';
+import { PlanGate } from './PlanGate';
 import logoGoogleAds from '@/assets/logo-google-ads.png';
 
 interface GoogleAdsGeneratorProps {
@@ -314,6 +315,7 @@ export function GoogleAdsGenerator({ clientId }: GoogleAdsGeneratorProps) {
 
         {/* Generate Tab */}
         <TabsContent value="generate" className="mt-6">
+          <PlanGate feature="google_ads.create">
           <div className="space-y-6">
             {/* Progress */}
             {step !== 'campaign' && (
@@ -664,6 +666,7 @@ export function GoogleAdsGenerator({ clientId }: GoogleAdsGeneratorProps) {
               )}
             </AnimatePresence>
           </div>
+        </PlanGate>
         </TabsContent>
 
         {/* History Tab */}

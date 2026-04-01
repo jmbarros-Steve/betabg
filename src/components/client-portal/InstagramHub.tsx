@@ -4,6 +4,7 @@ import { Instagram, Send, CalendarDays, BarChart3 } from 'lucide-react';
 import { InstagramPublisher } from './InstagramPublisher';
 import { ContentCalendar } from './ContentCalendar';
 import { IGMetricsDashboard } from './instagram/IGMetricsDashboard';
+import { PlanGate } from './PlanGate';
 
 interface InstagramHubProps {
   clientId: string;
@@ -53,11 +54,13 @@ export function InstagramHub({ clientId }: InstagramHubProps) {
         </TabsList>
 
         <TabsContent value="publish" className="mt-4">
-          <InstagramPublisher
-            clientId={clientId}
-            prefillDate={prefillDate}
-            onPublished={handlePublished}
-          />
+          <PlanGate feature="instagram.publish">
+            <InstagramPublisher
+              clientId={clientId}
+              prefillDate={prefillDate}
+              onPublished={handlePublished}
+            />
+          </PlanGate>
         </TabsContent>
 
         <TabsContent value="calendar" className="mt-4">
@@ -69,7 +72,9 @@ export function InstagramHub({ clientId }: InstagramHubProps) {
         </TabsContent>
 
         <TabsContent value="metrics" className="mt-4">
-          <IGMetricsDashboard clientId={clientId} />
+          <PlanGate feature="instagram.analysis">
+            <IGMetricsDashboard clientId={clientId} />
+          </PlanGate>
         </TabsContent>
       </Tabs>
     </div>

@@ -72,6 +72,7 @@ import CampaignCreateWizard from './CampaignCreateWizard';
 import DraftsManager from './DraftsManager';
 import PixelSetupWizard from './PixelSetupWizard';
 import MetaConnectionWizard from './MetaConnectionWizard';
+import { PlanGate } from '@/components/client-portal/PlanGate';
 import { MetaScopeStatusPanel } from './MetaScopeAlert';
 
 // Business context
@@ -969,11 +970,13 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
           />
         )}
         {key === 'create-wizard' && (
-          <CampaignCreateWizard
-            clientId={clientId}
-            onBack={() => handleNavClick('tree-view')}
-            onComplete={() => handleNavClick('tree-view')}
-          />
+          <PlanGate feature="meta_ads.create">
+            <CampaignCreateWizard
+              clientId={clientId}
+              onBack={() => handleNavClick('tree-view')}
+              onComplete={() => handleNavClick('tree-view')}
+            />
+          </PlanGate>
         )}
         {key === 'campaigns' && (
           <MetaCampaignManager
@@ -982,19 +985,23 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
           />
         )}
         {key === 'create-ad' && (
-          <MetaAdCreator
-            clientId={clientId}
-            onBack={() => handleNavClick('dashboard')}
-            onGoToLibrary={() => handleNavClick('library')}
-          />
+          <PlanGate feature="meta_ads.create">
+            <MetaAdCreator
+              clientId={clientId}
+              onBack={() => handleNavClick('dashboard')}
+              onGoToLibrary={() => handleNavClick('library')}
+            />
+          </PlanGate>
         )}
         {key === 'audiences' && <MetaAudienceManager clientId={clientId} />}
         {key === 'library' && <AdCreativesLibrary clientId={clientId} />}
         {key === 'analytics' && (
-          <MetaAnalyticsDashboard
-            clientId={clientId}
-            key={`analytics-${selectedAssets.adAccountId || 'none'}`}
-          />
+          <PlanGate feature="meta_ads.analysis">
+            <MetaAnalyticsDashboard
+              clientId={clientId}
+              key={`analytics-${selectedAssets.adAccountId || 'none'}`}
+            />
+          </PlanGate>
         )}
         {key === 'social-inbox' && <MetaSocialInbox clientId={clientId} />}
         {key === 'rules' && <MetaAutomatedRules clientId={clientId} />}

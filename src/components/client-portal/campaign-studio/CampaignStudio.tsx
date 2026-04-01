@@ -29,6 +29,7 @@ import { SteveKlaviyoChat } from './chat/SteveKlaviyoChat';
 import { AutoActivation } from './activation/AutoActivation';
 import TemplatesPanel from './templates/TemplatesPanel';
 import { Coachmark } from '@/components/client-portal/Coachmark';
+import { PlanGate } from '@/components/client-portal/PlanGate';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   TrendingUp,
@@ -223,11 +224,14 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
 
         {/* TAB: Plantillas — Editor drag & drop, CRUD de templates */}
         <TabsContent value="plantillas" className="mt-6">
-          <TemplatesPanel clientId={clientId} brand={brand} />
+          <PlanGate feature="klaviyo.editor">
+            <TemplatesPanel clientId={clientId} brand={brand} />
+          </PlanGate>
         </TabsContent>
 
         {/* TAB: Campañas — Crear campañas seleccionando tipo */}
         <TabsContent value="campanas" className="mt-6">
+          <PlanGate feature="klaviyo.create">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {CAMPAIGN_TYPE_LIST.map((type) => {
               const template = CAMPAIGN_TEMPLATES[type];
@@ -280,6 +284,7 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
               );
             })}
           </div>
+          </PlanGate>
         </TabsContent>
 
         {/* TAB: Flujos */}

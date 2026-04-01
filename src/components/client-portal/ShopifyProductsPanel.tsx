@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { ShopifyPhotoStudio } from './ShopifyPhotoStudio';
+import { useUserPlan } from '@/hooks/useUserPlan';
 
 interface SkuSale {
   sku: string;
@@ -86,6 +87,8 @@ function getSuggestedPrice(variant: ProductVariant, salesData: SkuSale | undefin
 }
 
 export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId: externalConnectionId, initialProducts }: ShopifyProductsPanelProps) {
+  const { canAccess } = useUserPlan();
+  const canEdit = canAccess('shopify.edit');
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [connectionId, setConnectionId] = useState<string | null>(externalConnectionId || null);
@@ -524,13 +527,13 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
                           </div>
                           {/* Actions */}
                           <div className="flex items-center gap-0.5 shrink-0">
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditModal(product, 0)} title="Editar">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditModal(product, 0)} title={canEdit ? 'Editar' : 'Requiere plan Full'} disabled={!canEdit}>
                               <Pencil className="w-3.5 h-3.5" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => generateDescription(product)} title="Descripción IA">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => generateDescription(product)} title={canEdit ? 'Descripción IA' : 'Requiere plan Full'} disabled={!canEdit}>
                               <Sparkles className="w-3.5 h-3.5" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setPhotoProduct(product)} title="Fotos IA">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setPhotoProduct(product)} title={canEdit ? 'Fotos IA' : 'Requiere plan Full'} disabled={!canEdit}>
                               <Camera className="w-3.5 h-3.5" />
                             </Button>
                           </div>
