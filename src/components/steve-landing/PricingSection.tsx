@@ -99,8 +99,14 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
 
                 {/* Price */}
                 <div className="text-center mb-6">
-                  <div className="text-3xl font-bold text-slate-900">
+                  <span className="inline-block bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-full mb-2">
+                    50% OFF Lanzamiento
+                  </span>
+                  <div className="text-sm text-slate-400 line-through">
                     {formatPriceCLP(plan.priceMonthly)}
+                  </div>
+                  <div className="text-3xl font-bold text-slate-900">
+                    {formatPriceCLP(Math.round(plan.priceMonthly / 2))}
                   </div>
                   <p className="text-xs text-slate-400 mt-1">CLP / mes + IVA</p>
                 </div>
