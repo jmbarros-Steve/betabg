@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { detectKnowledgeConflicts } from '../../lib/knowledge-conflict-detector.js';
 
 const CHUNK_SIZE = 50000;
 const SYSTEM_PROMPT = `Eres un experto en performance marketing para e-commerce. Analiza el siguiente contenido y extrae TODAS las reglas accionables, estrategias y tácticas mencionadas. Para cada regla genera un JSON con: titulo (nombre corto y descriptivo de la regla, máximo 60 caracteres), contenido (la regla completa con los pasos numerados, clara y accionable), categoria (clasifica en una de estas categorías EXACTAS: brief, seo, keywords, meta, meta_ads, google, shopify, klaviyo, anuncios, buyer_persona). Si una regla aplica a múltiples categorías, elige la más relevante. Responde SOLO con un array JSON válido sin markdown ni backticks.`;
@@ -248,7 +249,11 @@ export async function processQueueItem(c: Context) {
       return c.json({ status: 'completed', queueId, rulesSaved: 0, skippedDuplicates: uniqueRules.length });
     }
 
-    const inserts = newRules.map(r => ({
+    // Detect conflicts before inserting
+    const conflictCheck = await detectKnowledgeConflicts(supabase, newRules, ANTHROPIC_API_KEY || '');
+
+    const rulesToInsert = conflictCheck.safeRules;
+    const inserts = rulesToInsert.map(r => ({
       categoria: r.categoria,
       titulo: r.titulo.slice(0, 80),
       contenido: r.contenido,
@@ -257,18 +262,30 @@ export async function processQueueItem(c: Context) {
       source_id: queueId,
     }));
 
-    const { error: insertErr } = await supabase.from('steve_knowledge').insert(inserts);
-    if (insertErr) throw new Error(`Failed to save rules: ${insertErr.message}`);
+    if (inserts.length > 0) {
+      const { error: insertErr } = await supabase.from('steve_knowledge').insert(inserts);
+      if (insertErr) throw new Error(`Failed to save rules: ${insertErr.message}`);
+    }
+
+    const conflictNote = conflictCheck.hasConflicts
+      ? `${conflictCheck.conflicts.length} reglas descartadas por conflicto: ${conflictCheck.conflicts.map(c => `"${c.newRule}" vs "${c.existingRule}"`).join(', ')}`
+      : null;
 
     await supabase.from('learning_queue').update({
       status: 'completed',
       rules_extracted: inserts.length,
       processed_at: new Date().toISOString(),
       transcription: null,
-      error_message: null,
+      error_message: conflictNote,
     }).eq('id', queueId);
 
-    return c.json({ status: 'completed', queueId, rulesSaved: inserts.length });
+    return c.json({
+      status: 'completed',
+      queueId,
+      rulesSaved: inserts.length,
+      conflictsDetected: conflictCheck.conflicts.length,
+      conflicts: conflictCheck.conflicts,
+    });
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
 

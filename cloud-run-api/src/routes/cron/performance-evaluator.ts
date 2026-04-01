@@ -144,9 +144,72 @@ VS PROMEDIO MERCHANT: ${JSON.stringify(creative.benchmark_comparison || {})}
 
   console.log(`[perf-evaluator] Evaluated: ${evaluated}, Tasks created: ${tasksCreated}`);
 
+  // ── LEARNING LOOP: Generalizar patrones por ángulo → steve_knowledge ──
+  let knowledgeInserted = 0;
+  try {
+    // Fetch all measured creatives from last 30 days with angle + verdict
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+    const { data: recentCreatives } = await supabase
+      .from('creative_history')
+      .select('angle, channel, performance_score, performance_verdict')
+      .not('angle', 'is', null)
+      .not('performance_verdict', 'is', null)
+      .gte('measured_at', thirtyDaysAgo);
+
+    if (recentCreatives && recentCreatives.length >= 5) {
+      // Group by angle+channel
+      const groups: Record<string, { scores: number[]; verdicts: string[] }> = {};
+      for (const c of recentCreatives) {
+        const key = `${c.angle}||${c.channel}`;
+        if (!groups[key]) groups[key] = { scores: [], verdicts: [] };
+        groups[key].scores.push(c.performance_score);
+        groups[key].verdicts.push(c.performance_verdict);
+      }
+
+      for (const [key, data] of Object.entries(groups)) {
+        if (data.scores.length < 5) continue; // Need 5+ data points
+
+        const [angle, channel] = key.split('||');
+        const avgScore = Math.round(data.scores.reduce((a, b) => a + b, 0) / data.scores.length);
+        const goodRate = Math.round((data.verdicts.filter(v => v === 'bueno').length / data.verdicts.length) * 100);
+        const badRate = Math.round((data.verdicts.filter(v => v === 'malo').length / data.verdicts.length) * 100);
+
+        // Only write knowledge for clear patterns (>60% good or >60% bad)
+        if (goodRate < 60 && badRate < 60) continue;
+
+        const titulo = `${channel}: ángulo "${angle}" ${goodRate >= 60 ? 'FUNCIONA' : 'NO FUNCIONA'}`;
+        const contenido = goodRate >= 60
+          ? `Ángulo "${angle}" en ${channel} tiene score promedio ${avgScore}/100 con ${goodRate}% tasa de éxito (${data.scores.length} mediciones). USAR este ángulo.`
+          : `Ángulo "${angle}" en ${channel} tiene score promedio ${avgScore}/100 con ${badRate}% tasa de fracaso (${data.scores.length} mediciones). EVITAR este ángulo.`;
+
+        // Upsert: update if exists, insert if not
+        const { error: upsertErr } = await supabase
+          .from('steve_knowledge')
+          .upsert(
+            {
+              categoria: channel === 'meta' ? 'meta_ads' : 'klaviyo',
+              titulo,
+              contenido,
+              activo: true,
+              orden: 95, // High priority but below manual rules (99)
+            },
+            { onConflict: 'categoria,titulo' }
+          );
+
+        if (!upsertErr) {
+          knowledgeInserted++;
+          console.log(`[perf-evaluator] Knowledge inserted: ${titulo}`);
+        }
+      }
+    }
+  } catch (learnErr) {
+    console.error('[perf-evaluator] Learning loop error:', learnErr);
+  }
+
   return c.json({
     evaluated,
     tasks_created: tasksCreated,
     total_measured: measured.length,
+    knowledge_learned: knowledgeInserted,
   });
 }

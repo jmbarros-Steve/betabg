@@ -138,25 +138,67 @@ export async function fatigueDetector(c: Context) {
         const shopId = client?.id;
 
         let suggestedAngle = 'testimonio o beneficio';
+        let suggestionDetail = 'mejor score histórico';
         if (shopId) {
-          const { data: bestAngle } = await supabase
+          // Query all good-performing angles for this client
+          const { data: goodAngles } = await supabase
             .from('creative_history')
-            .select('angle')
+            .select('angle, performance_score, measured_at')
             .eq('shop_id', shopId)
             .eq('channel', 'meta')
             .eq('performance_verdict', 'bueno')
-            .not('angle', 'is', null)
-            .order('performance_score', { ascending: false })
-            .limit(1);
+            .not('angle', 'is', null);
 
-          if (bestAngle && bestAngle.length > 0 && bestAngle[0].angle) {
-            suggestedAngle = bestAngle[0].angle;
+          if (goodAngles && goodAngles.length > 0) {
+            // Find angles used in the last 30 days (to filter out)
+            const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+            const recentAngles = new Set(
+              goodAngles
+                .filter((a: any) => a.measured_at && a.measured_at >= thirtyDaysAgo)
+                .map((a: any) => a.angle)
+            );
+
+            // Group by angle and calculate avg score
+            const angleScores: Record<string, { total: number; count: number }> = {};
+            for (const a of goodAngles) {
+              if (!angleScores[a.angle]) angleScores[a.angle] = { total: 0, count: 0 };
+              angleScores[a.angle].total += a.performance_score || 0;
+              angleScores[a.angle].count++;
+            }
+
+            // Rank angles not used recently, by avg score
+            const freshAngles = Object.entries(angleScores)
+              .filter(([angle]) => !recentAngles.has(angle))
+              .map(([angle, data]) => ({
+                angle,
+                avg_score: Math.round(data.total / data.count),
+                count: data.count,
+              }))
+              .sort((a, b) => b.avg_score - a.avg_score);
+
+            if (freshAngles.length > 0) {
+              suggestedAngle = freshAngles[0].angle;
+              suggestionDetail = `avg score ${freshAngles[0].avg_score}/100, ${freshAngles[0].count} mediciones, no usado en 30 días`;
+            } else {
+              // All good angles were used recently — fall back to the best one overall
+              const allRanked = Object.entries(angleScores)
+                .map(([angle, data]) => ({
+                  angle,
+                  avg_score: Math.round(data.total / data.count),
+                }))
+                .sort((a, b) => b.avg_score - a.avg_score);
+
+              if (allRanked.length > 0) {
+                suggestedAngle = allRanked[0].angle;
+                suggestionDetail = `avg score ${allRanked[0].avg_score}/100 (todos los buenos fueron usados recientemente)`;
+              }
+            }
           }
         }
 
         const clientName = client?.name || adAccountId;
 
-        // Create rotation task
+        // Create rotation task with smart suggestion
         if (shopId) {
           await supabase.from('tasks').insert({
             title: `Fatiga creativa: ${campaign.name}`,
@@ -164,7 +206,7 @@ export async function fatigueDetector(c: Context) {
               `CTR bajó ${ctrDropPct}% en últimos 3 días (peak: ${peakCTR.toFixed(2)}%, actual: ${avgRecentCTR.toFixed(2)}%). ` +
               `Frequency: ${lastFrequency.toFixed(1)}.\n` +
               `Cliente: ${clientName}\n` +
-              `Sugerencia: rotar creative con ángulo "${suggestedAngle}" (mejor score histórico).`,
+              `Sugerencia: rotar creative con ángulo "${suggestedAngle}" (${suggestionDetail}).`,
             priority: 'alta',
             type: 'mejora',
             source: 'ojos',

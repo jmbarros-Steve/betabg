@@ -882,7 +882,7 @@ export async function steveChat(c: Context) {
         .select('categoria, titulo, contenido')
         .in('categoria', [categoriaRelevante, 'brief'])
         .eq('activo', true)
-        .order('orden', { ascending: true })
+        .order('orden', { ascending: false })
         .limit(8),
       // 5. Get client's connections grouped by platform
       supabase

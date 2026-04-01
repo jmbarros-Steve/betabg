@@ -48,10 +48,18 @@ export async function getCreativeContext(
     productBest = pb;
   }
 
-  // 4. Angle ranking
+  // 4. Angle ranking — query ALL scored creatives for this client+channel
+  //    to get accurate counts for [VALIDADO]/[DESCARTADO] markers
+  const { data: allAngleData } = await supabase
+    .from('creative_history')
+    .select('angle, cqs_score')
+    .eq('client_id', client_id)
+    .eq('channel', channel)
+    .not('cqs_score', 'is', null)
+    .not('angle', 'is', null);
+
   const angles: Record<string, { scores: number[]; count: number }> = {};
-  const allCreatives = [...(best || []), ...(worst || [])];
-  for (const c of allCreatives) {
+  for (const c of allAngleData || []) {
     if (!c.angle) continue;
     if (!angles[c.angle]) angles[c.angle] = { scores: [], count: 0 };
     angles[c.angle].scores.push(c.cqs_score);
@@ -59,17 +67,22 @@ export async function getCreativeContext(
   }
 
   const angleRanking = Object.entries(angles)
-    .map(([angle, data]) => ({
-      angle,
-      avg_score: Math.round(data.scores.reduce((a, b) => a + b, 0) / data.scores.length),
-      count: data.count,
-    }))
+    .map(([angle, data]) => {
+      const avg_score = Math.round(data.scores.reduce((a, b) => a + b, 0) / data.scores.length);
+      // With 10+ measurements, mark as validated or discarded
+      let status = '';
+      if (data.count >= 10) {
+        status = avg_score >= 60 ? ' [VALIDADO]' : avg_score < 40 ? ' [DESCARTADO]' : '';
+      }
+      return { angle, avg_score, count: data.count, status };
+    })
     .sort((a, b) => b.avg_score - a.avg_score);
 
   // 5. Build context text
   let context = '';
 
   // Only build if there's actual data
+  const allCreatives = [...(best || []), ...(worst || [])];
   if (allCreatives.length === 0 && !productBest?.length) {
     return ''; // No history yet — don't pollute the prompt
   }
@@ -83,13 +96,13 @@ export async function getCreativeContext(
     if (good.length > 0) {
       context += `### ÁNGULOS QUE FUNCIONAN:\n`;
       good.forEach(a => {
-        context += `✅ ${a.angle}: score promedio ${a.avg_score}/100 (${a.count} veces)\n`;
+        context += `✅ ${a.angle}${a.status}: score promedio ${a.avg_score}/100 (${a.count} mediciones)\n`;
       });
     }
     if (bad.length > 0) {
       context += `\n### ÁNGULOS QUE NO FUNCIONAN:\n`;
       bad.forEach(a => {
-        context += `❌ ${a.angle}: score promedio ${a.avg_score}/100 (${a.count} veces) — NO usar\n`;
+        context += `❌ ${a.angle}${a.status}: score promedio ${a.avg_score}/100 (${a.count} mediciones) — NO usar\n`;
       });
     }
   }
@@ -115,7 +128,7 @@ export async function getCreativeContext(
     });
   }
 
-  context += `\nIMPORTANTE: Usa este historial para tomar decisiones. Si un ángulo tiene score <40, NO lo sugieras. Prioriza ángulos con score >60. Si no hay historial, experimenta con ángulos variados.\n`;
+  context += `\nIMPORTANTE: Usa este historial para tomar decisiones. Si un ángulo tiene score <40, NO lo sugieras. Prioriza ángulos con score >60. Ángulos marcados [VALIDADO] (10+ mediciones, score >60) son los más confiables. Ángulos marcados [DESCARTADO] (10+ mediciones, score <40) están estadísticamente probados como malos — evítalos siempre. Si no hay historial, experimenta con ángulos variados.\n`;
 
   return context;
 }

@@ -429,9 +429,195 @@ export async function weeklyReport(c: Context) {
     details: { report_date: reportDate, qa_scorecard: qaScorecard, mejora_continua: mejoraContinua },
   });
 
+  // ─────────────────────────────────────────────
+  // TASK 5 — Conversaciones exitosas → knowledge
+  // Analyze WA conversations from last 7 days,
+  // extract patterns from 5+ message conversations
+  // ─────────────────────────────────────────────
+
+  let conversationPatternsLearned = 0;
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+
+  try {
+    if (ANTHROPIC_API_KEY) {
+      // Get wa_messages from last 7 days
+      const { data: recentMessages } = await supabase
+        .from('wa_messages')
+        .select('client_id, contact_phone, channel, direction, body, created_at')
+        .gte('created_at', weekAgo)
+        .not('body', 'is', null)
+        .order('created_at', { ascending: true });
+
+      if (recentMessages && recentMessages.length > 0) {
+        // Group by client_id + contact_phone (acts as conversation_id)
+        const conversations: Record<string, Array<{ direction: string; body: string }>> = {};
+        for (const msg of recentMessages) {
+          const key = `${msg.client_id}::${msg.contact_phone}`;
+          if (!conversations[key]) conversations[key] = [];
+          conversations[key].push({ direction: msg.direction, body: msg.body });
+        }
+
+        // Filter conversations with 5+ messages, take max 5
+        const richConversations = Object.entries(conversations)
+          .filter(([, msgs]) => msgs.length >= 5)
+          .slice(0, 5);
+
+        for (const [convKey, messages] of richConversations) {
+          try {
+            const transcript = messages
+              .map(m => `${m.direction === 'inbound' ? 'CLIENTE' : 'STEVE'}: ${m.body}`)
+              .join('\n');
+
+            const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': ANTHROPIC_API_KEY,
+                'anthropic-version': '2023-06-01',
+              },
+              body: JSON.stringify({
+                model: 'claude-haiku-4-5-20251001',
+                max_tokens: 300,
+                messages: [{
+                  role: 'user',
+                  content: `Analiza esta conversación de WhatsApp entre un cliente y Steve (asistente AI de marketing).
+Extrae 1-2 patrones útiles que Steve debería aprender para futuras conversaciones.
+Ejemplos: "cuando el cliente pregunta X, responder con Y funciona bien", "los clientes suelen necesitar Z después de preguntar W".
+Responde SOLO con los patrones, uno por línea, máximo 2 líneas. Sin explicaciones ni formato extra.
+
+CONVERSACIÓN:
+${transcript.substring(0, 2000)}`
+                }],
+              }),
+            });
+
+            if (aiResponse.ok) {
+              const aiData = await aiResponse.json() as any;
+              const patterns = aiData?.content?.[0]?.text?.trim();
+
+              if (patterns && patterns.length > 10) {
+                await supabase.from('steve_knowledge').upsert(
+                  {
+                    categoria: 'conversaciones',
+                    titulo: `Patrón conversacional ${convKey.split('::')[0].substring(0, 8)}`,
+                    contenido: patterns,
+                    activo: true,
+                    orden: 90,
+                  },
+                  { onConflict: 'categoria,titulo' }
+                );
+                conversationPatternsLearned++;
+                console.log(`[weekly-report] Conversation pattern learned from ${convKey.split('::')[0].substring(0, 8)}`);
+              }
+            }
+          } catch (convErr) {
+            console.error(`[weekly-report] Error analyzing conversation:`, convErr);
+          }
+        }
+      }
+    } else {
+      console.log('[weekly-report] ANTHROPIC_API_KEY not set, skipping conversation learning');
+    }
+  } catch (convLoopErr) {
+    console.error('[weekly-report] Conversation learning loop error:', convLoopErr);
+  }
+
+  // ─────────────────────────────────────────────
+  // TASK 6 — Meta campaigns post-mortem
+  // Extract patterns from creative verdicts of the week
+  // ─────────────────────────────────────────────
+
+  let postmortemPatternsLearned = 0;
+
+  try {
+    if (ANTHROPIC_API_KEY) {
+      // Query creative_history from last 7 days with verdict
+      const { data: verdictCreatives } = await supabase
+        .from('creative_history')
+        .select('angle, content_summary, channel, performance_score, performance_verdict')
+        .not('performance_verdict', 'is', null)
+        .gte('measured_at', weekAgo);
+
+      if (verdictCreatives && verdictCreatives.length >= 3) {
+        // Group by verdict
+        const buenos = verdictCreatives.filter((c: any) => c.performance_verdict === 'bueno');
+        const malos = verdictCreatives.filter((c: any) => c.performance_verdict === 'malo');
+
+        const summaryLines: string[] = [];
+        if (buenos.length > 0) {
+          summaryLines.push('CREATIVOS BUENOS:');
+          buenos.forEach((c: any) => {
+            summaryLines.push(`- Ángulo: ${c.angle || 'N/A'}, Score: ${c.performance_score}, Canal: ${c.channel}. ${c.content_summary || ''}`);
+          });
+        }
+        if (malos.length > 0) {
+          summaryLines.push('CREATIVOS MALOS:');
+          malos.forEach((c: any) => {
+            summaryLines.push(`- Ángulo: ${c.angle || 'N/A'}, Score: ${c.performance_score}, Canal: ${c.channel}. ${c.content_summary || ''}`);
+          });
+        }
+
+        const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 300,
+            messages: [{
+              role: 'user',
+              content: `Analiza el rendimiento de creativos publicitarios de esta semana.
+Extrae 1-2 patrones generales que expliquen qué funcionó y qué no.
+Responde SOLO con los patrones, uno por línea, máximo 2 líneas. Sin explicaciones ni formato extra.
+
+${summaryLines.join('\n').substring(0, 2000)}`
+            }],
+          }),
+        });
+
+        if (aiResponse.ok) {
+          const aiData = await aiResponse.json() as any;
+          const patterns = aiData?.content?.[0]?.text?.trim();
+
+          if (patterns && patterns.length > 10) {
+            // Determine primary channel from the data
+            const channelCounts: Record<string, number> = {};
+            for (const c of verdictCreatives) {
+              const ch = (c as any).channel || 'meta';
+              channelCounts[ch] = (channelCounts[ch] || 0) + 1;
+            }
+            const primaryChannel = Object.entries(channelCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'meta';
+            const categoria = primaryChannel === 'klaviyo' ? 'klaviyo' : 'meta_ads';
+
+            await supabase.from('steve_knowledge').upsert(
+              {
+                categoria,
+                titulo: `Post-mortem semanal creativos ${reportDate}`,
+                contenido: patterns,
+                activo: true,
+                orden: 90,
+              },
+              { onConflict: 'categoria,titulo' }
+            );
+            postmortemPatternsLearned++;
+            console.log(`[weekly-report] Post-mortem pattern learned: ${categoria}`);
+          }
+        }
+      } else {
+        console.log(`[weekly-report] Only ${verdictCreatives?.length || 0} measured creatives, need 3+ for post-mortem`);
+      }
+    }
+  } catch (postmortemErr) {
+    console.error('[weekly-report] Post-mortem learning error:', postmortemErr);
+  }
+
   const emailsSent = merchantResults.filter((r) => r.email_sent).length;
   console.log(`[weekly-report] Done: ${emailsSent}/${merchantResults.length} merchant emails sent`);
   console.log(`[weekly-report] QA Scorecard: ${thisWeekCount} errors (${errorTrend}), autofix: ${autofixRate}%`);
+  console.log(`[weekly-report] Learning: ${conversationPatternsLearned} conversation patterns, ${postmortemPatternsLearned} post-mortem patterns`);
 
   return c.json({
     success: true,
@@ -440,5 +626,9 @@ export async function weeklyReport(c: Context) {
     merchant_results: merchantResults,
     qa_scorecard: qaScorecard,
     mejora_continua: mejoraContinua,
+    learning: {
+      conversation_patterns: conversationPatternsLearned,
+      postmortem_patterns: postmortemPatternsLearned,
+    },
   });
 }

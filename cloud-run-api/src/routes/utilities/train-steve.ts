@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { detectKnowledgeConflicts } from '../../lib/knowledge-conflict-detector.js';
 
 export async function trainSteve(c: Context) {
   try {
@@ -111,9 +112,26 @@ ${contenido}`,
 
   let savedKnowledge = 0;
   let savedBugs = 0;
+  let conflictsDetected = 0;
+
+  // Extract rules for conflict detection
+  const newRules = resultado.entradas.map((e: any) => ({
+    categoria: e.categoria,
+    titulo: e.titulo,
+    contenido: e.contenido,
+  }));
+
+  // Detect conflicts before inserting
+  const conflictCheck = await detectKnowledgeConflicts(supabase, newRules, ANTHROPIC_API_KEY!);
+  conflictsDetected = conflictCheck.conflicts.length;
+
+  // Only insert safe (non-conflicting) rules
+  const safeEntradas = resultado.entradas.filter((e: any) =>
+    conflictCheck.safeRules.some((s: any) => s.titulo === e.titulo)
+  );
 
   await Promise.all(
-    resultado.entradas.map(async (entrada: {
+    safeEntradas.map(async (entrada: {
       categoria: string;
       titulo: string;
       contenido: string;
@@ -150,6 +168,8 @@ ${contenido}`,
     ...resultado,
     savedKnowledge,
     savedBugs,
+    conflictsDetected,
+    conflicts: conflictCheck.conflicts,
   });
   } catch (err: any) {
     console.error('[train-steve]', err);

@@ -397,6 +397,72 @@ serve(async (req) => {
         }
       }
 
+      // ── LEARNING LOOP: Auto-corregir steve_knowledge con los errores ──
+      if (failed.length > 0) {
+        try {
+          const failedSummary = failed.map(f =>
+            `Pregunta: "${f.question}" | Categoría: ${f.category} | Steve dijo: "${f.steve_answer.substring(0, 150)}" | Error: ${f.reason} | Dato real: ${JSON.stringify(f.real_data) || 'N/A'}`
+          ).join('\n');
+
+          const learnRes = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': ANTHROPIC_API_KEY,
+              'anthropic-version': '2023-06-01',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'claude-haiku-4-5-20251001',
+              max_tokens: 1000,
+              messages: [{
+                role: 'user',
+                content: `Steve (asistente de marketing IA) respondió mal estas preguntas anoche. Genera reglas correctivas para que NO vuelva a cometer estos errores.
+
+ERRORES:
+${failedSummary}
+
+Genera un JSON array con reglas correctivas. Cada regla:
+- "categoria": una de [brief, meta_ads, shopify, klaviyo, anuncios, google, seo, buyer_persona, steve_accuracy]
+- "titulo": max 80 chars, describe la corrección
+- "contenido": instrucción clara para Steve sobre cómo responder correctamente
+
+Solo genera reglas para errores que se pueden corregir con conocimiento (no errores de API o datos faltantes).
+Responde SOLO el JSON array, sin explicación.`
+              }]
+            })
+          });
+
+          if (learnRes.ok) {
+            const learnData: any = await learnRes.json();
+            const learnText = learnData.content?.[0]?.text || '';
+            try {
+              const rules = JSON.parse(learnText.replace(/```json|```/g, '').trim());
+              if (Array.isArray(rules)) {
+                for (const rule of rules) {
+                  if (rule.categoria && rule.titulo && rule.contenido) {
+                    await supabase.from('steve_knowledge').upsert(
+                      {
+                        categoria: rule.categoria,
+                        titulo: rule.titulo.substring(0, 80),
+                        contenido: rule.contenido,
+                        activo: true,
+                        orden: 99, // Highest priority
+                      },
+                      { onConflict: 'categoria,titulo' }
+                    );
+                  }
+                }
+                console.log(`[juez-nocturno] Auto-learned ${rules.length} corrective rules for ${client.name}`);
+              }
+            } catch (parseErr) {
+              console.error('[juez-nocturno] Failed to parse learning rules:', parseErr);
+            }
+          }
+        } catch (learnErr) {
+          console.error('[juez-nocturno] Learning loop error:', learnErr);
+        }
+      }
+
       const summary = {
         client_name: client.name,
         client_id: client.id,

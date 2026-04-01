@@ -32,6 +32,7 @@ interface KlaviyoContext {
   briefSection: string;
   bugSection: string;
   knowledgeSection: string;
+  criterioSection: string;
   learningContext: string;
   brandTone: string;
   brandName: string;
@@ -44,6 +45,7 @@ async function loadKlaviyoContext(supabase: any, clientId: string): Promise<Klav
     { data: bugsData },
     { data: globalFeedback },
     { data: clientFeedback },
+    { data: criterioRules },
   ] = await Promise.all([
     supabase
       .from('buyer_personas')
@@ -76,6 +78,12 @@ async function loadKlaviyoContext(supabase: any, clientId: string): Promise<Klav
       .eq('content_type', 'klaviyo_email')
       .order('created_at', { ascending: false })
       .limit(10),
+    supabase
+      .from('criterio_rules')
+      .select('name, check_rule, category')
+      .eq('active', true)
+      .or('category.ilike.%email%,category.ilike.%klaviyo%')
+      .limit(20),
   ]);
 
   // Brief section
@@ -132,7 +140,12 @@ ${clientNegative.length > 0 ? `\n\u26D4 LO QUE RECHAZA:\n${clientNegative.map((f
 `;
   }
 
-  return { briefSection, bugSection, knowledgeSection, learningContext: truncateContext(learningContext, 2000), brandTone, brandName };
+  // CRITERIO quality rules section
+  const criterioSection = criterioRules && criterioRules.length > 0
+    ? `\nREGLAS DE CALIDAD (tu contenido DEBE cumplir estas reglas):\n${criterioRules.map((r: { name: string; check_rule: string }) => `- ${r.name}: ${r.check_rule}`).join('\n')}\n`
+    : '';
+
+  return { briefSection, bugSection, knowledgeSection, criterioSection, learningContext: truncateContext(learningContext, 2000), brandTone, brandName };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -140,7 +153,7 @@ ${clientNegative.length > 0 ? `\n\u26D4 LO QUE RECHAZA:\n${clientNegative.map((f
 // ═══════════════════════════════════════════════════════════════
 
 function buildEmailSystemPrompt(ctx: KlaviyoContext): string {
-  return `${ctx.bugSection}${ctx.knowledgeSection}Eres Steve, un experto en email marketing y Klaviyo. Generas contenido de email profesional, persuasivo y optimizado para conversion. Sigues las mejores practicas: subjects < 50 chars, preview text < 90 chars, 1 CTA principal, urgency real, mobile-first. Siempre respondes en espanol. Tu tono es profesional pero cercano.
+  return `${ctx.bugSection}${ctx.knowledgeSection}${ctx.criterioSection}Eres Steve, un experto en email marketing y Klaviyo. Generas contenido de email profesional, persuasivo y optimizado para conversion. Sigues las mejores practicas: subjects < 50 chars, preview text < 90 chars, 1 CTA principal, urgency real, mobile-first. Siempre respondes en espanol. Tu tono es profesional pero cercano.
 
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 BRIEF DE MARCA DEL CLIENTE
@@ -477,7 +490,7 @@ async function handleChat(body: any, ctx: KlaviyoContext): Promise<any> {
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
 
-  const systemPrompt = `${ctx.bugSection}${ctx.knowledgeSection}Eres Steve, un experto senior en email marketing, Klaviyo y estrategia de ecommerce. Respondes en espanol de forma clara, practica y accionable. Tienes 10+ anos de experiencia.
+  const systemPrompt = `${ctx.bugSection}${ctx.knowledgeSection}${ctx.criterioSection}Eres Steve, un experto senior en email marketing, Klaviyo y estrategia de ecommerce. Respondes en espanol de forma clara, practica y accionable. Tienes 10+ anos de experiencia.
 
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 BRIEF DE MARCA DEL CLIENTE

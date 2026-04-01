@@ -97,18 +97,46 @@ export async function ruleCalibrator(c: Context) {
     },
   });
 
-  // Log individual problematic rules for visibility
-  for (const p of problematic) {
-    const issueLabel = p.issue === 'too_strict'
-      ? `rechaza ${p.reject_rate}% (demasiado estricta)`
-      : `nunca rechaza en ${p.total_evaluations} evaluaciones (posiblemente inútil)`;
+  // ── AUTO-ACTION: Disable/flag problematic rules instead of just logging ──
+  let autoDisabled = 0;
+  let autoFlagged = 0;
 
-    console.warn(`[rule-calibrator] ⚙️ ${p.rule_id} "${p.name}": ${issueLabel}`);
+  for (const p of problematic) {
+    if (p.issue === 'too_strict') {
+      // Check if this rule was already flagged last week (persistent problem)
+      const { data: prevLog } = await supabase
+        .from('qa_log')
+        .select('id')
+        .eq('check_type', 'rule_calibration')
+        .gte('checked_at', new Date(Date.now() - 14 * 86400000).toISOString())
+        .limit(5);
+
+      // If rule has been too_strict for 2+ weeks (found in previous logs), auto-disable
+      const persistentProblem = prevLog && prevLog.length >= 2;
+
+      if (persistentProblem) {
+        // Disable the rule
+        await supabase
+          .from('criterio_rules')
+          .update({ active: false })
+          .eq('id', p.rule_id);
+
+        autoDisabled++;
+        console.warn(`[rule-calibrator] 🔴 AUTO-DISABLED "${p.name}" (${p.rule_id}): ${p.reject_rate}% reject rate for 2+ weeks`);
+      } else {
+        autoFlagged++;
+        console.warn(`[rule-calibrator] 🟡 FLAGGED "${p.name}" (${p.rule_id}): ${p.reject_rate}% reject rate — will auto-disable next week if persists`);
+      }
+    } else if (p.issue === 'never_rejects') {
+      // Mark as candidate for removal but don't auto-disable (it's not causing harm)
+      autoFlagged++;
+      console.warn(`[rule-calibrator] 🟠 CANDIDATE FOR REMOVAL "${p.name}" (${p.rule_id}): never rejects in ${p.total_evaluations} evals`);
+    }
   }
 
   if (problematic.length > 0) {
     console.log(
-      `[rule-calibrator] ${problematic.length} rules need review out of ${rules.length} checked`
+      `[rule-calibrator] ${problematic.length} problematic, ${autoDisabled} auto-disabled, ${autoFlagged} flagged`
     );
   } else {
     console.log(`[rule-calibrator] All ${rules.length} rules within normal calibration range`);
@@ -119,6 +147,8 @@ export async function ruleCalibrator(c: Context) {
     calibrated_at: new Date().toISOString(),
     rules_checked: rules.length,
     problematic_count: problematic.length,
+    auto_disabled: autoDisabled,
+    auto_flagged: autoFlagged,
     problematic,
   });
 }
