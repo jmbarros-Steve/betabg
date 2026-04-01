@@ -58,7 +58,7 @@ function formatDate(iso: string | null) {
 }
 
 export function ShopifyDiscountsPanel({ clientId, connectionId, discountPerformance = [] }: ShopifyDiscountsPanelProps) {
-  const { canAccess } = useUserPlan();
+  const { canAccess } = useUserPlan(clientId);
   const canCreateDiscount = canAccess('shopify.discounts');
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [loading, setLoading] = useState(true);

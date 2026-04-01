@@ -87,7 +87,7 @@ function getSuggestedPrice(variant: ProductVariant, salesData: SkuSale | undefin
 }
 
 export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId: externalConnectionId, initialProducts }: ShopifyProductsPanelProps) {
-  const { canAccess } = useUserPlan();
+  const { canAccess } = useUserPlan(clientId);
   const canEdit = canAccess('shopify.edit');
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [loading, setLoading] = useState(false);

@@ -12,7 +12,7 @@ interface FloatingDiscountButtonProps {
 }
 
 export function FloatingDiscountButton({ clientId }: FloatingDiscountButtonProps) {
-  const { canAccess } = useUserPlan();
+  const { canAccess } = useUserPlan(clientId);
   const [isOpen, setIsOpen] = useState(false);
   const [hasShopify, setHasShopify] = useState(false);
   const [loading, setLoading] = useState(true);
