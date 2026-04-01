@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 /**
  * Image editing via Google Gemini 2.0 Flash (native image generation).
@@ -36,6 +37,12 @@ export async function editImageGemini(c: Context) {
     }
 
     const supabase = getSupabaseAdmin();
+
+    // Load brand visual knowledge
+    const { knowledgeBlock: visualKnowledge } = await loadKnowledge(
+      ['anuncios', 'creativos', 'imagenes'],
+      { clientId, limit: 5 }
+    );
 
     // Check credits (1 credit for edits, 2 for generation)
     const creditCost = ['generate_email_banner', 'variation'].includes(action) ? 2 : 1;
@@ -105,7 +112,8 @@ export async function editImageGemini(c: Context) {
         const bannerPrompt = prompt || 'Professional e-commerce promotional banner';
         const w = width || 600;
         const h = height || 300;
-        editPrompt = `Generate a professional email marketing banner image (${w}x${h} pixels). Style: ${bannerPrompt}. The image should be clean, modern, and suitable for an HTML email. No text in the image — the text will be overlaid separately. Use brand colors: primary ${brandColor || '#18181b'}, secondary ${brandSecondaryColor || '#6366f1'}.`;
+        const knowledgeHint = visualKnowledge ? ` Follow these brand rules: ${visualKnowledge.replace(/\n/g, ' ').slice(0, 500)}` : '';
+        editPrompt = `Generate a professional email marketing banner image (${w}x${h} pixels). Style: ${bannerPrompt}.${knowledgeHint} The image should be clean, modern, and suitable for an HTML email. No text in the image — the text will be overlaid separately. Use brand colors: primary ${brandColor || '#18181b'}, secondary ${brandSecondaryColor || '#6366f1'}.`;
         break;
       }
 

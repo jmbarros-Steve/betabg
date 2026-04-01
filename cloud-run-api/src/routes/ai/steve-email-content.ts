@@ -56,8 +56,9 @@ async function loadKlaviyoContext(supabase: any, clientId: string): Promise<Klav
     supabase
       .from('steve_knowledge')
       .select('titulo, contenido')
-      .eq('categoria', 'klaviyo')
+      .in('categoria', ['klaviyo', 'email'])
       .eq('activo', true)
+      .eq('approval_status', 'approved')
       .order('orden', { ascending: false })
       .limit(20),
     supabase

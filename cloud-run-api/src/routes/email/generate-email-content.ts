@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 function truncateContext(text: string, max = 4000): string {
   if (!text || text.length <= max) return text;
@@ -54,6 +55,8 @@ interface BrandContext {
   brandName: string;
   brandTone: string;
   products: any[];
+  knowledgeBlock: string;
+  bugsBlock: string;
 }
 
 async function loadBrandContext(supabase: any, clientId: string): Promise<BrandContext> {
@@ -80,6 +83,12 @@ async function loadBrandContext(supabase: any, clientId: string): Promise<BrandC
       .single(),
   ]);
 
+  // Load knowledge rules
+  const { knowledgeBlock, bugsBlock } = await loadKnowledge(
+    ['email', 'klaviyo', 'anuncios'],
+    { clientId, limit: 10 }
+  );
+
   let briefSection = 'Brief no completado.';
   let brandName = client?.name || client?.company || 'la marca';
   let brandTone = '';
@@ -96,6 +105,8 @@ async function loadBrandContext(supabase: any, clientId: string): Promise<BrandC
     brandName,
     brandTone,
     products: products || [],
+    knowledgeBlock,
+    bugsBlock,
   };
 }
 
@@ -115,7 +126,8 @@ REGLAS:
 - Genera MJML valido (NO HTML puro) usando componentes mj-section, mj-column, mj-text, mj-image, mj-button, mj-divider
 - Colores neutros profesionales (se puede customizar despues en el editor)
 - Incluye siempre un CTA claro con mj-button
-- El MJML se cargara en un editor visual GrapeJS donde el usuario puede editarlo`;
+- El MJML se cargara en un editor visual GrapeJS donde el usuario puede editarlo
+${ctx.knowledgeBlock}${ctx.bugsBlock}`;
 }
 
 async function handleGenerateCampaignHtml(body: any, ctx: BrandContext) {

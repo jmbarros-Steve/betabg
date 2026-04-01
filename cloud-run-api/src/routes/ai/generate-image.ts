@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 const IMAGE_CREDIT_COST = 2;
 const DIVERSITY_STYLES = [
@@ -40,6 +41,12 @@ export async function generateImage(c: Context) {
   if (!ownerCheck) {
     return c.json({ error: 'No tienes acceso a este cliente' }, 403);
   }
+
+  // Load visual/creative knowledge rules
+  const { knowledgeBlock: visualKnowledge } = await loadKnowledge(
+    ['anuncios', 'meta_ads', 'creativos', 'imagenes'],
+    { clientId, limit: 8 }
+  );
 
   // TODO: Re-enable credit system when billing is ready
 
@@ -110,7 +117,11 @@ export async function generateImage(c: Context) {
   // Add diversity instruction to avoid repetitive outputs
   const randomDiversity = DIVERSITY_STYLES[Math.floor(Math.random() * DIVERSITY_STYLES.length)];
 
-  const promptFinal = `${promptBase}. ${randomDiversity}. Ultra-realistic commercial photograph, shot on Canon EOS R5 with 85mm f/1.4 lens. Natural lighting with soft shadows, real skin texture with pores and subtle imperfections, genuine facial expressions. Real physical environment with depth of field and bokeh. No illustrations, no 3D renders, no AI artifacts, no plastic-looking skin, no floating objects. The image must be indistinguishable from a real professional advertising photo shoot.`;
+  const visualRulesForPrompt = visualKnowledge
+    ? `\nBRAND & CREATIVE RULES (follow these):\n${visualKnowledge}\n`
+    : '';
+
+  const promptFinal = `${promptBase}. ${randomDiversity}. ${visualRulesForPrompt}Ultra-realistic commercial photograph, shot on Canon EOS R5 with 85mm f/1.4 lens. Natural lighting with soft shadows, real skin texture with pores and subtle imperfections, genuine facial expressions. Real physical environment with depth of field and bokeh. No illustrations, no 3D renders, no AI artifacts, no plastic-looking skin, no floating objects. The image must be indistinguishable from a real professional advertising photo shoot.`;
 
   let imageBytes: Uint8Array | null = null;
 

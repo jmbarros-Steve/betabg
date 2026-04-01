@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getCreativeContext } from '../../lib/creative-context.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 export async function generateMassCampaigns(c: Context) {
   try {
@@ -41,6 +42,12 @@ ${previousEmails.substring(0, 3000)}`;
   if (clientId) {
     creativeHistoryHint = await getCreativeContext(clientId, 'klaviyo');
   }
+
+  // Load email/marketing knowledge rules
+  const { knowledgeBlock: emailKnowledge, bugsBlock: emailBugs } = await loadKnowledge(
+    ['email', 'klaviyo', 'anuncios'],
+    { clientId, limit: 10 }
+  );
 
   const systemPrompt = `Eres Steve, copywriter experto en email marketing para e-commerce chileno.
 
@@ -92,6 +99,7 @@ URLS SHOPIFY:
 COLORES: primario ${primaryColor}, botón ${buttonColor}, texto botón ${buttonTextColor}
 ${signatureHint}
 ${creativeHistoryHint}
+${emailKnowledge}${emailBugs}
 Responde SOLO con el array JSON de bloques. Sin explicación, sin markdown, sin backticks. Solo JSON puro.`;
 
   const userMessage = `Genera un email COMPLETO y ORIGINAL para esta campaña:

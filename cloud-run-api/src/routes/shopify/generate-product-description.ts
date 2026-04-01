@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 /**
  * Generate SEO-optimized product description using Gemini
@@ -56,6 +57,12 @@ export async function generateProductDescription(c: Context) {
     // Clean existing description
     const cleanHtml = (body_html || '').replace(/<[^>]*>/g, '').trim();
 
+    // Load product/SEO knowledge
+    const { knowledgeBlock } = await loadKnowledge(
+      ['shopify', 'seo', 'ecommerce', 'productos'],
+      { clientId: connection.client_id, limit: 8 }
+    );
+
     const geminiApiKey = process.env.GEMINI_API_KEY;
     if (!geminiApiKey) {
       return c.json({ error: 'GEMINI_API_KEY not configured' }, 500);
@@ -67,6 +74,7 @@ PRODUCTO: ${title}
 ${cleanHtml ? `DESCRIPCIÓN ACTUAL: ${cleanHtml}` : ''}
 ${brand_brief ? `BRIEF DE MARCA: ${brand_brief}` : ''}
 
+${knowledgeBlock}
 REGLAS:
 1. Escribe en español de Chile (no uses vosotros)
 2. Mínimo 200 caracteres, máximo 800

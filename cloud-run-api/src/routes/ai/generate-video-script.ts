@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 const SCRIPT_CREDIT_COST = 1;
@@ -60,6 +61,12 @@ export async function generateVideoScript(c: Context) {
     const brand = brandRes.data;
     const products = productsRes.data || [];
 
+    // Load video/ads knowledge rules
+    const { knowledgeBlock, bugsBlock } = await loadKnowledge(
+      ['video', 'anuncios', 'meta_ads', 'creativos'],
+      { clientId, limit: 10 }
+    );
+
     const duracionConfig = {
       '15s': { totalSeconds: 15, hookSeconds: 3, bodySeconds: 9, ctaSeconds: 3, wordCount: '30-45' },
       '30s': { totalSeconds: 30, hookSeconds: 3, bodySeconds: 22, ctaSeconds: 5, wordCount: '60-90' },
@@ -92,6 +99,7 @@ ${instrucciones ? `INSTRUCCIONES ADICIONALES: ${instrucciones}` : ''}
 ETAPA DEL FUNNEL: ${funnel.toUpperCase()}
 ${funnelGuide}
 
+${knowledgeBlock}${bugsBlock}
 ESTRUCTURA DEL SCRIPT:
 
 1. HOOK (primeros ${duracionConfig.hookSeconds} segundos):
