@@ -52,6 +52,11 @@ export interface ProspectRecord {
   last_email_at?: string | null;
   audit_data?: ProspectAuditData | null;
   lost_reason?: string | null;
+  budget_range?: string | null;
+  decision_timeline?: string | null;
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
 }
 
 export interface ProspectAuditData {
@@ -77,6 +82,14 @@ export interface ExtractedProspectInfo {
   pain_points?: string[];
   integrations_used?: string[];
   team_size?: string;
+  budget_range?: string;
+  decision_timeline?: string;
+}
+
+export interface CaseStudyResult {
+  summary: string;
+  mediaUrl: string | null;
+  title: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -549,21 +562,48 @@ export function calculateLostMoney(monthlyRevenue: string | null | undefined): {
   return { currentEstimate, optimizedEstimate, difference };
 }
 
-/** Paso 13: Load case studies from steve_knowledge matching prospect's industry. */
-export async function loadIndustryCaseStudy(whatTheySell: string | null | undefined): Promise<string | null> {
+/** Paso 13: Load case studies from wa_case_studies matching prospect's industry keywords. */
+export async function loadIndustryCaseStudy(whatTheySell: string | null | undefined): Promise<CaseStudyResult | null> {
   if (!whatTheySell) return null;
   const supabase = getSupabaseAdmin();
 
+  // Extract keywords from what they sell
+  const keywords = whatTheySell.toLowerCase().split(/[\s,;]+/).filter(w => w.length >= 3);
+  if (keywords.length === 0) return null;
+
+  // Try overlap query with industry_keywords array
   const { data } = await supabase
+    .from('wa_case_studies')
+    .select('title, summary, metrics, media_url, industry_keywords')
+    .eq('active', true)
+    .overlaps('industry_keywords', keywords)
+    .limit(1);
+
+  if (data && data.length > 0) {
+    return {
+      title: data[0].title,
+      summary: data[0].summary,
+      mediaUrl: data[0].media_url || null,
+    };
+  }
+
+  // Fallback: fuzzy match on first keyword via steve_knowledge
+  const { data: fallback } = await supabase
     .from('steve_knowledge')
     .select('titulo, contenido')
     .eq('activo', true)
-    .ilike('contenido', `%${whatTheySell.split(' ')[0]}%`)
-    .limit(2);
+    .ilike('contenido', `%${keywords[0]}%`)
+    .limit(1);
 
-  if (!data || data.length === 0) return null;
+  if (fallback && fallback.length > 0) {
+    return {
+      title: fallback[0].titulo || 'Caso de éxito',
+      summary: (fallback[0].contenido || '').slice(0, 400),
+      mediaUrl: null,
+    };
+  }
 
-  return data.map(d => `${d.titulo}: ${d.contenido}`).join('\n').slice(0, 500);
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -648,6 +688,8 @@ export async function buildDynamicSalesPrompt(
   if (prospect.is_decision_maker != null) known.push(`Decisor: ${prospect.is_decision_maker ? 'Sí' : 'No'}`);
   if (prospect.integrations_used?.length) known.push(`Herramientas: ${prospect.integrations_used.join(', ')}`);
   if (prospect.actively_looking != null) known.push(`Buscando solución: ${prospect.actively_looking ? 'Sí' : 'No'}`);
+  if (prospect.budget_range) known.push(`Presupuesto: ${prospect.budget_range}`);
+  if (prospect.decision_timeline) known.push(`Timeline decisión: ${prospect.decision_timeline}`);
   if (prospect.audit_data?.findings?.length) known.push(`Auditoría tienda: ${prospect.audit_data.findings.join('; ')}`);
 
   known.push(`Score: ${prospect.lead_score || 0}/100`);
@@ -735,7 +777,16 @@ export async function buildDynamicSalesPrompt(
 
   // Paso 13: Caso de éxito por industria
   if (caseStudy) {
-    prompt += `Caso de éxito de su industria: ${caseStudy}\n`;
+    prompt += `Caso de éxito de su industria: ${caseStudy.title} — ${caseStudy.summary}\n`;
+    // In pitching/closing, Steve can trigger media delivery
+    if ((effectiveStage === 'pitching' || effectiveStage === 'closing') && caseStudy.mediaUrl) {
+      prompt += `Si quieres enviarle el caso de éxito con imagen, incluye [SEND_CASE_STUDY] al final de tu mensaje (se enviará como mensaje separado).\n`;
+    }
+  }
+
+  // Trial activation — closing stage with buying signals
+  if (closerMode && (effectiveStage === 'pitching' || effectiveStage === 'closing')) {
+    prompt += `Si el prospecto dice "quiero probar" o similar y da su email, incluye [ACTIVATE_TRIAL:su@email.com] al final para activarle un trial automáticamente. Ejemplo: "Listo, te activo el plan Visual ahora mismo [ACTIVATE_TRIAL:juan@tienda.cl]"\n`;
   }
 
   // Meeting trigger — organic
@@ -863,7 +914,9 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown, sin explicación). Solo 
   "current_marketing": "cómo manejan marketing — solo si lo describió",
   "pain_points": ["dolor1"] — solo frustraciones que el prospecto EXPRESÓ,
   "integrations_used": ["Meta"] — solo herramientas que el prospecto NOMBRÓ,
-  "team_size": "tamaño del equipo — solo si lo mencionó"
+  "team_size": "tamaño del equipo — solo si lo mencionó",
+  "budget_range": "presupuesto de marketing mensual — solo si dio rango o cifra (ej: '$500K/mes', 'entre 1-2 millones')",
+  "decision_timeline": "cuándo quiere empezar — solo si lo dijo (ej: 'este mes', 'después de CyberDay', 'lo antes posible')"
 }`;
 
   try {
@@ -934,7 +987,7 @@ export function calculateLeadScore(
   if (prospect.what_they_sell) breakdown.need += 5;
   if (prospect.current_marketing) breakdown.need += 5;
 
-  // --- BUDGET (0-25): Monthly revenue — ONLY if parseable number ---
+  // --- BUDGET (0-25): Monthly revenue + budget range ---
   if (prospect.monthly_revenue) {
     const rev = prospect.monthly_revenue.toLowerCase();
     const digits = rev.replace(/\D/g, '');
@@ -950,6 +1003,15 @@ export function calculateLeadScore(
     }
     // If monthly_revenue is vague text without numbers → 0 pts
   }
+  // Bonus: explicit budget range shared
+  if (prospect.budget_range) {
+    const budgetLower = prospect.budget_range.toLowerCase();
+    if (budgetLower.includes('millón') || budgetLower.includes('millon') || /\d{6,}/.test(budgetLower.replace(/\D/g, ''))) {
+      breakdown.budget = Math.min(breakdown.budget + 10, 25); // High budget
+    } else {
+      breakdown.budget = Math.min(breakdown.budget + 5, 25);
+    }
+  }
 
   // --- AUTHORITY (0-15): Are they the decision maker? ---
   if (prospect.is_decision_maker === true) {
@@ -957,10 +1019,19 @@ export function calculateLeadScore(
   }
   // Unknown authority → 0 pts (not 5). Don't assume.
 
-  // --- TIMELINE (0-20): Actively looking + pain points = urgency ---
+  // --- TIMELINE (0-20): Actively looking + pain points + decision_timeline = urgency ---
   if (prospect.actively_looking === true) breakdown.timeline += 10;
   if (prospect.pain_points && prospect.pain_points.length > 0) {
     breakdown.timeline += Math.min(prospect.pain_points.length * 5, 10);
+  }
+  // Bonus: explicit decision timeline
+  if (prospect.decision_timeline) {
+    const tl = prospect.decision_timeline.toLowerCase();
+    if (tl.includes('ahora') || tl.includes('ya') || tl.includes('este mes') || tl.includes('lo antes posible') || tl.includes('urgente')) {
+      breakdown.timeline = Math.min(breakdown.timeline + 10, 20);
+    } else if (tl.includes('próximo mes') || tl.includes('proximo mes') || tl.includes('pronto')) {
+      breakdown.timeline = Math.min(breakdown.timeline + 5, 20);
+    }
   }
 
   // --- FIT (0-15): Only Shopify or WooCommerce are good fits ---
@@ -976,6 +1047,10 @@ export function calculateLeadScore(
       steveIntegrations.some((si: string) => i.toLowerCase().includes(si))
     ).length;
     breakdown.fit += Math.min(matchCount * 3, 5);
+  }
+  // Bonus: audit data available (we scraped their store)
+  if (prospect.audit_data?.findings?.length) {
+    breakdown.fit = Math.min(breakdown.fit + 5, 15);
   }
 
   let score = Object.values(breakdown).reduce((a, b) => a + b, 0);

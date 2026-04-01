@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MessageCircle } from 'lucide-react';
 
-const WA_LINK = 'https://wa.me/15559061514?text=Hola%20Steve%20%F0%9F%90%95';
+const WA_LINK = 'https://wa.me/18106425882?text=Hola%20Steve%20%F0%9F%90%95%20(src%3Dwebsite)';
 
 export function FloatingWhatsAppButton() {
   const [visible, setVisible] = useState(false);

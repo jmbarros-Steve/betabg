@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Users, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, Loader2, MessageSquare, Library, UserSearch } from 'lucide-react';
+import { Users, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, Loader2, MessageSquare, Library, UserSearch, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -18,9 +18,10 @@ import { KnowledgeRulesExplorer } from '@/components/dashboard/KnowledgeRulesExp
 import { AdminSupportPanel } from '@/components/dashboard/AdminSupportPanel';
 import { AcademyAdminPanel } from '@/components/dashboard/AcademyAdminPanel';
 import { ProspectosPanel } from '@/components/dashboard/ProspectosPanel';
+import { OnboardingProgressPanel } from '@/components/dashboard/OnboardingProgressPanel';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'overview' | 'clients' | 'blog' | 'estudios' | 'platforms' | 'metrics' | 'training' | 'support' | 'academy' | 'prospectos';
+type TabType = 'overview' | 'clients' | 'blog' | 'estudios' | 'platforms' | 'metrics' | 'training' | 'support' | 'academy' | 'prospectos' | 'onboarding';
 
 export default function Dashboard() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -71,6 +72,7 @@ export default function Dashboard() {
     { id: 'platforms', label: 'Plataformas', icon: Link2 },
     { id: 'training', label: 'Steve IA', icon: Brain },
     { id: 'prospectos', label: 'Prospectos', icon: UserSearch },
+    { id: 'onboarding', label: 'Onboarding', icon: ClipboardList },
     { id: 'support', label: 'Soporte', icon: MessageSquare },
     { id: 'blog', label: 'Blog', icon: BookOpen },
     { id: 'estudios', label: 'Centro Estudios', icon: GraduationCap },
@@ -131,6 +133,7 @@ export default function Dashboard() {
             </div>
           )}
           {activeTab === 'prospectos' && <ProspectosPanel />}
+          {activeTab === 'onboarding' && <OnboardingProgressPanel />}
           {activeTab === 'support' && <AdminSupportPanel />}
           {activeTab === 'blog' && <BlogPanel userId={user.id} />}
           {activeTab === 'estudios' && <StudyResourcesPanel userId={user.id} />}

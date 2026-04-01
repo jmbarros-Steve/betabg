@@ -65,6 +65,22 @@ export async function selfSignup(c: Context) {
     email,
   }).select('id').single();
 
+  // Seed onboarding steps
+  if (newClient) {
+    const onboardResult = await supabase.from('merchant_onboarding').insert([
+      { client_id: newClient.id, step: 'welcome', status: 'completed', completed_at: new Date().toISOString() },
+      { client_id: newClient.id, step: 'shopify_connected', status: 'pending' },
+      { client_id: newClient.id, step: 'meta_connected', status: 'pending' },
+      { client_id: newClient.id, step: 'brief_completed', status: 'pending' },
+      { client_id: newClient.id, step: 'first_campaign', status: 'pending' },
+    ]);
+    if (onboardResult.error) {
+      console.warn('Onboarding seed error (non-blocking):', onboardResult.error.message);
+    } else {
+      console.log('Onboarding steps seeded for client:', newClient.id);
+    }
+  }
+
   // Check if this email matches a WhatsApp prospect and convert them
   if (newClient) {
     const { data: prospect } = await supabase

@@ -43,7 +43,7 @@ export async function prospectFollowup(c: Context) {
     // ============================================================
     const { data: prospects } = await supabase
       .from('wa_prospects')
-      .select('id, phone, profile_name, name, what_they_sell, stage, followup_count, last_followup_at, updated_at, message_count')
+      .select('id, phone, profile_name, name, what_they_sell, stage, followup_count, last_followup_at, updated_at, message_count, pain_points, audit_data, lead_score')
       .not('stage', 'in', '("lost","converted")')
       .lt('followup_count', 3)
       .order('updated_at', { ascending: true })
@@ -86,13 +86,19 @@ export async function prospectFollowup(c: Context) {
 
           if (!shouldSend) continue;
 
-          // Generate follow-up message with Haiku
+          // Generate follow-up message with Haiku — personalized with pain_points and audit data
           const prospectName = prospect.name || prospect.profile_name || '';
           const industry = prospect.what_they_sell || 'e-commerce';
+          const painContext = (prospect as any).pain_points?.length
+            ? `Sus dolores: ${(prospect as any).pain_points.join(', ')}.`
+            : '';
+          const auditContext = (prospect as any).audit_data?.findings?.length
+            ? `Datos de su tienda: ${(prospect as any).audit_data.findings.slice(0, 2).join('; ')}.`
+            : '';
 
           const prompts: Record<string, string> = {
-            insight: `Genera un mensaje de WhatsApp corto (max 3 líneas) para hacer follow-up a un prospecto llamado "${prospectName}" que vende ${industry}. Dale un dato relevante de su industria sobre marketing digital. Tono: amigable, profesional, en español neutro (usar tú, no vos). NO uses "Hola" al inicio. Ejemplo: "Oye [nombre], vi que en [rubro] están metiendo fuerte en Meta Ads. ¿Lo has evaluado?" Responde SOLO con el mensaje, nada más.`,
-            fomo: `Genera un mensaje de WhatsApp corto (max 4 líneas) para follow-up a "${prospectName}" que vende ${industry}. Incluye un caso de éxito genérico de su industria con un número concreto de mejora + urgencia de cupos limitados. Tono: amigable, en español neutro. Ejemplo: "Una marca de [rubro] subió 40% en ventas en 2 meses con Steve. Me quedan 2 cupos este mes." Responde SOLO con el mensaje.`,
+            insight: `Genera un mensaje de WhatsApp corto (max 3 líneas) para hacer follow-up a un prospecto llamado "${prospectName}" que vende ${industry}. ${auditContext || painContext || ''} ${auditContext ? 'Usa los datos de su tienda para dar un insight concreto.' : 'Dale un dato relevante de su industria sobre marketing digital.'} Tono: amigable, profesional, en español neutro (usar tú, no vos). NO uses "Hola" al inicio. Responde SOLO con el mensaje, nada más.`,
+            fomo: `Genera un mensaje de WhatsApp corto (max 4 líneas) para follow-up a "${prospectName}" que vende ${industry}. ${painContext} Incluye un caso de éxito de su industria con un número concreto de mejora + urgencia de cupos limitados. Tono: amigable, en español neutro. Responde SOLO con el mensaje.`,
             goodbye: `Genera un mensaje de WhatsApp corto (max 2 líneas) de despedida respetuosa para "${prospectName}". Déjale la puerta abierta sin presionar. Tono: cálido, en español neutro. Ejemplo: "No quiero ser latero. Si en algún momento quieres retomar, aquí estoy." Responde SOLO con el mensaje.`,
           };
 

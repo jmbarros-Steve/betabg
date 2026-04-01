@@ -36,5 +36,14 @@ export async function authMiddleware(c: Context, next: Next) {
 
   c.set('user', user);
   c.set('token', token);
+
+  // Fire & forget: update last_active_at for churn detection
+  Promise.resolve(
+    supabase
+      .from('clients')
+      .update({ last_active_at: new Date().toISOString() })
+      .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+  ).catch(() => {});
+
   await next();
 }

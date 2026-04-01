@@ -127,6 +127,9 @@ import { prospectEmailNurture } from './cron/prospect-email-nurture.js';
 import { knowledgeDecay } from './cron/knowledge-decay.js';
 import { knowledgeConsolidator } from './cron/knowledge-consolidator.js';
 import { knowledgeDedup } from './cron/knowledge-dedup.js';
+import { onboardingWA } from './cron/onboarding-wa.js';
+import { merchantUpsell } from './cron/merchant-upsell.js';
+import { churnDetector } from './cron/churn-detector.js';
 
 // WhatsApp
 import { steveWAChat } from './whatsapp/steve-wa-chat.js';
@@ -135,6 +138,7 @@ import { waSendMessage } from './whatsapp/send-message.js';
 import { waSendCampaign } from './whatsapp/send-campaign.js';
 import { shopifyCheckoutWebhook } from './whatsapp/shopify-checkout-webhook.js';
 import { abandonedCartWA } from './whatsapp/abandoned-cart-wa.js';
+import { prospectTrial } from './whatsapp/prospect-trial.js';
 
 // Triggers
 import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
@@ -421,4 +425,12 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/knowledge-decay', knowledgeDecay); // No JWT — uses X-Cron-Secret, monthly: 0 4 1 * *
   app.post('/api/cron/knowledge-consolidator', knowledgeConsolidator); // No JWT — monthly: 0 5 1 * * (1st of month, 5am)
   app.post('/api/cron/knowledge-dedup', knowledgeDedup); // No JWT — monthly: 0 6 1 * * (1st of month, 6am)
+
+  // ============================================================
+  // Steve Sales + Post-Venta
+  // ============================================================
+  app.post('/api/whatsapp/prospect-trial', prospectTrial); // No JWT — uses X-Internal-Key, triggered by [ACTIVATE_TRIAL] tag
+  app.post('/api/cron/onboarding-wa', onboardingWA); // No JWT — uses X-Cron-Secret, every 4h: 0 */4 * * *
+  app.post('/api/cron/merchant-upsell', merchantUpsell); // No JWT — uses X-Cron-Secret, weekly: 0 11 * * 0 (Sun 11am UTC)
+  app.post('/api/cron/churn-detector', churnDetector); // No JWT — uses X-Cron-Secret, daily: 0 14 * * *
 }

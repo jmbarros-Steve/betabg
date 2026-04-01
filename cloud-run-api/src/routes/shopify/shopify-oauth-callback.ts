@@ -350,6 +350,17 @@ export async function shopifyOauthCallback(c: Context) {
       // Register webhooks
       await registerWebhooks(c, shopDomain, accessToken);
 
+      // Complete onboarding step (fire & forget)
+      Promise.resolve(
+        supabaseAdmin
+          .from('merchant_onboarding')
+          .update({ status: 'completed', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .eq('client_id', perClientId)
+          .eq('step', 'shopify_connected')
+          .eq('status', 'pending')
+      ).then(() => console.log(`[shopify-oauth] Onboarding step shopify_connected completed for client ${perClientId}`))
+        .catch(() => {});
+
       // Redirect back to Steve — use JS top-level navigation to break out of Shopify admin iframe
       if (isDirectRedirect) {
         const redirectUrl = new URL(`${frontendUrl}/oauth/shopify/callback`);

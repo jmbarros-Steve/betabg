@@ -14,9 +14,11 @@ import {
   pushToHubSpot,
   detectDisqualification,
   detectBuyingSignals,
+  loadIndustryCaseStudy,
   type ProspectRecord,
 } from '../../lib/steve-wa-brain.js';
-import { sendWhatsApp } from '../../lib/twilio-client.js';
+import { sendWhatsApp, sendWhatsAppMedia } from '../../lib/twilio-client.js';
+import { type CaseStudyResult } from '../../lib/steve-wa-brain.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 
@@ -240,6 +242,17 @@ async function handleProspect(
         message_count: (existingProspect.message_count || 0) + 1,
       };
     } else {
+      // Parse UTM from first message (e.g. "Hola Steve, vi tu web (src=website)")
+      let utmSource: string | null = null;
+      let utmMedium: string | null = null;
+      let utmCampaign: string | null = null;
+      const srcMatch = messageBody.match(/\bsrc=(\w+)/i);
+      const medMatch = messageBody.match(/\bmed=(\w+)/i);
+      const campMatch = messageBody.match(/\bcamp=(\w+)/i);
+      if (srcMatch) utmSource = srcMatch[1];
+      if (medMatch) utmMedium = medMatch[1];
+      if (campMatch) utmCampaign = campMatch[1];
+
       // Create new prospect
       const { data: newProspect } = await supabase
         .from('wa_prospects')
@@ -251,6 +264,9 @@ async function handleProspect(
           message_count: 1,
           lead_score: 0,
           score_breakdown: {},
+          ...(utmSource && { utm_source: utmSource }),
+          ...(utmMedium && { utm_medium: utmMedium }),
+          ...(utmCampaign && { utm_campaign: utmCampaign }),
         })
         .select()
         .single();
@@ -499,6 +515,68 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       }
     }
 
+    // Paso: Handle [SEND_CASE_STUDY] tag — send case study with media
+    const caseStudyTag = (firstReply + (secondReply || '')).includes('[SEND_CASE_STUDY]');
+    if (caseStudyTag) {
+      firstReply = firstReply.replace(/\[SEND_CASE_STUDY\]/g, '').trim();
+      if (secondReply) secondReply = secondReply.replace(/\[SEND_CASE_STUDY\]/g, '').trim();
+
+      // Fire & forget: load case study and send media
+      const sellsWhat = prospect.what_they_sell;
+      setTimeout(async () => {
+        try {
+          const caseStudy = await loadIndustryCaseStudy(sellsWhat);
+          if (caseStudy) {
+            const msg = `📊 ${caseStudy.title}\n\n${caseStudy.summary}`;
+            if (caseStudy.mediaUrl) {
+              await sendWhatsAppMedia(`+${phone}`, msg, caseStudy.mediaUrl);
+            } else {
+              await sendWhatsApp(`+${phone}`, msg);
+            }
+            await supabase.from('wa_messages').insert({
+              client_id: null, channel: 'prospect', direction: 'outbound',
+              from_number: STEVE_WA_NUMBER, to_number: phone,
+              body: msg, contact_name: profileName || phone, contact_phone: phone,
+            });
+          }
+        } catch (err) {
+          console.error('[send-case-study] Error:', err);
+        }
+      }, 3000);
+    }
+
+    // Paso: Handle [ACTIVATE_TRIAL:email] tag — create trial account
+    const trialMatch = (firstReply + (secondReply || '')).match(/\[ACTIVATE_TRIAL:([^\]]+)\]/);
+    if (trialMatch) {
+      const trialEmail = trialMatch[1].trim();
+      firstReply = firstReply.replace(/\[ACTIVATE_TRIAL:[^\]]+\]/g, '').trim();
+      if (secondReply) secondReply = secondReply.replace(/\[ACTIVATE_TRIAL:[^\]]+\]/g, '').trim();
+
+      // Fire & forget: call prospect-trial endpoint
+      const SELF_URL = process.env.SELF_URL || '';
+      if (SELF_URL) {
+        setTimeout(async () => {
+          try {
+            await fetch(`${SELF_URL}/api/whatsapp/prospect-trial`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Internal-Key': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+              },
+              body: JSON.stringify({
+                email: trialEmail,
+                phone,
+                prospect_id: prospect.id,
+                name: prospect.name || prospect.profile_name || profileName,
+              }),
+            });
+          } catch (err) {
+            console.error('[activate-trial] Error:', err);
+          }
+        }, 2000);
+      }
+    }
+
     // 7. FIRE & FORGET: async extraction + scoring + HubSpot push
     const fullReplyText = secondReply ? `${firstReply}\n${secondReply}` : firstReply;
     const fullHistory = [...history];
@@ -579,7 +657,7 @@ async function processProspectAsync(
         'name', 'email', 'company', 'what_they_sell', 'monthly_revenue',
         'has_online_store', 'store_platform', 'is_decision_maker',
         'actively_looking', 'current_marketing', 'pain_points',
-        'integrations_used', 'team_size',
+        'integrations_used', 'team_size', 'budget_range', 'decision_timeline',
       ] as const;
 
       for (const field of mergeFields) {

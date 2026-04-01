@@ -195,6 +195,19 @@ export async function metaOauthCallback(c: Context) {
       });
     }
 
+    // Complete onboarding step (fire & forget)
+    if (client_id) {
+      Promise.resolve(
+        getSupabaseAdmin()
+          .from('merchant_onboarding')
+          .update({ status: 'completed', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .eq('client_id', client_id)
+          .eq('step', 'meta_connected')
+          .eq('status', 'pending')
+      ).then(() => console.log(`[meta-oauth] Onboarding step meta_connected completed for client ${client_id}`))
+        .catch(() => {});
+    }
+
     const allAccounts = adAccounts.map((a: any) => ({
       id: a.id.replace('act_', ''),
       name: a.name,

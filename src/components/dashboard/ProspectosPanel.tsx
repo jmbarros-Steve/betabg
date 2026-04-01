@@ -2,7 +2,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight, ChevronDown, Search, Loader2, ThumbsUp, ThumbsDown,
-  MessageSquare, Brain, X, Send, Users, CheckCircle2, BookOpen
+  MessageSquare, Brain, X, Send, Users, CheckCircle2, BookOpen,
+  TrendingUp, ArrowRight, Globe
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +30,9 @@ interface Prospect {
   message_count: number;
   updated_at: string;
   created_at: string;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
 }
 
 interface WaMessage {
@@ -431,7 +435,7 @@ export function ProspectosPanel() {
     try {
       const { data, error } = await supabase
         .from('wa_prospects')
-        .select('id, phone, profile_name, name, company, what_they_sell, stage, lead_score, message_count, updated_at, created_at')
+        .select('id, phone, profile_name, name, company, what_they_sell, stage, lead_score, message_count, updated_at, created_at, utm_source, utm_medium, utm_campaign')
         .order('updated_at', { ascending: false })
         .limit(200);
 
@@ -497,27 +501,91 @@ export function ProspectosPanel() {
         </div>
       </div>
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-xl bg-white border border-slate-200 p-3 text-center card-hover">
-          <div className="text-2xl font-bold text-blue-600">{totalProspects}</div>
-          <div className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
-            <Users className="w-3 h-3" /> Total prospectos
+      {/* Funnel visualization */}
+      {(() => {
+        const funnelStages = ['discovery', 'qualifying', 'pitching', 'closing', 'converted'] as const;
+        const funnelColors = ['bg-cyan-500', 'bg-amber-500', 'bg-purple-500', 'bg-green-500', 'bg-emerald-600'];
+        const funnelCounts = funnelStages.map(s => stageCounts[s] || 0);
+        const maxCount = Math.max(...funnelCounts, 1);
+
+        // UTM breakdown
+        const utmCounts: Record<string, number> = {};
+        prospects.forEach(p => {
+          const src = p.utm_source || 'directo';
+          utmCounts[src] = (utmCounts[src] || 0) + 1;
+        });
+        const utmEntries = Object.entries(utmCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Funnel */}
+            <div className="lg:col-span-2 rounded-xl bg-white border border-slate-200 p-4">
+              <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" /> Funnel de ventas
+              </h3>
+              <div className="space-y-2">
+                {funnelStages.map((stage, i) => {
+                  const count = funnelCounts[i];
+                  const pct = totalProspects > 0 ? ((count / totalProspects) * 100).toFixed(0) : '0';
+                  const convRate = i > 0 && funnelCounts[i - 1] > 0
+                    ? ((count / funnelCounts[i - 1]) * 100).toFixed(0) + '%'
+                    : null;
+                  return (
+                    <div key={stage} className="flex items-center gap-3">
+                      <div className="w-24 text-xs font-medium text-slate-600 text-right capitalize">{stage}</div>
+                      <div className="flex-1 h-7 bg-slate-100 rounded-full overflow-hidden relative">
+                        <div
+                          className={`h-full ${funnelColors[i]} rounded-full transition-all duration-500`}
+                          style={{ width: `${Math.max((count / maxCount) * 100, count > 0 ? 8 : 0)}%` }}
+                        />
+                        <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-slate-700">
+                          {count} ({pct}%)
+                        </span>
+                      </div>
+                      {convRate && (
+                        <div className="w-14 text-xs text-slate-400 flex items-center gap-0.5">
+                          <ArrowRight className="w-3 h-3" /> {convRate}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-3 flex gap-4 text-xs text-slate-400">
+                <span>Lost: {stageCounts['lost'] || 0}</span>
+                <span>New: {stageCounts['new'] || 0}</span>
+                <span>Total: {totalProspects}</span>
+              </div>
+            </div>
+
+            {/* UTM breakdown */}
+            <div className="rounded-xl bg-white border border-slate-200 p-4">
+              <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                <Globe className="w-4 h-4" /> Fuentes (UTM)
+              </h3>
+              <div className="space-y-2">
+                {utmEntries.map(([src, count]) => (
+                  <div key={src} className="flex items-center justify-between">
+                    <span className="text-sm text-slate-600 capitalize">{src}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 rounded-full"
+                          style={{ width: `${(count / totalProspects) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-mono text-slate-500 w-6 text-right">{count}</span>
+                    </div>
+                  </div>
+                ))}
+                {utmEntries.length === 0 && (
+                  <p className="text-xs text-slate-400">Sin datos UTM</p>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="rounded-xl bg-white border border-slate-200 p-3 text-center card-hover">
-          <div className="text-2xl font-bold text-green-600">{stageCounts['qualifying'] || 0}</div>
-          <div className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
-            <MessageSquare className="w-3 h-3" /> En qualifying+
-          </div>
-        </div>
-        <div className="rounded-xl bg-white border border-slate-200 p-3 text-center card-hover">
-          <div className="text-2xl font-bold text-purple-600">{stageCounts['converted'] || 0}</div>
-          <div className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
-            <BookOpen className="w-3 h-3" /> Convertidos
-          </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Stage filter pills */}
       <div className="flex gap-2 overflow-x-auto pb-1">

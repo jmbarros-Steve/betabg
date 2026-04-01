@@ -43,3 +43,18 @@ export async function sendWhatsApp(to: string, body: string) {
 
   return client.messages.create({ from, to: toNorm, body });
 }
+
+/**
+ * Send a WhatsApp message with media (image, video, or PDF).
+ * @param to  Destination, e.g. "whatsapp:+56987654321" or raw "+56987654321"
+ * @param body  Message text
+ * @param mediaUrl  Public URL of the media file
+ */
+export async function sendWhatsAppMedia(to: string, body: string, mediaUrl: string) {
+  const client = getTwilioMasterClient();
+  const steveNumber = getSteveWANumber().replace(/^\+/, '');
+  const from = `whatsapp:+${steveNumber}`;
+  const toNorm = to.startsWith('whatsapp:') ? to : `whatsapp:${to.startsWith('+') ? to : '+' + to}`;
+
+  return client.messages.create({ from, to: toNorm, body, mediaUrl: [mediaUrl] });
+}
