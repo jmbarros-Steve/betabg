@@ -151,7 +151,14 @@ export async function investigateProspectBackground(
 async function scrapeStoreProducts(
   url: string,
   apifyToken: string,
-): Promise<{ product_images: string[]; brand_colors: string; price_range: string; top_products: string[] } | null> {
+): Promise<{
+  product_images: string[];
+  brand_colors: string;
+  price_range: string;
+  top_products: Array<{ name: string; price?: string; description?: string }>;
+  brand_style: string;
+  category_summary: string;
+} | null> {
   // Launch Apify website-content-crawler (lightweight)
   const runRes = await fetch('https://api.apify.com/v2/acts/apify~website-content-crawler/runs', {
     method: 'POST',
@@ -200,28 +207,77 @@ async function scrapeStoreProducts(
   const imgRegex = /https?:\/\/[^\s"']+\.(?:jpg|jpeg|png|webp)(?:\?[^\s"']*)?/gi;
   const images = [...new Set(allHtml.match(imgRegex) || [])].slice(0, 10);
 
-  // Extract prices
+  // Extract prices with their context (product name + price pairs)
   const priceRegex = /\$[\d.,]+/g;
-  const prices = (allText.match(priceRegex) || []).map(p => parseInt(p.replace(/[$.,]/g, ''), 10)).filter(p => p > 0);
-  const priceRange = prices.length >= 2
-    ? `$${Math.min(...prices).toLocaleString()} - $${Math.max(...prices).toLocaleString()}`
-    : prices.length === 1 ? `~$${prices[0].toLocaleString()}` : '';
+  const allPrices = (allText.match(priceRegex) || []).map(p => parseInt(p.replace(/[$.,]/g, ''), 10)).filter(p => p > 0);
+  const priceRange = allPrices.length >= 2
+    ? `$${Math.min(...allPrices).toLocaleString()} - $${Math.max(...allPrices).toLocaleString()}`
+    : allPrices.length === 1 ? `~$${allPrices[0].toLocaleString()}` : '';
 
-  // Extract product names (from titles)
-  const topProducts = items
-    .map((i: any) => i.title)
-    .filter(Boolean)
-    .slice(0, 5);
+  // Extract product names with prices (Cambio 5: rich product data)
+  const topProducts: Array<{ name: string; price?: string; description?: string }> = [];
+  for (const item of items) {
+    if (!item.title) continue;
+    // Try to find a price near the title in the text
+    const titleLower = (item.title || '').toLowerCase();
+    const itemText = (item.text || '');
+    const priceMatch = itemText.match(/\$[\d.,]+/);
+    const descMatch = itemText.slice(0, 200).replace(item.title || '', '').trim();
+
+    topProducts.push({
+      name: item.title,
+      price: priceMatch?.[0] || undefined,
+      description: descMatch.length > 10 ? descMatch.slice(0, 100) : undefined,
+    });
+
+    if (topProducts.length >= 5) break;
+  }
 
   // Extract brand colors (basic heuristic from CSS)
   const colorRegex = /#[0-9a-fA-F]{6}/g;
   const colors = [...new Set(allHtml.match(colorRegex) || [])].slice(0, 3);
+
+  // Infer brand style from colors and layout (Cambio 5)
+  let brandStyle = '';
+  if (colors.length > 0) {
+    const darkColors = colors.filter(c => {
+      const r = parseInt(c.slice(1, 3), 16);
+      const g = parseInt(c.slice(3, 5), 16);
+      const b = parseInt(c.slice(5, 7), 16);
+      return (r + g + b) / 3 < 128;
+    });
+    brandStyle = darkColors.length > colors.length / 2 ? 'oscuro, minimalista' : 'claro, moderno';
+  }
+
+  // Infer category from titles and text (Cambio 5)
+  const combinedText = (topProducts.map(p => p.name).join(' ') + ' ' + allText.slice(0, 500)).toLowerCase();
+  let categorySummary = '';
+  const categoryMap: Record<string, string[]> = {
+    'tienda de moda/ropa': ['vestido', 'polera', 'camisa', 'pantalón', 'jeans', 'blusa', 'falda', 'ropa'],
+    'tienda de zapatos/calzado': ['zapato', 'zapatilla', 'botín', 'sandalia', 'bota', 'calzado'],
+    'tienda de cosmética/belleza': ['crema', 'sérum', 'maquillaje', 'labial', 'skincare', 'belleza'],
+    'tienda de alimentos/gourmet': ['café', 'chocolate', 'vino', 'aceite', 'gourmet', 'orgánico'],
+    'tienda de deportes': ['fitness', 'gym', 'deporte', 'running', 'yoga', 'entrenamiento'],
+    'tienda de joyería/accesorios': ['anillo', 'collar', 'pulsera', 'aros', 'joya', 'plata'],
+    'tienda de hogar/decoración': ['cojín', 'lámpara', 'decoración', 'mueble', 'hogar'],
+    'tienda de mascotas': ['perro', 'gato', 'mascota', 'alimento', 'correa'],
+    'tienda de tecnología': ['auricular', 'cargador', 'case', 'funda', 'tech'],
+  };
+  for (const [category, keywords] of Object.entries(categoryMap)) {
+    if (keywords.some(k => combinedText.includes(k))) {
+      categorySummary = category;
+      break;
+    }
+  }
+  if (!categorySummary) categorySummary = 'tienda de e-commerce';
 
   return {
     product_images: images,
     brand_colors: colors.join(', ') || '',
     price_range: priceRange,
     top_products: topProducts,
+    brand_style: brandStyle,
+    category_summary: categorySummary,
   };
 }
 

@@ -62,26 +62,33 @@ export async function runInvestigator(
 
         if (invData.store) {
           const store = invData.store;
-          if (store.product_images?.length) parts.push(`Productos encontrados: ${store.product_images.length}`);
-          if (store.brand_colors) parts.push(`Colores de marca: ${store.brand_colors}`);
-          if (store.price_range) parts.push(`Rango de precios: ${store.price_range}`);
-          if (store.top_products?.length) parts.push(`Productos top: ${store.top_products.slice(0, 3).join(', ')}`);
+          // Format products with names and prices (expert observations)
+          if (store.top_products?.length) {
+            const products = store.top_products.slice(0, 5).map((p: any) => {
+              if (typeof p === 'string') return p;
+              return `${p.name}${p.price ? ` (${p.price})` : ''}`;
+            });
+            parts.push(`Productos: ${products.join(', ')}`);
+          }
+          if (store.brand_style) parts.push(`Estilo: ${store.brand_style}`);
+          if (store.price_range) parts.push(`Rango precios: ${store.price_range}`);
+          if (store.category_summary) parts.push(`Tipo tienda: ${store.category_summary}`);
+          if (store.product_images?.length) parts.push(`${store.product_images.length} productos publicados`);
         }
 
         if (invData.social) {
           const social = invData.social;
-          if (social.followers) parts.push(`IG followers: ${social.followers}`);
+          if (social.followers) parts.push(`IG: ${social.followers.toLocaleString()} followers`);
           if (social.engagement_rate) parts.push(`Engagement: ${social.engagement_rate}`);
-          if (social.posts) parts.push(`Posts: ${social.posts}`);
         }
 
         if (invData.competitor_ads?.length) {
           const topAds = invData.competitor_ads.slice(0, 3);
-          parts.push(`Ads de competencia: ${topAds.map((a: any) => a.headline || a.ad_text?.slice(0, 50)).join(' | ')}`);
+          parts.push(`Ads competencia: ${topAds.map((a: any) => a.headline || a.ad_text?.slice(0, 50)).join(' | ')}`);
         }
 
         if (parts.length > 0) {
-          result.investigationContext = `INVESTIGACIÓN PREVIA:\n${parts.join('\n')}`;
+          result.investigationContext = `TIENDA DEL PROSPECTO:\n${parts.join('\n')}`;
         }
       }
     }

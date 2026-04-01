@@ -61,6 +61,7 @@ export interface ProspectRecord {
   investigation_data?: InvestigationData | null;
   mockup_sent?: boolean | null;
   mockup_url?: string | null;
+  deck_sent?: boolean | null;
   wolf_findings?: Record<string, any> | null;
   wolf_checked_at?: string | null;
   learning_extracted?: boolean | null;
@@ -81,7 +82,10 @@ export interface InvestigationData {
     product_images?: string[];
     brand_colors?: string;
     price_range?: string;
-    top_products?: string[];
+    top_products?: string[] | Array<{ name: string; price?: string; description?: string }>;
+    brand_style?: string;
+    category_summary?: string;
+    scraped_at?: string;
   };
   social?: {
     handle?: string;
@@ -94,6 +98,7 @@ export interface InvestigationData {
     ad_text?: string;
     impressions?: number;
   }>;
+  detected_industry?: string;
 }
 
 export interface ExtractedProspectInfo {
@@ -229,7 +234,61 @@ PROHIBIDO:
 - No prometas resultados de ventas específicos
 - No hables mal de competidores por nombre
 - No exageres el AI
-- No prometas integraciones que no existen. Hoy: Meta, Google Ads, Shopify, Klaviyo`;
+- No prometas integraciones que no existen. Hoy: Meta, Google Ads, Shopify, Klaviyo
+- NUNCA digas "déjame revisar", "dame un minuto", "voy a checkear tu tienda", "déjame investigar"
+- NUNCA prometas acciones futuras ("te voy a armar un mockup", "te preparo algo")
+- Si no tienes datos de su tienda → habla de su INDUSTRIA en general con datos reales
+- Si se genera algo (mockup, caso de éxito, deck), se envía automáticamente. Tú solo conversas.`;
+
+// ---------------------------------------------------------------------------
+// Quick first-message intel (Cambio 1)
+// ---------------------------------------------------------------------------
+
+/**
+ * For message_count <= 1, use Haiku to quickly extract intel from the first message.
+ * ~1s latency. Returns a brief text to inject into the prompt so Steve doesn't sound generic.
+ */
+export async function quickFirstMessageIntel(
+  message: string,
+  profileName: string | null | undefined,
+): Promise<string> {
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!ANTHROPIC_API_KEY) return '';
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 150,
+        messages: [{
+          role: 'user',
+          content: `Analiza este primer mensaje de un prospecto de WhatsApp y extrae lo que puedas en 2-3 líneas:
+- ¿Qué vende o a qué industria pertenece?
+- ¿Mencionó tienda, URL, Instagram?
+- ¿Qué tono usa (formal, casual, directo)?
+- Cualquier detalle útil para impresionarlo
+
+Nombre de perfil: ${profileName || 'N/A'}
+Mensaje: "${message}"
+
+Responde en texto plano, máximo 3 líneas. Si no hay info suficiente, haz una hipótesis basada en el nombre del perfil o contexto. NUNCA digas "no hay suficiente info".`,
+        }],
+      }),
+    });
+
+    if (!response.ok) return '';
+    const data: any = await response.json();
+    return (data.content?.[0]?.text || '').trim();
+  } catch {
+    return '';
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Knowledge loader
@@ -754,24 +813,74 @@ export async function loadInvestigationContext(prospectId: string): Promise<stri
   const inv = data?.investigation_data;
   if (!inv) return '';
 
-  const parts: string[] = [];
+  const sections: string[] = [];
 
+  // Store data — formatted as CMO expert observations
   if (inv.store) {
-    if (inv.store.top_products?.length) parts.push(`Productos: ${inv.store.top_products.slice(0, 5).join(', ')}`);
-    if (inv.store.brand_colors) parts.push(`Colores marca: ${inv.store.brand_colors}`);
-    if (inv.store.price_range) parts.push(`Precios: ${inv.store.price_range}`);
+    const storeParts: string[] = [];
+    // Format top products with names and prices
+    if (inv.store.top_products?.length) {
+      const products = inv.store.top_products.slice(0, 5);
+      const productList = products.map((p: any) => {
+        if (typeof p === 'string') return p;
+        return `${p.name}${p.price ? ` (${p.price})` : ''}`;
+      }).join(', ');
+      storeParts.push(`- Productos: ${productList}`);
+    }
+    if (inv.store.brand_style) {
+      storeParts.push(`- Estilo: ${inv.store.brand_style}`);
+    }
+    if (inv.store.price_range) {
+      storeParts.push(`- Rango: ${inv.store.price_range} — ${detectTicketInsight(inv.store.price_range)}`);
+    }
+    if (inv.store.category_summary) {
+      storeParts.push(`- Tipo: ${inv.store.category_summary}`);
+    }
+    if (inv.store.product_images?.length) {
+      storeParts.push(`- ${inv.store.product_images.length} productos publicados — ${inv.store.product_images.length < 10 ? 'catálogo en crecimiento' : 'catálogo sólido'}`);
+    }
+
+    if (storeParts.length > 0) {
+      sections.push(`TIENDA DEL PROSPECTO (ya la revisaste):\n${storeParts.join('\n')}`);
+      // Instruction to use specific product data
+      const firstProduct = inv.store.top_products?.[0];
+      const productName = typeof firstProduct === 'string' ? firstProduct : firstProduct?.name;
+      if (productName) {
+        sections.push(`→ MENCIONA un producto específico, ej: "Vi tu ${productName}, tiene pinta de vender bien en ads"`);
+      }
+    }
   }
 
+  // Social data
   if (inv.social) {
-    if (inv.social.followers) parts.push(`IG: ${inv.social.followers} followers`);
-    if (inv.social.engagement_rate) parts.push(`Engagement: ${inv.social.engagement_rate}`);
+    const socialParts: string[] = [];
+    if (inv.social.followers) socialParts.push(`${inv.social.followers.toLocaleString()} followers`);
+    if (inv.social.posts) socialParts.push(`${inv.social.posts} posts`);
+    if (inv.social.engagement_rate) socialParts.push(`engagement: ${inv.social.engagement_rate}`);
+    if (socialParts.length > 0) {
+      sections.push(`IG: ${socialParts.join(', ')}`);
+    }
   }
 
+  // Competitor ads
   if (inv.competitor_ads?.length) {
-    parts.push(`Ads competencia: ${inv.competitor_ads.slice(0, 3).map((a: any) => `"${(a.headline || a.ad_text || '').slice(0, 40)}"`).join(', ')}`);
+    const ads = inv.competitor_ads.slice(0, 3).map((a: any) =>
+      `"${(a.headline || a.ad_text || '').slice(0, 50)}"`
+    ).join(', ');
+    sections.push(`Ads de competencia en su rubro: ${ads}`);
   }
 
-  return parts.length > 0 ? `\n🔍 INTEL INVESTIGADA:\n${parts.join('\n')}` : '';
+  return sections.length > 0 ? `\n🔍 INTEL INVESTIGADA:\n${sections.join('\n')}` : '';
+}
+
+/** Helper: detect ticket insight from price range */
+function detectTicketInsight(priceRange: string): string {
+  const numbers = priceRange.replace(/[$.,]/g, '').match(/\d+/g)?.map(Number) || [];
+  const maxPrice = Math.max(...numbers, 0);
+  if (maxPrice >= 100000) return 'ticket alto, ideal para Google Ads + Meta retargeting';
+  if (maxPrice >= 40000) return 'ticket ideal para Meta Ads';
+  if (maxPrice >= 15000) return 'buen ticket, funciona bien con volumen en Meta';
+  return 'ticket bajo, necesita volumen alto';
 }
 
 // ---------------------------------------------------------------------------
@@ -799,6 +908,7 @@ export async function buildDynamicSalesPrompt(
   lastMessage?: string,
   history?: Array<{ role: 'user' | 'assistant'; content: string }>,
   strategistBrief?: string,
+  quickIntel?: string,
 ): Promise<string> {
   const supabase = getSupabaseAdmin();
 
@@ -885,6 +995,16 @@ export async function buildDynamicSalesPrompt(
     prompt += `🧠 BRIEF DEL ESTRATEGA (SIGUE ESTA DIRECTRIZ):\n${strategistBrief}\n\n`;
   }
 
+  // 0.25. STAGE STRATEGY — at the TOP so it's the primary directive (Cambio 4a)
+  if (stageRule) {
+    prompt += `📋 ESTRATEGIA ${stageLabel.toUpperCase()} (TU DIRECTRIZ PRINCIPAL):\n${stageRule.contenido}\n\n`;
+  }
+
+  // 0.5. FIRST MESSAGE INTEL (quick Haiku analysis for msg 1)
+  if (quickIntel) {
+    prompt += `🎯 PRIMERA IMPRESIÓN (lo que captaste del primer mensaje):\n${quickIntel}\n→ USA esta info para impresionar desde el primer mensaje. NO digas "déjame revisar" ni "dame un minuto".\n\n`;
+  }
+
   // 1. KNOWN DATA
   prompt += `⛔ DATOS CONOCIDOS — PROHIBIDO preguntar esto (ya lo sabes):\n`;
   prompt += known.map(k => `- ${k}`).join('\n');
@@ -895,11 +1015,28 @@ export async function buildDynamicSalesPrompt(
     prompt += `\n⚡ IMPORTANTE: TIENES investigación del prospecto. ÚSALA en tu respuesta. Menciona algo concreto que viste de su tienda, sus productos o su competencia. Eso demuestra que hiciste la tarea y genera confianza inmediata.\n`;
   }
 
-  // 2. MISSING DATA (context for Steve, not a checklist)
+  // 2. MISSING DATA + ACTIVE QUALIFICATION by message count (Cambio 3)
+  const msgCount = prospect.message_count || 0;
   if (missing.length > 0) {
-    prompt += `\n\n💡 TODAVÍA NO SABES (si surge naturalmente, intenta averiguar):\n`;
+    prompt += `\n\n💡 TODAVÍA NO SABES:\n`;
     prompt += missing.map(m => `- ${m}`).join('\n');
-    prompt += `\nNo necesitas preguntar todo esto ahora. Ve sacándolo en la conversación de forma natural.`;
+
+    // Escalated qualification directives based on conversation stage
+    if (msgCount <= 2) {
+      prompt += `\n\n🎯 DIRECTIVA (msgs 1-2): IMPRESIONA. Muestra expertise de su industria. Máximo 1 pregunta natural al final. Tu objetivo es que diga "wow, este tipo sabe".`;
+    } else if (msgCount <= 5) {
+      const topMissing = missing.slice(0, 2).join(' y ');
+      prompt += `\n\n🎯 DIRECTIVA (msgs 3-5): CALIFICACIÓN ACTIVA. DEBES averiguar: ${topMissing}. Una pregunta directa pero natural por mensaje. No dejes pasar un mensaje sin intentar sacar info clave.`;
+    } else if (msgCount <= 8) {
+      prompt += `\n\n🎯 DIRECTIVA (msgs 6-8): PROFUNDIZACIÓN. Averigua dolores y presupuesto. Conecta cada problema con cómo Steve lo resuelve. Si ya tienes suficiente info, empieza a proponer.`;
+    } else {
+      prompt += `\n\n🎯 DIRECTIVA (msgs 9+): DECISIÓN. Resume lo que sabes, conecta con el valor de Steve para su caso específico. Si no has propuesto reunión, hazlo ahora.`;
+    }
+  } else {
+    // No missing data — still give stage directive
+    if (msgCount >= 9) {
+      prompt += `\n\n🎯 DIRECTIVA: Ya sabes todo lo necesario. Es momento de proponer reunión si no lo has hecho.`;
+    }
   }
 
   // 3. CONTEXT FOR THIS TURN
@@ -1028,6 +1165,16 @@ export async function buildDynamicSalesPrompt(
     prompt += `\n\n🎨 MOCKUP: Si quieres enviarle un ejemplo visual de cómo se vería un anuncio de su marca, incluye [SEND_MOCKUP] al final de tu mensaje.`;
   }
 
+  // Sales deck trigger (pitching/closing with qualification data) — Cambio 6
+  if (
+    (effectiveStage === 'pitching' || effectiveStage === 'closing') &&
+    prospect.what_they_sell &&
+    (prospect.pain_points?.length || prospect.current_marketing) &&
+    !(prospect as any).deck_sent
+  ) {
+    prompt += `\n\n📊 DECK: Si quieres enviarle una propuesta comercial personalizada, incluye [SEND_DECK] al final de tu mensaje. Se genera automáticamente con sus datos.`;
+  }
+
   // Sales learnings from past conversations
   if (salesLearningsText) {
     prompt += salesLearningsText;
@@ -1068,10 +1215,7 @@ Prospecto: "Uso una agencia pero siento que no me pescan"
 Si ya mencionaste una fecha comercial, NO la repitas. Si ya hablaste de CPA, habla de ROAS o conversión la próxima vez. VARÍA siempre.`;
 
 
-  // 6. STAGE STRATEGY (only current stage — 1 rule)
-  if (stageRule) {
-    prompt += `\n\n📋 ESTRATEGIA ${stageLabel.toUpperCase()}:\n${stageRule.contenido}`;
-  }
+  // 6. STAGE STRATEGY — already injected at the TOP (Cambio 4a, moved up)
 
   // Only load ONE content rule — the most relevant for the stage
   const contentRules = (rules || []).filter(r => r.titulo?.startsWith('Contenido:'));

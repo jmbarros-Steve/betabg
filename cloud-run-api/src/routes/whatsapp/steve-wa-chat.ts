@@ -15,6 +15,7 @@ import {
   detectDisqualification,
   detectBuyingSignals,
   loadIndustryCaseStudy,
+  quickFirstMessageIntel,
   type ProspectRecord,
 } from '../../lib/steve-wa-brain.js';
 import { sendWhatsApp, sendWhatsAppMedia } from '../../lib/twilio-client.js';
@@ -22,6 +23,7 @@ import { type CaseStudyResult } from '../../lib/steve-wa-brain.js';
 import { runInvestigator, runStrategist, runConversationalist } from '../../lib/steve-multi-brain.js';
 import { investigateProspectBackground } from '../../lib/steve-investigator.js';
 import { generateProspectMockup } from '../../lib/steve-mockup-generator.js';
+import { generateAndSendSalesDeck } from '../../lib/steve-sales-deck.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 
@@ -314,6 +316,12 @@ async function handleProspect(
 
     let replyText: string;
 
+    // Cambio 1: Quick intel for first message (Haiku, ~1s)
+    let quickIntel = '';
+    if ((prospect.message_count || 0) <= 1) {
+      quickIntel = await quickFirstMessageIntel(messageBody, profileName);
+    }
+
     try {
       // ============================================================
       // MULTI-BRAIN PIPELINE
@@ -321,7 +329,7 @@ async function handleProspect(
       // ============================================================
       const [investigatorResults, dynamicPrompt] = await Promise.all([
         runInvestigator(prospect),
-        buildDynamicSalesPrompt(prospect, messageBody, history),
+        buildDynamicSalesPrompt(prospect, messageBody, history, undefined, quickIntel),
       ]);
 
       // Step 2: Strategist (~1.5s)
@@ -352,7 +360,7 @@ async function handleProspect(
     } catch (multiBrainErr) {
       // FALLBACK: If multi-brain fails, use the original single-call approach
       console.error('[steve-wa-chat] Multi-brain pipeline failed, using fallback:', multiBrainErr);
-      const dynamicPrompt = await buildDynamicSalesPrompt(prospect, messageBody, history);
+      const dynamicPrompt = await buildDynamicSalesPrompt(prospect, messageBody, history, undefined, quickIntel);
       const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -618,6 +626,27 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
           console.error('[auto-mockup] Error:', err);
         }
       }, 5000);
+    }
+
+    // Cambio 6: Auto-trigger sales deck in pitching stage
+    const deckTag = (firstReply + (secondReply || '')).includes('[SEND_DECK]');
+    if (deckTag) {
+      firstReply = firstReply.replace(/\[SEND_DECK\]/g, '').trim();
+      if (secondReply) secondReply = secondReply.replace(/\[SEND_DECK\]/g, '').trim();
+    }
+    if (
+      (deckTag || (prospect.stage === 'pitching' || prospect.stage === 'closing')) &&
+      prospect.what_they_sell &&
+      (prospect.pain_points?.length || prospect.current_marketing) &&
+      !(prospect as any).deck_sent
+    ) {
+      setTimeout(async () => {
+        try {
+          await generateAndSendSalesDeck(prospect, phone, profileName);
+        } catch (err) {
+          console.error('[auto-sales-deck] Error:', err);
+        }
+      }, 7000); // 7s delay after main reply
     }
 
     // 7. FIRE & FORGET: async extraction + scoring + HubSpot push
