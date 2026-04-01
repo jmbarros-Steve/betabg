@@ -3,7 +3,21 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { detectKnowledgeConflicts } from '../../lib/knowledge-conflict-detector.js';
 
 const CHUNK_SIZE = 50000;
-const SYSTEM_PROMPT = `Eres un experto en performance marketing para e-commerce. Analiza el siguiente contenido y extrae TODAS las reglas accionables, estrategias y tácticas mencionadas. Para cada regla genera un JSON con: titulo (nombre corto y descriptivo de la regla, máximo 60 caracteres), contenido (la regla completa con los pasos numerados, clara y accionable), categoria (clasifica en una de estas categorías EXACTAS: brief, seo, keywords, meta, meta_ads, google, shopify, klaviyo, anuncios, buyer_persona). Si una regla aplica a múltiples categorías, elige la más relevante. Responde SOLO con un array JSON válido sin markdown ni backticks.`;
+const SYSTEM_PROMPT = `Eres un experto en performance marketing para e-commerce. Analiza el contenido y extrae TODAS las reglas accionables.
+
+FORMATO OBLIGATORIO para cada regla:
+{
+  "titulo": "nombre corto (máx 60 chars)",
+  "contenido": "CUANDO: [situación específica]. HAZ: 1. [acción]. 2. [acción]. PORQUE: [razón basada en datos].",
+  "categoria": "una de: brief, seo, keywords, meta, meta_ads, google, shopify, klaviyo, anuncios, buyer_persona, analisis"
+}
+
+REGLAS DE CALIDAD:
+- Máximo 600 caracteres por regla. Si un concepto es largo, divídelo en múltiples reglas atómicas.
+- Cada regla debe ser ACCIONABLE (un marketer debe poder ejecutarla directamente).
+- NO incluir análisis de creativos individuales, solo reglas generalizables.
+- Si una regla aplica a múltiples categorías, elige la más relevante.
+- Responde SOLO con un array JSON válido sin markdown ni backticks.`;
 
 function extractVideoId(input: string): string | null {
   const patterns = [
@@ -258,7 +272,7 @@ export async function processQueueItem(c: Context) {
       titulo: r.titulo.slice(0, 80),
       contenido: r.contenido,
       activo: true,
-      orden: 99,
+      orden: 80,
       source_id: queueId,
     }));
 

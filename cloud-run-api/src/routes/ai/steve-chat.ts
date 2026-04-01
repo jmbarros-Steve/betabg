@@ -877,6 +877,8 @@ export async function steveChat(c: Context) {
         .select('research_type, research_data')
         .eq('client_id', client_id),
       // 4. Load knowledge base
+      // TODO (Mejora #4 - Industry filter): Once clients have industria assigned, add
+      // .in('industria', ['general', clientIndustry]) to filter rules by client's industry.
       supabase
         .from('steve_knowledge')
         .select('categoria, titulo, contenido')
@@ -893,6 +895,42 @@ export async function steveChat(c: Context) {
     ]);
     timelog('estrategia-parallel-queries');
 
+    // Smart rule selection (Mejora #10): use Haiku to pick most relevant rules for this question
+    let filteredKnowledge = knowledge;
+    if (knowledge && knowledge.length > 5 && process.env.ANTHROPIC_API_KEY) {
+      try {
+        const ruleTitles = knowledge.map((k: any, i: number) => `[${i}] ${k.titulo}`).join('\n');
+        const filterRes = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': process.env.ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 100,
+            messages: [{
+              role: 'user',
+              content: `Pregunta del usuario: "${message}"\n\nReglas disponibles:\n${ruleTitles}\n\nResponde SOLO con los índices de las 5 reglas más relevantes para esta pregunta, separados por comas. Ejemplo: 0,3,5,7,12`,
+            }],
+          }),
+        });
+        if (filterRes.ok) {
+          const filterData: any = await filterRes.json();
+          const indices = (filterData.content?.[0]?.text || '')
+            .match(/\d+/g)?.map(Number).filter((n: number) => n < knowledge.length) || [];
+          if (indices.length > 0) {
+            filteredKnowledge = indices.map((i: number) => knowledge![i]).filter(Boolean);
+          }
+        }
+      } catch (e) {
+        // Fail silently, use all rules
+      }
+    }
+    // TODO (Mejora #4 - Industry filter): Once clients have industria assigned, add
+    // .in('industria', ['general', clientIndustry]) to the steve_knowledge query above.
+
     // Smart truncation: keep first 5 messages (context) + last 15 (recent) to preserve conversation intent
     const allMessages = convMessages || [];
     const recentMessages = allMessages.length > 20
@@ -907,7 +945,7 @@ export async function steveChat(c: Context) {
       `### ${r.research_type}\n${JSON.stringify(r.research_data).slice(0, 2000)}`
     ).join('\n\n') || '';
 
-    const knowledgeCtx = knowledge?.map((k: { categoria: string; titulo: string; contenido: string }) =>
+    const knowledgeCtx = filteredKnowledge?.map((k: { categoria: string; titulo: string; contenido: string }) =>
       `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
     ).join('\n\n') || '';
 
@@ -1264,6 +1302,19 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
       console.error('[EST] Failed to persist assistant message:', insertError);
     }
 
+    // Track rule usage (Mejora #5): update ultima_vez_usada for rules referenced in the response
+    if (filteredKnowledge && filteredKnowledge.length > 0 && assistantMsg) {
+      const usedTitles = filteredKnowledge
+        .filter((k: any) => assistantMsg.toLowerCase().includes(k.titulo.toLowerCase().substring(0, 20)))
+        .map((k: any) => k.titulo);
+      if (usedTitles.length > 0) {
+        supabase.from('steve_knowledge')
+          .update({ ultima_vez_usada: new Date().toISOString() })
+          .in('titulo', usedTitles)
+          .then(() => {});
+      }
+    }
+
     timelog('estrategia-complete');
     console.log(`Steve estrategia: conversation ${estrategiaConvId}, client ${client_id}, total ${Date.now() - requestStart}ms`);
 
@@ -1521,6 +1572,8 @@ REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de re
     mensajeLower.includes('shopify') || mensajeLower.includes('tienda') ? 'shopify' :
     'brief';
 
+  // TODO (Mejora #4 - Industry filter): Once clients have industria assigned, add
+  // .in('industria', ['general', clientIndustry]) to the steve_knowledge query below.
   const [{ data: knowledge }, { data: bugs }] = await Promise.all([
     supabase
       .from('steve_knowledge')
@@ -1538,7 +1591,41 @@ REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de re
       .limit(5),
   ]);
 
-  const knowledgeContext = knowledge?.map((k: { categoria: string; titulo: string; contenido: string }) =>
+  // Smart rule selection (Mejora #10): use Haiku to pick most relevant rules for this question
+  let filteredBriefKnowledge = knowledge;
+  if (knowledge && knowledge.length > 5 && process.env.ANTHROPIC_API_KEY) {
+    try {
+      const ruleTitles = knowledge.map((k: any, i: number) => `[${i}] ${k.titulo}`).join('\n');
+      const filterRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 100,
+          messages: [{
+            role: 'user',
+            content: `Pregunta del usuario: "${message}"\n\nReglas disponibles:\n${ruleTitles}\n\nResponde SOLO con los índices de las 5 reglas más relevantes para esta pregunta, separados por comas. Ejemplo: 0,3,5,7,12`,
+          }],
+        }),
+      });
+      if (filterRes.ok) {
+        const filterData: any = await filterRes.json();
+        const indices = (filterData.content?.[0]?.text || '')
+          .match(/\d+/g)?.map(Number).filter((n: number) => n < knowledge.length) || [];
+        if (indices.length > 0) {
+          filteredBriefKnowledge = indices.map((i: number) => knowledge![i]).filter(Boolean);
+        }
+      }
+    } catch (e) {
+      // Fail silently, use all rules
+    }
+  }
+
+  const knowledgeContext = filteredBriefKnowledge?.map((k: { categoria: string; titulo: string; contenido: string }) =>
     `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
   ).join('\n\n') || '';
 
@@ -1631,6 +1718,19 @@ REGLAS ABSOLUTAS:
 
   const aiData: any = await aiResponse.json();
   let assistantMessage = aiData.content?.[0]?.text || 'Lo siento, hubo un error. ¿Podrías repetir tu respuesta?';
+
+  // Track rule usage (Mejora #5): update ultima_vez_usada for rules referenced in the response
+  if (filteredBriefKnowledge && filteredBriefKnowledge.length > 0 && assistantMessage) {
+    const usedTitles = filteredBriefKnowledge
+      .filter((k: any) => assistantMessage.toLowerCase().includes(k.titulo.toLowerCase().substring(0, 20)))
+      .map((k: any) => k.titulo);
+    if (usedTitles.length > 0) {
+      supabase.from('steve_knowledge')
+        .update({ ultima_vez_usada: new Date().toISOString() })
+        .in('titulo', usedTitles)
+        .then(() => {});
+    }
+  }
 
   // Parse dynamic examples tag [EJEMPLOS: ej1 || ej2 || ej3] -- strip from visible message
   let dynamicExamples: string[] | null = null;

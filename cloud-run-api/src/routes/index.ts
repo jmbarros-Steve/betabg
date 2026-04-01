@@ -125,6 +125,8 @@ import { skyvernDispatcher } from './cron/skyvern-dispatcher.js';
 import { prospectFollowup } from './cron/prospect-followup.js';
 import { prospectEmailNurture } from './cron/prospect-email-nurture.js';
 import { knowledgeDecay } from './cron/knowledge-decay.js';
+import { knowledgeConsolidator } from './cron/knowledge-consolidator.js';
+import { knowledgeDedup } from './cron/knowledge-dedup.js';
 
 // WhatsApp
 import { steveWAChat } from './whatsapp/steve-wa-chat.js';
@@ -417,4 +419,6 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/prospect-followup', prospectFollowup); // No JWT — uses X-Cron-Secret, every 4h: 0 */4 * * *
   app.post('/api/cron/prospect-email-nurture', prospectEmailNurture); // No JWT — uses X-Cron-Secret, daily 1pm UTC (10am Chile): 0 13 * * *
   app.post('/api/cron/knowledge-decay', knowledgeDecay); // No JWT — uses X-Cron-Secret, monthly: 0 4 1 * *
+  app.post('/api/cron/knowledge-consolidator', knowledgeConsolidator); // No JWT — monthly: 0 5 1 * * (1st of month, 5am)
+  app.post('/api/cron/knowledge-dedup', knowledgeDedup); // No JWT — monthly: 0 6 1 * * (1st of month, 6am)
 }

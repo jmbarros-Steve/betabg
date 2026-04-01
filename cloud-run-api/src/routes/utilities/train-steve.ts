@@ -70,8 +70,8 @@ Por cada concepto importante genera una entrada. Si el contenido tiene varios te
 Por cada concepto genera:
 {
   "categoria": "categoria_detectada",
-  "titulo": "título corto y descriptivo (máximo 80 caracteres)",
-  "contenido": "reglas concretas y accionables en formato de lista numerada. Usa el formato: 1. Regla. 2. Regla. etc.",
+  "titulo": "título corto y descriptivo (máximo 60 caracteres)",
+  "contenido": "CUANDO: [situación]. HAZ: 1. [paso]. 2. [paso]. PORQUE: [razón]. Máximo 600 caracteres.",
   "bugs": [
     {
       "descripcion": "error que Steve debe evitar (máximo 100 caracteres)",
@@ -142,7 +142,7 @@ ${contenido}`,
         titulo: entrada.titulo,
         contenido: entrada.contenido,
         activo: true,
-        orden: 99,
+        orden: 90,
       });
 
       if (!kErr) savedKnowledge++;

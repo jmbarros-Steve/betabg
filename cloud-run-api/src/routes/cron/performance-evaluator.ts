@@ -199,6 +199,13 @@ VS PROMEDIO MERCHANT: ${JSON.stringify(creative.benchmark_comparison || {})}
         if (!upsertErr) {
           knowledgeInserted++;
           console.log(`[perf-evaluator] Knowledge inserted: ${titulo}`);
+
+          // Attach real example from data
+          const exampleText = `Campaña real: ${data.scores.length} creativos analizados, score promedio ${avgScore}%. Canal: ${channel}. Período: últimos 30 días.`;
+          await supabase.from('steve_knowledge')
+            .update({ ejemplo_real: exampleText })
+            .eq('titulo', titulo)
+            .eq('categoria', channel === 'meta' ? 'meta_ads' : 'klaviyo');
         }
       }
     }
