@@ -143,6 +143,9 @@ import { steveContentHunter } from './cron/steve-content-hunter.js';
 import { steveAgentLoop } from './cron/steve-agent-loop.js';
 import { steveDiscoverer } from './cron/steve-discoverer.js';
 import { stevePromptEvolver } from './cron/steve-prompt-evolver.js';
+import { wolfNightMode } from './cron/wolf-night-mode.js';
+import { wolfMorningSend } from './cron/wolf-morning-send.js';
+import { salesLearningLoop } from './cron/sales-learning-loop.js';
 
 // WhatsApp
 import { steveWAChat } from './whatsapp/steve-wa-chat.js';
@@ -467,4 +470,9 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/steve-agent-loop', steveAgentLoop); // No JWT — uses X-Cron-Secret, every 2h: 0 */2 * * *
   app.post('/api/cron/steve-discoverer', steveDiscoverer); // No JWT — uses X-Cron-Secret, weekly: 0 2 * * 0 (Sun 2am)
   app.post('/api/cron/steve-prompt-evolver', stevePromptEvolver); // No JWT — uses X-Cron-Secret, weekly: 0 3 * * 0 (Sun 3am)
+
+  // Steve Depredador — Autonomous Agent Crons
+  app.post('/api/cron/wolf-night-mode', wolfNightMode); // No JWT — X-Cron-Secret, daily 3am Chile: 0 6 * * *
+  app.post('/api/cron/wolf-morning-send', wolfMorningSend); // No JWT — X-Cron-Secret, daily 9am Chile: 0 12 * * *
+  app.post('/api/cron/sales-learning-loop', salesLearningLoop); // No JWT — X-Cron-Secret, daily 8pm Chile: 0 23 * * *
 }

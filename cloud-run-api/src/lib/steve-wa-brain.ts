@@ -57,6 +57,14 @@ export interface ProspectRecord {
   utm_source?: string | null;
   utm_medium?: string | null;
   utm_campaign?: string | null;
+  // Steve Depredador fields
+  investigation_data?: InvestigationData | null;
+  mockup_sent?: boolean | null;
+  mockup_url?: string | null;
+  wolf_findings?: Record<string, any> | null;
+  wolf_checked_at?: string | null;
+  learning_extracted?: boolean | null;
+  strategist_history?: Array<Record<string, any>> | null;
 }
 
 export interface ProspectAuditData {
@@ -66,6 +74,26 @@ export interface ProspectAuditData {
   product_count?: number;
   findings?: string[];
   audited_at?: string;
+}
+
+export interface InvestigationData {
+  store?: {
+    product_images?: string[];
+    brand_colors?: string;
+    price_range?: string;
+    top_products?: string[];
+  };
+  social?: {
+    handle?: string;
+    followers?: number;
+    posts?: number;
+    engagement_rate?: string;
+  };
+  competitor_ads?: Array<{
+    headline?: string;
+    ad_text?: string;
+    impressions?: number;
+  }>;
 }
 
 export interface ExtractedProspectInfo {
@@ -653,6 +681,79 @@ export async function loadIndustryCaseStudy(whatTheySell: string | null | undefi
 }
 
 // ---------------------------------------------------------------------------
+// Sales learnings & investigation context loaders
+// ---------------------------------------------------------------------------
+
+/**
+ * Load top sales learnings from steve_knowledge matching the prospect's industry.
+ * Used to inject past wins/losses into the prompt for continuous improvement.
+ */
+export async function loadSalesLearnings(industry: string | null | undefined): Promise<string> {
+  if (!industry) return '';
+  const supabase = getSupabaseAdmin();
+
+  const keywords = industry.toLowerCase().split(/[\s,;]+/).filter(w => w.length >= 3);
+
+  const { data: learnings } = await supabase
+    .from('steve_knowledge')
+    .select('titulo, contenido')
+    .eq('categoria', 'sales_learning')
+    .eq('activo', true)
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (!learnings?.length) return '';
+
+  // Filter by industry relevance, fallback to generic
+  const relevant = keywords.length > 0
+    ? learnings.filter((l: any) =>
+        keywords.some(k => (l.contenido || '').toLowerCase().includes(k) || (l.titulo || '').toLowerCase().includes(k))
+      )
+    : [];
+
+  const toUse = relevant.length > 0 ? relevant.slice(0, 5) : learnings.slice(0, 3);
+  if (toUse.length === 0) return '';
+
+  return `\n\n📚 APRENDIZAJES DE CONVERSACIONES PASADAS:\n${toUse.map((l: any) => `- ${l.titulo}: ${(l.contenido || '').slice(0, 250)}`).join('\n')}`;
+}
+
+/**
+ * Load investigation data for a prospect (pre-scraped store, social, competitor info).
+ */
+export async function loadInvestigationContext(prospectId: string): Promise<string> {
+  if (!prospectId) return '';
+  const supabase = getSupabaseAdmin();
+
+  const { data } = await supabase
+    .from('wa_prospects')
+    .select('investigation_data')
+    .eq('id', prospectId)
+    .maybeSingle();
+
+  const inv = data?.investigation_data;
+  if (!inv) return '';
+
+  const parts: string[] = [];
+
+  if (inv.store) {
+    if (inv.store.top_products?.length) parts.push(`Productos: ${inv.store.top_products.slice(0, 5).join(', ')}`);
+    if (inv.store.brand_colors) parts.push(`Colores marca: ${inv.store.brand_colors}`);
+    if (inv.store.price_range) parts.push(`Precios: ${inv.store.price_range}`);
+  }
+
+  if (inv.social) {
+    if (inv.social.followers) parts.push(`IG: ${inv.social.followers} followers`);
+    if (inv.social.engagement_rate) parts.push(`Engagement: ${inv.social.engagement_rate}`);
+  }
+
+  if (inv.competitor_ads?.length) {
+    parts.push(`Ads competencia: ${inv.competitor_ads.slice(0, 3).map((a: any) => `"${(a.headline || a.ad_text || '').slice(0, 40)}"`).join(', ')}`);
+  }
+
+  return parts.length > 0 ? `\n🔍 INTEL INVESTIGADA:\n${parts.join('\n')}` : '';
+}
+
+// ---------------------------------------------------------------------------
 // Dynamic sales prompt builder (per-stage)
 // ---------------------------------------------------------------------------
 
@@ -676,6 +777,7 @@ export async function buildDynamicSalesPrompt(
   prospect: ProspectRecord,
   lastMessage?: string,
   history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+  strategistBrief?: string,
 ): Promise<string> {
   const supabase = getSupabaseAdmin();
 
@@ -744,12 +846,32 @@ export async function buildDynamicSalesPrompt(
   if (prospect.meeting_link_sent) known.push('Link de reunión ya enviado: Sí');
 
   // ============================================================
+  // Load sales learnings + investigation context (parallel)
+  // ============================================================
+  const [salesLearningsText, investigationText] = await Promise.all([
+    loadSalesLearnings(prospect.what_they_sell),
+    loadInvestigationContext(prospect.id),
+  ]);
+
+  // ============================================================
   // PROMPT ASSEMBLY — Data FIRST, personality second
   // ============================================================
 
+  let prompt = '';
+
+  // 0. STRATEGIST BRIEF (injected by multi-brain pipeline)
+  if (strategistBrief) {
+    prompt += `🧠 BRIEF DEL ESTRATEGA (SIGUE ESTA DIRECTRIZ):\n${strategistBrief}\n\n`;
+  }
+
   // 1. KNOWN DATA
-  let prompt = `⛔ DATOS CONOCIDOS — PROHIBIDO preguntar esto (ya lo sabes):\n`;
+  prompt += `⛔ DATOS CONOCIDOS — PROHIBIDO preguntar esto (ya lo sabes):\n`;
   prompt += known.map(k => `- ${k}`).join('\n');
+
+  // 1.5 INVESTIGATION INTEL
+  if (investigationText) {
+    prompt += investigationText;
+  }
 
   // 2. MISSING DATA (context for Steve, not a checklist)
   if (missing.length > 0) {
@@ -871,6 +993,20 @@ export async function buildDynamicSalesPrompt(
 
   // Paso 6: Double text instruction
   prompt += `\n\n📱 Si quieres enviar 2 mensajes separados (ej: uno con respuesta y otro con dato extra), usa [SPLIT] para dividirlos. Máximo 2 partes.`;
+
+  // Mockup trigger (pitching/closing with product images)
+  if (
+    (effectiveStage === 'pitching' || effectiveStage === 'closing') &&
+    (prospect as any).investigation_data?.store?.product_images?.length &&
+    !(prospect as any).mockup_sent
+  ) {
+    prompt += `\n\n🎨 MOCKUP: Si quieres enviarle un ejemplo visual de cómo se vería un anuncio de su marca, incluye [SEND_MOCKUP] al final de tu mensaje.`;
+  }
+
+  // Sales learnings from past conversations
+  if (salesLearningsText) {
+    prompt += salesLearningsText;
+  }
 
   // 4. PERSONALITY (short)
   prompt += `\n\n🗣️ PERSONALIDAD:\n${WA_SALES_PROMPT_BASE}`;

@@ -19,6 +19,9 @@ import {
 } from '../../lib/steve-wa-brain.js';
 import { sendWhatsApp, sendWhatsAppMedia } from '../../lib/twilio-client.js';
 import { type CaseStudyResult } from '../../lib/steve-wa-brain.js';
+import { runInvestigator, runStrategist, runConversationalist } from '../../lib/steve-multi-brain.js';
+import { investigateProspectBackground } from '../../lib/steve-investigator.js';
+import { generateProspectMockup } from '../../lib/steve-mockup-generator.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 
@@ -293,50 +296,86 @@ async function handleProspect(
       contact_phone: phone,
     });
 
-    // 3. Load history first, then build dynamic prompt (needs history for detections)
+    // 3. Load history
     const history = await getProspectHistory(phone, 10);
-    const dynamicPrompt = await buildDynamicSalesPrompt(prospect, messageBody, history);
 
-    // Build messages array
+    // Build messages array for Claude
     const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [...history];
     if (messages.length === 0 || messages[messages.length - 1].content !== messageBody) {
       messages.push({ role: 'user', content: messageBody });
     }
     const sanitized = sanitizeForClaude(messages);
 
-    // 4. Call Claude Sonnet for sales response (upgraded from Haiku for quality)
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     if (!ANTHROPIC_API_KEY) {
       const twiml = `<Response><Message>Woof, tuve un problema técnico 🐕 Intenta de nuevo en un momento.</Message></Response>`;
       return c.text(twiml, 200, { 'Content-Type': 'text/xml' });
     }
 
-    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 400,
-        system: dynamicPrompt,
-        messages: sanitized,
-      }),
-    });
-
     let replyText: string;
 
-    if (!aiResponse.ok) {
-      console.error('[steve-wa-chat] Claude Sonnet API error:', aiResponse.status);
-      replyText = 'Hola! Soy Steve 🐕 Tu asistente de marketing AI. ¿En qué te puedo ayudar?';
-    } else {
-      const aiData: any = await aiResponse.json();
-      const rawMsg = aiData.content?.[0]?.text || '';
-      replyText = rawMsg
-        .replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '')
-        .trim() || 'Hola! Soy Steve 🐕 ¿Tienes una tienda online? Te puedo ayudar con tu marketing.';
+    try {
+      // ============================================================
+      // MULTI-BRAIN PIPELINE
+      // Step 1: Investigator + Dynamic Prompt in PARALLEL (~1s)
+      // ============================================================
+      const [investigatorResults, dynamicPrompt] = await Promise.all([
+        runInvestigator(prospect),
+        buildDynamicSalesPrompt(prospect, messageBody, history),
+      ]);
+
+      // Step 2: Strategist (~1.5s)
+      const strategistBrief = await runStrategist(prospect, history, investigatorResults);
+
+      // Step 3: Conversationalist with strategist brief (~3-5s)
+      replyText = await runConversationalist(history, strategistBrief, dynamicPrompt, sanitized);
+
+      // Save strategist brief to history (fire & forget)
+      if (strategistBrief.brief && prospect.id) {
+        const briefEntry = {
+          timestamp: new Date().toISOString(),
+          brief: strategistBrief.brief,
+          action: strategistBrief.suggestedAction,
+          tone: strategistBrief.tone,
+        };
+        supabase.from('wa_prospects')
+          .update({
+            strategist_history: [
+              ...(prospect.strategist_history || []).slice(-9),
+              briefEntry,
+            ],
+          })
+          .eq('id', prospect.id)
+          .then(() => {})
+          .catch(() => {});
+      }
+    } catch (multiBrainErr) {
+      // FALLBACK: If multi-brain fails, use the original single-call approach
+      console.error('[steve-wa-chat] Multi-brain pipeline failed, using fallback:', multiBrainErr);
+      const dynamicPrompt = await buildDynamicSalesPrompt(prospect, messageBody, history);
+      const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 400,
+          system: dynamicPrompt,
+          messages: sanitized,
+        }),
+      });
+      if (!aiResponse.ok) {
+        replyText = 'Hola! Soy Steve 🐕 Tu asistente de marketing AI. ¿En qué te puedo ayudar?';
+      } else {
+        const aiData: any = await aiResponse.json();
+        const rawMsg = aiData.content?.[0]?.text || '';
+        replyText = rawMsg
+          .replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '')
+          .trim() || 'Hola! Soy Steve 🐕 ¿Tienes una tienda online? Te puedo ayudar con tu marketing.';
+      }
     }
 
     // Paso 13: Detect human escalation requests
@@ -577,6 +616,38 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       }
     }
 
+    // Paso: Handle [SEND_MOCKUP] tag — generate and send ad mockup
+    const mockupTag = (firstReply + (secondReply || '')).includes('[SEND_MOCKUP]');
+    if (mockupTag) {
+      firstReply = firstReply.replace(/\[SEND_MOCKUP\]/g, '').trim();
+      if (secondReply) secondReply = secondReply.replace(/\[SEND_MOCKUP\]/g, '').trim();
+
+      // Fire & forget: generate mockup with Gemini and send via WA (5s delay)
+      setTimeout(async () => {
+        try {
+          await generateProspectMockup(prospect, phone, profileName);
+        } catch (err) {
+          console.error('[send-mockup] Error:', err);
+        }
+      }, 5000);
+    }
+
+    // Auto-trigger mockup: pitching/closing + has product_images + not sent yet
+    if (
+      !mockupTag &&
+      (prospect.stage === 'pitching' || prospect.stage === 'closing') &&
+      (prospect as any).investigation_data?.store?.product_images?.length &&
+      !(prospect as any).mockup_sent
+    ) {
+      setTimeout(async () => {
+        try {
+          await generateProspectMockup(prospect, phone, profileName);
+        } catch (err) {
+          console.error('[auto-mockup] Error:', err);
+        }
+      }, 5000);
+    }
+
     // 7. FIRE & FORGET: async extraction + scoring + HubSpot push
     const fullReplyText = secondReply ? `${firstReply}\n${secondReply}` : firstReply;
     const fullHistory = [...history];
@@ -641,6 +712,14 @@ async function processProspectAsync(
         console.error('[prospect-audit] Error:', err);
       });
     }
+
+    // Steve Depredador: Background investigation for NEXT message
+    // Enriches investigation_data with store scraping, competitor ads, social data
+    const lastUserMsg = history.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
+    investigateProspectBackground(prospect, history, lastUserMsg).catch(err => {
+      console.error('[steve-investigator] Error:', err);
+    });
+
     // Paso 10: Skip extraction if < 3 inbound messages (not enough info in "Hola" and "sí")
     const inboundCount = history.filter(m => m.role === 'user').length;
 
