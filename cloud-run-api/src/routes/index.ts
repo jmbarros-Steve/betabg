@@ -65,6 +65,8 @@ import { syncGoogleAdsMetrics } from './google/sync-google-ads-metrics.js';
 
 // Phase 3: Other
 import { storePlatformConnection } from './utilities/store-platform-connection.js';
+import { manageSources } from './utilities/manage-sources.js';
+import { approveKnowledge } from './utilities/approve-knowledge.js';
 
 // Phase 3: Klaviyo
 import { fetchKlaviyoTopProducts } from './klaviyo/fetch-klaviyo-top-products.js';
@@ -137,6 +139,10 @@ import { autoBriefGenerator } from './cron/auto-brief-generator.js';
 import { crossClientLearning } from './cron/cross-client-learning.js';
 import { revenueAttribution } from './cron/revenue-attribution.js';
 import { knowledgeQualityScore } from './cron/knowledge-quality-score.js';
+import { steveContentHunter } from './cron/steve-content-hunter.js';
+import { steveAgentLoop } from './cron/steve-agent-loop.js';
+import { steveDiscoverer } from './cron/steve-discoverer.js';
+import { stevePromptEvolver } from './cron/steve-prompt-evolver.js';
 
 // WhatsApp
 import { steveWAChat } from './whatsapp/steve-wa-chat.js';
@@ -146,6 +152,9 @@ import { waSendCampaign } from './whatsapp/send-campaign.js';
 import { shopifyCheckoutWebhook } from './whatsapp/shopify-checkout-webhook.js';
 import { abandonedCartWA } from './whatsapp/abandoned-cart-wa.js';
 import { prospectTrial } from './whatsapp/prospect-trial.js';
+
+// Public (no auth)
+import { auditStore } from './public/audit-store.js';
 
 // Triggers
 import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
@@ -219,6 +228,8 @@ export function registerRoutes(app: Hono) {
   app.post('/api/process-transcription', authMiddleware, processTranscription);
   app.post('/api/onboarding-bot', authMiddleware, onboardingBot);
   app.post('/api/check-client-connections', authMiddleware, checkClientConnections);
+  app.post('/api/manage-sources', authMiddleware, manageSources);
+  app.post('/api/approve-knowledge', authMiddleware, approveKnowledge);
 
   // ============================================================
   // Phase 2: AI & Analytics
@@ -310,6 +321,11 @@ export function registerRoutes(app: Hono) {
   // ============================================================
   app.post('/api/sync-google-ads-metrics', authMiddleware, syncGoogleAdsMetrics);
   app.post('/api/store-platform-connection', authMiddleware, storePlatformConnection);
+
+  // ============================================================
+  // Public endpoints (no JWT)
+  // ============================================================
+  app.post('/api/audit-store', auditStore); // No JWT — landing page store audit
 
   // ============================================================
   // Phase 4: Auth & OAuth
@@ -432,6 +448,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/knowledge-decay', knowledgeDecay); // No JWT — uses X-Cron-Secret, monthly: 0 4 1 * *
   app.post('/api/cron/knowledge-consolidator', knowledgeConsolidator); // No JWT — monthly: 0 5 1 * * (1st of month, 5am)
   app.post('/api/cron/knowledge-dedup', knowledgeDedup); // No JWT — monthly: 0 6 1 * * (1st of month, 6am)
+  app.post('/api/cron/steve-content-hunter', steveContentHunter); // No JWT — every 20min: */20 * * * *
 
   // ============================================================
   // Steve Sales + Post-Venta
@@ -447,4 +464,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/cross-client-learning', crossClientLearning); // No JWT — uses X-Cron-Secret, monthly: 0 3 1 * *
   app.post('/api/cron/revenue-attribution', revenueAttribution); // No JWT — uses X-Cron-Secret, weekly: 0 4 * * 0 (Sun 4am)
   app.post('/api/cron/knowledge-quality-score', knowledgeQualityScore); // No JWT — uses X-Cron-Secret, weekly: 0 5 * * 0 (Sun 5am)
+  app.post('/api/cron/steve-agent-loop', steveAgentLoop); // No JWT — uses X-Cron-Secret, every 2h: 0 */2 * * *
+  app.post('/api/cron/steve-discoverer', steveDiscoverer); // No JWT — uses X-Cron-Secret, weekly: 0 2 * * 0 (Sun 2am)
+  app.post('/api/cron/steve-prompt-evolver', stevePromptEvolver); // No JWT — uses X-Cron-Secret, weekly: 0 3 * * 0 (Sun 3am)
 }

@@ -1,0 +1,1712 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Ads — Landing Page v2 (Mockup)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, sans-serif; color: #1e293b; overflow-x: hidden; }
+  a { text-decoration: none; color: inherit; }
+
+  /* ── Announcement Bar ── */
+  .announcement-bar {
+    background: linear-gradient(90deg, #1E3A7B, #38BDF8);
+    color: white;
+    text-align: center;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .announcement-bar .ann-btn {
+    background: white; color: #1E3A7B;
+    padding: 4px 14px; border-radius: 20px;
+    font-size: 12px; font-weight: 700;
+    cursor: pointer; transition: transform 0.2s;
+  }
+  .announcement-bar .ann-btn:hover { transform: scale(1.05); }
+  .announcement-bar .ann-close {
+    position: absolute; right: 16px;
+    cursor: pointer; opacity: 0.7; font-size: 16px;
+  }
+  .announcement-bar .ann-close:hover { opacity: 1; }
+  .countdown-inline {
+    background: rgba(255,255,255,0.2);
+    padding: 2px 10px; border-radius: 12px;
+    font-variant-numeric: tabular-nums; font-size: 12px;
+  }
+
+  /* ── Navbar ── */
+  .navbar {
+    position: fixed; top: 40px; left: 0; right: 0; z-index: 90;
+    padding: 0 24px; height: 64px;
+    display: flex; align-items: center; justify-content: space-between;
+    transition: all 0.3s;
+  }
+  .navbar.scrolled {
+    background: rgba(255,255,255,0.95); backdrop-filter: blur(12px);
+    border-bottom: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .nav-logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; color: white; }
+  .navbar.scrolled .nav-logo { color: #0f172a; }
+  .nav-logo-icon {
+    width: 32px; height: 32px; background: #1E3A7B; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 16px; color: white;
+  }
+  .nav-links { display: flex; align-items: center; gap: 32px; }
+  .nav-links a { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.7); transition: color 0.2s; }
+  .navbar.scrolled .nav-links a { color: #64748b; }
+  .nav-cta {
+    background: #1E3A7B; color: white !important;
+    padding: 8px 20px; border-radius: 20px;
+    font-size: 13px; font-weight: 600;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    background: #0F172A; padding: 160px 24px 100px;
+    position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: ''; position: absolute; right: -100px; top: 50%; transform: translateY(-50%);
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(30,58,123,0.15), transparent); border-radius: 50%;
+  }
+  .hero-inner {
+    max-width: 1200px; margin: 0 auto;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 16px; border-radius: 20px;
+    background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.2);
+    color: #fb923c; font-size: 13px; font-weight: 500; margin-bottom: 24px;
+  }
+  .hero h1 { font-size: 52px; font-weight: 900; color: white; line-height: 1.1; margin-bottom: 20px; }
+  .text-gradient {
+    background: linear-gradient(135deg, #1E3A7B, #38BDF8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero p { color: #94a3b8; font-size: 17px; line-height: 1.6; max-width: 480px; margin-bottom: 32px; }
+  .hero-ctas { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .btn-primary {
+    padding: 14px 28px; border-radius: 28px; background: #1E3A7B; color: white;
+    font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s; border: none;
+  }
+  .btn-primary:hover { background: #162D5F; transform: translateY(-1px); box-shadow: 0 8px 25px rgba(30,58,123,0.3); }
+  .btn-whatsapp {
+    padding: 14px 28px; border-radius: 28px; background: #25D366; color: white;
+    font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s; border: none;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .btn-whatsapp:hover { background: #1ebe57; transform: translateY(-1px); }
+  .hero-checks { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+  .hero-checks span { display: flex; align-items: center; gap: 6px; color: #64748b; font-size: 13px; }
+  .check-icon { color: #34d399; }
+
+  /* Social proof */
+  .hero-social-proof {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 20px; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; backdrop-filter: blur(4px);
+  }
+  .avatar-stack { display: flex; }
+  .avatar-stack .av {
+    width: 32px; height: 32px; border-radius: 50%; border: 2px solid #0F172A;
+    margin-left: -8px; display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: white;
+  }
+  .avatar-stack .av:first-child { margin-left: 0; }
+  .stars { color: #fbbf24; font-size: 14px; letter-spacing: 2px; }
+  .social-proof-text { font-size: 13px; color: #cbd5e1; line-height: 1.4; }
+  .social-proof-text strong { color: white; }
+
+  /* ── Hero right: Panel de metricas screenshot ── */
+  .hero-visual { position: relative; }
+  .metrics-screenshot {
+    background: white; border-radius: 16px;
+    border: 1px solid #e2e8f0; overflow: hidden;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+  }
+  .ms-topbar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+  }
+  .ms-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .ms-url {
+    flex: 1; margin: 0 12px; background: white; border: 1px solid #e2e8f0;
+    border-radius: 6px; padding: 4px 12px; font-size: 11px; color: #94a3b8;
+  }
+  .ms-body { padding: 20px; }
+  .ms-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .ms-header h3 { font-size: 15px; font-weight: 800; color: #0f172a; }
+  .ms-tabs { display: flex; gap: 4px; }
+  .ms-tab {
+    padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 600;
+    background: #f1f5f9; color: #64748b;
+  }
+  .ms-tab.active { background: #1E3A7B; color: white; }
+  .ms-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+  .ms-kpi {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px;
+  }
+  .ms-kpi-label { font-size: 10px; color: #94a3b8; margin-bottom: 2px; }
+  .ms-kpi-value { font-size: 18px; font-weight: 800; color: #0f172a; }
+  .ms-kpi-change { font-size: 10px; margin-top: 2px; }
+  .ms-kpi-up { color: #059669; }
+  .ms-kpi-down { color: #dc2626; }
+  .ms-chart-area {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 14px; margin-bottom: 12px;
+  }
+  .ms-chart-title { font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 10px; }
+  .ms-chart {
+    height: 70px; display: flex; align-items: flex-end; gap: 3px;
+  }
+  .ms-bar {
+    flex: 1; border-radius: 3px 3px 0 0; transition: opacity 0.2s;
+  }
+  .ms-bar:hover { opacity: 1 !important; }
+  .ms-channels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .ms-channel {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ms-ch-icon {
+    width: 28px; height: 28px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; flex-shrink: 0;
+  }
+  .ms-ch-name { font-size: 10px; color: #94a3b8; }
+  .ms-ch-val { font-size: 13px; font-weight: 700; color: #0f172a; }
+
+  /* ── Logo bar ── */
+  .logo-bar {
+    background: white; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;
+    padding: 20px 0; overflow: hidden;
+  }
+  .logo-track {
+    display: flex; gap: 60px; align-items: center;
+    animation: marquee 20s linear infinite; width: max-content;
+  }
+  .logo-item { flex-shrink: 0; font-size: 18px; font-weight: 700; color: #cbd5e1; opacity: 0.6; }
+  @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+  /* ── Sections generales ── */
+  .section-inner { max-width: 1200px; margin: 0 auto; }
+  .section-header { text-align: center; margin-bottom: 48px; }
+  .section-header h2 { font-size: 36px; font-weight: 800; color: #0f172a; margin-bottom: 12px; }
+  .section-header p { font-size: 16px; color: #64748b; max-width: 600px; margin: 0 auto; }
+
+  /* ── Product Showcase ── */
+  .showcase { background: #f8fafc; padding: 100px 24px; }
+  .tab-row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 40px; }
+  .tab-btn {
+    padding: 8px 18px; border-radius: 20px; font-size: 13px; font-weight: 600;
+    border: 1px solid #e2e8f0; background: white; color: #64748b; cursor: pointer;
+  }
+  .tab-btn.active { background: #1E3A7B; color: white; border-color: #1E3A7B; }
+  .showcase-mockup {
+    max-width: 700px; margin: 0 auto; background: white;
+    border-radius: 16px; border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06); overflow: hidden;
+  }
+  .mockup-bar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 12px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+  }
+  .mockup-content { padding: 24px; min-height: 280px; }
+  .chat-msg {
+    padding: 10px 16px; border-radius: 16px; font-size: 14px;
+    line-height: 1.5; max-width: 80%; margin-bottom: 8px;
+  }
+  .chat-msg.inbound { background: #f1f5f9; color: #334155; border-bottom-left-radius: 4px; }
+  .chat-msg.outbound { background: #1E3A7B; color: white; margin-left: auto; border-bottom-right-radius: 4px; }
+
+  /* ── Features Bento ── */
+  .features { background: white; padding: 100px 24px; }
+  .bento-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .bento-card {
+    background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px;
+    transition: all 0.2s;
+  }
+  .bento-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.08); }
+  .bento-card.span-2 { grid-column: span 2; }
+  .bento-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; margin-bottom: 16px;
+  }
+  .bento-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .bento-card p { font-size: 14px; color: #64748b; line-height: 1.5; }
+
+  /* ══════════════════════════════════════════════════════
+     CALCULADORA — Tabla comparativa de costos
+     ══════════════════════════════════════════════════════ */
+  .calculator-section {
+    background: linear-gradient(135deg, #0F172A, #1e293b); padding: 100px 24px;
+  }
+  .calc-card {
+    max-width: 820px; margin: 0 auto;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 24px; padding: 48px; backdrop-filter: blur(8px);
+  }
+  .calc-card h2 { font-size: 30px; font-weight: 900; color: white; text-align: center; margin-bottom: 6px; }
+  .calc-card .subtitle { text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 40px; }
+
+  /* Tabla */
+  .cost-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+  .cost-table thead th {
+    padding: 12px 16px; font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .cost-table thead th:first-child { text-align: left; color: #64748b; }
+  .cost-table thead th:nth-child(2) { text-align: center; color: #ef4444; }
+  .cost-table thead th:nth-child(3) { text-align: center; color: #34d399; }
+  .cost-table thead th:nth-child(4) { text-align: center; color: #38BDF8; }
+
+  .cost-table tbody td {
+    padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.05);
+    vertical-align: middle;
+  }
+  .cost-table tbody td:first-child { color: #cbd5e1; font-size: 14px; font-weight: 500; }
+  .cost-table tbody td:nth-child(2) { text-align: center; }
+  .cost-table tbody td:nth-child(3) { text-align: center; }
+  .cost-table tbody td:nth-child(4) { text-align: center; }
+
+  .cost-input {
+    width: 150px; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.08);
+    color: white; font-size: 16px; font-weight: 700; text-align: center;
+    font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.2s;
+  }
+  .cost-input:focus { border-color: #38BDF8; }
+  .cost-input::placeholder { color: #475569; font-weight: 500; }
+
+  .steve-price {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.2);
+    padding: 8px 16px; border-radius: 10px; color: #34d399;
+    font-size: 16px; font-weight: 800;
+  }
+  .steve-included {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.2);
+    padding: 8px 16px; border-radius: 10px; color: #34d399;
+    font-size: 13px; font-weight: 700;
+  }
+  .row-desc { font-size: 11px; color: #64748b; margin-top: 4px; }
+
+  /* Totals */
+  .cost-table tfoot td {
+    padding: 20px 16px; border-top: 2px solid rgba(255,255,255,0.15);
+  }
+  .cost-table tfoot td:first-child { color: white; font-weight: 800; font-size: 15px; }
+  .total-current {
+    font-size: 28px; font-weight: 900; color: #ef4444; text-align: center;
+    display: block;
+  }
+  .total-steve {
+    font-size: 28px; font-weight: 900; color: #34d399; text-align: center;
+    display: block;
+  }
+
+  /* Savings banner */
+  .savings-banner {
+    margin-top: 32px; background: rgba(52,211,153,0.1);
+    border: 1px solid rgba(52,211,153,0.2); border-radius: 16px;
+    padding: 28px; text-align: center;
+  }
+  .savings-banner .label { color: #94a3b8; font-size: 13px; margin-bottom: 4px; font-weight: 500; }
+  .savings-banner .amount { font-size: 44px; font-weight: 900; color: #34d399; line-height: 1; }
+  .savings-banner .per-year { font-size: 14px; color: #64748b; margin-top: 8px; }
+  .savings-banner .per-year strong { color: #34d399; }
+  .savings-banner .cta-row { margin-top: 20px; }
+
+  /* ── Stats ── */
+  .stats-section { background: #0F172A; padding: 80px 24px; }
+  .stats-grid {
+    max-width: 1000px; margin: 0 auto;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 40px; text-align: center;
+  }
+  .stat-item h3 { font-size: 44px; font-weight: 900; color: white; margin-bottom: 4px; }
+  .stat-item .stat-label { font-size: 14px; font-weight: 600; color: #cbd5e1; margin-bottom: 4px; }
+  .stat-item .stat-desc { font-size: 12px; color: #64748b; }
+  .stat-item h3 .accent { color: #38BDF8; }
+
+  /* ── Testimonials ── */
+  .testimonials { background: #f8fafc; padding: 100px 24px; }
+  .testimonials-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+    max-width: 1100px; margin: 0 auto;
+  }
+  .testimonial-card {
+    background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px;
+    transition: all 0.2s;
+  }
+  .testimonial-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.06); }
+  .tc-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .tc-company-logo {
+    width: 48px; height: 48px; border-radius: 12px; background: #f1f5f9;
+    border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: #64748b; flex-shrink: 0;
+  }
+  .tc-info .tc-name { font-size: 14px; font-weight: 700; }
+  .tc-info .tc-role { font-size: 12px; color: #64748b; }
+  .tc-info .tc-verified { font-size: 11px; color: #1E3A7B; }
+  .tc-quote { font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 16px; font-style: italic; }
+  .tc-metric {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 20px; background: #ecfdf5;
+    color: #059669; font-size: 12px; font-weight: 600;
+  }
+
+  /* ── Pricing ── */
+  .pricing { background: #f8fafc; padding: 100px 24px; }
+  .pricing-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+    max-width: 1100px; margin: 0 auto;
+  }
+  .price-card {
+    background: white; border: 1px solid #e2e8f0; border-radius: 20px; padding: 36px;
+    position: relative; transition: all 0.2s;
+  }
+  .price-card:hover { box-shadow: 0 8px 30px rgba(0,0,0,0.08); }
+  .price-card.popular { border: 2px solid #1E3A7B; transform: scale(1.03); box-shadow: 0 8px 40px rgba(30,58,123,0.15); }
+  .popular-badge {
+    position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+    background: #1E3A7B; color: white; padding: 4px 16px; border-radius: 20px;
+    font-size: 12px; font-weight: 700;
+  }
+  .price-card-header { text-align: center; margin-bottom: 24px; }
+  .price-icon {
+    width: 48px; height: 48px; border-radius: 50%; margin: 0 auto 12px;
+    display: flex; align-items: center; justify-content: center; font-size: 22px;
+  }
+  .price-card-header h3 { font-size: 20px; font-weight: 800; }
+  .price-card-header .tagline { font-size: 13px; color: #64748b; margin-top: 4px; }
+  .price-amount { text-align: center; margin-bottom: 24px; }
+  .countdown-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fef2f2; color: #dc2626;
+    padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    margin-bottom: 8px; animation: pulse-red 2s ease-in-out infinite;
+  }
+  @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+  .countdown-badge .cd-num {
+    background: #dc2626; color: white; padding: 1px 6px; border-radius: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .price-old { font-size: 14px; color: #94a3b8; text-decoration: line-through; }
+  .price-new { font-size: 32px; font-weight: 900; color: #0f172a; }
+  .price-period { font-size: 12px; color: #94a3b8; }
+  .price-features { margin-bottom: 28px; }
+  .price-features li {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 13px; color: #475569; padding: 6px 0; list-style: none;
+  }
+  .price-features .feat-check { color: #1E3A7B; font-size: 16px; flex-shrink: 0; }
+  .price-cta {
+    display: block; width: 100%; padding: 14px; border-radius: 12px;
+    text-align: center; font-weight: 700; font-size: 14px; cursor: pointer;
+    transition: all 0.2s; border: none;
+  }
+  .price-cta.primary { background: #1E3A7B; color: white; }
+  .price-cta.primary:hover { background: #162D5F; }
+  .price-cta.secondary { background: #f1f5f9; color: #334155; }
+  .price-cta.secondary:hover { background: #e2e8f0; }
+
+  /* ── Final CTA ── */
+  .final-cta { background: #0F172A; padding: 100px 24px; text-align: center; }
+  .final-avatar {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: linear-gradient(135deg, #1E3A7B, #38BDF8);
+    margin: 0 auto 24px; display: flex; align-items: center; justify-content: center;
+    font-size: 36px; border: 3px solid #334155;
+  }
+  .final-cta h2 { font-size: 36px; font-weight: 900; color: white; margin-bottom: 12px; }
+  .final-cta p { color: #94a3b8; max-width: 500px; margin: 0 auto 32px; font-size: 16px; }
+
+  /* ── WhatsApp flotante con preview ── */
+  .wa-float { position: fixed; bottom: 24px; right: 24px; z-index: 80; }
+  .wa-btn {
+    display: flex; align-items: center; gap: 8px;
+    background: #25D366; color: white; padding: 14px 24px; border-radius: 28px;
+    font-weight: 700; font-size: 14px; box-shadow: 0 4px 20px rgba(37,211,102,0.3);
+    cursor: pointer; transition: all 0.2s; border: none; position: relative;
+  }
+  .wa-btn:hover { background: #1ebe57; transform: translateY(-2px); }
+  .wa-btn .wa-ping {
+    position: absolute; top: -2px; right: -2px; width: 12px; height: 12px;
+    background: white; border-radius: 50%; animation: ping 1.5s cubic-bezier(0,0,0.2,1) infinite;
+  }
+  @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+  .wa-preview {
+    position: absolute; bottom: 64px; right: 0; width: 300px;
+    background: white; border-radius: 16px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.15); border: 1px solid #e2e8f0;
+    overflow: hidden; display: none; animation: slideUp 0.3s ease-out;
+  }
+  .wa-float:hover .wa-preview { display: block; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .wa-preview-header {
+    background: #25D366; color: white; padding: 14px 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .wa-preview-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  .wa-preview-name { font-weight: 700; font-size: 14px; }
+  .wa-preview-status { font-size: 11px; opacity: 0.8; }
+  .wa-preview-body { padding: 16px; }
+  .wa-preview-msg {
+    background: #f1f5f9; padding: 10px 14px; border-radius: 12px;
+    border-bottom-left-radius: 4px; font-size: 13px; color: #334155;
+    line-height: 1.5; margin-bottom: 12px;
+  }
+  .wa-preview-options { display: flex; flex-direction: column; gap: 6px; }
+  .wa-preview-opt {
+    display: block; padding: 10px 14px; border-radius: 10px;
+    border: 1px solid #e2e8f0; font-size: 13px; font-weight: 600;
+    color: #1E3A7B; text-align: center; cursor: pointer;
+    transition: all 0.15s; background: white;
+  }
+  .wa-preview-opt:hover { background: #f0f4fa; border-color: #1E3A7B; }
+
+  /* ── Comparativa Steve vs Otros ── */
+  .comparativa { background: white; padding: 100px 24px; }
+  .comp-table { width: 100%; max-width: 900px; margin: 0 auto; border-collapse: separate; border-spacing: 0; }
+  .comp-table thead th {
+    padding: 16px; font-size: 13px; font-weight: 700; text-align: center;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  .comp-table thead th:first-child { text-align: left; color: #64748b; }
+  .comp-table thead th.steve-col {
+    background: #1E3A7B; color: white; border-radius: 12px 12px 0 0;
+    position: relative;
+  }
+  .comp-table thead th.steve-col::after {
+    content: 'Recomendado'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+    background: #f59e0b; color: #0f172a; font-size: 10px; font-weight: 800;
+    padding: 2px 10px; border-radius: 10px; white-space: nowrap;
+  }
+  .comp-table tbody td {
+    padding: 14px 16px; text-align: center; border-bottom: 1px solid #f1f5f9;
+    font-size: 14px; color: #475569;
+  }
+  .comp-table tbody td:first-child { text-align: left; font-weight: 600; color: #0f172a; }
+  .comp-table tbody td.steve-col { background: #f0f4ff; }
+  .comp-check { color: #059669; font-weight: 700; font-size: 18px; }
+  .comp-x { color: #dc2626; font-weight: 700; font-size: 18px; }
+  .comp-meh { color: #f59e0b; font-size: 13px; }
+  .comp-table tfoot td { padding: 16px; border-top: 2px solid #e2e8f0; font-weight: 800; text-align: center; }
+  .comp-table tfoot td:first-child { text-align: left; }
+  .comp-table tfoot td.steve-col {
+    background: #1E3A7B; color: white; border-radius: 0 0 12px 12px; font-size: 18px;
+  }
+
+  /* ── Calculadora de horas ── */
+  .hours-section { background: #f8fafc; padding: 100px 24px; }
+  .hours-card {
+    max-width: 700px; margin: 0 auto; text-align: center;
+  }
+  .hours-card h2 { font-size: 32px; font-weight: 900; color: #0f172a; margin-bottom: 8px; }
+  .hours-card .hours-sub { color: #64748b; font-size: 15px; margin-bottom: 40px; }
+  .hours-slider-wrap {
+    background: white; border: 1px solid #e2e8f0; border-radius: 20px;
+    padding: 40px; margin-bottom: 32px;
+  }
+  .hours-question { font-size: 16px; font-weight: 600; color: #0f172a; margin-bottom: 20px; }
+  .hours-slider {
+    width: 100%; -webkit-appearance: none; appearance: none;
+    height: 8px; border-radius: 4px; background: #e2e8f0; outline: none;
+    margin-bottom: 12px;
+  }
+  .hours-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 28px; height: 28px; border-radius: 50%;
+    background: #1E3A7B; cursor: pointer; box-shadow: 0 2px 8px rgba(30,58,123,0.3);
+  }
+  .hours-labels { display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; margin-bottom: 32px; }
+  .hours-current-val { font-size: 48px; font-weight: 900; color: #1E3A7B; line-height: 1; }
+  .hours-current-label { font-size: 14px; color: #64748b; margin-bottom: 24px; }
+  .hours-result-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 24px; }
+  .hours-result-card {
+    background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px;
+  }
+  .hours-result-card.highlight { background: #ecfdf5; border-color: #34d399; }
+  .hours-result-num { font-size: 32px; font-weight: 900; margin-bottom: 4px; }
+  .hours-result-label { font-size: 13px; color: #64748b; }
+
+  /* ── Lo que NO hacemos ── */
+  .no-hacemos { background: #0F172A; padding: 80px 24px; }
+  .no-inner { max-width: 800px; margin: 0 auto; text-align: center; }
+  .no-inner h2 { font-size: 32px; font-weight: 900; color: white; margin-bottom: 8px; }
+  .no-inner .no-sub { color: #64748b; font-size: 15px; margin-bottom: 40px; }
+  .no-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; text-align: left; }
+  .no-item {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px; padding: 24px; display: flex; gap: 14px; align-items: flex-start;
+  }
+  .no-icon { font-size: 24px; flex-shrink: 0; line-height: 1; }
+  .no-item h4 { font-size: 15px; font-weight: 700; color: white; margin-bottom: 4px; }
+  .no-item p { font-size: 13px; color: #94a3b8; line-height: 1.5; }
+
+  /* ── Audit teaser ── */
+  .audit-section { background: white; padding: 100px 24px; }
+  .audit-card {
+    max-width: 700px; margin: 0 auto; text-align: center;
+  }
+  .audit-card h2 { font-size: 32px; font-weight: 900; color: #0f172a; margin-bottom: 8px; }
+  .audit-card .audit-sub { color: #64748b; font-size: 15px; margin-bottom: 32px; }
+  .audit-input-row {
+    display: flex; gap: 12px; max-width: 500px; margin: 0 auto 32px;
+  }
+  .audit-input {
+    flex: 1; padding: 14px 20px; border-radius: 14px; border: 2px solid #e2e8f0;
+    font-size: 15px; font-family: 'Inter', sans-serif; outline: none;
+    transition: border-color 0.2s;
+  }
+  .audit-input:focus { border-color: #1E3A7B; }
+  .audit-input::placeholder { color: #94a3b8; }
+  .audit-btn {
+    padding: 14px 28px; border-radius: 14px; background: #1E3A7B; color: white;
+    font-weight: 700; font-size: 14px; border: none; cursor: pointer;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .audit-btn:hover { background: #162D5F; }
+  .audit-result {
+    max-width: 500px; margin: 0 auto; display: none;
+    text-align: left; animation: slideUp 0.4s ease-out;
+  }
+  .audit-result.show { display: block; }
+  .audit-action {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0;
+    border-radius: 12px; margin-bottom: 10px;
+  }
+  .audit-action-num {
+    width: 28px; height: 28px; border-radius: 50%; background: #1E3A7B; color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; flex-shrink: 0;
+  }
+  .audit-action-text { font-size: 14px; color: #334155; line-height: 1.5; }
+  .audit-action-text strong { color: #0f172a; }
+  .audit-cta-after {
+    margin-top: 24px; padding: 16px; background: #ecfdf5; border: 1px solid #34d399;
+    border-radius: 12px; font-size: 14px; color: #059669; font-weight: 600;
+  }
+
+  /* ── FAQ Chat WhatsApp ── */
+  .faq-chat { background: #f8fafc; padding: 100px 24px; }
+  .faq-inner { max-width: 600px; margin: 0 auto; }
+  .faq-inner h2 { font-size: 32px; font-weight: 900; color: #0f172a; text-align: center; margin-bottom: 8px; }
+  .faq-inner .faq-sub { text-align: center; color: #64748b; font-size: 15px; margin-bottom: 40px; }
+  .faq-phone {
+    background: #0F172A; border-radius: 32px; padding: 16px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.15);
+  }
+  .faq-phone-header {
+    background: #1E3A7B; border-radius: 20px 20px 0 0; padding: 16px 20px;
+    display: flex; align-items: center; gap: 10px; color: white;
+  }
+  .faq-phone-avatar {
+    width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.2);
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  .faq-phone-name { font-weight: 700; font-size: 14px; }
+  .faq-phone-status { font-size: 11px; opacity: 0.7; }
+  .faq-phone-body {
+    background: #e8e4df; border-radius: 0 0 20px 20px; padding: 20px;
+    max-height: 500px; overflow-y: auto;
+  }
+  .faq-bubble {
+    max-width: 85%; padding: 10px 14px; border-radius: 12px;
+    font-size: 13px; line-height: 1.5; margin-bottom: 8px; position: relative;
+    cursor: pointer;
+  }
+  .faq-bubble.question {
+    background: white; color: #0f172a; margin-left: auto;
+    border-bottom-right-radius: 4px; font-weight: 600;
+  }
+  .faq-bubble.answer {
+    background: #d9fdd3; color: #1a1a1a;
+    border-bottom-left-radius: 4px;
+  }
+  .faq-bubble .faq-time { font-size: 10px; color: #94a3b8; text-align: right; margin-top: 4px; }
+  .faq-answer-hidden { display: none; }
+  .faq-answer-hidden.show { display: block; }
+  .faq-tap-hint {
+    text-align: center; font-size: 12px; color: #94a3b8; margin-top: 12px;
+    animation: pulse-red 2s ease-in-out infinite;
+  }
+
+  /* ── CTA contextual flotante ── */
+  .contextual-cta {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    z-index: 70; opacity: 0; pointer-events: none;
+    transition: all 0.3s ease;
+  }
+  .contextual-cta.visible { opacity: 1; pointer-events: auto; }
+  .contextual-cta-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 28px; border-radius: 28px; background: #1E3A7B; color: white;
+    font-weight: 700; font-size: 14px; border: none; cursor: pointer;
+    box-shadow: 0 8px 30px rgba(30,58,123,0.4);
+    transition: all 0.2s;
+  }
+  .contextual-cta-btn:hover { background: #162D5F; transform: translateY(-2px); }
+
+  /* ── Footer ── */
+  .footer { background: #0F172A; border-top: 1px solid #1e293b; padding: 60px 24px 32px; }
+  .footer-grid {
+    max-width: 1200px; margin: 0 auto;
+    display: grid; grid-template-columns: 1.5fr repeat(4, 1fr); gap: 40px; margin-bottom: 40px;
+  }
+  .footer-logo { display: flex; align-items: center; gap: 8px; font-weight: 800; color: white; font-size: 16px; margin-bottom: 12px; }
+  .footer-desc { font-size: 13px; color: #64748b; line-height: 1.6; }
+  .footer-col h4 { font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 16px; }
+  .footer-col a { display: block; font-size: 13px; color: #64748b; padding: 4px 0; }
+  .footer-bottom {
+    max-width: 1200px; margin: 0 auto; padding-top: 24px; border-top: 1px solid #1e293b;
+    display: flex; justify-content: space-between; font-size: 12px; color: #475569;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .hero-inner { grid-template-columns: 1fr; }
+    .hero-visual { display: none; }
+    .hero h1 { font-size: 36px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 24px; }
+    .bento-grid { grid-template-columns: 1fr; }
+    .bento-card.span-2 { grid-column: span 1; }
+    .pricing-grid { grid-template-columns: 1fr; }
+    .price-card.popular { transform: none; }
+    .testimonials-grid { grid-template-columns: 1fr; }
+    .footer-grid { grid-template-columns: repeat(2, 1fr); }
+    .nav-links { display: none; }
+    .comp-table { font-size: 12px; }
+    .comp-table thead th, .comp-table tbody td { padding: 10px 6px; font-size: 11px; }
+    .hours-result-grid { grid-template-columns: 1fr; }
+    .no-grid { grid-template-columns: 1fr; }
+    .audit-input-row { flex-direction: column; }
+    .faq-phone { border-radius: 24px; padding: 10px; }
+    .contextual-cta { bottom: 80px; }
+    .calc-card { padding: 32px 16px; }
+    .cost-input { width: 120px; font-size: 12px; padding: 8px; }
+    .cost-table thead th { font-size: 10px; padding: 8px; }
+    .cost-table tbody td { padding: 10px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ Announcement Bar ═══ -->
+<div class="announcement-bar" id="announcementBar">
+  <span>Oferta de lanzamiento: <strong>50% en todos los planes</strong></span>
+  <span class="countdown-inline" id="annCountdown">2d 14h 23m</span>
+  <a href="#planes" class="ann-btn">Agenda tu demo gratis</a>
+  <span class="ann-close" onclick="document.getElementById('announcementBar').style.display='none'; document.querySelector('.navbar').style.top='0';">&times;</span>
+</div>
+
+<!-- ═══ Navbar ═══ -->
+<nav class="navbar" id="navbar">
+  <div class="nav-logo">
+    <div class="nav-logo-icon">S</div>
+    Steve
+  </div>
+  <div class="nav-links">
+    <a href="#features">Funcionalidades</a>
+    <a href="#integraciones">Integraciones</a>
+    <a href="#planes">Plataforma</a>
+    <a href="#planes" class="nav-cta">Agenda una reunion</a>
+  </div>
+</nav>
+
+<!-- ═══ Hero ═══ -->
+<section class="hero">
+  <div class="hero-inner">
+    <div>
+      <div class="hero-badge">Plataforma de Marketing AI para E-commerce</div>
+
+      <h1>Marketing <span class="text-gradient">inteligente</span> para tu e-commerce</h1>
+
+      <p>Steve es tu consultor AI de marketing. Gestiona campanas, genera copies, analiza competidores y optimiza tu e-commerce desde un solo lugar.</p>
+
+      <!-- Solo 2 CTAs -->
+      <div class="hero-ctas">
+        <button class="btn-primary">Agenda una reunion &rarr;</button>
+        <button class="btn-whatsapp">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          Preguntale a Steve
+        </button>
+      </div>
+
+      <div class="hero-checks">
+        <span><span class="check-icon">&#10003;</span> Todo incluido</span>
+        <span><span class="check-icon">&#10003;</span> Reunion sin compromiso</span>
+        <span><span class="check-icon">&#10003;</span> Setup en 5 min</span>
+      </div>
+
+      <!-- Social proof: +100 empresas en LATAM -->
+      <div class="hero-social-proof">
+        <div class="avatar-stack">
+          <div class="av" style="background:#8b5cf6;">JE</div>
+          <div class="av" style="background:#f59e0b;">AM</div>
+          <div class="av" style="background:#10b981;">ML</div>
+          <div class="av" style="background:#ef4444;">RP</div>
+          <div class="av" style="background:#3b82f6;">+96</div>
+        </div>
+        <div>
+          <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+          <div class="social-proof-text"><strong>+100 empresas</strong> en LATAM</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screenshot del panel de metricas -->
+    <div class="hero-visual">
+      <div class="metrics-screenshot">
+        <div class="ms-topbar">
+          <div class="ms-dot" style="background:#ef4444;"></div>
+          <div class="ms-dot" style="background:#fbbf24;"></div>
+          <div class="ms-dot" style="background:#22c55e;"></div>
+          <div class="ms-url">app.steve.cl/portal/metricas</div>
+        </div>
+        <div class="ms-body">
+          <div class="ms-header">
+            <h3>Panel de Metricas</h3>
+            <div class="ms-tabs">
+              <div class="ms-tab active">30 dias</div>
+              <div class="ms-tab">7 dias</div>
+              <div class="ms-tab">Hoy</div>
+            </div>
+          </div>
+
+          <!-- KPIs -->
+          <div class="ms-kpis">
+            <div class="ms-kpi">
+              <div class="ms-kpi-label">Ventas</div>
+              <div class="ms-kpi-value">$8.2M</div>
+              <div class="ms-kpi-change ms-kpi-up">&#9650; +18.4%</div>
+            </div>
+            <div class="ms-kpi">
+              <div class="ms-kpi-label">ROAS</div>
+              <div class="ms-kpi-value">5.8x</div>
+              <div class="ms-kpi-change ms-kpi-up">&#9650; +24.1%</div>
+            </div>
+            <div class="ms-kpi">
+              <div class="ms-kpi-label">CPA</div>
+              <div class="ms-kpi-value">$4,230</div>
+              <div class="ms-kpi-change ms-kpi-down">&#9660; -12%</div>
+            </div>
+            <div class="ms-kpi">
+              <div class="ms-kpi-label">Ordenes</div>
+              <div class="ms-kpi-value">1,847</div>
+              <div class="ms-kpi-change ms-kpi-up">&#9650; +9.3%</div>
+            </div>
+          </div>
+
+          <!-- Chart -->
+          <div class="ms-chart-area">
+            <div class="ms-chart-title">Ventas diarias — Shopify + Meta + Google</div>
+            <div class="ms-chart">
+              <div class="ms-bar" style="height:35%;background:#38BDF8;opacity:0.6;"></div>
+              <div class="ms-bar" style="height:42%;background:#38BDF8;opacity:0.65;"></div>
+              <div class="ms-bar" style="height:38%;background:#38BDF8;opacity:0.6;"></div>
+              <div class="ms-bar" style="height:55%;background:#38BDF8;opacity:0.7;"></div>
+              <div class="ms-bar" style="height:48%;background:#38BDF8;opacity:0.65;"></div>
+              <div class="ms-bar" style="height:62%;background:#38BDF8;opacity:0.75;"></div>
+              <div class="ms-bar" style="height:58%;background:#38BDF8;opacity:0.7;"></div>
+              <div class="ms-bar" style="height:72%;background:#38BDF8;opacity:0.8;"></div>
+              <div class="ms-bar" style="height:65%;background:#38BDF8;opacity:0.75;"></div>
+              <div class="ms-bar" style="height:78%;background:#1E3A7B;opacity:0.85;"></div>
+              <div class="ms-bar" style="height:85%;background:#1E3A7B;opacity:0.9;"></div>
+              <div class="ms-bar" style="height:92%;background:#1E3A7B;opacity:0.95;"></div>
+            </div>
+          </div>
+
+          <!-- Channels -->
+          <div class="ms-channels">
+            <div class="ms-channel">
+              <div class="ms-ch-icon" style="background:#e0e7ff;color:#4f46e5;">Sh</div>
+              <div>
+                <div class="ms-ch-name">Shopify</div>
+                <div class="ms-ch-val">$5.1M</div>
+              </div>
+            </div>
+            <div class="ms-channel">
+              <div class="ms-ch-icon" style="background:#dbeafe;color:#2563eb;">Me</div>
+              <div>
+                <div class="ms-ch-name">Meta Ads</div>
+                <div class="ms-ch-val">4.2x ROAS</div>
+              </div>
+            </div>
+            <div class="ms-channel">
+              <div class="ms-ch-icon" style="background:#fef3c7;color:#d97706;">Go</div>
+              <div>
+                <div class="ms-ch-name">Google Ads</div>
+                <div class="ms-ch-val">6.1x ROAS</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Logo bar -->
+<div class="logo-bar">
+  <div class="logo-track">
+    <span class="logo-item">Shopify</span>
+    <span class="logo-item">Meta Ads</span>
+    <span class="logo-item">Google Ads</span>
+    <span class="logo-item">Klaviyo</span>
+    <span class="logo-item">Instagram</span>
+    <span class="logo-item">Shopify</span>
+    <span class="logo-item">Meta Ads</span>
+    <span class="logo-item">Google Ads</span>
+    <span class="logo-item">Klaviyo</span>
+    <span class="logo-item">Instagram</span>
+  </div>
+</div>
+
+<!-- Product Showcase -->
+<section class="showcase" id="features">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2>Todo tu marketing en un panel</h2>
+      <p>Desde campanas de Meta Ads hasta emails de Klaviyo — gestiona todo con la ayuda de Steve.</p>
+    </div>
+    <div class="tab-row">
+      <button class="tab-btn active">Chat AI</button>
+      <button class="tab-btn">Copies Ads</button>
+      <button class="tab-btn">Shopify Analytics</button>
+      <button class="tab-btn">Email Marketing</button>
+      <button class="tab-btn">Finanzas</button>
+    </div>
+    <div class="showcase-mockup">
+      <div class="mockup-bar">
+        <div class="ms-dot" style="background:#ef4444;width:8px;height:8px;"></div>
+        <div class="ms-dot" style="background:#fbbf24;width:8px;height:8px;"></div>
+        <div class="ms-dot" style="background:#22c55e;width:8px;height:8px;"></div>
+      </div>
+      <div class="mockup-content">
+        <div class="chat-msg inbound">Tu campana "Summer Sale" tiene un CTR del 2.4%. Te sugiero probar estos headlines...</div>
+        <div class="chat-msg outbound">Genera 3 variaciones</div>
+        <div class="chat-msg inbound">
+          Aqui tienes 3 variaciones:<br>
+          1. Descuentos de verano hasta 50%<br>
+          2. Tu look de verano te espera<br>
+          3. Ofertas que no puedes dejar pasar
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features Bento -->
+<section class="features" id="integraciones">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2>Capacidades que impulsan tu crecimiento</h2>
+      <p>Herramientas de marketing potenciadas por AI, integradas en una sola plataforma.</p>
+    </div>
+    <div class="bento-grid">
+      <div class="bento-card">
+        <div class="bento-icon" style="background:#f0f4fa;color:#1E3A7B;">&#128172;</div>
+        <h3>Chat con Steve AI</h3>
+        <p>Tu consultor de marketing 24/7. Pregunta sobre estrategia, analisis y optimizacion.</p>
+      </div>
+      <div class="bento-card">
+        <div class="bento-icon" style="background:#faf5ff;color:#7c3aed;">&#128196;</div>
+        <h3>Generacion de Copies</h3>
+        <p>Headlines, textos de anuncios y descripciones generados con AI para Meta y Google.</p>
+      </div>
+      <div class="bento-card">
+        <div class="bento-icon" style="background:#ecfdf5;color:#059669;">&#128722;</div>
+        <h3>Shopify Analytics</h3>
+        <p>Metricas de ventas, productos top, y reportes sincronizados en tiempo real.</p>
+      </div>
+      <div class="bento-card span-2">
+        <div class="bento-icon" style="background:#fff7ed;color:#ea580c;">&#9993;</div>
+        <h3>Email Marketing Inteligente</h3>
+        <p>Disena flujos de email, genera contenido y analiza metricas de Klaviyo. Automatiza welcome series, abandoned cart y post-purchase.</p>
+      </div>
+      <div class="bento-card">
+        <div class="bento-icon" style="background:#ecfdf5;color:#059669;">&#128176;</div>
+        <h3>Control Financiero</h3>
+        <p>Ad spend, revenue, ROAS y profit consolidados por canal y campana.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ¿Que haria Steve con tu tienda? ═══ -->
+<section class="audit-section">
+  <div class="audit-card">
+    <h2>¿Que haria Steve con tu tienda?</h2>
+    <p class="audit-sub">Ingresa tu URL y descubre 3 acciones que Steve haria HOY para mejorar tu marketing.</p>
+
+    <div class="audit-input-row">
+      <input class="audit-input" type="text" placeholder="mitienda.myshopify.com" id="auditUrl">
+      <button class="audit-btn" onclick="showAudit()">Analizar gratis</button>
+    </div>
+
+    <div class="audit-result" id="auditResult"></div>
+  </div>
+</section>
+
+<!-- ═══ CALCULADORA — Tabla comparativa ═══ -->
+<section class="calculator-section">
+  <div class="section-inner">
+    <div class="calc-card">
+      <h2>&#128200; ¿Cuanto gastas hoy en marketing?</h2>
+      <p class="subtitle">Completa tus costos actuales y compara con Steve</p>
+
+      <table class="cost-table">
+        <thead>
+          <tr>
+            <th>Concepto</th>
+            <th>&#128308; Hoy pagas</th>
+            <th>&#128994; Con Steve</th>
+            <th>&#128176; Ahorras</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              Agencia de marketing
+              <div class="row-desc">Fee mensual por gestion de campanas</div>
+            </td>
+            <td><input class="cost-input" type="text" placeholder="$0" id="costAgencia" value="$1.200.000"></td>
+            <td><span class="steve-included">&#10003; Incluido</span></td>
+            <td id="saveAgencia" style="color:#34d399;font-weight:800;font-size:16px;">$1.200.000</td>
+          </tr>
+          <tr>
+            <td>
+              Gestion de Ads
+              <div class="row-desc">Herramientas, reportes, optimizacion</div>
+            </td>
+            <td><input class="cost-input" type="text" placeholder="$0" id="costAds" value="$400.000"></td>
+            <td><span class="steve-included">&#10003; Incluido</span></td>
+            <td id="saveAds" style="color:#34d399;font-weight:800;font-size:16px;">$400.000</td>
+          </tr>
+          <tr>
+            <td>
+              Plataformas / Herramientas
+              <div class="row-desc">Analytics, email, CRM, dashboards</div>
+            </td>
+            <td><input class="cost-input" type="text" placeholder="$0" id="costPlat" value="$250.000"></td>
+            <td><span class="steve-included">&#10003; Incluido</span></td>
+            <td id="savePlat" style="color:#34d399;font-weight:800;font-size:16px;">$250.000</td>
+          </tr>
+          <tr>
+            <td>
+              Freelancers / Copies
+              <div class="row-desc">Copywriter, disenador, community manager</div>
+            </td>
+            <td><input class="cost-input" type="text" placeholder="$0" id="costFree" value="$350.000"></td>
+            <td><span class="steve-included">&#10003; Incluido</span></td>
+            <td id="saveFree" style="color:#34d399;font-weight:800;font-size:16px;">$350.000</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>TOTAL MENSUAL</td>
+            <td><span class="total-current" id="totalCurrent">$2.200.000</span></td>
+            <td><span class="total-steve">$49.950</span><br><span style="font-size:11px;color:#64748b;">Plan Full / mes</span></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <!-- Savings banner -->
+      <div class="savings-banner">
+        <div class="label">Con Steve ahorras</div>
+        <div class="amount" id="totalSavings">$2.150.050 CLP/mes</div>
+        <div class="per-year">= <strong id="totalYear">$25.800.600 CLP</strong> al ano</div>
+        <div class="cta-row">
+          <button class="btn-primary" style="font-size:15px;margin-top:12px;">Ver mi ahorro en una demo &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Comparativa Steve vs Otros ═══ -->
+<section class="comparativa">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2>Steve vs las alternativas</h2>
+      <p>Compara lo que obtienes con cada opcion.</p>
+    </div>
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Hacerlo solo</th>
+          <th>Freelancer</th>
+          <th>Agencia</th>
+          <th class="steve-col">Steve</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Costo mensual</td>
+          <td>$0 (tu tiempo)</td>
+          <td>$400.000 - $800.000</td>
+          <td>$1.200.000+</td>
+          <td class="steve-col" style="font-weight:800;color:#059669;">$49.950</td>
+        </tr>
+        <tr>
+          <td>Disponibilidad</td>
+          <td><span class="comp-meh">Cuando puedas</span></td>
+          <td><span class="comp-meh">Horario laboral</span></td>
+          <td><span class="comp-meh">Horario laboral</span></td>
+          <td class="steve-col"><span class="comp-check">24/7</span></td>
+        </tr>
+        <tr>
+          <td>Tiempo de respuesta</td>
+          <td><span class="comp-x">Dias</span></td>
+          <td><span class="comp-meh">24-48 hrs</span></td>
+          <td><span class="comp-meh">24-48 hrs</span></td>
+          <td class="steve-col"><span class="comp-check">Inmediato</span></td>
+        </tr>
+        <tr>
+          <td>Shopify + Meta + Google + Klaviyo</td>
+          <td><span class="comp-x">Manual</span></td>
+          <td><span class="comp-meh">Parcial</span></td>
+          <td><span class="comp-check">&#10003;</span></td>
+          <td class="steve-col"><span class="comp-check">&#10003; Todo integrado</span></td>
+        </tr>
+        <tr>
+          <td>Analisis con AI</td>
+          <td><span class="comp-x">&#10007;</span></td>
+          <td><span class="comp-x">&#10007;</span></td>
+          <td><span class="comp-meh">Basico</span></td>
+          <td class="steve-col"><span class="comp-check">&#10003; Avanzado</span></td>
+        </tr>
+        <tr>
+          <td>Generacion de copies</td>
+          <td><span class="comp-x">&#10007;</span></td>
+          <td><span class="comp-check">&#10003;</span></td>
+          <td><span class="comp-check">&#10003;</span></td>
+          <td class="steve-col"><span class="comp-check">&#10003; Ilimitado</span></td>
+        </tr>
+        <tr>
+          <td>Reportes automaticos</td>
+          <td><span class="comp-x">&#10007;</span></td>
+          <td><span class="comp-meh">Manual</span></td>
+          <td><span class="comp-check">&#10003;</span></td>
+          <td class="steve-col"><span class="comp-check">&#10003; Tiempo real</span></td>
+        </tr>
+        <tr>
+          <td>Contrato / permanencia</td>
+          <td>No</td>
+          <td><span class="comp-meh">Variable</span></td>
+          <td><span class="comp-x">6-12 meses</span></td>
+          <td class="steve-col"><span class="comp-check">Sin contrato</span></td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td>Resultado</td>
+          <td style="color:#dc2626;">Lento</td>
+          <td style="color:#f59e0b;">Parcial</td>
+          <td style="color:#64748b;">Caro</td>
+          <td class="steve-col">Todo x menos</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ Calculadora de horas ═══ -->
+<section class="hours-section">
+  <div class="hours-card">
+    <h2>¿Cuantas horas pierdes en marketing?</h2>
+    <p class="hours-sub">Mueve el slider y ve cuanto tiempo recuperas con Steve.</p>
+
+    <div class="hours-slider-wrap">
+      <div class="hours-question">Horas semanales que dedicas a marketing:</div>
+      <input type="range" class="hours-slider" id="hoursSlider" min="2" max="40" value="15">
+      <div class="hours-labels">
+        <span>2 hrs</span>
+        <span>10 hrs</span>
+        <span>20 hrs</span>
+        <span>30 hrs</span>
+        <span>40 hrs</span>
+      </div>
+      <div class="hours-current-val" id="hoursVal">15 hrs/semana</div>
+      <div class="hours-current-label">Eso es mucho tiempo que podrias usar para vender</div>
+    </div>
+
+    <div class="hours-result-grid">
+      <div class="hours-result-card">
+        <div class="hours-result-num" style="color:#dc2626;" id="hoursYear">780</div>
+        <div class="hours-result-label">Horas al ano en marketing</div>
+      </div>
+      <div class="hours-result-card">
+        <div class="hours-result-num" style="color:#1E3A7B;" id="hoursSteve">104</div>
+        <div class="hours-result-label">Horas al ano con Steve (2 hrs/sem)</div>
+      </div>
+      <div class="hours-result-card highlight">
+        <div class="hours-result-num" style="color:#059669;" id="hoursSaved">676</div>
+        <div class="hours-result-label">Horas al ano que recuperas</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Lo que NO hacemos ═══ -->
+<section class="no-hacemos">
+  <div class="no-inner">
+    <h2 style="color:white;">Lo que NO hacemos</h2>
+    <p class="no-sub" style="color:#94a3b8;">Transparencia total. Sin letra chica.</p>
+    <div class="no-grid">
+      <div class="no-item">
+        <div class="no-icon">&#128683;</div>
+        <div>
+          <h4>No cobramos setup</h4>
+          <p>Conecta tus plataformas en 5 minutos. Sin costos de implementacion, sin onboarding pagado.</p>
+        </div>
+      </div>
+      <div class="no-item">
+        <div class="no-icon">&#128275;</div>
+        <div>
+          <h4>No pedimos contratos</h4>
+          <p>Cancela cuando quieras. Sin permanencia minima, sin penalizaciones. Mes a mes.</p>
+        </div>
+      </div>
+      <div class="no-item">
+        <div class="no-icon">&#128176;</div>
+        <div>
+          <h4>No tocamos tu ad spend</h4>
+          <p>Tu presupuesto de publicidad es tuyo. Steve optimiza, pero tu controlas cada peso.</p>
+        </div>
+      </div>
+      <div class="no-item">
+        <div class="no-icon">&#128274;</div>
+        <div>
+          <h4>No vendemos tus datos</h4>
+          <p>Tus metricas, clientes y estrategias son 100% privadas. Cero acceso a terceros.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Stats -->
+<section class="stats-section">
+  <div class="stats-grid">
+    <div class="stat-item">
+      <h3>$<span class="accent">2.4</span>M</h3>
+      <div class="stat-label">Ventas gestionadas</div>
+      <div class="stat-desc">A traves de la plataforma</div>
+    </div>
+    <div class="stat-item">
+      <h3>+<span class="accent">45</span>%</h3>
+      <div class="stat-label">ROAS promedio</div>
+      <div class="stat-desc">Mejora vs sin Steve</div>
+    </div>
+    <div class="stat-item">
+      <h3><span class="accent">100</span>+</h3>
+      <div class="stat-label">Empresas activas</div>
+      <div class="stat-desc">Chile y LATAM</div>
+    </div>
+    <div class="stat-item">
+      <h3>&lt;<span class="accent">5</span> min</h3>
+      <div class="stat-label">Setup completo</div>
+      <div class="stat-desc">Registro a primera consulta</div>
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section class="testimonials">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2>Lo que dicen nuestros clientes</h2>
+      <p>Empresas reales que usan Steve todos los dias.</p>
+    </div>
+    <div class="testimonials-grid">
+      <div class="testimonial-card">
+        <div class="tc-header">
+          <div class="tc-company-logo" style="background:#fef3c7;">JdE</div>
+          <div class="tc-info">
+            <div class="tc-name">Patricio Correa</div>
+            <div class="tc-role">Jardin de Eva</div>
+            <div class="tc-verified">&#10003; Cliente verificado</div>
+          </div>
+        </div>
+        <div class="tc-quote">"Steve me ahorra horas cada semana. El dashboard unificado con Shopify y Meta me permite tomar decisiones en minutos, no dias."</div>
+        <div class="tc-metric">&#8599; +45% ROAS en 2 meses</div>
+      </div>
+      <div class="testimonial-card">
+        <div class="tc-header">
+          <div class="tc-company-logo" style="background:#ede9fe;">AM</div>
+          <div class="tc-info">
+            <div class="tc-name">Camila Rojas</div>
+            <div class="tc-role">Amabile</div>
+            <div class="tc-verified">&#10003; Cliente verificado</div>
+          </div>
+        </div>
+        <div class="tc-quote">"El analisis de competencia es brutal. Descubrimos oportunidades que nos dieron ventaja competitiva real en nuestra categoria."</div>
+        <div class="tc-metric">&#8599; 3x mas rapido en research</div>
+      </div>
+      <div class="testimonial-card">
+        <div class="tc-header">
+          <div class="tc-company-logo" style="background:#fce7f3;">MR</div>
+          <div class="tc-info">
+            <div class="tc-name">Sofia Mendez</div>
+            <div class="tc-role">Moretta</div>
+            <div class="tc-verified">&#10003; Cliente verificado</div>
+          </div>
+        </div>
+        <div class="tc-quote">"Tener Shopify, Meta y Klaviyo en un solo lugar cambio nuestro workflow. Ya no pierdo tiempo cruzando datos entre 5 pestanas."</div>
+        <div class="tc-metric">&#8599; -60% tiempo en reportes</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing con countdown -->
+<section class="pricing" id="planes">
+  <div class="section-inner">
+    <div class="section-header">
+      <h2>Elige el plan que necesita tu negocio</h2>
+      <p>Desde visualizacion de datos hasta ejecucion completa con IA.</p>
+    </div>
+    <div class="pricing-grid">
+      <!-- Visual -->
+      <div class="price-card">
+        <div class="price-card-header">
+          <div class="price-icon" style="background:#f0f4fa;color:#1E3A7B;">&#128065;</div>
+          <h3>Visual</h3>
+          <div class="tagline">Ve todo tu marketing</div>
+        </div>
+        <div class="price-amount">
+          <div class="countdown-badge">
+            50% OFF &middot; <span class="cd-num">2d</span> <span class="cd-num">14h</span> <span class="cd-num">23m</span>
+          </div><br>
+          <span class="price-old">$39,900</span><br>
+          <span class="price-new">$19,950</span><br>
+          <span class="price-period">CLP / mes + IVA</span>
+        </div>
+        <ul class="price-features">
+          <li><span class="feat-check">&#10003;</span> Dashboard metricas unificado</li>
+          <li><span class="feat-check">&#10003;</span> Shopify: productos, ordenes</li>
+          <li><span class="feat-check">&#10003;</span> Meta Ads: ver campanas</li>
+          <li><span class="feat-check">&#10003;</span> Klaviyo: metricas y flows</li>
+          <li><span class="feat-check">&#10003;</span> Steve Chat basico</li>
+        </ul>
+        <button class="price-cta secondary">Agendar reunion</button>
+      </div>
+      <!-- Estrategia -->
+      <div class="price-card popular">
+        <div class="popular-badge">Mas popular</div>
+        <div class="price-card-header">
+          <div class="price-icon" style="background:#ede9fe;color:#7c3aed;">&#127919;</div>
+          <h3>Estrategia</h3>
+          <div class="tagline">Analisis + recomendaciones AI</div>
+        </div>
+        <div class="price-amount">
+          <div class="countdown-badge">
+            50% OFF &middot; <span class="cd-num">2d</span> <span class="cd-num">14h</span> <span class="cd-num">23m</span>
+          </div><br>
+          <span class="price-old">$69,900</span><br>
+          <span class="price-new">$34,950</span><br>
+          <span class="price-period">CLP / mes + IVA</span>
+        </div>
+        <ul class="price-features">
+          <li><span class="feat-check">&#10003;</span> Todo lo de Visual, mas:</li>
+          <li><span class="feat-check">&#10003;</span> Analisis de rendimiento IA</li>
+          <li><span class="feat-check">&#10003;</span> Steve Estrategia: diagnostico</li>
+          <li><span class="feat-check">&#10003;</span> Deep Dive: competencia</li>
+          <li><span class="feat-check">&#10003;</span> Generador de copies IA</li>
+          <li><span class="feat-check">&#10003;</span> Reportes avanzados</li>
+        </ul>
+        <button class="price-cta primary">Agendar reunion &rarr;</button>
+      </div>
+      <!-- Full -->
+      <div class="price-card">
+        <div class="price-card-header">
+          <div class="price-icon" style="background:#ecfdf5;color:#059669;">&#9889;</div>
+          <h3>Full</h3>
+          <div class="tagline">Ejecucion completa con IA</div>
+        </div>
+        <div class="price-amount">
+          <div class="countdown-badge">
+            50% OFF &middot; <span class="cd-num">2d</span> <span class="cd-num">14h</span> <span class="cd-num">23m</span>
+          </div><br>
+          <span class="price-old">$99,900</span><br>
+          <span class="price-new">$49,950</span><br>
+          <span class="price-period">CLP / mes + IVA</span>
+        </div>
+        <ul class="price-features">
+          <li><span class="feat-check">&#10003;</span> Todo lo de Estrategia, mas:</li>
+          <li><span class="feat-check">&#10003;</span> Crear campanas Meta y Google</li>
+          <li><span class="feat-check">&#10003;</span> Klaviyo: crear campanas</li>
+          <li><span class="feat-check">&#10003;</span> WhatsApp: mensajes + auto</li>
+          <li><span class="feat-check">&#10003;</span> Generacion imagenes IA</li>
+          <li><span class="feat-check">&#10003;</span> Ejecutar desde Steve Chat</li>
+        </ul>
+        <button class="price-cta secondary">Agendar reunion</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FAQ como Chat ═══ -->
+<section class="faq-chat">
+  <div class="faq-inner">
+    <h2>Preguntas frecuentes</h2>
+    <p class="faq-sub">Toca una pregunta para ver la respuesta de Steve.</p>
+
+    <div class="faq-phone">
+      <div class="faq-phone-header">
+        <div class="faq-phone-avatar">&#128054;</div>
+        <div>
+          <div class="faq-phone-name">Steve</div>
+          <div class="faq-phone-status">Online ahora</div>
+        </div>
+      </div>
+      <div class="faq-phone-body">
+        <!-- Q1 -->
+        <div class="faq-bubble question" onclick="toggleFaq(this)">
+          ¿Necesito saber de marketing para usar Steve?
+        </div>
+        <div class="faq-answer-hidden" id="faq1">
+          <div class="faq-bubble answer">
+            Para nada. Steve esta disenado para duenos de e-commerce que no son expertos en marketing. Te explica todo en lenguaje simple y te recomienda las acciones. Tu solo apruebas.
+            <div class="faq-time">Ahora</div>
+          </div>
+        </div>
+
+        <!-- Q2 -->
+        <div class="faq-bubble question" onclick="toggleFaq(this)">
+          ¿Cuanto demora conectar mis plataformas?
+        </div>
+        <div class="faq-answer-hidden" id="faq2">
+          <div class="faq-bubble answer">
+            5 minutos literalmente. Shopify, Meta y Klaviyo se conectan con un click via OAuth. Google Ads toma un par de clics mas. No necesitas developer ni codigo.
+            <div class="faq-time">Ahora</div>
+          </div>
+        </div>
+
+        <!-- Q3 -->
+        <div class="faq-bubble question" onclick="toggleFaq(this)">
+          ¿Steve maneja mi presupuesto de ads?
+        </div>
+        <div class="faq-answer-hidden" id="faq3">
+          <div class="faq-bubble answer">
+            Steve te recomienda como distribuir tu budget, pero TU decides. Nunca movemos plata sin tu aprobacion. En el plan Full puedes crear campanas directo desde Steve, pero siempre con tu OK.
+            <div class="faq-time">Ahora</div>
+          </div>
+        </div>
+
+        <!-- Q4 -->
+        <div class="faq-bubble question" onclick="toggleFaq(this)">
+          ¿Puedo cancelar cuando quiera?
+        </div>
+        <div class="faq-answer-hidden" id="faq4">
+          <div class="faq-bubble answer">
+            Si, 100%. Sin contrato, sin permanencia. Cancelas desde tu cuenta y listo. Tus datos se eliminan en 30 dias si lo pides. Sin dramas.
+            <div class="faq-time">Ahora</div>
+          </div>
+        </div>
+
+        <!-- Q5 -->
+        <div class="faq-bubble question" onclick="toggleFaq(this)">
+          ¿Funciona para tiendas chicas?
+        </div>
+        <div class="faq-answer-hidden" id="faq5">
+          <div class="faq-bubble answer">
+            Si. Tenemos clientes desde $500.000 CLP/mes en ventas hasta $50M+. El plan Visual es perfecto para tiendas que estan partiendo. Steve se adapta a tu tamano.
+            <div class="faq-time">Ahora</div>
+          </div>
+        </div>
+
+        <!-- Q6 -->
+        <div class="faq-bubble question" onclick="toggleFaq(this)">
+          ¿En que se diferencia Steve de ChatGPT?
+        </div>
+        <div class="faq-answer-hidden" id="faq6">
+          <div class="faq-bubble answer">
+            ChatGPT es generico. Steve esta conectado a TUS datos reales: tu Shopify, tus campanas de Meta, tus emails de Klaviyo. No inventa — analiza y ejecuta con tu data real.
+            <div class="faq-time">Ahora</div>
+          </div>
+        </div>
+
+        <div class="faq-tap-hint">&#9650; Toca una pregunta para ver la respuesta</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Final CTA -->
+<section class="final-cta">
+  <div class="final-avatar">&#128054;</div>
+  <h2>Tu marketing merece ser <span class="text-gradient">inteligente</span></h2>
+  <p>Unete a las empresas de e-commerce que ya usan Steve para crecer mas rapido.</p>
+  <button class="btn-primary" style="font-size:15px;margin-bottom:16px;">Agenda una reunion &rarr;</button>
+  <br>
+  <span style="color:#64748b;font-size:14px;">O escribele directo por WhatsApp &rarr;</span>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-grid">
+    <div>
+      <div class="footer-logo"><div class="nav-logo-icon" style="width:28px;height:28px;font-size:14px;">S</div> Steve</div>
+      <p class="footer-desc">Marketing AI para e-commerce. Tu consultor digital 24/7.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Producto</h4>
+      <a href="#">Funcionalidades</a><a href="#">Chat AI</a><a href="#">Analytics</a><a href="#">Precios</a>
+    </div>
+    <div class="footer-col">
+      <h4>Integraciones</h4>
+      <a href="#">Shopify</a><a href="#">Meta Ads</a><a href="#">Google Ads</a><a href="#">Klaviyo</a>
+    </div>
+    <div class="footer-col">
+      <h4>Recursos</h4>
+      <a href="#">Blog</a><a href="#">FAQ</a><a href="#">Soporte</a>
+    </div>
+    <div class="footer-col">
+      <h4>Legal</h4>
+      <a href="#">Privacidad</a><a href="#">Terminos</a><a href="#">Eliminacion Datos</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>&copy; 2026 Steve Ads. Todos los derechos reservados.</span>
+    <span>Hecho con AI por Steve</span>
+  </div>
+</footer>
+
+<!-- CTA contextual flotante -->
+<div class="contextual-cta" id="ctxCta">
+  <button class="contextual-cta-btn" id="ctxCtaBtn">Agenda una reunion &rarr;</button>
+</div>
+
+<!-- WhatsApp flotante con preview -->
+<div class="wa-float">
+  <div class="wa-preview">
+    <div class="wa-preview-header">
+      <div class="wa-preview-avatar">&#128054;</div>
+      <div>
+        <div class="wa-preview-name">Steve</div>
+        <div class="wa-preview-status">Online ahora</div>
+      </div>
+    </div>
+    <div class="wa-preview-body">
+      <div class="wa-preview-msg">Hola! Soy Steve, el bulldog marketer &#128054; ¿En que te puedo ayudar con tu e-commerce?</div>
+      <div class="wa-preview-options">
+        <a href="#" class="wa-preview-opt">&#128250; Quiero ver una demo</a>
+        <a href="#" class="wa-preview-opt">&#128176; Consultar precios</a>
+        <a href="#" class="wa-preview-opt">&#129300; Tengo una duda</a>
+      </div>
+    </div>
+  </div>
+  <button class="wa-btn">
+    <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+    Habla con Steve
+    <span class="wa-ping"></span>
+  </button>
+</div>
+
+<script>
+// Navbar scroll
+window.addEventListener('scroll', () => {
+  document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 40);
+});
+
+// Countdown timer
+(function() {
+  const end = new Date();
+  end.setDate(end.getDate() + 2);
+  end.setHours(end.getHours() + 14);
+  function tick() {
+    const diff = end - new Date();
+    if (diff <= 0) return;
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    document.querySelectorAll('.cd-num').forEach((el, i) => {
+      const idx = i % 3;
+      if (idx === 0) el.textContent = d + 'd';
+      if (idx === 1) el.textContent = h + 'h';
+      if (idx === 2) el.textContent = m + 'm';
+    });
+    document.getElementById('annCountdown').textContent = d + 'd ' + h + 'h ' + m + 'm ' + s + 's';
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
+
+// Calculator — interactive cost table (CLP)
+function parseNum(str) {
+  return parseInt(str.replace(/[^0-9]/g, ''), 10) || 0;
+}
+function fmt(n) {
+  return '$' + n.toLocaleString('es-CL');
+}
+function recalc() {
+  const a = parseNum(document.getElementById('costAgencia').value);
+  const b = parseNum(document.getElementById('costAds').value);
+  const c = parseNum(document.getElementById('costPlat').value);
+  const d = parseNum(document.getElementById('costFree').value);
+  const total = a + b + c + d;
+  const steve = 49950;
+  const savings = Math.max(0, total - steve);
+
+  document.getElementById('saveAgencia').textContent = fmt(a);
+  document.getElementById('saveAds').textContent = fmt(b);
+  document.getElementById('savePlat').textContent = fmt(c);
+  document.getElementById('saveFree').textContent = fmt(d);
+  document.getElementById('totalCurrent').textContent = fmt(total);
+  document.getElementById('totalSavings').textContent = fmt(savings) + ' CLP/mes';
+  document.getElementById('totalYear').textContent = fmt(savings * 12) + ' CLP';
+}
+
+['costAgencia', 'costAds', 'costPlat', 'costFree'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', recalc);
+  el.addEventListener('focus', function() { this.select(); });
+});
+
+// Audit — real analysis via Cloud Run
+async function showAudit() {
+  const url = document.getElementById('auditUrl').value.trim();
+  if (!url) { document.getElementById('auditUrl').focus(); return; }
+  const btn = document.querySelector('.audit-btn');
+  const resultDiv = document.getElementById('auditResult');
+  btn.textContent = 'Steve esta analizando...';
+  btn.disabled = true;
+  resultDiv.classList.remove('show');
+  resultDiv.innerHTML = '';
+
+  try {
+    const res = await fetch('https://steve-api-850416724643.us-central1.run.app/api/audit-store', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      resultDiv.innerHTML = '<div class="audit-action"><div class="audit-action-text" style="color:#ff6b6b;">' + (data.error || 'Error al analizar. Intenta de nuevo.') + '</div></div>';
+      resultDiv.classList.add('show');
+      return;
+    }
+
+    let html = '';
+    (data.actions || []).forEach(function(action, i) {
+      const impactBadge = action.impact === 'alto'
+        ? '<span style="background:#00d26a;color:#000;padding:2px 8px;border-radius:8px;font-size:0.75rem;margin-left:8px;">ALTO IMPACTO</span>'
+        : '<span style="background:#ffd166;color:#000;padding:2px 8px;border-radius:8px;font-size:0.75rem;margin-left:8px;">IMPACTO MEDIO</span>';
+      html += '<div class="audit-action">'
+        + '<div class="audit-action-num">' + (i + 1) + '</div>'
+        + '<div class="audit-action-text">'
+        + '<strong>' + action.title + '</strong>' + impactBadge + '<br>'
+        + action.detail
+        + '</div></div>';
+    });
+
+    html += '<div class="audit-cta-after">'
+      + 'Estas son solo 3 de las +20 optimizaciones que Steve detecta para <strong>' + (data.store_name || url) + '</strong>. '
+      + '<strong>Agenda una demo para ver el analisis completo.</strong></div>';
+
+    resultDiv.innerHTML = html;
+    resultDiv.classList.add('show');
+  } catch (err) {
+    resultDiv.innerHTML = '<div class="audit-action"><div class="audit-action-text" style="color:#ff6b6b;">Error de conexion. Intenta de nuevo.</div></div>';
+    resultDiv.classList.add('show');
+  } finally {
+    btn.textContent = 'Analizar gratis';
+    btn.disabled = false;
+  }
+}
+
+// Hours calculator
+const slider = document.getElementById('hoursSlider');
+function updateHours() {
+  const h = parseInt(slider.value);
+  document.getElementById('hoursVal').textContent = h + ' hrs/semana';
+  const yearHours = h * 52;
+  const steveHours = 2 * 52;
+  const saved = yearHours - steveHours;
+  document.getElementById('hoursYear').textContent = yearHours.toLocaleString('es-CL');
+  document.getElementById('hoursSteve').textContent = steveHours.toLocaleString('es-CL');
+  document.getElementById('hoursSaved').textContent = Math.max(0, saved).toLocaleString('es-CL');
+}
+slider.addEventListener('input', updateHours);
+updateHours();
+
+// FAQ chat toggle
+function toggleFaq(el) {
+  const answer = el.nextElementSibling;
+  answer.classList.toggle('show');
+  // Scroll into view
+  setTimeout(() => answer.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+}
+
+// Contextual CTA — changes text based on scroll position
+(function() {
+  const cta = document.getElementById('ctxCta');
+  const btn = document.getElementById('ctxCtaBtn');
+  const sections = [
+    { el: '.hero', text: '' }, // hidden in hero
+    { el: '.showcase', text: 'Pruebalo gratis &rarr;' },
+    { el: '.features', text: 'Ve todas las funciones &rarr;' },
+    { el: '.audit-section', text: 'Analiza tu tienda gratis &rarr;' },
+    { el: '.calculator-section', text: 'Calcula tu ahorro &rarr;' },
+    { el: '.comparativa', text: 'Compara y elige &rarr;' },
+    { el: '.hours-section', text: 'Recupera tu tiempo &rarr;' },
+    { el: '.testimonials', text: 'Unete a ellos &rarr;' },
+    { el: '.pricing', text: 'Agenda tu demo &rarr;' },
+    { el: '.faq-chat', text: 'Habla con Steve &rarr;' },
+  ];
+
+  let lastText = '';
+  function updateCta() {
+    const scrollY = window.scrollY + window.innerHeight * 0.6;
+    let currentText = '';
+
+    for (let i = sections.length - 1; i >= 0; i--) {
+      const el = document.querySelector(sections[i].el);
+      if (el && scrollY >= el.offsetTop) {
+        currentText = sections[i].text;
+        break;
+      }
+    }
+
+    if (!currentText) {
+      cta.classList.remove('visible');
+    } else {
+      cta.classList.add('visible');
+      if (currentText !== lastText) {
+        btn.innerHTML = currentText;
+        lastText = currentText;
+      }
+    }
+  }
+
+  window.addEventListener('scroll', updateCta);
+  updateCta();
+})();
+</script>
+</body>
+</html>
