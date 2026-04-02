@@ -279,12 +279,13 @@ async function handleProspect(
         contact_name: profileName || phone, contact_phone: phone,
       });
       // Update message count silently
-      await supabase.rpc('increment_prospect_message_count', { p_phone: phone }).catch(() => {
-        // Fallback: simple update
-        supabase.from('wa_prospects').update({
+      const { data: p } = await supabase.from('wa_prospects').select('message_count').eq('phone', phone).maybeSingle();
+      if (p) {
+        await supabase.from('wa_prospects').update({
+          message_count: (p.message_count || 0) + 1,
           updated_at: new Date().toISOString(),
         }).eq('phone', phone);
-      });
+      }
       console.log(`[rate-limit] Skipping response to ${phone} (${Math.round(elapsed / 1000)}s < 30s)`);
       return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
     }
