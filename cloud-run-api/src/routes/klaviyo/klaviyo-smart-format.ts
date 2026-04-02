@@ -70,7 +70,7 @@ async function loadBrandContext(supabase: any, connectionId: string): Promise<st
 
   const klRuleIds = (knowledgeData || []).map((k: any) => k.id).filter(Boolean);
   if (klRuleIds.length > 0) {
-    supabase.from('qa_log').insert({ check_type: 'knowledge_injection', status: 'info', details: JSON.stringify({ source: 'klaviyo-smart-format', rule_count: klRuleIds.length, rule_ids: klRuleIds }), detected_by: 'klaviyo-smart-format' }).then(({ error }) => { if (error) console.error('[klaviyo-smart-format] qa_log:', error.message); });
+    supabase.from('qa_log').insert({ check_type: 'knowledge_injection', status: 'info', details: JSON.stringify({ source: 'klaviyo-smart-format', rule_count: klRuleIds.length, rule_ids: klRuleIds }), detected_by: 'klaviyo-smart-format' }).then(({ error }: any) => { if (error) console.error('[klaviyo-smart-format] qa_log:', error.message); });
   }
 
   let brandContext = '';

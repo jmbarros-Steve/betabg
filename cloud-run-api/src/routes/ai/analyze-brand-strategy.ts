@@ -903,7 +903,7 @@ export async function analyzeBrandStrategy(c: Context) {
 
     const absRuleIds = (knowledge || []).map((k: any) => k.id).filter(Boolean);
     if (absRuleIds.length > 0) {
-      supabase.from('qa_log').insert({ check_type: 'knowledge_injection', status: 'info', details: JSON.stringify({ source: 'analyze-brand-strategy', rule_count: absRuleIds.length, rule_ids: absRuleIds }), detected_by: 'analyze-brand-strategy' }).then(({ error }) => { if (error) console.error('[analyze-brand] qa_log:', error.message); });
+      supabase.from('qa_log').insert({ check_type: 'knowledge_injection', status: 'info', details: JSON.stringify({ source: 'analyze-brand-strategy', rule_count: absRuleIds.length, rule_ids: absRuleIds }), detected_by: 'analyze-brand-strategy' }).then(({ error }: any) => { if (error) console.error('[analyze-brand] qa_log:', error.message); });
     }
     const knowledgeContext = knowledge?.map((k: any) =>
       `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`

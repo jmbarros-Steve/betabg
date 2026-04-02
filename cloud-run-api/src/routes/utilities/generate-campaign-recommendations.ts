@@ -316,7 +316,7 @@ export async function generateCampaignRecommendations(c: Context) {
 
       const crRuleIds = (kbKnowledgeCR || []).map((k: any) => k.id).filter(Boolean);
       if (crRuleIds.length > 0) {
-        supabase.from('qa_log').insert({ check_type: 'knowledge_injection', status: 'info', details: JSON.stringify({ source: 'generate-campaign-recommendations', rule_count: crRuleIds.length, rule_ids: crRuleIds }), detected_by: 'generate-campaign-recommendations' }).then(({ error }) => { if (error) console.error('[campaign-recs] qa_log:', error.message); });
+        supabase.from('qa_log').insert({ check_type: 'knowledge_injection', status: 'info', details: JSON.stringify({ source: 'generate-campaign-recommendations', rule_count: crRuleIds.length, rule_ids: crRuleIds }), detected_by: 'generate-campaign-recommendations' }).then(({ error }: any) => { if (error) console.error('[campaign-recs] qa_log:', error.message); });
       }
       const campaignKnowledge = kbKnowledgeCR?.map((k: any) =>
         `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
