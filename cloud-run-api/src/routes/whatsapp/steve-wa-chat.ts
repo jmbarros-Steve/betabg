@@ -163,9 +163,15 @@ export async function steveWAChat(c: Context) {
           // Audio failed to transcribe and no text body
           messageBody = '[El usuario envió un audio que no pude transcribir]';
         }
+      } else if (mediaType && mediaType.startsWith('image/')) {
+        // Image: Steve CANNOT see images — tell Claude explicitly
+        const imageHint = '[SISTEMA: El usuario envió una IMAGEN por WhatsApp. Tú NO PUEDES ver imágenes. NO describas, analices ni comentes la imagen. Responde honestamente: "No puedo ver imágenes por WhatsApp todavía. Si me describes lo que quieres mostrar, te ayudo. O mejor aún, en la reunión de demo conectamos tu tienda y veo todo directamente."]';
+        messageBody = messageBody
+          ? `${messageBody}\n\n${imageHint}`
+          : imageHint;
       } else if (!messageBody) {
-        // Non-audio media (image, video, document) with no text
-        messageBody = `[El usuario envió un archivo: ${mediaType || 'desconocido'}]`;
+        // Other non-audio media (video, document) with no text
+        messageBody = `[SISTEMA: El usuario envió un archivo (${mediaType || 'desconocido'}) que NO puedes ver. Dile que por WhatsApp no puedes abrir archivos, pero en la reunión de demo lo revisan juntos.]`;
       }
     }
 
