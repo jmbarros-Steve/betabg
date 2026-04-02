@@ -6,6 +6,7 @@
  */
 
 import { getSupabaseAdmin } from './supabase.js';
+import { getProductCatalogPrompt } from './steve-product-catalog.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -66,6 +67,9 @@ export interface ProspectRecord {
   wolf_checked_at?: string | null;
   learning_extracted?: boolean | null;
   strategist_history?: Array<Record<string, any>> | null;
+  // Rolling conversation summary
+  conversation_summary?: string | null;
+  summary_up_to_msg?: number | null;
 }
 
 export interface ProspectAuditData {
@@ -234,11 +238,16 @@ PROHIBIDO:
 - No prometas resultados de ventas específicos
 - No hables mal de competidores por nombre
 - No exageres el AI
-- No prometas integraciones que no existen. Hoy: Meta, Google Ads, Shopify, Klaviyo
+- No prometas integraciones que no existen. CONSULTA EL CATÁLOGO DE PRODUCTOS que tienes inyectado en el prompt para saber qué ofrece Steve realmente.
+- Si preguntan por WhatsApp, Steve Mail, videos, email, o cualquier feature → CONSULTA EL CATÁLOGO antes de responder.
 - NUNCA digas "déjame revisar", "dame un minuto", "voy a checkear tu tienda", "déjame investigar"
-- NUNCA prometas acciones futuras ("te voy a armar un mockup", "te preparo algo")
+- PUEDES decir "te preparo una presentación personalizada" o "te armo un ejemplo" porque la cola de tareas lo respalda y se entrega automáticamente.
+- PROHIBIDO: "dame un minuto", "déjame revisar", "voy a checkear"
 - Si no tienes datos de su tienda → habla de su INDUSTRIA en general con datos reales
-- Si se genera algo (mockup, caso de éxito, deck), se envía automáticamente. Tú solo conversas.`;
+- Si se genera algo (mockup, caso de éxito, deck, video demo), se envía automáticamente como mensaje separado.
+- NUNCA inventes casos de éxito, métricas de clientes o nombres de marcas.
+- Si piden resultados concretos → "Depende de cada marca. En la reunión te muestro proyecciones con tus datos reales."
+- Si piden ver una demo → puedes ofrecer enviarles un video demo de la plataforma incluyendo [SEND_VIDEO_DEMO] al final.`;
 
 // ---------------------------------------------------------------------------
 // Quick first-message intel (Cambio 1)
@@ -461,7 +470,7 @@ export async function getWAHistory(clientId: string, phone: string, limit = 10):
     }));
 }
 
-export async function getProspectHistory(phone: string, limit = 10): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
+export async function getProspectHistory(phone: string, limit = 20): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
   const supabase = getSupabaseAdmin();
 
   // Get the MOST RECENT messages (descending), then reverse for chronological order
@@ -476,13 +485,130 @@ export async function getProspectHistory(phone: string, limit = 10): Promise<Arr
 
   if (!messages || messages.length === 0) return [];
 
-  return messages
-    .reverse() // Back to chronological order for Claude
+  const recent = messages
+    .reverse()
     .filter((m: any) => m.body)
     .map((m: any) => ({
       role: m.direction === 'inbound' ? 'user' as const : 'assistant' as const,
       content: m.body,
     }));
+
+  // Inject rolling summary as first message if it exists
+  const { data: prospect } = await supabase
+    .from('wa_prospects')
+    .select('conversation_summary')
+    .eq('phone', phone)
+    .maybeSingle();
+
+  if (prospect?.conversation_summary) {
+    return [
+      { role: 'user' as const, content: `[RESUMEN DE CONVERSACIÓN ANTERIOR]\n${prospect.conversation_summary}` },
+      { role: 'assistant' as const, content: 'Entendido, tengo el contexto de nuestra conversación anterior.' },
+      ...recent,
+    ];
+  }
+
+  return recent;
+}
+
+/**
+ * Rolling conversation summary — compresses older messages with Haiku.
+ * Called from processProspectAsync every 10 new messages.
+ * Keeps conversation_summary up to date so getProspectHistory can inject it.
+ *
+ * Cost: ~$0.001 per summary (Haiku, ~500 input tokens + 200 output)
+ * At 500 msgs: ~50 summary updates = ~$0.05 total per prospect
+ */
+export async function updateRollingConversationSummary(
+  prospect: ProspectRecord,
+  phone: string,
+): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!ANTHROPIC_API_KEY) return;
+
+  const msgCount = prospect.message_count || 0;
+  const summaryUpTo = (prospect as any).summary_up_to_msg || 0;
+
+  // Only update every 10 new messages
+  if (msgCount - summaryUpTo < 10) return;
+
+  try {
+    // Get ALL messages (not just last 20) for the summary
+    const { data: allMessages } = await supabase
+      .from('wa_messages')
+      .select('direction, body, created_at')
+      .eq('channel', 'prospect')
+      .eq('contact_phone', phone)
+      .is('client_id', null)
+      .order('created_at', { ascending: true })
+      .limit(200);
+
+    if (!allMessages || allMessages.length < 10) return;
+
+    // Build conversation text (skip last 20 — those will be literal in prompt)
+    const olderMessages = allMessages.slice(0, -20);
+    if (olderMessages.length === 0) return;
+
+    const convoText = olderMessages
+      .filter((m: any) => m.body)
+      .map((m: any) => `${m.direction === 'inbound' ? 'Prospecto' : 'Steve'}: ${m.body}`)
+      .join('\n');
+
+    // Include existing summary for continuity
+    const existingSummary = (prospect as any).conversation_summary || '';
+    const summaryContext = existingSummary
+      ? `Resumen previo:\n${existingSummary}\n\nMensajes nuevos desde el último resumen:\n`
+      : '';
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 400,
+        messages: [{
+          role: 'user',
+          content: `Eres un asistente que comprime conversaciones de ventas por WhatsApp. Genera un resumen conciso que capture TODO lo importante para que un vendedor pueda retomar la conversación sin perder contexto.
+
+${summaryContext}${convoText.slice(0, 6000)}
+
+Incluye en el resumen:
+- Qué vende el prospecto y en qué plataforma
+- Dolores y necesidades mencionados
+- Qué le ofreció Steve y cómo reaccionó
+- Objeciones planteadas
+- Promesas o compromisos hechos por Steve
+- Nivel de interés actual
+- Cualquier dato personal relevante (nombre, empresa, etc.)
+
+Formato: bullets concisos, máximo 10 líneas. Solo hechos, sin opiniones.`,
+        }],
+      }),
+    });
+
+    if (!response.ok) return;
+    const data: any = await response.json();
+    const summary = (data.content?.[0]?.text || '').trim();
+    if (!summary) return;
+
+    await supabase
+      .from('wa_prospects')
+      .update({
+        conversation_summary: summary,
+        summary_up_to_msg: msgCount,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('phone', phone);
+
+    console.log(`[rolling-summary] Updated for ${phone} (msgs: ${msgCount}, summary: ${summary.length} chars)`);
+  } catch (err) {
+    console.error('[rolling-summary] Error:', err);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -768,21 +894,21 @@ export async function loadIndustryCaseStudy(whatTheySell: string | null | undefi
  * Load top sales learnings from steve_knowledge matching the prospect's industry.
  * Used to inject past wins/losses into the prompt for continuous improvement.
  */
-export async function loadSalesLearnings(industry: string | null | undefined): Promise<string> {
-  if (!industry) return '';
+export async function loadSalesLearnings(industry: string | null | undefined): Promise<{ text: string; ruleIds: string[] }> {
+  if (!industry) return { text: '', ruleIds: [] };
   const supabase = getSupabaseAdmin();
 
   const keywords = industry.toLowerCase().split(/[\s,;]+/).filter(w => w.length >= 3);
 
   const { data: learnings } = await supabase
     .from('steve_knowledge')
-    .select('titulo, contenido')
+    .select('id, titulo, contenido')
     .eq('categoria', 'sales_learning')
     .eq('activo', true)
     .order('created_at', { ascending: false })
     .limit(10);
 
-  if (!learnings?.length) return '';
+  if (!learnings?.length) return { text: '', ruleIds: [] };
 
   // Filter by industry relevance, fallback to generic
   const relevant = keywords.length > 0
@@ -792,9 +918,11 @@ export async function loadSalesLearnings(industry: string | null | undefined): P
     : [];
 
   const toUse = relevant.length > 0 ? relevant.slice(0, 5) : learnings.slice(0, 3);
-  if (toUse.length === 0) return '';
+  if (toUse.length === 0) return { text: '', ruleIds: [] };
 
-  return `\n\n📚 APRENDIZAJES DE CONVERSACIONES PASADAS:\n${toUse.map((l: any) => `- ${l.titulo}: ${(l.contenido || '').slice(0, 250)}`).join('\n')}`;
+  const ruleIds = toUse.map((l: any) => l.id).filter(Boolean);
+  const text = `\n\n📚 APRENDIZAJES DE CONVERSACIONES PASADAS:\n${toUse.map((l: any) => `- ${l.titulo}: ${(l.contenido || '').slice(0, 250)}`).join('\n')}`;
+  return { text, ruleIds };
 }
 
 /**
@@ -903,28 +1031,54 @@ function scoreToStage(score: number): string {
  * @param prospect - Current prospect record with all extracted data
  * @param lastMessage - The prospect's latest message (to detect questions)
  */
+export interface DynamicPromptResult {
+  prompt: string;
+  ruleIds: string[];
+}
+
 export async function buildDynamicSalesPrompt(
   prospect: ProspectRecord,
   lastMessage?: string,
   history?: Array<{ role: 'user' | 'assistant'; content: string }>,
   strategistBrief?: string,
   quickIntel?: string,
-): Promise<string> {
+): Promise<DynamicPromptResult> {
   const supabase = getSupabaseAdmin();
 
   // Determine effective stage by score
   const effectiveStage = scoreToStage(prospect.lead_score || 0);
   const stageLabel = effectiveStage.charAt(0).toUpperCase() + effectiveStage.slice(1);
 
+  // Track all rule IDs used in this prompt
+  const collectedRuleIds: string[] = [];
+
   // Load only the current stage rule (not all rules)
   const { data: rules } = await supabase
     .from('steve_knowledge')
-    .select('titulo, contenido')
+    .select('id, titulo, contenido, orden')
     .eq('categoria', 'prospecting')
     .eq('activo', true)
     .order('orden', { ascending: true });
 
   const stageRule = (rules || []).find(r => r.titulo?.toLowerCase().includes(effectiveStage));
+  if (stageRule?.id) collectedRuleIds.push(stageRule.id);
+
+  // Load recent corrections (CORRECCION: rules with high priority)
+  const { data: corrections } = await supabase
+    .from('steve_knowledge')
+    .select('id, titulo, contenido, orden')
+    .eq('categoria', 'prospecting')
+    .eq('activo', true)
+    .ilike('titulo', 'CORRECCION:%')
+    .gte('orden', 90)
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  if (corrections?.length) {
+    for (const c of corrections) {
+      if (c.id) collectedRuleIds.push(c.id);
+    }
+  }
 
   // ============================================================
   // Perro Lobo: Run detections in parallel
@@ -979,16 +1133,31 @@ export async function buildDynamicSalesPrompt(
   // ============================================================
   // Load sales learnings + investigation context (parallel)
   // ============================================================
-  const [salesLearningsText, investigationText] = await Promise.all([
+  const [salesLearningsResult, investigationText] = await Promise.all([
     loadSalesLearnings(prospect.what_they_sell),
     loadInvestigationContext(prospect.id),
   ]);
+  const salesLearningsText = salesLearningsResult.text;
+  if (salesLearningsResult.ruleIds.length > 0) {
+    collectedRuleIds.push(...salesLearningsResult.ruleIds);
+  }
 
   // ============================================================
   // PROMPT ASSEMBLY — Data FIRST, personality second
   // ============================================================
 
   let prompt = '';
+
+  // 0. PRODUCT CATALOG (so Steve knows what he's selling)
+  prompt += getProductCatalogPrompt() + '\n\n';
+
+  // 0. CORRECTIONS — injected with MAXIMUM priority so Steve learns from past mistakes
+  if (corrections?.length) {
+    prompt += `🚨 CORRECCIONES RECIENTES (PRIORIDAD MÁXIMA — sigue estas directrices):\n`;
+    for (const c of corrections) {
+      prompt += `### ${c.titulo}\n${c.contenido}\n\n`;
+    }
+  }
 
   // 0. STRATEGIST BRIEF (injected by multi-brain pipeline)
   if (strategistBrief) {
@@ -1121,7 +1290,8 @@ export async function buildDynamicSalesPrompt(
 
   // Paso 13: Caso de éxito por industria
   if (caseStudy) {
-    prompt += `Caso de éxito de su industria: ${caseStudy.title} — ${caseStudy.summary}\n`;
+    prompt += `Caso de éxito REAL de su industria: ${caseStudy.title} — ${caseStudy.summary}\n`;
+    prompt += `⚠️ Este caso es REAL. NO inventes métricas adicionales, nombres de marcas ni países. Solo usa los datos que te doy aquí.\n`;
     // In pitching/closing, Steve can trigger media delivery
     if ((effectiveStage === 'pitching' || effectiveStage === 'closing') && caseStudy.mediaUrl) {
       prompt += `Si quieres enviarle el caso de éxito con imagen, incluye [SEND_CASE_STUDY] al final de tu mensaje (se enviará como mensaje separado).\n`;
@@ -1174,6 +1344,9 @@ export async function buildDynamicSalesPrompt(
   ) {
     prompt += `\n\n📊 DECK: Si quieres enviarle una propuesta comercial personalizada, incluye [SEND_DECK] al final de tu mensaje. Se genera automáticamente con sus datos.`;
   }
+
+  // Video demo trigger — available in any stage if prospect asks to see the platform
+  prompt += `\n\n🎬 VIDEO DEMO: Si el prospecto pide ver cómo funciona Steve, ver una demo, o quiere que le muestres la plataforma, incluye [SEND_VIDEO_DEMO] al final de tu mensaje. Se enviará un link al video demo automáticamente.`;
 
   // Sales learnings from past conversations
   if (salesLearningsText) {
@@ -1228,10 +1401,11 @@ Si ya mencionaste una fecha comercial, NO la repitas. Si ya hablaste de CPA, hab
     }
     if (relevantRule) {
       prompt += `\n\n--- REFERENCIA ---\n${relevantRule.contenido}`;
+      if (relevantRule.id) collectedRuleIds.push(relevantRule.id);
     }
   }
 
-  return prompt;
+  return { prompt, ruleIds: collectedRuleIds };
 }
 
 // ---------------------------------------------------------------------------

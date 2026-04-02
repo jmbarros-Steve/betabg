@@ -16,6 +16,7 @@ import {
   detectBuyingSignals,
   loadIndustryCaseStudy,
   quickFirstMessageIntel,
+  updateRollingConversationSummary,
   type ProspectRecord,
 } from '../../lib/steve-wa-brain.js';
 import { sendWhatsApp, sendWhatsAppMedia } from '../../lib/twilio-client.js';
@@ -24,6 +25,7 @@ import { runInvestigator, runStrategist, runConversationalist } from '../../lib/
 import { investigateProspectBackground } from '../../lib/steve-investigator.js';
 import { generateProspectMockup } from '../../lib/steve-mockup-generator.js';
 import { generateAndSendSalesDeck } from '../../lib/steve-sales-deck.js';
+import { enqueueWAAction } from '../../lib/wa-task-queue.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 
@@ -159,9 +161,10 @@ export async function steveWAChat(c: Context) {
         .trim() || 'Woof, no pude procesar eso. ¿Me lo dices de otra forma?';
     }
 
-    // Truncate for WhatsApp (1600 char limit)
+    // Smart truncate for WhatsApp — split at word boundary, never mid-word
     if (replyText.length > 1500) {
-      replyText = replyText.slice(0, 1497) + '...';
+      const { head } = splitAtWordBoundary(replyText, 1500);
+      replyText = head;
     }
 
     // Save outbound message
@@ -463,12 +466,37 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       secondReply = parts[1] || null;
     }
 
-    // Truncate to 800 chars per part (WhatsApp supports up to 4096)
-    if (firstReply.length > 800) {
-      firstReply = firstReply.slice(0, 797) + '...';
+    // Smart split: if a part exceeds 800 chars, break at word boundary
+    // and queue the overflow as additional messages
+    const MAX_CHARS = 800;
+    if (firstReply.length > MAX_CHARS) {
+      const { head, tail } = splitAtWordBoundary(firstReply, MAX_CHARS);
+      firstReply = head;
+      // Prepend overflow to secondReply or create it
+      if (tail) {
+        secondReply = secondReply ? `${tail}\n\n${secondReply}` : tail;
+      }
     }
-    if (secondReply && secondReply.length > 800) {
-      secondReply = secondReply.slice(0, 797) + '...';
+
+    // If secondReply is also too long, split into chunks and queue extras
+    const extraMessages: string[] = [];
+    if (secondReply && secondReply.length > MAX_CHARS) {
+      let remaining = secondReply;
+      while (remaining.length > MAX_CHARS) {
+        const { head, tail } = splitAtWordBoundary(remaining, MAX_CHARS);
+        extraMessages.push(head);
+        remaining = tail;
+      }
+      secondReply = extraMessages.shift() || null;
+      if (remaining) extraMessages.push(remaining);
+    }
+
+    // Queue any extra overflow chunks (3rd, 4th message, etc.)
+    for (let i = 0; i < extraMessages.length; i++) {
+      enqueueWAAction(phone, 'split_message', {
+        body: extraMessages[i],
+        profileName: profileName || phone,
+      }, 3 + i * 2).catch(err => console.error('[overflow-split] Enqueue error:', err));
     }
 
     // 5. Save outbound message (first part)
@@ -483,26 +511,12 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       contact_phone: phone,
     });
 
-    // Paso 6: Send second message via Twilio (fire & forget, 2s delay)
+    // Paso 6: Send second message via task queue (persistent, 2s delay)
     if (secondReply) {
-      const secondMsg = secondReply;
-      setTimeout(async () => {
-        try {
-          await sendWhatsApp(`+${phone}`, secondMsg);
-          await supabase.from('wa_messages').insert({
-            client_id: null,
-            channel: 'prospect',
-            direction: 'outbound',
-            from_number: STEVE_WA_NUMBER,
-            to_number: phone,
-            body: secondMsg,
-            contact_name: profileName || phone,
-            contact_phone: phone,
-          });
-        } catch (err) {
-          console.error('[steve-wa-chat] Double text send error:', err);
-        }
-      }, 2000);
+      enqueueWAAction(phone, 'split_message', {
+        body: secondReply,
+        profileName: profileName || phone,
+      }, 2).catch(err => console.error('[steve-wa-chat] Enqueue split_message error:', err));
     }
 
     // 6. Reply via TwiML — user gets response HERE
@@ -521,45 +535,12 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       firstReply = firstReply.replace(/\[GENERATE_COPY:[^\]]+\]/g, '').trim();
       if (secondReply) secondReply = secondReply.replace(/\[GENERATE_COPY:[^\]]+\]/g, '').trim();
 
-      // Fire & forget: generate copy and send as extra message
-      const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-      if (ANTHROPIC_KEY) {
-        const industry = prospect.what_they_sell || 'e-commerce';
-        setTimeout(async () => {
-          try {
-            const copyRes = await fetch('https://api.anthropic.com/v1/messages', {
-              method: 'POST',
-              headers: {
-                'x-api-key': ANTHROPIC_KEY,
-                'anthropic-version': '2023-06-01',
-                'content-type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: 'claude-haiku-4-5-20251001',
-                max_tokens: 400,
-                messages: [{
-                  role: 'user',
-                  content: `Genera un copy de anuncio de Meta Ads para una marca de ${industry}. Descripción: ${copyDesc}. Formato:\n🎯 Headline: ...\n📝 Texto principal: ...\n🔗 Descripción: ...\n📲 CTA: ...\nMáximo 300 caracteres total. Español neutro.`,
-                }],
-              }),
-            });
-            if (!copyRes.ok) return;
-            const copyData: any = await copyRes.json();
-            const copyText = (copyData.content?.[0]?.text || '').trim();
-            if (!copyText) return;
-
-            await sendWhatsApp(`+${phone}`, `Acá te va un ejemplo de copy gratis 🎁:\n\n${copyText}`);
-            await supabase.from('wa_messages').insert({
-              client_id: null, channel: 'prospect', direction: 'outbound',
-              from_number: STEVE_WA_NUMBER, to_number: phone,
-              body: `Acá te va un ejemplo de copy gratis 🎁:\n\n${copyText}`,
-              contact_name: profileName || phone, contact_phone: phone,
-            });
-          } catch (err) {
-            console.error('[wingman-copy] Error:', err);
-          }
-        }, 4000); // 4s delay after main reply
-      }
+      // Enqueue copy generation via task queue (persistent, 4s delay)
+      enqueueWAAction(phone, 'generate_copy', {
+        copyDescription: copyDesc,
+        whatTheySell: prospect.what_they_sell || 'e-commerce',
+        profileName: profileName || phone,
+      }, 4).catch(err => console.error('[wingman-copy] Enqueue error:', err));
     }
 
     // Paso: Handle [SEND_CASE_STUDY] tag — send case study with media
@@ -568,28 +549,11 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       firstReply = firstReply.replace(/\[SEND_CASE_STUDY\]/g, '').trim();
       if (secondReply) secondReply = secondReply.replace(/\[SEND_CASE_STUDY\]/g, '').trim();
 
-      // Fire & forget: load case study and send media
-      const sellsWhat = prospect.what_they_sell;
-      setTimeout(async () => {
-        try {
-          const caseStudy = await loadIndustryCaseStudy(sellsWhat);
-          if (caseStudy) {
-            const msg = `📊 ${caseStudy.title}\n\n${caseStudy.summary}`;
-            if (caseStudy.mediaUrl) {
-              await sendWhatsAppMedia(`+${phone}`, msg, caseStudy.mediaUrl);
-            } else {
-              await sendWhatsApp(`+${phone}`, msg);
-            }
-            await supabase.from('wa_messages').insert({
-              client_id: null, channel: 'prospect', direction: 'outbound',
-              from_number: STEVE_WA_NUMBER, to_number: phone,
-              body: msg, contact_name: profileName || phone, contact_phone: phone,
-            });
-          }
-        } catch (err) {
-          console.error('[send-case-study] Error:', err);
-        }
-      }, 3000);
+      // Enqueue case study delivery via task queue (persistent, 3s delay)
+      enqueueWAAction(phone, 'send_case_study', {
+        whatTheySell: prospect.what_they_sell || undefined,
+        profileName: profileName || phone,
+      }, 3).catch(err => console.error('[send-case-study] Enqueue error:', err));
     }
 
     // Safety: strip any [ACTIVATE_TRIAL] tag if it leaks through (Steve NEVER creates free accounts)
@@ -602,14 +566,11 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       firstReply = firstReply.replace(/\[SEND_MOCKUP\]/g, '').trim();
       if (secondReply) secondReply = secondReply.replace(/\[SEND_MOCKUP\]/g, '').trim();
 
-      // Fire & forget: generate mockup with Gemini and send via WA (5s delay)
-      setTimeout(async () => {
-        try {
-          await generateProspectMockup(prospect, phone, profileName);
-        } catch (err) {
-          console.error('[send-mockup] Error:', err);
-        }
-      }, 5000);
+      // Enqueue mockup generation via task queue (persistent, 5s delay)
+      enqueueWAAction(phone, 'send_mockup', {
+        prospectId: prospect.id,
+        profileName: profileName || phone,
+      }, 5).catch(err => console.error('[send-mockup] Enqueue error:', err));
     }
 
     // Auto-trigger mockup: pitching/closing + has product_images + not sent yet
@@ -619,13 +580,10 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       (prospect as any).investigation_data?.store?.product_images?.length &&
       !(prospect as any).mockup_sent
     ) {
-      setTimeout(async () => {
-        try {
-          await generateProspectMockup(prospect, phone, profileName);
-        } catch (err) {
-          console.error('[auto-mockup] Error:', err);
-        }
-      }, 5000);
+      enqueueWAAction(phone, 'send_mockup', {
+        prospectId: prospect.id,
+        profileName: profileName || phone,
+      }, 5).catch(err => console.error('[auto-mockup] Enqueue error:', err));
     }
 
     // Cambio 6: Auto-trigger sales deck in pitching stage
@@ -640,13 +598,21 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       (prospect.pain_points?.length || prospect.current_marketing) &&
       !(prospect as any).deck_sent
     ) {
-      setTimeout(async () => {
-        try {
-          await generateAndSendSalesDeck(prospect, phone, profileName);
-        } catch (err) {
-          console.error('[auto-sales-deck] Error:', err);
-        }
-      }, 7000); // 7s delay after main reply
+      enqueueWAAction(phone, 'send_deck', {
+        prospectId: prospect.id,
+        profileName: profileName || phone,
+      }, 7).catch(err => console.error('[auto-sales-deck] Enqueue error:', err));
+    }
+
+    // Handle [SEND_VIDEO_DEMO] tag — send video demo link
+    const videoDemoTag = (firstReply + (secondReply || '')).includes('[SEND_VIDEO_DEMO]');
+    if (videoDemoTag) {
+      firstReply = firstReply.replace(/\[SEND_VIDEO_DEMO\]/g, '').trim();
+      if (secondReply) secondReply = secondReply.replace(/\[SEND_VIDEO_DEMO\]/g, '').trim();
+
+      enqueueWAAction(phone, 'send_video_demo', {
+        profileName: profileName || phone,
+      }, 3).catch(err => console.error('[send-video-demo] Enqueue error:', err));
     }
 
     // 7. FIRE & FORGET: async extraction + scoring + HubSpot push
@@ -805,6 +771,12 @@ async function processProspectAsync(
       .from('wa_prospects')
       .update(updatePayload)
       .eq('id', prospect.id);
+
+    // Rolling summary: compress older messages every 10 msgs (fire & forget)
+    updateRollingConversationSummary(
+      { ...prospect, ...updatePayload } as ProspectRecord,
+      prospect.phone,
+    ).catch(err => console.error('[rolling-summary] Error:', err));
 
     // Paso 20: Quality logging
     const knownFields = [
@@ -997,4 +969,45 @@ function sanitizeForClaude(
   }
 
   return merged;
+}
+
+/**
+ * Split text at a word boundary (space or newline) before maxLen.
+ * Never cuts a word in half. If no boundary found, falls back to maxLen.
+ */
+function splitAtWordBoundary(text: string, maxLen: number): { head: string; tail: string } {
+  if (text.length <= maxLen) return { head: text, tail: '' };
+
+  // Prefer splitting at a paragraph break (\n\n) near the limit
+  const paragraphBreak = text.lastIndexOf('\n\n', maxLen);
+  if (paragraphBreak > maxLen * 0.5) {
+    return {
+      head: text.slice(0, paragraphBreak).trimEnd(),
+      tail: text.slice(paragraphBreak + 2).trimStart(),
+    };
+  }
+
+  // Fall back to last newline
+  const newlineBreak = text.lastIndexOf('\n', maxLen);
+  if (newlineBreak > maxLen * 0.5) {
+    return {
+      head: text.slice(0, newlineBreak).trimEnd(),
+      tail: text.slice(newlineBreak + 1).trimStart(),
+    };
+  }
+
+  // Fall back to last space
+  const spaceBreak = text.lastIndexOf(' ', maxLen);
+  if (spaceBreak > maxLen * 0.3) {
+    return {
+      head: text.slice(0, spaceBreak).trimEnd(),
+      tail: text.slice(spaceBreak + 1).trimStart(),
+    };
+  }
+
+  // Worst case: hard cut (very long word with no spaces)
+  return {
+    head: text.slice(0, maxLen),
+    tail: text.slice(maxLen),
+  };
 }

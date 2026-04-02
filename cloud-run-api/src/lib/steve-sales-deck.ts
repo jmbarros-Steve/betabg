@@ -14,6 +14,7 @@
 
 import { getSupabaseAdmin } from './supabase.js';
 import { sendWhatsApp, sendWhatsAppMedia } from './twilio-client.js';
+import { enqueueWAAction } from './wa-task-queue.js';
 import type { ProspectRecord } from './steve-wa-brain.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
@@ -91,7 +92,7 @@ Genera EXACTAMENTE 6 slides en JSON. Cada slide tiene "title" y "body" (máximo 
     { "title": "Tu situación hoy", "body": ["dolor 1 real del prospecto", "dolor 2", "oportunidad que no está aprovechando"] },
     { "title": "Qué hace Steve por ti", "body": ["feature relevante a SU caso", "feature 2", "feature 3"] },
     { "title": "Resultados de marcas similares", "body": ["caso 1 de su industria", "métrica real o estimada"] },
-    { "title": "Planes Steve", "body": ["Visual: $190K/mes — ads automáticos", "Estrategia: $390K/mes — ads + email + analytics", "Full: $590K/mes — todo incluido + consultor"] },
+    { "title": "Planes Steve (50% OFF lanzamiento)", "body": ["Visual: $49.990/mes → $24.995/mes — ve tus datos", "Estrategia: $99.990/mes → $49.995/mes — ve + IA + análisis", "Full: $199.990/mes → $99.995/mes — ve + IA + crea + ejecuta"] },
     { "title": "Siguiente paso", "body": ["Agenda una reunión de 15 min", "Te mostramos Steve con TUS datos", "meetings.hubspot.com/jose-manuel15"] }
   ]
 }
@@ -214,27 +215,12 @@ This should look like a screenshot of a real pitch deck overview.`;
       contact_phone: phone,
     });
 
-    // Send demo video if configured
+    // Send demo video if configured (via persistent task queue)
     const DEMO_VIDEO_URL = process.env.STEVE_DEMO_VIDEO_URL;
     if (DEMO_VIDEO_URL) {
-      setTimeout(async () => {
-        try {
-          const videoMsg = `Y si quieres ver Steve en acción, acá hay un video de 2 min: ${DEMO_VIDEO_URL}`;
-          await sendWhatsApp(`+${phone}`, videoMsg);
-          await supabase.from('wa_messages').insert({
-            client_id: null,
-            channel: 'prospect',
-            direction: 'outbound',
-            from_number: STEVE_WA_NUMBER,
-            to_number: phone,
-            body: videoMsg,
-            contact_name: profileName || phone,
-            contact_phone: phone,
-          });
-        } catch (err) {
-          console.error('[steve-sales-deck] Video msg error:', err);
-        }
-      }, 3000);
+      enqueueWAAction(phone, 'send_video_demo', {
+        profileName: profileName || phone,
+      }, 3).catch(err => console.error('[steve-sales-deck] Video enqueue error:', err));
     }
 
     // 6. Mark deck as sent
@@ -304,7 +290,7 @@ async function sendTextDeck(
     await supabase
       .from('wa_prospects')
       .update({ deck_sent: true, updated_at: new Date().toISOString() })
-      .eq('id', phone); // fallback ID
+      .eq('phone', phone); // fallback by phone number
 
     return true;
   } catch (err) {

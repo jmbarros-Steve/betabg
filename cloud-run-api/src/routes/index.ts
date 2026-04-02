@@ -146,6 +146,7 @@ import { stevePromptEvolver } from './cron/steve-prompt-evolver.js';
 import { wolfNightMode } from './cron/wolf-night-mode.js';
 import { wolfMorningSend } from './cron/wolf-morning-send.js';
 import { salesLearningLoop } from './cron/sales-learning-loop.js';
+import { waActionProcessor } from './cron/wa-action-processor.js';
 
 // WhatsApp
 import { steveWAChat } from './whatsapp/steve-wa-chat.js';
@@ -475,4 +476,5 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/wolf-night-mode', wolfNightMode); // No JWT — X-Cron-Secret, daily 3am Chile: 0 6 * * *
   app.post('/api/cron/wolf-morning-send', wolfMorningSend); // No JWT — X-Cron-Secret, daily 9am Chile: 0 12 * * *
   app.post('/api/cron/sales-learning-loop', salesLearningLoop); // No JWT — X-Cron-Secret, daily 8pm Chile: 0 23 * * *
+  app.post('/api/cron/wa-action-processor', waActionProcessor); // No JWT — X-Cron-Secret, every 1min via Cloud Scheduler: * * * * *
 }
