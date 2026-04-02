@@ -18,6 +18,7 @@ import {
   quickFirstMessageIntel,
   updateRollingConversationSummary,
   type ProspectRecord,
+  type DynamicPromptResult,
 } from '../../lib/steve-wa-brain.js';
 import { sendWhatsApp, sendWhatsAppMedia } from '../../lib/twilio-client.js';
 import { type CaseStudyResult } from '../../lib/steve-wa-brain.js';
@@ -26,8 +27,14 @@ import { investigateProspectBackground } from '../../lib/steve-investigator.js';
 import { generateProspectMockup } from '../../lib/steve-mockup-generator.js';
 import { generateAndSendSalesDeck } from '../../lib/steve-sales-deck.js';
 import { enqueueWAAction } from '../../lib/wa-task-queue.js';
+import { scrubPII } from '../../lib/pii-scrubber.js';
+import { isSupportedAudio, transcribeAudio } from '../../lib/audio-transcriber.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
+
+// Rate limiting: track last response time per phone (in-memory + DB fallback)
+const lastResponseTime = new Map<string, number>();
+const RATE_LIMIT_MS = 30_000; // 30 seconds
 
 // Stage order for "only advance, never go back" rule
 const STAGE_ORDER: Record<string, number> = {
@@ -57,13 +64,46 @@ export async function steveWAChat(c: Context) {
     // Parse Twilio webhook payload (application/x-www-form-urlencoded)
     const body = await c.req.parseBody();
     const from = String(body['From'] || '');           // whatsapp:+56987654321
-    const messageBody = String(body['Body'] || '');
+    let messageBody = String(body['Body'] || '');
     const profileName = String(body['ProfileName'] || '');
     const messageSid = String(body['MessageSid'] || '');
+    const numMedia = parseInt(String(body['NumMedia'] || '0'), 10);
+
+    // Audio transcription: if message has audio media, transcribe with Whisper
+    if (numMedia > 0) {
+      const mediaType = String(body['MediaContentType0'] || '');
+      const mediaUrl = String(body['MediaUrl0'] || '');
+      if (mediaUrl && isSupportedAudio(mediaType)) {
+        const transcription = await transcribeAudio(mediaUrl, mediaType);
+        if (transcription) {
+          // Use transcription as message body (prefix for context)
+          messageBody = messageBody
+            ? `${messageBody}\n\n[Audio transcrito]: ${transcription}`
+            : transcription;
+          console.log(`[steve-wa-chat] Audio transcribed for ${from}: ${transcription.slice(0, 100)}...`);
+        } else if (!messageBody) {
+          // Audio failed to transcribe and no text body
+          messageBody = '[El usuario envió un audio que no pude transcribir]';
+        }
+      } else if (!messageBody) {
+        // Non-audio media (image, video, document) with no text
+        messageBody = `[El usuario envió un archivo: ${mediaType || 'desconocido'}]`;
+      }
+    }
 
     if (!from || !messageBody) {
       return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
     }
+
+    // PII scrubbing: strip sensitive data before any processing/storage
+    const { scrubbed: scrubbedBody, hadPII } = scrubPII(messageBody);
+    if (hadPII) {
+      console.log(`[steve-wa-chat] PII detected and scrubbed from ${from}`);
+    }
+    // Use scrubbed version for storage, original for detecting PII warning
+    const storageBody = scrubbedBody;
+    // Keep original for AI processing (AI should see context to warn user)
+    // but messageBody for DB storage is always scrubbed
 
     // Extract clean phone number
     const phone = from.replace('whatsapp:', '').replace('+', '').trim();
@@ -78,17 +118,17 @@ export async function steveWAChat(c: Context) {
 
     if (!client) {
       // Unknown number — AI sales funnel for prospects
-      return handleProspect(c, supabase, phone, messageBody, profileName, messageSid);
+      return handleProspect(c, supabase, phone, messageBody, profileName, messageSid, storageBody, hadPII);
     }
 
-    // Save inbound message
+    // Save inbound message (PII scrubbed)
     await supabase.from('wa_messages').insert({
       client_id: client.id,
       channel: 'steve_chat',
       direction: 'inbound',
       from_number: phone,
       to_number: STEVE_WA_NUMBER,
-      body: messageBody,
+      body: storageBody,
       message_sid: messageSid,
       contact_name: profileName || client.name,
       contact_phone: phone,
@@ -223,8 +263,32 @@ async function handleProspect(
   messageBody: string,
   profileName: string,
   messageSid: string,
+  storageBody: string,
+  hadPII: boolean,
 ) {
   try {
+    // Rate limiting: max 1 response per 30s per phone
+    const lastTime = lastResponseTime.get(phone) || 0;
+    const elapsed = Date.now() - lastTime;
+    if (elapsed < RATE_LIMIT_MS) {
+      // Still save the message but don't respond (prevents API waste on spam)
+      await supabase.from('wa_messages').insert({
+        client_id: null, channel: 'prospect', direction: 'inbound',
+        from_number: phone, to_number: STEVE_WA_NUMBER,
+        body: storageBody, message_sid: messageSid,
+        contact_name: profileName || phone, contact_phone: phone,
+      });
+      // Update message count silently
+      await supabase.rpc('increment_prospect_message_count', { p_phone: phone }).catch(() => {
+        // Fallback: simple update
+        supabase.from('wa_prospects').update({
+          updated_at: new Date().toISOString(),
+        }).eq('phone', phone);
+      });
+      console.log(`[rate-limit] Skipping response to ${phone} (${Math.round(elapsed / 1000)}s < 30s)`);
+      return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
+    }
+
     // 1. Upsert prospect (use 'discovery' instead of old 'talking' for new prospects)
     const { data: existingProspect } = await supabase
       .from('wa_prospects')
@@ -288,14 +352,14 @@ async function handleProspect(
       };
     }
 
-    // 2. Save inbound message
+    // 2. Save inbound message (PII scrubbed)
     await supabase.from('wa_messages').insert({
       client_id: null,
       channel: 'prospect',
       direction: 'inbound',
       from_number: phone,
       to_number: STEVE_WA_NUMBER,
-      body: messageBody,
+      body: storageBody,
       message_sid: messageSid,
       contact_name: profileName || phone,
       contact_phone: phone,
@@ -304,10 +368,14 @@ async function handleProspect(
     // 3. Load history
     const history = await getProspectHistory(phone, 20);
 
-    // Build messages array for Claude
+    // Build messages array for Claude (use original messageBody for AI context, not scrubbed)
     const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [...history];
-    if (messages.length === 0 || messages[messages.length - 1].content !== messageBody) {
-      messages.push({ role: 'user', content: messageBody });
+    // If PII was detected, inject a system hint so Steve warns the user
+    const aiMessageBody = hadPII
+      ? `${messageBody}\n\n[SISTEMA: El usuario compartió datos sensibles como tarjeta de crédito o RUT. DEBES advertirle que NO comparta datos financieros por WhatsApp y que los pagos se hacen en steve.cl]`
+      : messageBody;
+    if (messages.length === 0 || messages[messages.length - 1].content !== aiMessageBody) {
+      messages.push({ role: 'user', content: aiMessageBody });
     }
     const sanitized = sanitizeForClaude(messages);
 
@@ -318,6 +386,7 @@ async function handleProspect(
     }
 
     let replyText: string;
+    let collectedRuleIds: string[] = [];
 
     // Cambio 1: Quick intel for first message (Haiku, ~1s)
     let quickIntel = '';
@@ -330,16 +399,22 @@ async function handleProspect(
       // MULTI-BRAIN PIPELINE
       // Step 1: Investigator + Dynamic Prompt in PARALLEL (~1s)
       // ============================================================
-      const [investigatorResults, dynamicPrompt] = await Promise.all([
+      const [investigatorResults, promptResult] = await Promise.all([
         runInvestigator(prospect),
         buildDynamicSalesPrompt(prospect, messageBody, history, undefined, quickIntel),
       ]);
+
+      // Collect rule IDs from prompt builder + investigator
+      collectedRuleIds = [
+        ...promptResult.ruleIds,
+        ...investigatorResults.ruleIds,
+      ];
 
       // Step 2: Strategist (~1.5s)
       const strategistBrief = await runStrategist(prospect, history, investigatorResults);
 
       // Step 3: Conversationalist with strategist brief (~3-5s)
-      replyText = await runConversationalist(history, strategistBrief, dynamicPrompt, sanitized);
+      replyText = await runConversationalist(history, strategistBrief, promptResult.prompt, sanitized);
 
       // Save strategist brief to history (fire & forget)
       if (strategistBrief.brief && prospect.id) {
@@ -363,7 +438,8 @@ async function handleProspect(
     } catch (multiBrainErr) {
       // FALLBACK: If multi-brain fails, use the original single-call approach
       console.error('[steve-wa-chat] Multi-brain pipeline failed, using fallback:', multiBrainErr);
-      const dynamicPrompt = await buildDynamicSalesPrompt(prospect, messageBody, history, undefined, quickIntel);
+      const promptResult = await buildDynamicSalesPrompt(prospect, messageBody, history, undefined, quickIntel);
+      collectedRuleIds = promptResult.ruleIds;
       const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -374,7 +450,7 @@ async function handleProspect(
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
           max_tokens: 800,
-          system: dynamicPrompt,
+          system: promptResult.prompt,
           messages: sanitized,
         }),
       });
@@ -499,7 +575,14 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       }, 3 + i * 2).catch(err => console.error('[overflow-split] Enqueue error:', err));
     }
 
-    // 5. Save outbound message (first part)
+    // 5. Save outbound message (first part) with rule tracking metadata
+    const outboundMetadata: Record<string, any> = {};
+    if (collectedRuleIds.length > 0) {
+      outboundMetadata.rule_ids = [...new Set(collectedRuleIds)]; // dedupe
+    }
+    outboundMetadata.stage = prospect.stage || 'discovery';
+    outboundMetadata.lead_score = prospect.lead_score || 0;
+
     await supabase.from('wa_messages').insert({
       client_id: null,
       channel: 'prospect',
@@ -509,6 +592,7 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       body: firstReply,
       contact_name: profileName || phone,
       contact_phone: phone,
+      metadata: outboundMetadata,
     });
 
     // Paso 6: Send second message via task queue (persistent, 2s delay)
@@ -520,6 +604,9 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
     }
 
     // 6. Reply via TwiML — user gets response HERE
+    // Update rate limit timestamp
+    lastResponseTime.set(phone, Date.now());
+
     const escapedReply = firstReply
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -1011,3 +1098,11 @@ function splitAtWordBoundary(text: string, maxLen: number): { head: string; tail
     tail: text.slice(maxLen),
   };
 }
+
+// Cleanup stale rate limit entries every 5 minutes to prevent memory leak
+setInterval(() => {
+  const cutoff = Date.now() - RATE_LIMIT_MS * 2;
+  for (const [phone, time] of lastResponseTime) {
+    if (time < cutoff) lastResponseTime.delete(phone);
+  }
+}, 5 * 60 * 1000);
