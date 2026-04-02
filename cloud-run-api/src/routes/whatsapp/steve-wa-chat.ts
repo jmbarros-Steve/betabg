@@ -9,6 +9,7 @@ import {
   buildDynamicSalesPrompt,
   buildEnrichedProspectContext,
   extractProspectInfo,
+  consolidatePainPoints,
   calculateLeadScore,
   generateConversationSummary,
   pushToHubSpot,
@@ -553,13 +554,38 @@ async function handleProspect(
 
     let replyText: string;
     let collectedRuleIds: string[] = [];
+    let skipMultiBrain = false;
+
+    // ============================================================
+    // PRE-CHECK: Human escalation — respond instantly, skip pipeline
+    // ============================================================
+    const lowerMsgEarly = messageBody.toLowerCase();
+    const humanEscalationTriggers = [
+      'hablar con alguien', 'persona real', 'habla con alguien',
+      'agente humano', 'quiero hablar con una persona', 'asesor',
+      'hablar con humano', 'eres un bot', 'eres robot', 'eres una ia',
+    ];
+    if (humanEscalationTriggers.some(t => lowerMsgEarly.includes(t))) {
+      replyText = 'Sí, soy un asistente de IA del equipo de Steve. Te conecto con José Manuel — te va a escribir pronto por este mismo chat. Si prefieres agendar directo: meetings.hubspot.com/jose-manuel15';
+      skipMultiBrain = true;
+      // Fire & forget: create escalation task
+      supabase.from('tasks').insert({
+        title: `[ESCALAR] Prospecto ${phone} pidió hablar con humano`,
+        description: `El prospecto solicitó hablar con una persona real. Mensaje: "${messageBody}"`,
+        priority: 'high',
+        status: 'pending',
+        assigned_to: '3d195082-aa83-48c0-b514-a8052264a1e7',
+        created_at: new Date().toISOString(),
+      }).catch(() => {});
+    }
 
     // Cambio 1: Quick intel for first message (Haiku, ~1s)
     let quickIntel = '';
-    if ((prospect.message_count || 0) <= 1) {
+    if (!skipMultiBrain && (prospect.message_count || 0) <= 1) {
       quickIntel = await quickFirstMessageIntel(messageBody, profileName);
     }
 
+    if (!skipMultiBrain) {
     try {
       // ============================================================
       // MULTI-BRAIN PIPELINE
@@ -621,31 +647,16 @@ async function handleProspect(
         }),
       });
       if (!aiResponse.ok) {
-        replyText = 'Hola! Soy Steve 🐕 Tu asistente de marketing AI. ¿En qué te puedo ayudar?';
+        replyText = 'Perdón, tuve un problema procesando tu mensaje. ¿Me lo puedes repetir?';
       } else {
         const aiData: any = await aiResponse.json();
         const rawMsg = aiData.content?.[0]?.text || '';
         replyText = rawMsg
           .replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '')
-          .trim() || 'Hola! Soy Steve 🐕 ¿Tienes una tienda online? Te puedo ayudar con tu marketing.';
+          .trim() || 'Perdón, no pude procesar bien tu mensaje. ¿Me lo repites?';
       }
     }
-
-    // Paso 13: Detect human escalation requests
-    const lowerMsg = messageBody.toLowerCase();
-    const humanEscalationTriggers = ['hablar con alguien', 'persona real', 'habla con alguien', 'agente humano', 'quiero hablar con una persona', 'asesor'];
-    if (humanEscalationTriggers.some(t => lowerMsg.includes(t))) {
-      replyText = 'Entendido, te conecto con José Manuel. Te va a escribir pronto por este mismo chat.';
-      // Fire & forget: create escalation task
-      supabase.from('tasks').insert({
-        title: `[ESCALAR] Prospecto ${phone} pidió hablar con humano`,
-        description: `El prospecto solicitó hablar con una persona real. Mensaje: "${messageBody}"`,
-        priority: 'high',
-        status: 'pending',
-        assigned_to: '3d195082-aa83-48c0-b514-a8052264a1e7',
-        created_at: new Date().toISOString(),
-      }).catch(() => {});
-    }
+    } // end if (!skipMultiBrain)
 
     // Paso 13: Detect frustration (3+ very short messages in a row)
     const recentUserMsgs = history.filter(m => m.role === 'user').slice(-3);
@@ -660,6 +671,12 @@ async function handleProspect(
         created_at: new Date().toISOString(),
       }).catch(() => {});
     }
+
+    // ============================================================
+    // POST-PIPELINE: Validation, tag detection, splitting, DB save, TwiML
+    // Wrapped in try-catch to prevent propagation to outer fallback
+    // ============================================================
+    try {
 
     // Paso 18: Validation — if reply asks "¿qué vendes?" but we already know what_they_sell
     if (
@@ -709,8 +726,6 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
     const caseStudyTag = fullText.includes('[SEND_CASE_STUDY]');
     const mockupTag = fullText.includes('[SEND_MOCKUP]');
     const deckTag = fullText.includes('[SEND_DECK]');
-    const videoDemoTag = fullText.includes('[SEND_VIDEO_DEMO]');
-
     // Strip ALL tags from the reply text
     replyText = replyText
       .replace(/\[SPLIT\]/g, '|||SPLIT|||')  // preserve split marker
@@ -734,35 +749,18 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       secondReply = parts[1] || null;
     }
 
-    // Smart split: if a part exceeds 800 chars, break at word boundary
-    const MAX_CHARS = 800;
-    if (firstReply.length > MAX_CHARS) {
+    // Smart split: if firstReply exceeds 1200 chars, break at word boundary
+    // MAX 2 messages total (TwiML + 1 split). No flooding the prospect.
+    const MAX_CHARS = 1200;
+    if (firstReply.length > MAX_CHARS && !secondReply) {
       const { head, tail } = splitAtWordBoundary(firstReply, MAX_CHARS);
       firstReply = head;
-      if (tail) {
-        secondReply = secondReply ? `${tail}\n\n${secondReply}` : tail;
-      }
+      secondReply = tail || null;
     }
 
-    // If secondReply is also too long, split into chunks and queue extras
-    const extraMessages: string[] = [];
+    // If both parts exist and secondReply is too long, truncate (don't create 3rd message)
     if (secondReply && secondReply.length > MAX_CHARS) {
-      let remaining = secondReply;
-      while (remaining.length > MAX_CHARS) {
-        const { head, tail } = splitAtWordBoundary(remaining, MAX_CHARS);
-        extraMessages.push(head);
-        remaining = tail;
-      }
-      secondReply = extraMessages.shift() || null;
-      if (remaining) extraMessages.push(remaining);
-    }
-
-    // Queue any extra overflow chunks (3rd, 4th message, etc.)
-    for (let i = 0; i < extraMessages.length; i++) {
-      enqueueWAAction(phone, 'split_message', {
-        body: extraMessages[i],
-        profileName: profileName || phone,
-      }, 3 + i * 2).catch(err => console.error('[overflow-split] Enqueue error:', err));
+      secondReply = secondReply.slice(0, MAX_CHARS - 3) + '...';
     }
 
     // ============================================================
@@ -845,22 +843,20 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       }, 5).catch(err => console.error('[auto-mockup] Enqueue error:', err));
     }
 
-    if (
-      (deckTag || (prospect.stage === 'pitching' || prospect.stage === 'closing')) &&
-      prospect.what_they_sell &&
-      (prospect.pain_points?.length || prospect.current_marketing) &&
-      !(prospect as any).deck_sent
-    ) {
-      enqueueWAAction(phone, 'send_deck', {
-        prospectId: prospect.id,
-        profileName: profileName || phone,
-      }, 7).catch(err => console.error('[auto-sales-deck] Enqueue error:', err));
-    }
-
-    if (videoDemoTag) {
-      enqueueWAAction(phone, 'send_video_demo', {
-        profileName: profileName || phone,
-      }, 3).catch(err => console.error('[send-video-demo] Enqueue error:', err));
+    // Only send deck when Steve EXPLICITLY includes [SEND_DECK] — no auto-trigger
+    if (deckTag && !(prospect as any).deck_sent) {
+      // Double-check deck_sent from fresh DB to prevent race condition duplicates
+      const { data: freshDeck } = await supabase
+        .from('wa_prospects')
+        .select('deck_sent')
+        .eq('id', prospect.id)
+        .maybeSingle();
+      if (!freshDeck?.deck_sent) {
+        enqueueWAAction(phone, 'send_deck', {
+          prospectId: prospect.id,
+          profileName: profileName || phone,
+        }, 7).catch(err => console.error('[auto-sales-deck] Enqueue error:', err));
+      }
     }
 
     // 7. FIRE & FORGET: async extraction + scoring + HubSpot push
@@ -886,9 +882,20 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
 
     return c.text(twiml, 200, { 'Content-Type': 'text/xml' });
 
+    } catch (postPipelineErr) {
+      // Post-pipeline failed (tag detection, splitting, or DB save)
+      // We still have replyText from the pipeline — send it raw
+      console.error('[steve-wa-chat] Post-pipeline error, sending raw reply:', postPipelineErr);
+      const safeReply = (replyText || 'Perdón, tuve un problema. ¿Me puedes repetir eso?')
+        .replace(/\[[A-Z_]+(?::[^\]]*)?\]/g, '') // strip any leaked tags
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const fallbackTwiml = `<Response><Message>${safeReply}</Message></Response>`;
+      return c.text(fallbackTwiml, 200, { 'Content-Type': 'text/xml' });
+    }
+
   } catch (error: any) {
     console.error('[steve-wa-chat] Prospect handler error:', error);
-    const twiml = `<Response><Message>Hola! Soy Steve 🐕 el asistente de marketing de Steve Ads. Visita steve.cl para conocer más!</Message></Response>`;
+    const twiml = `<Response><Message>Perdón, tuve un problema técnico. ¿Me puedes repetir eso? Si prefieres hablar con alguien del equipo: meetings.hubspot.com/jose-manuel15</Message></Response>`;
     return c.text(twiml, 200, { 'Content-Type': 'text/xml' });
   }
 }
@@ -935,11 +942,11 @@ async function processProspectAsync(
       console.error('[steve-investigator] Error:', err);
     });
 
-    // Paso 10: Skip extraction if < 3 inbound messages (not enough info in "Hola" and "sí")
+    // Paso 10: Extract every 3rd inbound message (not every message — reduces API calls & duplicates)
     const inboundCount = history.filter(m => m.role === 'user').length;
 
     let extracted: Record<string, any> | null = null;
-    if (inboundCount >= 3) {
+    if (inboundCount >= 3 && inboundCount % 3 === 0) {
       extracted = await extractProspectInfo(history, prospect);
     }
 
@@ -980,13 +987,27 @@ async function processProspectAsync(
           }
         }
 
-        // For arrays, merge with existing
+        // For arrays, merge with case-insensitive dedup
         if (Array.isArray(newVal) && Array.isArray(existingVal)) {
-          merged[field] = [...new Set([...existingVal, ...newVal])];
+          const seen = new Set(existingVal.map((v: string) => String(v).toLowerCase().trim()));
+          const deduped = [...existingVal];
+          for (const item of newVal) {
+            const key = String(item).toLowerCase().trim();
+            if (!seen.has(key)) {
+              deduped.push(item);
+              seen.add(key);
+            }
+          }
+          merged[field] = deduped;
         } else {
           merged[field] = newVal;
         }
       }
+    }
+
+    // Consolidate pain points if too many (semantic dedup via Haiku)
+    if (merged.pain_points && Array.isArray(merged.pain_points) && merged.pain_points.length > 8) {
+      merged.pain_points = await consolidatePainPoints(merged.pain_points);
     }
 
     // Calculate lead score with merged data

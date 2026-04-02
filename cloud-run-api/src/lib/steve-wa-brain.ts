@@ -269,8 +269,8 @@ PROHIBIDO:
 - PUEDES decir "te preparo una presentación personalizada" o "te armo un ejemplo" porque la cola de tareas lo respalda y se entrega automáticamente.
 - PROHIBIDO: "dame un minuto", "déjame revisar", "voy a checkear"
 - Si no tienes datos de su tienda → NO FINJAS que la revisaste. Pide el link o habla de su industria.
-- Si se genera algo (mockup, caso de éxito, deck, video demo), se envía automáticamente como mensaje separado.
-- Si piden ver una demo → puedes ofrecer enviarles un video demo de la plataforma incluyendo [SEND_VIDEO_DEMO] al final.
+- Si se genera algo (mockup, caso de éxito, deck), se envía automáticamente como mensaje separado.
+- Si piden ver una demo en vivo → redirige a agendar reunión: "En 15 min te muestro Steve con tus datos reales: meetings.hubspot.com/jose-manuel15"
 
 PRESENTACIONES Y DECKS — REGLAS ANTI-STALLING:
 - Cuando prometas una presentación/deck, dilo UNA sola vez: "Te la envío por acá en unos minutos."
@@ -352,6 +352,12 @@ Responde en texto plano, máximo 3 líneas. Si no hay info suficiente, haz una h
 /**
  * Load relevant knowledge base rules based on keyword matching in the user's message.
  * When includeProspecting is true, also loads category 'prospecting'.
+ *
+ * Now also:
+ * - Filters by approval_status = 'approved' (only validated rules)
+ * - Orders by quality_score desc (best rules first)
+ * - Loads steve_bugs matching categories (anti-patterns to avoid)
+ * - Expands category detection for sales conversations
  */
 export async function loadRelevantKnowledge(
   userMessage: string,
@@ -362,23 +368,27 @@ export async function loadRelevantKnowledge(
 
   const categories: string[] = ['brief'];
 
-  if (msg.includes('meta') || msg.includes('anuncio') || msg.includes('campaña') || msg.includes('ads') || msg.includes('publicidad')) {
+  if (msg.includes('meta') || msg.includes('anuncio') || msg.includes('campaña') || msg.includes('ads') || msg.includes('publicidad') || msg.includes('facebook') || msg.includes('instagram') || msg.includes('redes')) {
     categories.push('meta_ads', 'anuncios');
   }
-  if (msg.includes('shopify') || msg.includes('tienda') || msg.includes('producto') || msg.includes('inventario')) {
+  if (msg.includes('shopify') || msg.includes('tienda') || msg.includes('producto') || msg.includes('inventario') || msg.includes('ecommerce') || msg.includes('e-commerce') || msg.includes('ventas online')) {
     categories.push('shopify');
   }
-  if (msg.includes('email') || msg.includes('klaviyo') || msg.includes('flujo') || msg.includes('template')) {
+  if (msg.includes('email') || msg.includes('klaviyo') || msg.includes('flujo') || msg.includes('template') || msg.includes('correo') || msg.includes('newsletter') || msg.includes('mailchimp')) {
     categories.push('klaviyo');
   }
-  if (msg.includes('google') || msg.includes('search') || msg.includes('display')) {
+  if (msg.includes('google') || msg.includes('search') || msg.includes('display') || msg.includes('shopping') || msg.includes('ppc')) {
     categories.push('google_ads');
   }
-  if (msg.includes('buyer') || msg.includes('cliente') || msg.includes('audiencia') || msg.includes('persona')) {
+  if (msg.includes('buyer') || msg.includes('cliente') || msg.includes('audiencia') || msg.includes('persona') || msg.includes('segmento') || msg.includes('target')) {
     categories.push('buyer_persona');
   }
-  if (msg.includes('seo') || msg.includes('posicionamiento')) {
+  if (msg.includes('seo') || msg.includes('posicionamiento') || msg.includes('orgánico') || msg.includes('organico')) {
     categories.push('seo');
+  }
+  // New: load analisis (discovered patterns) when prospect asks about results/data
+  if (msg.includes('resultado') || msg.includes('funciona') || msg.includes('caso') || msg.includes('éxito') || msg.includes('exito') || msg.includes('ejemplo') || msg.includes('dato') || msg.includes('métrica') || msg.includes('metrica')) {
+    categories.push('analisis');
   }
   if (includeProspecting) {
     categories.push('prospecting');
@@ -386,24 +396,46 @@ export async function loadRelevantKnowledge(
 
   const uniqueCategories = [...new Set(categories)];
 
-  const { data: knowledge } = await supabase
-    .from('steve_knowledge')
-    .select('id, categoria, titulo, contenido')
-    .in('categoria', uniqueCategories)
-    .eq('activo', true)
-    .order('orden', { ascending: false })
-    .limit(10);
+  // Load knowledge rules — filtered by approved + ordered by quality_score
+  const [{ data: knowledge }, { data: bugs }] = await Promise.all([
+    supabase
+      .from('steve_knowledge')
+      .select('id, categoria, titulo, contenido')
+      .in('categoria', uniqueCategories)
+      .eq('activo', true)
+      .eq('approval_status', 'approved')
+      .order('quality_score', { ascending: false })
+      .order('orden', { ascending: false })
+      .limit(10),
+    supabase
+      .from('steve_bugs')
+      .select('descripcion, ejemplo_malo, ejemplo_bueno')
+      .in('categoria', uniqueCategories)
+      .eq('activo', true)
+      .limit(8),
+  ]);
 
-  if (!knowledge || knowledge.length === 0) return '';
+  let result = '';
 
-  let result = 'CONOCIMIENTO DE STEVE:\n';
-  for (const rule of knowledge) {
-    result += `### [${(rule.categoria || '').toUpperCase()}] ${rule.titulo || ''}\n`;
-    result += `${rule.contenido || ''}\n\n`;
+  if (knowledge && knowledge.length > 0) {
+    result += 'CONOCIMIENTO DE STEVE:\n';
+    for (const rule of knowledge) {
+      result += `### [${(rule.categoria || '').toUpperCase()}] ${rule.titulo || ''}\n`;
+      result += `${rule.contenido || ''}\n\n`;
+    }
   }
 
-  if (result.length > 3000) {
-    result = result.slice(0, 2997) + '...';
+  if (bugs && bugs.length > 0) {
+    result += '\nERRORES CONOCIDOS — EVITAR OBLIGATORIAMENTE:\n';
+    for (const bug of bugs) {
+      result += `❌ ${bug.descripcion}`;
+      if (bug.ejemplo_bueno) result += ` → CORRECTO: ${bug.ejemplo_bueno}`;
+      result += '\n';
+    }
+  }
+
+  if (result.length > 3500) {
+    result = result.slice(0, 3497) + '...';
   }
 
   return result;
@@ -933,6 +965,72 @@ export async function loadIndustryCaseStudy(whatTheySell: string | null | undefi
 }
 
 // ---------------------------------------------------------------------------
+// Creative performance insights (real social proof for sales)
+// ---------------------------------------------------------------------------
+
+/**
+ * Load aggregated creative performance insights from creative_history.
+ * Returns a short text block with real data Steve can cite in sales conversations.
+ * Only loads data with measured performance (not pending).
+ */
+export async function loadCreativeInsights(): Promise<string> {
+  const supabase = getSupabaseAdmin();
+
+  try {
+    // Get top-performing creatives with real metrics (last 90 days)
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000).toISOString();
+    const { data: topCreatives } = await supabase
+      .from('creative_history')
+      .select('channel, angle, performance_verdict, meta_roas, meta_ctr, meta_cpa, klaviyo_open_rate, klaviyo_click_rate, performance_score')
+      .not('measured_at', 'is', null)
+      .gte('created_at', ninetyDaysAgo)
+      .order('performance_score', { ascending: false })
+      .limit(30);
+
+    if (!topCreatives || topCreatives.length < 3) return '';
+
+    // Aggregate by channel
+    const metaCreatives = topCreatives.filter(c => c.channel === 'meta' && c.meta_roas);
+    const emailCreatives = topCreatives.filter(c => c.channel === 'email' && c.klaviyo_open_rate);
+
+    const lines: string[] = [];
+
+    if (metaCreatives.length >= 3) {
+      const avgRoas = metaCreatives.reduce((s, c) => s + (Number(c.meta_roas) || 0), 0) / metaCreatives.length;
+      const avgCtr = metaCreatives.reduce((s, c) => s + (Number(c.meta_ctr) || 0), 0) / metaCreatives.length;
+      if (avgRoas > 0) lines.push(`Meta Ads: ROAS promedio ${avgRoas.toFixed(1)}x, CTR ${(avgCtr * 100).toFixed(1)}% (${metaCreatives.length} campañas medidas)`);
+
+      // Top angle
+      const angles = metaCreatives.filter(c => c.angle).map(c => c.angle!);
+      if (angles.length > 0) {
+        const angleCounts: Record<string, number> = {};
+        for (const a of angles) angleCounts[a] = (angleCounts[a] || 0) + 1;
+        const topAngle = Object.entries(angleCounts).sort((a, b) => b[1] - a[1])[0];
+        if (topAngle) lines.push(`Ángulo más usado en Meta: "${topAngle[0]}" (${topAngle[1]} veces)`);
+      }
+    }
+
+    if (emailCreatives.length >= 3) {
+      const avgOpen = emailCreatives.reduce((s, c) => s + (Number(c.klaviyo_open_rate) || 0), 0) / emailCreatives.length;
+      const avgClick = emailCreatives.reduce((s, c) => s + (Number(c.klaviyo_click_rate) || 0), 0) / emailCreatives.length;
+      if (avgOpen > 0) lines.push(`Email: open rate ${(avgOpen * 100).toFixed(1)}%, click rate ${(avgClick * 100).toFixed(1)}% (${emailCreatives.length} campañas)`);
+    }
+
+    // Verdicts summary
+    const buenos = topCreatives.filter(c => c.performance_verdict === 'bueno').length;
+    const total = topCreatives.length;
+    if (total > 5) lines.push(`${buenos}/${total} creativos evaluados como "buenos" en los últimos 90 días`);
+
+    if (lines.length === 0) return '';
+
+    return `\n📈 DATOS CREATIVOS REALES DE LA PLATAFORMA (usa como social proof — son datos REALES, no inventados):\n${lines.map(l => `- ${l}`).join('\n')}`;
+  } catch (err) {
+    console.error('[creative-insights] Error loading:', err);
+    return '';
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Sales learnings & investigation context loaders
 // ---------------------------------------------------------------------------
 
@@ -1098,27 +1196,33 @@ export async function buildDynamicSalesPrompt(
   // Track all rule IDs used in this prompt
   const collectedRuleIds: string[] = [];
 
-  // Load only the current stage rule (not all rules)
-  const { data: rules } = await supabase
-    .from('steve_knowledge')
-    .select('id, titulo, contenido, orden')
-    .eq('categoria', 'prospecting')
-    .eq('activo', true)
-    .order('orden', { ascending: true });
+  // Load stage rules + corrections + sales bugs in parallel
+  const [{ data: rules }, { data: corrections }, { data: salesBugs }] = await Promise.all([
+    supabase
+      .from('steve_knowledge')
+      .select('id, titulo, contenido, orden')
+      .eq('categoria', 'prospecting')
+      .eq('activo', true)
+      .order('orden', { ascending: true }),
+    supabase
+      .from('steve_knowledge')
+      .select('id, titulo, contenido, orden')
+      .eq('categoria', 'prospecting')
+      .eq('activo', true)
+      .ilike('titulo', 'CORRECCION:%')
+      .gte('orden', 90)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    supabase
+      .from('steve_bugs')
+      .select('descripcion, ejemplo_malo, ejemplo_bueno')
+      .in('categoria', ['prospecting', 'meta_ads', 'anuncios', 'brief'])
+      .eq('activo', true)
+      .limit(10),
+  ]);
 
   const stageRule = (rules || []).find(r => r.titulo?.toLowerCase().includes(effectiveStage));
   if (stageRule?.id) collectedRuleIds.push(stageRule.id);
-
-  // Load recent corrections (CORRECCION: rules with high priority)
-  const { data: corrections } = await supabase
-    .from('steve_knowledge')
-    .select('id, titulo, contenido, orden')
-    .eq('categoria', 'prospecting')
-    .eq('activo', true)
-    .ilike('titulo', 'CORRECCION:%')
-    .gte('orden', 90)
-    .order('created_at', { ascending: false })
-    .limit(5);
 
   if (corrections?.length) {
     for (const c of corrections) {
@@ -1177,11 +1281,12 @@ export async function buildDynamicSalesPrompt(
   if (prospect.meeting_link_sent) known.push('Link de reunión ya enviado: Sí');
 
   // ============================================================
-  // Load sales learnings + investigation context (parallel)
+  // Load sales learnings + investigation + creative insights (parallel)
   // ============================================================
-  const [salesLearningsResult, investigationText] = await Promise.all([
+  const [salesLearningsResult, investigationText, creativeInsightsText] = await Promise.all([
     loadSalesLearnings(prospect.what_they_sell),
     loadInvestigationContext(prospect.id),
+    loadCreativeInsights(),
   ]);
   const salesLearningsText = salesLearningsResult.text;
   if (salesLearningsResult.ruleIds.length > 0) {
@@ -1203,6 +1308,17 @@ export async function buildDynamicSalesPrompt(
     for (const c of corrections) {
       prompt += `### ${c.titulo}\n${c.contenido}\n\n`;
     }
+  }
+
+  // 0.1 KNOWN BUGS — anti-patterns Steve must avoid
+  if (salesBugs?.length) {
+    prompt += `🚫 ERRORES CONOCIDOS — EVITAR OBLIGATORIAMENTE:\n`;
+    for (const bug of salesBugs) {
+      prompt += `❌ ${bug.descripcion}`;
+      if (bug.ejemplo_bueno) prompt += ` → CORRECTO: ${bug.ejemplo_bueno}`;
+      prompt += '\n';
+    }
+    prompt += '\n';
   }
 
   // 0. STRATEGIST BRIEF (injected by multi-brain pipeline)
@@ -1391,12 +1507,18 @@ export async function buildDynamicSalesPrompt(
     prompt += `\n\n📊 DECK: Si quieres enviarle una propuesta comercial personalizada, incluye [SEND_DECK] al final de tu mensaje. Se genera automáticamente con sus datos.`;
   }
 
-  // Video demo trigger — available in any stage if prospect asks to see the platform
-  prompt += `\n\n🎬 VIDEO DEMO: Si el prospecto pide ver cómo funciona Steve, ver una demo, o quiere que le muestres la plataforma, incluye [SEND_VIDEO_DEMO] al final de tu mensaje. Se enviará un link al video demo automáticamente.`;
+  // Demo requests → redirect to meeting (no video demo available yet)
+  prompt += `\n\n🎬 DEMO: Si el prospecto pide ver una demo, screenshot, o cómo funciona Steve → NO prometas enviar video ni screenshots. Redirige a la reunión: "En 15 min te muestro Steve con TUS datos reales conectados: meetings.hubspot.com/jose-manuel15"`;
+
 
   // Sales learnings from past conversations
   if (salesLearningsText) {
     prompt += salesLearningsText;
+  }
+
+  // Creative performance insights (real social proof)
+  if (creativeInsightsText) {
+    prompt += creativeInsightsText;
   }
 
   // 4. PERSONALITY (short)
@@ -1473,6 +1595,72 @@ Si ya mencionaste una fecha comercial, NO la repitas. Si ya hablaste de CPA, hab
 }
 
 // ---------------------------------------------------------------------------
+// Pain points consolidation (semantic dedup via Haiku)
+// ---------------------------------------------------------------------------
+
+/**
+ * Consolidate pain points by removing semantic duplicates.
+ * Uses Haiku to identify items that express the same frustration with different words.
+ * Returns deduplicated array (max 8 items). Falls back to slice(-8) on error.
+ */
+export async function consolidatePainPoints(painPoints: string[]): Promise<string[]> {
+  if (painPoints.length <= 8) return painPoints;
+
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!ANTHROPIC_API_KEY) return painPoints.slice(-8);
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        messages: [{
+          role: 'user',
+          content: `Consolida estos pain points eliminando duplicados semánticos. Dos items son duplicados si expresan la MISMA frustración con distintas palabras.
+
+Pain points actuales:
+${JSON.stringify(painPoints)}
+
+Reglas:
+- Máximo 8 items únicos en el resultado
+- Si dos items dicen lo mismo, quédate con la versión más específica/detallada
+- Mantén el texto original (no reescribas)
+- Responde SOLO con un JSON array, sin explicación
+
+Ejemplo:
+["pierde plata en ads", "está perdiendo dinero en publicidad", "no sabe medir ROI"]
+→ ["está perdiendo dinero en publicidad", "no sabe medir ROI"]`,
+        }],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('[consolidatePainPoints] API error:', response.status);
+      return painPoints.slice(-8);
+    }
+
+    const data: any = await response.json();
+    const text = (data.content?.[0]?.text || '').trim();
+    const jsonStr = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const parsed = JSON.parse(jsonStr);
+
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.slice(0, 8);
+    }
+    return painPoints.slice(-8);
+  } catch (err) {
+    console.error('[consolidatePainPoints] Error:', err);
+    return painPoints.slice(-8);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Prospect info extraction (async, post-response)
 // ---------------------------------------------------------------------------
 
@@ -1495,12 +1683,24 @@ export async function extractProspectInfo(
     .map(m => `${m.role === 'user' ? 'Prospecto' : 'Steve'}: ${m.content}`)
     .join('\n');
 
+  const existingPainPoints = currentProspect.pain_points || [];
   const extractionPrompt = `Eres un extractor de información. Analiza la CONVERSACIÓN COMPLETA y extrae SOLO lo que el PROSPECTO dijo EXPLÍCITAMENTE.
 REGLAS ESTRICTAS:
 - Solo extrae datos que el PROSPECTO confirmó directamente.
 - Si Steve preguntó algo y el prospecto NO respondió → no asumas.
 - Si el prospecto corrigió algo (ej: "no, en realidad vendo artesanías") → usa la ÚLTIMA versión.
 - NO inventes, NO asumas, NO infieras datos vagos.
+
+REGLA CRÍTICA SOBRE PAIN_POINTS:
+Los pain_points YA REGISTRADOS son: ${JSON.stringify(existingPainPoints)}
+- COMPARA cada candidato contra CADA item existente antes de incluirlo
+- Si expresa la MISMA frustración con otras palabras → NO LO INCLUYAS
+- Ejemplos de duplicados semánticos (NO incluir):
+  * "pierde plata en ads" ≈ "está perdiendo dinero en publicidad" → MISMO DOLOR
+  * "no sabe si los ads funcionan" ≈ "no puede medir resultados" → MISMO DOLOR
+  * "no tiene tiempo" ≈ "le falta tiempo para marketing" → MISMO DOLOR
+- Si no hay dolores genuinamente NUEVOS y DISTINTOS → devuelve pain_points como array vacío []
+- MÁXIMO 3 pain_points nuevos por extracción
 
 CONVERSACIÓN:
 ${conversation}
@@ -1513,6 +1713,7 @@ ${JSON.stringify({
     monthly_revenue: currentProspect.monthly_revenue,
     store_platform: currentProspect.store_platform,
     current_marketing: currentProspect.current_marketing,
+    pain_points: existingPainPoints,
   })}
 
 Responde ÚNICAMENTE con un JSON válido (sin markdown, sin explicación). Solo incluye campos con info EXPLÍCITA nueva:
@@ -1527,7 +1728,7 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown, sin explicación). Solo 
   "is_decision_maker": true/false — solo si dijo 'soy el dueño/fundador/CEO',
   "actively_looking": true/false — solo si expresó búsqueda activa,
   "current_marketing": "cómo manejan marketing — solo si lo describió",
-  "pain_points": ["dolor1"] — solo frustraciones que el prospecto EXPRESÓ,
+  "pain_points": ["dolor genuinamente NUEVO"] — solo si NO está ya cubierto semánticamente en la lista existente. Si no hay nuevos → [],
   "integrations_used": ["Meta"] — solo herramientas que el prospecto NOMBRÓ,
   "team_size": "tamaño del equipo — solo si lo mencionó",
   "budget_range": "presupuesto de marketing mensual — solo si dio rango o cifra (ej: '$500K/mes', 'entre 1-2 millones')",
