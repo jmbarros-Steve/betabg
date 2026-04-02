@@ -9,6 +9,7 @@
  */
 
 import { getSupabaseAdmin } from './supabase.js';
+import { anthropicFetch } from './anthropic-fetch.js';
 import type { ProspectRecord } from './steve-wa-brain.js';
 
 // ---------------------------------------------------------------------------
@@ -19,6 +20,7 @@ export interface InvestigatorResult {
   investigationContext: string;
   competitorInsights: string;
   salesLearnings: string;
+  ruleIds: string[];
 }
 
 export interface StrategistResult {
@@ -45,6 +47,7 @@ export async function runInvestigator(
     investigationContext: '',
     competitorInsights: '',
     salesLearnings: '',
+    ruleIds: [],
   };
 
   try {
@@ -117,7 +120,7 @@ export async function runInvestigator(
     // 3. Load sales learnings from steve_knowledge
     const { data: learnings } = await supabase
       .from('steve_knowledge')
-      .select('titulo, contenido')
+      .select('id, titulo, contenido')
       .eq('categoria', 'sales_learning')
       .eq('activo', true)
       .order('created_at', { ascending: false })
@@ -135,6 +138,7 @@ export async function runInvestigator(
       const toUse = relevant.length > 0 ? relevant.slice(0, 3) : learnings.slice(0, 2);
       if (toUse.length > 0) {
         result.salesLearnings = `APRENDIZAJES DE VENTAS PASADAS:\n${toUse.map((l: any) => `- ${l.titulo}: ${(l.contenido || '').slice(0, 200)}`).join('\n')}`;
+        result.ruleIds.push(...toUse.map((l: any) => l.id).filter(Boolean));
       }
     }
   } catch (err) {
@@ -195,26 +199,20 @@ Responde SOLO con un JSON (sin markdown):
   "tone": "una de: empathetic | confident | casual | urgent | provocative"
 }`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
+    const { ok, data, status } = await anthropicFetch(
+      {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 200,
         messages: [{ role: 'user', content: prompt }],
-      }),
-    });
+      },
+      ANTHROPIC_API_KEY,
+    );
 
-    if (!response.ok) {
-      console.error('[multi-brain/strategist] API error:', response.status);
+    if (!ok) {
+      console.error('[multi-brain/strategist] API error:', status);
       return { brief: '', suggestedAction: 'continue_discovery', tone: 'friendly' };
     }
 
-    const data: any = await response.json();
     const text = (data.content?.[0]?.text || '').trim();
     const jsonStr = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
     const parsed = JSON.parse(jsonStr);
@@ -261,27 +259,21 @@ Tono: ${strategistBrief.tone}
 ${dynamicPrompt}`;
     }
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
+    const { ok, data, status } = await anthropicFetch(
+      {
         model: 'claude-sonnet-4-6',
         max_tokens: 800,
         system: systemPrompt,
         messages: sanitizedMessages,
-      }),
-    });
+      },
+      ANTHROPIC_API_KEY,
+    );
 
-    if (!response.ok) {
-      console.error('[multi-brain/conversationalist] API error:', response.status);
+    if (!ok) {
+      console.error('[multi-brain/conversationalist] API error:', status);
       return 'Hola! Soy Steve 🐕 Tu asistente de marketing AI. ¿En qué te puedo ayudar?';
     }
 
-    const data: any = await response.json();
     const rawMsg = data.content?.[0]?.text || '';
     return rawMsg
       .replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '')

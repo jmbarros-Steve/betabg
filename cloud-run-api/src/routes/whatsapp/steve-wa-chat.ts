@@ -30,6 +30,7 @@ import { generateAndSendSalesDeck } from '../../lib/steve-sales-deck.js';
 import { enqueueWAAction } from '../../lib/wa-task-queue.js';
 import { scrubPII } from '../../lib/pii-scrubber.js';
 import { isSupportedAudio, transcribeAudio } from '../../lib/audio-transcriber.js';
+import { anthropicFetch } from '../../lib/anthropic-fetch.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 
@@ -300,28 +301,22 @@ export async function steveWAChat(c: Context) {
 
     const systemPrompt = `${WA_SYSTEM_PROMPT}\n\n${merchantContext}`;
 
-    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
+    const { ok: aiOk, data: aiData, status: aiStatus } = await anthropicFetch(
+      {
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
         system: systemPrompt.slice(0, 12000),
         messages: sanitized,
-      }),
-    });
+      },
+      ANTHROPIC_API_KEY,
+    );
 
     let replyText: string;
 
-    if (!aiResponse.ok) {
-      console.error('[steve-wa-chat] Claude API error:', aiResponse.status);
+    if (!aiOk) {
+      console.error('[steve-wa-chat] Claude API error:', aiStatus);
       replyText = 'Perdón, tuve un momento de confusión 🐕 ¿Me repites eso?';
     } else {
-      const aiData: any = await aiResponse.json();
       const rawMsg = aiData.content?.[0]?.text || '';
       replyText = rawMsg
         .replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '')
@@ -632,25 +627,19 @@ async function handleProspect(
       console.error('[steve-wa-chat] Multi-brain pipeline failed, using fallback:', multiBrainErr);
       const promptResult = await buildDynamicSalesPrompt(prospect, messageBody, history, undefined, quickIntel);
       collectedRuleIds = promptResult.ruleIds;
-      const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { ok: fbOk, data: fbData } = await anthropicFetch(
+        {
           model: 'claude-sonnet-4-6',
           max_tokens: 800,
           system: promptResult.prompt,
           messages: sanitized,
-        }),
-      });
-      if (!aiResponse.ok) {
+        },
+        ANTHROPIC_API_KEY,
+      );
+      if (!fbOk) {
         replyText = 'Perdón, tuve un problema procesando tu mensaje. ¿Me lo puedes repetir?';
       } else {
-        const aiData: any = await aiResponse.json();
-        const rawMsg = aiData.content?.[0]?.text || '';
+        const rawMsg = fbData.content?.[0]?.text || '';
         replyText = rawMsg
           .replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '')
           .trim() || 'Perdón, no pude procesar bien tu mensaje. ¿Me lo repites?';
