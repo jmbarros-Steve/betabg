@@ -19,6 +19,7 @@
     "@supabase/supabase-js": "^2.90.1",
     "hono": "^4.6.0",
     "nunjucks": "^3.2.4",
+    "puppeteer": "^24.2.0",
     "resend": "^6.9.3",
     "twilio": "^5.13.0"
   },

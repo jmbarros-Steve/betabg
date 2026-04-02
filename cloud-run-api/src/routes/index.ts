@@ -169,6 +169,13 @@ import { approveRulesPublic } from './public/approve-rules-public.js';
 import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
 import { competitorSpy } from './triggers/competitor-spy.js';
 
+// El Chino — Check System + Fix Queue + Fixer + Reports
+import {
+  chinoRun, chinoReport, chinoLatest, chinoFailures,
+  chinoFixNext, chinoFixDone, chinoFixFailed,
+  chinoFixer, chinoReportSend, chinoInstruction,
+} from '../chino/endpoints.js';
+
 // Phase 4: Auth
 import { selfSignup } from './auth/self-signup.js';
 import { adminCreateClient } from './auth/admin-create-client.js';
@@ -492,4 +499,22 @@ export function registerRoutes(app: Hono) {
   // Public approval API (token-based, no JWT)
   app.get('/api/approve-rules-public', approveRulesPublic);
   app.post('/api/approve-rules-public', approveRulesPublic);
+
+  // ============================================================
+  // El Chino — Automated Check System
+  // ============================================================
+  app.post('/api/chino/run', chinoRun);           // No JWT — uses X-Cron-Secret
+  app.get('/api/chino/report', chinoReport);       // No JWT — uses X-Cron-Secret
+  app.get('/api/chino/latest', chinoLatest);       // No JWT — uses X-Cron-Secret
+  app.get('/api/chino/failures', chinoFailures);   // No JWT — uses X-Cron-Secret
+
+  // El Chino — Fix Queue (agents take and report fixes)
+  app.get('/api/chino/fixes/next', chinoFixNext);           // No JWT — uses X-Cron-Secret
+  app.post('/api/chino/fixes/:id/done', chinoFixDone);      // No JWT — uses X-Cron-Secret
+  app.post('/api/chino/fixes/:id/failed', chinoFixFailed);  // No JWT — uses X-Cron-Secret
+
+  // El Chino — Fixer loop + WhatsApp reports + Instructions
+  app.post('/api/chino/fixer', chinoFixer);                 // No JWT — X-Cron-Secret, every 5-10 min
+  app.post('/api/chino/report/send', chinoReportSend);      // No JWT — X-Cron-Secret, every 6h
+  app.post('/api/chino/instruction', chinoInstruction);      // No JWT — X-Cron-Secret
 }
