@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 
 // ---------------------------------------------------------------------------
 // Scope → Feature mapping
@@ -90,16 +91,16 @@ export function useMetaScopes(clientId: string) {
       setNoConnection(false);
       setConnectionId(conns[0].id);
 
-      // Call edge function
+      // Call Cloud Run API
       let data: any = null;
       try {
-        const result = await supabase.functions.invoke('check-meta-scopes', {
+        const { data: result, error: apiError } = await callApi('check-meta-scopes', {
           body: { connection_id: conns[0].id },
         });
-        if (result.error) {
+        if (apiError || !result) {
           return; // scopeDataLoaded stays false → panel hidden
         }
-        data = result.data;
+        data = result;
       } catch {
         return; // scopeDataLoaded stays false → panel hidden
       }
