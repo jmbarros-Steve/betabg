@@ -552,7 +552,7 @@ async function handleProspect(
       return c.text(twiml, 200, { 'Content-Type': 'text/xml' });
     }
 
-    let replyText: string;
+    let replyText = '';
     let collectedRuleIds: string[] = [];
     let skipMultiBrain = false;
 
