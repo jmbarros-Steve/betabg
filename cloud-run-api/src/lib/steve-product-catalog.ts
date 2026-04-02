@@ -192,13 +192,17 @@ export const MODULOS: FeatureModule[] = [
     ],
   },
   {
-    nombre: 'Instagram',
-    descripcion: 'Conecta tu cuenta de Instagram y ve métricas, analiza contenido y publica directo desde Steve.',
-    planMinimo: 'Visual (ver) / Full (publicar)',
+    nombre: 'Instagram Publisher',
+    descripcion: 'Publica contenido en Instagram directo desde Steve: fotos, carruseles, Reels y Stories. Genera captions con IA y programa publicaciones.',
+    planMinimo: 'Visual (ver métricas) / Full (publicar)',
     highlights: [
-      'Métricas de feed e insights',
+      'Publicar fotos, carruseles (hasta 10 imágenes), Reels y Stories',
+      'Programar publicaciones para fecha/hora futura',
+      'Generación de captions y hashtags con IA (basado en tu brand brief)',
+      'Subir imágenes o generarlas con IA desde Steve',
+      'Preview tipo Instagram antes de publicar',
+      'Métricas de feed e insights (plan Visual+)',
       'Análisis de contenido con IA (plan Estrategia+)',
-      'Publicar contenido directo (plan Full)',
     ],
   },
 ];
@@ -228,7 +232,16 @@ REGLAS DE PRODUCTO:
 - Si preguntan por WhatsApp Marketing → Steve tiene inbox, campañas masivas, carrito abandonado automático (plan Full)
 - Si preguntan por Steve Mail / email → Steve tiene email marketing nativo con editor drag & drop, flujos y A/B testing (plan Full)
 - Si preguntan por videos → Steve genera videos AI cortos para Reels/Stories (plan Full)
+- Si preguntan por Instagram → Steve SÍ PUEDE publicar en Instagram: fotos, carruseles, Reels y Stories con captions AI y scheduling (plan Full). También ve métricas (plan Visual+)
 - Si preguntan por precio → Siempre menciona el precio con descuento de lanzamiento (50% OFF)
 - Si preguntan por algo que NO está en el catálogo → Di honestamente que no lo tenemos aún
-- NUNCA inventes módulos, integraciones o features que no estén listados arriba`;
+- NUNCA inventes módulos, integraciones o features que no estén listados arriba
+
+CÓMO SE CONTRATA (MUY IMPORTANTE — NO digas que pueden comprar directo en steve.cl):
+- El flujo principal es AGENDAR UNA REUNIÓN de 15 min: meetings.hubspot.com/jose-manuel15
+- En la reunión se hace la demo, se elige plan y se activa la cuenta
+- NO digas "entra a steve.cl/planes y compra" ni "paga en steve.cl" — eso NO existe como self-service
+- Si quieren contratar YA → "Agenda una reunión rápida de 15 min y te activamos la cuenta al toque"
+- Si preguntan por formas de pago → "Eso lo vemos en la reunión, aceptamos tarjeta y transferencia"
+- NUNCA pidas datos de pago por WhatsApp`;
 }
