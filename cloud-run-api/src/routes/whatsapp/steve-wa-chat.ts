@@ -628,22 +628,46 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       } catch {} // If fix fails, use original
     }
 
-    // Paso 6: Double text — split on [SPLIT]
+    // ============================================================
+    // STEP A: Strip ALL action tags FIRST (before TwiML or DB save)
+    // ============================================================
+    const fullText = replyText;
+
+    // Detect tags before stripping
+    const copyMatch = fullText.match(/\[GENERATE_COPY:([^\]]+)\]/);
+    const caseStudyTag = fullText.includes('[SEND_CASE_STUDY]');
+    const mockupTag = fullText.includes('[SEND_MOCKUP]');
+    const deckTag = fullText.includes('[SEND_DECK]');
+    const videoDemoTag = fullText.includes('[SEND_VIDEO_DEMO]');
+
+    // Strip ALL tags from the reply text
+    replyText = replyText
+      .replace(/\[SPLIT\]/g, '|||SPLIT|||')  // preserve split marker
+      .replace(/\[GENERATE_COPY:[^\]]*\]/g, '')
+      .replace(/\[SEND_CASE_STUDY\]/g, '')
+      .replace(/\[SEND_MOCKUP\]/g, '')
+      .replace(/\[SEND_DECK\]/g, '')
+      .replace(/\[SEND_VIDEO_DEMO\]/g, '')
+      .replace(/\[ACTIVATE_TRIAL:[^\]]*\]/g, '')
+      .replace(/\[[A-Z_]+(?::[^\]]*)?\]/g, '')  // catch any other leaked tags
+      .trim();
+
+    // ============================================================
+    // STEP B: Split into first/second reply
+    // ============================================================
     let firstReply = replyText;
     let secondReply: string | null = null;
-    if (replyText.includes('[SPLIT]')) {
-      const parts = replyText.split('[SPLIT]').map(p => p.trim()).filter(Boolean);
+    if (replyText.includes('|||SPLIT|||')) {
+      const parts = replyText.split('|||SPLIT|||').map(p => p.trim()).filter(Boolean);
       firstReply = parts[0] || replyText;
       secondReply = parts[1] || null;
     }
 
     // Smart split: if a part exceeds 800 chars, break at word boundary
-    // and queue the overflow as additional messages
     const MAX_CHARS = 800;
     if (firstReply.length > MAX_CHARS) {
       const { head, tail } = splitAtWordBoundary(firstReply, MAX_CHARS);
       firstReply = head;
-      // Prepend overflow to secondReply or create it
       if (tail) {
         secondReply = secondReply ? `${tail}\n\n${secondReply}` : tail;
       }
@@ -670,10 +694,12 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       }, 3 + i * 2).catch(err => console.error('[overflow-split] Enqueue error:', err));
     }
 
-    // 5. Save outbound message (first part) with rule tracking metadata
+    // ============================================================
+    // STEP C: Save outbound message (clean text, no tags)
+    // ============================================================
     const outboundMetadata: Record<string, any> = {};
     if (collectedRuleIds.length > 0) {
-      outboundMetadata.rule_ids = [...new Set(collectedRuleIds)]; // dedupe
+      outboundMetadata.rule_ids = [...new Set(collectedRuleIds)];
     }
     outboundMetadata.stage = prospect.stage || 'discovery';
     outboundMetadata.lead_score = prospect.lead_score || 0;
@@ -690,7 +716,7 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       metadata: outboundMetadata,
     });
 
-    // Paso 6: Send second message via task queue (persistent, 2s delay)
+    // Queue second message via task queue (persistent, 2s delay)
     if (secondReply) {
       enqueueWAAction(phone, 'split_message', {
         body: secondReply,
@@ -698,8 +724,9 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       }, 2).catch(err => console.error('[steve-wa-chat] Enqueue split_message error:', err));
     }
 
-    // 6. Reply via TwiML — user gets response HERE
-    // Update rate limit timestamp
+    // ============================================================
+    // STEP D: Build TwiML (clean, no tags, safe for user)
+    // ============================================================
     lastResponseTime.set(phone, Date.now());
 
     const escapedReply = firstReply
@@ -709,46 +736,25 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
 
     const twiml = `<Response><Message>${escapedReply}</Message></Response>`;
 
-    // Paso 20: Wingman — detect [GENERATE_COPY:description] and send copy as extra msg
-    const copyMatch = (firstReply + (secondReply || '')).match(/\[GENERATE_COPY:([^\]]+)\]/);
+    // ============================================================
+    // STEP E: Enqueue async actions from detected tags
+    // ============================================================
     if (copyMatch) {
-      const copyDesc = copyMatch[1].trim();
-      // Remove the tag from the reply
-      firstReply = firstReply.replace(/\[GENERATE_COPY:[^\]]+\]/g, '').trim();
-      if (secondReply) secondReply = secondReply.replace(/\[GENERATE_COPY:[^\]]+\]/g, '').trim();
-
-      // Enqueue copy generation via task queue (persistent, 4s delay)
       enqueueWAAction(phone, 'generate_copy', {
-        copyDescription: copyDesc,
+        copyDescription: copyMatch[1].trim(),
         whatTheySell: prospect.what_they_sell || 'e-commerce',
         profileName: profileName || phone,
       }, 4).catch(err => console.error('[wingman-copy] Enqueue error:', err));
     }
 
-    // Paso: Handle [SEND_CASE_STUDY] tag — send case study with media
-    const caseStudyTag = (firstReply + (secondReply || '')).includes('[SEND_CASE_STUDY]');
     if (caseStudyTag) {
-      firstReply = firstReply.replace(/\[SEND_CASE_STUDY\]/g, '').trim();
-      if (secondReply) secondReply = secondReply.replace(/\[SEND_CASE_STUDY\]/g, '').trim();
-
-      // Enqueue case study delivery via task queue (persistent, 3s delay)
       enqueueWAAction(phone, 'send_case_study', {
         whatTheySell: prospect.what_they_sell || undefined,
         profileName: profileName || phone,
       }, 3).catch(err => console.error('[send-case-study] Enqueue error:', err));
     }
 
-    // Safety: strip any [ACTIVATE_TRIAL] tag if it leaks through (Steve NEVER creates free accounts)
-    firstReply = firstReply.replace(/\[ACTIVATE_TRIAL:[^\]]*\]/g, '').trim();
-    if (secondReply) secondReply = secondReply.replace(/\[ACTIVATE_TRIAL:[^\]]*\]/g, '').trim();
-
-    // Paso: Handle [SEND_MOCKUP] tag — generate and send ad mockup
-    const mockupTag = (firstReply + (secondReply || '')).includes('[SEND_MOCKUP]');
     if (mockupTag) {
-      firstReply = firstReply.replace(/\[SEND_MOCKUP\]/g, '').trim();
-      if (secondReply) secondReply = secondReply.replace(/\[SEND_MOCKUP\]/g, '').trim();
-
-      // Enqueue mockup generation via task queue (persistent, 5s delay)
       enqueueWAAction(phone, 'send_mockup', {
         prospectId: prospect.id,
         profileName: profileName || phone,
@@ -768,12 +774,6 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       }, 5).catch(err => console.error('[auto-mockup] Enqueue error:', err));
     }
 
-    // Cambio 6: Auto-trigger sales deck in pitching stage
-    const deckTag = (firstReply + (secondReply || '')).includes('[SEND_DECK]');
-    if (deckTag) {
-      firstReply = firstReply.replace(/\[SEND_DECK\]/g, '').trim();
-      if (secondReply) secondReply = secondReply.replace(/\[SEND_DECK\]/g, '').trim();
-    }
     if (
       (deckTag || (prospect.stage === 'pitching' || prospect.stage === 'closing')) &&
       prospect.what_they_sell &&
@@ -786,12 +786,7 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       }, 7).catch(err => console.error('[auto-sales-deck] Enqueue error:', err));
     }
 
-    // Handle [SEND_VIDEO_DEMO] tag — send video demo link
-    const videoDemoTag = (firstReply + (secondReply || '')).includes('[SEND_VIDEO_DEMO]');
     if (videoDemoTag) {
-      firstReply = firstReply.replace(/\[SEND_VIDEO_DEMO\]/g, '').trim();
-      if (secondReply) secondReply = secondReply.replace(/\[SEND_VIDEO_DEMO\]/g, '').trim();
-
       enqueueWAAction(phone, 'send_video_demo', {
         profileName: profileName || phone,
       }, 3).catch(err => console.error('[send-video-demo] Enqueue error:', err));

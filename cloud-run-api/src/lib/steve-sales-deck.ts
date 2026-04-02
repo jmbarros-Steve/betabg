@@ -32,9 +32,12 @@ export async function generateAndSendSalesDeck(
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
   const supabase = getSupabaseAdmin();
 
-  if (!ANTHROPIC_API_KEY || !GEMINI_API_KEY) {
-    console.warn('[steve-sales-deck] Missing API keys');
+  if (!ANTHROPIC_API_KEY) {
+    console.warn('[steve-sales-deck] Missing ANTHROPIC_API_KEY');
     return false;
+  }
+  if (!GEMINI_API_KEY) {
+    console.warn('[steve-sales-deck] Missing GEMINI_API_KEY — will use text-only deck');
   }
 
   if (!prospect.id) return false;
@@ -133,7 +136,11 @@ IMPORTANTE: Personaliza TODO con datos reales del prospecto. No seas genérico. 
 
     if (slides.length === 0) return false;
 
-    // 3. Generate deck image with Gemini
+    // 3. Generate deck image with Gemini (or fallback to text if no key)
+    if (!GEMINI_API_KEY) {
+      return await sendTextDeck(phone, slides, companyName, industry, profileName);
+    }
+
     const slideText = slides.map((s, i) =>
       `Slide ${i + 1}: "${s.title}"\n${s.body.map(b => `• ${b}`).join('\n')}`
     ).join('\n\n');
