@@ -127,6 +127,7 @@ import { taskCompleted } from './cron/task-completed.js';
 import { detectiveVisual } from './cron/detective-visual.js';
 import { skyvernDispatcher } from './cron/skyvern-dispatcher.js';
 import { prospectFollowup } from './cron/prospect-followup.js';
+import { meetingReminder } from './cron/meeting-reminder.js';
 import { prospectEmailNurture } from './cron/prospect-email-nurture.js';
 import { knowledgeDecay } from './cron/knowledge-decay.js';
 import { knowledgeConsolidator } from './cron/knowledge-consolidator.js';
@@ -462,6 +463,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/detective-visual', detectiveVisual); // No JWT — uses X-Cron-Secret, every 2h: 0 8,10,12,14,16,18,20 * * *
   app.post('/api/cron/skyvern-dispatcher', skyvernDispatcher); // No JWT — uses X-Cron-Secret, every 2min: */2 * * * *
   app.post('/api/cron/prospect-followup', prospectFollowup); // No JWT — uses X-Cron-Secret, every 4h: 0 */4 * * *
+  app.post('/api/cron/meeting-reminder', meetingReminder); // No JWT — uses X-Cron-Secret, every 30min: */30 * * * *
   app.post('/api/cron/prospect-email-nurture', prospectEmailNurture); // No JWT — uses X-Cron-Secret, daily 1pm UTC (10am Chile): 0 13 * * *
   app.post('/api/cron/knowledge-decay', knowledgeDecay); // No JWT — uses X-Cron-Secret, monthly: 0 4 1 * *
   app.post('/api/cron/knowledge-consolidator', knowledgeConsolidator); // No JWT — monthly: 0 5 1 * * (1st of month, 5am)
@@ -501,20 +503,18 @@ export function registerRoutes(app: Hono) {
   app.post('/api/approve-rules-public', approveRulesPublic);
 
   // ============================================================
-  // El Chino — Automated Check System
+  // El Chino — Automated Check System (sub-router to avoid Hono RegExpRouter limit)
   // ============================================================
-  app.post('/api/chino/run', chinoRun);           // No JWT — uses X-Cron-Secret
-  app.get('/api/chino/report', chinoReport);       // No JWT — uses X-Cron-Secret
-  app.get('/api/chino/latest', chinoLatest);       // No JWT — uses X-Cron-Secret
-  app.get('/api/chino/failures', chinoFailures);   // No JWT — uses X-Cron-Secret
-
-  // El Chino — Fix Queue (agents take and report fixes)
-  app.get('/api/chino/fixes/next', chinoFixNext);           // No JWT — uses X-Cron-Secret
-  app.post('/api/chino/fixes/:id/done', chinoFixDone);      // No JWT — uses X-Cron-Secret
-  app.post('/api/chino/fixes/:id/failed', chinoFixFailed);  // No JWT — uses X-Cron-Secret
-
-  // El Chino — Fixer loop + WhatsApp reports + Instructions
-  app.post('/api/chino/fixer', chinoFixer);                 // No JWT — X-Cron-Secret, every 5-10 min
-  app.post('/api/chino/report/send', chinoReportSend);      // No JWT — X-Cron-Secret, every 6h
-  app.post('/api/chino/instruction', chinoInstruction);      // No JWT — X-Cron-Secret
+  const chino = new Hono();
+  chino.post('/run', chinoRun);
+  chino.get('/report', chinoReport);
+  chino.get('/latest', chinoLatest);
+  chino.get('/failures', chinoFailures);
+  chino.get('/fixes/next', chinoFixNext);
+  chino.post('/fixes/:id/done', chinoFixDone);
+  chino.post('/fixes/:id/failed', chinoFixFailed);
+  chino.post('/fixer', chinoFixer);
+  chino.post('/report/send', chinoReportSend);
+  chino.post('/instruction', chinoInstruction);
+  app.route('/api/chino', chino);
 }
