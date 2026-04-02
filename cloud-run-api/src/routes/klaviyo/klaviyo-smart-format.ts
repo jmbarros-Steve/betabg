@@ -61,7 +61,7 @@ async function loadBrandContext(supabase: any, connectionId: string): Promise<st
       .maybeSingle(),
     supabase
       .from('steve_knowledge')
-      .select('titulo, contenido')
+      .select('id, titulo, contenido')
       .eq('categoria', 'klaviyo')
       .eq('activo', true)
       .order('orden', { ascending: false })

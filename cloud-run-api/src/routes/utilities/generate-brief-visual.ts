@@ -25,7 +25,7 @@ export async function generateBriefVisual(c: Context) {
   const categoria = 'anuncios';
   const [{ data: kbBugs }, { data: kbKnowledge }, { data: adReferences }] = await Promise.all([
     supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoria).eq('activo', true),
-    supabase.from('steve_knowledge').select('titulo, contenido')
+    supabase.from('steve_knowledge').select('id, titulo, contenido')
       .in('categoria', ['anuncios', 'meta_ads'])
       .eq('activo', true)
       .order('orden', { ascending: false })

@@ -310,7 +310,7 @@ export async function generateCampaignRecommendations(c: Context) {
         supabase.from('steve_training_examples').select('*').eq('is_active', true).limit(10),
         supabase.from('steve_training_feedback').select('original_recommendation, improved_recommendation, feedback_notes').eq('feedback_rating', 'positive').limit(10),
         supabase.from('steve_training_feedback').select('original_recommendation, improved_recommendation, feedback_notes').eq('feedback_rating', 'negative').not('improved_recommendation', 'is', null).limit(10),
-        supabase.from('steve_knowledge').select('categoria, titulo, contenido').in('categoria', [platformCategoria, 'anuncios']).eq('activo', true).eq('approval_status', 'approved').order('orden', { ascending: false }).limit(8),
+        supabase.from('steve_knowledge').select('id, categoria, titulo, contenido').in('categoria', [platformCategoria, 'anuncios']).eq('activo', true).eq('approval_status', 'approved').order('orden', { ascending: false }).limit(8),
         supabase.from('steve_bugs').select('categoria, descripcion, ejemplo_malo, ejemplo_bueno').in('categoria', [platformCategoria, 'anuncios']).eq('activo', true).limit(4),
       ]);
 

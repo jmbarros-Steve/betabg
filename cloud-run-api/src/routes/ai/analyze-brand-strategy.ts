@@ -892,7 +892,7 @@ export async function analyzeBrandStrategy(c: Context) {
 
     // Fetch knowledge base
     const [{ data: knowledge }, { data: bugs }] = await Promise.all([
-      supabase.from('steve_knowledge').select('categoria, titulo, contenido')
+      supabase.from('steve_knowledge').select('id, categoria, titulo, contenido')
         .in('categoria', ['meta_ads', 'brief', 'anuncios', 'google', 'seo', 'shopify', 'klaviyo'])
         .eq('activo', true)
         .order('orden', { ascending: false })

@@ -342,7 +342,7 @@ export async function loadRelevantKnowledge(
 
   const { data: knowledge } = await supabase
     .from('steve_knowledge')
-    .select('categoria, titulo, contenido')
+    .select('id, categoria, titulo, contenido')
     .in('categoria', uniqueCategories)
     .eq('activo', true)
     .order('orden', { ascending: false })
@@ -870,7 +870,7 @@ export async function loadIndustryCaseStudy(whatTheySell: string | null | undefi
   // Fallback: fuzzy match on first keyword via steve_knowledge
   const { data: fallback } = await supabase
     .from('steve_knowledge')
-    .select('titulo, contenido')
+    .select('id, titulo, contenido')
     .eq('activo', true)
     .ilike('contenido', `%${keywords[0]}%`)
     .limit(1);
@@ -1216,7 +1216,7 @@ export async function buildDynamicSalesPrompt(
     prompt += `⚠️ El prospecto NO está interesado. Despídete con respeto y cierra la conversación: "Entendido, sin problema. Si en algún momento quieres retomar, aquí estoy. Éxito!"\n`;
     // Short-circuit — no need for other tactics
     prompt += `\n🗣️ PERSONALIDAD:\n${WA_SALES_PROMPT_BASE}`;
-    return prompt;
+    return { prompt, ruleIds: collectedRuleIds };
   }
 
   // Paso 3: Closer mode — buying signals
@@ -1403,6 +1403,24 @@ Si ya mencionaste una fecha comercial, NO la repitas. Si ya hablaste de CPA, hab
       prompt += `\n\n--- REFERENCIA ---\n${relevantRule.contenido}`;
       if (relevantRule.id) collectedRuleIds.push(relevantRule.id);
     }
+  }
+
+  // Audit trail: fire-and-forget qa_log insert (non-blocking)
+  if (collectedRuleIds.length > 0) {
+    supabase.from('qa_log').insert({
+      check_type: 'knowledge_injection',
+      status: 'info',
+      details: JSON.stringify({
+        source: 'wa-sales-brain',
+        prospect_id: prospect.id,
+        rule_count: collectedRuleIds.length,
+        rule_ids: collectedRuleIds,
+        stage: effectiveStage,
+      }),
+      detected_by: 'steve-wa-brain',
+    }).then(({ error }) => {
+      if (error) console.error('[steve-wa-brain] qa_log insert failed:', error.message);
+    });
   }
 
   return { prompt, ruleIds: collectedRuleIds };

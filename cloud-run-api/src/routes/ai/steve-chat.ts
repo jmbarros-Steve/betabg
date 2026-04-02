@@ -883,7 +883,7 @@ export async function steveChat(c: Context) {
       // .in('industria', ['general', clientIndustry]) to filter rules by client's industry.
       supabase
         .from('steve_knowledge')
-        .select('categoria, titulo, contenido')
+        .select('id, categoria, titulo, contenido')
         .in('categoria', [categoriaRelevante, 'brief'])
         .eq('activo', true)
         .order('orden', { ascending: false })
@@ -897,7 +897,7 @@ export async function steveChat(c: Context) {
       // 6. Fetch client-specific knowledge (Mejora #1)
       supabase
         .from('steve_knowledge')
-        .select('categoria, titulo, contenido, orden')
+        .select('id, categoria, titulo, contenido, orden')
         .eq('client_id', client_id)
         .eq('activo', true)
         .order('orden', { ascending: false })
@@ -949,6 +949,15 @@ export async function steveChat(c: Context) {
       } catch (e) {
         // Fail silently, use all rules
       }
+    }
+    // Audit: log knowledge injection (fire-and-forget)
+    const estRuleIds = (filteredKnowledge || []).map((k: any) => k.id).filter(Boolean);
+    if (estRuleIds.length > 0) {
+      supabase.from('qa_log').insert({
+        check_type: 'knowledge_injection', status: 'info',
+        details: JSON.stringify({ source: 'steve-chat/estrategia', client_id, rule_count: estRuleIds.length, rule_ids: estRuleIds }),
+        detected_by: 'steve-chat',
+      }).then(({ error }) => { if (error) console.error('[steve-chat] qa_log insert failed:', error.message); });
     }
     // TODO (Mejora #4 - Industry filter): Once clients have industria assigned, add
     // .in('industria', ['general', clientIndustry]) to the steve_knowledge query above.
@@ -1845,7 +1854,7 @@ REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de re
   const [{ data: knowledge }, { data: bugs }, { data: briefClientKnowledge }] = await Promise.all([
     supabase
       .from('steve_knowledge')
-      .select('categoria, titulo, contenido, orden')
+      .select('id, categoria, titulo, contenido, orden')
       .in('categoria', [categoriaRelevante, 'brief', 'anuncios'])
       .eq('activo', true)
       .order('orden', { ascending: false })
@@ -1860,7 +1869,7 @@ REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de re
     // Fetch client-specific knowledge (Mejora #1)
     supabase
       .from('steve_knowledge')
-      .select('categoria, titulo, contenido, orden')
+      .select('id, categoria, titulo, contenido, orden')
       .eq('client_id', client_id)
       .eq('activo', true)
       .order('orden', { ascending: false })
@@ -1903,6 +1912,16 @@ REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de re
     } catch (e) {
       // Fail silently, use all rules
     }
+  }
+
+  // Audit: log knowledge injection for brief flow (fire-and-forget)
+  const briefRuleIds = (filteredBriefKnowledge || []).map((k: any) => k.id).filter(Boolean);
+  if (briefRuleIds.length > 0) {
+    supabase.from('qa_log').insert({
+      check_type: 'knowledge_injection', status: 'info',
+      details: JSON.stringify({ source: 'steve-chat/brief', client_id, rule_count: briefRuleIds.length, rule_ids: briefRuleIds }),
+      detected_by: 'steve-chat',
+    }).then(({ error }) => { if (error) console.error('[steve-chat] qa_log insert failed:', error.message); });
   }
 
   const knowledgeContext = filteredBriefKnowledge?.map((k: { categoria: string; titulo: string; contenido: string }) =>

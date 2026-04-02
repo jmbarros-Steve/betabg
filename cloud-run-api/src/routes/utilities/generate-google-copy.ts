@@ -90,7 +90,7 @@ export async function generateGoogleCopy(c: Context) {
   const categoriaGG = 'google_ads';
   const [{ data: kbBugsGG }, { data: kbKnowledgeGG }] = await Promise.all([
     supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoriaGG).eq('activo', true),
-    supabase.from('steve_knowledge').select('titulo, contenido').eq('categoria', categoriaGG).eq('activo', true).order('orden'),
+    supabase.from('steve_knowledge').select('id, titulo, contenido').eq('categoria', categoriaGG).eq('activo', true).order('orden'),
   ]);
 
   const bugSectionGG = kbBugsGG && kbBugsGG.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsGG.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';

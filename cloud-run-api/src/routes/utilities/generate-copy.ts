@@ -68,7 +68,7 @@ export async function generateCopy(c: Context) {
   const categoriaRelevante = contextoLower.includes('google') ? 'google_ads' : 'meta_ads';
 
   const [{ data: knowledge }, { data: bugs }] = await Promise.all([
-    supabase.from('steve_knowledge').select('categoria, titulo, contenido')
+    supabase.from('steve_knowledge').select('id, categoria, titulo, contenido')
       .in('categoria', [categoriaRelevante, 'anuncios', 'meta_ads'])
       .eq('activo', true)
       .order('orden', { ascending: false })
