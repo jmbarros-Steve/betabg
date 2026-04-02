@@ -64,7 +64,7 @@ export async function generateVideoScript(c: Context) {
     // Load video/ads knowledge rules
     const { knowledgeBlock, bugsBlock } = await loadKnowledge(
       ['video', 'anuncios', 'meta_ads', 'creativos'],
-      { clientId, limit: 10 }
+      { clientId, limit: 10, audit: { source: 'generate-video-script' } }
     );
 
     const duracionConfig = {

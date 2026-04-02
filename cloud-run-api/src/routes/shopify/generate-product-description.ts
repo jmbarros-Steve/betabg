@@ -60,7 +60,7 @@ export async function generateProductDescription(c: Context) {
     // Load product/SEO knowledge
     const { knowledgeBlock } = await loadKnowledge(
       ['shopify', 'seo', 'ecommerce', 'productos'],
-      { clientId: connection.client_id, limit: 8 }
+      { clientId: connection.client_id, limit: 8, audit: { source: 'generate-product-description' } }
     );
 
     const geminiApiKey = process.env.GEMINI_API_KEY;

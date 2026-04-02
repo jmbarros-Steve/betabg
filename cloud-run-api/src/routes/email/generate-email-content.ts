@@ -86,7 +86,7 @@ async function loadBrandContext(supabase: any, clientId: string): Promise<BrandC
   // Load knowledge rules
   const { knowledgeBlock, bugsBlock } = await loadKnowledge(
     ['email', 'klaviyo', 'anuncios'],
-    { clientId, limit: 10 }
+    { clientId, limit: 10, audit: { source: 'generate-email-content' } }
   );
 
   let briefSection = 'Brief no completado.';

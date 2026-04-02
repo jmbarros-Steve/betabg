@@ -901,6 +901,10 @@ export async function analyzeBrandStrategy(c: Context) {
       supabase.from('steve_bugs').select('categoria, descripcion, ejemplo_malo, ejemplo_bueno').eq('activo', true).limit(5),
     ]);
 
+    const absRuleIds = (knowledge || []).map((k: any) => k.id).filter(Boolean);
+    if (absRuleIds.length > 0) {
+      supabase.from('qa_log').insert({ check_type: 'knowledge_injection', status: 'info', details: JSON.stringify({ source: 'analyze-brand-strategy', rule_count: absRuleIds.length, rule_ids: absRuleIds }), detected_by: 'analyze-brand-strategy' }).then(({ error }) => { if (error) console.error('[analyze-brand] qa_log:', error.message); });
+    }
     const knowledgeContext = knowledge?.map((k: any) =>
       `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
     ).join('\n\n') || '';

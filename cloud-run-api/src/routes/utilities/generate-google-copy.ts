@@ -93,6 +93,10 @@ export async function generateGoogleCopy(c: Context) {
     supabase.from('steve_knowledge').select('id, titulo, contenido').eq('categoria', categoriaGG).eq('activo', true).order('orden'),
   ]);
 
+  const ggRuleIds = (kbKnowledgeGG || []).map((k: any) => k.id).filter(Boolean);
+  if (ggRuleIds.length > 0) {
+    supabase.from('qa_log').insert({ check_type: 'knowledge_injection', status: 'info', details: JSON.stringify({ source: 'generate-google-copy', rule_count: ggRuleIds.length, rule_ids: ggRuleIds }), detected_by: 'generate-google-copy' }).then(({ error }) => { if (error) console.error('[generate-google-copy] qa_log:', error.message); });
+  }
   const bugSectionGG = kbBugsGG && kbBugsGG.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsGG.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
   const knowledgeSectionGG = kbKnowledgeGG && kbKnowledgeGG.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledgeGG.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
 

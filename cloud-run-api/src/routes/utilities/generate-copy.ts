@@ -79,6 +79,10 @@ export async function generateCopy(c: Context) {
       .eq('activo', true).limit(5),
   ]);
 
+  const gcRuleIds = (knowledge || []).map((k: any) => k.id).filter(Boolean);
+  if (gcRuleIds.length > 0) {
+    supabase.from('qa_log').insert({ check_type: 'knowledge_injection', status: 'info', details: JSON.stringify({ source: 'generate-copy', rule_count: gcRuleIds.length, rule_ids: gcRuleIds }), detected_by: 'generate-copy' }).then(({ error }) => { if (error) console.error('[generate-copy] qa_log:', error.message); });
+  }
   const copyKnowledge = knowledge?.map((k: any) =>
     `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
   ).join('\n\n') || '';

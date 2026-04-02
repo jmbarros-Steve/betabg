@@ -38,6 +38,10 @@ export async function generateBriefVisual(c: Context) {
       .limit(3),
   ]);
 
+  const bvRuleIds = (kbKnowledge || []).map((k: any) => k.id).filter(Boolean);
+  if (bvRuleIds.length > 0) {
+    supabase.from('qa_log').insert({ check_type: 'knowledge_injection', status: 'info', details: JSON.stringify({ source: 'generate-brief-visual', rule_count: bvRuleIds.length, rule_ids: bvRuleIds }), detected_by: 'generate-brief-visual' }).then(({ error }) => { if (error) console.error('[generate-brief-visual] qa_log:', error.message); });
+  }
   const bugSection = kbBugs && kbBugs.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugs.map((b: any) => `❌ ${b.descripcion}\nMAL: ${b.ejemplo_malo}\nBIEN: ${b.ejemplo_bueno}`).join('\n\n')}\n` : '';
   const knowledgeSection = kbKnowledge && kbKnowledge.length > 0 ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\nSi hay conflicto entre reglas, priorizar las de orden más alto (más recientes).\n${kbKnowledge.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 

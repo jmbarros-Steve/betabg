@@ -45,7 +45,7 @@ export async function generateImage(c: Context) {
   // Load visual/creative knowledge rules
   const { knowledgeBlock: visualKnowledge } = await loadKnowledge(
     ['anuncios', 'meta_ads', 'creativos', 'imagenes'],
-    { clientId, limit: 8 }
+    { clientId, limit: 8, audit: { source: 'generate-image' } }
   );
 
   // TODO: Re-enable credit system when billing is ready

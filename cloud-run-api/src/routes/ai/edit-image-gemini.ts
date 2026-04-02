@@ -41,7 +41,7 @@ export async function editImageGemini(c: Context) {
     // Load brand visual knowledge
     const { knowledgeBlock: visualKnowledge } = await loadKnowledge(
       ['anuncios', 'creativos', 'imagenes'],
-      { clientId, limit: 5 }
+      { clientId, limit: 5, audit: { source: 'edit-image-gemini' } }
     );
 
     // Check credits (1 credit for edits, 2 for generation)

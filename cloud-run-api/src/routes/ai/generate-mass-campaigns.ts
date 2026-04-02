@@ -46,7 +46,7 @@ ${previousEmails.substring(0, 3000)}`;
   // Load email/marketing knowledge rules
   const { knowledgeBlock: emailKnowledge, bugsBlock: emailBugs } = await loadKnowledge(
     ['email', 'klaviyo', 'anuncios'],
-    { clientId, limit: 10 }
+    { clientId, limit: 10, audit: { source: 'generate-mass-campaigns' } }
   );
 
   const systemPrompt = `Eres Steve, copywriter experto en email marketing para e-commerce chileno.
