@@ -32,6 +32,84 @@ import { isSupportedAudio, transcribeAudio } from '../../lib/audio-transcriber.j
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 
+// URL regex: catches https://..., http://..., www.xxx.xx, and bare domain.tld
+const URL_REGEX = /(?:https?:\/\/)?(?:www\.)?[a-z0-9][-a-z0-9]*\.[a-z]{2,}(?:\.[a-z]{2,})?(?:\/[^\s]*)?/i;
+
+/**
+ * Quick scrape — fetch homepage HTML and extract basic info for Claude context.
+ * Timeout: 3s. Returns null on failure. NOT a deep audit, just basic page data.
+ */
+async function quickScrapeUrl(rawUrl: string): Promise<string | null> {
+  try {
+    let url = rawUrl.trim();
+    if (!url.match(/^https?:\/\//i)) url = 'https://' + url;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SteveBot/1.0)' },
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+
+    const html = await res.text();
+    const parts: string[] = [];
+
+    // Title
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (titleMatch) parts.push(`Título: ${titleMatch[1].trim()}`);
+
+    // Meta description
+    const metaDescMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i);
+    if (metaDescMatch) parts.push(`Descripción: ${metaDescMatch[1].trim()}`);
+
+    // H1s and H2s (strip HTML tags inside)
+    const stripTags = (s: string) => s.replace(/<[^>]+>/g, '').trim();
+    const h1s = [...html.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/gi)].map(m => stripTags(m[1])).filter(Boolean).slice(0, 5);
+    const h2s = [...html.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)].map(m => stripTags(m[1])).filter(Boolean).slice(0, 10);
+    if (h1s.length) parts.push(`H1: ${h1s.join(' | ')}`);
+    if (h2s.length) parts.push(`Secciones: ${h2s.join(' | ')}`);
+
+    // Shopify product titles
+    const productTitles = [...html.matchAll(/class="[^"]*product[_-]?(?:title|name|card__heading)[^"]*"[^>]*>([\s\S]*?)<\//gi)]
+      .map(m => stripTags(m[1])).filter(Boolean).slice(0, 15);
+    if (productTitles.length) parts.push(`Productos: ${productTitles.join(', ')}`);
+
+    // JSON-LD structured data
+    const jsonLds = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+    for (const jm of jsonLds.slice(0, 3)) {
+      try {
+        const data = JSON.parse(jm[1]);
+        if (data['@type'] === 'Organization' || data['@type'] === 'WebSite') {
+          parts.push(`Organización: ${data.name || ''} — ${data.description || ''}`);
+        }
+        if (data['@type'] === 'Product' || data['@type'] === 'ItemList') {
+          const items = data.itemListElement || [data];
+          for (const item of items.slice(0, 10)) {
+            const name = item.name || item.item?.name;
+            const price = item.offers?.price || item.item?.offers?.price || '';
+            if (name) parts.push(`Producto: ${name}${price ? ` — $${price}` : ''}`);
+          }
+        }
+      } catch {}
+    }
+
+    // OG tags
+    const ogTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+    const ogDesc = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i);
+    if (ogTitle && !titleMatch) parts.push(`Título: ${ogTitle[1].trim()}`);
+    if (ogDesc && !metaDescMatch) parts.push(`Descripción: ${ogDesc[1].trim()}`);
+
+    if (parts.length === 0) return null;
+    return parts.join('\n').slice(0, 2000);
+  } catch (err: any) {
+    console.warn(`[quick-scrape] Error fetching ${rawUrl}: ${err.message}`);
+    return null;
+  }
+}
+
 // Rate limiting: track last response time per phone (in-memory + DB fallback)
 const lastResponseTime = new Map<string, number>();
 const RATE_LIMIT_MS = 5_000; // 5 seconds
@@ -366,15 +444,31 @@ async function handleProspect(
       contact_phone: phone,
     });
 
-    // 3. Load history
-    const history = await getProspectHistory(phone, 20);
+    // 3. Load history + quick scrape URL if detected (in parallel)
+    const detectedUrlMatch = messageBody.match(URL_REGEX);
+    const detectedUrl = detectedUrlMatch?.[0] || null;
+
+    const [history, quickScrapeData] = await Promise.all([
+      getProspectHistory(phone, 20),
+      detectedUrl ? quickScrapeUrl(detectedUrl) : Promise.resolve(null),
+    ]);
+
+    if (quickScrapeData) {
+      console.log(`[quick-scrape] Got ${quickScrapeData.length} chars for ${detectedUrl}`);
+    }
 
     // Build messages array for Claude (use original messageBody for AI context, not scrubbed)
     const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [...history];
-    // If PII was detected, inject a system hint so Steve warns the user
-    const aiMessageBody = hadPII
-      ? `${messageBody}\n\n[SISTEMA: El usuario compartió datos sensibles como tarjeta de crédito o RUT. DEBES advertirle que NO comparta datos financieros por WhatsApp y que los pagos se hacen en steve.cl]`
-      : messageBody;
+    // Build AI message with context injections
+    let aiMessageBody = messageBody;
+    // Inject quick scrape data so Claude has real page info
+    if (quickScrapeData) {
+      aiMessageBody += `\n\n[SISTEMA: Steve revisó la página ${detectedUrl} y encontró esta información REAL. USA SOLO ESTOS DATOS para hablar de la tienda, NO inventes nada que no esté aquí:\n${quickScrapeData}]`;
+    }
+    // If PII was detected, inject warning hint
+    if (hadPII) {
+      aiMessageBody += `\n\n[SISTEMA: El usuario compartió datos sensibles como tarjeta de crédito o RUT. DEBES advertirle que NO comparta datos financieros por WhatsApp y que los pagos se hacen en steve.cl]`;
+    }
     if (messages.length === 0 || messages[messages.length - 1].content !== aiMessageBody) {
       messages.push({ role: 'user', content: aiMessageBody });
     }
@@ -717,8 +811,8 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
     // Paso 2: Detect disqualification → mark as lost
     const disqResult = detectDisqualification(messageBody, history);
 
-    // Paso 17: Detect URL in prospect message
-    const urlMatch = messageBody.match(/https?:\/\/[^\s]+/);
+    // Paso 17: Detect URL in prospect message (reuse earlier detection)
+    const urlMatch = detectedUrl ? [detectedUrl] : null;
 
     processProspectAsync(prospect, fullHistory, meetingLinkSent, disqResult.disqualified ? disqResult.reason : undefined, urlMatch?.[0]).catch(err => {
       console.error('[steve-wa-chat] processProspectAsync error:', err);
