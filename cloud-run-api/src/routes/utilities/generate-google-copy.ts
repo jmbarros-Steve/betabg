@@ -90,7 +90,7 @@ export async function generateGoogleCopy(c: Context) {
   const categoriaGG = 'google_ads';
   const [{ data: kbBugsGG }, { data: kbKnowledgeGG }] = await Promise.all([
     supabase.from('steve_bugs').select('descripcion, ejemplo_malo, ejemplo_bueno').eq('categoria', categoriaGG).eq('activo', true),
-    supabase.from('steve_knowledge').select('id, titulo, contenido').eq('categoria', categoriaGG).eq('activo', true).order('orden'),
+    supabase.from('steve_knowledge').select('id, titulo, contenido').eq('categoria', categoriaGG).eq('activo', true).eq('approval_status', 'approved').order('orden'),
   ]);
 
   const ggRuleIds = (kbKnowledgeGG || []).map((k: any) => k.id).filter(Boolean);

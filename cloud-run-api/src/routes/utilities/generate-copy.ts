@@ -71,6 +71,7 @@ export async function generateCopy(c: Context) {
     supabase.from('steve_knowledge').select('id, categoria, titulo, contenido')
       .in('categoria', [categoriaRelevante, 'anuncios', 'meta_ads'])
       .eq('activo', true)
+      .eq('approval_status', 'approved')
       .order('orden', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(20),

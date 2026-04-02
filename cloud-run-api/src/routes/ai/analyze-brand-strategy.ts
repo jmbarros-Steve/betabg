@@ -895,6 +895,7 @@ export async function analyzeBrandStrategy(c: Context) {
       supabase.from('steve_knowledge').select('id, categoria, titulo, contenido')
         .in('categoria', ['meta_ads', 'brief', 'anuncios', 'google', 'seo', 'shopify', 'klaviyo'])
         .eq('activo', true)
+        .eq('approval_status', 'approved')
         .order('orden', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(20),

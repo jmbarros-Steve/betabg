@@ -51,7 +51,9 @@ export function KnowledgeRulesExplorer() {
   const fetchCategories = useCallback(async () => {
     const { data } = await supabase
       .from('steve_knowledge')
-      .select('categoria');
+      .select('categoria')
+      .eq('activo', true)
+      .eq('approval_status', 'approved');
     if (data) {
       const counts: Record<string, number> = {};
       data.forEach(r => { counts[r.categoria] = (counts[r.categoria] || 0) + 1; });
@@ -68,6 +70,7 @@ export function KnowledgeRulesExplorer() {
       .from('steve_knowledge')
       .select('id, titulo, contenido, categoria, created_at, source_id')
       .eq('activo', true)
+      .eq('approval_status', 'approved')
       .order('created_at', { ascending: false })
       .limit(500);
 

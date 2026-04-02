@@ -123,6 +123,7 @@ export async function runInvestigator(
       .select('id, titulo, contenido')
       .eq('categoria', 'sales_learning')
       .eq('activo', true)
+      .eq('approval_status', 'approved')
       .order('created_at', { ascending: false })
       .limit(5);
 

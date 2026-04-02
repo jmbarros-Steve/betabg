@@ -17,6 +17,7 @@ export interface ProspectRecord {
   phone: string;
   profile_name?: string | null;
   name?: string | null;
+  apellido?: string | null;
   email?: string | null;
   company?: string | null;
   what_they_sell?: string | null;
@@ -36,6 +37,12 @@ export interface ProspectRecord {
   score_breakdown?: Record<string, number> | null;
   meeting_suggested_at?: string | null;
   meeting_link_sent?: boolean | null;
+  meeting_url?: string | null;
+  meeting_at?: string | null;
+  meeting_status?: string | null;
+  meeting_notes?: string | null;
+  reminder_24h_sent?: boolean | null;
+  reminder_2h_sent?: boolean | null;
   last_extracted_at?: string | null;
   hubspot_contact_id?: string | null;
   hubspot_deal_id?: string | null;
@@ -107,6 +114,7 @@ export interface InvestigationData {
 
 export interface ExtractedProspectInfo {
   name?: string;
+  apellido?: string;
   email?: string;
   company?: string;
   what_they_sell?: string;
@@ -950,6 +958,7 @@ export async function loadIndustryCaseStudy(whatTheySell: string | null | undefi
     .from('steve_knowledge')
     .select('id, titulo, contenido')
     .eq('activo', true)
+    .eq('approval_status', 'approved')
     .ilike('contenido', `%${keywords[0]}%`)
     .limit(1);
 
@@ -1049,6 +1058,7 @@ export async function loadSalesLearnings(industry: string | null | undefined): P
     .select('id, titulo, contenido')
     .eq('categoria', 'sales_learning')
     .eq('activo', true)
+    .eq('approval_status', 'approved')
     .order('created_at', { ascending: false })
     .limit(10);
 
@@ -1203,12 +1213,14 @@ export async function buildDynamicSalesPrompt(
       .select('id, titulo, contenido, orden')
       .eq('categoria', 'prospecting')
       .eq('activo', true)
+      .eq('approval_status', 'approved')
       .order('orden', { ascending: true }),
     supabase
       .from('steve_knowledge')
       .select('id, titulo, contenido, orden')
       .eq('categoria', 'prospecting')
       .eq('activo', true)
+      .eq('approval_status', 'approved')
       .ilike('titulo', 'CORRECCION:%')
       .gte('orden', 90)
       .order('created_at', { ascending: false })
@@ -1274,6 +1286,10 @@ export async function buildDynamicSalesPrompt(
   if (prospect.budget_range) known.push(`Presupuesto: ${prospect.budget_range}`);
   if (prospect.decision_timeline) known.push(`Timeline decisión: ${prospect.decision_timeline}`);
   if (prospect.audit_data?.findings?.length) known.push(`Auditoría tienda: ${prospect.audit_data.findings.join('; ')}`);
+
+  if (prospect.apellido) known.push(`Apellido: ${prospect.apellido}`);
+  if (prospect.meeting_status && prospect.meeting_status !== 'none') known.push(`Estado reunión: ${prospect.meeting_status}`);
+  if (prospect.meeting_at) known.push(`Reunión agendada: ${new Date(prospect.meeting_at).toLocaleString('es-CL', { timeZone: 'America/Santiago' })}`);
 
   known.push(`Score: ${prospect.lead_score || 0}/100`);
   known.push(`Stage: ${prospect.stage || 'discovery'}`);
@@ -1383,7 +1399,20 @@ export async function buildDynamicSalesPrompt(
 
   // Paso 3: Closer mode — buying signals
   if (closerMode) {
-    prompt += `🔥 SEÑAL DE COMPRA DETECTADA. Responde su duda directamente y propón agendar llamada: "Te muestro cómo se ve con tus datos → https://meetings.hubspot.com/jose-manuel15"\n`;
+    prompt += `🔥 SEÑAL DE COMPRA DETECTADA. Responde su duda directamente y propón agendar llamada de 15 minutos.\n`;
+  }
+
+  // Mini CRM: Meeting auto-suggestion when score is high enough
+  const meetingStatus = prospect.meeting_status || 'none';
+  const prospectScore = prospect.lead_score || 0;
+  const prospectStage = prospect.stage || 'discovery';
+
+  if (prospectScore >= 70 && meetingStatus === 'none' && (prospectStage === 'qualifying' || prospectStage === 'pitching')) {
+    prompt += `\n📞 INSTRUCCIÓN PRIORITARIA: Este prospecto tiene score ${prospectScore}. DEBES sugerir agendar una llamada de 15 minutos para mostrarle Steve con sus datos reales. Propón 2-3 horarios del próximo día hábil (horario Chile). NO mandes un link externo — solo propón horarios y espera confirmación.\n`;
+  } else if (meetingStatus === 'proposed') {
+    prompt += `\n📞 Ya le propusiste reunión. Si confirma un horario, responde con entusiasmo y confirma la hora. Si propone otro horario, acepta si es razonable. Si rechaza, respétalo y sigue la conversación normalmente.\n`;
+  } else if (meetingStatus === 'scheduled' || meetingStatus === 'reminded_24h' || meetingStatus === 'reminded_2h') {
+    prompt += `\n📞 Ya hay reunión agendada (${prospect.meeting_at ? new Date(prospect.meeting_at).toLocaleString('es-CL', { timeZone: 'America/Santiago' }) : 'pendiente'}). NO vuelvas a proponer reunión. Si el prospecto pregunta, confirma la hora.\n`;
   }
 
   // Detect if prospect asked a question
@@ -1719,6 +1748,7 @@ ${JSON.stringify({
 Responde ÚNICAMENTE con un JSON válido (sin markdown, sin explicación). Solo incluye campos con info EXPLÍCITA nueva:
 {
   "name": "nombre si lo dijo",
+  "apellido": "apellido del prospecto (SOLO si lo dijo EXPLÍCITAMENTE, NO inferir del nombre)",
   "email": "email si lo compartió",
   "company": "nombre de empresa si lo mencionó EXPLÍCITAMENTE",
   "what_they_sell": "qué venden — solo si el prospecto lo dijo claramente",
@@ -2065,6 +2095,135 @@ export async function pushToHubSpot(
     return { contactId, dealId };
   } catch (err) {
     console.error('[steve-wa-brain] pushToHubSpot error:', err);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Meeting confirmation detection — Mini CRM Pipeline
+// ---------------------------------------------------------------------------
+
+export interface MeetingConfirmationResult {
+  confirmed: boolean;
+  proposedTime?: string;
+  rejected?: boolean;
+}
+
+/**
+ * Use Haiku to detect if the prospect's message confirms, rejects, or proposes
+ * another time for a meeting. Only called when meeting_status === 'proposed'.
+ */
+export async function detectMeetingConfirmation(
+  message: string,
+  history: Array<{ role: 'user' | 'assistant'; content: string }>,
+): Promise<MeetingConfirmationResult> {
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!ANTHROPIC_API_KEY) return { confirmed: false };
+
+  // Get last few messages for context
+  const recentHistory = history.slice(-6)
+    .map(m => `${m.role === 'user' ? 'Prospecto' : 'Steve'}: ${m.content}`)
+    .join('\n');
+
+  const prompt = `Analiza si el prospecto confirma, rechaza, o propone otro horario para una reunión.
+
+CONVERSACIÓN RECIENTE:
+${recentHistory}
+
+ÚLTIMO MENSAJE DEL PROSPECTO:
+${message}
+
+Responde ÚNICAMENTE con JSON válido (sin markdown):
+{
+  "confirmed": true/false — true si acepta un horario propuesto,
+  "proposedTime": "fecha y hora que el prospecto propone o confirma (ej: 'mañana a las 10', 'el lunes a las 3pm', '2026-04-03 10:00'). null si no propone horario",
+  "rejected": true/false — true si rechaza la reunión por completo (no quiere reunirse, no solo cambiar horario)
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 200,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('[steve-wa-brain] detectMeetingConfirmation API error:', response.status);
+      return { confirmed: false };
+    }
+
+    const data: any = await response.json();
+    const text = (data.content?.[0]?.text || '').trim();
+    const jsonStr = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const parsed = JSON.parse(jsonStr);
+
+    return {
+      confirmed: !!parsed.confirmed,
+      proposedTime: parsed.proposedTime || undefined,
+      rejected: !!parsed.rejected,
+    };
+  } catch (err) {
+    console.error('[steve-wa-brain] detectMeetingConfirmation error:', err);
+    return { confirmed: false };
+  }
+}
+
+/**
+ * Parse a natural language time reference into a Date.
+ * Uses Haiku to interpret relative times like "mañana a las 10" or "el lunes a las 3pm".
+ */
+export async function parseMeetingTime(
+  timeStr: string,
+): Promise<Date | null> {
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!ANTHROPIC_API_KEY) return null;
+
+  const now = new Date();
+  const chileNow = now.toLocaleString('en-US', { timeZone: 'America/Santiago' });
+
+  const prompt = `La fecha/hora actual en Chile es: ${chileNow}
+
+El prospecto dijo: "${timeStr}"
+
+Convierte eso a una fecha ISO 8601 con timezone de Chile (America/Santiago, UTC-3 o UTC-4 según horario de verano).
+Si dice "mañana" → el día siguiente. Si dice "lunes" → el próximo lunes. Si no especifica AM/PM, asume horario laboral (10am-6pm).
+
+Responde ÚNICAMENTE con la fecha en formato ISO 8601, ej: 2026-04-03T10:00:00-03:00
+Si no puedes interpretar la hora, responde: null`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 100,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!response.ok) return null;
+
+    const data: any = await response.json();
+    const text = (data.content?.[0]?.text || '').trim();
+    if (text === 'null' || !text) return null;
+
+    const parsed = new Date(text);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  } catch (err) {
+    console.error('[steve-wa-brain] parseMeetingTime error:', err);
     return null;
   }
 }

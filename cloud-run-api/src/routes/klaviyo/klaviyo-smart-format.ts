@@ -64,6 +64,7 @@ async function loadBrandContext(supabase: any, connectionId: string): Promise<st
       .select('id, titulo, contenido')
       .eq('categoria', 'klaviyo')
       .eq('activo', true)
+      .eq('approval_status', 'approved')
       .order('orden', { ascending: false })
       .limit(10),
   ]);

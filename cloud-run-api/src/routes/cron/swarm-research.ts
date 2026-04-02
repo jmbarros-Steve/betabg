@@ -61,23 +61,35 @@ export async function swarmResearch(c: Context) {
     }).eq('id', runId);
 
     // ── Step 4: Save insights to steve_knowledge as pending ──
+    // Each insight can have multiple categories — insert one row per category
+    // linked by a shared insight_group_id.
     let saved = 0;
     for (const insight of insights) {
-      const { error: knErr } = await supabase.from('steve_knowledge').insert({
-        categoria: insight.categoria || 'analisis',
-        titulo: (insight.titulo || '').slice(0, 200),
-        contenido: insight.contenido || '',
-        activo: true,
-        orden: 0,
-        approval_status: 'pending',
-        source_explanation: insight.explanation || '',
-        confidence: Math.min(10, Math.max(1, insight.confidence || 5)),
-        sources_urls: insight.sources || [],
-        swarm_run_id: runId,
-        industria: 'general',
-      });
-      if (!knErr) saved++;
-      else console.error('[swarm] Failed to save insight:', knErr);
+      // Support both "categorias" (array) and legacy "categoria" (string)
+      const categories: string[] = Array.isArray(insight.categorias) && insight.categorias.length > 0
+        ? insight.categorias.slice(0, 3)
+        : [insight.categoria || 'analisis'];
+
+      const groupId = crypto.randomUUID();
+
+      for (const cat of categories) {
+        const { error: knErr } = await supabase.from('steve_knowledge').insert({
+          categoria: cat,
+          titulo: (insight.titulo || '').slice(0, 200),
+          contenido: insight.contenido || '',
+          activo: true,
+          orden: 0,
+          approval_status: 'pending',
+          source_explanation: insight.explanation || '',
+          confidence: Math.min(10, Math.max(1, insight.confidence || 5)),
+          sources_urls: insight.sources || [],
+          swarm_run_id: runId,
+          industria: 'general',
+          insight_group_id: categories.length > 1 ? groupId : null,
+        });
+        if (!knErr) saved++;
+        else console.error('[swarm] Failed to save insight:', knErr);
+      }
     }
 
     // ── Step 4b: Update swarm_sources tracking (last_used_at, hits) ──
@@ -405,7 +417,8 @@ async function runParallelResearch(questions: string[], apiKey: string): Promise
 interface Insight {
   titulo: string;
   contenido: string;
-  categoria: string;
+  categoria?: string;
+  categorias?: string[];
   explanation: string;
   confidence: number;
   sources: string[];
@@ -438,16 +451,19 @@ Responde SOLO JSON array:
 [{
   "titulo": "máx 80 chars, accionable",
   "contenido": "CUANDO: [situación]. HAZ: 1. [acción]. 2. [acción]. PORQUE: [razón con dato].",
-  "categoria": "meta_ads|google_ads|anuncios|sales_learning|klaviyo|shopify|analisis|cross_channel",
+  "categorias": ["array de 1-3 categorías donde aplica este insight"],
   "explanation": "Por qué este insight es valioso. Qué reportes cruzaste para llegar a él.",
   "confidence": 1-10,
   "sources": ["url1", "url2"]
 }]
 
+CATEGORÍAS VÁLIDAS: meta_ads, google_ads, anuncios, sales_learning, klaviyo, shopify, analisis, cross_channel
+
 REGLAS:
 - Solo insights CRUZADOS (que combinan hallazgos de 2+ reportes)
 - Máximo 8 insights por síntesis
 - Cada insight debe ser ACCIONABLE para un merchant de ecommerce LATAM
+- "categorias" es un ARRAY de 1-3 categorías donde el insight aplica. Ejemplo: un insight sobre cuotas sin interés que suben conversión aplica a ["shopify", "meta_ads", "klaviyo"].
 - confidence 8+ = dato duro con fuente. confidence 5-7 = tendencia clara. <5 = hipótesis.
 - Responde SOLO el JSON array, sin markdown ni texto adicional.`,
       messages: [{ role: 'user', content: reportsText }],
