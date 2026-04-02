@@ -576,7 +576,7 @@ async function handleProspect(
         status: 'pending',
         assigned_to: '3d195082-aa83-48c0-b514-a8052264a1e7',
         created_at: new Date().toISOString(),
-      }).catch(() => {});
+      }).then(() => {}, () => {});
     }
 
     // Cambio 1: Quick intel for first message (Haiku, ~1s)
@@ -669,7 +669,7 @@ async function handleProspect(
         status: 'pending',
         assigned_to: '3d195082-aa83-48c0-b514-a8052264a1e7',
         created_at: new Date().toISOString(),
-      }).catch(() => {});
+      }).then(() => {}, () => {});
     }
 
     // ============================================================
