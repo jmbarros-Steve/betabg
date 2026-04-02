@@ -32,6 +32,48 @@ import { isSupportedAudio, transcribeAudio } from '../../lib/audio-transcriber.j
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 
+// Supported image types for vision
+const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+/**
+ * Download image from Twilio and return base64 + media type for Claude vision.
+ * Returns null if download fails or image is too large (>5MB).
+ */
+async function downloadImageForVision(
+  mediaUrl: string,
+  contentType: string,
+): Promise<{ base64: string; mediaType: string } | null> {
+  try {
+    const twilioSid = process.env.TWILIO_ACCOUNT_SID || '';
+    const twilioToken = process.env.TWILIO_AUTH_TOKEN || '';
+    const authHeader = 'Basic ' + Buffer.from(`${twilioSid}:${twilioToken}`).toString('base64');
+
+    const res = await fetch(mediaUrl, {
+      headers: { Authorization: authHeader },
+    });
+    if (!res.ok) {
+      console.error(`[image-vision] Failed to download: ${res.status}`);
+      return null;
+    }
+
+    const buffer = Buffer.from(await res.arrayBuffer());
+    // Skip images > 5MB (Claude limit is ~20MB but keep it reasonable for latency)
+    if (buffer.length > 5 * 1024 * 1024) {
+      console.warn('[image-vision] Image too large (>5MB), skipping');
+      return null;
+    }
+
+    const base64 = buffer.toString('base64');
+    // Normalize media type for Claude
+    const mediaType = SUPPORTED_IMAGE_TYPES.includes(contentType) ? contentType : 'image/jpeg';
+    console.log(`[image-vision] Downloaded ${buffer.length} bytes (${mediaType})`);
+    return { base64, mediaType };
+  } catch (err: any) {
+    console.error('[image-vision] Error:', err.message);
+    return null;
+  }
+}
+
 // URL regex: catches https://..., http://..., www.xxx.xx, and bare domain.tld
 const URL_REGEX = /(?:https?:\/\/)?(?:www\.)?[a-z0-9][-a-z0-9]*\.[a-z]{2,}(?:\.[a-z]{2,})?(?:\/[^\s]*)?/i;
 
@@ -147,30 +189,30 @@ export async function steveWAChat(c: Context) {
     const messageSid = String(body['MessageSid'] || '');
     const numMedia = parseInt(String(body['NumMedia'] || '0'), 10);
 
-    // Audio transcription: if message has audio media, transcribe with Whisper
+    // Media handling: audio transcription, image vision, or fallback
+    let imageData: { base64: string; mediaType: string } | null = null;
     if (numMedia > 0) {
       const mediaType = String(body['MediaContentType0'] || '');
       const mediaUrl = String(body['MediaUrl0'] || '');
       if (mediaUrl && isSupportedAudio(mediaType)) {
         const transcription = await transcribeAudio(mediaUrl, mediaType);
         if (transcription) {
-          // Use transcription as message body (prefix for context)
           messageBody = messageBody
             ? `${messageBody}\n\n[Audio transcrito]: ${transcription}`
             : transcription;
           console.log(`[steve-wa-chat] Audio transcribed for ${from}: ${transcription.slice(0, 100)}...`);
         } else if (!messageBody) {
-          // Audio failed to transcribe and no text body
           messageBody = '[El usuario envió un audio que no pude transcribir]';
         }
-      } else if (mediaType && mediaType.startsWith('image/')) {
-        // Image: Steve CANNOT see images — tell Claude explicitly
-        const imageHint = '[SISTEMA: El usuario envió una IMAGEN por WhatsApp. Tú NO PUEDES ver imágenes. NO describas, analices ni comentes la imagen. Responde honestamente: "No puedo ver imágenes por WhatsApp todavía. Si me describes lo que quieres mostrar, te ayudo. O mejor aún, en la reunión de demo conectamos tu tienda y veo todo directamente."]';
-        messageBody = messageBody
-          ? `${messageBody}\n\n${imageHint}`
-          : imageHint;
+      } else if (mediaUrl && mediaType && SUPPORTED_IMAGE_TYPES.some(t => mediaType.startsWith(t))) {
+        // Image: download for Claude vision
+        imageData = await downloadImageForVision(mediaUrl, mediaType);
+        if (!imageData && !messageBody) {
+          messageBody = '[El usuario envió una imagen que no pude descargar]';
+        } else if (!messageBody) {
+          messageBody = '[El usuario envió una imagen]';
+        }
       } else if (!messageBody) {
-        // Other non-audio media (video, document) with no text
         messageBody = `[SISTEMA: El usuario envió un archivo (${mediaType || 'desconocido'}) que NO puedes ver. Dile que por WhatsApp no puedes abrir archivos, pero en la reunión de demo lo revisan juntos.]`;
       }
     }
@@ -202,7 +244,7 @@ export async function steveWAChat(c: Context) {
 
     if (!client) {
       // Unknown number — AI sales funnel for prospects
-      return handleProspect(c, supabase, phone, messageBody, profileName, messageSid, storageBody, hadPII);
+      return handleProspect(c, supabase, phone, messageBody, profileName, messageSid, storageBody, hadPII, imageData);
     }
 
     // Save inbound message (PII scrubbed)
@@ -349,6 +391,7 @@ async function handleProspect(
   messageSid: string,
   storageBody: string,
   hadPII: boolean,
+  imageData?: { base64: string; mediaType: string } | null,
 ) {
   try {
     // Rate limiting: max 1 response per 30s per phone
@@ -479,6 +522,28 @@ async function handleProspect(
       messages.push({ role: 'user', content: aiMessageBody });
     }
     const sanitized = sanitizeForClaude(messages);
+
+    // If image was sent, replace the last user message with multimodal content
+    // so Claude can actually SEE the image
+    if (imageData && sanitized.length > 0) {
+      const lastMsg = sanitized[sanitized.length - 1];
+      if (lastMsg.role === 'user') {
+        (lastMsg as any).content = [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: imageData.mediaType,
+              data: imageData.base64,
+            },
+          },
+          {
+            type: 'text',
+            text: aiMessageBody + '\n\n[SISTEMA: El usuario envió esta imagen por WhatsApp. Puedes verla. Descríbela brevemente y relaciónala con su negocio si es relevante. Si es un producto, comenta sobre cómo se podría usar en ads o en su tienda.]',
+          },
+        ];
+      }
+    }
 
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     if (!ANTHROPIC_API_KEY) {
