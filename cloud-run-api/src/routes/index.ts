@@ -67,6 +67,8 @@ import { syncGoogleAdsMetrics } from './google/sync-google-ads-metrics.js';
 import { storePlatformConnection } from './utilities/store-platform-connection.js';
 import { manageSources } from './utilities/manage-sources.js';
 import { approveKnowledge } from './utilities/approve-knowledge.js';
+import { submitCorrection } from './utilities/submit-correction.js';
+import { swarmSources } from './utilities/swarm-sources.js';
 
 // Phase 3: Klaviyo
 import { fetchKlaviyoTopProducts } from './klaviyo/fetch-klaviyo-top-products.js';
@@ -147,6 +149,8 @@ import { wolfNightMode } from './cron/wolf-night-mode.js';
 import { wolfMorningSend } from './cron/wolf-morning-send.js';
 import { salesLearningLoop } from './cron/sales-learning-loop.js';
 import { waActionProcessor } from './cron/wa-action-processor.js';
+import { swarmResearch } from './cron/swarm-research.js';
+import { autoLearningDigest } from './cron/auto-learning-digest.js';
 
 // WhatsApp
 import { steveWAChat } from './whatsapp/steve-wa-chat.js';
@@ -159,6 +163,7 @@ import { prospectTrial } from './whatsapp/prospect-trial.js';
 
 // Public (no auth)
 import { auditStore } from './public/audit-store.js';
+import { approveRulesPublic } from './public/approve-rules-public.js';
 
 // Triggers
 import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
@@ -234,6 +239,8 @@ export function registerRoutes(app: Hono) {
   app.post('/api/check-client-connections', authMiddleware, checkClientConnections);
   app.post('/api/manage-sources', authMiddleware, manageSources);
   app.post('/api/approve-knowledge', authMiddleware, approveKnowledge);
+  app.post('/api/submit-correction', authMiddleware, submitCorrection);
+  app.post('/api/swarm-sources', authMiddleware, swarmSources);
 
   // ============================================================
   // Phase 2: AI & Analytics
@@ -477,4 +484,12 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/wolf-morning-send', wolfMorningSend); // No JWT — X-Cron-Secret, daily 9am Chile: 0 12 * * *
   app.post('/api/cron/sales-learning-loop', salesLearningLoop); // No JWT — X-Cron-Secret, daily 8pm Chile: 0 23 * * *
   app.post('/api/cron/wa-action-processor', waActionProcessor); // No JWT — X-Cron-Secret, every 1min via Cloud Scheduler: * * * * *
+
+  // Steve Brain Swarm — parallel research + auto-learning
+  app.post('/api/cron/swarm-research', swarmResearch); // No JWT — X-Cron-Secret, every 2h: 0 */2 * * *
+  app.post('/api/cron/auto-learning-digest', autoLearningDigest); // No JWT — X-Cron-Secret, daily 9am Chile: 0 12 * * *
+
+  // Public approval API (token-based, no JWT)
+  app.get('/api/approve-rules-public', approveRulesPublic);
+  app.post('/api/approve-rules-public', approveRulesPublic);
 }
