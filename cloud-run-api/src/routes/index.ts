@@ -215,6 +215,7 @@ import { signupForms, signupFormPublic } from './email/signup-forms.js';
 import { formWidget } from './email/form-widget.js';
 import { emailTemplatesApi, universalBlocksApi } from './email/email-templates-api.js';
 import { seedSystemEmailTemplates } from '../seed/email-system-templates.js';
+import { seedChinoChecks } from '../seed/chino-checks-seed.js';
 import { smartSendTime } from './email/smart-send-time.js';
 import { emailSendQueue } from './email/send-queue.js';
 import { emailListCleanup } from './email/list-cleanup.js';
@@ -385,6 +386,16 @@ export function registerRoutes(app: Hono) {
   app.post('/api/seed-email-templates', async (c) => {
     try {
       const result = await seedSystemEmailTemplates();
+      return c.json(result);
+    } catch (err: any) {
+      return c.json({ error: err.message }, 500);
+    }
+  });
+
+  // Seed El Chino checks (temporary, idempotent)
+  app.post('/api/seed-chino-checks', async (c) => {
+    try {
+      const result = await seedChinoChecks();
       return c.json(result);
     } catch (err: any) {
       return c.json({ error: err.message }, 500);

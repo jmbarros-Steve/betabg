@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { handleChinoWhatsApp } from '../../chino/whatsapp.js';
 import {
   WA_SYSTEM_PROMPT,
   buildWAContext,
@@ -18,6 +19,8 @@ import {
   loadIndustryCaseStudy,
   quickFirstMessageIntel,
   updateRollingConversationSummary,
+  detectMeetingConfirmation,
+  parseMeetingTime,
   type ProspectRecord,
   type DynamicPromptResult,
 } from '../../lib/steve-wa-brain.js';
@@ -235,6 +238,17 @@ export async function steveWAChat(c: Context) {
 
     // Extract clean phone number
     const phone = from.replace('whatsapp:', '').replace('+', '').trim();
+
+    // ─── El Chino routing: if JM sends a command, handle it here ────
+    const jmPhone = (process.env.JOSE_WHATSAPP_NUMBER || process.env.JM_PHONE || '').replace('+', '');
+    if (jmPhone && phone === jmPhone) {
+      const chinoResult = await handleChinoWhatsApp(messageBody);
+      if (chinoResult) {
+        const escXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return c.text(`<Response><Message>${escXml(chinoResult)}</Message></Response>`, 200, { 'Content-Type': 'text/xml' });
+      }
+      // Not a Chino command — JM falls through to normal merchant flow
+    }
 
     // Identify merchant by whatsapp_phone (with and without + prefix)
     const { data: client } = await supabase
@@ -859,13 +873,17 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
     // Detect if Steve sent meeting link in this reply
     const meetingLinkSent = fullReplyText.includes('meetings.hubspot.com');
 
+    // Detect if Steve proposed meeting times (Mini CRM)
+    const meetingProposed = /(?:llamada|reunión|videollamada|call).*(?:\d{1,2}[:\.]?\d{0,2}\s*(?:am|pm|hrs|h)?|mañana|lunes|martes|miércoles|jueves|viernes)/i.test(fullReplyText)
+      && (prospect.meeting_status === 'none' || !prospect.meeting_status);
+
     // Paso 2: Detect disqualification → mark as lost
     const disqResult = detectDisqualification(messageBody, history);
 
     // Paso 17: Detect URL in prospect message (reuse earlier detection)
     const urlMatch = detectedUrl ? [detectedUrl] : null;
 
-    processProspectAsync(prospect, fullHistory, meetingLinkSent, disqResult.disqualified ? disqResult.reason : undefined, urlMatch?.[0]).catch(err => {
+    processProspectAsync(prospect, fullHistory, meetingLinkSent, disqResult.disqualified ? disqResult.reason : undefined, urlMatch?.[0], meetingProposed).catch(err => {
       console.error('[steve-wa-chat] processProspectAsync error:', err);
     });
 
@@ -899,6 +917,7 @@ async function processProspectAsync(
   meetingLinkSentInReply: boolean,
   disqualifiedReason?: string,
   detectedUrl?: string,
+  meetingProposed?: boolean,
 ): Promise<void> {
   const supabase = getSupabaseAdmin();
 
@@ -944,7 +963,7 @@ async function processProspectAsync(
 
     if (extracted) {
       const mergeFields = [
-        'name', 'email', 'company', 'what_they_sell', 'monthly_revenue',
+        'name', 'apellido', 'email', 'company', 'what_they_sell', 'monthly_revenue',
         'has_online_store', 'store_platform', 'is_decision_maker',
         'actively_looking', 'current_marketing', 'pain_points',
         'integrations_used', 'team_size', 'budget_range', 'decision_timeline',
@@ -1024,6 +1043,12 @@ async function processProspectAsync(
       updatePayload.meeting_suggested_at = new Date().toISOString();
     }
 
+    // Track meeting proposal (Mini CRM)
+    if (meetingProposed && (!prospect.meeting_status || prospect.meeting_status === 'none')) {
+      updatePayload.meeting_status = 'proposed';
+      updatePayload.meeting_suggested_at = new Date().toISOString();
+    }
+
     // Update prospect in DB
     await supabase
       .from('wa_prospects')
@@ -1084,6 +1109,64 @@ async function processProspectAsync(
 
         console.log(`[prospect ${prospect.phone}] pushed to HubSpot: contact=${hubspotResult.contactId}`);
       }
+    }
+
+    // ============================================================
+    // Mini CRM: Meeting confirmation detection
+    // If meeting_status === 'proposed', check if prospect confirmed/rejected
+    // ============================================================
+    const currentMeetingStatus = prospect.meeting_status || 'none';
+    if (currentMeetingStatus === 'proposed') {
+      const lastUserMsg = history.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
+      const meetingResult = await detectMeetingConfirmation(lastUserMsg, history);
+
+      if (meetingResult.confirmed && meetingResult.proposedTime) {
+        // Prospect confirmed a time via text — parse it and save as scheduled
+        // The booking API handles Calendar + Meet when prospect books via link.
+        // This fallback handles text-based confirmations (no link was used).
+        const meetingDate = await parseMeetingTime(meetingResult.proposedTime);
+        if (meetingDate) {
+          await supabase
+            .from('wa_prospects')
+            .update({
+              meeting_at: meetingDate.toISOString(),
+              meeting_status: 'scheduled',
+              reminder_24h_sent: false,
+              reminder_2h_sent: false,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', prospect.id);
+
+          // If there's an assigned seller, create Calendar event via booking API
+          if (prospect.assigned_seller_id) {
+            const bookingApiUrl = process.env.CLOUD_RUN_URL || 'http://localhost:8080';
+            fetch(`${bookingApiUrl}/api/booking/confirm`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                seller_id: prospect.assigned_seller_id,
+                slot_start: meetingDate.toISOString(),
+                prospect_name: prospect.name || prospect.profile_name || 'Prospecto',
+                prospect_phone: prospect.phone,
+                prospect_id: prospect.id,
+              }),
+            }).catch(err => console.error('[meeting-confirm] Booking API error:', err));
+          }
+
+          console.log(`[prospect ${prospect.phone}] Meeting scheduled via text: ${meetingDate.toISOString()}`);
+        }
+      } else if (meetingResult.rejected) {
+        // Prospect rejected the meeting entirely
+        await supabase
+          .from('wa_prospects')
+          .update({
+            meeting_status: 'cancelled',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', prospect.id);
+        console.log(`[prospect ${prospect.phone}] Meeting rejected`);
+      }
+      // If proposedTime but not confirmed → prospect suggested alternative, Steve handles in next reply
     }
   } catch (err) {
     console.error('[steve-wa-chat] processProspectAsync error:', err);

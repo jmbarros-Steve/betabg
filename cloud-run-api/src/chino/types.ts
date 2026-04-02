@@ -4,8 +4,8 @@ export interface ChinoCheck {
   id: string;
   check_number: number;
   description: string;
-  check_type: 'api_compare' | 'token_health' | 'performance' | 'visual' | 'functional' | 'data_quality' | 'security';
-  platform: 'shopify' | 'meta' | 'klaviyo' | 'infra' | 'all';
+  check_type: 'api_compare' | 'api_exists' | 'token_health' | 'performance' | 'visual' | 'functional' | 'data_quality' | 'security';
+  platform: 'shopify' | 'meta' | 'klaviyo' | 'stevemail' | 'steve_chat' | 'brief' | 'scraping' | 'infra' | 'security' | 'all';
   severity: 'critical' | 'high' | 'medium' | 'low';
   check_config: Record<string, any>;
   consecutive_fails: number;

@@ -29,18 +29,23 @@ Mensaje: "${message}"
 Convierte esto en un check para la tabla chino_routine. Responde en JSON:
 {
   "description": "descripción del check en lenguaje claro",
-  "check_type": "api_compare|visual|data_quality|functional|security|performance|token_health",
-  "platform": "shopify|meta|klaviyo|infra|all",
+  "check_type": "api_compare|api_exists|visual|data_quality|functional|security|performance|token_health",
+  "platform": "shopify|meta|klaviyo|stevemail|steve_chat|brief|scraping|infra|security|all",
   "severity": "critical|high|medium|low",
   "check_config": {},
   "confirmation_message": "mensaje de confirmación para José Manuel en español chileno informal"
 }
 
 Contexto de plataformas:
-- shopify: productos, órdenes, descuentos, colecciones
-- meta: campañas, audiencias, pixel, presupuesto
-- klaviyo: flows de email, métricas de email
-- infra: endpoints de Steve, tiempos de respuesta, health checks
+- shopify: productos, órdenes, descuentos, colecciones, webhooks
+- meta: campañas, audiencias, pixel, presupuesto, social inbox
+- klaviyo: flows de email, métricas de email, sincronización contactos
+- stevemail: sistema de email marketing propio, templates, campañas, formularios
+- steve_chat: chat AI de Steve, respuestas, contexto, prompt quality
+- brief: generación de copies, briefs creativos, análisis de marca
+- scraping: web scraping, competencia, contenido externo
+- infra: endpoints de Steve, tiempos de respuesta, health checks, Cloud Run
+- security: tokens, permisos, RLS, datos sensibles, accesos
 - all: aplica a todas las plataformas
 
 Responde SOLO el JSON.`,

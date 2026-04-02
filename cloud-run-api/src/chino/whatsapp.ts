@@ -1,8 +1,9 @@
-// El Chino — WhatsApp notifications
+// El Chino — WhatsApp notifications + command handlers
 // Uses existing Twilio integration from lib/twilio-client.ts
 
 import { getSupabaseAdmin } from '../lib/supabase.js';
 import { sendWhatsApp, sendWhatsAppMedia } from '../lib/twilio-client.js';
+import { isChinoInstruction, handleChinoInstruction } from './instruction-handler.js';
 
 // JM's phone — env var or hardcoded fallback
 function getJMPhone(): string {
@@ -150,4 +151,162 @@ ${criticalFails.map((f) => `• #${f.check_number}: ${f.error_message || f.descr
 Generando fixes automáticos...`;
 
   await sendToJM(message);
+}
+
+// ─── WhatsApp Command Handlers ──────────────────────────────────
+// JM sends a message → handleChinoWhatsApp tries to match a command.
+// Returns string response if matched, null if not a chino command.
+
+const CMD_RESUMEN = /qu[eé]\s*(revisas|checks|checkeas)/i;
+const CMD_DESACTIVAR = /desactiva\s*(?:check\s*)?#?(\d+)/i;
+const CMD_ACTIVAR = /activa\s*(?:check\s*)?#?(\d+)/i;
+const CMD_ESTADO = /\b(estado|status|c[oó]mo\s*va)\b/i;
+const CMD_REPORTE = /\b([uú]ltimo\s*reporte|reporte)\b/i;
+const CMD_FALLOS = /\b(qu[eé]\s*fall[oó]|errores\s*hoy|fallos)\b/i;
+
+async function cmdResumen(): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase
+    .from('chino_routine')
+    .select('platform, is_active');
+
+  if (!data || data.length === 0) return 'No hay checks configurados todavía.';
+
+  const active = data.filter((r) => r.is_active);
+  const byPlatform: Record<string, number> = {};
+  for (const row of active) {
+    byPlatform[row.platform] = (byPlatform[row.platform] || 0) + 1;
+  }
+
+  const lines = Object.entries(byPlatform)
+    .sort((a, b) => b[1] - a[1])
+    .map(([p, c]) => `• ${p}: ${c}`);
+
+  return `📋 *EL CHINO — Resumen*
+${data.length} checks totales (${active.length} activos)
+
+*Por plataforma:*
+${lines.join('\n')}`;
+}
+
+async function cmdDesactivar(checkNum: number): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('chino_routine')
+    .update({ is_active: false })
+    .eq('check_number', checkNum)
+    .select('description')
+    .maybeSingle();
+
+  if (error) return `Error al desactivar: ${error.message}`;
+  if (!data) return `Check #${checkNum} no existe.`;
+  return `✅ Check #${checkNum} desactivado: ${data.description}`;
+}
+
+async function cmdActivar(checkNum: number): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('chino_routine')
+    .update({ is_active: true })
+    .eq('check_number', checkNum)
+    .select('description')
+    .maybeSingle();
+
+  if (error) return `Error al activar: ${error.message}`;
+  if (!data) return `Check #${checkNum} no existe.`;
+  return `✅ Check #${checkNum} activado: ${data.description}`;
+}
+
+async function cmdEstado(): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const oneHourAgo = new Date(Date.now() - 3600_000).toISOString();
+
+  const [{ data: reports }, { data: routine }] = await Promise.all([
+    supabase.from('chino_reports').select('result').gte('created_at', oneHourAgo),
+    supabase.from('chino_routine').select('is_active').eq('is_active', true),
+  ]);
+
+  const total = reports?.length || 0;
+  const passed = reports?.filter((r) => r.result === 'pass').length || 0;
+  const failed = reports?.filter((r) => r.result === 'fail').length || 0;
+  const errors = reports?.filter((r) => r.result === 'error').length || 0;
+  const activeChecks = routine?.length || 0;
+
+  if (total === 0) {
+    return `🔵 *EL CHINO — Estado*
+${activeChecks} checks activos
+No hay corridas en la última hora.`;
+  }
+
+  const emoji = failed === 0 && errors === 0 ? '✅' : '⚠️';
+  return `${emoji} *EL CHINO — Estado*
+${activeChecks} checks activos
+Última hora: ${total} ejecutados
+${passed} ✅ | ${failed} ❌ | ${errors} ⚠️`;
+}
+
+async function cmdFallos(): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 3600_000).toISOString();
+
+  const { data: failures } = await supabase
+    .from('chino_reports')
+    .select('check_number, error_message, result, created_at')
+    .in('result', ['fail', 'error'])
+    .gte('created_at', twentyFourHoursAgo)
+    .order('created_at', { ascending: false })
+    .limit(15);
+
+  if (!failures || failures.length === 0) {
+    return '✅ *EL CHINO* — Sin fallos en las últimas 24 horas. Todo limpio jefe.';
+  }
+
+  const lines = failures.map((f) => {
+    const err = (f.error_message || f.result).substring(0, 60);
+    return `• #${f.check_number}: ${err}`;
+  });
+
+  return `❌ *EL CHINO — Fallos (24h)*
+${failures.length} fallo(s):
+
+${lines.join('\n')}`;
+}
+
+export async function handleChinoWhatsApp(message: string): Promise<string | null> {
+  try {
+    // 1. Match explicit commands
+    let match: RegExpMatchArray | null;
+
+    match = message.match(CMD_RESUMEN);
+    if (match) return cmdResumen();
+
+    match = message.match(CMD_DESACTIVAR);
+    if (match) return cmdDesactivar(parseInt(match[1], 10));
+
+    match = message.match(CMD_ACTIVAR);
+    if (match) return cmdActivar(parseInt(match[1], 10));
+
+    match = message.match(CMD_ESTADO);
+    if (match) return cmdEstado();
+
+    match = message.match(CMD_REPORTE);
+    if (match) {
+      await sendPeriodicReport();
+      return 'Listo jefe, reporte enviado arriba. ☝️';
+    }
+
+    match = message.match(CMD_FALLOS);
+    if (match) return cmdFallos();
+
+    // 2. Check if it's a Chino instruction (natural language → new check)
+    if (isChinoInstruction(message)) {
+      return handleChinoInstruction(message);
+    }
+
+    // 3. Not a Chino command — return null so JM falls through to normal merchant flow
+    return null;
+  } catch (err: any) {
+    console.error('[chino/wa] Command handler error:', err.message);
+    return `Error procesando comando: ${err.message}`;
+  }
 }
