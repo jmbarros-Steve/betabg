@@ -34,7 +34,7 @@ const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_
 
 // Rate limiting: track last response time per phone (in-memory + DB fallback)
 const lastResponseTime = new Map<string, number>();
-const RATE_LIMIT_MS = 30_000; // 30 seconds
+const RATE_LIMIT_MS = 5_000; // 5 seconds
 
 // Stage order for "only advance, never go back" rule
 const STAGE_ORDER: Record<string, number> = {
