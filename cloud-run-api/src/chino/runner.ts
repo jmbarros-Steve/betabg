@@ -17,15 +17,18 @@ import type { ChinoCheck, MerchantConn, CheckResult, PatrolResult, PatrolDetail 
 
 // All supported check types
 const ALL_CHECK_TYPES = [
-  'api_compare', 'token_health', 'performance',
+  'api_compare', 'api_exists', 'token_health', 'performance',
   'visual', 'functional', 'data_quality', 'security',
 ] as const;
 
+// Concurrency limit for parallel check execution
+const CONCURRENCY = 10;
+
 // Check types that don't need a merchant connection
-const NO_MERCHANT_TYPES = new Set(['performance', 'visual']);
+const NO_MERCHANT_TYPES = new Set(['performance', 'visual', 'api_exists']);
 
 // Check types that don't need a decrypted token
-const NO_TOKEN_TYPES = new Set(['performance', 'visual', 'data_quality']);
+const NO_TOKEN_TYPES = new Set(['performance', 'visual', 'data_quality', 'api_exists']);
 
 // ─── Get merchant connections ────────────────────────────────────
 
@@ -216,6 +219,9 @@ async function executeCheck(
       case 'api_compare':
         return await executeApiCompare(supabase, check, merchant!, decryptedToken);
 
+      case 'api_exists':
+        return await executePerformance(check); // api_exists checks endpoint reachability like performance
+
       case 'token_health':
         return await executeTokenHealth(check, merchant!, decryptedToken);
 
@@ -306,7 +312,7 @@ export async function runChinoPatrol(): Promise<PatrolResult> {
     return token;
   }
 
-  // 4. Execute checks sequentially
+  // 4. Execute checks in parallel batches (CONCURRENCY at a time)
   const details: PatrolDetail[] = [];
   let passed = 0, failed = 0, errors = 0, skipped = 0;
 
@@ -317,24 +323,25 @@ export async function runChinoPatrol(): Promise<PatrolResult> {
     else skipped++;
   }
 
-  for (const check of checks as ChinoCheck[]) {
+  // Process a single check (may produce multiple details if per-merchant)
+  async function processCheck(check: ChinoCheck): Promise<PatrolDetail[]> {
+    const localDetails: PatrolDetail[] = [];
     const needsMerchant = !NO_MERCHANT_TYPES.has(check.check_type);
     const needsToken = !NO_TOKEN_TYPES.has(check.check_type);
 
-    // ── Checks that DON'T need a merchant (performance, visual with infra platform) ──
-    if (!needsMerchant || check.platform === 'infra') {
+    // ── Checks that DON'T need a merchant ──
+    if (!needsMerchant || ['infra', 'security', 'stevemail', 'steve_chat', 'brief', 'scraping'].includes(check.platform)) {
       const result = await executeCheck(supabase, check, null, null);
-      details.push({
+      localDetails.push({
         check_number: check.check_number,
         description: check.description,
         platform: check.platform,
         result,
       });
-      tallyResult(result);
       await saveReport(supabase, runId, check, result);
       await updateCheckStatus(supabase, check, result);
       await enqueueFixIfNeeded(supabase, check, result);
-      continue;
+      return localDetails;
     }
 
     // ── Checks that run per merchant ──
@@ -347,20 +354,18 @@ export async function runChinoPatrol(): Promise<PatrolResult> {
     }
 
     if (targetMerchants.length === 0) {
-      // Visual/data_quality checks with no merchants can still run without merchant context
       if (!needsMerchant || !needsToken) {
         const result = await executeCheck(supabase, check, null, null);
-        details.push({
+        localDetails.push({
           check_number: check.check_number,
           description: check.description,
           platform: check.platform,
           result,
         });
-        tallyResult(result);
         await saveReport(supabase, runId, check, result);
         await updateCheckStatus(supabase, check, result);
         await enqueueFixIfNeeded(supabase, check, result);
-        continue;
+        return localDetails;
       }
 
       const skipResult: CheckResult = {
@@ -368,16 +373,15 @@ export async function runChinoPatrol(): Promise<PatrolResult> {
         error_message: `No hay conexiones activas para ${check.platform}`,
         duration_ms: 0,
       };
-      details.push({
+      localDetails.push({
         check_number: check.check_number,
         description: check.description,
         platform: check.platform,
         result: skipResult,
       });
-      skipped++;
       await saveReport(supabase, runId, check, skipResult);
       await updateCheckStatus(supabase, check, skipResult);
-      continue;
+      return localDetails;
     }
 
     // Execute for each target merchant
@@ -393,7 +397,7 @@ export async function runChinoPatrol(): Promise<PatrolResult> {
             error_message: 'Token no disponible',
             duration_ms: 0,
           };
-          details.push({
+          localDetails.push({
             check_number: check.check_number,
             description: check.description,
             platform: check.platform,
@@ -401,7 +405,6 @@ export async function runChinoPatrol(): Promise<PatrolResult> {
             merchant_name: merchant.client_name,
             result: skipResult,
           });
-          skipped++;
           await saveReport(supabase, runId, check, skipResult, merchant.client_id, merchant.client_name);
           lastResult = skipResult;
           continue;
@@ -409,7 +412,7 @@ export async function runChinoPatrol(): Promise<PatrolResult> {
       }
 
       const result = await executeCheck(supabase, check, merchant, token);
-      details.push({
+      localDetails.push({
         check_number: check.check_number,
         description: check.description,
         platform: check.platform,
@@ -418,15 +421,32 @@ export async function runChinoPatrol(): Promise<PatrolResult> {
         result,
       });
 
-      tallyResult(result);
       await saveReport(supabase, runId, check, result, merchant.client_id, merchant.client_name);
       lastResult = result;
     }
 
-    // Update check status with the last result
     if (lastResult) {
       await updateCheckStatus(supabase, check, lastResult);
       await enqueueFixIfNeeded(supabase, check, lastResult);
+    }
+    return localDetails;
+  }
+
+  // Run in batches of CONCURRENCY
+  const typedChecks = checks as ChinoCheck[];
+  for (let i = 0; i < typedChecks.length; i += CONCURRENCY) {
+    const batch = typedChecks.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.allSettled(batch.map((c) => processCheck(c)));
+    for (const result of batchResults) {
+      if (result.status === 'fulfilled') {
+        for (const d of result.value) {
+          details.push(d);
+          tallyResult(d.result);
+        }
+      } else {
+        errors++;
+        console.error(`[chino] Batch check error:`, result.reason);
+      }
     }
   }
 
