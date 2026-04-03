@@ -18,6 +18,7 @@ import { processQueueItem } from './utilities/process-queue-item.js';
 import { processTranscription } from './utilities/process-transcription.js';
 import { onboardingBot } from './utilities/onboarding-bot.js';
 import { checkClientConnections } from './utilities/check-client-connections.js';
+import { creativeReviewFeed } from './utilities/creative-review-feed.js';
 
 // Phase 2: AI
 import { steveChat } from './ai/steve-chat.js';
@@ -127,6 +128,7 @@ import { taskCompleted } from './cron/task-completed.js';
 import { detectiveVisual } from './cron/detective-visual.js';
 import { skyvernDispatcher } from './cron/skyvern-dispatcher.js';
 import { prospectFollowup } from './cron/prospect-followup.js';
+import { prospectRottingDetector } from './cron/prospect-rotting-detector.js';
 import { meetingReminder } from './cron/meeting-reminder.js';
 import { prospectEmailNurture } from './cron/prospect-email-nurture.js';
 import { knowledgeDecay } from './cron/knowledge-decay.js';
@@ -172,10 +174,11 @@ import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
 import { competitorSpy } from './triggers/competitor-spy.js';
 
 // CRM
-import { prospectDetail, prospectAddNote, prospectChangeStage, prospectChangePriority, prospectUpdateTags, prospectsKanban, prospectMoveStage } from './crm/prospect-crm.js';
+import { prospectDetail, prospectAddNote, prospectChangeStage, prospectChangePriority, prospectUpdateTags, prospectsKanban, prospectMoveStage, prospectUpdateDeal } from './crm/prospect-crm.js';
 import { salesTasksCrud, salesTasksAutoGenerate } from './crm/sales-tasks.js';
 import { proposalsCrud, proposalsGenerate } from './crm/proposals.js';
 import { sellersList } from './crm/sellers.js';
+import { webFormsCrud, webFormSubmit, webFormConfig } from './crm/web-forms.js';
 
 // Booking
 import { bookingSlots, bookingConfirm } from './booking/booking-api.js';
@@ -261,6 +264,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/approve-knowledge', authMiddleware, approveKnowledge);
   app.post('/api/submit-correction', authMiddleware, submitCorrection);
   app.post('/api/swarm-sources', authMiddleware, swarmSources);
+  app.post('/api/creative-review-feed', authMiddleware, creativeReviewFeed);
 
   // ============================================================
   // Phase 2: AI & Analytics
@@ -485,6 +489,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/detective-visual', detectiveVisual); // No JWT — uses X-Cron-Secret, every 2h: 0 8,10,12,14,16,18,20 * * *
   app.post('/api/cron/skyvern-dispatcher', skyvernDispatcher); // No JWT — uses X-Cron-Secret, every 2min: */2 * * * *
   app.post('/api/cron/prospect-followup', prospectFollowup); // No JWT — uses X-Cron-Secret, every 4h: 0 */4 * * *
+  app.post('/api/cron/prospect-rotting-detector', prospectRottingDetector); // No JWT — uses X-Cron-Secret, every 6h: 0 */6 * * *
   app.post('/api/cron/meeting-reminder', meetingReminder); // No JWT — uses X-Cron-Secret, every 30min: */30 * * * *
   app.post('/api/cron/prospect-email-nurture', prospectEmailNurture); // No JWT — uses X-Cron-Secret, daily 1pm UTC (10am Chile): 0 13 * * *
   app.post('/api/cron/knowledge-decay', knowledgeDecay); // No JWT — uses X-Cron-Secret, monthly: 0 4 1 * *
@@ -541,7 +546,11 @@ export function registerRoutes(app: Hono) {
   app.post('/api/crm/prospect/priority', authMiddleware, prospectChangePriority);
   app.post('/api/crm/prospect/tags', authMiddleware, prospectUpdateTags);
   app.post('/api/crm/prospect/move-stage', authMiddleware, prospectMoveStage);
+  app.post('/api/crm/prospect/deal', authMiddleware, prospectUpdateDeal);
   app.post('/api/crm/prospects/kanban', authMiddleware, prospectsKanban);
+  app.post('/api/crm/web-forms', authMiddleware, webFormsCrud);
+  app.post('/api/web-forms/submit', webFormSubmit); // PUBLIC — no auth, form submissions
+  app.post('/api/web-forms/config', webFormConfig); // PUBLIC — no auth, load form config
   app.post('/api/crm/tasks', authMiddleware, salesTasksCrud);
   app.post('/api/crm/tasks/auto-generate', authMiddleware, salesTasksAutoGenerate);
   app.post('/api/crm/proposals', authMiddleware, proposalsCrud);
