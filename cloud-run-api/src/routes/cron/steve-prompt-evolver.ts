@@ -2,6 +2,12 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 export async function stevePromptEvolver(c: Context) {
+  const cronSecret = process.env.CRON_SECRET;
+  const providedSecret = c.req.header('X-Cron-Secret');
+  if (!cronSecret || providedSecret !== cronSecret) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
   const supabase = getSupabaseAdmin();
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) return c.json({ error: 'ANTHROPIC_API_KEY not configured' }, 500);

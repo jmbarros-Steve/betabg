@@ -213,10 +213,48 @@ VS PROMEDIO MERCHANT: ${JSON.stringify(creative.benchmark_comparison || {})}
     console.error('[perf-evaluator] Learning loop error:', learnErr);
   }
 
+  // ── EFFECTIVENESS SCORING: correlate rules_applied with performance_score ──
+  let effectivenessUpdated = 0;
+  try {
+    const thirtyDaysAgo2 = new Date(Date.now() - 30 * 86400000).toISOString();
+    const { data: scored } = await supabase
+      .from('creative_history')
+      .select('rules_applied, performance_score')
+      .not('rules_applied', 'is', null)
+      .not('performance_score', 'is', null)
+      .gte('measured_at', thirtyDaysAgo2);
+
+    if (scored && scored.length > 0) {
+      // Group performance_score by rule_id
+      const ruleScores: Record<string, number[]> = {};
+      for (const row of scored) {
+        if (!Array.isArray(row.rules_applied)) continue;
+        for (const ruleId of row.rules_applied) {
+          if (!ruleScores[ruleId]) ruleScores[ruleId] = [];
+          ruleScores[ruleId].push(row.performance_score);
+        }
+      }
+
+      // Update effectiveness_score for rules with 3+ measurements
+      for (const [ruleId, scores] of Object.entries(ruleScores)) {
+        if (scores.length < 3) continue;
+        const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+        const { error: effErr } = await supabase
+          .from('steve_knowledge')
+          .update({ effectiveness_score: avg })
+          .eq('id', ruleId);
+        if (!effErr) effectivenessUpdated++;
+      }
+    }
+  } catch (effErr) {
+    console.error('[perf-evaluator] Effectiveness scoring error:', effErr);
+  }
+
   return c.json({
     evaluated,
     tasks_created: tasksCreated,
     total_measured: measured.length,
     knowledge_learned: knowledgeInserted,
+    effectiveness_updated: effectivenessUpdated,
   });
 }

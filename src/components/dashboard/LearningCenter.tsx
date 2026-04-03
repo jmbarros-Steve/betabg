@@ -42,6 +42,8 @@ const CATEGORY_COLORS: Record<string, string> = {
   buyer_persona: 'bg-cyan-500/15 text-cyan-700 border-cyan-300',
   keywords: 'bg-gray-500/15 text-gray-700 border-gray-300',
   analisis: 'bg-emerald-500/15 text-emerald-700 border-emerald-300',
+  cross_channel: 'bg-violet-500/15 text-violet-700 border-violet-300',
+  sales_learning: 'bg-amber-500/15 text-amber-700 border-amber-300',
 };
 
 const CATEGORIES = [
@@ -56,6 +58,8 @@ const CATEGORIES = [
   { value: 'anuncios', label: '🎯 Anuncios' },
   { value: 'buyer_persona', label: '👤 Buyer Persona' },
   { value: 'analisis', label: '📊 Análisis' },
+  { value: 'cross_channel', label: '🔗 Cross Channel' },
+  { value: 'sales_learning', label: '💼 Sales' },
 ];
 
 // ── Queue item for batch processing ──────────────────────────────────────────
@@ -151,6 +155,13 @@ export function LearningCenter({ onSaved }: { onSaved: () => void }) {
 
       if (data?.status === 'duplicate') {
         toast.info('Este contenido ya está en la cola');
+        setPhase('idle');
+        setPhaseMessage('');
+        return;
+      }
+
+      if (data?.status === 'already_processed') {
+        toast.info('Este contenido ya fue procesado anteriormente.');
         setPhase('idle');
         setPhaseMessage('');
         return;

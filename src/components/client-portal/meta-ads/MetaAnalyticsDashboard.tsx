@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -32,9 +33,11 @@ import {
   TrendingUp, TrendingDown, DollarSign, Eye, MousePointerClick,
   ShoppingCart, Target, ArrowUpRight, ArrowDownRight,
   ChevronDown, ChevronRight, Sparkles, RefreshCw,
-  FileDown, CalendarClock, Loader2,
+  FileDown, CalendarClock, Loader2, Settings2, AlertTriangle,
 } from 'lucide-react';
 import { useMetaBusiness } from './MetaBusinessContext';
+import { getTargetStatus, getTargetBgColor, getProgressPercent } from '@/lib/metric-utils';
+import MetaHealthBanner from './MetaHealthBanner';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -526,6 +529,150 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
     return { bestCampaign, worstCampaign, budgetRec, creativeFatigue };
   }, [campaigns]);
 
+  // ------ Merchant Goals (localStorage) ------
+
+  const goalsKey = `steve-meta-goals-${clientId}`;
+  const [goalsOpen, setGoalsOpen] = useState(false);
+  const [goalRoas, setGoalRoas] = useState('');
+  const [goalCpa, setGoalCpa] = useState('');
+
+  // Load goals from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(goalsKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.roas) setGoalRoas(String(parsed.roas));
+        if (parsed.cpa) setGoalCpa(String(parsed.cpa));
+      }
+    } catch { /* ignore */ }
+  }, [goalsKey]);
+
+  const savedGoals = useMemo(() => {
+    const roas = parseFloat(goalRoas);
+    const cpa = parseFloat(goalCpa);
+    return {
+      roas: isNaN(roas) || roas <= 0 ? 0 : roas,
+      cpa: isNaN(cpa) || cpa <= 0 ? 0 : cpa,
+    };
+  }, [goalRoas, goalCpa]);
+
+  function handleSaveGoals() {
+    const roas = parseFloat(goalRoas);
+    const cpa = parseFloat(goalCpa);
+    const data: Record<string, number> = {};
+    if (!isNaN(roas) && roas > 0) data.roas = roas;
+    if (!isNaN(cpa) && cpa > 0) data.cpa = cpa;
+    localStorage.setItem(goalsKey, JSON.stringify(data));
+    setGoalsOpen(false);
+    toast.success('Metas guardadas');
+  }
+
+  // ------ Proactive Alerts ------
+
+  const activeCampaignCount = useMemo(
+    () => campaigns.filter((c) => c.status === 'ACTIVE').length,
+    [campaigns],
+  );
+
+  const proactiveAlerts = useMemo(() => {
+    const alerts: { key: string; title: string; description: string; variant: 'default' | 'destructive' }[] = [];
+
+    // ROAS dropped 20%+
+    const roasChange = pctChange(totals.roas, prevTotals.roas);
+    if (roasChange !== null && roasChange <= -20) {
+      alerts.push({
+        key: 'roas-drop',
+        title: 'ROAS en caída',
+        description: `Tu ROAS bajó ${Math.abs(roasChange).toFixed(0)}% vs el periodo anterior (${prevTotals.roas.toFixed(2)}x → ${totals.roas.toFixed(2)}x).`,
+        variant: 'destructive',
+      });
+    }
+
+    // CPA doubled
+    if (prevTotals.conversions > 0 && totals.conversions > 0) {
+      const prevCpa = prevTotals.spend / prevTotals.conversions;
+      const currCpa = totals.spend / totals.conversions;
+      if (prevCpa > 0 && currCpa >= prevCpa * 2) {
+        alerts.push({
+          key: 'cpa-spike',
+          title: 'CPA se duplicó',
+          description: `Tu costo por venta subió de ${formatCLP(prevCpa)} a ${formatCLP(currCpa)}. Revisa segmentación o creativos.`,
+          variant: 'destructive',
+        });
+      }
+    }
+
+    // Creative fatigue
+    if (insights?.creativeFatigue) {
+      alerts.push({
+        key: 'fatigue',
+        title: 'Fatiga creativa detectada',
+        description: insights.creativeFatigue,
+        variant: 'default',
+      });
+    }
+
+    return alerts.slice(0, 3);
+  }, [totals, prevTotals, insights]);
+
+  // ------ Best Day of Week ------
+
+  const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+  const bestDayOfWeek = useMemo(() => {
+    if (dailyChartData.length < 7) return null;
+    const byDay: Record<number, { spend: number; revenue: number; count: number }> = {};
+    for (const d of dailyChartData) {
+      const dow = new Date(d.date + 'T12:00:00').getDay();
+      const entry = byDay[dow] || { spend: 0, revenue: 0, count: 0 };
+      entry.spend += d.spend;
+      entry.revenue += d.revenue;
+      entry.count++;
+      byDay[dow] = entry;
+    }
+    let bestDay = -1;
+    let bestRoas = 0;
+    for (const [day, data] of Object.entries(byDay)) {
+      const roas = data.spend > 0 ? data.revenue / data.spend : 0;
+      if (roas > bestRoas) {
+        bestRoas = roas;
+        bestDay = Number(day);
+      }
+    }
+    if (bestDay < 0 || bestRoas === 0) return null;
+    return { day: DAY_NAMES[bestDay], roas: bestRoas };
+  }, [dailyChartData]);
+
+  // ------ Conversion Velocity ------
+
+  const conversionVelocity = useMemo(() => {
+    if (totals.conversions <= 0 || days <= 0) return null;
+    const totalHours = days * 24;
+    const hoursPerConversion = totalHours / totals.conversions;
+    if (hoursPerConversion < 1) {
+      const minsPerConv = Math.round(hoursPerConversion * 60);
+      return `1 venta cada ${minsPerConv} min`;
+    }
+    if (hoursPerConversion < 24) {
+      return `1 venta cada ${hoursPerConversion.toFixed(1)}h`;
+    }
+    const daysPerConv = hoursPerConversion / 24;
+    return `1 venta cada ${daysPerConv.toFixed(1)} días`;
+  }, [totals.conversions, days]);
+
+  // ------ Month Projection ------
+
+  const projection = useMemo(() => {
+    if (days <= 0 || totals.revenue <= 0) return null;
+    const dailyRevenue = totals.revenue / days;
+    const dailySpend = totals.spend / days;
+    const projectedRevenue = dailyRevenue * 30;
+    const projectedSpend = dailySpend * 30;
+    const projectedRoas = projectedSpend > 0 ? projectedRevenue / projectedSpend : 0;
+    return { revenue: projectedRevenue, roas: projectedRoas };
+  }, [totals, days]);
+
   // ------ PDF Export ------
 
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -714,6 +861,11 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
   return (
     <div className="space-y-6">
       {/* ------------------------------------------------------------------ */}
+      {/* 0. Health Banner (semaphore + sync time + summary)                  */}
+      {/* ------------------------------------------------------------------ */}
+      <MetaHealthBanner totals={totals} activeCampaignCount={activeCampaignCount} />
+
+      {/* ------------------------------------------------------------------ */}
       {/* 1. Date Range Selector + Refresh                                   */}
       {/* ------------------------------------------------------------------ */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -759,6 +911,14 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setGoalsOpen(true)}
+          >
+            <Settings2 className="w-4 h-4 mr-2" />
+            Metas
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -821,13 +981,26 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
           icon={Target}
           accent="amber"
         />
-        <KpiCard
-          title="Ventas"
-          value={formatNumber(totals.conversions)}
-          change={pctChange(totals.conversions, prevTotals.conversions)}
-          icon={ShoppingCart}
-          accent="green"
-        />
+        <Card className="relative overflow-hidden border bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
+          <CardContent className="pt-5 pb-5 px-5">
+            <div className="flex items-start justify-between mb-3">
+              <span className="text-sm font-medium text-muted-foreground leading-tight">Ventas</span>
+              <div className="p-2 rounded-lg text-green-500 bg-green-500/10">
+                <ShoppingCart className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-3xl font-bold tracking-tight leading-none mb-2">
+              {formatNumber(totals.conversions)}
+            </p>
+            <ChangeIndicator value={pctChange(totals.conversions, prevTotals.conversions)} />
+            {conversionVelocity && (
+              <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                {conversionVelocity}
+              </p>
+            )}
+          </CardContent>
+        </Card>
         <KpiCard
           title="Ingresos"
           value={formatCLP(totals.revenue)}
@@ -835,14 +1008,83 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
           icon={DollarSign}
           accent="cyan"
         />
-        <KpiCard
-          title={<JargonTooltip term="ROAS" />}
-          value={formatRoas(totals.roas)}
-          change={pctChange(totals.roas, prevTotals.roas)}
-          icon={TrendingUp}
-          accent="green"
-        />
+        {/* ROAS KPI with optional progress bar */}
+        <Card className="relative overflow-hidden border bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
+          <CardContent className="pt-5 pb-5 px-5">
+            <div className="flex items-start justify-between mb-3">
+              <span className="text-sm font-medium text-muted-foreground leading-tight">
+                <JargonTooltip term="ROAS" />
+              </span>
+              <div className="p-2 rounded-lg text-green-500 bg-green-500/10">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-3xl font-bold tracking-tight leading-none mb-2">
+              {formatRoas(totals.roas)}
+            </p>
+            <ChangeIndicator value={pctChange(totals.roas, prevTotals.roas)} />
+            {savedGoals.roas > 0 && (
+              <div className="mt-3">
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                  <span>Meta: {savedGoals.roas.toFixed(1)}x</span>
+                  <span>{Math.min(100, Math.round(getProgressPercent(totals.roas, savedGoals.roas, true)))}%</span>
+                </div>
+                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${getTargetBgColor(getTargetStatus(totals.roas, savedGoals.roas, true))}`}
+                    style={{ width: `${Math.min(100, getProgressPercent(totals.roas, savedGoals.roas, true))}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* 2.5 Proactive Alerts                                               */}
+      {/* ------------------------------------------------------------------ */}
+      {proactiveAlerts.length > 0 && (
+        <div className="space-y-2">
+          {proactiveAlerts.map((alert) => (
+            <Alert key={alert.key} variant={alert.variant}>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>{alert.title}</AlertTitle>
+              <AlertDescription>{alert.description}</AlertDescription>
+            </Alert>
+          ))}
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* 2.7 Quick Insights: Best Day + Projection                          */}
+      {/* ------------------------------------------------------------------ */}
+      {(bestDayOfWeek || projection) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {bestDayOfWeek && (
+            <Card className="border-indigo-500/20 bg-indigo-500/[0.03]">
+              <CardContent className="py-4 px-5">
+                <p className="text-xs font-medium text-muted-foreground mb-1">Tu mejor día</p>
+                <p className="text-lg font-bold">
+                  Los <span className="text-indigo-600">{bestDayOfWeek.day}</span> tienes ROAS {bestDayOfWeek.roas.toFixed(1)}x
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Considera aumentar presupuesto ese día</p>
+              </CardContent>
+            </Card>
+          )}
+          {projection && (
+            <Card className="border-cyan-500/20 bg-cyan-500/[0.03]">
+              <CardContent className="py-4 px-5">
+                <p className="text-xs font-medium text-muted-foreground mb-1">Si mantienes este ritmo...</p>
+                <p className="text-lg font-bold">
+                  Cerrarás el mes con <span className="text-cyan-600">{formatCLP(projection.revenue)}</span> y ROAS {projection.roas.toFixed(1)}x
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Proyección lineal basada en los últimos {days} días</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* ------------------------------------------------------------------ */}
       {/* 3. Spend & Revenue Chart                                           */}
@@ -944,6 +1186,9 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                     <SortHeader field="roas" label={<JargonTooltip term="ROAS" />} />
                     <SortHeader field="ctr" label={<JargonTooltip term="CTR" />} />
                     <SortHeader field="cpa" label={<JargonTooltip term="CPA" />} />
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider w-20">
+                      Tendencia
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -972,6 +1217,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                     <td className="px-4 py-3 text-right">
                       {totals.conversions > 0 ? formatCLP(totals.spend / totals.conversions) : '--'}
                     </td>
+                    <td />
                   </tr>
                 </tfoot>
               </table>
@@ -1206,6 +1452,55 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Goals Dialog */}
+      <Dialog open={goalsOpen} onOpenChange={setGoalsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Metas de Rendimiento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>ROAS objetivo (ej: 3)</Label>
+              <Input
+                type="number"
+                min={0}
+                step={0.1}
+                value={goalRoas}
+                onChange={(e) => setGoalRoas(e.target.value)}
+                placeholder="3.0"
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Retorno deseado por cada $1 invertido
+              </p>
+            </div>
+            <div>
+              <Label>CPA máximo (ej: 15000)</Label>
+              <Input
+                type="number"
+                min={0}
+                step={100}
+                value={goalCpa}
+                onChange={(e) => setGoalCpa(e.target.value)}
+                placeholder="15000"
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Costo máximo aceptable por venta
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setGoalsOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveGoals}>
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1251,12 +1546,41 @@ function CampaignRow({
         <td className="px-4 py-3 text-right tabular-nums">
           {c.conversions > 0 ? formatCLP(c.cpa) : '--'}
         </td>
+        <td className="px-4 py-3">
+          {c.dailyBreakdown.length >= 3 && (() => {
+            const sorted = [...c.dailyBreakdown].sort((a, b) => a.date.localeCompare(b.date));
+            const values = sorted.map((d) => d.roas);
+            const max = Math.max(...values, 0.01);
+            const min = Math.min(...values, 0);
+            const range = max - min || 1;
+            const w = 60;
+            const h = 20;
+            const points = values
+              .map((v, i) => `${(i / (values.length - 1)) * w},${h - ((v - min) / range) * h}`)
+              .join(' ');
+            const lastVal = values[values.length - 1];
+            const firstVal = values[0];
+            const color = lastVal >= firstVal ? '#22c55e' : '#ef4444';
+            return (
+              <svg width={w} height={h} className="mx-auto">
+                <polyline
+                  points={points}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            );
+          })()}
+        </td>
       </tr>
 
       {/* Expanded daily breakdown */}
       {isExpanded && c.dailyBreakdown.length > 0 && (
         <tr>
-          <td colSpan={8} className="p-0">
+          <td colSpan={9} className="p-0">
             <div className="bg-muted/20 border-b">
               <table className="w-full text-xs">
                 <thead>

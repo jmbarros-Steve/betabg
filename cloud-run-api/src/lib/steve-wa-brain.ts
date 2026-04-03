@@ -43,6 +43,7 @@ export interface ProspectRecord {
   meeting_notes?: string | null;
   reminder_24h_sent?: boolean | null;
   reminder_2h_sent?: boolean | null;
+  assigned_seller_id?: string | null;
   last_extracted_at?: string | null;
   hubspot_contact_id?: string | null;
   hubspot_deal_id?: string | null;
@@ -1406,9 +1407,19 @@ export async function buildDynamicSalesPrompt(
   const meetingStatus = prospect.meeting_status || 'none';
   const prospectScore = prospect.lead_score || 0;
   const prospectStage = prospect.stage || 'discovery';
+  const bookingBaseUrl = process.env.BOOKING_BASE_URL || 'https://www.steve.cl/agendar';
 
   if (prospectScore >= 70 && meetingStatus === 'none' && (prospectStage === 'qualifying' || prospectStage === 'pitching')) {
-    prompt += `\n📞 INSTRUCCIÓN PRIORITARIA: Este prospecto tiene score ${prospectScore}. DEBES sugerir agendar una llamada de 15 minutos para mostrarle Steve con sus datos reales. Propón 2-3 horarios del próximo día hábil (horario Chile). NO mandes un link externo — solo propón horarios y espera confirmación.\n`;
+    // Check if there's an assigned seller with booking link
+    const bookingLink = prospect.assigned_seller_id
+      ? `${bookingBaseUrl}/${prospect.assigned_seller_id}`
+      : null;
+
+    if (bookingLink) {
+      prompt += `\n📞 INSTRUCCIÓN PRIORITARIA: Este prospecto tiene score ${prospectScore}. DEBES sugerir agendar una llamada de 15 minutos. Mándale este link de agendamiento: ${bookingLink}\nDile algo como: "¿Agendamos una llamada rápida? Elige el horario que te acomode: ${bookingLink}"\n`;
+    } else {
+      prompt += `\n📞 INSTRUCCIÓN PRIORITARIA: Este prospecto tiene score ${prospectScore}. DEBES sugerir agendar una llamada de 15 minutos para mostrarle Steve con sus datos reales. Propón 2-3 horarios del próximo día hábil (horario Chile) y espera confirmación.\n`;
+    }
   } else if (meetingStatus === 'proposed') {
     prompt += `\n📞 Ya le propusiste reunión. Si confirma un horario, responde con entusiasmo y confirma la hora. Si propone otro horario, acepta si es razonable. Si rechaza, respétalo y sigue la conversación normalmente.\n`;
   } else if (meetingStatus === 'scheduled' || meetingStatus === 'reminded_24h' || meetingStatus === 'reminded_2h') {

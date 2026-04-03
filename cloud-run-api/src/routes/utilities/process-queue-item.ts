@@ -209,6 +209,7 @@ export async function processQueueItem(c: Context) {
       case 'pdf':
       case 'document':
       case 'text':
+      case 'feedback':
         extractedText = item.source_content;
         break;
       default:

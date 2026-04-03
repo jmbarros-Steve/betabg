@@ -28,8 +28,16 @@ import {
   Layers,
   AlertCircle,
   Pencil,
+  Copy,
 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useMetaBusiness } from './MetaBusinessContext';
+import { EmptyState } from '@/components/client-portal/EmptyState';
 import AdPreviewMockup from './AdPreviewMockup';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -119,6 +127,19 @@ function timeAgo(ts: number | null): string {
   const days = Math.floor(hours / 24);
   return `hace ${days} día${days > 1 ? 's' : ''}`;
 }
+
+function copyId(id: string, label: string) {
+  navigator.clipboard.writeText(id);
+  toast.success(`${label} ID copiado`);
+}
+
+const CHARLIE_TOOLTIPS: Record<string, string> = {
+  ESCALAR: 'ROAS > 3x y CTR > 1.5%. Aumentar presupuesto.',
+  MANTENER: 'ROAS > 2x. Está funcionando bien, mantener.',
+  OBSERVAR: 'ROAS entre 1x-2x. Revisar creativos o segmentación.',
+  APAGAR: 'ROAS < 1x. Pierdes dinero, considera pausar.',
+  'SIN DATOS': 'Sin datos suficientes para evaluar.',
+};
 
 const objectiveLabels: Record<string, string> = {
   OUTCOME_SALES: 'Ventas',
@@ -256,9 +277,18 @@ function AdSetRow({ adset, depth = 1, onAdClick, connectionId, onStatusChange }:
           const hasData = adset.spend > 0 || adset.impressions > 0;
           const charlie = getCharlieAdvice(adset.roas, adset.ctr, hasData);
           return (
-            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${charlie.bg} ${charlie.color} shrink-0`}>
-              {charlie.emoji} {charlie.verdict}
-            </span>
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${charlie.bg} ${charlie.color} shrink-0 cursor-help`}>
+                    {charlie.emoji} {charlie.verdict}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[220px] text-xs">
+                  {CHARLIE_TOOLTIPS[charlie.verdict]}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           );
         })()}
         {connectionId && (
@@ -354,11 +384,18 @@ function CampaignRow({
       {/* Campaign header */}
       <button
         onClick={handleExpand}
-        className={`w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-muted/30 transition-colors ${expanded ? 'bg-muted/20 border-b border-border/40' : ''}`}
+        className={`group w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-muted/30 transition-colors ${expanded ? 'bg-muted/20 border-b border-border/40' : ''}`}
       >
         {expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
         <Megaphone className="w-4 h-4 text-primary shrink-0" />
         <span className="font-semibold text-sm truncate max-w-[260px]">{campaign.campaign_name}</span>
+        <button
+          onClick={(e) => { e.stopPropagation(); copyId(campaign.campaign_id, 'Campaña'); }}
+          className="p-0.5 rounded hover:bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+          title="Copiar ID"
+        >
+          <Copy className="w-3 h-3" />
+        </button>
         <StatusBadge status={campaign.status} />
         <BudgetTypeBadge type={campaign.budget_type} />
         {campaign.objective && objectiveLabels[campaign.objective] && (
@@ -391,6 +428,24 @@ function CampaignRow({
           {campaign.adsets.map((adset) => (
             <AdSetRow key={adset.id} adset={adset} onAdClick={onAdClick} connectionId={connectionIds[0]} onStatusChange={() => {}} />
           ))}
+          {/* Burn rate bar */}
+          {campaign.daily_budget > 0 && campaign.status === 'ACTIVE' && (
+            <div className="flex items-center gap-3 px-4 py-2 border-t border-border/30">
+              <span className="text-xs text-muted-foreground shrink-0">Burn rate:</span>
+              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden max-w-xs">
+                {(() => {
+                  const daysActive = 30;
+                  const expectedSpend = campaign.daily_budget * daysActive;
+                  const pct = expectedSpend > 0 ? Math.min(100, (campaign.spend_30d / expectedSpend) * 100) : 0;
+                  const color = pct > 120 ? 'bg-red-500' : pct > 90 ? 'bg-yellow-500' : 'bg-green-500';
+                  return <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />;
+                })()}
+              </div>
+              <span className="text-xs text-muted-foreground shrink-0">
+                {fmtCLP(campaign.spend_30d)} / {fmtCLP(campaign.daily_budget * 30)}
+              </span>
+            </div>
+          )}
           {/* Inline actions */}
           <div className="flex items-center gap-2 px-4 py-2 border-t border-border/30">
             <Button
@@ -780,12 +835,16 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
       {/* Campaign tree */}
       {filtered.length === 0 ? (
         <Card className="border-dashed">
-          <CardContent className="py-12 text-center">
-            <AlertCircle className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-            <h3 className="text-base font-semibold mb-1">{campaigns.length === 0 ? 'Sin campañas' : 'Sin resultados'}</h3>
-            <p className="text-muted-foreground text-sm">
-              {campaigns.length === 0 ? 'Sincroniza tus datos o crea tu primera campaña.' : 'Intenta con otro filtro o búsqueda.'}
-            </p>
+          <CardContent className="p-0">
+            <EmptyState
+              icon={campaigns.length === 0 ? Megaphone : Search}
+              title={campaigns.length === 0 ? 'Sin campañas' : 'Sin resultados'}
+              description={campaigns.length === 0 ? 'Sincroniza tus datos o crea tu primera campaña.' : 'Intenta con otro filtro o búsqueda.'}
+              actionLabel={campaigns.length === 0 && onCreateCampaign ? 'Crear campaña' : undefined}
+              onAction={campaigns.length === 0 ? onCreateCampaign : undefined}
+              tip={campaigns.length === 0 ? 'Haz clic en "Sincronizar" para importar campañas desde Meta.' : undefined}
+              variant="compact"
+            />
           </CardContent>
         </Card>
       ) : (

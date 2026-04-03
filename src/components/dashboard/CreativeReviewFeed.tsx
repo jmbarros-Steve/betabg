@@ -22,10 +22,10 @@ interface CreativeItem {
   copy_text: string | null;
   angle: string | null;
   product_name: string | null;
-  score_headline: number | null;
-  score_hook: number | null;
-  score_cta: number | null;
-  score_overall: number | null;
+  performance_score: number | null;
+  criterio_score: number | null;
+  espejo_score: number | null;
+  cqs_score: number | null;
   review_status: string;
   admin_feedback: string | null;
   feedback_rules_generated: number | null;
@@ -214,9 +214,9 @@ export function CreativeReviewFeed() {
                   </div>
 
                   {/* Score */}
-                  {item.score_overall != null && (
-                    <span className={`text-xs font-bold tabular-nums flex-shrink-0 ${getScoreColor(item.score_overall)}`}>
-                      {item.score_overall}/10
+                  {item.criterio_score != null && (
+                    <span className={`text-xs font-bold tabular-nums flex-shrink-0 ${getScoreColor(item.criterio_score)}`}>
+                      {item.criterio_score}/10
                     </span>
                   )}
                 </div>
@@ -233,14 +233,14 @@ export function CreativeReviewFeed() {
                       {item.product_name}
                     </Badge>
                   )}
-                  {item.score_headline != null && (
-                    <span className="text-[10px] text-slate-400">H:{item.score_headline}</span>
+                  {item.performance_score != null && (
+                    <span className="text-[10px] text-slate-400">Perf:{item.performance_score}</span>
                   )}
-                  {item.score_hook != null && (
-                    <span className="text-[10px] text-slate-400">Hk:{item.score_hook}</span>
+                  {item.espejo_score != null && (
+                    <span className="text-[10px] text-slate-400">Visual:{item.espejo_score}</span>
                   )}
-                  {item.score_cta != null && (
-                    <span className="text-[10px] text-slate-400">CTA:{item.score_cta}</span>
+                  {item.cqs_score != null && (
+                    <span className="text-[10px] text-slate-400">CQS:{item.cqs_score}</span>
                   )}
                   <span className="text-[10px] text-slate-400 ml-auto">{date}</span>
                 </div>

@@ -2,6 +2,12 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 export async function anomalyDetector(c: Context) {
+  const cronSecret = process.env.CRON_SECRET;
+  const providedSecret = c.req.header('X-Cron-Secret');
+  if (!cronSecret || providedSecret !== cronSecret) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
   const supabase = getSupabaseAdmin();
   let anomaliesDetected = 0;
 

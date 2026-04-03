@@ -1,14 +1,21 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { snapshotBeforeUpdate } from '../../lib/knowledge-versioner.js';
 
 export async function knowledgeQualityScore(c: Context) {
+  const cronSecret = process.env.CRON_SECRET;
+  const providedSecret = c.req.header('X-Cron-Secret');
+  if (!cronSecret || providedSecret !== cronSecret) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
   const supabase = getSupabaseAdmin();
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
   try {
     const { data: rules } = await supabase
       .from('steve_knowledge')
-      .select('id, titulo, contenido, orden, veces_usada, ultima_vez_usada, ejemplo_real, created_at, merged_from')
+      .select('id, titulo, contenido, orden, veces_usada, ultima_vez_usada, ejemplo_real, created_at, merged_from, effectiveness_score')
       .eq('activo', true);
 
     if (!rules) return c.json({ success: true, message: 'No rules to score' });
@@ -49,6 +56,7 @@ export async function knowledgeQualityScore(c: Context) {
       // Auto-improve rules with score < 40 (if we have API key)
       if (score < 40 && ANTHROPIC_API_KEY) {
         try {
+          await snapshotBeforeUpdate(rule.id, 'knowledge-quality-score', `auto-rewrite: quality_score=${score}`);
           const res = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: {
@@ -94,6 +102,19 @@ Máximo 500 caracteres. Solo la regla mejorada, sin explicaciones.`,
           .update({ activo: false })
           .eq('id', rule.id);
         deactivated++;
+      }
+
+      // Auto-adjust orden based on effectiveness_score
+      const eff = (rule as any).effectiveness_score as number | null;
+      if (eff != null) {
+        let newOrden: number | null = null;
+        if (eff >= 70) newOrden = 95;
+        else if (eff < 30 && (rule.veces_usada || 0) > 5) newOrden = 60;
+        if (newOrden != null && newOrden !== rule.orden) {
+          await supabase.from('steve_knowledge')
+            .update({ orden: newOrden })
+            .eq('id', rule.id);
+        }
       }
     }
 

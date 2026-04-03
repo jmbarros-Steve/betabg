@@ -110,43 +110,110 @@ cd ~/steve && git pull
 - Nicolás W15 — SOLO ESPEJO + holdout tests (evaluación visual)
 - Tomás W7 — SOLO CEREBRO (orquestador, mantenimiento base)
 
-## Sync Métricas cada 6 horas (OpenClaw)
-- Cron ID: `0293cfb4-9790-4921-a0dc-3cc1b9f0aa56`
-- Nombre: `sync-all-metrics-6h`
-- Cada 6 horas sincroniza métricas de Shopify, Meta, Google, Klaviyo
-- Llama POST /api/cron/sync-all-metrics con X-Cron-Secret
-- También se triggerea automáticamente al reconectar Shopify o Meta (OAuth callback)
+## ⛔ Crons — TODOS en Google Cloud Scheduler (NO usar OpenClaw)
+**TODOS los crons corren via Google Cloud Scheduler → Cloud Run. NUNCA crear crons en OpenClaw.**
+Para listar: `gcloud scheduler jobs list --project=steveapp-agency --location=us-central1`
+Para crear nuevo: `gcloud scheduler jobs create http NOMBRE --schedule="CRON" --uri="https://steve-api-850416724643.us-central1.run.app/api/cron/RUTA" --http-method=POST --headers="X-Cron-Secret=steve-cron-secret-2024,Content-Type=application/json" --location=us-central1 --project=steveapp-agency`
 
-## Reporte Semanal lunes 8am Chile (OpenClaw)
-- Cron ID: `df73d262-bc8a-4bcf-a7b7-1f908b510750`
-- Nombre: `weekly-report-monday`
-- Lunes 11:00 UTC (8am Chile) → POST /api/cron/weekly-report
-- Envía email a cada merchant via Resend con ventas, top campaña, CPA, acción recomendada
-- Guarda reporte en qa_log como weekly_merchant_report para el dashboard
+### 44 jobs activos (todos ENABLED):
+| Job | Schedule | Endpoint |
+|-----|----------|----------|
+| wa-action-processor-1min | `* * * * *` | /api/cron/wa-action-processor |
+| skyvern-dispatcher-2min | `*/2 * * * *` | /api/cron/skyvern-dispatcher |
+| chino-fixer | `*/10 * * * *` | /api/chino/fixer |
+| steve-content-hunter-20min | `*/20 * * * *` | /api/cron/steve-content-hunter |
+| chino-patrol | `*/30 * * * *` | /api/chino/run |
+| abandoned-cart-wa-hourly | `0 * * * *` | /api/cron/abandoned-cart-wa |
+| task-prioritizer-hourly | `0 */1 * * *` | /api/cron/task-prioritizer |
+| steve-agent-loop-2h | `0 */2 * * *` | /api/cron/steve-agent-loop |
+| swarm-research-2h | `0 */2 * * *` | /api/cron/swarm-research |
+| prospect-followup-4h | `0 */4 * * *` | /api/cron/prospect-followup |
+| error-budget-4h | `0 */4 * * *` | /api/cron/error-budget-calculator |
+| onboarding-wa-4h | `0 */4 * * *` | /api/cron/onboarding-wa |
+| sync-all-metrics-6h | `0 */6 * * *` | /api/cron/sync-all-metrics |
+| predictive-alerts-6h | `0 */6 * * *` | /api/cron/predictive-alerts |
+| reconciliation-6h | `0 */6 * * *` | /api/cron/reconciliation |
+| chino-report | `0 0,6,12,18 * * *` | /api/chino/report/send |
+| wolf-night-mode-3am | `0 3 * * *` | /api/cron/wolf-night-mode |
+| auto-brief-generator-7am | `0 7 * * *` | /api/cron/auto-brief-generator |
+| changelog-watcher-daily | `0 7 * * *` | /api/cron/changelog-watcher |
+| performance-tracker-meta-8am | `0 8 * * *` | /api/cron/performance-tracker-meta |
+| detective-visual-2h | `0 8,10,12,14,16,18,20 * * *` | /api/cron/detective-visual |
+| auto-learning-digest-9am | `0 9 * * *` | /api/cron/auto-learning-digest |
+| execute-meta-rules-9am | `0 9 * * *` | /api/cron/execute-meta-rules |
+| wolf-morning-send-9am | `0 9 * * *` | /api/cron/wolf-morning-send |
+| performance-evaluator-10am | `0 10 * * *` | /api/cron/performance-evaluator |
+| fatigue-detector-11am | `0 11 * * *` | /api/cron/fatigue-detector |
+| prospect-email-nurture-10am | `0 13 * * *` | /api/cron/prospect-email-nurture |
+| churn-detector-daily | `0 14 * * *` | /api/cron/churn-detector |
+| sales-learning-loop-8pm | `0 20 * * *` | /api/cron/sales-learning-loop |
+| anomaly-detector-10pm | `0 22 * * *` | /api/cron/anomaly-detector |
+| funnel-diagnosis-monday-5am | `0 5 * * 1` | /api/cron/funnel-diagnosis |
+| competitor-spy-weekly | `0 6 * * 1` | /api/cron/competitor-spy |
+| weekly-report-monday-8am | `0 11 * * 1` | /api/cron/weekly-report |
+| root-cause-analysis-sun-2am | `0 2 * * 0` | /api/cron/root-cause-analysis |
+| steve-discoverer-sun-2am | `0 2 * * 0` | /api/cron/steve-discoverer |
+| rule-calibrator-sun-3am | `0 3 * * 0` | /api/cron/rule-calibrator |
+| steve-prompt-evolver-sun-3am | `0 3 * * 0` | /api/cron/steve-prompt-evolver |
+| revenue-attribution-sun-4am | `0 4 * * 0` | /api/cron/revenue-attribution |
+| knowledge-quality-score-sun-5am | `0 5 * * 0` | /api/cron/knowledge-quality-score |
+| merchant-upsell-sunday | `0 11 * * 0` | /api/cron/merchant-upsell |
+| knowledge-dedup-monthly | `0 6 1 * *` | /api/cron/knowledge-dedup |
+| cross-client-learning-monthly | `0 3 1 * *` | /api/cron/cross-client-learning |
+| knowledge-decay-monthly | `0 4 1 * *` | /api/cron/knowledge-decay |
+| knowledge-consolidator-monthly | `0 5 1 * *` | /api/cron/knowledge-consolidator |
 
-## QA Automático cada 4 horas (OpenClaw)
-- Cron ID: `fb005468-3ddb-4e5e-a3c9-f19cb880063f`
-- Nombre: `qa-automatico-4h`
-- Horario: `0 9,13,17,21,1,5 * * *` (America/Santiago) — 9am, 1pm, 5pm, 9pm, 1am, 5am
-- Sesión: main
-- Acción: QA full regression con gstack en https://www.steve.cl
-- Login: patricio.correa@jardindeeva.cl / Jardin2026
-- Reportes: .gstack/qa-reports/ con fecha y hora
-- Si hay bugs high/critical → insertar en tabla tasks automáticamente
+## ⛔ NO TOCAR — Variables de entorno en Cloud Run (20 vars obligatorias)
+**PROHIBIDO hacer deploy sin --update-env-vars. NUNCA usar --set-env-vars (reemplaza TODAS las vars).**
+**Si se pierde UNA sola variable, funcionalidades CRÍTICAS dejan de funcionar.**
 
-## ADVERTENCIA: Variables de entorno en Cloud Run
-Cada vez que se haga `gcloud run deploy steve-api`, verificar que estas env vars estén configuradas:
-- `META_APP_ID`
-- `META_APP_SECRET`
-- `APIFY_TOKEN`
-- `GEMINI_API_KEY`
-- `SENTRY_DSN`
+Después de CADA `gcloud run deploy steve-api`, ejecutar inmediatamente:
+```bash
+gcloud run services describe steve-api --region=us-central1 --project=steveapp-agency \
+  --format='json(spec.template.spec.containers[0].env[].name)' | python3 -c "
+import json,sys; data=json.load(sys.stdin)
+names=[e['name'] for e in data['spec']['template']['spec']['containers'][0]['env']]
+required=['SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SUPABASE_ANON_KEY','ANTHROPIC_API_KEY',
+'REPLICATE_API_KEY','FIRECRAWL_API_KEY','RESEND_API_KEY','OPENAI_API_KEY','GEMINI_API_KEY',
+'META_APP_ID','META_APP_SECRET','APIFY_TOKEN','SENTRY_DSN','ENCRYPTION_KEY','CRON_SECRET',
+'TWILIO_ACCOUNT_SID','TWILIO_AUTH_TOKEN','TWILIO_PHONE_NUMBER','JOSE_WHATSAPP_NUMBER','ADMIN_WA_PHONE']
+missing=[r for r in required if r not in names]
+print(f'Total: {len(names)}/20')
+if missing: print(f'⛔ FALTAN: {missing}')
+else: print('✅ Todas presentes')
+"
+```
 
-### ✅ Twilio (WhatsApp) — YA CONFIGURADO
-Las credenciales de Twilio ya están activas en Cloud Run:
-- `TWILIO_ACCOUNT_SID` = configurado
-- `TWILIO_AUTH_TOKEN` = configurado
-- `TWILIO_PHONE_NUMBER` = configurado
+### Las 20 variables (NO BORRAR NINGUNA):
+| Variable | Usa | Crítico para |
+|----------|-----|-------------|
+| `SUPABASE_URL` | Secret Manager | TODO |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret Manager | TODO |
+| `SUPABASE_ANON_KEY` | Secret Manager | TODO |
+| `ANTHROPIC_API_KEY` | Secret Manager | Steve AI, Opus, chat |
+| `REPLICATE_API_KEY` | Secret Manager | Generación imágenes |
+| `FIRECRAWL_API_KEY` | Secret Manager | Web scraping |
+| `RESEND_API_KEY` | Secret Manager | Emails transaccionales |
+| `OPENAI_API_KEY` | Valor directo | Embeddings, GPT fallback |
+| `GEMINI_API_KEY` | Valor directo | Gemini fallback |
+| `META_APP_ID` | Valor directo | OAuth Meta, token refresh, campañas |
+| `META_APP_SECRET` | Valor directo | OAuth Meta, data deletion |
+| `APIFY_TOKEN` | Valor directo | Swarm, competitor spy, scraping |
+| `SENTRY_DSN` | Valor directo | Error tracking backend |
+| `ENCRYPTION_KEY` | Valor directo | Encriptación tokens guardados |
+| `CRON_SECRET` | Valor directo | Autenticación de crons |
+| `TWILIO_ACCOUNT_SID` | Valor directo | WhatsApp Steve |
+| `TWILIO_AUTH_TOKEN` | Valor directo | WhatsApp Steve |
+| `TWILIO_PHONE_NUMBER` | Valor directo | WhatsApp Steve |
+| `JOSE_WHATSAPP_NUMBER` | Valor directo | Alertas a JM |
+| `ADMIN_WA_PHONE` | Valor directo | Alertas admin |
+
+### Recuperar variables perdidas:
+Si falta alguna, buscar en revisiones antiguas:
+```bash
+gcloud run revisions list --service=steve-api --region=us-central1 --project=steveapp-agency --format='value(name)' --limit=100 | tail -5
+gcloud run revisions describe REVISION_NAME --region=us-central1 --project=steveapp-agency --format='json(spec.containers[0].env)'
+```
 
 ### ❌ Pendiente: Google Ads
 Faltan 3 credenciales para que Google Ads funcione:

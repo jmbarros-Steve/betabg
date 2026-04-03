@@ -37,6 +37,35 @@ Responde SOLO en JSON válido (sin markdown, sin backticks):
 
 pass=true si overall >= 7.`;
 
+// ─── Dynamic visual criteria from steve_knowledge ───────────────────────────
+
+async function loadDynamicVisualCriteria(entityType: 'email' | 'ad'): Promise<string> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const relevantCategories = entityType === 'email'
+      ? ['klaviyo', 'brief', 'anuncios', 'steve_accuracy']
+      : ['meta_ads', 'anuncios', 'brief', 'steve_accuracy'];
+
+    const { data: criteria } = await supabase
+      .from('steve_knowledge')
+      .select('titulo, contenido')
+      .eq('visual_relevant', true)
+      .eq('approval_status', 'approved')
+      .eq('activo', true)
+      .in('categoria', relevantCategories)
+      .order('orden', { ascending: false })
+      .limit(10);
+
+    if (!criteria || criteria.length === 0) return '';
+
+    const lines = criteria.map((c: any) => `- ${c.titulo}: ${c.contenido}`).join('\n');
+    return `\n\nCRITERIOS ADICIONALES (aprendidos del swarm):\n${lines}`;
+  } catch (err) {
+    console.error('[espejo] Error loading dynamic visual criteria:', err);
+    return '';
+  }
+}
+
 // ─── Claude Vision call ──────────────────────────────────────────────────────
 
 interface VisionContent {
@@ -124,12 +153,14 @@ export async function espejoEmail(
 ): Promise<{ pass: boolean; score: number; issues: string[]; details: any }> {
   console.log(`[espejo] Evaluating email for shop=${shopId} entity=${entityId}`);
 
+  const dynamicCriteria = await loadDynamicVisualCriteria('email');
+
   const content: VisionContent[] = [
     {
       type: 'text',
       text: `Aquí está el código HTML del email. Analízalo como si lo vieras renderizado visualmente:\n\n${emailHtml.substring(0, 30000)}`,
     },
-    { type: 'text', text: EMAIL_PROMPT(brandName, brandColors) },
+    { type: 'text', text: EMAIL_PROMPT(brandName, brandColors) + dynamicCriteria },
   ];
 
   const visionResponse = await callClaudeVision(content);
@@ -192,12 +223,14 @@ export async function espejoAd(
   const contentType = imgResponse.headers.get('content-type') || 'image/jpeg';
   const mediaType = contentType.startsWith('image/') ? contentType.split(';')[0] : 'image/jpeg';
 
+  const dynamicCriteria = await loadDynamicVisualCriteria('ad');
+
   const content: VisionContent[] = [
     {
       type: 'image',
       source: { type: 'base64', media_type: mediaType, data: base64 },
     },
-    { type: 'text', text: AD_PROMPT(brandName, brandColors) },
+    { type: 'text', text: AD_PROMPT(brandName, brandColors) + dynamicCriteria },
   ];
 
   const visionResponse = await callClaudeVision(content);

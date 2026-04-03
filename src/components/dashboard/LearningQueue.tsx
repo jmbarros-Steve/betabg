@@ -40,6 +40,17 @@ function isYouTubeUrl(url: string): boolean {
   return /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)/.test(url.trim());
 }
 
+function isUrl(str: string): boolean {
+  return /^https?:\/\//i.test(str.trim());
+}
+
+function detectSourceType(line: string): 'youtube' | 'url' | 'text' {
+  const trimmed = line.trim();
+  if (isYouTubeUrl(trimmed)) return 'youtube';
+  if (isUrl(trimmed)) return 'url';
+  return 'text';
+}
+
 export function LearningQueue() {
   const [bulkUrls, setBulkUrls] = useState('');
   const [items, setItems] = useState<QueueRow[]>([]);
@@ -89,25 +100,64 @@ export function LearningQueue() {
     : 0;
   const estimatedMinutes = Math.max(0, (pending + processing) * 2);
 
-  // ── Bulk add YouTube URLs ──
+  // ── Bulk add: YouTube URLs, article URLs, and free text (separated by ---) ──
   async function handleBulkAdd() {
-    const lines = bulkUrls
-      .split('\n')
-      .map(l => l.trim())
-      .filter(Boolean);
+    // Split by --- for text blocks, then by newline for URLs
+    const blocks = bulkUrls.split(/^---$/m);
+    const inserts: { source_type: string; source_content: string; source_title: string; status: string }[] = [];
 
-    const valid = lines.filter(isYouTubeUrl);
-    if (valid.length === 0) {
-      toast.error('No se encontraron URLs de YouTube válidas');
-      return;
+    for (const block of blocks) {
+      const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length === 0) continue;
+
+      // If the block has a single line that's a URL, add it directly
+      // If multiple lines that are all URLs, add each one
+      // If lines don't look like URLs, treat the whole block as text
+      const allUrls = lines.every(l => isUrl(l));
+
+      if (allUrls) {
+        for (const line of lines) {
+          const type = detectSourceType(line);
+          const label = type === 'youtube' ? 'YouTube' : 'URL';
+          inserts.push({
+            source_type: type,
+            source_content: line,
+            source_title: `${label}: ${line.slice(0, 60)}`,
+            status: 'pending',
+          });
+        }
+      } else {
+        // Check if some lines are URLs mixed with text
+        for (const line of lines) {
+          const type = detectSourceType(line);
+          if (type !== 'text') {
+            const label = type === 'youtube' ? 'YouTube' : 'URL';
+            inserts.push({
+              source_type: type,
+              source_content: line,
+              source_title: `${label}: ${line.slice(0, 60)}`,
+              status: 'pending',
+            });
+          }
+        }
+        // Collect non-URL lines as a text block
+        const textLines = lines.filter(l => detectSourceType(l) === 'text');
+        if (textLines.length > 0) {
+          const textContent = textLines.join('\n');
+          inserts.push({
+            source_type: 'text',
+            source_content: textContent.slice(0, 2000),
+            source_title: `Texto: ${textContent.slice(0, 60)}`,
+            status: 'pending',
+          });
+        }
+      }
     }
 
-    const inserts = valid.map(url => ({
-      source_type: 'youtube',
-      source_content: url,
-      source_title: `YouTube: ${url.slice(0, 60)}`,
-      status: 'pending',
-    }));
+    if (inserts.length === 0) {
+      toast.error('No se encontró contenido válido para agregar');
+      return;
+    }
 
     const { error } = await supabase.from('learning_queue').insert(inserts);
     if (error) {
@@ -115,10 +165,13 @@ export function LearningQueue() {
       return;
     }
 
-    toast.success(`${valid.length} videos agregados a la cola`);
-    if (valid.length < lines.length) {
-      toast.warning(`${lines.length - valid.length} líneas ignoradas (no son URLs de YouTube válidas)`);
-    }
+    const counts = { youtube: 0, url: 0, text: 0 };
+    inserts.forEach(i => { counts[i.source_type as keyof typeof counts]++; });
+    const parts = [];
+    if (counts.youtube) parts.push(`${counts.youtube} videos`);
+    if (counts.url) parts.push(`${counts.url} URLs`);
+    if (counts.text) parts.push(`${counts.text} textos`);
+    toast.success(`${inserts.length} items agregados: ${parts.join(', ')}`);
     setBulkUrls('');
     fetchQueue();
   }
@@ -341,7 +394,7 @@ export function LearningQueue() {
           <Textarea
             value={bulkUrls}
             onChange={e => setBulkUrls(e.target.value)}
-            placeholder="Pega múltiples URLs de YouTube, una por línea..."
+            placeholder="Pega URLs (YouTube o articulos) una por linea, o textos separados por ---"
             className="text-sm resize-none"
             style={{ minHeight: '80px' }}
           />

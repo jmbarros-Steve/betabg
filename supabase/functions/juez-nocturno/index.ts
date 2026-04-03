@@ -95,7 +95,6 @@ interface QuestionResult {
 function selectQuestions(dataset: GoldenQuestion[], count: number): GoldenQuestion[] {
   const trampa = dataset.filter(q => q.category.startsWith('TRAMPA_'))
   const ventas = dataset.filter(q => q.category.startsWith('VENTAS_'))
-  const rest = dataset.filter(q => !q.category.startsWith('TRAMPA_') && !q.category.startsWith('VENTAS_'))
 
   // Shuffle each pool
   const shuffle = <T>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5)
@@ -109,6 +108,66 @@ function selectQuestions(dataset: GoldenQuestion[], count: number): GoldenQuesti
   const fill = remaining.slice(0, count - 4)
 
   return shuffle([...selectedTrampa, ...selectedVentas, ...fill])
+}
+
+/**
+ * Select questions with supplementary ones from juez_golden_questions.
+ * Guarantees: 2 TRAMPA + 2 VENTAS + up to 3 supplementary from swarm.
+ */
+function selectQuestionsWithSupplementary(
+  coreDataset: GoldenQuestion[],
+  supplementary: GoldenQuestion[],
+  count: number
+): GoldenQuestion[] {
+  const shuffle = <T>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5)
+
+  // Pick up to 3 supplementary questions
+  const selectedSupp = shuffle(supplementary).slice(0, 3)
+
+  // From core: 2 TRAMPA + 2 VENTAS
+  const trampa = coreDataset.filter(q => q.category.startsWith('TRAMPA_'))
+  const ventas = coreDataset.filter(q => q.category.startsWith('VENTAS_'))
+  const selectedTrampa = shuffle(trampa).slice(0, 2)
+  const selectedVentas = shuffle(ventas).slice(0, 2)
+
+  // Fill the rest from core (excluding selected)
+  const selectedIds = new Set([
+    ...selectedTrampa, ...selectedVentas, ...selectedSupp
+  ].map(q => q.id))
+  const remaining = shuffle(coreDataset.filter(q => !selectedIds.has(q.id)))
+  const fillCount = count - selectedTrampa.length - selectedVentas.length - selectedSupp.length
+  const fill = remaining.slice(0, Math.max(0, fillCount))
+
+  return shuffle([...selectedTrampa, ...selectedVentas, ...selectedSupp, ...fill])
+}
+
+/**
+ * Load supplementary golden questions from juez_golden_questions table.
+ */
+async function loadSupplementaryQuestions(
+  supabase: ReturnType<typeof createClient>
+): Promise<GoldenQuestion[]> {
+  try {
+    const { data, error } = await supabase
+      .from('juez_golden_questions')
+      .select('id, category, question, expected_behavior')
+      .eq('active', true)
+
+    if (error || !data || data.length === 0) return []
+
+    return data.map((q: any) => ({
+      id: q.id,
+      category: q.category,
+      question: q.question,
+      source: 'swarm_knowledge',
+      validation: q.expected_behavior,
+      example_good: q.expected_behavior,
+      example_bad: 'Respuesta que ignora el conocimiento aprendido del swarm',
+    }))
+  } catch (e) {
+    console.error('[juez-nocturno] Error loading supplementary questions:', e)
+    return []
+  }
 }
 
 /**
@@ -272,10 +331,16 @@ serve(async (req) => {
 
     const summaries = []
 
+    // Load supplementary golden questions from swarm knowledge
+    const supplementary = await loadSupplementaryQuestions(supabase)
+    console.log(`[juez-nocturno] Loaded ${supplementary.length} supplementary golden questions from swarm`)
+
     for (const client of clients) {
       console.log(`[juez-nocturno] Evaluating client: ${client.name} (${client.id})`)
 
-      const selected = selectQuestions(goldenDataset as GoldenQuestion[], 20)
+      const selected = supplementary.length > 0
+        ? selectQuestionsWithSupplementary(goldenDataset as GoldenQuestion[], supplementary, 20)
+        : selectQuestions(goldenDataset as GoldenQuestion[], 20)
       const results: QuestionResult[] = []
 
       for (const q of selected) {

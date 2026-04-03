@@ -79,6 +79,12 @@ export async function loadKnowledge(
 
   const ruleIds = allRules.map(r => r.id).filter(Boolean);
 
+  // Fire-and-forget: increment usage counters
+  if (ruleIds.length > 0) {
+    supabase.rpc('increment_knowledge_usage', { rule_ids: ruleIds })
+      .then(({ error }) => { if (error) console.error('[knowledge-loader] usage increment failed:', error.message); });
+  }
+
   // Audit trail: fire-and-forget insert to qa_log
   if (options.audit && ruleIds.length > 0) {
     supabase.from('qa_log').insert({

@@ -48,10 +48,9 @@ async function handleList(c: Context, supabase: any, params: any) {
     .from('creative_history')
     .select(`
       id, client_id, channel, copy_text, angle, product_name,
-      score_headline, score_hook, score_cta, score_overall,
+      performance_score, criterio_score, espejo_score, cqs_score,
       review_status, admin_feedback, feedback_rules_generated, feedback_queue_id,
-      feedback_processed_at, created_at,
-      clients!inner(name, company)
+      feedback_processed_at, created_at
     `)
     .order('created_at', { ascending: false })
     .limit(100);
@@ -69,6 +68,24 @@ async function handleList(c: Context, supabase: any, params: any) {
     console.error('[creative-review-feed] list error:', error.message);
     return c.json({ error: error.message }, 500);
   }
+
+  // Enrich with client names (no FK exists, so query separately)
+  const clientIds = [...new Set((data || []).map((d: any) => d.client_id).filter(Boolean))];
+  let clientMap: Record<string, { name: string | null; company: string | null }> = {};
+  if (clientIds.length > 0) {
+    const { data: clients } = await supabase
+      .from('clients')
+      .select('id, name, company')
+      .in('id', clientIds);
+    for (const cl of clients || []) {
+      clientMap[cl.id] = { name: cl.name, company: cl.company };
+    }
+  }
+
+  const enriched = (data || []).map((d: any) => ({
+    ...d,
+    clients: clientMap[d.client_id] || null,
+  }));
 
   // Get stats
   const { data: statsData } = await supabase
@@ -104,7 +121,7 @@ async function handleList(c: Context, supabase: any, params: any) {
     );
   }
 
-  return c.json({ items: data || [], stats });
+  return c.json({ items: enriched, stats });
 }
 
 // ─── SUBMIT FEEDBACK ────────────────────────────────────────────────

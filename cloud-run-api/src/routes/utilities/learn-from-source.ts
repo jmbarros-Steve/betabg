@@ -27,16 +27,18 @@ export async function learnFromSource(c: Context) {
     return c.json({ error: 'sourceType and content are required' }, 400);
   }
 
-  // Duplicate check
+  // Duplicate check (includes already completed items)
   if (!queueId) {
     const { data: existing } = await supabase
       .from('learning_queue')
       .select('id, status')
       .eq('source_content', content.trim())
-      .in('status', ['pending', 'processing'])
       .limit(1);
 
     if (existing && existing.length > 0) {
+      if (existing[0].status === 'completed' || existing[0].status === 'done') {
+        return c.json({ status: 'already_processed', queueId: existing[0].id, message: 'Ya fue procesado anteriormente' });
+      }
       return c.json({ status: 'duplicate', queueId: existing[0].id, message: 'Este contenido ya está en la cola' });
     }
   }

@@ -764,6 +764,8 @@ export async function generateMetaCopy(c: Context) {
         details: JSON.stringify({ source: 'generate-meta-copy/instruction', rule_count: kbKnowledgeIds.length, rule_ids: kbKnowledgeIds }),
         detected_by: 'generate-meta-copy',
       }).then(({ error }) => { if (error) console.error('[generate-meta-copy] qa_log insert failed:', error.message); });
+      supabase.rpc('increment_knowledge_usage', { rule_ids: kbKnowledgeIds })
+        .then(({ error }) => { if (error) console.error('[generate-meta-copy] usage increment failed:', error.message); });
     }
 
     // Fetch Shopify products for concrete context
@@ -859,6 +861,8 @@ export async function generateMetaCopy(c: Context) {
         details: JSON.stringify({ source: 'generate-meta-copy/variations', rule_count: kbKnowledgeVarIds.length, rule_ids: kbKnowledgeVarIds }),
         detected_by: 'generate-meta-copy',
       }).then(({ error }) => { if (error) console.error('[generate-meta-copy] qa_log insert failed:', error.message); });
+      supabase.rpc('increment_knowledge_usage', { rule_ids: kbKnowledgeVarIds })
+        .then(({ error }) => { if (error) console.error('[generate-meta-copy] usage increment failed:', error.message); });
     }
     const bugSectionVar = kbBugsVar && kbBugsVar.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsVar.map((b: any) => `❌ ${b.descripcion}${b.ejemplo_bueno ? `\nBIEN: ${b.ejemplo_bueno}` : ''}`).join('\n\n')}\n` : '';
     const knowledgeSectionVar = kbKnowledgeVar && kbKnowledgeVar.length > 0 ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\nSi hay conflicto entre reglas, priorizar las de orden más alto (más recientes).\n${kbKnowledgeVar.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
@@ -971,6 +975,8 @@ Responde SOLO en JSON válido sin markdown ni backticks:
         details: JSON.stringify({ source: 'generate-meta-copy/brief-visual', rule_count: kbKnowledgeBVIds.length, rule_ids: kbKnowledgeBVIds }),
         detected_by: 'generate-meta-copy',
       }).then(({ error }) => { if (error) console.error('[generate-meta-copy] qa_log insert failed:', error.message); });
+      supabase.rpc('increment_knowledge_usage', { rule_ids: kbKnowledgeBVIds })
+        .then(({ error }) => { if (error) console.error('[generate-meta-copy] usage increment failed:', error.message); });
     }
     const bugSectionBV = kbBugsBV && kbBugsBV.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsBV.map((b: any) => `❌ ${b.descripcion}${b.ejemplo_bueno ? `\nBIEN: ${b.ejemplo_bueno}` : ''}`).join('\n\n')}\n` : '';
     const knowledgeSectionBV = kbKnowledgeBV && kbKnowledgeBV.length > 0 ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\n${kbKnowledgeBV.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
@@ -1199,6 +1205,8 @@ las preferencias específicas de cada cliente cuando las conozco.
       details: JSON.stringify({ source: 'generate-meta-copy/legacy', rule_count: kbKnowledgeLegacyIds.length, rule_ids: kbKnowledgeLegacyIds }),
       detected_by: 'generate-meta-copy',
     }).then(({ error }) => { if (error) console.error('[generate-meta-copy] qa_log insert failed:', error.message); });
+    supabase.rpc('increment_knowledge_usage', { rule_ids: kbKnowledgeLegacyIds })
+      .then(({ error }) => { if (error) console.error('[generate-meta-copy] usage increment failed:', error.message); });
   }
   const knowledgeSectionLegacy = kbKnowledgeLegacy && kbKnowledgeLegacy.length > 0 ? `\nREGLAS APRENDIDAS (seguir obligatoriamente):\nSi hay conflicto entre reglas, priorizar las de orden más alto.\n${kbKnowledgeLegacy.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 

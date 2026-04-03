@@ -51,6 +51,7 @@ import {
   Instagram,
   Facebook,
   ShoppingBag,
+  Clock,
 } from 'lucide-react';
 
 // Existing components
@@ -63,6 +64,7 @@ import { CompetitorAdsPanel } from '@/components/client-portal/CompetitorAdsPane
 import MetaCampaignManager from './MetaCampaignManager';
 import MetaAudienceManager from './MetaAudienceManager';
 import MetaAnalyticsDashboard from './MetaAnalyticsDashboard';
+import MetaHealthBanner from './MetaHealthBanner';
 import MetaSocialInbox from './MetaSocialInbox';
 import MetaAutomatedRules from './MetaAutomatedRules';
 
@@ -374,10 +376,35 @@ function DashboardSection({ clientId }: { clientId: string }) {
   return (
     <div className="space-y-6">
       <Coachmark id="meta_ads_intro" message="Desde aquí puedes crear campañas, gestionar audiencias y ver métricas de Meta Ads. Empieza por el Dashboard para una vista general." />
+      <MetaHealthBanner
+        totals={{
+          spend: totals.spend,
+          conversions: totals.conversions,
+          revenue: totals.revenue,
+          roas: overallRoas,
+        }}
+        activeCampaignCount={aggregated.length}
+      />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Meta Ads Dashboard</h2>
-          <p className="text-muted-foreground text-sm">Últimos 30 días</p>
+          <p className="text-muted-foreground text-sm flex items-center gap-1.5">
+            Últimos 30 días
+            {lastSyncAt > 0 && (
+              <span className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-0.5 rounded-full">
+                <Clock className="w-3 h-3" />
+                {(() => {
+                  const diff = Date.now() - lastSyncAt;
+                  const min = Math.floor(diff / 60000);
+                  if (min < 1) return 'Justo ahora';
+                  if (min < 60) return `Hace ${min}m`;
+                  const h = Math.floor(min / 60);
+                  if (h < 24) return `Hace ${h}h`;
+                  return `Hace ${Math.floor(h / 24)}d`;
+                })()}
+              </span>
+            )}
+          </p>
         </div>
         <Button
           variant="outline"
@@ -423,22 +450,31 @@ function DashboardSection({ clientId }: { clientId: string }) {
           </CardContent>
         </Card>
 
-        <Card className="relative overflow-hidden border bg-gradient-to-br from-green-500/8 to-transparent border-green-500/15">
-          <CardContent className="pt-6 pb-5 px-6">
-            <div className="flex items-start justify-between mb-3">
-              <JargonTooltip term="ROAS" className="text-sm font-medium text-muted-foreground" />
-              <div className="p-2.5 rounded-xl bg-green-500/10">
-                <TrendingUp className="w-5 h-5 text-green-500" />
-              </div>
-            </div>
-            <p className={`text-3xl font-bold tracking-tight mb-1 ${overallRoas >= 3 ? 'text-green-600' : overallRoas >= 2 ? 'text-yellow-600' : 'text-red-500'}`}>
-              {overallRoas.toFixed(2)}x
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Retorno por cada $1 invertido
-            </p>
-          </CardContent>
-        </Card>
+        {(() => {
+          const roasLevel = overallRoas >= 3 ? 'green' : overallRoas >= 2 ? 'yellow' : 'red';
+          const bgMap = { green: 'from-green-500/8 border-green-500/15', yellow: 'from-yellow-500/8 border-yellow-500/15', red: 'from-red-500/8 border-red-500/15' };
+          const iconBgMap = { green: 'bg-green-500/10', yellow: 'bg-yellow-500/10', red: 'bg-red-500/10' };
+          const iconColorMap = { green: 'text-green-500', yellow: 'text-yellow-500', red: 'text-red-500' };
+          const textMap = { green: 'text-green-600', yellow: 'text-yellow-600', red: 'text-red-500' };
+          return (
+            <Card className={`relative overflow-hidden border bg-gradient-to-br ${bgMap[roasLevel]} to-transparent`}>
+              <CardContent className="pt-6 pb-5 px-6">
+                <div className="flex items-start justify-between mb-3">
+                  <JargonTooltip term="ROAS" className="text-sm font-medium text-muted-foreground" />
+                  <div className={`p-2.5 rounded-xl ${iconBgMap[roasLevel]}`}>
+                    <TrendingUp className={`w-5 h-5 ${iconColorMap[roasLevel]}`} />
+                  </div>
+                </div>
+                <p className={`text-3xl font-bold tracking-tight mb-1 ${textMap[roasLevel]}`}>
+                  {overallRoas.toFixed(2)}x
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Retorno por cada $1 invertido
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         <Card className="relative overflow-hidden border bg-gradient-to-br from-[#F0F4FA]0/8 to-transparent border-[#2A4F9E]/15">
           <CardContent className="pt-6 pb-5 px-6">

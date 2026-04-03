@@ -55,6 +55,8 @@ const TABS = [
   { id: 'anuncios', label: '🎯 Anuncios',                categoria: 'anuncios' },
   { id: 'analisis', label: '📊 Generación de Análisis',  categoria: 'analisis' },
   { id: 'prospecting', label: '🎯 Prospecting',           categoria: 'prospecting' },
+  { id: 'cross_channel', label: '🔗 Cross Channel',       categoria: 'cross_channel' },
+  { id: 'sales_learning', label: '💼 Sales',              categoria: 'sales_learning' },
 ] as const;
 
 type TabId = typeof TABS[number]['id'];

@@ -36,9 +36,12 @@ import {
   Instagram,
   Facebook,
   Megaphone,
+  Download,
 } from 'lucide-react';
 import MetaScopeAlert from './MetaScopeAlert';
 import { useMetaBusiness } from './MetaBusinessContext';
+
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -793,9 +796,25 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
             </div>
 
             {/* Footer */}
-            <div className="px-3 py-2 border-t border-border/50 text-[11px] text-muted-foreground text-center shrink-0">
-              {filteredConversations.length} interacción
-              {filteredConversations.length !== 1 ? 'es' : ''}
+            <div className="px-3 py-2 border-t border-border/50 flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-muted-foreground">
+                {filteredConversations.length} interacción
+                {filteredConversations.length !== 1 ? 'es' : ''}
+              </span>
+              {filteredConversations.some((c) => (c.unread_count || 0) > 0) && (
+                <button
+                  onClick={() => {
+                    setConversations((prev) =>
+                      prev.map((c) => ({ ...c, unread_count: 0 })),
+                    );
+                    toast.success('Todas marcadas como leídas');
+                  }}
+                  className="text-[11px] text-primary hover:underline font-medium flex items-center gap-1"
+                >
+                  <MailCheck className="w-3 h-3" />
+                  Marcar todo leído
+                </button>
+              )}
             </div>
           </div>
 
@@ -843,6 +862,29 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                         {selectedConversation.platform === 'instagram' ? 'Instagram' : 'Facebook'}
                       </Badge>
                     </div>
+                    {messages.length > 0 && (
+                      <button
+                        onClick={() => {
+                          const lines = messages.map(
+                            (m) =>
+                              `[${new Date(m.created_time).toLocaleString('es-CL')}] ${m.from_name}: ${m.message}`,
+                          );
+                          const text = `Conversación con ${selectedConversation.user_name}\n${selectedConversation.platform} · ${selectedConversation.type}\n${'─'.repeat(40)}\n${lines.join('\n')}`;
+                          const blob = new Blob([text], { type: 'text/plain' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `conversacion-${selectedConversation.user_name.replace(/\s+/g, '-')}.txt`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                          toast.success('Conversación exportada');
+                        }}
+                        className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                        title="Exportar conversación"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                    )}
                     {selectedConversation.post_text && (
                       <p className="text-[11px] text-muted-foreground truncate">
                         En: {selectedConversation.post_text}
@@ -953,7 +995,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                         handleSendReply();
                       }
                     }}
-                    placeholder="Escribe tu respuesta... (Ctrl+Enter para enviar)"
+                    placeholder={`Escribe tu respuesta... (${isMac ? '⌘' : 'Ctrl'}+Enter para enviar)`}
                     className="min-h-[60px] max-h-[120px] resize-none text-sm"
                     rows={2}
                   />
@@ -989,11 +1031,13 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
-                <MessageSquare className="w-16 h-16 text-muted-foreground/20 mb-4" />
-                <p className="text-lg font-medium mb-1">Selecciona una conversación</p>
-                <p className="text-sm text-muted-foreground/70">
-                  Elige una interacción de la lista para ver los detalles
+              <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground px-4">
+                <div className="rounded-full bg-gradient-to-br from-primary/10 to-accent/10 p-4 mb-4">
+                  <MessageSquare className="h-8 w-8 text-primary/70" />
+                </div>
+                <p className="text-lg font-semibold mb-2">Selecciona una conversación</p>
+                <p className="text-sm text-muted-foreground/70 max-w-md text-center">
+                  Elige una interacción de la lista para ver los detalles y responder
                 </p>
               </div>
             )}

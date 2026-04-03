@@ -62,6 +62,9 @@ Categorías disponibles:
 - anuncios
 - buyer_persona
 - analisis
+- prospecting (reglas de venta por WhatsApp: stages, pitch, objeciones, técnicas de cierre)
+- sales_learning (aprendizajes extraídos de conversaciones reales con prospectos)
+- sales_strategy (meta-patrones de ventas que aplican a múltiples conversaciones)
 
 ${categoriaHint ? `Categoría sugerida: ${categoriaHint}` : 'Detecta la categoría automáticamente'}
 

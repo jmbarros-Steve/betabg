@@ -960,6 +960,8 @@ export async function steveChat(c: Context) {
         details: JSON.stringify({ source: 'steve-chat/estrategia', client_id, rule_count: estRuleIds.length, rule_ids: estRuleIds }),
         detected_by: 'steve-chat',
       }).then(({ error }) => { if (error) console.error('[steve-chat] qa_log insert failed:', error.message); });
+      supabase.rpc('increment_knowledge_usage', { rule_ids: estRuleIds })
+        .then(({ error }) => { if (error) console.error('[steve-chat] usage increment failed:', error.message); });
     }
     // TODO (Mejora #4 - Industry filter): Once clients have industria assigned, add
     // .in('industria', ['general', clientIndustry]) to the steve_knowledge query above.
@@ -1926,6 +1928,8 @@ REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de re
       details: JSON.stringify({ source: 'steve-chat/brief', client_id, rule_count: briefRuleIds.length, rule_ids: briefRuleIds }),
       detected_by: 'steve-chat',
     }).then(({ error }) => { if (error) console.error('[steve-chat] qa_log insert failed:', error.message); });
+    supabase.rpc('increment_knowledge_usage', { rule_ids: briefRuleIds })
+      .then(({ error }) => { if (error) console.error('[steve-chat] usage increment failed:', error.message); });
   }
 
   const knowledgeContext = filteredBriefKnowledge?.map((k: { categoria: string; titulo: string; contenido: string }) =>

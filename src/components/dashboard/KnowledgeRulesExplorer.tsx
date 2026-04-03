@@ -19,6 +19,7 @@ interface KnowledgeRule {
   created_at: string | null;
   source_id: string | null;
   source_title?: string | null;
+  effectiveness_score: number | null;
 }
 
 type CategoryFilter = string | 'all';
@@ -36,6 +37,8 @@ const CATEGORY_COLORS: Record<string, string> = {
   keywords: 'bg-gray-500/15 text-gray-700 border-gray-300',
   analisis: 'bg-emerald-500/15 text-emerald-700 border-emerald-300',
   prospecting: 'bg-teal-500/15 text-teal-700 border-teal-300',
+  cross_channel: 'bg-violet-500/15 text-violet-700 border-violet-300',
+  sales_learning: 'bg-amber-500/15 text-amber-700 border-amber-300',
 };
 
 export function KnowledgeRulesExplorer() {
@@ -68,7 +71,7 @@ export function KnowledgeRulesExplorer() {
     setLoading(true);
     let query = supabase
       .from('steve_knowledge')
-      .select('id, titulo, contenido, categoria, created_at, source_id')
+      .select('id, titulo, contenido, categoria, created_at, source_id, effectiveness_score')
       .eq('activo', true)
       .eq('approval_status', 'approved')
       .order('created_at', { ascending: false })
@@ -251,6 +254,18 @@ export function KnowledgeRulesExplorer() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      {rule.effectiveness_score != null && (
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] border ${
+                            rule.effectiveness_score >= 70 ? 'bg-green-500/15 text-green-700 border-green-300' :
+                            rule.effectiveness_score >= 50 ? 'bg-yellow-500/15 text-yellow-700 border-yellow-300' :
+                            'bg-red-500/15 text-red-700 border-red-300'
+                          }`}
+                        >
+                          {rule.effectiveness_score >= 70 ? '▲' : rule.effectiveness_score >= 50 ? '●' : '▼'} {rule.effectiveness_score}%
+                        </Badge>
+                      )}
                       <span className="text-[10px] text-muted-foreground">
                         {rule.created_at ? format(new Date(rule.created_at), 'dd/MM/yy HH:mm') : '—'}
                       </span>
