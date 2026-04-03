@@ -152,6 +152,7 @@ import { salesLearningLoop } from './cron/sales-learning-loop.js';
 import { waActionProcessor } from './cron/wa-action-processor.js';
 import { swarmResearch } from './cron/swarm-research.js';
 import { autoLearningDigest } from './cron/auto-learning-digest.js';
+import { knowledgePropagationCatchup } from './cron/knowledge-propagation-catchup.js';
 
 // WhatsApp
 import { steveWAChat } from './whatsapp/steve-wa-chat.js';
@@ -169,6 +170,16 @@ import { approveRulesPublic } from './public/approve-rules-public.js';
 // Triggers
 import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
 import { competitorSpy } from './triggers/competitor-spy.js';
+
+// CRM
+import { prospectDetail, prospectAddNote, prospectChangeStage, prospectChangePriority, prospectUpdateTags, prospectsKanban, prospectMoveStage } from './crm/prospect-crm.js';
+import { salesTasksCrud, salesTasksAutoGenerate } from './crm/sales-tasks.js';
+import { proposalsCrud, proposalsGenerate } from './crm/proposals.js';
+import { sellersList } from './crm/sellers.js';
+
+// Booking
+import { bookingSlots, bookingConfirm } from './booking/booking-api.js';
+import { googleCalendarOauthCallback } from './oauth/google-calendar-oauth-callback.js';
 
 // El Chino — Check System + Fix Queue + Fixer + Reports
 import {
@@ -508,10 +519,34 @@ export function registerRoutes(app: Hono) {
   // Steve Brain Swarm — parallel research + auto-learning
   app.post('/api/cron/swarm-research', swarmResearch); // No JWT — X-Cron-Secret, every 2h: 0 */2 * * *
   app.post('/api/cron/auto-learning-digest', autoLearningDigest); // No JWT — X-Cron-Secret, daily 9am Chile: 0 12 * * *
+  app.post('/api/cron/knowledge-propagation-catchup', knowledgePropagationCatchup); // No JWT — X-Cron-Secret, manual or piggyback on Sun 5am
 
   // Public approval API (token-based, no JWT)
   app.get('/api/approve-rules-public', approveRulesPublic);
   app.post('/api/approve-rules-public', approveRulesPublic);
+
+  // ============================================================
+  // Booking — Public meeting scheduler (no JWT, accessed by prospects)
+  // ============================================================
+  app.get('/api/booking/slots/:sellerId', bookingSlots);
+  app.post('/api/booking/confirm', bookingConfirm);
+  app.post('/api/google-calendar-oauth-callback', authMiddleware, googleCalendarOauthCallback);
+
+  // ============================================================
+  // CRM — Pipeline, Ficha, Timeline, Tasks, Proposals
+  // ============================================================
+  app.post('/api/crm/prospect/detail', authMiddleware, prospectDetail);
+  app.post('/api/crm/prospect/note', authMiddleware, prospectAddNote);
+  app.post('/api/crm/prospect/stage', authMiddleware, prospectChangeStage);
+  app.post('/api/crm/prospect/priority', authMiddleware, prospectChangePriority);
+  app.post('/api/crm/prospect/tags', authMiddleware, prospectUpdateTags);
+  app.post('/api/crm/prospect/move-stage', authMiddleware, prospectMoveStage);
+  app.post('/api/crm/prospects/kanban', authMiddleware, prospectsKanban);
+  app.post('/api/crm/tasks', authMiddleware, salesTasksCrud);
+  app.post('/api/crm/tasks/auto-generate', authMiddleware, salesTasksAutoGenerate);
+  app.post('/api/crm/proposals', authMiddleware, proposalsCrud);
+  app.post('/api/crm/proposals/generate', authMiddleware, proposalsGenerate);
+  app.post('/api/crm/sellers', authMiddleware, sellersList);
 
   // ============================================================
   // El Chino — Automated Check System (sub-router to avoid Hono RegExpRouter limit)

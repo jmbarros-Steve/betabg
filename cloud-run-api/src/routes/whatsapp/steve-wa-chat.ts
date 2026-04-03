@@ -34,6 +34,7 @@ import { enqueueWAAction } from '../../lib/wa-task-queue.js';
 import { scrubPII } from '../../lib/pii-scrubber.js';
 import { isSupportedAudio, transcribeAudio } from '../../lib/audio-transcriber.js';
 import { anthropicFetch } from '../../lib/anthropic-fetch.js';
+import { logProspectEvent } from '../../lib/prospect-event-logger.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 
@@ -932,6 +933,7 @@ async function processProspectAsync(
           updated_at: new Date().toISOString(),
         })
         .eq('id', prospect.id);
+      logProspectEvent(prospect.id, 'stage_change', { from: prospect.stage, to: 'lost', reason: disqualifiedReason }, 'steve');
       console.log(`[prospect ${prospect.phone}] DISQUALIFIED: ${disqualifiedReason}`);
       return; // No further processing needed
     }
@@ -1055,6 +1057,14 @@ async function processProspectAsync(
       .update(updatePayload)
       .eq('id', prospect.id);
 
+    // CRM Timeline: log stage/score changes (fire & forget)
+    if (effectiveStage !== (prospect.stage || 'new')) {
+      logProspectEvent(prospect.id, 'stage_change', { from: prospect.stage || 'new', to: effectiveStage }, 'steve');
+    }
+    if (score !== (prospect.lead_score || 0)) {
+      logProspectEvent(prospect.id, 'score_change', { old_score: prospect.lead_score || 0, new_score: score }, 'steve');
+    }
+
     // Rolling summary: compress older messages every 10 msgs (fire & forget)
     updateRollingConversationSummary(
       { ...prospect, ...updatePayload } as ProspectRecord,
@@ -1153,6 +1163,7 @@ async function processProspectAsync(
             }).catch(err => console.error('[meeting-confirm] Booking API error:', err));
           }
 
+          logProspectEvent(prospect.id, 'meeting_booked', { meeting_at: meetingDate.toISOString(), method: 'text_confirmation' }, 'steve');
           console.log(`[prospect ${prospect.phone}] Meeting scheduled via text: ${meetingDate.toISOString()}`);
         }
       } else if (meetingResult.rejected) {
@@ -1164,6 +1175,7 @@ async function processProspectAsync(
             updated_at: new Date().toISOString(),
           })
           .eq('id', prospect.id);
+        logProspectEvent(prospect.id, 'meeting_cancelled', { reason: 'prospect_rejected' }, 'steve');
         console.log(`[prospect ${prospect.phone}] Meeting rejected`);
       }
       // If proposedTime but not confirmed → prospect suggested alternative, Steve handles in next reply

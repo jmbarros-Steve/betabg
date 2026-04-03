@@ -1,7 +1,7 @@
 // El Chino — api_compare executor
-// Handles checks 1-3, 6, 11-14, 17, 21-28
+// Handles checks 1-3, 6, 11-14, 17, 21-28, 31-35
 // Category A: Connectivity checks (1-3, 6) — verify API responds 200
-// Category B: Numeric comparison checks (11-14, 17, 21-28) — compare Steve vs real API
+// Category B: Numeric comparison checks (11-14, 17, 21-28, 31-35) — compare Steve vs real API
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ChinoCheck, MerchantConn, CheckResult } from '../types.js';
@@ -265,6 +265,56 @@ async function getSteveValue(
       const totalImpressions = data?.reduce((s, r) => s + (Number(r.impressions) || 0), 0) ?? 0;
       return totalImpressions > 0 ? Math.round((totalSpend / totalImpressions * 1000) * 100) / 100 : null;
     }
+    case 31: { // Klaviyo open_rate 7d
+      const { data } = await supabase
+        .from('platform_metrics')
+        .select('metric_value')
+        .eq('connection_id', merchant.connection_id)
+        .eq('metric_type', 'open_rate')
+        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10))
+        .order('metric_date', { ascending: false })
+        .limit(1);
+      return data?.[0] ? Math.round(Number(data[0].metric_value) * 100) / 100 : null;
+    }
+    case 32: { // Klaviyo click_rate 7d
+      const { data } = await supabase
+        .from('platform_metrics')
+        .select('metric_value')
+        .eq('connection_id', merchant.connection_id)
+        .eq('metric_type', 'click_rate')
+        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10))
+        .order('metric_date', { ascending: false })
+        .limit(1);
+      return data?.[0] ? Math.round(Number(data[0].metric_value) * 100) / 100 : null;
+    }
+    case 33: { // Klaviyo emails_sent 7d
+      const { data } = await supabase
+        .from('platform_metrics')
+        .select('metric_value')
+        .eq('connection_id', merchant.connection_id)
+        .eq('metric_type', 'emails_sent')
+        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
+      return data?.reduce((sum, r) => sum + (Number(r.metric_value) || 0), 0) ?? null;
+    }
+    case 34: { // Klaviyo subscriber_count
+      const { data } = await supabase
+        .from('platform_metrics')
+        .select('metric_value')
+        .eq('connection_id', merchant.connection_id)
+        .eq('metric_type', 'subscriber_count')
+        .order('metric_date', { ascending: false })
+        .limit(1);
+      return data?.[0] ? Math.round(Number(data[0].metric_value)) : null;
+    }
+    case 35: { // Klaviyo revenue 7d
+      const { data } = await supabase
+        .from('platform_metrics')
+        .select('metric_value')
+        .eq('connection_id', merchant.connection_id)
+        .eq('metric_type', 'revenue')
+        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
+      return data?.reduce((sum, r) => sum + (Number(r.metric_value) || 0), 0) ?? null;
+    }
     default:
       return null;
   }
@@ -402,6 +452,112 @@ async function getRealValue(
         const data = await res.json() as any;
         const cpm = parseFloat(data.data?.[0]?.cpm || '0');
         return { value: Math.round(cpm * 100) / 100 };
+      }
+      case 31: { // Klaviyo open_rate — aggregate from metrics API
+        const res = await fetchWithRetry(() =>
+          fetchKlaviyoApi(decryptedToken, 'metrics/?filter=equals(name,"Opened Email")')
+        );
+        if (!res.ok) return { value: null, error: `Klaviyo API ${res.status}` };
+        const data = await res.json() as any;
+        // Get the metric ID for "Opened Email"
+        const metricId = data.data?.[0]?.id;
+        if (!metricId) return { value: null, error: 'Klaviyo: Opened Email metric not found' };
+        // Query aggregate for last 7 days
+        const aggRes = await fetchWithRetry(() =>
+          fetchKlaviyoApi(decryptedToken, `metric-aggregates/`, /* POST needed — use query params */)
+        );
+        // Klaviyo metric-aggregates requires POST, so we approximate from campaigns
+        const campRes = await fetchWithRetry(() =>
+          fetchKlaviyoApi(decryptedToken, 'campaigns/?filter=equals(messages.channel,"email")&sort=-send_time&page[size]=10')
+        );
+        if (!campRes.ok) return { value: null, error: `Klaviyo campaigns API ${campRes.status}` };
+        const campData = await campRes.json() as any;
+        const campaigns = campData.data || [];
+        if (campaigns.length === 0) return { value: null, error: 'No Klaviyo campaigns found' };
+        // Average open rate across recent campaigns
+        let totalOpen = 0, count = 0;
+        for (const camp of campaigns) {
+          const stats = camp.attributes?.send_options?.statistics || camp.attributes?.statistics;
+          if (stats?.open_rate !== undefined) {
+            totalOpen += Number(stats.open_rate);
+            count++;
+          }
+        }
+        return { value: count > 0 ? Math.round((totalOpen / count) * 100) / 100 : null };
+      }
+      case 32: { // Klaviyo click_rate
+        const campRes = await fetchWithRetry(() =>
+          fetchKlaviyoApi(decryptedToken, 'campaigns/?filter=equals(messages.channel,"email")&sort=-send_time&page[size]=10')
+        );
+        if (!campRes.ok) return { value: null, error: `Klaviyo API ${campRes.status}` };
+        const campData = await campRes.json() as any;
+        const campaigns = campData.data || [];
+        if (campaigns.length === 0) return { value: null, error: 'No Klaviyo campaigns found' };
+        let totalClick = 0, count = 0;
+        for (const camp of campaigns) {
+          const stats = camp.attributes?.statistics;
+          if (stats?.click_rate !== undefined) {
+            totalClick += Number(stats.click_rate);
+            count++;
+          }
+        }
+        return { value: count > 0 ? Math.round((totalClick / count) * 100) / 100 : null };
+      }
+      case 33: { // Klaviyo emails_sent 7d
+        const since = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 19) + '+00:00';
+        const campRes = await fetchWithRetry(() =>
+          fetchKlaviyoApi(decryptedToken, `campaigns/?filter=and(equals(messages.channel,"email"),greater-than(send_time,${since}))&sort=-send_time&page[size]=50`)
+        );
+        if (!campRes.ok) return { value: null, error: `Klaviyo API ${campRes.status}` };
+        const campData = await campRes.json() as any;
+        const campaigns = campData.data || [];
+        let totalSent = 0;
+        for (const camp of campaigns) {
+          const stats = camp.attributes?.statistics;
+          totalSent += Number(stats?.email_count || stats?.recipient_count || 0);
+        }
+        return { value: totalSent };
+      }
+      case 34: { // Klaviyo subscriber_count
+        const res = await fetchWithRetry(() =>
+          fetchKlaviyoApi(decryptedToken, 'lists/')
+        );
+        if (!res.ok) return { value: null, error: `Klaviyo API ${res.status}` };
+        const data = await res.json() as any;
+        const lists = data.data || [];
+        // Sum profile_count across all lists
+        let totalSubscribers = 0;
+        for (const list of lists) {
+          // Need to fetch each list's profile count
+          const countRes = await fetchWithRetry(() =>
+            fetchKlaviyoApi(decryptedToken, `lists/${list.id}/profiles/?page[size]=1`)
+          );
+          if (countRes.ok) {
+            const countData = await countRes.json() as any;
+            // Use the page cursor info or total count
+            totalSubscribers += countData.data?.length || 0;
+            // If there's a page info with total, use that
+            if (countData.meta?.total !== undefined) {
+              totalSubscribers += countData.meta.total - (countData.data?.length || 0);
+            }
+          }
+        }
+        // Fallback: if we only got partial data, at least return what we have
+        return { value: totalSubscribers > 0 ? totalSubscribers : null };
+      }
+      case 35: { // Klaviyo revenue 7d — attributed revenue from flows/campaigns
+        const campRes = await fetchWithRetry(() =>
+          fetchKlaviyoApi(decryptedToken, 'campaigns/?filter=equals(messages.channel,"email")&sort=-send_time&page[size]=10')
+        );
+        if (!campRes.ok) return { value: null, error: `Klaviyo API ${campRes.status}` };
+        const campData = await campRes.json() as any;
+        const campaigns = campData.data || [];
+        let totalRevenue = 0;
+        for (const camp of campaigns) {
+          const stats = camp.attributes?.statistics;
+          totalRevenue += Number(stats?.revenue || 0);
+        }
+        return { value: Math.round(totalRevenue * 100) / 100 };
       }
       default:
         return { value: null, error: `Numeric compare not implemented for check #${check.check_number}` };

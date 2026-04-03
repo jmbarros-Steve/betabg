@@ -223,7 +223,7 @@ async function executeCheck(
         return await executePerformance(check); // api_exists checks endpoint reachability like performance
 
       case 'token_health':
-        return await executeTokenHealth(check, merchant!, decryptedToken);
+        return await executeTokenHealth(supabase, check, merchant!, decryptedToken);
 
       case 'performance':
         return await executePerformance(check);

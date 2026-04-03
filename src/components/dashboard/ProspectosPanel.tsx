@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight, ChevronDown, Search, Loader2, ThumbsUp, ThumbsDown,
   MessageSquare, Brain, X, Send, Users, CheckCircle2, BookOpen,
-  TrendingUp, ArrowRight, Globe
+  TrendingUp, ArrowRight, Globe, FileText, AlertTriangle, Flag, ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { ProspectDetail as ProspectDetailCRM } from './ProspectDetail';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -94,6 +95,8 @@ function RatingDialog({
     if (!rating || !message || !prospect) return;
     setSaving(true);
     try {
+      const ruleIds: string[] = message.metadata?.rule_ids || [];
+
       // 1. Update wa_messages.metadata with rating
       const existingMeta = message.metadata || {};
       const newMeta = {
@@ -108,8 +111,8 @@ function RatingDialog({
         .eq('id', message.id);
       if (updateErr) throw updateErr;
 
-      // 2. Insert training data
       if (rating === 'good') {
+        // Create good example in steve_knowledge
         const { error: knErr } = await supabase
           .from('steve_knowledge')
           .insert({
@@ -120,8 +123,27 @@ function RatingDialog({
             orden: 99,
           });
         if (knErr) throw knErr;
-        toast.success('Ejemplo bueno guardado en steve_knowledge');
+
+        // Boost rules used: orden += 5 (cap 100)
+        if (ruleIds.length > 0) {
+          for (const ruleId of ruleIds) {
+            const { data: rule } = await supabase
+              .from('steve_knowledge')
+              .select('orden')
+              .eq('id', ruleId)
+              .maybeSingle();
+            if (rule) {
+              await supabase
+                .from('steve_knowledge')
+                .update({ orden: Math.min((rule.orden || 0) + 5, 100) })
+                .eq('id', ruleId);
+            }
+          }
+        }
+
+        toast.success('Ejemplo bueno guardado + reglas reforzadas');
       } else {
+        // Bad rating: create CORRECCION rule + steve_bugs + degrade rules
         const { error: bugErr } = await supabase
           .from('steve_bugs')
           .insert({
@@ -132,7 +154,41 @@ function RatingDialog({
             activo: true,
           });
         if (bugErr) throw bugErr;
-        toast.success('Bug registrado en steve_bugs');
+
+        // Create CORRECCION rule with high priority if correction text provided
+        if (correction.trim()) {
+          const { error: corrErr } = await supabase
+            .from('steve_knowledge')
+            .insert({
+              categoria: 'prospecting',
+              titulo: `CORRECCION: ${prospect.stage} — ${prospect.what_they_sell || 'general'}`,
+              contenido: `CONTEXTO: Prospecto de ${prospect.what_they_sell || 'industria desconocida'} en stage ${prospect.stage}\nRESPUESTA INCORRECTA: ${message.body}\nRESPUESTA CORRECTA: ${correction}${notes ? `\nNOTA: ${notes}` : ''}`,
+              activo: true,
+              orden: 99,
+            });
+          if (corrErr) throw corrErr;
+        }
+
+        // Degrade rules used: orden -= 10
+        if (ruleIds.length > 0) {
+          for (const ruleId of ruleIds) {
+            const { data: rule } = await supabase
+              .from('steve_knowledge')
+              .select('orden')
+              .eq('id', ruleId)
+              .maybeSingle();
+            if (rule) {
+              await supabase
+                .from('steve_knowledge')
+                .update({ orden: Math.max((rule.orden || 0) - 10, 0) })
+                .eq('id', ruleId);
+            }
+          }
+        }
+
+        toast.success(correction.trim()
+          ? 'Bug + corrección guardados, reglas degradadas'
+          : 'Bug registrado, reglas degradadas');
       }
 
       onRated();
@@ -157,6 +213,13 @@ function RatingDialog({
               <p className="text-xs text-blue-500 mb-1 font-medium">Mensaje de Steve:</p>
               <p className="text-slate-800">{message.body}</p>
             </div>
+
+            {/* Rule count indicator */}
+            {(message.metadata?.rule_ids?.length || 0) > 0 && (
+              <p className="text-xs text-slate-400">
+                Este mensaje usó {message.metadata!.rule_ids.length} regla(s) de steve_knowledge
+              </p>
+            )}
 
             {/* Rating buttons */}
             <div className="flex gap-3">
@@ -197,6 +260,9 @@ function RatingDialog({
                   placeholder="Escribe la respuesta correcta que Steve debería haber dado..."
                   rows={3}
                 />
+                <p className="text-xs text-slate-400 mt-1">
+                  Se creará una regla CORRECCION de prioridad máxima que Steve usará en futuros mensajes
+                </p>
               </div>
             )}
 
@@ -212,17 +278,146 @@ function RatingDialog({
   );
 }
 
+// ─── Rules Dialog ────────────────────────────────────────────────────────────
+
+interface KnowledgeRule {
+  id: string;
+  titulo: string | null;
+  categoria: string | null;
+  orden: number | null;
+  contenido: string | null;
+}
+
+function RulesDialog({
+  open,
+  onOpenChange,
+  ruleIds,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  ruleIds: string[];
+}) {
+  const [rules, setRules] = useState<KnowledgeRule[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [flagging, setFlagging] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open && ruleIds.length > 0) {
+      fetchRules();
+    }
+  }, [open, ruleIds]);
+
+  const fetchRules = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('steve_knowledge')
+        .select('id, titulo, categoria, orden, contenido')
+        .in('id', ruleIds);
+      if (error) throw error;
+      setRules(data || []);
+    } catch {
+      toast.error('Error cargando reglas');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFlag = async (ruleId: string) => {
+    setFlagging(ruleId);
+    try {
+      const rule = rules.find(r => r.id === ruleId);
+      if (!rule) return;
+      const newOrden = Math.max((rule.orden || 0) - 10, 0);
+      const { error } = await supabase
+        .from('steve_knowledge')
+        .update({ orden: newOrden })
+        .eq('id', ruleId);
+      if (error) throw error;
+      setRules(prev => prev.map(r => r.id === ruleId ? { ...r, orden: newOrden } : r));
+      toast.success(`Regla degradada: orden ${rule.orden} → ${newOrden}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Error al degradar regla');
+    } finally {
+      setFlagging(null);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Reglas usadas en este mensaje ({ruleIds.length})
+          </DialogTitle>
+        </DialogHeader>
+
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+          </div>
+        ) : rules.length === 0 ? (
+          <p className="text-sm text-slate-400 py-4">No se encontraron reglas</p>
+        ) : (
+          <div className="space-y-3">
+            {rules.map(rule => (
+              <div key={rule.id} className="rounded-lg border border-slate-200 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs font-mono">
+                      {rule.categoria}
+                    </Badge>
+                    <span className="text-sm font-medium text-slate-700">
+                      {rule.titulo || '(sin título)'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-slate-400">
+                      orden: {rule.orden ?? 0}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-orange-500 hover:text-orange-700 hover:bg-orange-50"
+                      onClick={() => handleFlag(rule.id)}
+                      disabled={flagging === rule.id}
+                      title="Degradar regla (orden -10)"
+                    >
+                      {flagging === rule.id
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <Flag className="w-3.5 h-3.5" />
+                      }
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 whitespace-pre-wrap leading-relaxed">
+                  {(rule.contenido || '').slice(0, 300)}
+                  {(rule.contenido || '').length > 300 && '...'}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Message Bubble ─────────────────────────────────────────────────────────
 
 function MessageBubble({
   msg,
   onRate,
+  onShowRules,
 }: {
   msg: WaMessage;
   onRate: (msg: WaMessage) => void;
+  onShowRules: (ruleIds: string[]) => void;
 }) {
   const isOutbound = msg.direction === 'outbound';
   const existingRating = msg.metadata?.rating as string | undefined;
+  const ruleIds: string[] = msg.metadata?.rule_ids || [];
 
   return (
     <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'} group`}>
@@ -234,14 +429,25 @@ function MessageBubble({
         }`}
       >
         <p className="whitespace-pre-wrap break-words">{msg.body || '(sin contenido)'}</p>
-        <p className={`text-[10px] mt-1 ${isOutbound ? 'text-blue-200' : 'text-slate-400'}`}>
-          {new Date(msg.created_at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+        <div className={`flex items-center gap-2 mt-1 text-[10px] ${isOutbound ? 'text-blue-200' : 'text-slate-400'}`}>
+          <span>
+            {new Date(msg.created_at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+          </span>
           {existingRating && (
-            <span className="ml-2">
-              {existingRating === 'good' ? '👍' : '👎'}
-            </span>
+            <span>{existingRating === 'good' ? '👍' : '👎'}</span>
           )}
-        </p>
+          {/* Rules badge */}
+          {isOutbound && ruleIds.length > 0 && (
+            <button
+              onClick={e => { e.stopPropagation(); onShowRules(ruleIds); }}
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-white/20 hover:bg-white/30 transition-colors cursor-pointer"
+              title="Ver reglas usadas"
+            >
+              <FileText className="w-2.5 h-2.5" />
+              {ruleIds.length} regla{ruleIds.length !== 1 ? 's' : ''}
+            </button>
+          )}
+        </div>
 
         {/* Rating buttons for outbound messages */}
         {isOutbound && !existingRating && (
@@ -274,6 +480,8 @@ function ProspectDetail({
   const [ratingMsg, setRatingMsg] = useState<WaMessage | null>(null);
   const [ratingOpen, setRatingOpen] = useState(false);
   const [training, setTraining] = useState(false);
+  const [rulesDialogOpen, setRulesDialogOpen] = useState(false);
+  const [rulesDialogIds, setRulesDialogIds] = useState<string[]>([]);
 
   useEffect(() => {
     fetchMessages();
@@ -301,6 +509,11 @@ function ProspectDetail({
   const handleRate = (msg: WaMessage) => {
     setRatingMsg(msg);
     setRatingOpen(true);
+  };
+
+  const handleShowRules = (ruleIds: string[]) => {
+    setRulesDialogIds(ruleIds);
+    setRulesDialogOpen(true);
   };
 
   const handleBulkTrain = async () => {
@@ -398,7 +611,7 @@ function ProspectDetail({
           ) : (
             <div className="p-4 space-y-3 max-h-[500px] overflow-y-auto">
               {messages.map(msg => (
-                <MessageBubble key={msg.id} msg={msg} onRate={handleRate} />
+                <MessageBubble key={msg.id} msg={msg} onRate={handleRate} onShowRules={handleShowRules} />
               ))}
             </div>
           )}
@@ -413,6 +626,13 @@ function ProspectDetail({
         prospect={prospect}
         onRated={fetchMessages}
       />
+
+      {/* Rules dialog */}
+      <RulesDialog
+        open={rulesDialogOpen}
+        onOpenChange={setRulesDialogOpen}
+        ruleIds={rulesDialogIds}
+      />
     </motion.div>
   );
 }
@@ -425,6 +645,7 @@ export function ProspectosPanel() {
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<Stage>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [crmDetailId, setCrmDetailId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProspects();
@@ -662,6 +883,15 @@ export function ProspectosPanel() {
                         <div className="text-sm font-mono font-semibold">{prospect.lead_score}</div>
                       </div>
                     )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-slate-400 hover:text-[#1E3A7B]"
+                      onClick={(e) => { e.stopPropagation(); setCrmDetailId(prospect.id); }}
+                      title="Ficha CRM"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 </div>
               </motion.div>
@@ -679,6 +909,14 @@ export function ProspectosPanel() {
           );
         })}
       </div>
+
+      {crmDetailId && (
+        <ProspectDetailCRM
+          prospectId={crmDetailId}
+          open={!!crmDetailId}
+          onOpenChange={(open) => !open && setCrmDetailId(null)}
+        />
+      )}
     </div>
   );
 }

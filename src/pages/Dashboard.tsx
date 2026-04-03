@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Users, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, Loader2, MessageSquare, Library, UserSearch, ClipboardList, Zap } from 'lucide-react';
+import { Users, LogOut, LayoutDashboard, BookOpen, GraduationCap, Link2, BarChart3, Brain, Loader2, MessageSquare, Library, UserSearch, ClipboardList, Zap, Kanban, CheckSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -20,9 +20,11 @@ import { AcademyAdminPanel } from '@/components/dashboard/AcademyAdminPanel';
 import { ProspectosPanel } from '@/components/dashboard/ProspectosPanel';
 import { OnboardingProgressPanel } from '@/components/dashboard/OnboardingProgressPanel';
 import { InsightApprovalPanel } from '@/components/dashboard/InsightApprovalPanel';
+import { ProspectKanban } from '@/components/dashboard/ProspectKanban';
+import { SalesTasksPanel } from '@/components/dashboard/SalesTasksPanel';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'overview' | 'clients' | 'blog' | 'estudios' | 'platforms' | 'metrics' | 'training' | 'insights' | 'support' | 'academy' | 'prospectos' | 'onboarding';
+type TabType = 'overview' | 'clients' | 'blog' | 'estudios' | 'platforms' | 'metrics' | 'training' | 'insights' | 'support' | 'academy' | 'prospectos' | 'onboarding' | 'pipeline' | 'tareas';
 
 export default function Dashboard() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -74,6 +76,8 @@ export default function Dashboard() {
     { id: 'training', label: 'Steve IA', icon: Brain },
     { id: 'insights', label: 'Insights', icon: Zap },
     { id: 'prospectos', label: 'Prospectos', icon: UserSearch },
+    { id: 'pipeline', label: 'Pipeline', icon: Kanban },
+    { id: 'tareas', label: 'Tareas', icon: CheckSquare },
     { id: 'onboarding', label: 'Onboarding', icon: ClipboardList },
     { id: 'support', label: 'Soporte', icon: MessageSquare },
     { id: 'blog', label: 'Blog', icon: BookOpen },
@@ -136,6 +140,8 @@ export default function Dashboard() {
           )}
           {activeTab === 'insights' && <InsightApprovalPanel />}
           {activeTab === 'prospectos' && <ProspectosPanel />}
+          {activeTab === 'pipeline' && <ProspectKanban />}
+          {activeTab === 'tareas' && <SalesTasksPanel />}
           {activeTab === 'onboarding' && <OnboardingProgressPanel />}
           {activeTab === 'support' && <AdminSupportPanel />}
           {activeTab === 'blog' && <BlogPanel userId={user.id} />}

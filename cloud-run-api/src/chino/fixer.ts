@@ -37,7 +37,7 @@ async function reExecuteCheck(
       case 'api_compare':
         return await executeApiCompare(supabase, check, merchant!, decryptedToken);
       case 'token_health':
-        return await executeTokenHealth(check, merchant!, decryptedToken);
+        return await executeTokenHealth(supabase, check, merchant!, decryptedToken);
       case 'performance':
         return await executePerformance(check);
       case 'visual':

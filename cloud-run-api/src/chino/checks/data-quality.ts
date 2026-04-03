@@ -1,172 +1,301 @@
 // El Chino — data_quality check executor
-// Fetches data from Supabase and uses Claude Haiku to evaluate if it makes sense
+// Deterministic SQL validations per check_number (no LLM dependency)
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { anthropicFetch } from '../../lib/anthropic-fetch.js';
 import type { ChinoCheck, MerchantConn, CheckResult } from '../types.js';
 
-const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
+interface ValidationResult {
+  invalid_count: number;
+  total_count: number;
+  sample_errors: string[];
+}
 
-// ─── Data fetchers by check_config.data_source ───────────────────
+// ─── Check 15: platform_metrics data quality ─────────────────────
+// Revenue not negative, required fields not null
 
-async function getDataForCheck(
+async function validatePlatformMetrics(
+  supabase: SupabaseClient,
+  merchant?: MerchantConn | null
+): Promise<ValidationResult> {
+  let query = supabase
+    .from('platform_metrics')
+    .select('id, metric_type, metric_value, metric_date, connection_id')
+    .order('metric_date', { ascending: false })
+    .limit(200);
+
+  if (merchant?.connection_id) {
+    query = query.eq('connection_id', merchant.connection_id);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(`DB error: ${error.message}`);
+  if (!data || data.length === 0) return { invalid_count: 0, total_count: 0, sample_errors: [] };
+
+  const errors: string[] = [];
+
+  for (const row of data) {
+    // Required fields not null
+    if (!row.metric_type) {
+      errors.push(`id=${row.id}: metric_type is null`);
+    }
+    if (row.metric_date === null || row.metric_date === undefined) {
+      errors.push(`id=${row.id}: metric_date is null`);
+    }
+    if (row.connection_id === null || row.connection_id === undefined) {
+      errors.push(`id=${row.id}: connection_id is null`);
+    }
+    // Revenue should not be negative
+    if (row.metric_type === 'revenue' && Number(row.metric_value) < 0) {
+      errors.push(`id=${row.id}: negative revenue (${row.metric_value})`);
+    }
+    // Metric value should be a valid number
+    if (row.metric_value !== null && row.metric_value !== undefined && isNaN(Number(row.metric_value))) {
+      errors.push(`id=${row.id}: metric_value is NaN (${row.metric_value})`);
+    }
+  }
+
+  return {
+    invalid_count: errors.length,
+    total_count: data.length,
+    sample_errors: errors.slice(0, 10),
+  };
+}
+
+// ─── Check 16: campaign_metrics data quality ─────────────────────
+// No CTR > 100%, no CPC negative, no impressions < clicks
+
+async function validateCampaignMetrics(
+  supabase: SupabaseClient,
+  merchant?: MerchantConn | null
+): Promise<ValidationResult> {
+  let query = supabase
+    .from('campaign_metrics')
+    .select('id, campaign_name, spend, impressions, clicks, revenue, metric_date, connection_id')
+    .order('metric_date', { ascending: false })
+    .limit(200);
+
+  if (merchant?.connection_id) {
+    query = query.eq('connection_id', merchant.connection_id);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(`DB error: ${error.message}`);
+  if (!data || data.length === 0) return { invalid_count: 0, total_count: 0, sample_errors: [] };
+
+  const errors: string[] = [];
+
+  for (const row of data) {
+    const impressions = Number(row.impressions) || 0;
+    const clicks = Number(row.clicks) || 0;
+    const spend = Number(row.spend) || 0;
+
+    // CTR > 100% is impossible
+    if (impressions > 0 && (clicks / impressions) > 1) {
+      errors.push(`id=${row.id}: clicks (${clicks}) > impressions (${impressions})`);
+    }
+
+    // CPC should not be negative
+    if (spend < 0) {
+      errors.push(`id=${row.id}: negative spend (${spend})`);
+    }
+
+    // Revenue should not be negative
+    if (Number(row.revenue) < 0) {
+      errors.push(`id=${row.id}: negative revenue (${row.revenue})`);
+    }
+
+    // Impressions and clicks should not be negative
+    if (impressions < 0) {
+      errors.push(`id=${row.id}: negative impressions (${impressions})`);
+    }
+    if (clicks < 0) {
+      errors.push(`id=${row.id}: negative clicks (${clicks})`);
+    }
+  }
+
+  return {
+    invalid_count: errors.length,
+    total_count: data.length,
+    sample_errors: errors.slice(0, 10),
+  };
+}
+
+// ─── Check 18: shopify_products data quality ─────────────────────
+// No price=0 with active status, no empty title
+
+async function validateShopifyProducts(
+  supabase: SupabaseClient,
+  merchant?: MerchantConn | null
+): Promise<ValidationResult> {
+  let query = supabase
+    .from('shopify_products')
+    .select('id, title, price, status, vendor, product_type')
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  if (merchant?.client_id) {
+    query = query.eq('client_id', merchant.client_id);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(`DB error: ${error.message}`);
+  if (!data || data.length === 0) return { invalid_count: 0, total_count: 0, sample_errors: [] };
+
+  const errors: string[] = [];
+
+  for (const row of data) {
+    // Active product with price = 0
+    if (row.status === 'active' && (Number(row.price) === 0 || row.price === null)) {
+      errors.push(`id=${row.id}: active product with price=0 ("${(row.title || '').substring(0, 40)}")`);
+    }
+
+    // Empty title
+    if (!row.title || row.title.trim() === '') {
+      errors.push(`id=${row.id}: empty title`);
+    }
+  }
+
+  return {
+    invalid_count: errors.length,
+    total_count: data.length,
+    sample_errors: errors.slice(0, 10),
+  };
+}
+
+// ─── Check 19: email_events data quality ─────────────────────────
+// No open_rate > 100%, no future dates
+
+async function validateEmailEvents(
+  supabase: SupabaseClient,
+  _merchant?: MerchantConn | null
+): Promise<ValidationResult> {
+  const { data, error } = await supabase
+    .from('email_events')
+    .select('id, event_type, created_at, metadata')
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+  if (!data || data.length === 0) return { invalid_count: 0, total_count: 0, sample_errors: [] };
+
+  const errors: string[] = [];
+  const now = Date.now();
+
+  for (const row of data) {
+    // Future dates (more than 1 hour ahead to allow for timezone drift)
+    if (row.created_at) {
+      const eventTime = new Date(row.created_at).getTime();
+      if (eventTime > now + 3600_000) {
+        errors.push(`id=${row.id}: future date (${row.created_at})`);
+      }
+    }
+
+    // Check open_rate in metadata if present
+    const meta = row.metadata as Record<string, any> | null;
+    if (meta?.open_rate !== undefined) {
+      const rate = Number(meta.open_rate);
+      if (rate > 100) {
+        errors.push(`id=${row.id}: open_rate > 100% (${rate})`);
+      }
+      if (rate < 0) {
+        errors.push(`id=${row.id}: negative open_rate (${rate})`);
+      }
+    }
+  }
+
+  return {
+    invalid_count: errors.length,
+    total_count: data.length,
+    sample_errors: errors.slice(0, 10),
+  };
+}
+
+// ─── Check 20: clients data quality ──────────────────────────────
+// No empty email, no empty name, no duplicates by email
+
+async function validateClients(
+  supabase: SupabaseClient,
+  _merchant?: MerchantConn | null
+): Promise<ValidationResult> {
+  const { data, error } = await supabase
+    .from('clients')
+    .select('id, name, email, created_at')
+    .order('created_at', { ascending: false })
+    .limit(500);
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+  if (!data || data.length === 0) return { invalid_count: 0, total_count: 0, sample_errors: [] };
+
+  const errors: string[] = [];
+  const emailsSeen = new Map<string, string>(); // email -> first id
+
+  for (const row of data) {
+    // Empty name
+    if (!row.name || row.name.trim() === '') {
+      errors.push(`id=${row.id}: empty name`);
+    }
+
+    // Empty email
+    if (!row.email || row.email.trim() === '') {
+      errors.push(`id=${row.id}: empty email`);
+    }
+
+    // Duplicate email
+    if (row.email) {
+      const normalized = row.email.trim().toLowerCase();
+      if (emailsSeen.has(normalized)) {
+        errors.push(`id=${row.id}: duplicate email "${normalized}" (first seen in id=${emailsSeen.get(normalized)})`);
+      } else {
+        emailsSeen.set(normalized, row.id);
+      }
+    }
+  }
+
+  return {
+    invalid_count: errors.length,
+    total_count: data.length,
+    sample_errors: errors.slice(0, 10),
+  };
+}
+
+// ─── Fallback: generic null/count check ──────────────────────────
+
+async function validateGeneric(
   supabase: SupabaseClient,
   check: ChinoCheck,
   merchant?: MerchantConn | null
-): Promise<Record<string, any> | null> {
-  const source = check.check_config?.data_source as string | undefined;
-  const table = check.check_config?.table as string | undefined;
-  const limit = (check.check_config?.sample_limit as number) || 20;
-
-  // If a specific table is configured, fetch recent rows
-  if (table) {
-    let query = supabase.from(table).select('*').order('created_at', { ascending: false }).limit(limit);
-
-    // Scope to merchant if provided and table has client_id
-    if (merchant?.client_id && check.check_config?.scope_to_merchant !== false) {
-      query = query.eq('client_id', merchant.client_id);
-    }
-
-    const { data, error } = await query;
-    if (error) return { _error: error.message };
-    return { table, row_count: data?.length || 0, sample: data || [] };
+): Promise<ValidationResult> {
+  const table = (check.check_config?.table || check.check_config?.data_source) as string | undefined;
+  if (!table) {
+    return { invalid_count: 0, total_count: 0, sample_errors: ['No table configured for generic check'] };
   }
 
-  // Predefined data sources
-  switch (source) {
-    case 'platform_metrics': {
-      const { data, error } = await supabase
-        .from('platform_metrics')
-        .select('metric_type, metric_value, metric_date, connection_id')
-        .order('metric_date', { ascending: false })
-        .limit(limit);
-      if (error) return { _error: error.message };
-      return { source, row_count: data?.length || 0, sample: data || [] };
-    }
+  let query = supabase.from(table).select('*').order('created_at', { ascending: false }).limit(100);
 
-    case 'campaign_metrics': {
-      let query = supabase
-        .from('campaign_metrics')
-        .select('campaign_name, spend, impressions, clicks, revenue, metric_date, connection_id')
-        .order('metric_date', { ascending: false })
-        .limit(limit);
-
-      if (merchant?.connection_id) {
-        query = query.eq('connection_id', merchant.connection_id);
-      }
-
-      const { data, error } = await query;
-      if (error) return { _error: error.message };
-      return { source, row_count: data?.length || 0, sample: data || [] };
-    }
-
-    case 'shopify_products': {
-      let query = supabase
-        .from('shopify_products')
-        .select('title, price, vendor, product_type, created_at')
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (merchant?.client_id) {
-        query = query.eq('client_id', merchant.client_id);
-      }
-
-      const { data, error } = await query;
-      if (error) return { _error: error.message };
-      return { source, row_count: data?.length || 0, sample: data || [] };
-    }
-
-    case 'email_events': {
-      const { data, error } = await supabase
-        .from('email_events')
-        .select('event_type, created_at, metadata')
-        .order('created_at', { ascending: false })
-        .limit(limit);
-      if (error) return { _error: error.message };
-      return { source, row_count: data?.length || 0, sample: data || [] };
-    }
-
-    case 'clients': {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('name, email, created_at, last_active_at, onboarding_status')
-        .order('created_at', { ascending: false })
-        .limit(limit);
-      if (error) return { _error: error.message };
-      return { source, row_count: data?.length || 0, sample: data || [] };
-    }
-
-    default: {
-      // If no source configured, fetch from chino_reports to self-check
-      const { data, error } = await supabase
-        .from('chino_reports')
-        .select('check_number, result, steve_value, real_value, created_at')
-        .order('created_at', { ascending: false })
-        .limit(limit);
-      if (error) return { _error: error.message };
-      return { source: 'chino_reports (default)', row_count: data?.length || 0, sample: data || [] };
-    }
-  }
-}
-
-// ─── Claude Haiku evaluation ─────────────────────────────────────
-
-async function evaluateDataQuality(
-  data: Record<string, any>,
-  checkDescription: string
-): Promise<{ pass: boolean; reason: string }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY not configured');
+  if (merchant?.client_id && check.check_config?.scope_to_merchant !== false) {
+    query = query.eq('client_id', merchant.client_id);
   }
 
-  const result = await anthropicFetch(
-    {
-      model: HAIKU_MODEL,
-      max_tokens: 300,
-      messages: [
-        {
-          role: 'user',
-          content: `Eres un QA evaluando datos de una plataforma de marketing para e-commerce.
+  const { data, error } = await query;
+  if (error) throw new Error(`DB error: ${error.message}`);
+  if (!data || data.length === 0) return { invalid_count: 0, total_count: 0, sample_errors: [] };
 
-Check: ${checkDescription}
-Datos: ${JSON.stringify(data, null, 2).substring(0, 3000)}
-
-¿Estos datos hacen sentido? Responde en JSON:
-{
-  "pass": true/false,
-  "reason": "explicación breve"
-}
-
-Criterios:
-- Números negativos donde no deberían haber = fail
-- Fechas en el futuro donde no deberían = fail
-- Datos de años anteriores a 2025 en contexto actual = fail
-- Valores extremadamente altos o bajos sin explicación = fail
-- Campos vacíos que deberían tener datos = fail
-- Datos duplicados = fail
-- Si hay 0 filas de datos y el check espera datos = fail
-- Si hay un _error en los datos = fail
-
-Responde SOLO el JSON.`,
-        },
-      ],
-    },
-    apiKey,
-    { timeoutMs: 15_000 },
-  );
-
-  if (!result.ok) {
-    throw new Error(`Claude Haiku API error: ${result.status}`);
+  // Basic check: count rows with any null required-looking fields
+  const errors: string[] = [];
+  for (const row of data) {
+    const nullFields = Object.entries(row)
+      .filter(([key, val]) => val === null && !key.endsWith('_at') && !key.startsWith('deleted') && key !== 'metadata')
+      .map(([key]) => key);
+    if (nullFields.length > 3) {
+      errors.push(`id=${(row as any).id}: ${nullFields.length} null fields (${nullFields.slice(0, 3).join(', ')}...)`);
+    }
   }
 
-  const text = result.data?.content?.[0]?.text || '{}';
-  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    return { pass: false, reason: `Unparseable Claude response: ${text.substring(0, 100)}` };
-  }
+  return {
+    invalid_count: errors.length,
+    total_count: data.length,
+    sample_errors: errors.slice(0, 10),
+  };
 }
 
 // ─── Main data_quality executor ──────────────────────────────────
@@ -179,33 +308,55 @@ export async function executeDataQuality(
   const start = Date.now();
 
   try {
-    // 1. Fetch data to evaluate
-    const data = await getDataForCheck(supabase, check, merchant);
+    let validation: ValidationResult;
 
-    if (!data) {
+    switch (check.check_number) {
+      case 15:
+        validation = await validatePlatformMetrics(supabase, merchant);
+        break;
+      case 16:
+        validation = await validateCampaignMetrics(supabase, merchant);
+        break;
+      case 18:
+        validation = await validateShopifyProducts(supabase, merchant);
+        break;
+      case 19:
+        validation = await validateEmailEvents(supabase, merchant);
+        break;
+      case 20:
+        validation = await validateClients(supabase, merchant);
+        break;
+      default:
+        validation = await validateGeneric(supabase, check, merchant);
+        break;
+    }
+
+    const duration_ms = Date.now() - start;
+
+    // No data → skip
+    if (validation.total_count === 0) {
       return {
         result: 'skip',
-        error_message: 'No data returned for check',
-        duration_ms: Date.now() - start,
+        error_message: 'Sin datos para validar',
+        duration_ms,
       };
     }
 
-    if (data._error) {
+    // Has invalid rows → fail
+    if (validation.invalid_count > 0) {
       return {
-        result: 'error',
-        error_message: `DB error: ${data._error}`,
-        duration_ms: Date.now() - start,
+        result: 'fail',
+        steve_value: `${validation.invalid_count}/${validation.total_count} invalid`,
+        error_message: validation.sample_errors.join('; '),
+        duration_ms,
       };
     }
 
-    // 2. Send to Claude Haiku for evaluation
-    const evaluation = await evaluateDataQuality(data, check.description);
-
+    // All good → pass
     return {
-      result: evaluation.pass ? 'pass' : 'fail',
-      steve_value: JSON.stringify(data).substring(0, 200),
-      error_message: evaluation.pass ? undefined : evaluation.reason,
-      duration_ms: Date.now() - start,
+      result: 'pass',
+      steve_value: `${validation.total_count} rows checked, 0 issues`,
+      duration_ms,
     };
   } catch (err: any) {
     return {

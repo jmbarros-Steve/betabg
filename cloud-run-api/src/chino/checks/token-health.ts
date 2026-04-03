@@ -1,9 +1,11 @@
 // El Chino — token_health executor
 // Checks 4-5: verify tokens are valid and not expired
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ChinoCheck, MerchantConn, CheckResult } from '../types.js';
 
 export async function executeTokenHealth(
+  supabase: SupabaseClient,
   check: ChinoCheck,
   merchant: MerchantConn,
   decryptedToken: string | null
@@ -68,10 +70,26 @@ export async function executeTokenHealth(
         }
 
         // Check token age if max_age_days is configured
-        const maxAgeDays = check.check_config?.max_age_days;
+        const maxAgeDays = check.check_config?.max_age_days as number | undefined;
         if (maxAgeDays && merchant.connection_id) {
-          // We compare against platform_connections.updated_at in the runner
-          // Here we just verify the API responded OK
+          const { data: conn } = await supabase
+            .from('platform_connections')
+            .select('updated_at')
+            .eq('id', merchant.connection_id)
+            .single();
+
+          if (conn?.updated_at) {
+            const ageDays = (Date.now() - new Date(conn.updated_at).getTime()) / 86400_000;
+            if (ageDays > maxAgeDays) {
+              return {
+                result: 'fail',
+                steve_value: `${ageDays.toFixed(1)} days`,
+                real_value: `max ${maxAgeDays} days`,
+                error_message: `Token tiene ${ageDays.toFixed(1)} días (máximo: ${maxAgeDays})`,
+                duration_ms: Date.now() - start,
+              };
+            }
+          }
         }
 
         return { result: 'pass', duration_ms: Date.now() - start };

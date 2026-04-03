@@ -1,0 +1,198 @@
+import { Context } from 'hono';
+import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { logProspectEvent } from '../../lib/prospect-event-logger.js';
+
+/** GET full prospect detail: profile + events + tasks + proposals + recent messages */
+export async function prospectDetail(c: Context) {
+  try {
+    const { prospect_id } = await c.req.json();
+    if (!prospect_id) return c.json({ error: 'prospect_id required' }, 400);
+
+    const supabase = getSupabaseAdmin();
+
+    const [prospectRes, eventsRes, tasksRes, proposalsRes, messagesRes] = await Promise.all([
+      supabase.from('wa_prospects').select('*').eq('id', prospect_id).single(),
+      supabase.from('wa_prospect_events').select('*').eq('prospect_id', prospect_id).order('created_at', { ascending: false }).limit(100),
+      supabase.from('sales_tasks').select('*').eq('prospect_id', prospect_id).order('created_at', { ascending: false }),
+      supabase.from('proposals').select('*').eq('prospect_id', prospect_id).order('created_at', { ascending: false }),
+      supabase.from('wa_messages').select('id, direction, body, created_at, contact_name, metadata').eq('contact_phone', '').limit(0), // placeholder, filled below
+    ]);
+
+    if (prospectRes.error || !prospectRes.data) {
+      return c.json({ error: 'Prospect not found' }, 404);
+    }
+
+    // Fetch messages using the prospect's phone
+    const { data: messages } = await supabase
+      .from('wa_messages')
+      .select('id, direction, body, created_at, contact_name, metadata')
+      .eq('contact_phone', prospectRes.data.phone)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    return c.json({
+      prospect: prospectRes.data,
+      events: eventsRes.data || [],
+      tasks: tasksRes.data || [],
+      proposals: proposalsRes.data || [],
+      messages: messages || [],
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+}
+
+/** Add admin note to prospect */
+export async function prospectAddNote(c: Context) {
+  try {
+    const { prospect_id, note } = await c.req.json();
+    if (!prospect_id || !note) return c.json({ error: 'prospect_id and note required' }, 400);
+
+    const supabase = getSupabaseAdmin();
+    const user = c.get('user');
+
+    const { error } = await supabase
+      .from('wa_prospects')
+      .update({ admin_notes: note, updated_at: new Date().toISOString() })
+      .eq('id', prospect_id);
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    logProspectEvent(prospect_id, 'note_added', { note: note.substring(0, 200) }, `admin:${user?.id || 'unknown'}`);
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+}
+
+/** Change prospect stage manually */
+export async function prospectChangeStage(c: Context) {
+  try {
+    const { prospect_id, stage } = await c.req.json();
+    if (!prospect_id || !stage) return c.json({ error: 'prospect_id and stage required' }, 400);
+
+    const validStages = ['new', 'discovery', 'qualifying', 'pitching', 'closing', 'converted', 'lost'];
+    if (!validStages.includes(stage)) return c.json({ error: 'Invalid stage' }, 400);
+
+    const supabase = getSupabaseAdmin();
+    const user = c.get('user');
+
+    // Get current stage for event log
+    const { data: prospect } = await supabase.from('wa_prospects').select('stage').eq('id', prospect_id).single();
+    const oldStage = prospect?.stage || 'unknown';
+
+    const { error } = await supabase
+      .from('wa_prospects')
+      .update({ stage, updated_at: new Date().toISOString() })
+      .eq('id', prospect_id);
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    logProspectEvent(prospect_id, 'stage_change', { from: oldStage, to: stage }, `admin:${user?.id || 'unknown'}`);
+
+    return c.json({ success: true, from: oldStage, to: stage });
+  } catch (error: any) {
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+}
+
+/** Change prospect priority */
+export async function prospectChangePriority(c: Context) {
+  try {
+    const { prospect_id, priority } = await c.req.json();
+    if (!prospect_id || !priority) return c.json({ error: 'prospect_id and priority required' }, 400);
+
+    const validPriorities = ['low', 'normal', 'high', 'urgent'];
+    if (!validPriorities.includes(priority)) return c.json({ error: 'Invalid priority' }, 400);
+
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from('wa_prospects')
+      .update({ priority, updated_at: new Date().toISOString() })
+      .eq('id', prospect_id);
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+}
+
+/** Update prospect tags */
+export async function prospectUpdateTags(c: Context) {
+  try {
+    const { prospect_id, tags } = await c.req.json();
+    if (!prospect_id || !Array.isArray(tags)) return c.json({ error: 'prospect_id and tags[] required' }, 400);
+
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from('wa_prospects')
+      .update({ tags, updated_at: new Date().toISOString() })
+      .eq('id', prospect_id);
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+}
+
+/** Get all prospects grouped by stage (for Kanban view) */
+export async function prospectsKanban(c: Context) {
+  try {
+    const supabase = getSupabaseAdmin();
+
+    const { data, error } = await supabase
+      .from('wa_prospects')
+      .select('id, phone, profile_name, name, company, what_they_sell, stage, lead_score, message_count, updated_at, priority, tags, meeting_status, meeting_at, apellido')
+      .order('updated_at', { ascending: false });
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    // Group by stage
+    const stages = ['new', 'discovery', 'qualifying', 'pitching', 'closing', 'converted', 'lost'];
+    const kanban: Record<string, any[]> = {};
+    for (const s of stages) {
+      kanban[s] = (data || []).filter((p: any) => (p.stage || 'new') === s);
+    }
+
+    return c.json({ kanban, total: (data || []).length });
+  } catch (error: any) {
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+}
+
+/** Move prospect stage via drag & drop */
+export async function prospectMoveStage(c: Context) {
+  try {
+    const { prospect_id, new_stage } = await c.req.json();
+    if (!prospect_id || !new_stage) return c.json({ error: 'prospect_id and new_stage required' }, 400);
+
+    const validStages = ['new', 'discovery', 'qualifying', 'pitching', 'closing', 'converted', 'lost'];
+    if (!validStages.includes(new_stage)) return c.json({ error: 'Invalid stage' }, 400);
+
+    const supabase = getSupabaseAdmin();
+    const user = c.get('user');
+
+    const { data: prospect } = await supabase.from('wa_prospects').select('stage').eq('id', prospect_id).single();
+    const oldStage = prospect?.stage || 'unknown';
+
+    if (oldStage === new_stage) return c.json({ success: true, moved: false });
+
+    const { error } = await supabase
+      .from('wa_prospects')
+      .update({ stage: new_stage, updated_at: new Date().toISOString() })
+      .eq('id', prospect_id);
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    logProspectEvent(prospect_id, 'stage_change', { from: oldStage, to: new_stage, method: 'drag_drop' }, `admin:${user?.id || 'unknown'}`);
+
+    return c.json({ success: true, moved: true, from: oldStage, to: new_stage });
+  } catch (error: any) {
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+}
