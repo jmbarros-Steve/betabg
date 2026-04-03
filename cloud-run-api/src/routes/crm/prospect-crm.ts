@@ -2,6 +2,43 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { logProspectEvent } from '../../lib/prospect-event-logger.js';
 
+/** Update deal value, win probability, expected close date */
+export async function prospectUpdateDeal(c: Context) {
+  try {
+    const { prospect_id, deal_value, win_probability, expected_close_date } = await c.req.json();
+    if (!prospect_id) return c.json({ error: 'prospect_id required' }, 400);
+
+    const supabase = getSupabaseAdmin();
+    const user = c.get('user');
+
+    const update: Record<string, any> = { updated_at: new Date().toISOString(), last_activity_at: new Date().toISOString() };
+    if (deal_value != null) update.deal_value = Number(deal_value) || 0;
+    if (win_probability != null) {
+      const wp = Number(win_probability);
+      if (wp < 0 || wp > 100) return c.json({ error: 'win_probability must be 0-100' }, 400);
+      update.win_probability = wp;
+    }
+    if (expected_close_date !== undefined) update.expected_close_date = expected_close_date || null;
+
+    const { error } = await supabase
+      .from('wa_prospects')
+      .update(update)
+      .eq('id', prospect_id);
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    logProspectEvent(prospect_id, 'deal_updated', {
+      deal_value: update.deal_value,
+      win_probability: update.win_probability,
+      expected_close_date: update.expected_close_date,
+    }, `admin:${user?.id || 'unknown'}`);
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+}
+
 /** GET full prospect detail: profile + events + tasks + proposals + recent messages */
 export async function prospectDetail(c: Context) {
   try {
@@ -84,7 +121,7 @@ export async function prospectChangeStage(c: Context) {
 
     const { error } = await supabase
       .from('wa_prospects')
-      .update({ stage, updated_at: new Date().toISOString() })
+      .update({ stage, updated_at: new Date().toISOString(), last_activity_at: new Date().toISOString(), is_rotting: false })
       .eq('id', prospect_id);
 
     if (error) return c.json({ error: error.message }, 500);
@@ -147,7 +184,7 @@ export async function prospectsKanban(c: Context) {
 
     const { data, error } = await supabase
       .from('wa_prospects')
-      .select('id, phone, profile_name, name, company, what_they_sell, stage, lead_score, message_count, updated_at, priority, tags, meeting_status, meeting_at, apellido')
+      .select('id, phone, profile_name, name, company, what_they_sell, stage, lead_score, message_count, updated_at, priority, tags, meeting_status, meeting_at, apellido, deal_value, win_probability, is_rotting')
       .order('updated_at', { ascending: false });
 
     if (error) return c.json({ error: error.message }, 500);
@@ -155,11 +192,27 @@ export async function prospectsKanban(c: Context) {
     // Group by stage
     const stages = ['new', 'discovery', 'qualifying', 'pitching', 'closing', 'converted', 'lost'];
     const kanban: Record<string, any[]> = {};
+    const stageTotals: Record<string, { total: number; weighted: number; count: number }> = {};
+
     for (const s of stages) {
-      kanban[s] = (data || []).filter((p: any) => (p.stage || 'new') === s);
+      const stageProspects = (data || []).filter((p: any) => (p.stage || 'new') === s);
+      kanban[s] = stageProspects;
+
+      let total = 0;
+      let weighted = 0;
+      for (const p of stageProspects) {
+        const dv = Number(p.deal_value) || 0;
+        total += dv;
+        weighted += dv * ((p.win_probability ?? 50) / 100);
+      }
+      stageTotals[s] = { total, weighted, count: stageProspects.length };
     }
 
-    return c.json({ kanban, total: (data || []).length });
+    // Pipeline-wide totals
+    const pipelineTotal = Object.values(stageTotals).reduce((s, v) => s + v.total, 0);
+    const pipelineWeighted = Object.values(stageTotals).reduce((s, v) => s + v.weighted, 0);
+
+    return c.json({ kanban, total: (data || []).length, stageTotals, pipelineTotal, pipelineWeighted });
   } catch (error: any) {
     return c.json({ error: error.message || 'Internal server error' }, 500);
   }
@@ -184,7 +237,7 @@ export async function prospectMoveStage(c: Context) {
 
     const { error } = await supabase
       .from('wa_prospects')
-      .update({ stage: new_stage, updated_at: new Date().toISOString() })
+      .update({ stage: new_stage, updated_at: new Date().toISOString(), last_activity_at: new Date().toISOString(), is_rotting: false })
       .eq('id', prospect_id);
 
     if (error) return c.json({ error: error.message }, 500);

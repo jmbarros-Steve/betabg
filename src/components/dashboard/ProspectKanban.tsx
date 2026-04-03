@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Loader2, User, Building2, TrendingUp, MessageSquare,
   Calendar, GripVertical, Info, ChevronDown, ChevronUp,
+  DollarSign, AlertTriangle,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { callApi } from '@/lib/api';
@@ -26,6 +27,9 @@ interface KanbanProspect {
   meeting_status: string | null;
   meeting_at: string | null;
   apellido: string | null;
+  deal_value: number | null;
+  win_probability: number | null;
+  is_rotting: boolean | null;
 }
 
 const STAGES = [
@@ -37,6 +41,11 @@ const STAGES = [
   { id: 'converted', label: 'Convertido', color: 'bg-emerald-500', bgLight: 'bg-emerald-50 border-emerald-200' },
   { id: 'lost', label: 'Perdido', color: 'bg-red-500', bgLight: 'bg-red-50 border-red-200' },
 ];
+
+function formatCurrency(value: number): string {
+  if (value >= 1000) return `$${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}k`;
+  return `$${value.toLocaleString()}`;
+}
 
 function ScoreBadge({ score }: { score: number | null }) {
   if (score == null) return null;
@@ -51,6 +60,9 @@ function ScoreBadge({ score }: { score: number | null }) {
 
 export function ProspectKanban() {
   const [kanban, setKanban] = useState<Record<string, KanbanProspect[]>>({});
+  const [stageTotals, setStageTotals] = useState<Record<string, { total: number; weighted: number; count: number }>>({});
+  const [pipelineTotal, setPipelineTotal] = useState(0);
+  const [pipelineWeighted, setPipelineWeighted] = useState(0);
   const [loading, setLoading] = useState(true);
   const [dragProspectId, setDragProspectId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
@@ -62,6 +74,9 @@ export function ProspectKanban() {
       const { data, error } = await callApi('crm/prospects/kanban', { body: {} });
       if (error) throw new Error(error);
       setKanban(data?.kanban || {});
+      setStageTotals(data?.stageTotals || {});
+      setPipelineTotal(data?.pipelineTotal || 0);
+      setPipelineWeighted(data?.pipelineWeighted || 0);
     } catch (err: any) {
       toast.error(err.message || 'Error cargando pipeline');
     } finally {
@@ -146,6 +161,20 @@ export function ProspectKanban() {
 
   return (
     <>
+      {/* Pipeline totals header */}
+      {pipelineTotal > 0 && (
+        <div className="mb-4 flex items-center gap-4 bg-white border border-slate-200 rounded-xl px-4 py-2.5">
+          <DollarSign className="w-4 h-4 text-green-600" />
+          <span className="text-sm font-semibold text-slate-700">
+            Pipeline total: {formatCurrency(pipelineTotal)}
+          </span>
+          <span className="text-sm text-slate-400">|</span>
+          <span className="text-sm text-slate-500">
+            Ponderado: {formatCurrency(pipelineWeighted)}
+          </span>
+        </div>
+      )}
+
       {/* Guide */}
       <div className="mb-4">
         <button
@@ -153,12 +182,12 @@ export function ProspectKanban() {
           className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
         >
           <Info className="w-4 h-4" />
-          <span className="font-medium">Cómo funciona el pipeline</span>
+          <span className="font-medium">Como funciona el pipeline</span>
           {showGuide ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </button>
         {showGuide && (
           <div className="mt-2 bg-white border border-slate-200 rounded-xl p-4 text-xs text-slate-600 space-y-2">
-            <p className="font-semibold text-slate-700 text-sm">Etapas automáticas (Steve AI por WhatsApp)</p>
+            <p className="font-semibold text-slate-700 text-sm">Etapas automaticas (Steve AI por WhatsApp)</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
               <p><span className="font-mono bg-blue-50 px-1 rounded">Nuevo</span> — Primer mensaje recibido</p>
               <p><span className="font-mono bg-cyan-50 px-1 rounded">Discovery</span> — Score 0-19, recopilando info</p>
@@ -170,7 +199,7 @@ export function ProspectKanban() {
             <hr className="border-slate-100" />
             <p className="font-semibold text-slate-700 text-sm">Reuniones</p>
             <div className="space-y-1">
-              <p>Steve agenda reuniones automáticamente cuando el score es alto</p>
+              <p>Steve agenda reuniones automaticamente cuando el score es alto</p>
               <p>24h antes — Steve manda recordatorio por WhatsApp</p>
               <p>2h antes — Segundo recordatorio con link de Google Meet</p>
               <p>No-show — Si no confirma, Steve cancela y baja el score</p>
@@ -196,6 +225,7 @@ export function ProspectKanban() {
           {STAGES.map((stage) => {
             const prospects = kanban[stage.id] || [];
             const isDragOver = dragOverStage === stage.id;
+            const stTotal = stageTotals[stage.id];
 
             return (
               <div
@@ -214,60 +244,82 @@ export function ProspectKanban() {
                     <span className="text-sm font-semibold text-slate-700">{stage.label}</span>
                     <span className="text-xs text-slate-400 ml-auto">{prospects.length}</span>
                   </div>
+                  {stTotal && stTotal.total > 0 && (
+                    <div className="mt-1 text-[10px] text-slate-400">
+                      {formatCurrency(stTotal.total)}
+                      <span className="text-slate-300 mx-1">|</span>
+                      pond: {formatCurrency(stTotal.weighted)}
+                    </div>
+                  )}
                 </div>
 
                 {/* Cards */}
                 <div className="p-2 space-y-2 min-h-[100px] max-h-[calc(100vh-300px)] overflow-y-auto">
-                  {prospects.map((p, idx) => (
-                    <motion.div
-                      key={p.id}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.02 }}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e as any, p.id)}
-                      onDragEnd={handleDragEnd}
-                      onClick={() => setSelectedProspectId(p.id)}
-                      className={`bg-white rounded-lg border border-slate-200 p-2.5 cursor-grab active:cursor-grabbing hover:shadow-sm transition-all ${
-                        dragProspectId === p.id ? 'opacity-40 scale-95' : ''
-                      }`}
-                    >
-                      <div className="flex items-start gap-1.5">
-                        <GripVertical className="w-3.5 h-3.5 text-slate-300 mt-0.5 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-700 truncate">
-                            {p.name || p.profile_name || p.phone}
-                          </p>
-                          {p.company && (
-                            <p className="text-[11px] text-slate-400 flex items-center gap-1 truncate">
-                              <Building2 className="w-3 h-3 shrink-0" /> {p.company}
+                  {prospects.map((p, idx) => {
+                    const isRotting = p.is_rotting && stage.id !== 'converted' && stage.id !== 'lost';
+                    const dealVal = Number(p.deal_value) || 0;
+
+                    return (
+                      <motion.div
+                        key={p.id}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.02 }}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e as any, p.id)}
+                        onDragEnd={handleDragEnd}
+                        onClick={() => setSelectedProspectId(p.id)}
+                        className={`bg-white rounded-lg border p-2.5 cursor-grab active:cursor-grabbing hover:shadow-sm transition-all ${
+                          dragProspectId === p.id ? 'opacity-40 scale-95' : ''
+                        } ${isRotting ? 'border-orange-400 ring-1 ring-orange-200' : 'border-slate-200'}`}
+                      >
+                        <div className="flex items-start gap-1.5">
+                          <GripVertical className="w-3.5 h-3.5 text-slate-300 mt-0.5 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-700 truncate">
+                              {p.name || p.profile_name || p.phone}
                             </p>
+                            {p.company && (
+                              <p className="text-[11px] text-slate-400 flex items-center gap-1 truncate">
+                                <Building2 className="w-3 h-3 shrink-0" /> {p.company}
+                              </p>
+                            )}
+                          </div>
+                          <ScoreBadge score={p.lead_score} />
+                        </div>
+
+                        <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-400 flex-wrap">
+                          {dealVal > 0 && (
+                            <span className="flex items-center gap-0.5 text-green-600 font-medium">
+                              <DollarSign className="w-3 h-3" /> {formatCurrency(dealVal)}
+                            </span>
+                          )}
+                          {p.message_count > 0 && (
+                            <span className="flex items-center gap-0.5">
+                              <MessageSquare className="w-3 h-3" /> {p.message_count}
+                            </span>
+                          )}
+                          {p.meeting_status === 'scheduled' && p.meeting_at && (
+                            <span className="flex items-center gap-0.5 text-cyan-500">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(p.meeting_at).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })}
+                            </span>
+                          )}
+                          {p.priority === 'urgent' && (
+                            <Badge className="bg-red-100 text-red-600 text-[9px] px-1 py-0">urgent</Badge>
+                          )}
+                          {p.priority === 'high' && (
+                            <Badge className="bg-orange-100 text-orange-600 text-[9px] px-1 py-0">high</Badge>
+                          )}
+                          {isRotting && (
+                            <Badge className="bg-orange-100 text-orange-700 text-[9px] px-1 py-0 flex items-center gap-0.5">
+                              <AlertTriangle className="w-2.5 h-2.5" /> Estancado
+                            </Badge>
                           )}
                         </div>
-                        <ScoreBadge score={p.lead_score} />
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-400">
-                        {p.message_count > 0 && (
-                          <span className="flex items-center gap-0.5">
-                            <MessageSquare className="w-3 h-3" /> {p.message_count}
-                          </span>
-                        )}
-                        {p.meeting_status === 'scheduled' && p.meeting_at && (
-                          <span className="flex items-center gap-0.5 text-cyan-500">
-                            <Calendar className="w-3 h-3" />
-                            {new Date(p.meeting_at).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })}
-                          </span>
-                        )}
-                        {p.priority === 'urgent' && (
-                          <Badge className="bg-red-100 text-red-600 text-[9px] px-1 py-0">urgent</Badge>
-                        )}
-                        {p.priority === 'high' && (
-                          <Badge className="bg-orange-100 text-orange-600 text-[9px] px-1 py-0">high</Badge>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))}
+                      </motion.div>
+                    );
+                  })}
                 </div>
               </div>
             );

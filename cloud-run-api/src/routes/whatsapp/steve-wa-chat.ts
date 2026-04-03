@@ -931,6 +931,8 @@ async function processProspectAsync(
           stage: 'lost',
           lost_reason: disqualifiedReason,
           updated_at: new Date().toISOString(),
+          last_activity_at: new Date().toISOString(),
+          is_rotting: false,
         })
         .eq('id', prospect.id);
       logProspectEvent(prospect.id, 'stage_change', { from: prospect.stage, to: 'lost', reason: disqualifiedReason }, 'steve');
@@ -1037,6 +1039,8 @@ async function processProspectAsync(
       stage: effectiveStage,
       last_extracted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      last_activity_at: new Date().toISOString(),
+      is_rotting: false,
     };
 
     // Track meeting link

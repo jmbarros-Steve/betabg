@@ -147,6 +147,7 @@ export default function Dashboard() {
           {activeTab === 'prospectos' && <ProspectosPanel />}
           {activeTab === 'pipeline' && <ProspectKanban />}
           {activeTab === 'tareas' && <SalesTasksPanel />}
+          {activeTab === 'formularios' && <WebFormsPanel />}
           {activeTab === 'onboarding' && <OnboardingProgressPanel />}
           {activeTab === 'support' && <AdminSupportPanel />}
           {activeTab === 'blog' && <BlogPanel userId={user.id} />}

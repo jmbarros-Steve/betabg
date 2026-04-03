@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   Loader2, Phone, Building2, ShoppingBag, TrendingUp,
   Tag, MessageSquare, CheckCircle2, FileText, Clock,
-  Save, X, Plus,
+  Save, X, Plus, DollarSign,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
@@ -58,6 +58,12 @@ export function ProspectDetail({ prospectId, open, onOpenChange, onStageChanged 
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [creatingTask, setCreatingTask] = useState(false);
 
+  // Deal fields
+  const [dealValue, setDealValue] = useState<string>('0');
+  const [winProbability, setWinProbability] = useState<string>('');
+  const [expectedCloseDate, setExpectedCloseDate] = useState<string>('');
+  const [savingDeal, setSavingDeal] = useState(false);
+
   const fetchDetail = useCallback(async () => {
     if (!prospectId) return;
     setLoading(true);
@@ -74,6 +80,9 @@ export function ProspectDetail({ prospectId, open, onOpenChange, onStageChanged 
       setMessages(data.messages || []);
       setNotes(data.prospect?.admin_notes || '');
       setTags(data.prospect?.tags || []);
+      setDealValue(String(data.prospect?.deal_value || 0));
+      setWinProbability(data.prospect?.win_probability != null ? String(data.prospect.win_probability) : '');
+      setExpectedCloseDate(data.prospect?.expected_close_date || '');
     } catch (err: any) {
       toast.error(err.message || 'Error cargando prospecto');
     } finally {
@@ -163,6 +172,32 @@ export function ProspectDetail({ prospectId, open, onOpenChange, onStageChanged 
     } catch {}
   };
 
+  const handleSaveDeal = async () => {
+    setSavingDeal(true);
+    try {
+      const { error } = await callApi('crm/prospect/deal', {
+        body: {
+          prospect_id: prospectId,
+          deal_value: Number(dealValue) || 0,
+          win_probability: winProbability ? Number(winProbability) : null,
+          expected_close_date: expectedCloseDate || null,
+        },
+      });
+      if (error) throw new Error(error);
+      toast.success('Deal actualizado');
+      setProspect((p: any) => ({
+        ...p,
+        deal_value: Number(dealValue) || 0,
+        win_probability: winProbability ? Number(winProbability) : null,
+        expected_close_date: expectedCloseDate || null,
+      }));
+    } catch (err: any) {
+      toast.error(err.message || 'Error');
+    } finally {
+      setSavingDeal(false);
+    }
+  };
+
   const tabs: { id: Tab; label: string; icon: any; count?: number }[] = [
     { id: 'timeline', label: 'Timeline', icon: Clock, count: events.length },
     { id: 'chat', label: 'Chat', icon: MessageSquare, count: messages.length },
@@ -233,6 +268,53 @@ export function ProspectDetail({ prospectId, open, onOpenChange, onStageChanged 
                   {p}
                 </button>
               ))}
+            </div>
+
+            {/* Deal section */}
+            <div className="flex items-end gap-2 mb-3 shrink-0 bg-slate-50 rounded-lg p-2.5 border border-slate-200">
+              <div className="flex-1 min-w-0">
+                <label className="text-[10px] text-slate-400 block mb-0.5">Valor (USD)</label>
+                <div className="relative">
+                  <DollarSign className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    type="number"
+                    value={dealValue}
+                    onChange={(e) => setDealValue(e.target.value)}
+                    className="h-7 text-xs pl-6 w-full"
+                    min={0}
+                  />
+                </div>
+              </div>
+              <div className="w-20">
+                <label className="text-[10px] text-slate-400 block mb-0.5">Prob. %</label>
+                <select
+                  value={winProbability}
+                  onChange={(e) => setWinProbability(e.target.value)}
+                  className="h-7 text-xs rounded-md border border-slate-200 w-full px-1 bg-white"
+                >
+                  <option value="">—</option>
+                  {[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((v) => (
+                    <option key={v} value={v}>{v}%</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1 min-w-0">
+                <label className="text-[10px] text-slate-400 block mb-0.5">Cierre esperado</label>
+                <Input
+                  type="date"
+                  value={expectedCloseDate}
+                  onChange={(e) => setExpectedCloseDate(e.target.value)}
+                  className="h-7 text-xs w-full"
+                />
+              </div>
+              <Button
+                size="sm"
+                onClick={handleSaveDeal}
+                disabled={savingDeal}
+                className="h-7 text-xs bg-[#1E3A7B] hover:bg-[#162d5e] px-2"
+              >
+                {savingDeal ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+              </Button>
             </div>
 
             {/* Tabs */}

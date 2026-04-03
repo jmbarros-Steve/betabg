@@ -31,6 +31,8 @@ import AdminCerebro from "./pages/AdminCerebro";
 import AdminSkyvern from "./pages/AdminSkyvern";
 import AdminPlanes from "./pages/AdminPlanes";
 import AdminSwarmSources from "./pages/AdminSwarmSources";
+import Agendar from "./pages/Agendar";
+import WebForm from "./pages/WebForm";
 import NotFound from "./pages/NotFound";
 import { Sentry } from "./lib/sentry";
 
@@ -78,6 +80,8 @@ const App = () => (
             <Route path="/admin/skyvern" element={<AdminSkyvern />} />
             <Route path="/admin/planes" element={<AdminPlanes />} />
             <Route path="/admin/swarm-sources" element={<AdminSwarmSources />} />
+            <Route path="/agendar/:sellerId" element={<Agendar />} />
+            <Route path="/formulario/:formId" element={<WebForm />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
