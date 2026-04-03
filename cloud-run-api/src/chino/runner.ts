@@ -28,7 +28,7 @@ const CONCURRENCY = 10;
 const NO_MERCHANT_TYPES = new Set(['performance', 'visual', 'api_exists']);
 
 // Check types that don't need a decrypted token
-const NO_TOKEN_TYPES = new Set(['performance', 'visual', 'data_quality', 'api_exists']);
+const NO_TOKEN_TYPES = new Set(['performance', 'visual', 'api_exists']);
 
 // ─── Get merchant connections ────────────────────────────────────
 
@@ -235,7 +235,7 @@ async function executeCheck(
         return await executeFunctional(supabase, check, merchant!, decryptedToken);
 
       case 'data_quality':
-        return await executeDataQuality(supabase, check, merchant);
+        return await executeDataQuality(supabase, check, merchant, decryptedToken);
 
       case 'security':
         return await executeSecurity(supabase, check, merchant!);

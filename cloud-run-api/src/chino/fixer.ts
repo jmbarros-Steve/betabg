@@ -45,7 +45,7 @@ async function reExecuteCheck(
       case 'functional':
         return await executeFunctional(supabase, check, merchant!, decryptedToken);
       case 'data_quality':
-        return await executeDataQuality(supabase, check, merchant);
+        return await executeDataQuality(supabase, check, merchant, decryptedToken);
       case 'security':
         return await executeSecurity(supabase, check, merchant!);
       default:
