@@ -155,6 +155,7 @@ import { waActionProcessor } from './cron/wa-action-processor.js';
 import { swarmResearch } from './cron/swarm-research.js';
 import { autoLearningDigest } from './cron/auto-learning-digest.js';
 import { knowledgePropagationCatchup } from './cron/knowledge-propagation-catchup.js';
+import { validateContexts } from './cron/validate-contexts.js';
 
 // WhatsApp
 import { steveWAChat } from './whatsapp/steve-wa-chat.js';
@@ -525,6 +526,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/cron/swarm-research', swarmResearch); // No JWT — X-Cron-Secret, every 2h: 0 */2 * * *
   app.post('/api/cron/auto-learning-digest', autoLearningDigest); // No JWT — X-Cron-Secret, daily 9am Chile: 0 12 * * *
   app.post('/api/cron/knowledge-propagation-catchup', knowledgePropagationCatchup); // No JWT — X-Cron-Secret, manual or piggyback on Sun 5am
+  app.post('/api/cron/validate-contexts', validateContexts); // No JWT — X-Cron-Secret, every 12h: 0 6,18 * * *
 
   // Public approval API (token-based, no JWT)
   app.get('/api/approve-rules-public', approveRulesPublic);

@@ -4,7 +4,8 @@ import {
   Users, ArrowLeft, RefreshCw, Brain, Wifi, WifiOff, Clock,
   MessageSquare, ChevronDown, ChevronUp, Shield, BarChart3, Zap,
   Database, Cloud, Monitor, Mail, ShoppingBag, Image, Phone, Search,
-  AlertTriangle, CheckCircle2
+  AlertTriangle, CheckCircle2, FileText, Cog, ArrowRight, Layers,
+  Timer, GitBranch
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -44,103 +45,120 @@ interface AgentInfo {
   ifNotExist: string;
   icon: typeof Brain;
   challenge: string;
+  contextFile: string;
+  tables: number;
+  crons: number;
 }
 
 const AGENTS: AgentInfo[] = [
   {
     code: 'w2', name: 'Felipe', squad: 'canales', module: 'Meta Ads + IG',
-    icon: BarChart3,
+    icon: BarChart3, tables: 8, crons: 3,
+    contextFile: 'agents/contexts/felipe-w2.md',
     whatSimple: 'Mantiene la conexión con Meta para que los clientes creen campañas y vean métricas desde Steve',
     ifNotExist: 'Los clientes no podrían crear ni monitorear campañas de Meta/IG desde la plataforma',
     challenge: 'Solo 3 de 127 clientes tienen Meta conectado. El 97% tiene un módulo de Meta vacío.',
   },
   {
     code: 'w3', name: 'Andrés', squad: 'canales', module: 'Google Ads',
-    icon: Search,
+    icon: Search, tables: 2, crons: 0,
+    contextFile: 'agents/contexts/andres-w3.md',
     whatSimple: 'Mantiene la integración con Google Ads para que los clientes vean sus métricas de Google en Steve',
     ifNotExist: 'Google Ads 100% desconectado — faltan 3 credenciales en Cloud Run',
     challenge: 'Google Ads está completamente desconectado. Los clientes que usan Google no ven NADA de su inversión.',
   },
   {
     code: 'w0', name: 'Rodrigo', squad: 'canales', module: 'Klaviyo',
-    icon: Mail,
+    icon: Mail, tables: 5, crons: 0,
+    contextFile: 'agents/contexts/rodrigo-w0.md',
     whatSimple: 'Mantiene el sync con Klaviyo para que los clientes gestionen flows de email desde Steve',
     ifNotExist: 'El módulo de email marketing vía Klaviyo dejaría de funcionar',
     challenge: 'email_send_queue = 0. Tenemos 7 edge functions de Klaviyo pero no enviamos nada.',
   },
   {
     code: 'w1', name: 'Valentina', squad: 'canales', module: 'Steve Mail',
-    icon: Mail,
+    icon: Mail, tables: 15, crons: 2,
+    contextFile: 'agents/contexts/valentina-w1.md',
     whatSimple: 'Mantiene el editor de emails propio (GrapeJS), templates y pipeline de envío directo',
     ifNotExist: 'Los clientes no podrían crear ni enviar emails directamente desde Steve',
     challenge: 'El editor lleva semanas sin que nadie lo toque. Sin editor no hay emails.',
   },
   {
     code: 'w7', name: 'Tomás', squad: 'producto', module: 'Steve AI & Brain',
-    icon: Brain,
+    icon: Brain, tables: 19, crons: 11,
+    contextFile: 'agents/contexts/tomas-w7.md',
     whatSimple: 'Mantiene el cerebro: knowledge base, swarm research, content hunter, agent loop',
     ifNotExist: 'Steve sería un dashboard tonto — sin inteligencia propia',
     challenge: 'El swarm tiene 16 runs exitosos de 360 posibles. El Brain opera al 5% de capacidad.',
   },
   {
     code: 'w17', name: 'Ignacio', squad: 'producto', module: 'Métricas & Reportes',
-    icon: BarChart3,
+    icon: BarChart3, tables: 5, crons: 6,
+    contextFile: 'agents/contexts/ignacio-w17.md',
     whatSimple: 'Mantiene dashboards, reportes semanales, anomalías y atribución de revenue',
     ifNotExist: 'Los clientes no tendrían visibilidad — irían a cada plataforma por separado',
     challenge: 'El reporte semanal se genera pero nadie lo lee. Datos sin acción = tokens desperdiciados.',
   },
   {
     code: 'w19', name: 'Paula', squad: 'producto', module: 'WA, CRM & Ventas',
-    icon: Phone,
+    icon: Phone, tables: 14, crons: 8,
+    contextFile: 'agents/contexts/paula-w19.md',
     whatSimple: 'Mantiene WhatsApp Steve, seguimiento de prospectos y carritos abandonados',
     ifNotExist: 'Los clientes no podrían usar Steve como canal de ventas vía WhatsApp',
     challenge: 'wa-action-processor corre 1440 veces/día. ¿Cuántas acciones procesó hoy?',
   },
   {
     code: 'w18', name: 'Valentín', squad: 'producto', module: 'Creativos & Assets',
-    icon: Image,
+    icon: Image, tables: 3, crons: 3,
+    contextFile: 'agents/contexts/valentin-w18.md',
     whatSimple: 'Mantiene generación de imágenes AI, fatiga creativa y biblioteca de assets',
     ifNotExist: 'Los clientes tendrían que crear todos sus creativos fuera de Steve',
     challenge: 'El fatigue detector corre diario. ¿Cuántas alertas generó este mes?',
   },
   {
     code: 'w8', name: 'Diego', squad: 'infra', module: 'Base de Datos',
-    icon: Database,
-    whatSimple: 'Mantiene 37 tablas, 120 RLS policies y la integridad de los datos de 127 clientes',
+    icon: Database, tables: 8, crons: 0,
+    contextFile: 'agents/contexts/diego-w8.md',
+    whatSimple: 'Mantiene 97 tablas, 120 RLS policies y la integridad de los datos de 127 clientes',
     ifNotExist: 'Los datos podrían corromperse, perderse o quedar expuestos',
     challenge: 'steve_sources = 0, swarm_sources = 0. Las tablas del Brain están vacías.',
   },
   {
     code: 'w5', name: 'Sebastián', squad: 'infra', module: 'Cloud & Crons',
-    icon: Cloud,
-    whatSimple: 'Mantiene 45 crons, 69 edge functions, Cloud Run y 20 env vars',
+    icon: Cloud, tables: 6, crons: 44,
+    contextFile: 'agents/contexts/sebastian-w5.md',
+    whatSimple: 'Mantiene 44 crons, 65 edge functions, Cloud Run y 20 env vars',
     ifNotExist: 'La plataforma entera se caería y nadie se enteraría',
     challenge: 'Health-check cubre 10 de 69 endpoints. Eso es 14% de cobertura.',
   },
   {
     code: 'w4', name: 'Camila', squad: 'infra', module: 'Frontend & Portal',
-    icon: Monitor,
+    icon: Monitor, tables: 1, crons: 0,
+    contextFile: 'agents/contexts/camila-w4.md',
     whatSimple: 'Mantiene 130+ componentes React, portal del cliente, onboarding y dashboard',
     ifNotExist: 'Los clientes no tendrían interfaz para usar Steve',
     challenge: '130 componentes y cero design system. Cada página se ve diferente.',
   },
   {
     code: 'w13', name: 'Matías', squad: 'infra', module: 'Shopify',
-    icon: ShoppingBag,
+    icon: ShoppingBag, tables: 3, crons: 0,
+    contextFile: 'agents/contexts/matias-w13.md',
     whatSimple: 'Mantiene sync de productos, orders y webhooks de las tiendas de los clientes',
     ifNotExist: 'Anuncios mostrarían productos agotados, no sabríamos cuánto venden',
     challenge: 'Shopify App desconectada. Faltan 3 credenciales. La mitad del equipo trabaja ciego.',
   },
   {
     code: 'w6', name: 'Isidora', squad: 'qa', module: 'CRITERIO + Code Review',
-    icon: Shield,
+    icon: Shield, tables: 2, crons: 3,
+    contextFile: 'agents/contexts/isidora-w6.md',
     whatSimple: 'Mantiene 493 reglas de calidad + reviewer obligatoria de lógica y calidad de código',
     ifNotExist: 'Steve aprobaría contenido malo — ads con errores, copies que no convierten',
     challenge: '493 reglas — ¿cuántas se crearon automáticamente y nunca se revisaron?',
   },
   {
     code: 'w12', name: 'Javiera', squad: 'qa', module: 'El Chino (QA) + Code Review',
-    icon: AlertTriangle,
+    icon: AlertTriangle, tables: 3, crons: 4,
+    contextFile: 'agents/contexts/javiera-w12.md',
     whatSimple: 'Audita todo: 800 checks diarios + reviewer obligatoria de integridad y seguridad',
     ifNotExist: 'Errores silenciosos se acumularían — nadie verificaría que el sistema funciona',
     challenge: 'qa_log tiene 550+ registros. ¿Cuántos revisaste? Apuesto que cero.',
@@ -182,7 +200,7 @@ export default function AdminOrganigrama() {
   const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
-  const [mdTab, setMdTab] = useState<'status' | 'personality' | 'memory'>('status');
+  const [mdTab, setMdTab] = useState<'status' | 'personality' | 'context' | 'memory'>('status');
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/auth');
@@ -313,7 +331,12 @@ export default function AdminOrganigrama() {
                                   </Badge>
                                 )}
                               </div>
-                              <p className="text-xs font-medium text-muted-foreground mb-1">{a.module}</p>
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="text-xs font-medium text-muted-foreground">{a.module}</p>
+                                <span className="text-[10px] text-muted-foreground/60">
+                                  {a.tables}T {a.crons > 0 ? `· ${a.crons}C` : ''}
+                                </span>
+                              </div>
                               <p className="text-sm text-muted-foreground">{a.whatSimple}</p>
                               <div className="mt-2 text-xs border-l-2 border-orange-500/50 pl-2 italic text-muted-foreground">
                                 "{a.challenge}"
@@ -329,10 +352,117 @@ export default function AdminOrganigrama() {
             );
           })}
 
+          {/* Activation Protocol — 4 layers */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Layers className="h-4 w-4 text-orange-500" />
+                Protocolo de Activación (4 Capas)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground mb-3">
+                Cuando se activa un agente, se leen 4 capas en orden. Cada capa aporta un tipo de contexto diferente.
+              </p>
+              {[
+                { n: 1, icon: '1.', label: 'Personality', file: 'agents/personalities/', desc: 'QUIÉN eres — personalidad, 5 misiones, mandato de desafío', color: 'text-purple-400', note: 'Nunca cambia' },
+                { n: 2, icon: '2.', label: 'Context', file: 'agents/contexts/', desc: 'CON QUÉ trabajas — tablas, crons, archivos, dependencias', color: 'text-blue-400', note: 'Referencia estática' },
+                { n: 3, icon: '3.', label: 'State', file: 'agents/state/', desc: 'DÓNDE quedaste — tareas actuales, progreso, blockers', color: 'text-amber-400', note: 'Cambia cada sesión' },
+                { n: 4, icon: '4.', label: 'Memory', file: 'agents/memory/', desc: 'QUÉ aprendiste — decisiones, descubrimientos, desacuerdos', color: 'text-emerald-400', note: 'Crece siempre' },
+              ].map(layer => (
+                <div key={layer.n} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
+                  <span className={`text-lg font-extrabold w-6 text-center ${layer.color}`}>{layer.n}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm">{layer.label}</span>
+                      <code className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">{layer.file}</code>
+                      <Badge variant="outline" className="text-[9px]">{layer.note}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{layer.desc}</p>
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+                <span className="text-lg font-extrabold w-6 text-center text-orange-400">5</span>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">Unassigned Check</span>
+                    <code className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">agents/state/_unassigned.md</code>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Revisa si hay tablas o crons nuevos sin dueño asignado</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Automatizaciones */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Cog className="h-4 w-4 text-blue-400" />
+                Automatizaciones del Sistema de Agentes
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {[
+                {
+                  name: 'Context Validator',
+                  schedule: 'Cada 12h (6am/6pm UTC)',
+                  cron: 'context-validator-12h',
+                  desc: 'Compara tablas en Supabase y crons en Cloud Scheduler contra los context files. Items nuevos sin dueño van a _unassigned.md. Crea task si hay discrepancias.',
+                  color: 'text-blue-400',
+                },
+                {
+                  name: 'SYNC Agresivo',
+                  schedule: 'Cada interacción de agente',
+                  cron: 'via curl PATCH',
+                  desc: 'Cada agente guarda su estado en agent_sessions después de cada tarea, descubrimiento o challenge. Se lee aquí en "Agentes en Vivo".',
+                  color: 'text-emerald-400',
+                },
+                {
+                  name: 'Cross-Review Obligatorio',
+                  schedule: 'Antes de cada commit',
+                  cron: 'via sub-agente',
+                  desc: 'Isidora W6 revisa lógica/calidad. Javiera W12 revisa integridad/seguridad. Sin aprobación no hay commit.',
+                  color: 'text-pink-400',
+                },
+                {
+                  name: 'Bug → Task Automático',
+                  schedule: 'Al detectar bug',
+                  cron: 'insert directo',
+                  desc: 'Cualquier agente que encuentre un bug critical/major/high lo inserta inmediatamente como task en Supabase.',
+                  color: 'text-red-400',
+                },
+                {
+                  name: 'El Chino (QA Patrol)',
+                  schedule: '~800 checks/día',
+                  cron: 'chino-patrol + chino-fixer',
+                  desc: 'Javiera W12 ejecuta 7 tipos de checks cada 30min. Auto-fix cada 10min. Reportes 4x/día.',
+                  color: 'text-amber-400',
+                },
+              ].map(auto => (
+                <div key={auto.name} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
+                  <Timer className={`h-4 w-4 mt-0.5 ${auto.color}`} />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm">{auto.name}</span>
+                      <span className="text-[10px] text-muted-foreground">{auto.schedule}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{auto.desc}</p>
+                    <code className="text-[9px] text-muted-foreground/60">{auto.cron}</code>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
           {/* Dependency layers */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Orden de Activación (Dependencias)</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">
+                <GitBranch className="h-4 w-4 text-emerald-400" />
+                Orden de Activación (Dependencias)
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {[
@@ -472,7 +602,7 @@ export default function AdminOrganigrama() {
                             {/* MD tabs */}
                             <div className="space-y-2">
                               <div className="flex gap-1">
-                                {(['status', 'personality', 'memory'] as const).map(tab => (
+                                {(['status', 'personality', 'context', 'memory'] as const).map(tab => (
                                   <button
                                     key={tab}
                                     onClick={(e) => { e.stopPropagation(); setMdTab(tab); }}
@@ -482,13 +612,39 @@ export default function AdminOrganigrama() {
                                         : 'text-muted-foreground hover:bg-muted/30'
                                     }`}
                                   >
-                                    {tab === 'status' ? 'Estado' : tab === 'personality' ? 'Personalidad' : 'Memoria'}
+                                    {tab === 'status' ? 'Estado' : tab === 'personality' ? 'Personalidad' : tab === 'context' ? 'Contexto' : 'Memoria'}
                                   </button>
                                 ))}
                               </div>
 
                               <div className="bg-muted/20 rounded-lg p-3 max-h-64 overflow-y-auto">
-                                {(() => {
+                                {mdTab === 'context' ? (
+                                  <div className="space-y-3">
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <FileText className="h-4 w-4 text-blue-400" />
+                                      <code className="text-xs bg-muted/50 px-2 py-1 rounded">{a.contextFile}</code>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="bg-muted/30 rounded p-2 text-center">
+                                        <div className="text-lg font-bold text-blue-400">{a.tables}</div>
+                                        <div className="text-[10px] text-muted-foreground">Tablas propias</div>
+                                      </div>
+                                      <div className="bg-muted/30 rounded p-2 text-center">
+                                        <div className="text-lg font-bold text-amber-400">{a.crons}</div>
+                                        <div className="text-[10px] text-muted-foreground">Crons propios</div>
+                                      </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                      El context file contiene las tablas exactas (con columnas y estado), crons, archivos de código,
+                                      edge functions y dependencias con otros agentes. Es la referencia operacional que el agente
+                                      lee al activarse para saber CON QUÉ trabaja.
+                                    </p>
+                                    <p className="text-[10px] text-muted-foreground/60">
+                                      Validación automática cada 12h via <code>context-validator-12h</code> — detecta tablas/crons
+                                      nuevos sin dueño y los escala a <code>_unassigned.md</code>
+                                    </p>
+                                  </div>
+                                ) : (() => {
                                   const content = mdTab === 'status' ? session.status_md
                                     : mdTab === 'personality' ? session.personality_md
                                     : session.memory_md;
