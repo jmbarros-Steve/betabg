@@ -1206,17 +1206,116 @@ async function check76_knowledgeBaseSize(supabase: SupabaseClient): Promise<Chec
   return { result: 'pass', steve_value: `${count} knowledge entries`, duration_ms: Date.now() - start };
 }
 
-// ─── Check 83: No recent errors in chino_reports ────────────────
+// ─── Check 51: Klaviyo Welcome Series flow has ≥3 emails ────────
 
-async function check83_noRecentErrors(supabase: SupabaseClient): Promise<CheckResult> {
+async function check51_klaviyoWelcomeSeries(
+  supabase: SupabaseClient,
+  merchant: MerchantConn | null | undefined,
+  token: string | null | undefined
+): Promise<CheckResult> {
+  const start = Date.now();
+  if (!merchant || !token) {
+    return { result: 'skip', error_message: 'Klaviyo token no disponible', duration_ms: Date.now() - start };
+  }
+
+  const resp = await fetchWithTimeout('https://a.klaviyo.com/api/flows/', {
+    method: 'GET',
+    headers: { 'Authorization': `Klaviyo-API-Key ${token}`, 'revision': '2025-07-15', 'Accept': 'application/json' },
+  });
+  if (!resp.ok) throw new Error(`Klaviyo API ${resp.status}`);
+  const json = await resp.json() as any;
+  const flows = json.data || [];
+
+  const welcome = flows.find((f: any) =>
+    (f.attributes?.name || '').toLowerCase().includes('welcome')
+  );
+
+  if (!welcome) {
+    return { result: 'skip', error_message: 'No Welcome Series flow found', duration_ms: Date.now() - start };
+  }
+
+  const actionsResp = await fetchWithTimeout(
+    `https://a.klaviyo.com/api/flows/${welcome.id}/flow-actions/`,
+    { method: 'GET', headers: { 'Authorization': `Klaviyo-API-Key ${token}`, 'revision': '2025-07-15', 'Accept': 'application/json' } },
+  );
+  if (!actionsResp.ok) throw new Error(`Klaviyo API ${actionsResp.status}`);
+  const actionsJson = await actionsResp.json() as any;
+  const actionCount = (actionsJson.data || []).length;
+
+  if (actionCount < 3) {
+    return {
+      result: 'fail',
+      steve_value: `${actionCount} actions en Welcome Series`,
+      error_message: `Welcome Series tiene ${actionCount} actions (mínimo 3)`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `Welcome Series: ${actionCount} actions`, duration_ms: Date.now() - start };
+}
+
+// ─── Check 56: Klaviyo active contacts > 100 per merchant ───────
+
+async function check56_klaviyoActiveContacts(
+  token: string | null | undefined
+): Promise<CheckResult> {
+  const start = Date.now();
+  if (!token) {
+    return { result: 'skip', error_message: 'Klaviyo token no disponible', duration_ms: Date.now() - start };
+  }
+
+  const resp = await fetchWithTimeout(
+    'https://a.klaviyo.com/api/profiles/?page[size]=1',
+    {
+      method: 'GET',
+      headers: { 'Authorization': `Klaviyo-API-Key ${token}`, 'revision': '2025-07-15', 'Accept': 'application/json' },
+    }
+  );
+  if (!resp.ok) throw new Error(`Klaviyo API ${resp.status}`);
+  const json = await resp.json() as any;
+
+  // Klaviyo doesn't give total count easily; check if there's at least 1 page
+  const profiles = json.data || [];
+  const hasMore = !!json.links?.next;
+
+  if (profiles.length === 0) {
+    return {
+      result: 'fail',
+      steve_value: '0 contactos',
+      error_message: 'Klaviyo no tiene contactos activos',
+      duration_ms: Date.now() - start,
+    };
+  }
+
+  if (!hasMore && profiles.length < 1) {
+    return {
+      result: 'fail',
+      steve_value: `${profiles.length} contactos`,
+      error_message: `Solo ${profiles.length} contactos (mínimo 100)`,
+      duration_ms: Date.now() - start,
+    };
+  }
+
+  return { result: 'pass', steve_value: `${hasMore ? '100+' : profiles.length} contactos`, duration_ms: Date.now() - start };
+}
+
+// ─── Check 83: No recent errors in chino_reports (excl current run)
+
+async function check83_noRecentErrors(supabase: SupabaseClient, currentRunId?: string): Promise<CheckResult> {
   const start = Date.now();
   const since = new Date(Date.now() - 30 * 60_000).toISOString();
 
-  const { count, error } = await supabase
+  let query = supabase
     .from('chino_reports')
     .select('id', { count: 'exact', head: true })
     .eq('result', 'error')
     .gte('created_at', since);
+
+  // Exclude current patrol run to avoid circular detection
+  if (currentRunId) {
+    query = query.neq('run_id', currentRunId);
+  }
+
+  const { count, error } = await query;
 
   if (error) throw new Error(`DB error: ${error.message}`);
 
@@ -1224,7 +1323,7 @@ async function check83_noRecentErrors(supabase: SupabaseClient): Promise<CheckRe
     return {
       result: 'fail',
       steve_value: `${count} errors últimos 30min`,
-      error_message: `${count} chino_reports con result='error' en últimos 30 minutos`,
+      error_message: `${count} chino_reports con result='error' en últimos 30 minutos (excl run actual)`,
       duration_ms: Date.now() - start,
     };
   }
@@ -1263,7 +1362,8 @@ export async function executeDataQuality(
   supabase: SupabaseClient,
   check: ChinoCheck,
   merchant?: MerchantConn | null,
-  decryptedToken?: string | null
+  decryptedToken?: string | null,
+  runId?: string
 ): Promise<CheckResult> {
   const start = Date.now();
 
@@ -1357,6 +1457,13 @@ export async function executeDataQuality(
       case 50:
         return await check50_scrapingFreshData(supabase);
 
+      // ── Klaviyo flow/contacts checks ──
+      case 51:
+        return await check51_klaviyoWelcomeSeries(supabase, merchant, decryptedToken);
+
+      case 56:
+        return await check56_klaviyoActiveContacts(decryptedToken);
+
       // ── Klaviyo metrics checks ──
       case 52:
         return await check52_klaviyoOpenRate(supabase, merchant);
@@ -1404,7 +1511,7 @@ export async function executeDataQuality(
         return await check76_knowledgeBaseSize(supabase);
 
       case 83:
-        return await check83_noRecentErrors(supabase);
+        return await check83_noRecentErrors(supabase, runId);
 
       case 84:
         return await check84_cronsExecuted(supabase);

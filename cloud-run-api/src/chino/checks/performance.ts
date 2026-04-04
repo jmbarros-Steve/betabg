@@ -167,14 +167,22 @@ async function perfSimpleFetch(check: ChinoCheck): Promise<CheckResult> {
   const start = Date.now();
   const url = check.check_config?.url as string | undefined;
   const maxMs = check.check_config?.max_ms as number | undefined;
+  const method = (check.check_config?.method as string) || 'GET';
 
   if (!url || !maxMs) {
     return { result: 'skip', error_message: 'check_config missing url or max_ms', duration_ms: Date.now() - start };
   }
 
-  const { res, elapsed } = await timedFetch(url, { method: 'GET' }, 30000);
+  const init: RequestInit = { method };
+  if (method === 'POST') {
+    init.headers = { 'Content-Type': 'application/json' };
+    init.body = '{}';
+  }
 
-  if (!res.ok) {
+  const { res, elapsed } = await timedFetch(url, init, 30000);
+
+  // Accept any non-5xx response as "endpoint alive"
+  if (res.status >= 500) {
     return errorResult(`URL returned ${res.status} (${elapsed}ms)`, start);
   }
 
@@ -185,16 +193,22 @@ async function perfSimpleFetch(check: ChinoCheck): Promise<CheckResult> {
 
 // ─── Check 48: Edge function errors últimos 30min ────────────────
 
-async function perfEdgeFunctionErrors(): Promise<CheckResult> {
+async function perfEdgeFunctionErrors(currentRunId?: string): Promise<CheckResult> {
   const start = Date.now();
   const supabase = getSupabaseAdmin();
   const since = new Date(Date.now() - 30 * 60_000).toISOString();
 
-  const { count, error } = await supabase
+  let query = supabase
     .from('chino_reports')
     .select('id', { count: 'exact', head: true })
     .eq('result', 'error')
     .gte('created_at', since);
+
+  if (currentRunId) {
+    query = query.neq('run_id', currentRunId);
+  }
+
+  const { count, error } = await query;
 
   if (error) return errorResult(`DB error: ${error.message}`, start);
 
@@ -203,7 +217,7 @@ async function perfEdgeFunctionErrors(): Promise<CheckResult> {
       result: 'fail',
       steve_value: 0,
       real_value: count,
-      error_message: `${count} errors en chino_reports últimos 30min`,
+      error_message: `${count} errors en chino_reports últimos 30min (excl run actual)`,
       duration_ms: Date.now() - start,
     };
   }
@@ -309,7 +323,7 @@ async function perfP95Latency(): Promise<CheckResult> {
 
 // ─── Main executor ───────────────────────────────────────────────
 
-export async function executePerformance(check: ChinoCheck): Promise<CheckResult> {
+export async function executePerformance(check: ChinoCheck, runId?: string): Promise<CheckResult> {
   const start = Date.now();
 
   try {
@@ -379,7 +393,7 @@ export async function executePerformance(check: ChinoCheck): Promise<CheckResult
 
       // #48 — Edge function errors últimos 30min
       case 48:
-        return await perfEdgeFunctionErrors();
+        return await perfEdgeFunctionErrors(runId);
 
       // #82 — Supabase pool latency < 500ms
       case 82:

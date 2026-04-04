@@ -3,6 +3,7 @@ import { serve } from '@hono/node-server';
 import { corsMiddleware } from './middleware/cors.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { registerRoutes } from './routes/index.js';
+import { checkRateLimit } from './lib/rate-limiter.js';
 
 // Catch silent crashes
 process.on('uncaughtException', (err) => {
@@ -26,6 +27,16 @@ const app = new Hono();
 // Global middleware
 app.use('*', corsMiddleware);
 app.onError(errorHandler);
+
+// Rate limiting middleware for public endpoints
+app.use('/health', async (c, next) => {
+  const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const rl = checkRateLimit(ip, 'health', 30); // 30 req/min
+  if (!rl.allowed) {
+    return c.json({ error: 'Rate limited', retryAfter: rl.retryAfter }, 429);
+  }
+  await next();
+});
 
 // Health check (both / and /health for compatibility)
 app.get('/', (c) =>

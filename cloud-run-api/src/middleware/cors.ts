@@ -1,7 +1,18 @@
 import { cors } from 'hono/cors';
 
 export const corsMiddleware = cors({
-  origin: '*',
+  origin: (origin) => {
+    if (!origin) return origin;
+    const allowed = [
+      'https://steve.cl',
+      'https://www.steve.cl',
+      'https://app.steve.cl',
+    ];
+    if (allowed.includes(origin)) return origin;
+    if (origin.endsWith('.vercel.app') && origin.startsWith('https://')) return origin;
+    if (origin.startsWith('http://localhost')) return origin;
+    return '';
+  },
   allowHeaders: [
     'authorization',
     'x-client-info',

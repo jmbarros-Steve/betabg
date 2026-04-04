@@ -2,6 +2,7 @@
 // Executes ALL check types: api_compare, token_health, performance,
 // visual, functional, data_quality, security
 
+import { randomUUID } from 'crypto';
 import { getSupabaseAdmin } from '../lib/supabase.js';
 import { decryptPlatformToken } from '../lib/decrypt-token.js';
 import { executeApiCompare } from './checks/api-compare.js';
@@ -78,6 +79,7 @@ async function saveReport(
 ): Promise<void> {
   const { error } = await supabase.from('chino_reports').insert({
     run_id: runId,
+    check_id: check.id,
     check_number: check.check_number,
     check_description: check.description,
     check_type: check.check_type,
@@ -210,35 +212,37 @@ async function executeCheck(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   check: ChinoCheck,
   merchant: MerchantConn | null,
-  decryptedToken: string | null
+  decryptedToken: string | null,
+  runId?: string
 ): Promise<CheckResult> {
   const start = Date.now();
 
   try {
     switch (check.check_type) {
       case 'api_compare':
-        return await executeApiCompare(supabase, check, merchant!, decryptedToken);
+        if (!merchant) return { result: 'skip', error_message: 'No merchant for api_compare', duration_ms: 0 };
+        return await executeApiCompare(supabase, check, merchant, decryptedToken);
 
       case 'api_exists':
-        return await executePerformance(check); // api_exists checks endpoint reachability like performance
+        return await executePerformance(check, runId);
 
       case 'token_health':
-        return await executeTokenHealth(supabase, check, merchant!, decryptedToken);
+        return await executeTokenHealth(supabase, check, merchant, decryptedToken);
 
       case 'performance':
-        return await executePerformance(check);
+        return await executePerformance(check, runId);
 
       case 'visual':
         return await executeVisual(supabase, check, merchant);
 
       case 'functional':
-        return await executeFunctional(supabase, check, merchant!, decryptedToken);
+        return await executeFunctional(supabase, check, merchant, decryptedToken);
 
       case 'data_quality':
-        return await executeDataQuality(supabase, check, merchant, decryptedToken);
+        return await executeDataQuality(supabase, check, merchant, decryptedToken, runId);
 
       case 'security':
-        return await executeSecurity(supabase, check, merchant!);
+        return await executeSecurity(supabase, check, merchant);
 
       default:
         return {
@@ -260,7 +264,7 @@ async function executeCheck(
 
 export async function runChinoPatrol(): Promise<PatrolResult> {
   const patrolStart = Date.now();
-  const runId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const runId = randomUUID();
   const supabase = getSupabaseAdmin();
 
   console.log(`[chino] Starting patrol ${runId}`);
@@ -331,7 +335,7 @@ export async function runChinoPatrol(): Promise<PatrolResult> {
 
     // ── Checks that DON'T need a merchant ──
     if (!needsMerchant || ['infra', 'security', 'stevemail', 'steve_chat', 'brief', 'scraping'].includes(check.platform)) {
-      const result = await executeCheck(supabase, check, null, null);
+      const result = await executeCheck(supabase, check, null, null, runId);
       localDetails.push({
         check_number: check.check_number,
         description: check.description,
@@ -355,7 +359,7 @@ export async function runChinoPatrol(): Promise<PatrolResult> {
 
     if (targetMerchants.length === 0) {
       if (!needsMerchant || !needsToken) {
-        const result = await executeCheck(supabase, check, null, null);
+        const result = await executeCheck(supabase, check, null, null, runId);
         localDetails.push({
           check_number: check.check_number,
           description: check.description,
@@ -411,7 +415,7 @@ export async function runChinoPatrol(): Promise<PatrolResult> {
         }
       }
 
-      const result = await executeCheck(supabase, check, merchant, token);
+      const result = await executeCheck(supabase, check, merchant, token, runId);
       localDetails.push({
         check_number: check.check_number,
         description: check.description,
