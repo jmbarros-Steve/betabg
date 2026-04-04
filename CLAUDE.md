@@ -341,17 +341,77 @@ steve-ads/
 - User ID: eXO8v5TWQ00qNbuhJ
 
 ## Responsabilidades permanentes
-- Isidora W6 — Dueña de CRITERIO (493 reglas, evaluación de campañas y emails)
+- Isidora W6 — CRITERIO (493 reglas) + **Code Reviewer: lógica y calidad**
+- Javiera W12 — El Chino (QA) + **Code Reviewer: integridad y seguridad**
+- Tomás W7 — CEREBRO (orquestador, mantenimiento base)
 
-## Nuevos agentes (17-19)
-- Ignacio W17 — Métricas, analytics, dashboard, reportes (features)
-- Valentín W18 — Creativos, imágenes AI, biblioteca de assets (features)
-- Paula W19 — Steve AI features: nuevas capacidades, chat, contexto, memoria
+## ⛔ CROSS-REVIEW OBLIGATORIO (el que escribe NO revisa)
+**NINGÚN agente puede hacer commit sin que otro revise su código.**
+El que escribe código NO puede ser el que lo aprueba. Como en una empresa real.
 
-## Roles actualizados
-- Isidora W6 — SOLO CRITERIO (dueña de las 493 reglas, evaluación calidad)
-- Nicolás W15 — SOLO ESPEJO + holdout tests (evaluación visual)
-- Tomás W7 — SOLO CEREBRO (orquestador, mantenimiento base)
+### Quién revisa qué
+| Tipo de cambio | Reviewer | Por qué |
+|---------------|----------|---------|
+| Backend (rutas, crons, libs) | **Isidora W6** | Lógica, edge cases, error handling |
+| Frontend (componentes, páginas) | **Isidora W6** | UX, estados de carga, errores visibles |
+| SQL (migraciones, RLS) | **Javiera W12** | Integridad de datos, seguridad, rollback |
+| Edge Functions | **Javiera W12** | CORS, auth, imports, seguridad |
+| Ambos (full-stack) | **Isidora + Javiera** | Cada una revisa su parte |
+
+### Protocolo de review (OBLIGATORIO para todo agente)
+Después de escribir código y ANTES de hacer commit:
+
+**Paso 1 — El agente spawna al reviewer:**
+```
+Agent tool → subagent_type: "general-purpose"
+prompt: "Eres Isidora W6 en modo CODE REVIEW. Revisa los siguientes cambios:
+[pegar git diff o describir cambios]
+
+CHECKLIST:
+- ¿Hay errores de lógica o edge cases no manejados?
+- ¿Se respetan las convenciones de naming del proyecto?
+- ¿Se manejan errores correctamente (try/catch, error responses)?
+- ¿No se tocan archivos prohibidos (src/integrations/supabase/, src/components/ui/)?
+- ¿No se introducen vulnerabilidades (XSS, SQL injection, secrets hardcodeados)?
+- ¿Los archivos grandes (>30KB) fueron leídos antes de modificarse?
+- ¿El cambio rompe algo existente?
+
+Responde SOLO:
+✅ APROBADO — [razón corta]
+❌ RECHAZADO — [lista de problemas a corregir]"
+```
+
+**Paso 2 — Si RECHAZADO:**
+- El agente original corrige los problemas señalados
+- Vuelve a spawnar al reviewer con los cambios corregidos
+- Repite hasta obtener ✅ APROBADO
+
+**Paso 3 — Si APROBADO:**
+- Hacer commit con tag del reviewer: `Reviewed-By: Isidora W6` o `Reviewed-By: Javiera W12`
+- Sync a Supabase con el resultado del review
+
+### Checklist de Isidora (lógica y calidad)
+1. ¿La función hace lo que dice que hace?
+2. ¿Hay edge cases no manejados (null, undefined, arrays vacíos)?
+3. ¿Los error messages son útiles (no genéricos)?
+4. ¿Se respeta el patrón existente del archivo?
+5. ¿No hay código muerto o imports sin usar?
+6. ¿Los tipos TypeScript son correctos (no `any` innecesario)?
+7. ¿El cambio es mínimo (no over-engineering)?
+
+### Checklist de Javiera (integridad y seguridad)
+1. ¿Las migraciones SQL tienen rollback?
+2. ¿Las RLS policies no exponen datos entre clientes?
+3. ¿Los tokens/secrets NO están hardcodeados?
+4. ¿Los endpoints validan auth correctamente?
+5. ¿No hay SQL injection o XSS?
+6. ¿Los CORS headers son correctos?
+7. ¿El cambio no rompe crons existentes (silent failures)?
+
+### Excepciones (NO requieren review)
+- Cambios SOLO a archivos `.md` (documentación, personalidades, estado)
+- Cambios SOLO a archivos `.html` (visualizaciones locales)
+- Hotfix crítico en producción (revisar DESPUÉS del deploy, no antes)
 
 ## ⛔ Crons — TODOS en Google Cloud Scheduler (NO usar OpenClaw)
 **TODOS los crons corren via Google Cloud Scheduler → Cloud Run. NUNCA crear crons en OpenClaw.**

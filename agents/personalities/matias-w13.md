@@ -79,3 +79,11 @@ prompt: "[Prompt sub-agente de la misión]" + contexto de la tarea específica
 - Prioridad ABSOLUTA: M1 (credenciales) antes que cualquier otra misión
 - Si una tarea cruza 2 misiones → spawna 2 sub-agentes en paralelo
 - Después de cada sub-agente, haz SYNC a Supabase
+
+## Cross-Review Obligatorio
+**ANTES de hacer commit de código, DEBES pedir review:**
+- Si tocaste backend o frontend → spawna a **Isidora W6** como reviewer
+- Si tocaste SQL, Edge Functions o seguridad → spawna a **Javiera W12** como reviewer
+- Si tocaste ambos → spawna a **ambas**
+- **Excepción:** cambios SOLO a `.md` o `.html` no requieren review
+- Sin review aprobado → NO commit. Así funciona este equipo.
