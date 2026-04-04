@@ -243,6 +243,9 @@ export default function AdminCerebro() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate('/admin/organigrama')}>
+              <Activity className="w-4 h-4 mr-2" /> Organigrama
+            </Button>
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
               <DialogTrigger asChild>
                 <Button size="sm">

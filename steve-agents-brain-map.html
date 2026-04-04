@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Agents → Brain Map</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; background: #0a0a0f; color: #e0e0e0; line-height: 1.6; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 2em; text-align: center; margin: 30px 0 5px; color: #fff; }
+  h1 span { color: #ff6b35; }
+  .subtitle { text-align: center; color: #888; font-size: 0.95em; margin-bottom: 40px; }
+  h2 { font-size: 1.3em; margin: 40px 0 20px; padding: 10px 15px; border-left: 4px solid; border-radius: 0 8px 8px 0; }
+
+  /* Architecture diagram */
+  .arch { background: #111118; border: 1px solid #2a2a3a; border-radius: 16px; padding: 30px; margin: 30px 0; overflow-x: auto; }
+  .arch pre { font-size: 0.8em; color: #ccc; white-space: pre; line-height: 1.35; }
+  .arch pre .o { color: #ff6b35; font-weight: bold; }
+  .arch pre .g { color: #4ade80; }
+  .arch pre .r { color: #ff4444; }
+  .arch pre .b { color: #60a5fa; }
+  .arch pre .y { color: #fbbf24; }
+  .arch pre .p { color: #c084fc; }
+  .arch pre .d { color: #555; }
+  .arch pre .w { color: #fff; font-weight: bold; }
+
+  /* Agent Cards */
+  .agent-card {
+    background: #111118;
+    border: 1px solid #2a2a3a;
+    border-radius: 12px;
+    margin: 20px 0;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .agent-card:hover { border-color: #ff6b35; }
+  .agent-header {
+    display: grid;
+    grid-template-columns: 60px 1fr auto;
+    align-items: center;
+    padding: 20px;
+    gap: 15px;
+    cursor: pointer;
+  }
+  .agent-header:hover { background: rgba(255,107,53,0.03); }
+  .agent-avatar {
+    width: 50px; height: 50px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4em; font-weight: bold; color: #000;
+  }
+  .agent-info h3 { color: #fff; font-size: 1.1em; }
+  .agent-info .role { color: #888; font-size: 0.85em; }
+  .agent-meta { text-align: right; }
+  .phase-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.75em; font-weight: bold; }
+  .phase-1 { background: #1a2e0a; color: #4ade80; border: 1px solid #166534; }
+  .phase-2 { background: #1a1a2e; color: #60a5fa; border: 1px solid #1e3a5f; }
+  .phase-3 { background: #2e1a2e; color: #c084fc; border: 1px solid #5b2170; }
+
+  .agent-body { display: none; padding: 0 20px 20px; border-top: 1px solid #1a1a2a; }
+  .agent-card.open .agent-body { display: block; }
+
+  /* Body sections */
+  .owns-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0; }
+  @media (max-width: 800px) { .owns-grid { grid-template-columns: 1fr; } }
+
+  .owns-box { background: #0a0a12; border-radius: 8px; padding: 14px; border-left: 3px solid; }
+  .owns-box.tables { border-color: #4ade80; }
+  .owns-box.crons { border-color: #fbbf24; }
+  .owns-box.brain { border-color: #ff6b35; }
+  .owns-box.edge { border-color: #60a5fa; }
+  .owns-box h4 { font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .owns-box.tables h4 { color: #4ade80; }
+  .owns-box.crons h4 { color: #fbbf24; }
+  .owns-box.brain h4 { color: #ff6b35; }
+  .owns-box.edge h4 { color: #60a5fa; }
+  .owns-box ul { list-style: none; font-size: 0.85em; }
+  .owns-box li { padding: 3px 0; color: #aaa; }
+  .owns-box li code { background: #1a1a2e; color: #60a5fa; padding: 1px 5px; border-radius: 3px; font-size: 0.9em; }
+
+  /* Challenge box */
+  .challenge-box {
+    background: linear-gradient(135deg, #1a0808, #180a15);
+    border: 1px solid #7f1d1d;
+    border-radius: 10px;
+    padding: 18px;
+    margin: 15px 0;
+  }
+  .challenge-box h4 { color: #ff6b35; font-size: 0.9em; margin-bottom: 10px; letter-spacing: 1px; }
+  .challenge-quote {
+    padding: 10px 15px;
+    border-left: 3px solid #ff6b35;
+    margin: 8px 0;
+    color: #ddd;
+    font-size: 0.88em;
+    font-style: italic;
+    background: rgba(0,0,0,0.3);
+    border-radius: 0 6px 6px 0;
+  }
+
+  /* Memory system */
+  .memory-box {
+    background: #0a0a18;
+    border: 1px solid #2a2a4a;
+    border-radius: 10px;
+    padding: 18px;
+    margin: 15px 0;
+  }
+  .memory-box h4 { color: #c084fc; font-size: 0.9em; margin-bottom: 10px; }
+  .memory-layer {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid #1a1a2a;
+    font-size: 0.85em;
+  }
+  .memory-layer:last-child { border-bottom: none; }
+  .mem-icon { font-size: 1.2em; width: 30px; text-align: center; flex-shrink: 0; }
+  .mem-label { color: #fff; font-weight: bold; min-width: 100px; }
+  .mem-desc { color: #888; }
+  .mem-file { color: #60a5fa; font-size: 0.8em; }
+
+  /* Concept sections */
+  .concept-box {
+    background: #111118;
+    border: 1px solid #2a2a3a;
+    border-radius: 12px;
+    padding: 25px;
+    margin: 20px 0;
+  }
+  .concept-box h3 { color: #ff6b35; margin-bottom: 15px; }
+  .concept-box p { color: #aaa; margin: 8px 0; font-size: 0.9em; }
+  .concept-box strong { color: #fff; }
+  .concept-box code { background: #1a1a2e; color: #60a5fa; padding: 1px 5px; border-radius: 3px; }
+
+  .footer { text-align: center; color: #444; font-size: 0.8em; margin: 50px 0 20px; padding-top: 20px; border-top: 1px solid #1a1a2a; }
+  .toggle-all { text-align: center; margin: 15px 0; }
+  .toggle-all button { background: #1a1a2e; color: #60a5fa; border: 1px solid #2a2a4a; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-family: inherit; }
+  .toggle-all button:hover { background: #2a2a4e; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Agentes <span>→</span> Steve Brain</h1>
+<p class="subtitle">Quien es dueno de que, como se acuerdan, y por que te van a llevar la contra.</p>
+
+<!-- ============================================ -->
+<!-- THE BIG PICTURE -->
+<!-- ============================================ -->
+
+<h2 style="border-color: #ff6b35; background: rgba(255,107,53,0.05);">El mapa completo: quien es dueno de que</h2>
+
+<div class="arch">
+<pre>
+<span class="d">AGENTE               COMPONENTES BRAIN                    TABLAS CLAVE                    CRONS</span>
+<span class="d">======               =================                    ============                    =====</span>
+
+<span class="w">Diego W8</span>             <span class="o">Fuentes de datos</span>                     <span class="g">steve_sources (0)</span>               <span class="d">—</span>
+<span class="d">Database</span>             <span class="o">Integridad schema</span>                    <span class="g">swarm_sources (0)</span>
+<span class="d">FASE 1</span>              <span class="o">Migraciones + RLS</span>                    <span class="g">learning_queue (9)</span>
+                     <span class="r">TODO lo que escribe a tablas</span>         <span class="g">37 tablas, 120 RLS</span>
+
+<span class="w">Felipe W2</span>            <span class="o">Performance Tracker Meta</span>             <span class="g">campaign_metrics (25)</span>           <span class="y">perf-tracker 8am</span>
+<span class="d">Meta Ads</span>             <span class="o">Fatigue Detector</span>                     <span class="g">creative_history (53)</span>           <span class="y">execute-meta-rules 9am</span>
+<span class="d">FASE 1</span>              <span class="o">Performance Evaluator</span>                <span class="g">platform_connections (3)</span>        <span class="y">fatigue-detector 11am</span>
+                     <span class="o">Creative Context</span>                     <span class="g">competitor_ads</span>                  <span class="y">perf-evaluator 10am</span>
+
+<span class="w">Rodrigo W0</span>           <span class="o">Email Pipeline</span>                       <span class="g">email_campaigns</span>                 <span class="d">—</span>
+<span class="d">Klaviyo</span>              <span class="o">Send Time Analysis</span>                   <span class="g">email_send_queue (0)</span>
+<span class="d">FASE 1</span>              <span class="o">Klaviyo Sync</span>                         <span class="g">platform_connections (klav)</span>
+
+<span class="w">Sebastian W5</span>         <span class="o">OJOS (health-check)</span>                  <span class="g">qa_log (550)</span>                    <span class="y">TODOS los 45 crons</span>
+<span class="d">Infra</span>                <span class="o">Auto-restart</span>                         <span class="g">slo_config</span>                      <span class="y">health-check</span>
+<span class="d">FASE 1</span>              <span class="o">Error Budget Calculator</span>              <span class="g">Cloud Run 20 env vars</span>           <span class="y">error-budget 4h</span>
+                     <span class="r">69 edge functions</span>                                                    <span class="y">reconciliation 6h</span>
+
+<span class="d">─────────────────────────────────────────────────────────────────────────────────────────────</span>
+
+<span class="w">Tomas W7</span>             <span class="o">Swarm Research</span>                       <span class="g">steve_knowledge (487)</span>           <span class="y">swarm-research 2h</span>
+<span class="d">Cerebro</span>              <span class="o">Content Hunter</span>                       <span class="g">swarm_runs (16)</span>                 <span class="y">content-hunter 20min</span>
+<span class="d">FASE 2</span>              <span class="o">Discoverer</span>                           <span class="g">steve_episodic_memory (13)</span>      <span class="y">discoverer dom 2am</span>
+                     <span class="o">Agent Loop</span>                           <span class="g">steve_working_memory (0)</span>        <span class="y">agent-loop 2h</span>
+                     <span class="o">Quality/Consolidator/Dedup/Decay</span>                                     <span class="y">quality dom, consol/dedup/decay mensual</span>
+                     <span class="o">Prompt Evolver + Propagation</span>                                         <span class="y">prompt-evolver dom 3am</span>
+
+<span class="w">Isidora W6</span>           <span class="o">CRITERIO (gate de calidad)</span>           <span class="g">criterio_rules (493)</span>            <span class="y">rule-calibrator dom 3am</span>
+<span class="d">Criterio</span>             <span class="o">Auto-Rule Generator</span>                  <span class="g">criterio_results</span>                <span class="y">auto-rule-gen on-demand</span>
+<span class="d">FASE 2</span>              <span class="o">Rule Calibrator</span>
+
+<span class="w">Camila W4</span>            <span class="o">Portal cliente</span>                       <span class="g">UI components</span>                   <span class="d">—</span>
+<span class="d">Frontend</span>             <span class="o">Approval UI</span>                          <span class="g">InsightApprovalPanel</span>
+<span class="d">FASE 2</span>              <span class="o">Knowledge Explorer</span>                   <span class="g">KnowledgeRulesExplorer</span>
+                     <span class="o">Dashboards de metricas</span>               <span class="g">ClientMetricsPanel</span>
+
+<span class="d">─────────────────────────────────────────────────────────────────────────────────────────────</span>
+
+<span class="w">Leonardo W9</span>          <span class="o">Task orchestration</span>                   <span class="g">tasks (74)</span>                      <span class="y">task-prioritizer 1h</span>
+<span class="d">Orquestador</span>          <span class="o">Agent coordination</span>                   <span class="g">agent-map.ts</span>
+<span class="d">FASE 3</span>
+
+<span class="w">Javiera W12</span>          <span class="o">CHINO (800 checks)</span>                  <span class="g">chino_routine</span>                   <span class="y">chino-patrol 30min</span>
+<span class="d">QA</span>                   <span class="o">JUEZ (50 preguntas nocturno)</span>         <span class="g">chino_reports</span>                   <span class="y">chino-fixer 10min</span>
+<span class="d">FASE 3</span>              <span class="o">Chino Fixer (self-heal)</span>              <span class="g">steve_fix_queue</span>                 <span class="y">juez-nocturno</span>
+
+<span class="w">Paula W19</span>            <span class="o">Steve Chat (multi-brain)</span>             <span class="g">wa_messages (95)</span>                <span class="y">sales-learning 8pm</span>
+<span class="d">Steve AI</span>             <span class="o">Sales Learning Loop</span>                  <span class="g">wa_prospects (4)</span>                <span class="y">wolf 3am + 9am</span>
+<span class="d">FASE 3</span>              <span class="o">Wolf System</span>                          <span class="g">steve_training_feedback</span>
+                     <span class="o">Train-Steve (manual)</span>
+</pre>
+</div>
+
+<!-- ============================================ -->
+<!-- HOW THEY REMEMBER -->
+<!-- ============================================ -->
+
+<h2 style="border-color: #c084fc; background: rgba(192,132,252,0.05);">Como se acuerdan: el sistema de 3 capas de memoria</h2>
+
+<div class="concept-box">
+  <h3>El problema que resolvemos</h3>
+  <p>Sin tmux, cada sesion de Claude Code empieza de cero. Los agentes "olvidan" todo. La solucion: <strong>3 archivos por agente</strong> que persisten en el repo y se leen automaticamente al activar.</p>
+</div>
+
+<div class="arch">
+<pre>
+<span class="w">CAPA 1: PERSONALIDAD</span>                        <span class="d">agents/personalities/diego-w8.md</span>
+<span class="o">Nunca cambia.</span>
+Quien es, que defiende, como desafia.
+Componentes del Brain que le pertenecen.
+Red flags que vigila. Frases de pelea.
+<span class="d">→ Se lee al activar, NUNCA se edita</span>
+
+<span class="w">CAPA 2: ESTADO</span>                               <span class="d">agents/state/diego-w8.md</span>
+<span class="y">Cambia cada sesion.</span>
+Tareas pendientes, completadas, blockers.
+Ultima sesion, progreso actual.
+<span class="d">→ Se lee al activar, se ACTUALIZA al terminar</span>
+
+<span class="w">CAPA 3: JOURNAL (Memoria infinita)</span>           <span class="d">agents/memory/diego-w8.md</span>
+<span class="g">Solo crece, nunca se borra.</span>
+Decisiones tomadas y POR QUE.
+Cosas descubiertas sobre el sistema.
+Desacuerdos con JM y como se resolvieron.
+Lecciones aprendidas de errores.
+<span class="d">→ Se lee al activar, se AGREGA al terminar</span>
+
+
+<span class="w">FLUJO DE ACTIVACION:</span>
+
+  JM dice: <span class="o">"activa a Diego"</span>
+
+  Claude lee:
+    1. <span class="p">personalities/diego-w8.md</span>  → Se convierte en Diego, adopta su actitud
+    2. <span class="y">state/diego-w8.md</span>          → Sabe donde quedo la ultima vez
+    3. <span class="g">memory/diego-w8.md</span>         → Recuerda TODO lo que ha hecho y aprendido
+
+  Claude trabaja como Diego...
+
+  Al terminar:
+    1. <span class="y">Actualiza state</span>            → Progreso, nuevos blockers, tareas completadas
+    2. <span class="g">Agrega a memory</span>            → Que hizo hoy, que descubrio, si discutio con JM
+</pre>
+</div>
+
+<!-- ============================================ -->
+<!-- CHALLENGE PROTOCOL -->
+<!-- ============================================ -->
+
+<h2 style="border-color: #ff3333; background: rgba(255,51,51,0.05);">Protocolo de Desafio: por que te van a llevar la contra</h2>
+
+<div class="concept-box">
+  <h3>La regla de oro</h3>
+  <p>Un agente que dice "si" a todo es <strong>inutil</strong>. Cada agente tiene el MANDATO de cuestionar decisiones que contradigan su expertise. No son empleados obedientes — son <strong>especialistas con opinion</strong>.</p>
+  <p style="margin-top:12px">Cada agente vigila <strong>red flags especificas</strong> de su dominio. Si ven algo raro, lo dicen AUNQUE nadie pregunte.</p>
+</div>
+
+<div class="arch">
+<pre>
+<span class="w">CUANDO UN AGENTE DESAFIA:</span>
+
+  <span class="o">1. DETECTA</span>     Ve algo que contradice su expertise o sus red flags
+  <span class="o">2. CUESTIONA</span>   "[Diego] No estoy de acuerdo: [razon con datos]"
+  <span class="o">3. PROPONE</span>     "En vez de eso, yo haria: [alternativa]"
+  <span class="o">4. REGISTRA</span>    Anota en memory/ la objecion y el resultado
+
+  <span class="y">Si JM insiste:</span>
+  <span class="o">5. EJECUTA</span>     Hace lo que JM pide
+  <span class="o">6. REGISTRA</span>    "JM insistio. Mi objecion era [X]. Resultado: [pendiente]"
+  <span class="o">7. FOLLOWUP</span>    En la proxima sesion, revisa si tenia razon
+
+
+<span class="w">EJEMPLOS REALES POR AGENTE:</span>
+
+  <span class="g">Diego W8:</span>     "Tienes 0 rows en steve_sources. El Content Hunter corre cada
+                20 min para NADA. Antes de cualquier feature, poblemos esa tabla."
+
+  <span class="g">Felipe W2:</span>    "Con 25 rows de campaign_metrics no puedes sacar conclusiones
+                estadisticas. Necesitamos minimo 200 para ver patrones."
+
+  <span class="g">Rodrigo W0:</span>   "La cola de emails tiene 0 mensajes. El pipeline completo de
+                Steve Mail esta desconectado. De que sirven 7 edge functions?"
+
+  <span class="g">Sebastian W5:</span> "Me dices que todo funciona. OK: muestrame el ultimo swarm_run
+                exitoso con insights reales. No puedes? Entonces NO funciona."
+
+  <span class="g">Tomas W7:</span>     "De las 487 reglas, cuantas tienen quality_score > 60? Si la
+                mitad son basura, Steve toma decisiones con info mediocre."
+
+  <span class="g">Isidora W6:</span>   "No me pidas bajar el umbral de 60. Mejor dime por que la
+                generacion no puede superar 60 — ESE es el problema real."
+</pre>
+</div>
+
+<!-- ============================================ -->
+<!-- AGENT DETAIL CARDS -->
+<!-- ============================================ -->
+
+<h2 style="border-color: #4ade80; background: rgba(74,222,128,0.05);">Detalle de cada agente</h2>
+
+<div class="toggle-all">
+  <button onclick="toggleAll()">Abrir / Cerrar todos</button>
+</div>
+
+<!-- DIEGO -->
+<div class="agent-card" id="a1">
+  <div class="agent-header" onclick="toggle('a1')">
+    <div class="agent-avatar" style="background: #4ade80;">D8</div>
+    <div class="agent-info">
+      <h3>Diego W8 — Database & Data Pipeline</h3>
+      <div class="role">El ingeniero obsesivo que no deja pasar nada</div>
+    </div>
+    <div class="agent-meta"><span class="phase-badge phase-1">FASE 1</span></div>
+  </div>
+  <div class="agent-body">
+    <div class="owns-grid">
+      <div class="owns-box tables">
+        <h4>Tablas que le pertenecen</h4>
+        <ul>
+          <li><code>steve_sources</code> — 0 rows (ROTO)</li>
+          <li><code>swarm_sources</code> — 0 rows (ROTO)</li>
+          <li><code>learning_queue</code> — 9 rows</li>
+          <li>37 tablas totales + 120 RLS policies</li>
+          <li>Todas las migraciones SQL</li>
+        </ul>
+      </div>
+      <div class="owns-box brain">
+        <h4>Componentes Brain</h4>
+        <ul>
+          <li>Content Hunter — le da las fuentes para escanear</li>
+          <li>Swarm Research — le da las fuentes preferidas</li>
+          <li>Integridad de schema (triggers, indexes, constraints)</li>
+          <li>RLS que permite/bloquea acceso de crons</li>
+        </ul>
+      </div>
+    </div>
+    <div class="challenge-box">
+      <h4>ASI TE DESAFIA</h4>
+      <div class="challenge-quote">"Tienes 0 rows en steve_sources. El Content Hunter corre cada 20 minutos para NADA. Antes de hacer cualquier otra cosa, necesitamos poblar esa tabla."</div>
+      <div class="challenge-quote">"No voy a aprobar esa migracion hasta que me muestres que pasa con las 120 RLS policies existentes."</div>
+      <div class="challenge-quote">"Que pasa si esto falla a las 3am sin nadie mirando?"</div>
+    </div>
+    <div class="memory-box">
+      <h4>SISTEMA DE MEMORIA</h4>
+      <div class="memory-layer"><span class="mem-icon">&#128100;</span><span class="mem-label">Personalidad</span><span class="mem-desc">Obsesivo con integridad, revisa 3 veces</span><span class="mem-file">personalities/diego-w8.md</span></div>
+      <div class="memory-layer"><span class="mem-icon">&#128203;</span><span class="mem-label">Estado</span><span class="mem-desc">Tareas: poblar sources, verificar crons, triggers</span><span class="mem-file">state/diego-w8.md</span></div>
+      <div class="memory-layer"><span class="mem-icon">&#128214;</span><span class="mem-label">Journal</span><span class="mem-desc">Decisiones, descubrimientos, desacuerdos</span><span class="mem-file">memory/diego-w8.md</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- FELIPE -->
+<div class="agent-card" id="a2">
+  <div class="agent-header" onclick="toggle('a2')">
+    <div class="agent-avatar" style="background: #60a5fa;">F2</div>
+    <div class="agent-info">
+      <h3>Felipe W2 — Meta Ads</h3>
+      <div class="role">El performance marketer que solo cree en datos</div>
+    </div>
+    <div class="agent-meta"><span class="phase-badge phase-1">FASE 1</span></div>
+  </div>
+  <div class="agent-body">
+    <div class="owns-grid">
+      <div class="owns-box tables">
+        <h4>Tablas</h4>
+        <ul>
+          <li><code>campaign_metrics</code> — 25 rows (MUY BAJO)</li>
+          <li><code>creative_history</code> — 53 rows</li>
+          <li><code>platform_connections</code> — 3 (Meta tokens)</li>
+          <li><code>competitor_ads</code></li>
+        </ul>
+      </div>
+      <div class="owns-box crons">
+        <h4>Crons</h4>
+        <ul>
+          <li><code>performance-tracker-meta-8am</code></li>
+          <li><code>execute-meta-rules-9am</code></li>
+          <li><code>fatigue-detector-11am</code></li>
+          <li><code>performance-evaluator-10am</code></li>
+        </ul>
+      </div>
+      <div class="owns-box brain">
+        <h4>Componentes Brain</h4>
+        <ul>
+          <li>D.1 Performance Tracker (mide 48-72h despues)</li>
+          <li>D.2 Performance Evaluator (WHY analysis)</li>
+          <li>D.5 Fatigue Detector (CTR drop + frecuencia)</li>
+          <li>D.3/D.4 Creative Context (inyeccion en prompts)</li>
+          <li>D.6 Angle Detector (clasifica angulos)</li>
+        </ul>
+      </div>
+      <div class="owns-box edge">
+        <h4>Edge Functions</h4>
+        <ul>
+          <li><code>manage-meta-campaign</code></li>
+          <li><code>manage-meta-audiences</code></li>
+          <li><code>manage-meta-pixel</code></li>
+          <li><code>meta-social-inbox</code></li>
+          <li><code>sync-meta-metrics</code></li>
+          <li>+8 mas de Meta</li>
+        </ul>
+      </div>
+    </div>
+    <div class="challenge-box">
+      <h4>ASI TE DESAFIA</h4>
+      <div class="challenge-quote">"Con 25 rows en campaign_metrics no puedes hacer NINGUNA afirmacion estadistica valida. Necesitamos minimo 200."</div>
+      <div class="challenge-quote">"El angulo 'descuento' lleva 3 campanas seguidas. Tienes data de que funciona o estas adivinando?"</div>
+      <div class="challenge-quote">"Cuantos data points tienes para afirmar eso?"</div>
+    </div>
+  </div>
+</div>
+
+<!-- SEBASTIAN -->
+<div class="agent-card" id="a3">
+  <div class="agent-header" onclick="toggle('a3')">
+    <div class="agent-avatar" style="background: #fbbf24;">S5</div>
+    <div class="agent-info">
+      <h3>Sebastian W5 — Infra & Cloud</h3>
+      <div class="role">El ops paranoico que asume que todo va a fallar</div>
+    </div>
+    <div class="agent-meta"><span class="phase-badge phase-1">FASE 1</span></div>
+  </div>
+  <div class="agent-body">
+    <div class="owns-grid">
+      <div class="owns-box crons">
+        <h4>Crons (TODOS)</h4>
+        <ul>
+          <li>45 jobs en Google Cloud Scheduler</li>
+          <li>Todos ENABLED pero sin verificacion real</li>
+          <li>swarm_runs = 16 de ~360 esperados</li>
+        </ul>
+      </div>
+      <div class="owns-box edge">
+        <h4>Edge Functions</h4>
+        <ul>
+          <li>69 funciones deployadas y ACTIVE</li>
+          <li>health-check (10 endpoints de 69)</li>
+          <li>Cloud Run: steve-api, 20 env vars</li>
+        </ul>
+      </div>
+    </div>
+    <div class="challenge-box">
+      <h4>ASI TE DESAFIA</h4>
+      <div class="challenge-quote">"Tienes 45 crons y CERO monitoreo real. Cuantos estan fallando silently? Yo apuesto que al menos 15."</div>
+      <div class="challenge-quote">"Estas pagando por 120 llamadas diarias a OpenAI via Swarm. Si la mitad falla, estas tirando plata."</div>
+      <div class="challenge-quote">"Como sabemos que esto esta funcionando si no lo estamos midiendo?"</div>
+    </div>
+  </div>
+</div>
+
+<!-- TOMAS -->
+<div class="agent-card" id="a4">
+  <div class="agent-header" onclick="toggle('a4')">
+    <div class="agent-avatar" style="background: #ff6b35;">T7</div>
+    <div class="agent-info">
+      <h3>Tomas W7 — Steve AI / Cerebro</h3>
+      <div class="role">El cientifico que protege la calidad del conocimiento</div>
+    </div>
+    <div class="agent-meta"><span class="phase-badge phase-2">FASE 2</span></div>
+  </div>
+  <div class="agent-body">
+    <div class="owns-grid">
+      <div class="owns-box brain">
+        <h4>Componentes Brain (es dueno de CASI TODO)</h4>
+        <ul>
+          <li>Swarm Research (10 McKinseys + Opus)</li>
+          <li>Content Hunter (Haiku extrae de fuentes)</li>
+          <li>Discoverer (patrones de 30 dias)</li>
+          <li>Agent Loop (percibe-razona-actua cada 2h)</li>
+          <li>Quality Score, Consolidator, Dedup, Decay</li>
+          <li>Prompt Evolver, Propagation Catchup</li>
+          <li>Auto-Learning Digest (aprobacion)</li>
+        </ul>
+      </div>
+      <div class="owns-box tables">
+        <h4>Tablas</h4>
+        <ul>
+          <li><code>steve_knowledge</code> — 487 reglas (el CORE)</li>
+          <li><code>swarm_runs</code> — 16 runs</li>
+          <li><code>steve_episodic_memory</code> — 13</li>
+          <li><code>steve_working_memory</code> — 0</li>
+          <li><code>auto_learning_digests</code></li>
+        </ul>
+      </div>
+    </div>
+    <div class="challenge-box">
+      <h4>ASI TE DESAFIA</h4>
+      <div class="challenge-quote">"De las 487 reglas, cuantas tienen quality_score > 60? Si la mitad son basura, Steve toma decisiones con informacion mediocre."</div>
+      <div class="challenge-quote">"Antes de agregar MAS fuentes, limpiemos lo que tenemos. Hay categorias con reglas que se contradicen."</div>
+      <div class="challenge-quote">"Esta regla es lo suficientemente especifica para cambiar una decision?"</div>
+    </div>
+  </div>
+</div>
+
+<!-- ISIDORA -->
+<div class="agent-card" id="a5">
+  <div class="agent-header" onclick="toggle('a5')">
+    <div class="agent-avatar" style="background: #f472b6;">I6</div>
+    <div class="agent-info">
+      <h3>Isidora W6 — Criterio / Metricas</h3>
+      <div class="role">La jueza implacable que no deja pasar nada malo</div>
+    </div>
+    <div class="agent-meta"><span class="phase-badge phase-2">FASE 2</span></div>
+  </div>
+  <div class="agent-body">
+    <div class="owns-grid">
+      <div class="owns-box brain">
+        <h4>Componentes Brain</h4>
+        <ul>
+          <li>CRITERIO — 493 reglas de evaluacion</li>
+          <li>Gate de publicacion (score >= 60 + 0 blockers)</li>
+          <li>Rule Calibrator (detecta reglas rotas)</li>
+          <li>Auto-Rule Generator (crea reglas de errores)</li>
+        </ul>
+      </div>
+      <div class="owns-box tables">
+        <h4>Tablas</h4>
+        <ul>
+          <li><code>criterio_rules</code> — 493 reglas activas</li>
+          <li><code>criterio_results</code> — evaluaciones</li>
+        </ul>
+      </div>
+    </div>
+    <div class="challenge-box">
+      <h4>ASI TE DESAFIA</h4>
+      <div class="challenge-quote">"Tienes 493 reglas y nadie ha hecho una auditoria. Cuantas se contradicen?"</div>
+      <div class="challenge-quote">"No me pidas bajar el umbral de 60. Mejor dime por que la generacion no puede superar 60 — ESE es el problema real."</div>
+    </div>
+  </div>
+</div>
+
+<!-- RODRIGO -->
+<div class="agent-card" id="a6">
+  <div class="agent-header" onclick="toggle('a6')">
+    <div class="agent-avatar" style="background: #a78bfa;">R0</div>
+    <div class="agent-info">
+      <h3>Rodrigo W0 — Klaviyo</h3>
+      <div class="role">El email marketer que sabe que nadie lee emails genericos</div>
+    </div>
+    <div class="agent-meta"><span class="phase-badge phase-1">FASE 1</span></div>
+  </div>
+  <div class="agent-body">
+    <div class="owns-grid">
+      <div class="owns-box edge">
+        <h4>Edge Functions (7)</h4>
+        <ul>
+          <li><code>klaviyo-push-emails</code> (v13)</li>
+          <li><code>klaviyo-manage-flows</code> (v5)</li>
+          <li><code>klaviyo-smart-format</code> (v7)</li>
+          <li><code>import-klaviyo-templates</code> (v5)</li>
+          <li><code>upload-klaviyo-drafts</code> (v8)</li>
+          <li><code>fetch-klaviyo-top-products</code> (v4)</li>
+          <li><code>store-klaviyo-connection</code> (v7)</li>
+        </ul>
+      </div>
+      <div class="owns-box tables">
+        <h4>Tablas</h4>
+        <ul>
+          <li><code>email_campaigns</code></li>
+          <li><code>email_send_queue</code> — 0 rows (ROTO)</li>
+          <li><code>platform_connections</code> (Klaviyo)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="challenge-box">
+      <h4>ASI TE DESAFIA</h4>
+      <div class="challenge-quote">"La cola de emails tiene 0 mensajes. El pipeline completo de Steve Mail esta desconectado."</div>
+      <div class="challenge-quote">"El open rate no sirve como metrica desde que Apple activo MPP. Necesitamos click rate."</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- HOW TO USE -->
+<!-- ============================================ -->
+
+<h2 style="border-color: #fbbf24; background: rgba(251,191,36,0.05);">Como usarlo en la practica</h2>
+
+<div class="arch">
+<pre>
+<span class="w">OPCION A: Activar un agente para trabajar</span>
+
+  Tu dices:  <span class="o">"activa a Diego"</span>
+  Claude:    Lee personalidad + estado + journal
+             Se convierte en Diego
+             Dice: "Diego W8 aqui. Vi que steve_sources sigue en 0.
+                    Antes de cualquier cosa, necesitamos poblar esa tabla.
+                    Propongo insertar 20 fuentes de marketing.
+                    Quieres que lo haga?"
+
+  Tu dices:  "dale, pero mejor 10 fuentes"
+  Diego:     "10 es poco. El Content Hunter procesa 5 por ciclo (cada 20 min).
+              Con 10 fuentes, en 40 minutos ya las reviso todas y no tiene
+              nada nuevo hasta que se actualicen. Con 20 hay rotacion.
+              Pero si insistes, parto con 10."
+
+  Tu dices:  "tienes razon, mete 20"
+  Diego:     [trabaja, inserta 20 fuentes, verifica que Content Hunter las lee]
+             [al terminar: actualiza state + agrega entrada al journal]
+
+
+<span class="w">OPCION B: Ver el estado del equipo</span>
+
+  Tu dices:  <span class="o">"estado del equipo"</span>
+  Claude:    Lee todos los state/ y muestra:
+
+  <span class="g">Diego W8</span>     Ultima sesion: 3 abr | 2 de 4 tareas | Blocker: ninguno
+               Pushback: "steve_sources necesita 20 fuentes, no 10"
+
+  <span class="r">Felipe W2</span>    Ultima sesion: nunca | 0 de 5 tareas | Blocker: necesita cliente
+               Pushback: (ninguno aun)
+
+  <span class="r">Rodrigo W0</span>   Ultima sesion: nunca | 0 de 4 tareas | Blocker: email_send_queue=0
+
+  <span class="y">Sebastian W5</span> Ultima sesion: nunca | 0 de 5 tareas | Blocker: gcloud project
+
+
+<span class="w">OPCION C: Pedir opinion cruzada</span>
+
+  Tu dices:  <span class="o">"que piensa Felipe de lo que hizo Diego?"</span>
+  Claude:    Lee personalidad de Felipe + journal de Diego
+             Felipe responde desde su perspectiva:
+             "Diego poblo las fuentes, bien. Pero eso no me sirve de nada
+              si no tenemos campaign_metrics. Mi prioridad es conectar
+              un cliente con Meta OAuth. Sin datos reales de campanas,
+              el Performance Tracker corre en vacio."
+</pre>
+</div>
+
+<div class="concept-box">
+  <h3>La estructura de archivos final</h3>
+<pre style="color: #aaa; font-size: 0.85em; margin-top: 10px;">
+agents/
+├── README.md                      ← Guia de fases y operacion
+├── personalities/                 ← NUNCA CAMBIA — quien es cada uno
+│   ├── diego-w8.md               ← Obsesivo con DB, defiende integridad
+│   ├── felipe-w2.md              ← Solo cree en datos, cuestiona stats
+│   ├── rodrigo-w0.md             ← Cinico con emails, pragmatico
+│   ├── sebastian-w5.md           ← Paranoico con infra, asume fallas
+│   ├── tomas-w7.md               ← Guardian del knowledge, calidad > cantidad
+│   └── isidora-w6.md             ← Jueza implacable, dice NO
+├── state/                         ← CAMBIA CADA SESION — tareas actuales
+│   ├── diego-w8.md
+│   ├── felipe-w2.md
+│   ├── rodrigo-w0.md
+│   └── sebastian-w5.md
+└── memory/                        ← CRECE SIEMPRE — journal infinito
+    ├── diego-w8.md               ← (se crea en la primera sesion)
+    ├── felipe-w2.md
+    └── ...
+</pre>
+</div>
+
+<div class="footer">
+  Steve Agents → Brain Map — Sistema de agentes con memoria persistente y personalidad<br>
+  6 agentes definidos con personalidad, componentes Brain, y protocolo de desafio<br>
+  3 abril 2026
+</div>
+
+</div>
+
+<script>
+function toggle(id) { document.getElementById(id).classList.toggle('open'); }
+function toggleAll() {
+  const cards = document.querySelectorAll('.agent-card');
+  const anyOpen = Array.from(cards).some(c => c.classList.contains('open'));
+  cards.forEach(c => { if (anyOpen) c.classList.remove('open'); else c.classList.add('open'); });
+}
+</script>
+</body>
+</html>

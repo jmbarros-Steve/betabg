@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Ads — Equipo y Organigrama</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; background: #0a0a0f; color: #e0e0e0; line-height: 1.7; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+  h1 { font-size: 2.2em; text-align: center; margin: 30px 0 5px; color: #fff; font-weight: 700; }
+  h1 span { color: #ff6b35; }
+  .subtitle { text-align: center; color: #888; font-size: 1em; margin-bottom: 40px; }
+  h2 { font-size: 1.4em; margin: 50px 0 20px; padding: 12px 18px; border-left: 4px solid; border-radius: 0 8px 8px 0; color: #fff; }
+
+  /* PLATFORM CONTEXT */
+  .platform-banner {
+    background: linear-gradient(135deg, #1a1005, #0f1520);
+    border: 2px solid #ff6b35;
+    border-radius: 16px;
+    padding: 24px 30px;
+    margin-bottom: 40px;
+    text-align: center;
+  }
+  .platform-banner h3 { color: #ff6b35; font-size: 1.3em; margin-bottom: 10px; }
+  .platform-banner p { color: #bbb; font-size: 0.95em; max-width: 800px; margin: 0 auto; }
+  .platform-banner .highlight { color: #fff; font-weight: 700; }
+
+  /* KPI BOXES */
+  .kpi-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin: 30px 0; }
+  .kpi-box {
+    background: #111118;
+    border: 1px solid #2a2a3a;
+    border-radius: 12px;
+    padding: 16px 22px;
+    text-align: center;
+    min-width: 150px;
+    flex: 1;
+    max-width: 200px;
+  }
+  .kpi-box .num { font-size: 2em; font-weight: 800; color: #ff6b35; }
+  .kpi-box .label { font-size: 0.8em; color: #888; margin-top: 4px; }
+
+  /* ORG CHART */
+  .org-chart { margin: 30px 0; overflow-x: auto; }
+  .org-level { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 8px 0; position: relative; }
+  .org-connector { text-align: center; color: #333; font-size: 1.5em; line-height: 1; margin: 4px 0; }
+  .org-node {
+    background: #111118;
+    border: 2px solid #2a2a3a;
+    border-radius: 12px;
+    padding: 14px 18px;
+    text-align: center;
+    min-width: 140px;
+    transition: all 0.3s;
+    cursor: default;
+  }
+  .org-node:hover { border-color: #ff6b35; transform: translateY(-2px); }
+  .org-node .name { font-weight: 700; font-size: 1em; color: #fff; }
+  .org-node .code { font-size: 0.75em; color: #888; font-family: monospace; }
+  .org-node .role { font-size: 0.8em; color: #aaa; margin-top: 4px; }
+  .org-node.boss { border-color: #ff6b35; background: linear-gradient(135deg, #1a0f08, #111118); }
+  .org-node.canales { border-color: #f59e0b; }
+  .org-node.producto { border-color: #60a5fa; }
+  .org-node.infra { border-color: #34d399; }
+  .org-node.qa { border-color: #f472b6; }
+
+  .squad-label {
+    font-size: 0.7em;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 20px;
+    display: inline-block;
+    margin-bottom: 6px;
+  }
+  .sq-canales { background: rgba(245,158,11,0.15); color: #f59e0b; }
+  .sq-producto { background: rgba(96,165,250,0.15); color: #60a5fa; }
+  .sq-infra { background: rgba(52,211,153,0.15); color: #34d399; }
+  .sq-qa { background: rgba(244,114,182,0.15); color: #f472b6; }
+
+  /* EXECUTIVE TABLE */
+  .exec-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 0.9em; }
+  .exec-table th { background: #1a1a2a; color: #ff6b35; padding: 12px 14px; text-align: left; font-weight: 700; border-bottom: 2px solid #ff6b35; }
+  .exec-table td { padding: 12px 14px; border-bottom: 1px solid #1a1a2a; vertical-align: top; }
+  .exec-table tr:hover { background: rgba(255,107,53,0.04); }
+  .exec-table .badge {
+    font-size: 0.7em;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .b-canales { background: rgba(245,158,11,0.15); color: #f59e0b; }
+  .b-producto { background: rgba(96,165,250,0.15); color: #60a5fa; }
+  .b-infra { background: rgba(52,211,153,0.15); color: #34d399; }
+  .b-qa { background: rgba(244,114,182,0.15); color: #f472b6; }
+
+  /* AGENT CARDS */
+  .agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 20px; margin: 20px 0; }
+  .agent-card {
+    background: #111118;
+    border: 1px solid #2a2a3a;
+    border-radius: 14px;
+    overflow: hidden;
+    transition: all 0.3s;
+  }
+  .agent-card:hover { border-color: #444; }
+  .agent-card-header {
+    padding: 18px 20px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+  }
+  .agent-card-header:hover { background: rgba(255,255,255,0.02); }
+  .agent-card-header h3 { font-size: 1.05em; color: #fff; }
+  .agent-card-header h3 .wn { color: #888; font-weight: 400; font-size: 0.85em; }
+  .agent-card-header .arrow { color: #555; transition: transform 0.3s; font-size: 1.2em; }
+  .agent-card.open .arrow { transform: rotate(180deg); }
+  .agent-card-body { display: none; padding: 0 20px 20px; }
+  .agent-card.open .agent-card-body { display: block; }
+
+  .what-box {
+    background: rgba(255,255,255,0.03);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 10px 0;
+  }
+  .what-box h4 { font-size: 0.85em; color: #ff6b35; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .what-box p, .what-box li { font-size: 0.9em; color: #ccc; }
+  .what-box ul { padding-left: 18px; }
+  .what-box li { margin: 4px 0; }
+
+  .impact-meter { margin: 6px 0; }
+  .impact-meter .bar-bg { background: #1a1a2a; border-radius: 8px; height: 8px; overflow: hidden; }
+  .impact-meter .bar-fill { height: 100%; border-radius: 8px; transition: width 1s ease; }
+  .impact-meter .bar-label { display: flex; justify-content: space-between; font-size: 0.75em; color: #888; margin-bottom: 3px; }
+
+  .challenge-quote {
+    border-left: 3px solid #ff6b35;
+    padding: 10px 14px;
+    margin: 12px 0;
+    background: rgba(255,107,53,0.05);
+    border-radius: 0 8px 8px 0;
+    font-style: italic;
+    font-size: 0.88em;
+    color: #ccc;
+  }
+
+  /* DEPENDENCY MAP */
+  .dep-map { margin: 20px 0; }
+  .dep-layer {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 10px 0;
+    padding: 14px 18px;
+    border-radius: 12px;
+    background: #111118;
+    border: 1px solid #1a1a2a;
+  }
+  .dep-layer .layer-num {
+    font-size: 1.8em;
+    font-weight: 800;
+    color: #ff6b35;
+    min-width: 45px;
+    text-align: center;
+  }
+  .dep-layer .layer-name {
+    font-weight: 700;
+    color: #fff;
+    font-size: 0.95em;
+    min-width: 130px;
+  }
+  .dep-layer .layer-agents {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .dep-chip {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+    border: 1px solid;
+  }
+  .dep-chip.canales { border-color: #f59e0b; color: #f59e0b; background: rgba(245,158,11,0.08); }
+  .dep-chip.producto { border-color: #60a5fa; color: #60a5fa; background: rgba(96,165,250,0.08); }
+  .dep-chip.infra { border-color: #34d399; color: #34d399; background: rgba(52,211,153,0.08); }
+  .dep-chip.qa { border-color: #f472b6; color: #f472b6; background: rgba(244,114,182,0.08); }
+
+  .dep-arrow { text-align: center; color: #333; font-size: 1.5em; margin: 2px 0; }
+
+  /* PHASE PLAN */
+  .phase-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 20px 0; }
+  @media (max-width: 900px) { .phase-grid { grid-template-columns: 1fr; } }
+  .phase-card {
+    background: #111118;
+    border: 1px solid #2a2a3a;
+    border-radius: 14px;
+    padding: 22px;
+  }
+  .phase-card h3 { font-size: 1.1em; color: #ff6b35; margin-bottom: 12px; }
+  .phase-card .agents-list { list-style: none; padding: 0; }
+  .phase-card .agents-list li { padding: 4px 0; font-size: 0.9em; color: #ccc; border-bottom: 1px solid #1a1a2a; }
+  .phase-card .agents-list li:last-child { border: none; }
+  .phase-card .goal { margin-top: 12px; padding: 10px; background: rgba(255,107,53,0.06); border-radius: 8px; font-size: 0.85em; color: #ff6b35; }
+
+  /* FOOTER */
+  .footer { text-align: center; color: #444; font-size: 0.8em; margin: 60px 0 30px; padding-top: 20px; border-top: 1px solid #1a1a2a; }
+
+  @media (max-width: 768px) {
+    .agent-grid { grid-template-columns: 1fr; }
+    .kpi-box { min-width: 100px; }
+    h1 { font-size: 1.6em; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Steve Ads — <span>El Equipo</span></h1>
+<p class="subtitle">14 agentes que mantienen la plataforma que usan tus clientes</p>
+
+<!-- PLATFORM CONTEXT BANNER -->
+<div class="platform-banner">
+  <h3>Steve es una plataforma SaaS</h3>
+  <p>
+    Tus <span class="highlight">127 clientes</span> usan Steve para manejar sus campañas de Meta, Google Ads, Klaviyo, Shopify y más.
+    Estos 14 agentes <span class="highlight">no hacen marketing</span> — mantienen y mejoran los <span class="highlight">módulos de la plataforma</span>
+    para que cada cliente pueda operar sus canales desde Steve sin problemas.
+  </p>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-row">
+  <div class="kpi-box"><div class="num">14</div><div class="label">Agentes</div></div>
+  <div class="kpi-box"><div class="num">127</div><div class="label">Clientes en DB</div></div>
+  <div class="kpi-box"><div class="num">130+</div><div class="label">Componentes Frontend</div></div>
+  <div class="kpi-box"><div class="num">170+</div><div class="label">Rutas Backend</div></div>
+  <div class="kpi-box"><div class="num">45</div><div class="label">Crons Activos</div></div>
+  <div class="kpi-box"><div class="num">69</div><div class="label">Edge Functions</div></div>
+</div>
+
+<!-- ORG CHART -->
+<h2 style="border-color: #ff6b35;">Organigrama</h2>
+
+<div class="org-chart">
+  <!-- JM -->
+  <div class="org-level">
+    <div class="org-node boss">
+      <div class="name">JM</div>
+      <div class="role">Jefe de Producto</div>
+    </div>
+  </div>
+  <div class="org-connector">|</div>
+
+  <!-- 4 SQUADS -->
+  <div class="org-level">
+    <div style="text-align:center; padding: 0 20px;">
+      <div class="squad-label sq-canales">Squad Canales</div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:8px;">
+        <div class="org-node canales"><div class="name">Felipe</div><div class="code">W2</div><div class="role">Módulo Meta + IG</div></div>
+        <div class="org-node canales"><div class="name">Andrés</div><div class="code">W3</div><div class="role">Módulo Google Ads</div></div>
+        <div class="org-node canales"><div class="name">Rodrigo</div><div class="code">W0</div><div class="role">Módulo Klaviyo</div></div>
+        <div class="org-node canales"><div class="name">Valentina</div><div class="code">W1</div><div class="role">Módulo Steve Mail</div></div>
+      </div>
+    </div>
+
+    <div style="text-align:center; padding: 0 20px;">
+      <div class="squad-label sq-producto">Squad Producto</div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:8px;">
+        <div class="org-node producto"><div class="name">Tomás</div><div class="code">W7</div><div class="role">Steve AI & Brain</div></div>
+        <div class="org-node producto"><div class="name">Ignacio</div><div class="code">W17</div><div class="role">Métricas & Reportes</div></div>
+        <div class="org-node producto"><div class="name">Paula</div><div class="code">W19</div><div class="role">WA, CRM & Ventas</div></div>
+        <div class="org-node producto"><div class="name">Valentín</div><div class="code">W18</div><div class="role">Creativos & Assets</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="org-level" style="margin-top: 16px;">
+    <div style="text-align:center; padding: 0 20px;">
+      <div class="squad-label sq-infra">Squad Infra</div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:8px;">
+        <div class="org-node infra"><div class="name">Diego</div><div class="code">W8</div><div class="role">Base de Datos</div></div>
+        <div class="org-node infra"><div class="name">Sebastián</div><div class="code">W5</div><div class="role">Cloud & Crons</div></div>
+        <div class="org-node infra"><div class="name">Camila</div><div class="code">W4</div><div class="role">Frontend & Portal</div></div>
+        <div class="org-node infra"><div class="name">Matías</div><div class="code">W13</div><div class="role">Módulo Shopify</div></div>
+      </div>
+    </div>
+
+    <div style="text-align:center; padding: 0 20px;">
+      <div class="squad-label sq-qa">Squad QA</div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:8px;">
+        <div class="org-node qa"><div class="name">Isidora</div><div class="code">W6</div><div class="role">CRITERIO (Reglas)</div></div>
+        <div class="org-node qa"><div class="name">Javiera</div><div class="code">W12</div><div class="role">El Chino (Auditoría)</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EXECUTIVE SUMMARY TABLE -->
+<h2 style="border-color: #f59e0b;">Resumen Ejecutivo — ¿Qué hace cada uno?</h2>
+<p style="color:#888; margin-bottom:16px; font-size:0.9em;">Cada agente mantiene un módulo de la plataforma Steve. Si ese módulo falla, los clientes que lo usan quedan afectados.</p>
+
+<table class="exec-table">
+<thead>
+  <tr>
+    <th>Agente</th>
+    <th>Módulo que mantiene</th>
+    <th>Qué hace (en simple)</th>
+    <th>Si no existiera...</th>
+    <th>Squad</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td><strong>Felipe W2</strong></td>
+    <td>Meta Ads + Instagram</td>
+    <td>Mantiene la conexión con Meta para que los clientes puedan crear campañas, ver métricas y gestionar su pixel desde Steve</td>
+    <td>Los clientes no podrían crear ni monitorear campañas de Meta/IG desde la plataforma</td>
+    <td><span class="badge b-canales">Canales</span></td>
+  </tr>
+  <tr>
+    <td><strong>Andrés W3</strong></td>
+    <td>Google Ads</td>
+    <td>Mantiene la integración con Google Ads para que los clientes vean sus métricas y gestionen campañas de Google desde Steve</td>
+    <td>Google Ads estaría 100% desconectado — hoy ya lo está (faltan 3 credenciales)</td>
+    <td><span class="badge b-canales">Canales</span></td>
+  </tr>
+  <tr>
+    <td><strong>Rodrigo W0</strong></td>
+    <td>Klaviyo</td>
+    <td>Mantiene el sync con Klaviyo para que los clientes puedan gestionar sus flows de email, importar templates y ver métricas de email</td>
+    <td>El módulo de email marketing vía Klaviyo dejaría de funcionar para los clientes</td>
+    <td><span class="badge b-canales">Canales</span></td>
+  </tr>
+  <tr>
+    <td><strong>Valentina W1</strong></td>
+    <td>Steve Mail</td>
+    <td>Mantiene el editor de emails propio de Steve (GrapeJS), templates y el pipeline de envío directo sin Klaviyo</td>
+    <td>Los clientes no podrían crear ni enviar emails directamente desde Steve</td>
+    <td><span class="badge b-canales">Canales</span></td>
+  </tr>
+  <tr>
+    <td><strong>Tomás W7</strong></td>
+    <td>Steve AI & Brain</td>
+    <td>Mantiene el cerebro de la plataforma: knowledge base, swarm research, content hunter, agent loop — todo lo que hace a Steve "inteligente"</td>
+    <td>Steve sería una herramienta sin inteligencia propia — un dashboard más</td>
+    <td><span class="badge b-producto">Producto</span></td>
+  </tr>
+  <tr>
+    <td><strong>Ignacio W17</strong></td>
+    <td>Métricas & Reportes</td>
+    <td>Mantiene los dashboards, reportes semanales, detección de anomalías y atribución de revenue que los clientes ven en Steve</td>
+    <td>Los clientes no tendrían visibilidad de cómo les va — tendrían que ir a cada plataforma por separado</td>
+    <td><span class="badge b-producto">Producto</span></td>
+  </tr>
+  <tr>
+    <td><strong>Paula W19</strong></td>
+    <td>WhatsApp, CRM & Ventas</td>
+    <td>Mantiene el sistema de WhatsApp de Steve, seguimiento de prospectos, carritos abandonados y pipeline de ventas para los clientes</td>
+    <td>Los clientes no podrían usar Steve como canal de ventas vía WhatsApp</td>
+    <td><span class="badge b-producto">Producto</span></td>
+  </tr>
+  <tr>
+    <td><strong>Valentín W18</strong></td>
+    <td>Creativos & Assets</td>
+    <td>Mantiene la generación de imágenes AI, detección de fatiga creativa, y la biblioteca de assets que los clientes usan para sus anuncios</td>
+    <td>Los clientes tendrían que crear todos sus creativos fuera de Steve</td>
+    <td><span class="badge b-producto">Producto</span></td>
+  </tr>
+  <tr>
+    <td><strong>Diego W8</strong></td>
+    <td>Base de Datos</td>
+    <td>Mantiene las 37 tablas, migraciones, RLS policies y la integridad de todos los datos que Steve guarda para los clientes</td>
+    <td>Los datos de los clientes podrían corromperse, perderse o quedar expuestos</td>
+    <td><span class="badge b-infra">Infra</span></td>
+  </tr>
+  <tr>
+    <td><strong>Sebastián W5</strong></td>
+    <td>Cloud & Crons</td>
+    <td>Mantiene los 45 crons, 69 edge functions, Cloud Run, env vars y el monitoreo — todo lo que hace que Steve "corra"</td>
+    <td>La plataforma entera se caería y nadie se enteraría hasta que un cliente se queje</td>
+    <td><span class="badge b-infra">Infra</span></td>
+  </tr>
+  <tr>
+    <td><strong>Camila W4</strong></td>
+    <td>Frontend & Portal</td>
+    <td>Mantiene los 130+ componentes React, el portal del cliente, onboarding, dashboard — todo lo que el cliente ve y toca</td>
+    <td>Los clientes no tendrían interfaz para usar Steve — todo lo demás existiría pero nadie podría accederlo</td>
+    <td><span class="badge b-infra">Infra</span></td>
+  </tr>
+  <tr>
+    <td><strong>Matías W13</strong></td>
+    <td>Shopify</td>
+    <td>Mantiene el sync de productos, órdenes y webhooks de las tiendas Shopify de los clientes para que Steve tenga datos actualizados</td>
+    <td>Los anuncios podrían mostrar productos agotados y no sabríamos cuánto venden los clientes</td>
+    <td><span class="badge b-infra">Infra</span></td>
+  </tr>
+  <tr>
+    <td><strong>Isidora W6</strong></td>
+    <td>CRITERIO (493 reglas)</td>
+    <td>Mantiene las reglas de calidad que evalúan cada campaña y email antes de que Steve los apruebe para los clientes</td>
+    <td>Steve aprobaría contenido malo — emails con errores, ads fuera de marca, copies que no convierten</td>
+    <td><span class="badge b-qa">QA</span></td>
+  </tr>
+  <tr>
+    <td><strong>Javiera W12</strong></td>
+    <td>El Chino (QA)</td>
+    <td>Audita TODO: reconciliación de datos, health checks, reportes de errores — es la que verifica que lo que dicen los demás agentes es verdad</td>
+    <td>Nadie verificaría que el sistema realmente funciona — los errores silenciosos se acumularían</td>
+    <td><span class="badge b-qa">QA</span></td>
+  </tr>
+</tbody>
+</table>
+
+<!-- DETAIL CARDS -->
+<h2 style="border-color: #f59e0b;">Squad Canales <span style="font-weight:400; font-size:0.7em; color:#888;">— Conexiones con plataformas externas de los clientes</span></h2>
+<p style="color:#888; margin-bottom:16px; font-size:0.9em;">Estos agentes mantienen los módulos que conectan Steve con las plataformas que usan los clientes: Meta, Google, Klaviyo, Email.</p>
+
+<div class="agent-grid">
+
+  <!-- FELIPE W2 -->
+  <div class="agent-card" onclick="this.classList.toggle('open')">
+    <div class="agent-card-header">
+      <h3>Felipe <span class="wn">W2</span> — Módulo Meta Ads + IG</h3>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="agent-card-body">
+      <div class="what-box">
+        <h4>Qué mantiene</h4>
+        <ul>
+          <li><strong>OAuth de Meta</strong> — para que los clientes conecten sus cuentas de Meta/IG a Steve</li>
+          <li><strong>Sync de métricas</strong> — trae los datos de campañas de Meta al dashboard de Steve</li>
+          <li><strong>Creación de campañas</strong> — permite a los clientes lanzar campañas de Meta desde Steve</li>
+          <li><strong>Creative history</strong> — guarda qué creativos usó cada cliente y cómo les fue</li>
+          <li><strong>Social inbox</strong> — mensajes de IG/FB centralizados en Steve</li>
+        </ul>
+      </div>
+      <div class="what-box">
+        <h4>Impacto en el negocio</h4>
+        <div class="impact-meter">
+          <div class="bar-label"><span>Clientes que usan Meta</span><span>~80%</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:80%; background: linear-gradient(90deg, #f59e0b, #ff6b35);"></div></div>
+        </div>
+        <div class="impact-meter">
+          <div class="bar-label"><span>Revenue influenciado</span><span>Alto</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:85%; background: linear-gradient(90deg, #f59e0b, #ff6b35);"></div></div>
+        </div>
+        <p style="font-size:0.85em; color:#999; margin-top:8px;">Meta es probablemente el canal #1 de tus clientes. Si este módulo falla, la mayoría pierde visibilidad de su inversión publicitaria.</p>
+      </div>
+      <div class="what-box">
+        <h4>Depende de</h4>
+        <p>Diego W8 (DB para guardar métricas) · Sebastián W5 (crons de sync) · Valentín W18 (creativos)</p>
+      </div>
+      <div class="challenge-quote">
+        "Solo hay 3 platform_connections en toda la base. Con 127 clientes, eso significa que el 97% NO tiene Meta conectado. Este módulo es un escaparate vacío."
+      </div>
+    </div>
+  </div>
+
+  <!-- ANDRÉS W3 -->
+  <div class="agent-card" onclick="this.classList.toggle('open')">
+    <div class="agent-card-header">
+      <h3>Andrés <span class="wn">W3</span> — Módulo Google Ads</h3>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="agent-card-body">
+      <div class="what-box">
+        <h4>Qué mantiene</h4>
+        <ul>
+          <li><strong>OAuth de Google</strong> — para que los clientes conecten Google Ads a Steve</li>
+          <li><strong>Sync de métricas Google</strong> — trae CPC, ROAS, conversiones al dashboard</li>
+          <li><strong>Comparison cross-channel</strong> — permite a los clientes comparar Meta vs Google en un solo lugar</li>
+        </ul>
+      </div>
+      <div class="what-box">
+        <h4>Impacto en el negocio</h4>
+        <div class="impact-meter">
+          <div class="bar-label"><span>Estado actual</span><span>DESCONECTADO</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:5%; background: #ef4444;"></div></div>
+        </div>
+        <p style="font-size:0.85em; color:#ef4444; margin-top:8px; font-weight:600;">Faltan 3 credenciales en Cloud Run: GOOGLE_CLIENT_ID, GOOGLE_ADS_CLIENT_SECRET, GOOGLE_ADS_DEVELOPER_TOKEN. Módulo 100% inoperativo.</p>
+      </div>
+      <div class="what-box">
+        <h4>Depende de</h4>
+        <p>Sebastián W5 (env vars en Cloud Run) · Diego W8 (tablas para guardar métricas)</p>
+      </div>
+      <div class="challenge-quote">
+        "Google Ads está completamente desconectado. Faltan 3 credenciales. Los clientes que usan Google no pueden ver NADA de su inversión en Steve."
+      </div>
+    </div>
+  </div>
+
+  <!-- RODRIGO W0 -->
+  <div class="agent-card" onclick="this.classList.toggle('open')">
+    <div class="agent-card-header">
+      <h3>Rodrigo <span class="wn">W0</span> — Módulo Klaviyo</h3>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="agent-card-body">
+      <div class="what-box">
+        <h4>Qué mantiene</h4>
+        <ul>
+          <li><strong>Conexión Klaviyo</strong> — API keys de los clientes para conectar sus cuentas</li>
+          <li><strong>Sync de métricas de email</strong> — open rates, click rates, revenue por email</li>
+          <li><strong>Gestión de flows</strong> — crear y administrar flows de Klaviyo desde Steve</li>
+          <li><strong>Import de templates</strong> — traer templates de Klaviyo a Steve y viceversa</li>
+          <li><strong>Top products</strong> — identificar qué productos impulsar por email</li>
+        </ul>
+      </div>
+      <div class="what-box">
+        <h4>Impacto en el negocio</h4>
+        <div class="impact-meter">
+          <div class="bar-label"><span>Pipeline de emails</span><span>ROTO</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:10%; background: #ef4444;"></div></div>
+        </div>
+        <p style="font-size:0.85em; color:#ef4444; margin-top:8px;">email_send_queue = 0 rows. El pipeline de envío completo está desconectado. Los clientes no están enviando emails vía Steve.</p>
+      </div>
+      <div class="what-box">
+        <h4>Depende de</h4>
+        <p>Valentina W1 (templates para enviar) · Matías W13 (productos para recomendar) · Sebastián W5 (crons de sync)</p>
+      </div>
+      <div class="challenge-quote">
+        "La cola de emails tiene 0 mensajes. Tenemos 7 edge functions de Klaviyo pero no enviamos nada. Es como tener un correo con 7 buzones y ninguna carta."
+      </div>
+    </div>
+  </div>
+
+  <!-- VALENTINA W1 -->
+  <div class="agent-card" onclick="this.classList.toggle('open')">
+    <div class="agent-card-header">
+      <h3>Valentina <span class="wn">W1</span> — Módulo Steve Mail</h3>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="agent-card-body">
+      <div class="what-box">
+        <h4>Qué mantiene</h4>
+        <ul>
+          <li><strong>Editor GrapeJS</strong> — el editor visual donde los clientes diseñan sus emails</li>
+          <li><strong>Templates</strong> — biblioteca de templates pre-hechos para los clientes</li>
+          <li><strong>Pipeline de envío propio</strong> — envío directo sin depender de Klaviyo</li>
+          <li><strong>Preview & testing</strong> — que los clientes puedan ver cómo queda antes de enviar</li>
+        </ul>
+      </div>
+      <div class="what-box">
+        <h4>Impacto en el negocio</h4>
+        <div class="impact-meter">
+          <div class="bar-label"><span>Diferenciación</span><span>Alto</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:70%; background: linear-gradient(90deg, #f59e0b, #ff6b35);"></div></div>
+        </div>
+        <p style="font-size:0.85em; color:#999; margin-top:8px;">Steve Mail es lo que diferencia a Steve de "otro dashboard" — es la capacidad de crear y enviar emails sin salir de la plataforma.</p>
+      </div>
+      <div class="what-box">
+        <h4>Depende de</h4>
+        <p>Rodrigo W0 (integración Klaviyo para envío dual) · Camila W4 (UI del editor) · Isidora W6 (validación de contenido)</p>
+      </div>
+      <div class="challenge-quote">
+        "El editor lleva semanas sin que nadie lo toque. Si quieres que los clientes creen emails en Steve, el editor tiene que funcionar perfecto en mobile."
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- SQUAD PRODUCTO -->
+<h2 style="border-color: #60a5fa;">Squad Producto <span style="font-weight:400; font-size:0.7em; color:#888;">— Features internos que hacen a Steve inteligente</span></h2>
+<p style="color:#888; margin-bottom:16px; font-size:0.9em;">Estos agentes mantienen lo que hace a Steve más que un simple dashboard: AI, métricas unificadas, ventas automatizadas y creativos.</p>
+
+<div class="agent-grid">
+
+  <!-- TOMÁS W7 -->
+  <div class="agent-card" onclick="this.classList.toggle('open')">
+    <div class="agent-card-header">
+      <h3>Tomás <span class="wn">W7</span> — Steve AI & Brain</h3>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="agent-card-body">
+      <div class="what-box">
+        <h4>Qué mantiene</h4>
+        <ul>
+          <li><strong>Knowledge base</strong> — 487 reglas de conocimiento que Steve usa para dar recomendaciones a los clientes</li>
+          <li><strong>Swarm Research</strong> — investigación automática con 3 modelos AI que alimenta el conocimiento</li>
+          <li><strong>Content Hunter</strong> — busca contenido relevante cada 20 min para mantener a Steve actualizado</li>
+          <li><strong>Agent Loop</strong> — el loop autónomo que decide qué hacer sin intervención humana</li>
+          <li><strong>Mantenimiento</strong> — dedup, decay, consolidación, quality score del knowledge</li>
+        </ul>
+      </div>
+      <div class="what-box">
+        <h4>Impacto en el negocio</h4>
+        <div class="impact-meter">
+          <div class="bar-label"><span>Es el cerebro de Steve</span><span>Crítico</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:95%; background: linear-gradient(90deg, #60a5fa, #3b82f6);"></div></div>
+        </div>
+        <p style="font-size:0.85em; color:#999; margin-top:8px;">Sin Brain, Steve es un dashboard tonto. Con Brain, Steve da recomendaciones, aprende de cada cliente y mejora solo. Es lo que justifica cobrar por la plataforma.</p>
+      </div>
+      <div class="what-box">
+        <h4>Depende de</h4>
+        <p>Diego W8 (tablas de knowledge) · Sebastián W5 (crons del brain) · Isidora W6 (calidad de reglas)</p>
+      </div>
+      <div class="challenge-quote">
+        "El swarm corre cada 2 horas pero solo tiene 16 runs exitosos. De 360 intentos posibles, el 95% falla. El Brain está operando con el 5% de su capacidad."
+      </div>
+    </div>
+  </div>
+
+  <!-- IGNACIO W17 -->
+  <div class="agent-card" onclick="this.classList.toggle('open')">
+    <div class="agent-card-header">
+      <h3>Ignacio <span class="wn">W17</span> — Métricas & Reportes</h3>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="agent-card-body">
+      <div class="what-box">
+        <h4>Qué mantiene</h4>
+        <ul>
+          <li><strong>Dashboards</strong> — los paneles donde los clientes ven cómo les va en todos sus canales</li>
+          <li><strong>Weekly report</strong> — reporte semanal automático para cada cliente</li>
+          <li><strong>Anomaly detector</strong> — alerta cuando algo se sale de lo normal en las métricas de un cliente</li>
+          <li><strong>Revenue attribution</strong> — conectar ventas con el canal que las generó</li>
+          <li><strong>Predictive alerts</strong> — anticipar problemas antes de que impacten al cliente</li>
+        </ul>
+      </div>
+      <div class="what-box">
+        <h4>Impacto en el negocio</h4>
+        <div class="impact-meter">
+          <div class="bar-label"><span>Valor percibido por cliente</span><span>Alto</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:80%; background: linear-gradient(90deg, #60a5fa, #3b82f6);"></div></div>
+        </div>
+        <p style="font-size:0.85em; color:#999; margin-top:8px;">Si los clientes no ven métricas claras en Steve, no ven el valor. Este módulo es lo que demuestra que Steve funciona.</p>
+      </div>
+      <div class="what-box">
+        <h4>Depende de</h4>
+        <p>Felipe W2 (métricas Meta) · Andrés W3 (métricas Google) · Matías W13 (datos Shopify) · Rodrigo W0 (métricas email)</p>
+      </div>
+      <div class="challenge-quote">
+        "El reporte semanal se genera pero nadie lo lee. Si nadie toma acción con estos datos, estamos gastando tokens de AI para decorar."
+      </div>
+    </div>
+  </div>
+
+  <!-- PAULA W19 -->
+  <div class="agent-card" onclick="this.classList.toggle('open')">
+    <div class="agent-card-header">
+      <h3>Paula <span class="wn">W19</span> — WA, CRM & Ventas</h3>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="agent-card-body">
+      <div class="what-box">
+        <h4>Qué mantiene</h4>
+        <ul>
+          <li><strong>WhatsApp Steve</strong> — el bot de WA que interactúa con los prospectos de los clientes</li>
+          <li><strong>Pipeline de ventas</strong> — seguimiento de prospectos, estados, conversiones</li>
+          <li><strong>Carritos abandonados</strong> — recuperación automática vía WA para los clientes</li>
+          <li><strong>Prospect nurture</strong> — emails de seguimiento automáticos</li>
+          <li><strong>CRM básico</strong> — contactos, interacciones, historial</li>
+        </ul>
+      </div>
+      <div class="what-box">
+        <h4>Impacto en el negocio</h4>
+        <div class="impact-meter">
+          <div class="bar-label"><span>Revenue directo</span><span>Alto potencial</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:65%; background: linear-gradient(90deg, #60a5fa, #3b82f6);"></div></div>
+        </div>
+        <p style="font-size:0.85em; color:#999; margin-top:8px;">Cada carrito recuperado es venta directa. Cada prospecto atendido a tiempo es un cliente potencial. Este módulo es el que convierte leads en plata.</p>
+      </div>
+      <div class="what-box">
+        <h4>Depende de</h4>
+        <p>Sebastián W5 (cron wa-action-processor cada 1 min) · Matías W13 (datos de carritos de Shopify) · Diego W8 (tablas de prospects)</p>
+      </div>
+      <div class="challenge-quote">
+        "El cron de WhatsApp corre cada minuto — 1440 veces al día. ¿Cuántas acciones procesó hoy? Si la respuesta es 0, los clientes tienen un bot mudo."
+      </div>
+    </div>
+  </div>
+
+  <!-- VALENTÍN W18 -->
+  <div class="agent-card" onclick="this.classList.toggle('open')">
+    <div class="agent-card-header">
+      <h3>Valentín <span class="wn">W18</span> — Creativos & Assets</h3>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="agent-card-body">
+      <div class="what-box">
+        <h4>Qué mantiene</h4>
+        <ul>
+          <li><strong>Generación de imágenes AI</strong> — los clientes generan creativos para sus ads desde Steve</li>
+          <li><strong>Fatigue detector</strong> — avisa a los clientes cuando un creativo ya está "quemado"</li>
+          <li><strong>Angle detector</strong> — evita que los clientes repitan el mismo mensaje</li>
+          <li><strong>Creative preview</strong> — vista previa de cómo se verá el ad antes de publicar</li>
+          <li><strong>Mass campaigns</strong> — generación masiva de variantes de copies y creativos</li>
+        </ul>
+      </div>
+      <div class="what-box">
+        <h4>Impacto en el negocio</h4>
+        <div class="impact-meter">
+          <div class="bar-label"><span>Diferenciación</span><span>Alto</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:75%; background: linear-gradient(90deg, #60a5fa, #3b82f6);"></div></div>
+        </div>
+        <p style="font-size:0.85em; color:#999; margin-top:8px;">Generar creativos con AI es uno de los features más atractivos para los clientes. Si esto funciona bien, es el "wow factor" de Steve.</p>
+      </div>
+      <div class="what-box">
+        <h4>Depende de</h4>
+        <p>Felipe W2 (datos de performance de ads) · Sebastián W5 (API keys de Fal.ai/Replicate) · Isidora W6 (validación de calidad)</p>
+      </div>
+      <div class="challenge-quote">
+        "El fatigue detector corre todos los días a las 11am. ¿Cuántas alertas generó este mes? Si cero, o no hay ads corriendo o no está detectando nada."
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- SQUAD INFRA -->
+<h2 style="border-color: #34d399;">Squad Infra <span style="font-weight:400; font-size:0.7em; color:#888;">— Lo que hace que Steve corra</span></h2>
+<p style="color:#888; margin-bottom:16px; font-size:0.9em;">Sin estos agentes, la plataforma no funciona. Son los cimientos sobre los que todo lo demás se construye.</p>
+
+<div class="agent-grid">
+
+  <!-- DIEGO W8 -->
+  <div class="agent-card" onclick="this.classList.toggle('open')">
+    <div class="agent-card-header">
+      <h3>Diego <span class="wn">W8</span> — Base de Datos</h3>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="agent-card-body">
+      <div class="what-box">
+        <h4>Qué mantiene</h4>
+        <ul>
+          <li><strong>37 tablas</strong> — todos los datos de los 127 clientes</li>
+          <li><strong>120 RLS policies</strong> — que cada cliente solo vea SUS datos</li>
+          <li><strong>Migraciones</strong> — cambios al schema sin romper nada</li>
+          <li><strong>steve_sources / swarm_sources</strong> — fuentes de información del Brain</li>
+          <li><strong>Integridad</strong> — que los datos no se corrompan ni se pierdan</li>
+        </ul>
+      </div>
+      <div class="what-box">
+        <h4>Impacto en el negocio</h4>
+        <div class="impact-meter">
+          <div class="bar-label"><span>Criticidad</span><span>Máxima</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:100%; background: linear-gradient(90deg, #34d399, #059669);"></div></div>
+        </div>
+        <p style="font-size:0.85em; color:#ef4444; margin-top:8px;">steve_sources = 0 rows, swarm_sources = 0 rows. Las tablas que alimentan el Brain están vacías. El cerebro de Steve no tiene combustible.</p>
+      </div>
+      <div class="what-box">
+        <h4>Depende de</h4>
+        <p>Sebastián W5 (acceso a Supabase) · Nadie más — todos dependen de Diego</p>
+      </div>
+      <div class="challenge-quote">
+        "Tenemos 37 tablas y las 2 más importantes para el Brain tienen 0 filas. Es como tener una Ferrari con el tanque vacío."
+      </div>
+    </div>
+  </div>
+
+  <!-- SEBASTIÁN W5 -->
+  <div class="agent-card" onclick="this.classList.toggle('open')">
+    <div class="agent-card-header">
+      <h3>Sebastián <span class="wn">W5</span> — Cloud & Crons</h3>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="agent-card-body">
+      <div class="what-box">
+        <h4>Qué mantiene</h4>
+        <ul>
+          <li><strong>Cloud Run</strong> — el servidor donde corre toda la API de Steve</li>
+          <li><strong>45 crons</strong> — todas las tareas automáticas (syncs, análisis, reportes, etc.)</li>
+          <li><strong>69 edge functions</strong> — funciones serverless en Supabase</li>
+          <li><strong>20 env vars</strong> — credenciales que conectan Steve con Meta, Google, Twilio, etc.</li>
+          <li><strong>Health monitoring</strong> — OJOS, Sentry, auto-restart</li>
+        </ul>
+      </div>
+      <div class="what-box">
+        <h4>Impacto en el negocio</h4>
+        <div class="impact-meter">
+          <div class="bar-label"><span>Criticidad</span><span>Máxima</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:100%; background: linear-gradient(90deg, #34d399, #059669);"></div></div>
+        </div>
+        <p style="font-size:0.85em; color:#999; margin-top:8px;">Si Cloud Run se cae, NADA funciona. Si un env var se pierde, un módulo entero deja de funcionar. Sebastián es el que mantiene las luces prendidas.</p>
+      </div>
+      <div class="what-box">
+        <h4>Depende de</h4>
+        <p>Nadie — todos dependen de Sebastián</p>
+      </div>
+      <div class="challenge-quote">
+        "Tienes 45 crons y el health-check solo revisa 10 endpoints de 69. Eso es 14% de cobertura. Pregúntale a cualquier cliente si le parece suficiente."
+      </div>
+    </div>
+  </div>
+
+  <!-- CAMILA W4 -->
+  <div class="agent-card" onclick="this.classList.toggle('open')">
+    <div class="agent-card-header">
+      <h3>Camila <span class="wn">W4</span> — Frontend & Portal</h3>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="agent-card-body">
+      <div class="what-box">
+        <h4>Qué mantiene</h4>
+        <ul>
+          <li><strong>Portal del cliente</strong> — la interfaz donde los 127 clientes interactúan con Steve</li>
+          <li><strong>Dashboard</strong> — donde los clientes ven sus métricas consolidadas</li>
+          <li><strong>Onboarding</strong> — el flujo de registro y configuración inicial de cada cliente</li>
+          <li><strong>130+ componentes React</strong> — todos los elementos visuales de la plataforma</li>
+          <li><strong>Design system</strong> — consistencia visual en toda la plataforma</li>
+        </ul>
+      </div>
+      <div class="what-box">
+        <h4>Impacto en el negocio</h4>
+        <div class="impact-meter">
+          <div class="bar-label"><span>Primera impresión del cliente</span><span>Crítico</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:90%; background: linear-gradient(90deg, #34d399, #059669);"></div></div>
+        </div>
+        <p style="font-size:0.85em; color:#999; margin-top:8px;">Si el frontend no funciona, el cliente no puede usar Steve. Todo lo que los demás agentes construyen queda invisible. Camila es la puerta de entrada.</p>
+      </div>
+      <div class="what-box">
+        <h4>Depende de</h4>
+        <p>Diego W8 (datos para mostrar) · Sebastián W5 (API disponible) · Todos los de Canales (datos de cada módulo)</p>
+      </div>
+      <div class="challenge-quote">
+        "Tenemos 130 componentes y cero design system. Si un cliente nuevo entra al portal y cada página se ve diferente, no confiará en la plataforma."
+      </div>
+    </div>
+  </div>
+
+  <!-- MATÍAS W13 -->
+  <div class="agent-card" onclick="this.classList.toggle('open')">
+    <div class="agent-card-header">
+      <h3>Matías <span class="wn">W13</span> — Módulo Shopify</h3>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="agent-card-body">
+      <div class="what-box">
+        <h4>Qué mantiene</h4>
+        <ul>
+          <li><strong>Sync de productos</strong> — trae los productos de la tienda Shopify del cliente a Steve</li>
+          <li><strong>Sync de orders</strong> — trae las ventas para calcular ROAS y atribución</li>
+          <li><strong>Webhooks</strong> — actualización en tiempo real cuando algo cambia en la tienda del cliente</li>
+          <li><strong>Shopify App</strong> — la app que se instala desde el App Store de Shopify</li>
+        </ul>
+      </div>
+      <div class="what-box">
+        <h4>Impacto en el negocio</h4>
+        <div class="impact-meter">
+          <div class="bar-label"><span>Estado actual</span><span>DESCONECTADO</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:5%; background: #ef4444;"></div></div>
+        </div>
+        <p style="font-size:0.85em; color:#ef4444; margin-top:8px;">Faltan 3 credenciales: SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET, SHOPIFY_WEBHOOK_SECRET. Sin Shopify, no sabemos qué venden los clientes.</p>
+      </div>
+      <div class="what-box">
+        <h4>Depende de</h4>
+        <p>Sebastián W5 (env vars en Cloud Run) · Diego W8 (tablas para guardar productos/orders)</p>
+      </div>
+      <div class="challenge-quote">
+        "Sin Shopify, Felipe crea anuncios de productos que podrían estar agotados e Ignacio no puede calcular revenue. La mitad del equipo trabaja ciego."
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- SQUAD QA -->
+<h2 style="border-color: #f472b6;">Squad QA <span style="font-weight:400; font-size:0.7em; color:#888;">— Los que verifican que todo realmente funciona</span></h2>
+<p style="color:#888; margin-bottom:16px; font-size:0.9em;">Sin QA, los demás agentes dicen que todo funciona y nadie lo verifica. Estos dos se aseguran de que lo que Steve entrega a los clientes tenga calidad.</p>
+
+<div class="agent-grid">
+
+  <!-- ISIDORA W6 -->
+  <div class="agent-card" onclick="this.classList.toggle('open')">
+    <div class="agent-card-header">
+      <h3>Isidora <span class="wn">W6</span> — CRITERIO</h3>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="agent-card-body">
+      <div class="what-box">
+        <h4>Qué mantiene</h4>
+        <ul>
+          <li><strong>493 reglas de calidad</strong> — evalúan cada campaña y email antes de que Steve los apruebe para un cliente</li>
+          <li><strong>Evaluación automática</strong> — cada pieza de contenido pasa por CRITERIO antes de salir</li>
+          <li><strong>Rule calibration</strong> — ajuste automático de reglas basado en resultados reales</li>
+          <li><strong>Quality gates</strong> — bloquea contenido que no cumple estándares mínimos</li>
+        </ul>
+      </div>
+      <div class="what-box">
+        <h4>Impacto en el negocio</h4>
+        <div class="impact-meter">
+          <div class="bar-label"><span>Protección de marca del cliente</span><span>Crítico</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:85%; background: linear-gradient(90deg, #f472b6, #ec4899);"></div></div>
+        </div>
+        <p style="font-size:0.85em; color:#999; margin-top:8px;">Si CRITERIO no funciona, Steve podría aprobar ads con errores, emails fuera de marca, o copies que dañan la reputación del cliente.</p>
+      </div>
+      <div class="what-box">
+        <h4>Depende de</h4>
+        <p>Diego W8 (tabla criterio_rules) · Tomás W7 (knowledge para contexto) · Felipe/Rodrigo (contenido a evaluar)</p>
+      </div>
+      <div class="challenge-quote">
+        "Tenemos 493 reglas pero ¿cuántas se crearon automáticamente y nunca se revisaron? Una regla mala es peor que ninguna regla — aprueba basura con sello de calidad."
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVIERA W12 -->
+  <div class="agent-card" onclick="this.classList.toggle('open')">
+    <div class="agent-card-header">
+      <h3>Javiera <span class="wn">W12</span> — El Chino (QA)</h3>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="agent-card-body">
+      <div class="what-box">
+        <h4>Qué mantiene</h4>
+        <ul>
+          <li><strong>800 checks diarios</strong> — reconciliación de datos entre tablas y sistemas</li>
+          <li><strong>Health monitoring</strong> — verifica que endpoints responden correctamente</li>
+          <li><strong>Chino reports</strong> — 4 reportes diarios del estado de la plataforma</li>
+          <li><strong>Chino fixer</strong> — corrección automática de problemas cada 10 min</li>
+          <li><strong>JUEZ nocturno</strong> — tests de golden questions por la noche</li>
+        </ul>
+      </div>
+      <div class="what-box">
+        <h4>Impacto en el negocio</h4>
+        <div class="impact-meter">
+          <div class="bar-label"><span>Confiabilidad de la plataforma</span><span>Crítico</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:90%; background: linear-gradient(90deg, #f472b6, #ec4899);"></div></div>
+        </div>
+        <p style="font-size:0.85em; color:#999; margin-top:8px;">Sin Javiera, los errores se acumulan silenciosamente. Hoy el qa_log tiene 550+ registros — muchos sin revisar. Es la diferencia entre "funciona" y "funciona de verdad".</p>
+      </div>
+      <div class="what-box">
+        <h4>Depende de</h4>
+        <p>Sebastián W5 (endpoints a verificar) · Diego W8 (tablas a reconciliar) · Todos los demás (son lo que ella audita)</p>
+      </div>
+      <div class="challenge-quote">
+        "El Chino hace 800 checks al día y el qa_log tiene 550 registros. ¿Cuántos revisaste? Si la respuesta es 'ninguno', ¿para qué tenemos QA?"
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- DEPENDENCY MAP -->
+<h2 style="border-color: #ff6b35;">Mapa de Dependencias — Orden de Activación</h2>
+<p style="color:#888; margin-bottom:16px; font-size:0.9em;">Los agentes de arriba no pueden funcionar sin los de abajo. Este es el orden correcto para activarlos.</p>
+
+<div class="dep-map">
+  <div class="dep-layer">
+    <div class="layer-num">1</div>
+    <div class="layer-name">Cimientos</div>
+    <div class="layer-agents">
+      <span class="dep-chip infra">Diego W8 — DB</span>
+      <span class="dep-chip infra">Sebastián W5 — Cloud</span>
+    </div>
+  </div>
+  <div class="dep-arrow">↑ depende de</div>
+  <div class="dep-layer">
+    <div class="layer-num">2</div>
+    <div class="layer-name">Conexiones</div>
+    <div class="layer-agents">
+      <span class="dep-chip canales">Felipe W2 — Meta</span>
+      <span class="dep-chip canales">Andrés W3 — Google</span>
+      <span class="dep-chip canales">Rodrigo W0 — Klaviyo</span>
+      <span class="dep-chip infra">Matías W13 — Shopify</span>
+      <span class="dep-chip infra">Camila W4 — Frontend</span>
+    </div>
+  </div>
+  <div class="dep-arrow">↑ depende de</div>
+  <div class="dep-layer">
+    <div class="layer-num">3</div>
+    <div class="layer-name">Inteligencia</div>
+    <div class="layer-agents">
+      <span class="dep-chip producto">Tomás W7 — Brain</span>
+      <span class="dep-chip producto">Ignacio W17 — Métricas</span>
+      <span class="dep-chip producto">Valentín W18 — Creativos</span>
+      <span class="dep-chip producto">Valentina W1 — Steve Mail</span>
+    </div>
+  </div>
+  <div class="dep-arrow">↑ depende de</div>
+  <div class="dep-layer">
+    <div class="layer-num">4</div>
+    <div class="layer-name">Autonomía</div>
+    <div class="layer-agents">
+      <span class="dep-chip producto">Paula W19 — WA/CRM/Ventas</span>
+      <span class="dep-chip qa">Isidora W6 — CRITERIO</span>
+      <span class="dep-chip qa">Javiera W12 — El Chino</span>
+    </div>
+  </div>
+</div>
+
+<!-- PHASE PLAN -->
+<h2 style="border-color: #ff6b35;">Plan de Activación en 3 Fases</h2>
+
+<div class="phase-grid">
+  <div class="phase-card" style="border-top: 3px solid #34d399;">
+    <h3 style="color: #34d399;">Fase 1 — Plomería</h3>
+    <p style="font-size:0.85em; color:#888; margin-bottom:12px;">Que los datos fluyan y la infra funcione</p>
+    <ul class="agents-list">
+      <li><strong>Diego W8</strong> — Llenar steve_sources y swarm_sources (hoy = 0)</li>
+      <li><strong>Sebastián W5</strong> — Auditar 45 crons, verificar env vars, ampliar health-check</li>
+      <li><strong>Felipe W2</strong> — Verificar OAuth Meta, probar sync de métricas con 1 cliente piloto</li>
+      <li><strong>Rodrigo W0</strong> — Verificar conexión Klaviyo, probar pipeline de emails</li>
+    </ul>
+    <div class="goal">Meta: Datos fluyendo, crons verificados, al menos 1 cliente con Meta + Klaviyo funcionando en Steve</div>
+  </div>
+
+  <div class="phase-card" style="border-top: 3px solid #60a5fa;">
+    <h3 style="color: #60a5fa;">Fase 2 — Inteligencia</h3>
+    <p style="font-size:0.85em; color:#888; margin-bottom:12px;">Que Steve piense y muestre valor a los clientes</p>
+    <ul class="agents-list">
+      <li><strong>Tomás W7</strong> — Arreglar swarm (95% falla), verificar knowledge pipeline</li>
+      <li><strong>Ignacio W17</strong> — Dashboard funcional con datos reales de Fase 1</li>
+      <li><strong>Valentín W18</strong> — Generación de creativos funcionando para clientes</li>
+      <li><strong>Valentina W1</strong> — Editor de emails funcional, templates mobile-ready</li>
+      <li><strong>Camila W4</strong> — Onboarding end-to-end, portal cliente usable</li>
+      <li><strong>Matías W13</strong> — Shopify conectado (requiere credenciales)</li>
+    </ul>
+    <div class="goal">Meta: Un cliente puede usar Steve completo — ver métricas, crear ads, enviar emails, generar creativos</div>
+  </div>
+
+  <div class="phase-card" style="border-top: 3px solid #f472b6;">
+    <h3 style="color: #f472b6;">Fase 3 — Autonomía</h3>
+    <p style="font-size:0.85em; color:#888; margin-bottom:12px;">Steve opera solo y se vigila a sí mismo</p>
+    <ul class="agents-list">
+      <li><strong>Paula W19</strong> — WhatsApp activo, carritos abandonados recuperándose</li>
+      <li><strong>Andrés W3</strong> — Google Ads conectado (requiere credenciales)</li>
+      <li><strong>Isidora W6</strong> — CRITERIO validando calidad en cada output</li>
+      <li><strong>Javiera W12</strong> — El Chino auditando 100% del sistema</li>
+    </ul>
+    <div class="goal">Meta: Steve corre 24/7 para todos los clientes, detecta y corrige problemas solo, y escala sin intervención manual</div>
+  </div>
+</div>
+
+<!-- ESTADO ACTUAL -->
+<h2 style="border-color: #ef4444;">Estado Actual — La Verdad</h2>
+<div style="background: #111118; border: 1px solid #2a2a3a; border-radius: 14px; padding: 24px; margin: 20px 0;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+    <div style="padding: 14px; background: rgba(239,68,68,0.08); border-radius: 10px; border-left: 3px solid #ef4444;">
+      <div style="color: #ef4444; font-weight: 700; font-size: 0.9em;">Desconectado</div>
+      <ul style="font-size: 0.85em; color: #ccc; padding-left: 16px; margin-top: 6px;">
+        <li>Google Ads — 3 credenciales faltantes</li>
+        <li>Shopify App — 3 credenciales faltantes</li>
+        <li>steve_sources = 0 filas (Brain sin fuentes)</li>
+        <li>swarm_sources = 0 filas (Research sin fuentes)</li>
+        <li>email_send_queue = 0 (pipeline email roto)</li>
+      </ul>
+    </div>
+    <div style="padding: 14px; background: rgba(245,158,11,0.08); border-radius: 10px; border-left: 3px solid #f59e0b;">
+      <div style="color: #f59e0b; font-weight: 700; font-size: 0.9em;">Parcialmente funcional</div>
+      <ul style="font-size: 0.85em; color: #ccc; padding-left: 16px; margin-top: 6px;">
+        <li>Meta Ads — solo 3 de 127 clientes conectados</li>
+        <li>Swarm Research — 16 de 360 runs exitosos (4.4%)</li>
+        <li>Health-check — cubre 10 de 69 endpoints (14%)</li>
+        <li>45 crons corriendo sin monitoreo real</li>
+      </ul>
+    </div>
+    <div style="padding: 14px; background: rgba(52,211,153,0.08); border-radius: 10px; border-left: 3px solid #34d399;">
+      <div style="color: #34d399; font-weight: 700; font-size: 0.9em;">Funcionando</div>
+      <ul style="font-size: 0.85em; color: #ccc; padding-left: 16px; margin-top: 6px;">
+        <li>Cloud Run — steve-api activo y respondiendo</li>
+        <li>Base de datos — 37 tablas, 120 RLS policies</li>
+        <li>Knowledge base — 487 reglas activas</li>
+        <li>Criterio — 493 reglas de evaluación</li>
+        <li>Frontend — desplegado y accesible</li>
+      </ul>
+    </div>
+  </div>
+  <p style="text-align: center; margin-top: 20px; color: #888; font-size: 0.9em; font-style: italic;">
+    "Tienes una Ferrari armada con el tanque vacío. Las piezas están, pero los datos no fluyen."
+  </p>
+</div>
+
+<div class="footer">
+  Steve Ads — Organigrama de Equipo · Generado el 3 de abril 2026 · 14 agentes · 4 squads
+</div>
+
+</div>
+</body>
+</html>
