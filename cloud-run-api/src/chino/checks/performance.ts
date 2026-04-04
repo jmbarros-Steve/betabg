@@ -3,6 +3,7 @@
 // Checks 60,66,71,181-188,195: endpoint response time (Group A)
 
 import type { ChinoCheck, CheckResult } from '../types.js';
+import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 const API_BASE = process.env.STEVE_API_URL
   || 'https://steve-api-850416724643.us-central1.run.app';
@@ -182,6 +183,130 @@ async function perfSimpleFetch(check: ChinoCheck): Promise<CheckResult> {
     : failResult(elapsed, maxMs, start);
 }
 
+// ─── Check 48: Edge function errors últimos 30min ────────────────
+
+async function perfEdgeFunctionErrors(): Promise<CheckResult> {
+  const start = Date.now();
+  const supabase = getSupabaseAdmin();
+  const since = new Date(Date.now() - 30 * 60_000).toISOString();
+
+  const { count, error } = await supabase
+    .from('chino_reports')
+    .select('id', { count: 'exact', head: true })
+    .eq('result', 'error')
+    .gte('created_at', since);
+
+  if (error) return errorResult(`DB error: ${error.message}`, start);
+
+  if (count && count > 0) {
+    return {
+      result: 'fail',
+      steve_value: 0,
+      real_value: count,
+      error_message: `${count} errors en chino_reports últimos 30min`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: 0, real_value: 0, duration_ms: Date.now() - start };
+}
+
+// ─── Check 82: Supabase connection pool latency ─────────────────
+
+async function perfSupabasePool(): Promise<CheckResult> {
+  const start = Date.now();
+  const supabase = getSupabaseAdmin();
+  const maxMs = 500;
+
+  const t0 = Date.now();
+  const { error } = await supabase.from('clients').select('id').limit(1);
+  const elapsed = Date.now() - t0;
+
+  if (error) return errorResult(`DB query failed: ${error.message}`, start);
+
+  return elapsed <= maxMs
+    ? passResult(elapsed, maxMs, start)
+    : failResult(elapsed, maxMs, start);
+}
+
+// ─── Check 85: Storage buckets accessible ───────────────────────
+
+async function perfStorageBuckets(): Promise<CheckResult> {
+  const start = Date.now();
+  const supabase = getSupabaseAdmin();
+  const buckets = ['avatars', 'assets', 'emails'];
+  const failures: string[] = [];
+
+  for (const bucket of buckets) {
+    const { error } = await supabase.storage.from(bucket).list('', { limit: 1 });
+    if (error) failures.push(`${bucket}: ${error.message}`);
+  }
+
+  if (failures.length > 0) {
+    return {
+      result: 'fail',
+      steve_value: `${buckets.length} buckets`,
+      real_value: `${failures.length} failures`,
+      error_message: `Storage errors: ${failures.join('; ')}`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${buckets.length} buckets`, real_value: 'All accessible', duration_ms: Date.now() - start };
+}
+
+// ─── Check 89: Memory usage < 512MB ─────────────────────────────
+
+async function perfMemoryUsage(): Promise<CheckResult> {
+  const start = Date.now();
+  const maxMB = 512;
+  const usedMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+
+  if (usedMB >= maxMB) {
+    return {
+      result: 'fail',
+      steve_value: maxMB,
+      real_value: usedMB,
+      error_message: `Heap usage ${usedMB}MB >= ${maxMB}MB`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: maxMB, real_value: usedMB, duration_ms: Date.now() - start };
+}
+
+// ─── Check 90: P95 latency from chino_reports ───────────────────
+
+async function perfP95Latency(): Promise<CheckResult> {
+  const start = Date.now();
+  const supabase = getSupabaseAdmin();
+
+  const { data, error } = await supabase
+    .from('chino_reports')
+    .select('duration_ms')
+    .not('duration_ms', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) return errorResult(`DB error: ${error.message}`, start);
+  if (!data || data.length < 10) {
+    return { result: 'skip', error_message: `Solo ${(data || []).length} reports para calcular p95`, duration_ms: Date.now() - start };
+  }
+
+  const sorted = data.map((r) => r.duration_ms).sort((a: number, b: number) => a - b);
+  const p95Index = Math.floor(sorted.length * 0.95);
+  const p95 = sorted[p95Index];
+  const maxP95 = 30000; // 30s
+
+  if (p95 > maxP95) {
+    return {
+      result: 'fail',
+      steve_value: maxP95,
+      real_value: p95,
+      error_message: `P95 latency ${p95}ms > ${maxP95}ms`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: maxP95, real_value: p95, duration_ms: Date.now() - start };
+}
+
 // ─── Main executor ───────────────────────────────────────────────
 
 export async function executePerformance(check: ChinoCheck): Promise<CheckResult> {
@@ -249,6 +374,28 @@ export async function executePerformance(check: ChinoCheck): Promise<CheckResult
       // #195 — Anthropic API latency < 5s
       case 195:
         return await perfAnthropicDirect(5000, start);
+
+      // ── Group B: Special handlers ──
+
+      // #48 — Edge function errors últimos 30min
+      case 48:
+        return await perfEdgeFunctionErrors();
+
+      // #82 — Supabase pool latency < 500ms
+      case 82:
+        return await perfSupabasePool();
+
+      // #85 — Storage buckets accessible
+      case 85:
+        return await perfStorageBuckets();
+
+      // #89 — Memory usage < 512MB
+      case 89:
+        return await perfMemoryUsage();
+
+      // #90 — P95 latency < 30s
+      case 90:
+        return await perfP95Latency();
 
       // ── Default: try check_config url+max_ms (api_exists, etc) ──
       default:

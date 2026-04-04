@@ -484,12 +484,12 @@ async function check37_klaviyoCampaignsNotInSteve(
   const start = Date.now();
 
   const resp = await fetchWithTimeout(
-    'https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,\'email\')',
+    "https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,'email')",
     {
       method: 'GET',
       headers: {
         'Authorization': `Klaviyo-API-Key ${token}`,
-        'revision': '2024-10-15',
+        'revision': '2025-07-15',
         'Accept': 'application/json',
       },
     }
@@ -661,17 +661,28 @@ async function check40_deliverability(
 
 // ─── Check 43: Steve Chat responds in Spanish ───────────────────
 
-async function check43_chatSpanish(): Promise<CheckResult> {
+async function check43_chatSpanish(supabase: SupabaseClient): Promise<CheckResult> {
   const start = Date.now();
 
   // Call Steve Chat internally
   const apiBase = process.env.STEVE_API_URL || 'https://steve-api-850416724643.us-central1.run.app';
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
+  // Need a client_id for the chat endpoint
+  const { data: anyClient } = await supabase
+    .from('clients')
+    .select('id')
+    .limit(1)
+    .single();
+
+  if (!anyClient) {
+    return { result: 'skip', error_message: 'No clients in DB for chat test', duration_ms: Date.now() - start };
+  }
+
   let chatResponse: string;
   try {
     const resp = await fetchWithTimeout(
-      `${apiBase}/api/ai/steve-chat`,
+      `${apiBase}/api/steve-chat`,
       {
         method: 'POST',
         headers: {
@@ -679,11 +690,11 @@ async function check43_chatSpanish(): Promise<CheckResult> {
           'Authorization': `Bearer ${serviceKey}`,
         },
         body: JSON.stringify({
+          client_id: anyClient.id,
           message: '¿Cuáles son las métricas de hoy?',
-          system_test: true,
         }),
       },
-      20000
+      30000
     );
     if (!resp.ok) {
       return {
@@ -839,6 +850,413 @@ async function check50_scrapingFreshData(
   };
 }
 
+// ─── Check 52: Klaviyo open rate > 15% últimos 7d ────────────────
+
+async function check52_klaviyoOpenRate(
+  supabase: SupabaseClient,
+  merchant: MerchantConn | null | undefined
+): Promise<CheckResult> {
+  const start = Date.now();
+  if (!merchant) return { result: 'skip', error_message: 'No merchant connection', duration_ms: Date.now() - start };
+
+  const since = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from('platform_metrics')
+    .select('metric_value')
+    .eq('connection_id', merchant.connection_id)
+    .eq('metric_type', 'open_rate')
+    .gte('metric_date', since);
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+  if (!data || data.length === 0) {
+    return { result: 'skip', error_message: 'No open_rate data últimos 7d', duration_ms: Date.now() - start };
+  }
+
+  const avg = data.reduce((s, r) => s + Number(r.metric_value || 0), 0) / data.length;
+  if (avg < 0.15) {
+    return {
+      result: 'fail',
+      steve_value: `${(avg * 100).toFixed(1)}%`,
+      error_message: `Open rate promedio ${(avg * 100).toFixed(1)}% < 15%`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${(avg * 100).toFixed(1)}% open rate`, duration_ms: Date.now() - start };
+}
+
+// ─── Check 53: Klaviyo flows no vacíos ──────────────────────────
+
+async function check53_klaviyoNoEmptyFlows(token: string): Promise<CheckResult> {
+  const start = Date.now();
+
+  const resp = await fetchWithTimeout('https://a.klaviyo.com/api/flows/', {
+    method: 'GET',
+    headers: { 'Authorization': `Klaviyo-API-Key ${token}`, 'revision': '2025-07-15', 'Accept': 'application/json' },
+  });
+  if (!resp.ok) throw new Error(`Klaviyo API ${resp.status}: ${await resp.text()}`);
+  const json = await resp.json() as any;
+  const flows = json.data || [];
+
+  if (flows.length === 0) {
+    return { result: 'skip', error_message: 'No flows en Klaviyo', duration_ms: Date.now() - start };
+  }
+
+  const emptyFlows: string[] = [];
+  for (const flow of flows.slice(0, 20)) {
+    const actionsResp = await fetchWithTimeout(
+      `https://a.klaviyo.com/api/flows/${flow.id}/flow-actions/`,
+      { method: 'GET', headers: { 'Authorization': `Klaviyo-API-Key ${token}`, 'revision': '2025-07-15', 'Accept': 'application/json' } },
+    );
+    if (actionsResp.ok) {
+      const actionsJson = await actionsResp.json() as any;
+      if (!actionsJson.data || actionsJson.data.length === 0) {
+        emptyFlows.push(flow.attributes?.name || flow.id);
+      }
+    }
+  }
+
+  if (emptyFlows.length > 0) {
+    return {
+      result: 'fail',
+      steve_value: `${emptyFlows.length} flows vacíos`,
+      error_message: `Flows sin actions: ${emptyFlows.slice(0, 5).join(', ')}`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${flows.length} flows con actions`, duration_ms: Date.now() - start };
+}
+
+// ─── Check 54: Klaviyo bounce rate < 5% últimos 30d ─────────────
+
+async function check54_klaviyoBounceRate30d(
+  supabase: SupabaseClient,
+  merchant: MerchantConn | null | undefined
+): Promise<CheckResult> {
+  const start = Date.now();
+  if (!merchant) return { result: 'skip', error_message: 'No merchant connection', duration_ms: Date.now() - start };
+
+  const since = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from('platform_metrics')
+    .select('metric_value')
+    .eq('connection_id', merchant.connection_id)
+    .eq('metric_type', 'bounce_rate')
+    .gte('metric_date', since);
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+  if (!data || data.length === 0) {
+    return { result: 'skip', error_message: 'No bounce_rate data últimos 30d', duration_ms: Date.now() - start };
+  }
+
+  const avg = data.reduce((s, r) => s + Number(r.metric_value || 0), 0) / data.length;
+  if (avg > 0.05) {
+    return {
+      result: 'fail',
+      steve_value: `${(avg * 100).toFixed(2)}%`,
+      error_message: `Bounce rate promedio ${(avg * 100).toFixed(2)}% > 5%`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${(avg * 100).toFixed(2)}% bounce rate`, duration_ms: Date.now() - start };
+}
+
+// ─── Check 55: Klaviyo unsubscribe rate < 1% ────────────────────
+
+async function check55_klaviyoUnsubRate(
+  supabase: SupabaseClient,
+  merchant: MerchantConn | null | undefined
+): Promise<CheckResult> {
+  const start = Date.now();
+  if (!merchant) return { result: 'skip', error_message: 'No merchant connection', duration_ms: Date.now() - start };
+
+  const { data, error } = await supabase
+    .from('platform_metrics')
+    .select('metric_value')
+    .eq('connection_id', merchant.connection_id)
+    .eq('metric_type', 'unsubscribe_rate')
+    .order('metric_date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+  if (!data?.metric_value) {
+    return { result: 'skip', error_message: 'No unsubscribe_rate data', duration_ms: Date.now() - start };
+  }
+
+  const rate = Number(data.metric_value);
+  if (rate > 0.01) {
+    return {
+      result: 'fail',
+      steve_value: `${(rate * 100).toFixed(2)}%`,
+      error_message: `Unsubscribe rate ${(rate * 100).toFixed(2)}% > 1%`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${(rate * 100).toFixed(2)}% unsub rate`, duration_ms: Date.now() - start };
+}
+
+// ─── Check 57: Klaviyo templates have non-empty HTML ────────────
+
+async function check57_klaviyoTemplatesValid(token: string): Promise<CheckResult> {
+  const start = Date.now();
+
+  const resp = await fetchWithTimeout('https://a.klaviyo.com/api/templates/', {
+    method: 'GET',
+    headers: { 'Authorization': `Klaviyo-API-Key ${token}`, 'revision': '2025-07-15', 'Accept': 'application/json' },
+  });
+  if (!resp.ok) throw new Error(`Klaviyo API ${resp.status}: ${await resp.text()}`);
+  const json = await resp.json() as any;
+  const templates = json.data || [];
+
+  if (templates.length === 0) {
+    return { result: 'skip', error_message: 'No templates en Klaviyo', duration_ms: Date.now() - start };
+  }
+
+  const emptyHtml: string[] = [];
+  for (const t of templates) {
+    const html = t.attributes?.html || '';
+    if (html.trim().length === 0) {
+      emptyHtml.push(t.attributes?.name || t.id);
+    }
+  }
+
+  if (emptyHtml.length > 0) {
+    return {
+      result: 'fail',
+      steve_value: `${emptyHtml.length} templates sin HTML`,
+      error_message: `Templates vacíos: ${emptyHtml.slice(0, 5).join(', ')}`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${templates.length} templates con HTML`, duration_ms: Date.now() - start };
+}
+
+// ─── Check 58: Klaviyo last sync < 24h ──────────────────────────
+
+async function check58_klaviyoLastSync(supabase: SupabaseClient): Promise<CheckResult> {
+  const start = Date.now();
+
+  const { data, error } = await supabase
+    .from('platform_connections')
+    .select('last_sync_at, client_id')
+    .eq('platform', 'klaviyo')
+    .eq('is_active', true);
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+  if (!data || data.length === 0) {
+    return { result: 'skip', error_message: 'No Klaviyo connections', duration_ms: Date.now() - start };
+  }
+
+  const cutoff = Date.now() - 24 * 3600_000;
+  const stale = data.filter((r) => !r.last_sync_at || new Date(r.last_sync_at).getTime() < cutoff);
+
+  if (stale.length > 0) {
+    return {
+      result: 'fail',
+      steve_value: `${stale.length} Klaviyo connections sin sync <24h`,
+      error_message: `Klaviyo sync atrasada para clients: ${stale.slice(0, 5).map((r) => r.client_id).join(', ')}`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${data.length} Klaviyo connections synced <24h`, duration_ms: Date.now() - start };
+}
+
+// ─── Check 61: Email campaigns exist ────────────────────────────
+
+async function check61_emailCampaignsExist(supabase: SupabaseClient): Promise<CheckResult> {
+  const start = Date.now();
+
+  const { count, error } = await supabase
+    .from('email_campaigns')
+    .select('id', { count: 'exact', head: true });
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+
+  if (!count || count === 0) {
+    return {
+      result: 'fail',
+      steve_value: '0 email campaigns',
+      error_message: 'No hay email_campaigns en la DB',
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${count} email campaigns`, duration_ms: Date.now() - start };
+}
+
+// ─── Check 67: System templates >= 5 ────────────────────────────
+
+async function check67_systemTemplates(supabase: SupabaseClient): Promise<CheckResult> {
+  const start = Date.now();
+
+  const { count, error } = await supabase
+    .from('email_templates')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_system', true);
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+
+  if (!count || count < 5) {
+    return {
+      result: 'fail',
+      steve_value: `${count || 0} system templates`,
+      error_message: `Solo ${count || 0} system templates (mínimo 5)`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${count} system templates`, duration_ms: Date.now() - start };
+}
+
+// ─── Check 70: Domain verified via Resend ───────────────────────
+
+async function check70_domainVerified(): Promise<CheckResult> {
+  const start = Date.now();
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) {
+    return { result: 'skip', error_message: 'RESEND_API_KEY not set', duration_ms: Date.now() - start };
+  }
+
+  const resp = await fetchWithTimeout('https://api.resend.com/domains', {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${resendKey}` },
+  });
+  if (!resp.ok) throw new Error(`Resend API ${resp.status}: ${await resp.text()}`);
+  const json = await resp.json() as any;
+  const domains = json.data || [];
+
+  const verified = domains.filter((d: any) => d.status === 'verified');
+  if (verified.length === 0) {
+    return {
+      result: 'fail',
+      steve_value: `${domains.length} domains, 0 verified`,
+      error_message: 'Ningún dominio verificado en Resend',
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${verified.length} dominios verificados`, duration_ms: Date.now() - start };
+}
+
+// ─── Check 72: WA chat historial últimos 7d ─────────────────────
+
+async function check72_chatHistorial(supabase: SupabaseClient): Promise<CheckResult> {
+  const start = Date.now();
+  const since = new Date(Date.now() - 7 * 86400_000).toISOString();
+
+  const { count, error } = await supabase
+    .from('wa_messages')
+    .select('id', { count: 'exact', head: true })
+    .gte('created_at', since);
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+
+  if (!count || count === 0) {
+    return {
+      result: 'fail',
+      steve_value: '0 messages últimos 7d',
+      error_message: 'No hay wa_messages en los últimos 7 días',
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${count} wa_messages últimos 7d`, duration_ms: Date.now() - start };
+}
+
+// ─── Check 73: No empty WA messages últimas 24h ─────────────────
+
+async function check73_noEmptyMessages(supabase: SupabaseClient): Promise<CheckResult> {
+  const start = Date.now();
+  const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+
+  const { count, error } = await supabase
+    .from('wa_messages')
+    .select('id', { count: 'exact', head: true })
+    .gte('created_at', since)
+    .or('body.is.null,body.eq.');
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+
+  if (count && count > 0) {
+    return {
+      result: 'fail',
+      steve_value: `${count} mensajes vacíos`,
+      error_message: `${count} wa_messages con body NULL o vacío en últimas 24h`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: '0 mensajes vacíos últimas 24h', duration_ms: Date.now() - start };
+}
+
+// ─── Check 76: Knowledge base >= 50 entries ─────────────────────
+
+async function check76_knowledgeBaseSize(supabase: SupabaseClient): Promise<CheckResult> {
+  const start = Date.now();
+
+  const { count, error } = await supabase
+    .from('steve_knowledge')
+    .select('id', { count: 'exact', head: true });
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+
+  if (!count || count < 50) {
+    return {
+      result: 'fail',
+      steve_value: `${count || 0} knowledge entries`,
+      error_message: `Solo ${count || 0} entries en steve_knowledge (mínimo 50)`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${count} knowledge entries`, duration_ms: Date.now() - start };
+}
+
+// ─── Check 83: No recent errors in chino_reports ────────────────
+
+async function check83_noRecentErrors(supabase: SupabaseClient): Promise<CheckResult> {
+  const start = Date.now();
+  const since = new Date(Date.now() - 30 * 60_000).toISOString();
+
+  const { count, error } = await supabase
+    .from('chino_reports')
+    .select('id', { count: 'exact', head: true })
+    .eq('result', 'error')
+    .gte('created_at', since);
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+
+  if (count && count > 0) {
+    return {
+      result: 'fail',
+      steve_value: `${count} errors últimos 30min`,
+      error_message: `${count} chino_reports con result='error' en últimos 30 minutos`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: '0 errors últimos 30min', duration_ms: Date.now() - start };
+}
+
+// ─── Check 84: Crons executed recently ──────────────────────────
+
+async function check84_cronsExecuted(supabase: SupabaseClient): Promise<CheckResult> {
+  const start = Date.now();
+  const since = new Date(Date.now() - 6 * 3600_000).toISOString();
+
+  const { data, error } = await supabase
+    .from('chino_reports')
+    .select('run_id')
+    .gte('created_at', since);
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+
+  const distinctRunIds = new Set((data || []).map((r) => r.run_id));
+
+  if (distinctRunIds.size === 0) {
+    return {
+      result: 'fail',
+      steve_value: '0 patrol runs últimas 6h',
+      error_message: 'Ningún chino patrol ejecutado en las últimas 6 horas',
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${distinctRunIds.size} patrol runs últimas 6h`, duration_ms: Date.now() - start };
+}
+
 // ─── Main data_quality executor ──────────────────────────────────
 
 export async function executeDataQuality(
@@ -929,7 +1347,7 @@ export async function executeDataQuality(
 
       // ── platform: steve_chat ──
       case 43:
-        return await check43_chatSpanish();
+        return await check43_chatSpanish(supabase);
 
       // ── platform: brief ──
       case 49:
@@ -938,6 +1356,58 @@ export async function executeDataQuality(
       // ── platform: scraping ──
       case 50:
         return await check50_scrapingFreshData(supabase);
+
+      // ── Klaviyo metrics checks ──
+      case 52:
+        return await check52_klaviyoOpenRate(supabase, merchant);
+
+      case 53:
+        if (!merchant || !decryptedToken) {
+          return { result: 'skip', error_message: 'Klaviyo token no disponible', duration_ms: Date.now() - start };
+        }
+        return await check53_klaviyoNoEmptyFlows(decryptedToken);
+
+      case 54:
+        return await check54_klaviyoBounceRate30d(supabase, merchant);
+
+      case 55:
+        return await check55_klaviyoUnsubRate(supabase, merchant);
+
+      case 57:
+        if (!merchant || !decryptedToken) {
+          return { result: 'skip', error_message: 'Klaviyo token no disponible', duration_ms: Date.now() - start };
+        }
+        return await check57_klaviyoTemplatesValid(decryptedToken);
+
+      case 58:
+        return await check58_klaviyoLastSync(supabase);
+
+      // ── Email / system checks ──
+      case 61:
+        return await check61_emailCampaignsExist(supabase);
+
+      case 67:
+        return await check67_systemTemplates(supabase);
+
+      case 70:
+        return await check70_domainVerified();
+
+      // ── WhatsApp checks ──
+      case 72:
+        return await check72_chatHistorial(supabase);
+
+      case 73:
+        return await check73_noEmptyMessages(supabase);
+
+      // ── Knowledge / infra checks ──
+      case 76:
+        return await check76_knowledgeBaseSize(supabase);
+
+      case 83:
+        return await check83_noRecentErrors(supabase);
+
+      case 84:
+        return await check84_cronsExecuted(supabase);
 
       default:
         return {

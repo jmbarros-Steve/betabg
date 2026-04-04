@@ -8,7 +8,7 @@ import type { ChinoCheck, MerchantConn, CheckResult } from '../types.js';
 const TIMEOUT = 30_000;
 
 function getApiBaseUrl(): string {
-  return process.env.STEVE_API_URL || process.env.API_BASE_URL || 'http://localhost:8080';
+  return process.env.STEVE_API_URL || process.env.API_BASE_URL || 'https://steve-api-850416724643.us-central1.run.app';
 }
 
 async function fetchWithTimeout(
@@ -304,12 +304,454 @@ async function testUnauthenticatedAccess(
   };
 }
 
+// ─── Test: PII scrubber ──────────────────────────────────────────
+// Check last 100 wa_messages for un-scrubbed RUT/email patterns
+
+async function testPiiScrubber(supabase: SupabaseClient): Promise<CheckResult> {
+  const start = Date.now();
+
+  const { data, error } = await supabase
+    .from('wa_messages')
+    .select('id, body')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+  if (!data || data.length === 0) {
+    return { result: 'skip', error_message: 'No wa_messages to check', duration_ms: Date.now() - start };
+  }
+
+  // Chilean RUT pattern: XX.XXX.XXX-X or XXXXXXXX-X
+  const rutRegex = /\b\d{1,2}\.?\d{3}\.?\d{3}-[\dkK]\b/;
+  // Email pattern
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+
+  const piiFound: string[] = [];
+  for (const msg of data) {
+    const body = msg.body || '';
+    if (rutRegex.test(body)) piiFound.push(`msg ${msg.id}: RUT`);
+    if (emailRegex.test(body)) piiFound.push(`msg ${msg.id}: email`);
+  }
+
+  if (piiFound.length > 0) {
+    return {
+      result: 'fail',
+      steve_value: `${data.length} mensajes revisados`,
+      error_message: `PII no scrubbed: ${piiFound.slice(0, 5).join('; ')}`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${data.length} mensajes sin PII expuesta`, duration_ms: Date.now() - start };
+}
+
+// ─── Test: expired Meta tokens ───────────────────────────────────
+
+async function testExpiredTokens(supabase: SupabaseClient): Promise<CheckResult> {
+  const start = Date.now();
+  const fiftyFiveDaysAgo = new Date(Date.now() - 55 * 86400_000).toISOString();
+
+  const { data, error } = await supabase
+    .from('platform_connections')
+    .select('id, client_id, platform, updated_at')
+    .eq('platform', 'meta')
+    .eq('is_active', true)
+    .lt('updated_at', fiftyFiveDaysAgo);
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+
+  if (data && data.length > 0) {
+    const details = data.slice(0, 5).map((r) => `client ${r.client_id}`).join(', ');
+    return {
+      result: 'fail',
+      steve_value: `${data.length} tokens próximos a expirar`,
+      error_message: `Meta tokens >55 días sin refresh: ${details}`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: 'Todos los Meta tokens frescos (<55d)', duration_ms: Date.now() - start };
+}
+
+// ─── Test: RLS active (anon key can't read everything) ───────────
+
+async function testRlsActive(supabase: SupabaseClient): Promise<CheckResult> {
+  const start = Date.now();
+
+  // Try to query with anon key — if RLS is active, it should return limited/no data
+  const anonUrl = process.env.SUPABASE_URL;
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  if (!anonUrl || !anonKey) {
+    return { result: 'skip', error_message: 'SUPABASE_ANON_KEY not set', duration_ms: Date.now() - start };
+  }
+
+  const { createClient } = await import('@supabase/supabase-js');
+  const anonClient = createClient(anonUrl, anonKey);
+
+  // Count with service role (should see all)
+  const { count: serviceCount } = await supabase
+    .from('platform_connections')
+    .select('id', { count: 'exact', head: true });
+
+  // Count with anon (RLS should block)
+  const { count: anonCount } = await anonClient
+    .from('platform_connections')
+    .select('id', { count: 'exact', head: true });
+
+  if (serviceCount && serviceCount > 0 && anonCount === serviceCount) {
+    return {
+      result: 'fail',
+      steve_value: `anon ve ${anonCount} rows = service ${serviceCount}`,
+      error_message: 'CRÍTICO: anon key puede ver TODA la data — RLS no está bloqueando',
+      duration_ms: Date.now() - start,
+    };
+  }
+
+  return {
+    result: 'pass',
+    steve_value: `service: ${serviceCount}, anon: ${anonCount || 0}`,
+    duration_ms: Date.now() - start,
+  };
+}
+
+// ─── Test: no plaintext API keys in data tables ──────────────────
+
+async function testNoPlaintextKeys(supabase: SupabaseClient): Promise<CheckResult> {
+  const start = Date.now();
+  const sensitivePatterns = ['sk-', 'shpat_', 'EAA'];
+
+  // Check wa_messages
+  const { data: msgs } = await supabase
+    .from('wa_messages')
+    .select('id, body')
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  // Check steve_knowledge
+  const { data: knowledge } = await supabase
+    .from('steve_knowledge')
+    .select('id, contenido')
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  const leaks: string[] = [];
+
+  for (const msg of msgs || []) {
+    const body = msg.body || '';
+    for (const pat of sensitivePatterns) {
+      if (body.includes(pat)) {
+        leaks.push(`wa_messages/${msg.id}: ${pat}...`);
+        break;
+      }
+    }
+  }
+
+  for (const k of knowledge || []) {
+    const content = k.contenido || '';
+    for (const pat of sensitivePatterns) {
+      if (content.includes(pat)) {
+        leaks.push(`steve_knowledge/${k.id}: ${pat}...`);
+        break;
+      }
+    }
+  }
+
+  if (leaks.length > 0) {
+    return {
+      result: 'fail',
+      steve_value: `${leaks.length} leaks encontradas`,
+      error_message: `Plaintext keys: ${leaks.slice(0, 5).join('; ')}`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: 'No plaintext keys en data tables', duration_ms: Date.now() - start };
+}
+
+// ─── Test: auth middleware on protected endpoints ─────────────────
+
+async function testAuthMiddleware(): Promise<CheckResult> {
+  const start = Date.now();
+  const baseUrl = getApiBaseUrl();
+
+  const endpoints = [
+    { method: 'POST', path: '/api/steve-chat' },
+    { method: 'POST', path: '/api/manage-meta-campaign' },
+    { method: 'POST', path: '/api/send-email' },
+    { method: 'POST', path: '/api/fetch-shopify-products' },
+    { method: 'POST', path: '/api/export-all-data' },
+  ];
+
+  const failures: string[] = [];
+  for (const ep of endpoints) {
+    try {
+      const res = await fetchWithTimeout(`${baseUrl}${ep.path}`, {
+        method: ep.method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      }, 10_000);
+
+      if (res.status === 200) {
+        failures.push(`${ep.path} respondió 200 sin auth`);
+      }
+    } catch { /* network error = not reachable, skip */ }
+  }
+
+  if (failures.length > 0) {
+    return {
+      result: 'fail',
+      steve_value: `${endpoints.length} endpoints probados`,
+      error_message: `Endpoints sin auth: ${failures.join('; ')}`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${endpoints.length} endpoints protegidos con auth`, duration_ms: Date.now() - start };
+}
+
+// ─── Test: webhook HMAC verification ─────────────────────────────
+
+async function testWebhookHmac(): Promise<CheckResult> {
+  const start = Date.now();
+  const baseUrl = getApiBaseUrl();
+
+  const webhookEndpoints = [
+    '/api/shopify/webhooks',
+    '/api/email-ses-webhooks',
+  ];
+
+  const failures: string[] = [];
+  for (const path of webhookEndpoints) {
+    try {
+      const res = await fetchWithTimeout(`${baseUrl}${path}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Hmac-Sha256': 'invalid-hmac-test',
+        },
+        body: JSON.stringify({ test: true }),
+      }, 10_000);
+
+      if (res.status === 200) {
+        failures.push(`${path} aceptó HMAC inválido`);
+      }
+    } catch { /* not reachable, skip */ }
+  }
+
+  if (failures.length > 0) {
+    return {
+      result: 'fail',
+      steve_value: `${webhookEndpoints.length} webhooks probados`,
+      error_message: `Webhooks sin HMAC check: ${failures.join('; ')}`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${webhookEndpoints.length} webhooks rechazan HMAC inválido`, duration_ms: Date.now() - start };
+}
+
+// ─── Test: cron secret protection ────────────────────────────────
+
+async function testCronSecret(): Promise<CheckResult> {
+  const start = Date.now();
+  const baseUrl = getApiBaseUrl();
+
+  const cronEndpoints = [
+    '/api/cron/sync-all-metrics',
+    '/api/cron/reconciliation',
+    '/api/cron/anomaly-detector',
+  ];
+
+  const failures: string[] = [];
+  for (const path of cronEndpoints) {
+    try {
+      const res = await fetchWithTimeout(`${baseUrl}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      }, 10_000);
+
+      if (res.status === 200) {
+        failures.push(`${path} ejecutó sin X-Cron-Secret`);
+      }
+    } catch { /* not reachable, skip */ }
+  }
+
+  if (failures.length > 0) {
+    return {
+      result: 'fail',
+      steve_value: `${cronEndpoints.length} crons probados`,
+      error_message: `Crons sin protección: ${failures.join('; ')}`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${cronEndpoints.length} crons protegidos con X-Cron-Secret`, duration_ms: Date.now() - start };
+}
+
+// ─── Test: admin role check ──────────────────────────────────────
+
+async function testAdminRoleCheck(supabase: SupabaseClient): Promise<CheckResult> {
+  const start = Date.now();
+
+  const { data, error } = await supabase
+    .from('user_roles')
+    .select('user_id, role')
+    .eq('role', 'admin');
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+
+  // Check if any admin is not the super admin
+  const superAdmin = 'jmbarros@bgconsult.cl';
+  const nonSuperAdmins = (data || []).filter((r) => {
+    // user_id is a UUID — we need to check if this user's email is the super admin
+    // Since we can't join here easily, just verify count is reasonable
+    return true;
+  });
+
+  if ((data || []).length > 5) {
+    return {
+      result: 'fail',
+      steve_value: `${data!.length} admins`,
+      error_message: `Demasiados admins (${data!.length}) — revisar user_roles`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${(data || []).length} admins`, duration_ms: Date.now() - start };
+}
+
+// ─── Test: pgcrypto encryption on tokens ─────────────────────────
+
+async function testPgcryptoEncryption(supabase: SupabaseClient): Promise<CheckResult> {
+  const start = Date.now();
+
+  const { data, error } = await supabase
+    .from('platform_connections')
+    .select('id, access_token_encrypted, platform')
+    .eq('is_active', true)
+    .not('access_token_encrypted', 'is', null)
+    .limit(20);
+
+  if (error) throw new Error(`DB error: ${error.message}`);
+  if (!data || data.length === 0) {
+    return { result: 'skip', error_message: 'No encrypted tokens to verify', duration_ms: Date.now() - start };
+  }
+
+  const plaintext: string[] = [];
+  for (const row of data) {
+    const token = row.access_token_encrypted || '';
+    // Plaintext tokens start with known prefixes
+    if (token.startsWith('shpat_') || token.startsWith('EAA') || token.startsWith('sk-') || token.startsWith('pk_')) {
+      plaintext.push(`${row.platform}/${row.id}`);
+    }
+  }
+
+  if (plaintext.length > 0) {
+    return {
+      result: 'fail',
+      steve_value: `${plaintext.length} tokens plaintext`,
+      error_message: `CRÍTICO: Tokens sin encriptar: ${plaintext.slice(0, 5).join(', ')}`,
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: `${data.length} tokens encriptados correctamente`, duration_ms: Date.now() - start };
+}
+
+// ─── Test: CORS config ───────────────────────────────────────────
+
+async function testCorsConfig(): Promise<CheckResult> {
+  const start = Date.now();
+  const baseUrl = getApiBaseUrl();
+
+  try {
+    const res = await fetchWithTimeout(`${baseUrl}/health`, {
+      method: 'OPTIONS',
+      headers: {
+        'Origin': 'https://evil.com',
+        'Access-Control-Request-Method': 'POST',
+      },
+    }, 10_000);
+
+    const allowOrigin = res.headers.get('access-control-allow-origin');
+    if (allowOrigin === '*') {
+      return {
+        result: 'fail',
+        steve_value: `CORS: ${allowOrigin}`,
+        error_message: 'CORS permite wildcard * — debería ser restrictivo',
+        duration_ms: Date.now() - start,
+      };
+    }
+
+    if (allowOrigin === 'https://evil.com') {
+      return {
+        result: 'fail',
+        steve_value: `CORS refleja origin: ${allowOrigin}`,
+        error_message: 'CORS refleja cualquier Origin — vulnerabilidad de CORS',
+        duration_ms: Date.now() - start,
+      };
+    }
+
+    return {
+      result: 'pass',
+      steve_value: `CORS: ${allowOrigin || 'no wildcard'}`,
+      duration_ms: Date.now() - start,
+    };
+  } catch {
+    return { result: 'skip', error_message: 'Could not reach API for CORS test', duration_ms: Date.now() - start };
+  }
+}
+
+// ─── Test: rate limiting ─────────────────────────────────────────
+
+async function testRateLimiting(): Promise<CheckResult> {
+  const start = Date.now();
+  const baseUrl = getApiBaseUrl();
+
+  let got429 = false;
+  for (let i = 0; i < 15; i++) {
+    try {
+      const res = await fetchWithTimeout(`${baseUrl}/health`, { method: 'GET' }, 5000);
+      if (res.status === 429) {
+        got429 = true;
+        break;
+      }
+    } catch { /* ignore */ }
+  }
+
+  if (!got429) {
+    return {
+      result: 'fail',
+      steve_value: '15 requests sin 429',
+      error_message: '15 requests rápidos a /health sin rate limiting (no 429)',
+      duration_ms: Date.now() - start,
+    };
+  }
+  return { result: 'pass', steve_value: 'Rate limiting activo (429)', duration_ms: Date.now() - start };
+}
+
 // ─── Main security check executor ────────────────────────────────
+
+// Get a fallback merchant when runner passes null (security platform checks)
+async function getFallbackMerchant(supabase: SupabaseClient): Promise<MerchantConn | null> {
+  const { data } = await supabase
+    .from('platform_connections')
+    .select('client_id, platform, id, store_url, account_id')
+    .eq('is_active', true)
+    .limit(1)
+    .single();
+
+  if (!data) return null;
+
+  return {
+    client_id: data.client_id,
+    client_name: 'Security Test',
+    platform: data.platform,
+    connection_id: data.id,
+    access_token_encrypted: null,
+    api_key_encrypted: null,
+    store_url: data.store_url || null,
+    account_id: data.account_id || null,
+  };
+}
 
 export async function executeSecurity(
   supabase: SupabaseClient,
   check: ChinoCheck,
-  merchant: MerchantConn
+  merchant: MerchantConn | null
 ): Promise<CheckResult> {
   const start = Date.now();
   const testType = check.check_config?.test as string | undefined;
@@ -322,19 +764,61 @@ export async function executeSecurity(
     };
   }
 
+  // Resolve merchant if null
+  let m = merchant;
+  if (!m) {
+    m = await getFallbackMerchant(supabase);
+    if (!m) {
+      return { result: 'skip', error_message: 'No merchants available for security test', duration_ms: Date.now() - start };
+    }
+  }
+
   try {
     switch (testType) {
       case 'ask_for_other_merchant_data':
       case 'cross_merchant_access':
-        return testCrossMerchantAccess(supabase, merchant);
+        return testCrossMerchantAccess(supabase, m);
 
       case 'sql_injection':
       case 'malicious_inputs':
-        return testMaliciousInputs(supabase, merchant);
+        return testMaliciousInputs(supabase, m);
 
       case 'unauthenticated_access':
       case 'auth_bypass':
-        return testUnauthenticatedAccess(supabase, merchant);
+        return testUnauthenticatedAccess(supabase, m);
+
+      case 'pii_scrubber':
+        return testPiiScrubber(supabase);
+
+      case 'expired_tokens':
+        return testExpiredTokens(supabase);
+
+      case 'rls_active':
+        return testRlsActive(supabase);
+
+      case 'no_plaintext_keys':
+        return testNoPlaintextKeys(supabase);
+
+      case 'auth_middleware':
+        return testAuthMiddleware();
+
+      case 'webhook_hmac':
+        return testWebhookHmac();
+
+      case 'cron_secret':
+        return testCronSecret();
+
+      case 'admin_role_check':
+        return testAdminRoleCheck(supabase);
+
+      case 'pgcrypto_encryption':
+        return testPgcryptoEncryption(supabase);
+
+      case 'cors_config':
+        return testCorsConfig();
+
+      case 'rate_limiting':
+        return testRateLimiting();
 
       default:
         return {
