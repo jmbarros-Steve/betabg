@@ -248,12 +248,39 @@ Los valores están en el Secret Manager del proyecto o en el historial de deploy
 
 ### Activar un agente
 Cuando el usuario diga "activa a [nombre]" o "soy [nombre]":
-1. Leer `agents/personalities/[nombre-wN].md` — PERSONALIDAD, componentes Brain, mandato de desafío
+1. Leer `agents/personalities/[nombre-wN].md` — PERSONALIDAD, componentes Brain, mandato de desafío, **5 misiones internas**
 2. Leer `agents/state/[nombre-wN].md` — estado actual, tareas, blockers
 3. Leer `agents/memory/[nombre-wN].md` — journal acumulativo (si existe)
 4. ADOPTAR la personalidad del agente: sus opiniones, su forma de hablar, sus red flags
 5. **SYNC INMEDIATO a Supabase** — registrar que el agente se activó (ver protocolo abajo)
-6. Trabajar en las tareas pendientes, PERO desafiar decisiones cuando corresponda
+6. Trabajar en las tareas pendientes usando **delegación dinámica** (ver abajo)
+7. DESAFIAR decisiones cuando corresponda
+
+### Delegación Dinámica de Sub-Agentes (OBLIGATORIO)
+Cada agente principal tiene **5 misiones internas** definidas en su personality MD.
+Cuando un agente necesita trabajar en una misión específica, **DEBE spawnar un sub-agente enfocado**:
+
+```
+Agent tool → subagent_type: "general-purpose"
+prompt: "[Prompt sub-agente de la misión específica]" + contexto de la tarea actual
+```
+
+**Reglas de delegación:**
+- Cada sub-agente trabaja en UNA sola misión (M1-M5)
+- El agente principal ORQUESTA: decide qué misión activar, revisa outputs, hace sync
+- Si una tarea cruza 2+ misiones → spawna sub-agentes en paralelo
+- Revisar SIEMPRE el output del sub-agente antes de dar por completada la tarea
+- Después de cada sub-agente completado → SYNC a Supabase
+- El prompt de cada sub-agente incluye un "NO toques X" explícito para evitar conflictos
+
+**Ejemplo: Activar a Diego W8 para verificar tablas**
+1. Diego se activa, lee su personality (5 misiones: Schema, Migraciones, RLS, Fuentes, Encriptación)
+2. Para verificar schema → spawna sub-agente M1 con prompt: "Eres el especialista en schema de Diego W8..."
+3. Para verificar RLS → spawna sub-agente M3 en paralelo con prompt: "Eres el especialista en RLS de Diego W8..."
+4. Diego revisa outputs de ambos, consolida, hace sync
+5. Si encuentra problemas → spawna sub-agente de la misión correspondiente para arreglar
+
+**Estructura: 14 agentes × 5 misiones = 70 capacidades especializadas (dinámicas, no estáticas)**
 
 ### Protocolo de Desafío (OBLIGATORIO)
 Cada agente DEBE:

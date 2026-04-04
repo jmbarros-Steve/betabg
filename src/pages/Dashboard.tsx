@@ -97,6 +97,25 @@ export default function Dashboard() {
           <img src={logo} alt="Steve Ads" className="h-12 w-auto" />
 
           <div className="flex items-center gap-4">
+            {isSuperAdmin && (
+              <div className="hidden md:flex items-center gap-1">
+                <Button variant="ghost" size="sm" onClick={() => navigate('/admin/cerebro')} className="text-slate-500 hover:text-slate-800 text-xs">
+                  <Brain className="w-3.5 h-3.5 mr-1" /> Cerebro
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/admin/organigrama')} className="text-slate-500 hover:text-slate-800 text-xs">
+                  <Users className="w-3.5 h-3.5 mr-1" /> Organigrama
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/admin/planes')} className="text-slate-500 hover:text-slate-800 text-xs">
+                  <BarChart3 className="w-3.5 h-3.5 mr-1" /> Planes
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/admin/skyvern')} className="text-slate-500 hover:text-slate-800 text-xs">
+                  <Zap className="w-3.5 h-3.5 mr-1" /> Skyvern
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/admin/swarm-sources')} className="text-slate-500 hover:text-slate-800 text-xs">
+                  <BookOpen className="w-3.5 h-3.5 mr-1" /> Swarm
+                </Button>
+              </div>
+            )}
             <span className="text-sm font-medium text-slate-400 hidden sm:block">{user.email}</span>
             <Button variant="ghost" size="icon" onClick={signOut} className="text-slate-400 hover:text-slate-700">
               <LogOut className="w-5 h-5" />
