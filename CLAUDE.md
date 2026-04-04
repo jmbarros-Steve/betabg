@@ -25,12 +25,255 @@ cd ~/steve && git pull
 - Agente 7 Brief: Steve Chat, copies, análisis de marca
 - Agente 8 Database: migraciones SQL, esquema, RLS
 
-## Reglas
-- Nunca tocar src/integrations/supabase/ (auto-generado)
-- Nunca tocar src/components/ui/ (shadcn)
-- Siempre git pull antes de empezar
-- Siempre git push al terminar
+## Reglas de Código
+- **NUNCA** tocar `src/integrations/supabase/` (auto-generado por Supabase)
+- **NUNCA** tocar `src/components/ui/` (shadcn — se actualiza con CLI)
+- **NUNCA** editar archivos >30KB sin leerlos primero
+- Siempre `git pull` antes de empezar
+- Siempre `git push` al terminar
 - Super admin: jmbarros@bgconsult.cl
+
+### Naming conventions
+| Qué | Convención | Ejemplo |
+|-----|-----------|---------|
+| Rutas API | kebab-case | `/api/sync-meta-metrics` |
+| Funciones | camelCase | `syncAllMetrics` |
+| Archivos handler | kebab-case | `sync-meta-metrics.ts` |
+| Componentes React | PascalCase | `MetaCampaignManager.tsx` |
+| Tablas SQL | snake_case | `campaign_metrics` |
+| Columnas SQL | snake_case | `user_id`, `created_at` |
+| Env vars | UPPER_SNAKE | `CRON_SECRET` |
+| Interfaces TS | PascalCase | `ChatMessage` |
+
+### Imports (alias @/)
+```typescript
+import { Button } from '@/components/ui/button';      // shadcn
+import { useAuth } from '@/hooks/useAuth';             // hooks custom
+import { supabase } from '@/integrations/supabase/client'; // DB client
+import { cn } from '@/lib/utils';                      // utilities
+import { Send, Loader2 } from 'lucide-react';          // icons
+```
+Backend (Cloud Run): extensiones `.js` obligatorias para ESM.
+
+### Auth en endpoints
+- **Páginas React**: `useAuth()` + `useUserRole()` → redirect si no autorizado
+- **API con JWT**: `authMiddleware` en la ruta
+- **Crons**: header `X-Cron-Secret` (sin JWT)
+- **Webhooks públicos**: HMAC verification (Shopify, Twilio, SES)
+- **Interno**: header `X-Internal-Key` con service role key
+
+### Archivos GRANDES (leer antes de tocar)
+| Archivo | Tamaño | Qué es |
+|---------|--------|--------|
+| `src/components/client-portal/BrandBriefView.tsx` | 287KB | Formulario de brief — MUY complejo |
+| `src/components/client-portal/meta-ads/CampaignCreateWizard.tsx` | 141KB | Wizard de campañas Meta |
+| `src/components/client-portal/email/emailTemplates.ts` | 107KB | Librería de templates |
+| `src/components/client-portal/meta-ads/MetaCampaignManager.tsx` | 86KB | Gestión de campañas |
+| `src/components/client-portal/email/CampaignBuilder.tsx` | 81KB | Editor GrapeJS |
+| `cloud-run-api/src/routes/ai/steve-chat.ts` | 120KB | Motor principal de Steve AI |
+| `cloud-run-api/src/routes/ai/generate-meta-copy.ts` | 71KB | Generación de copies |
+| `cloud-run-api/src/routes/meta/manage-meta-campaign.ts` | 56KB | CRUD campañas Meta |
+| `cloud-run-api/src/routes/whatsapp/steve-wa-chat.ts` | 55KB | Chat WA con AI |
+| `src/integrations/supabase/types.ts` | 54KB | AUTO-GENERADO — NO EDITAR |
+
+## Estructura del Proyecto
+
+```
+steve-ads/
+├── src/                          # Frontend React + Vite
+│   ├── pages/           (31)     # Páginas/rutas
+│   ├── components/      (159)    # Componentes React
+│   │   ├── ui/                   # shadcn (NO TOCAR)
+│   │   ├── dashboard/            # Panels del admin dashboard
+│   │   ├── client-portal/        # Portal del cliente (Meta, Email, Klaviyo, Shopify)
+│   │   ├── landing/              # Landing page
+│   │   └── shopify/              # Shopify app
+│   ├── hooks/                    # useAuth, useUserRole, custom hooks
+│   ├── integrations/             # Supabase client (NO TOCAR)
+│   ├── lib/                      # Utilidades (api, utils, reports)
+│   └── assets/                   # Logos, imágenes
+├── cloud-run-api/src/            # Backend Hono + Node.js
+│   ├── routes/          (187)    # Endpoints API
+│   │   ├── ai/                   # steve-chat, generate-copy, criterio, espejo
+│   │   ├── meta/                 # manage-campaign, audiences, rules, pixel
+│   │   ├── google/               # google-ads sync, metrics
+│   │   ├── klaviyo/              # flows, push, sync, templates
+│   │   ├── shopify/              # products, orders, webhooks, analytics
+│   │   ├── email/                # campaigns, send, flows, subscribers
+│   │   ├── whatsapp/             # steve-wa-chat, send, campaigns
+│   │   ├── instagram/            # publish, insights
+│   │   ├── cron/                 # 44 crons (schedulers)
+│   │   ├── crm/                  # prospects, proposals, sellers
+│   │   ├── analytics/            # competitor, deep-dive
+│   │   ├── oauth/                # Meta, Google, Shopify callbacks
+│   │   ├── triggers/             # webhooks, changelog watcher
+│   │   └── utilities/            # helpers, queue, transcription
+│   ├── middleware/               # Auth, validation
+│   ├── lib/                      # Shared utils (supabase, creative-context)
+│   └── chino/                    # QA checks (7 tipos)
+├── supabase/
+│   ├── functions/       (64)     # Edge Functions (Deno)
+│   │   ├── _shared/             # Utilidades compartidas
+│   │   └── {function}/index.ts  # Una carpeta por función
+│   └── migrations/      (142)    # SQL migrations
+├── agents/                       # Sistema de agentes
+│   ├── personalities/   (14)     # Personalidad + 5 misiones
+│   ├── state/           (4+)     # Estado actual por agente
+│   └── memory/                   # Journal acumulativo
+├── scripts/                      # Utility scripts
+└── prompts/                      # Prompt templates
+```
+
+## 97 Tablas de Supabase (por módulo)
+
+### Core (6)
+| Tabla | Qué guarda |
+|-------|-----------|
+| `clients` | 127 cuentas de merchants/negocios |
+| `user_roles` | Roles: admin, client |
+| `platform_connections` | Tokens encriptados (Meta, Google, Shopify, Klaviyo) |
+| `tasks` | Cola de tareas de agentes |
+| `agent_sessions` | Estado de los 14 agentes (sync desde Claude Code) |
+| `backlog` | Cola de mejora continua |
+
+### Meta Ads (8)
+| Tabla | Qué guarda |
+|-------|-----------|
+| `meta_campaigns` | Campañas Meta |
+| `campaign_metrics` | Spend, CTR, CPA, ROAS por día (Meta + Google) |
+| `adset_metrics` | Métricas por ad set |
+| `ad_creatives` | Copy y creative variations |
+| `ad_assets` | Imágenes/video para ads |
+| `ad_references` | Referencia histórica de ads |
+| `meta_automated_rules` | Reglas automáticas CPA/ROAS |
+| `meta_rule_execution_log` | Log de ejecución de reglas |
+
+### Email (17)
+| Tabla | Qué guarda |
+|-------|-----------|
+| `email_campaigns` | Campañas de email |
+| `email_templates` | Galería de templates |
+| `email_send_queue` | Cola de envío (**0 filas — roto**) |
+| `email_events` | Opens, clicks, bounces, conversions |
+| `email_subscribers` | Contactos por merchant |
+| `email_lists` | Listas y segmentos |
+| `email_list_members` | Membresía estática |
+| `email_flows` | Secuencias automáticas |
+| `email_flow_enrollments` | Enrollments en flows |
+| `email_ab_tests` | Config de A/B tests |
+| `email_domains` | Dominios verificados (SES) |
+| `email_forms` | Formularios de signup |
+| `email_send_settings` | Config SMTP/SES por cliente |
+| `email_universal_blocks` | Bloques drag-drop del editor |
+| `klaviyo_email_plans` | Sync metadata Klaviyo |
+| `saved_meta_copies` | Copies Meta guardados |
+| `saved_google_copies` | Copies Google guardados |
+
+### WhatsApp & CRM (14)
+| Tabla | Qué guarda |
+|-------|-----------|
+| `wa_conversations` | Hilos de conversación WA |
+| `wa_messages` | Mensajes individuales |
+| `wa_campaigns` | Campañas broadcast WA |
+| `wa_prospects` | Prospectos/leads WA |
+| `wa_pending_actions` | Cola de acciones pendientes |
+| `wa_automations` | Reglas de automatización |
+| `wa_credits` | Balance WA por merchant |
+| `wa_credit_transactions` | Historial de uso WA |
+| `wa_twilio_accounts` | Cuentas Twilio por merchant |
+| `wa_case_studies` | Casos de éxito WA |
+| `sales_tasks` | Tareas de venta por vendedor |
+| `proposals` | Propuestas/cotizaciones |
+| `web_forms` | Formularios de intake |
+| `web_form_submissions` | Respuestas a formularios |
+
+### Shopify (3)
+| Tabla | Qué guarda |
+|-------|-----------|
+| `shopify_products` | Catálogo synceado |
+| `shopify_abandoned_checkouts` | Carritos abandonados |
+| `platform_metrics` | Revenue y orders (Shopify + Google) |
+
+### Steve AI / Brain (15)
+| Tabla | Qué guarda |
+|-------|-----------|
+| `steve_knowledge` | 487 reglas/insights activos |
+| `steve_knowledge_versions` | Snapshots de versiones |
+| `steve_sources` | Fuentes de contenido (**0 filas**) |
+| `steve_conversations` | Historial multi-turn |
+| `steve_messages` | Mensajes individuales |
+| `steve_episodic_memory` | Memoria corto plazo |
+| `steve_working_memory` | Memoria largo plazo |
+| `steve_feedback` | Feedback del usuario |
+| `steve_training_examples` | Ejemplos de training |
+| `steve_training_feedback` | Feedback de training |
+| `steve_ab_tests` | A/B tests de features |
+| `steve_bugs` | Bug tracking |
+| `steve_commitments` | Compromisos de agentes |
+| `steve_fix_queue` | Cola de fixes |
+| `learning_queue` | Cola de insights para swarm |
+
+### Knowledge & Research (4)
+| Tabla | Qué guarda |
+|-------|-----------|
+| `swarm_runs` | Ejecuciones de swarm (16 exitosos) |
+| `swarm_sources` | Fuentes para swarm (**0 filas**) |
+| `auto_learning_digests` | Digests de research |
+| `study_resources` | Material de estudio |
+
+### Creativos & QA (8)
+| Tabla | Qué guarda |
+|-------|-----------|
+| `creative_history` | Copies generados + performance |
+| `creative_analyses` | Análisis de patrones creativos |
+| `criterio_rules` | 493 reglas de calidad |
+| `criterio_results` | Resultados de evaluación |
+| `detective_log` | Reviews visuales |
+| `detective_runs` | Batch de evaluación visual |
+| `qa_log` | 550+ registros de QA checks |
+| `chino_reports` | Reportes de El Chino |
+
+### Competencia & Analytics (4)
+| Tabla | Qué guarda |
+|-------|-----------|
+| `brand_research` | Análisis de marca/competencia |
+| `competitor_ads` | Ads de competidores |
+| `competitor_tracking` | Métricas de competidores |
+| `campaign_recommendations` | Recomendaciones AI |
+
+### Merchant & Billing (12)
+| Tabla | Qué guarda |
+|-------|-----------|
+| `client_assets` | Logos, archivos de marca |
+| `client_credits` | Balance email/WA |
+| `client_financial_config` | Config billing |
+| `credit_transactions` | Historial de créditos |
+| `merchant_onboarding` | Progreso de onboarding |
+| `merchant_upsell_opportunities` | Oportunidades de upsell |
+| `subscription_plans` | Planes de servicio |
+| `user_subscriptions` | Suscripciones activas |
+| `invoices` | Facturas |
+| `time_entries` | Tracking de tiempo |
+| `buyer_personas` | Segmentos de clientes |
+| `campaign_month_plans` | Planes mensuales |
+
+### Infra (6)
+| Tabla | Qué guarda |
+|-------|-----------|
+| `slo_config` | Error budgets (4 CUJs) |
+| `oauth_states` | Validación de OAuth flows |
+| `onboarding_jobs` | Jobs background de setup |
+| `instagram_scheduled_posts` | Posts IG programados |
+| `juez_golden_questions` | Golden questions para tests nocturnos |
+| `seller_calendars` | Disponibilidad de vendedores |
+
+### Content (3)
+| Tabla | Qué guarda |
+|-------|-----------|
+| `blog_posts` | Blog interno |
+| `academy_courses` + `academy_*` (5 tablas) | Cursos, lecciones, quizzes |
+| `support_tickets` | Tickets de soporte |
+| `chino_routine` | Rutinas de automatización |
 
 ## Equipo de Desarrollo — Organigrama
 
