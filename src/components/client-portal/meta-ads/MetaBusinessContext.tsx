@@ -81,4 +81,9 @@ export function useMetaBusiness(): MetaBusinessContextType {
   return ctx;
 }
 
+/** Safe version that returns null when outside MetaBusinessProvider (e.g. SocialHub) */
+export function useMetaBusinessSafe(): MetaBusinessContextType | null {
+  return useContext(MetaBusinessContext);
+}
+
 export default MetaBusinessContext;

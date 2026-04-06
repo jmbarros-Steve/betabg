@@ -39,7 +39,8 @@ import {
   Download,
 } from 'lucide-react';
 import MetaScopeAlert from './MetaScopeAlert';
-import { useMetaBusiness } from './MetaBusinessContext';
+import { useMetaBusinessSafe } from './MetaBusinessContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -124,7 +125,10 @@ function getInitials(name: string): string {
 // ---------------------------------------------------------------------------
 
 export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
-  const { connectionId: ctxConnectionId, pageId: ctxPageId } = useMetaBusiness();
+  // Safe: returns null when outside MetaBusinessProvider (e.g. used from SocialHub)
+  const metaCtx = useMetaBusinessSafe();
+  const ctxConnectionId = metaCtx?.connectionId ?? null;
+  const ctxPageId = metaCtx?.pageId ?? null;
 
   // Connection state
   const [connectionId, setConnectionId] = useState<string | null>(null);
@@ -187,18 +191,32 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
     async function init() {
       setLoadingPages(true);
       try {
-        // Use connectionId from MetaBusinessContext
-        if (!ctxConnectionId) {
+        // Use connectionId from MetaBusinessContext, or fallback to Supabase query
+        let resolvedConnectionId = ctxConnectionId;
+        if (!resolvedConnectionId) {
+          const { data: conn } = await supabase
+            .from('platform_connections')
+            .select('id, page_id')
+            .eq('client_id', clientId)
+            .eq('platform', 'meta')
+            .eq('is_active', true)
+            .maybeSingle();
+          if (conn) {
+            resolvedConnectionId = conn.id;
+          }
+        }
+
+        if (!resolvedConnectionId) {
           setNoConnection(true);
           return;
         }
 
-        setConnectionId(ctxConnectionId);
+        setConnectionId(resolvedConnectionId);
         setNoConnection(false);
 
         // Fetch pages
         const { data, error } = await callApi('meta-social-inbox', {
-          body: { connection_id: ctxConnectionId, action: 'list_pages' },
+          body: { connection_id: resolvedConnectionId, action: 'list_pages' },
         });
 
         if (error) throw error;

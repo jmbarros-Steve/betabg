@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { createHash } from 'crypto';
 
 const META_API_BASE = 'https://graph.facebook.com/v21.0';
@@ -55,18 +56,17 @@ export async function syncKlaviyoToMetaAudience(c: Context) {
     // 2. Get Meta connection + decrypt token
     const { data: metaConn } = await supabase
       .from('platform_connections')
-      .select('id, account_id, access_token_encrypted, client_id')
+      .select('id, account_id, access_token_encrypted, connection_type, client_id')
       .eq('id', meta_connection_id)
       .eq('platform', 'meta')
       .single();
 
-    if (!metaConn?.access_token_encrypted || !metaConn?.account_id) {
-      return c.json({ error: 'Meta connection not found or missing credentials' }, 404);
+    if (!metaConn?.account_id) {
+      return c.json({ error: 'Meta connection not found or missing account ID' }, 404);
     }
 
-    const { data: metaToken } = await supabase
-      .rpc('decrypt_platform_token', { encrypted_token: metaConn.access_token_encrypted });
-    if (!metaToken) return c.json({ error: 'Failed to decrypt Meta token' }, 500);
+    const metaToken = await getTokenForConnection(supabase, metaConn);
+    if (!metaToken) return c.json({ error: 'Failed to resolve Meta token' }, 500);
 
     const accountId = metaConn.account_id.replace(/^act_/, '');
 

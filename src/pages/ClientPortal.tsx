@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare, Home, Instagram, GraduationCap, Lock } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare, Home, Share2, GraduationCap, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -47,14 +47,13 @@ import { UpgradeOverlay } from '@/components/client-portal/UpgradeOverlay';
 import { canAccessTab, getTabRequiredPlan, type PlanSlug } from '@/lib/plan-features';
 import { KeyboardShortcutsDialog, useShortcutsDialog } from '@/components/client-portal/KeyboardShortcutsDialog';
 import { WhatsAppHub } from '@/components/client-portal/whatsapp/WhatsAppHub';
-import { IGMetricsDashboard } from '@/components/client-portal/instagram/IGMetricsDashboard';
-import { InstagramHub } from '@/components/client-portal/InstagramHub';
+import { SocialHub } from '@/components/client-portal/SocialHub';
 import { SteveAcademy } from '@/components/client-portal/SteveAcademy';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'estrategia' | 'copies' | 'instagram' | 'google' | 'klaviyo' | 'email' | 'config' | 'wa_credits' | 'academy';
+type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'estrategia' | 'copies' | 'social' | 'google' | 'klaviyo' | 'email' | 'config' | 'wa_credits' | 'academy';
 interface ClientInfo {
   id: string;
   name: string;
@@ -309,7 +308,7 @@ export default function ClientPortal() {
     { id: 'deepdive', label: 'Deep Dive', icon: Code },
     { id: 'estrategia', label: 'Estrategia', icon: Lightbulb },
     { id: 'copies', label: 'Meta Ads', icon: Sparkles },
-    { id: 'instagram', label: 'Instagram', icon: Instagram },
+    { id: 'social', label: 'Social', icon: Share2 },
     { id: 'google', label: 'Google Ads', icon: Target },
     { id: 'klaviyo', label: 'Klaviyo', icon: Mail },
     { id: 'email', label: 'Steve Mail', icon: MailCheck },
@@ -571,11 +570,11 @@ export default function ClientPortal() {
               </TabErrorBoundary>
             </div>
           )}
-          {visitedTabs.has('instagram') && effectiveClientId && (
-            <div className={activeTab !== 'instagram' || !userCanAccessTab('instagram') ? 'hidden' : ''}>
-              <TabErrorBoundary tabName="Instagram">
+          {visitedTabs.has('social') && effectiveClientId && (
+            <div className={activeTab !== 'social' || !userCanAccessTab('social') ? 'hidden' : ''}>
+              <TabErrorBoundary tabName="Social">
                 <div className="max-w-5xl mx-auto">
-                  <InstagramHub clientId={effectiveClientId} />
+                  <SocialHub clientId={effectiveClientId} />
                 </div>
               </TabErrorBoundary>
             </div>

@@ -1,10 +1,10 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { criterioEmailEvaluate } from '../ai/criterio-email.js';
-
 import { espejoEmail } from '../ai/espejo.js';
+import { escapeHtml, decryptKlaviyoApiKey, sendCampaignJob, deleteKlaviyoTemplate } from './_helpers.js';
 
-const KLAVIYO_REVISION = '2024-10-15';
+const KLAVIYO_REVISION = '2025-01-15';
 const KLAVIYO_BASE = 'https://a.klaviyo.com/api';
 
 interface EmailStep {
@@ -21,7 +21,7 @@ interface PushEmailsRequest {
   connection_id: string;
   list_id: string;
   send_strategy: 'immediate' | 'scheduled' | 'smart_send' | 'draft';
-  scheduled_at?: string; // ISO datetime for scheduled sends
+  scheduled_at?: string;
 }
 
 function klaviyoFetchHeaders(apiKey: string) {
@@ -46,7 +46,6 @@ async function klaviyoFetch(url: string, apiKey: string, options: RequestInit = 
   return text ? JSON.parse(text) : null;
 }
 
-// Step 1: Fetch available lists
 async function fetchLists(apiKey: string) {
   const data: any = await klaviyoFetch(`${KLAVIYO_BASE}/lists/`, apiKey);
   return (data.data || []).map((l: any) => ({
@@ -56,7 +55,6 @@ async function fetchLists(apiKey: string) {
   }));
 }
 
-// Step 2: Create a template
 async function createTemplate(apiKey: string, name: string, html: string, textContent: string) {
   const data: any = await klaviyoFetch(`${KLAVIYO_BASE}/templates/`, apiKey, {
     method: 'POST',
@@ -75,7 +73,6 @@ async function createTemplate(apiKey: string, name: string, html: string, textCo
   return data.data.id;
 }
 
-// Step 3: Create a campaign
 async function createCampaign(
   apiKey: string,
   name: string,
@@ -83,18 +80,29 @@ async function createCampaign(
   sendStrategy: string,
   scheduledAt?: string,
 ) {
+  // Build send_strategy based on user selection
+  const sendStrategyObj: any = {};
+  if (sendStrategy === 'smart_send') {
+    sendStrategyObj.method = 'smart_send_time';
+  } else {
+    sendStrategyObj.method = 'static';
+    sendStrategyObj.options_static = {
+      // For 'immediate': use scheduledAt (set to now+5min by caller) or 1 year default for draft
+      // For 'scheduled': use the user-provided datetime
+      // For 'draft': use 1 year in the future (Klaviyo requires a datetime)
+      datetime: sendStrategy === 'draft'
+        ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+        : scheduledAt || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+  }
+
   const attributes: any = {
     name,
     audiences: {
       included: [listId],
       excluded: [],
     },
-    send_strategy: {
-      method: sendStrategy === 'smart_send' ? 'smart_send_time' : 'static',
-      options_static: {
-        datetime: scheduledAt || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-    },
+    send_strategy: sendStrategyObj,
     'campaign-messages': {
       data: [
         {
@@ -120,7 +128,6 @@ async function createCampaign(
   return data.data;
 }
 
-// Step 4: Get campaign message ID from campaign
 async function getCampaignMessageId(apiKey: string, campaignId: string) {
   const data: any = await klaviyoFetch(
     `${KLAVIYO_BASE}/campaigns/${campaignId}/?include=campaign-messages`,
@@ -131,7 +138,6 @@ async function getCampaignMessageId(apiKey: string, campaignId: string) {
   return msg?.id || null;
 }
 
-// Step 5: Assign template to campaign message
 async function assignTemplateToMessage(apiKey: string, messageId: string, templateId: string) {
   await klaviyoFetch(`${KLAVIYO_BASE}/campaign-message-assign-template/`, apiKey, {
     method: 'POST',
@@ -149,7 +155,6 @@ async function assignTemplateToMessage(apiKey: string, messageId: string, templa
   });
 }
 
-// Step 6: Update campaign message with subject & preview text
 async function updateCampaignMessage(
   apiKey: string,
   messageId: string,
@@ -174,31 +179,13 @@ async function updateCampaignMessage(
   });
 }
 
-// Step 7: Send/schedule the campaign
-async function sendCampaign(apiKey: string, campaignId: string) {
-  await klaviyoFetch(`${KLAVIYO_BASE}/campaign-send-jobs/`, apiKey, {
-    method: 'POST',
-    body: JSON.stringify({
-      data: {
-        type: 'campaign-send-job',
-        attributes: {},
-        relationships: {
-          campaign: {
-            data: { type: 'campaign', id: campaignId },
-          },
-        },
-      },
-    }),
-  });
-}
-
 function generateEmailHtml(email: EmailStep): string {
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${email.subject}</title>
+  <title>${escapeHtml(email.subject)}</title>
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
     .preheader { display: none; max-height: 0; overflow: hidden; }
@@ -209,30 +196,6 @@ function generateEmailHtml(email: EmailStep): string {
   ${(email.content || '').replace(/\n/g, '<br>')}
 </body>
 </html>`.trim();
-}
-
-async function decryptApiKey(connectionId: string): Promise<string> {
-  const serviceSupabase = getSupabaseAdmin();
-
-  const { data: connection, error } = await serviceSupabase
-    .from('platform_connections')
-    .select('api_key_encrypted')
-    .eq('id', connectionId)
-    .eq('platform', 'klaviyo')
-    .single();
-
-  if (error || !connection?.api_key_encrypted) {
-    throw new Error('Klaviyo connection not found or missing API key');
-  }
-
-  const { data: apiKey, error: decryptError } = await serviceSupabase
-    .rpc('decrypt_platform_token', { encrypted_token: connection.api_key_encrypted });
-
-  if (decryptError || !apiKey) {
-    throw new Error('Failed to decrypt Klaviyo API key');
-  }
-
-  return apiKey;
 }
 
 export async function klaviyoPushEmails(c: Context) {
@@ -253,10 +216,9 @@ export async function klaviyoPushEmails(c: Context) {
     const userId = user.id;
     const body = await c.req.json();
 
-    // Helper: verify connection ownership
+    // Helper: verify connection ownership (reuses existing supabase instance)
     async function verifyConnectionOwnership(connId: string) {
-      const svc = getSupabaseAdmin();
-      const { data: conn, error } = await svc
+      const { data: conn, error } = await supabase
         .from('platform_connections')
         .select('id, clients!inner(user_id, client_user_id)')
         .eq('id', connId)
@@ -277,7 +239,7 @@ export async function klaviyoPushEmails(c: Context) {
       }
 
       await verifyConnectionOwnership(connection_id);
-      const apiKey = await decryptApiKey(connection_id);
+      const apiKey = await decryptKlaviyoApiKey(supabase, connection_id);
       const lists = await fetchLists(apiKey);
 
       return c.json({ lists });
@@ -293,8 +255,7 @@ export async function klaviyoPushEmails(c: Context) {
     await verifyConnectionOwnership(connection_id);
 
     // Fetch the plan using service role to bypass RLS
-    const serviceSupabase = getSupabaseAdmin();
-    const { data: plan, error: planError } = await serviceSupabase
+    const { data: plan, error: planError } = await supabase
       .from('klaviyo_email_plans')
       .select('*')
       .eq('id', plan_id)
@@ -304,20 +265,22 @@ export async function klaviyoPushEmails(c: Context) {
       return c.json({ error: 'Plan not found' }, 404);
     }
 
-    // CRITERIO pre-flight: evaluate each email before pushing
-    const rawEmailsForCheck = plan.emails;
-    const emailsForCheck: EmailStep[] = typeof rawEmailsForCheck === 'string' ? JSON.parse(rawEmailsForCheck) : rawEmailsForCheck as EmailStep[];
+    // Parse emails once and reuse
+    const rawEmails = plan.emails;
+    const emails: EmailStep[] = typeof rawEmails === 'string' ? JSON.parse(rawEmails) : rawEmails as EmailStep[];
 
     // Get shop_id from the plan's client connection
-    const { data: connData } = await serviceSupabase
+    const { data: connData } = await supabase
       .from('platform_connections')
       .select('client_id, clients!inner(shop_id)')
       .eq('id', connection_id)
       .single();
     const shopId = (connData as any)?.clients?.shop_id;
+    const clientId = (connData as any)?.client_id;
 
+    // CRITERIO pre-flight: evaluate each email before pushing
     if (shopId) {
-      for (const emailToCheck of emailsForCheck) {
+      for (const emailToCheck of emails) {
         const criterioResult = await criterioEmailEvaluate({
           subject: emailToCheck.subject,
           preview_text: emailToCheck.previewText,
@@ -336,25 +299,16 @@ export async function klaviyoPushEmails(c: Context) {
       }
     }
 
-    // REGLA INQUEBRANTABLE: all Klaviyo emails born as DRAFT
-    const effectiveSendStrategy = 'draft';
+    // Respect user's send strategy. CRITERIO already blocked non-compliant emails above.
+    const effectiveSendStrategy = send_strategy || 'draft';
 
-    const apiKey = await decryptApiKey(connection_id);
-    const rawEmails = plan.emails;
-    const emails: EmailStep[] = typeof rawEmails === 'string' ? JSON.parse(rawEmails) : rawEmails as EmailStep[];
+    const apiKey = await decryptKlaviyoApiKey(supabase, connection_id);
     const results: Array<{ email_subject: string; template_id: string; campaign_id: string; status: string }> = [];
 
-    // Fetch client_id and brand info for ESPEJO evaluation
-    const { data: connInfo } = await serviceSupabase
-      .from('platform_connections')
-      .select('client_id')
-      .eq('id', connection_id)
-      .single();
-    const espejoShopId = connInfo?.client_id || 'unknown';
-
+    // Fetch brand info for ESPEJO evaluation
     let brandInfo: { brand_name?: string; colors?: string } | null = null;
-    if (espejoShopId !== 'unknown') {
-      const { data: bi } = await serviceSupabase
+    if (clientId) {
+      const { data: bi } = await supabase
         .from('brand_research')
         .select('brand_name, colors')
         .eq('shop_id', shopId)
@@ -368,7 +322,7 @@ export async function klaviyoPushEmails(c: Context) {
 
       console.log(`[${i + 1}/${emails.length}] Creating campaign: ${emailName}`);
 
-      // ── ESPEJO visual check ──
+      // ESPEJO visual check
       const emailHtml = generateEmailHtml(email);
       try {
         const espejoResult = await espejoEmail(
@@ -391,11 +345,10 @@ export async function klaviyoPushEmails(c: Context) {
         }
         console.log(`[klaviyo-push-emails] ESPEJO approved email ${i + 1}: score=${espejoResult.score}`);
       } catch (espejoErr: any) {
-        // ESPEJO failure should not block email push — log and continue
         console.warn(`[klaviyo-push-emails] ESPEJO evaluation failed (non-blocking): ${espejoErr?.message}`);
       }
 
-      // 1. Create template (reuse emailHtml from ESPEJO check above)
+      // 1. Create template
       const templateId = await createTemplate(
         apiKey,
         emailName,
@@ -433,34 +386,37 @@ export async function klaviyoPushEmails(c: Context) {
       }
       console.log(`  Message ID: ${messageId}`);
 
-      // 5. Assign template to message
+      // 5. Assign template to message (Klaviyo copies HTML into the message)
       await assignTemplateToMessage(apiKey, messageId, templateId);
       console.log(`  Template assigned to message`);
 
-      // 6. Update message with subject & preview text
+      // 6. Delete the Steve-created template (Klaviyo already copied the HTML)
+      await deleteKlaviyoTemplate(apiKey, templateId);
+      console.log(`  Template cleaned up: ${templateId}`);
+
+      // 7. Update message with subject & preview text
       await updateCampaignMessage(apiKey, messageId, email.subject, email.previewText || '');
       console.log(`  Message updated with subject`);
 
-      // 7. All campaigns created as DRAFT (CRITERIO enforced)
-      if (effectiveSendStrategy === 'draft') {
-        console.log(`  Campaign created as draft (CRITERIO enforced)`);
-        results.push({ email_subject: email.subject, template_id: templateId, campaign_id: campaignId, status: 'draft' });
-      } else if (effectiveSendStrategy === 'immediate' && i === 0) {
+      // 8. If not draft, trigger send job
+      if (effectiveSendStrategy === 'immediate' || effectiveSendStrategy === 'scheduled' || effectiveSendStrategy === 'smart_send') {
         try {
-          await sendCampaign(apiKey, campaignId);
-          console.log(`  Campaign sent!`);
-          results.push({ email_subject: email.subject, template_id: templateId, campaign_id: campaignId, status: 'sent' });
-        } catch (sendErr) {
-          console.error(`  Send failed:`, sendErr);
-          results.push({ email_subject: email.subject, template_id: templateId, campaign_id: campaignId, status: 'created_not_sent' });
+          await sendCampaignJob(apiKey, campaignId);
+          const sendStatus = effectiveSendStrategy === 'immediate' ? 'queued' : 'scheduled';
+          console.log(`  Campaign ${sendStatus}: ${campaignId}`);
+          results.push({ email_subject: email.subject, template_id: templateId, campaign_id: campaignId, status: sendStatus });
+        } catch (sendErr: any) {
+          console.error(`  Failed to trigger send for campaign ${campaignId}:`, sendErr.message);
+          results.push({ email_subject: email.subject, template_id: templateId, campaign_id: campaignId, status: `send_failed: ${sendErr.message}` });
         }
       } else {
-        results.push({ email_subject: email.subject, template_id: templateId, campaign_id: campaignId, status: 'ready' });
+        console.log(`  Campaign created as draft: ${campaignId}`);
+        results.push({ email_subject: email.subject, template_id: templateId, campaign_id: campaignId, status: 'draft' });
       }
     }
 
     // Update plan status
-    await serviceSupabase
+    await supabase
       .from('klaviyo_email_plans')
       .update({
         status: 'implemented',

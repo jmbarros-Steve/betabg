@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 
 const META_API_VERSION = 'v21.0';
 const META_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
@@ -299,7 +300,7 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
     // Fetch connection
     const { data: connection, error: connError } = await supabase
       .from('platform_connections')
-      .select(`id, platform, access_token_encrypted, client_id, clients!inner(user_id, client_user_id)`)
+      .select(`id, platform, access_token_encrypted, connection_type, client_id, clients!inner(user_id, client_user_id)`)
       .eq('id', connection_id)
       .eq('platform', 'meta')
       .single();
@@ -328,12 +329,11 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
       console.error('[fetch-meta-business-hierarchy] No encrypted token for connection:', connection.id);
       return c.json({ error: 'No encrypted token found for this connection' }, 500);
     }
-    const { data: token, error: decryptError } = await supabase
-      .rpc('decrypt_platform_token', { encrypted_token: connection.access_token_encrypted });
-
-    if (decryptError || !token) {
-      console.error('[fetch-meta-business-hierarchy] decrypt_platform_token failed:', decryptError?.message, decryptError?.code);
-      return c.json({ error: 'Failed to decrypt token' }, 500);
+    // Resolve token (SUAT for bm_partner, decrypt for oauth)
+    const token = await getTokenForConnection(supabase, connection);
+    if (!token) {
+      console.error('[fetch-meta-business-hierarchy] Token resolution failed');
+      return c.json({ error: 'Failed to resolve token' }, 500);
     }
 
     // No circuit breaker — let Meta handle its own rate limits

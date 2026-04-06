@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { metaApiJson } from '../../lib/meta-fetch.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 
 /**
  * POST /api/fetch-instagram-insights
@@ -32,7 +33,7 @@ export async function fetchInstagramInsights(c: Context) {
   // Get Meta connection (Instagram uses Meta token)
   const { data: conn } = await supabase
     .from('platform_connections')
-    .select('id, access_token_encrypted, ig_account_id, page_id')
+    .select('id, access_token_encrypted, ig_account_id, page_id, connection_type')
     .eq('client_id', client_id)
     .eq('platform', 'meta')
     .maybeSingle();
@@ -41,9 +42,7 @@ export async function fetchInstagramInsights(c: Context) {
     return c.json({ error: 'No hay conexión a Meta/Instagram' }, 404);
   }
 
-  const { data: token } = await supabase.rpc('decrypt_platform_token', {
-    encrypted_token: conn.access_token_encrypted,
-  });
+  const token = await getTokenForConnection(supabase, conn);
   if (!token) return c.json({ error: 'Error descifrando token' }, 500);
 
   // Find Instagram Business Account ID

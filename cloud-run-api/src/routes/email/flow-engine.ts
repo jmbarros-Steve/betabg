@@ -195,13 +195,15 @@ export async function emailFlowExecute(c: Context) {
   }
 
   // 7b. Idempotency check — skip if this step was already sent (Cloud Tasks retry)
+  // Only check events created AFTER this enrollment started, to allow re-enrollments
   const { count: alreadySentCount } = await supabase
     .from('email_events')
     .select('*', { count: 'exact', head: true })
     .eq('subscriber_id', subscriber.id)
     .eq('flow_id', flow.id)
     .eq('event_type', 'sent')
-    .eq('metadata->>step_path', effectivePath);
+    .eq('metadata->>step_path', effectivePath)
+    .gte('created_at', enrollment.enrolled_at);
 
   if (alreadySentCount && alreadySentCount > 0) {
     console.log(`Step ${effectivePath} already sent to ${subscriber.email}. Skipping (idempotency).`);
@@ -814,7 +816,8 @@ async function scheduleFlowStep(
     return task;
   } catch (err: any) {
     console.error('Failed to schedule flow step:', err);
-    throw err;
+    // Don't re-throw — email was already sent, scheduling failure is non-critical
+    // Steps can be triggered manually or via fallback mechanism
   }
 }
 

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 
 export async function checkMetaScopes(c: Context) {
   try {
@@ -27,7 +28,7 @@ export async function checkMetaScopes(c: Context) {
     const { data: connection, error: connError } = await supabase
       .from('platform_connections')
       .select(`
-        id, platform, account_id, access_token_encrypted, client_id,
+        id, platform, account_id, access_token_encrypted, client_id, connection_type,
         clients!inner(user_id, client_user_id)
       `)
       .eq('id', connection_id)
@@ -50,15 +51,20 @@ export async function checkMetaScopes(c: Context) {
       }
     }
 
-    if (!connection.access_token_encrypted) {
-      return c.json({ error: 'No access token', granted: [], missing_all: true }, 200);
+    // BM Partner: SUAT has fixed permissions, skip API check
+    if ((connection as any).connection_type === 'bm_partner') {
+      const bmPartnerScopes = [
+        'ads_management', 'ads_read', 'business_management',
+        'pages_read_engagement', 'pages_manage_ads', 'pages_manage_posts',
+        'pages_show_list', 'instagram_basic', 'instagram_content_publish',
+        'instagram_manage_insights', 'read_insights', 'public_profile',
+      ];
+      return c.json({ success: true, granted: bmPartnerScopes, declined: [] }, 200);
     }
 
-    const { data: decryptedToken, error: decryptError } = await supabase
-      .rpc('decrypt_platform_token', { encrypted_token: connection.access_token_encrypted });
-
-    if (decryptError || !decryptedToken) {
-      return c.json({ error: 'Failed to decrypt token', granted: [] }, 200);
+    const decryptedToken = await getTokenForConnection(supabase, connection);
+    if (!decryptedToken) {
+      return c.json({ error: 'Failed to resolve token', granted: [], missing_all: true }, 200);
     }
 
     // Check permissions via Meta Graph API (token in header, not URL)

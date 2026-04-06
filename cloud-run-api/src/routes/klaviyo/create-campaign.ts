@@ -1,7 +1,8 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { deleteKlaviyoTemplate } from './_helpers.js';
 
-const KLAVIYO_REVISION = '2024-10-15';
+const KLAVIYO_REVISION = '2025-01-15';
 const KLAVIYO_BASE = 'https://a.klaviyo.com/api';
 
 function headers(apiKey: string) {
@@ -111,6 +112,8 @@ export async function createKlaviyoCampaign(c: Context) {
     });
     if (!campRes.ok) {
       const err = await campRes.text();
+      // Cleanup: delete orphaned template
+      await deleteKlaviyoTemplate(apiKey, templateId);
       return c.json({ error: 'Failed to create campaign', detail: err }, 500);
     }
     const campaignId = (await campRes.json() as any).data.id;
@@ -122,7 +125,7 @@ export async function createKlaviyoCampaign(c: Context) {
     if (!messageId) return c.json({ error: 'No message found in campaign' }, 500);
 
     // 4. Assign template
-    await fetch(`${KLAVIYO_BASE}/campaign-message-assign-template/`, {
+    const assignRes = await fetch(`${KLAVIYO_BASE}/campaign-message-assign-template/`, {
       method: 'POST',
       headers: h,
       body: JSON.stringify({
@@ -133,9 +136,18 @@ export async function createKlaviyoCampaign(c: Context) {
         },
       }),
     });
+    if (!assignRes.ok) {
+      const err = await assignRes.text();
+      console.error('[klaviyo/create-campaign] Template assign failed:', assignRes.status, err);
+      return c.json({ error: 'Failed to assign template to campaign message', detail: err }, 500);
+    }
 
-    // 5. Update subject & preview
-    await fetch(`${KLAVIYO_BASE}/campaign-messages/${messageId}/`, {
+    // 5. Delete the Steve-created template (Klaviyo already copied the HTML into the message)
+    await deleteKlaviyoTemplate(apiKey, templateId);
+    console.log(`[klaviyo/create-campaign] Template cleaned up: ${templateId}`);
+
+    // 6. Update subject & preview
+    const patchRes = await fetch(`${KLAVIYO_BASE}/campaign-messages/${messageId}/`, {
       method: 'PATCH',
       headers: h,
       body: JSON.stringify({
@@ -149,6 +161,11 @@ export async function createKlaviyoCampaign(c: Context) {
         },
       }),
     });
+    if (!patchRes.ok) {
+      const err = await patchRes.text();
+      console.error('[klaviyo/create-campaign] Subject update failed:', patchRes.status, err);
+      return c.json({ error: 'Failed to update campaign subject', detail: err }, 500);
+    }
 
     return c.json({
       success: true,

@@ -1,63 +1,9 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-
-interface BrandData {
-  name: string;
-  logoUrl: string;
-  storeUrl: string;
-}
-
-const KLAVIYO_BASE = 'https://a.klaviyo.com/api';
-
-async function fetchLogoFromKlaviyo(apiKey: string): Promise<string> {
-  try {
-    const res = await fetch(`${KLAVIYO_BASE}/images/?page[size]=5&sort=-updated`, {
-      headers: {
-        Authorization: `Klaviyo-API-Key ${apiKey}`,
-        accept: 'application/json',
-        revision: '2024-10-15',
-      },
-    });
-    if (!res.ok) return '';
-    const data: any = await res.json();
-    const logo = (data.data || []).find(
-      (img: any) => /logo/i.test(img.attributes?.name || '') && img.attributes?.image_url
-    );
-    return logo?.attributes?.image_url || '';
-  } catch {
-    return '';
-  }
-}
-
-async function fetchClientBrand(
-  serviceClient: any,
-  clientId: string,
-  apiKey: string,
-  storeName?: string
-): Promise<BrandData> {
-  const { data: client } = await serviceClient
-    .from('clients')
-    .select('name, logo_url, website_url')
-    .eq('id', clientId)
-    .single();
-
-  const storeUrl = client?.website_url || '';
-  const brandName = storeName || client?.name || 'Tu Tienda';
-
-  let logoUrl = '';
-  if (client?.logo_url && !client.logo_url.includes('supabase.co/storage')) {
-    logoUrl = client.logo_url;
-  }
-  if (!logoUrl) {
-    logoUrl = await fetchLogoFromKlaviyo(apiKey);
-  }
-
-  return {
-    name: brandName,
-    logoUrl,
-    storeUrl: storeUrl.startsWith('http') ? storeUrl : storeUrl ? `https://${storeUrl}` : '#',
-  };
-}
+import {
+  fetchClientBrand, escapeHtml,
+  type BrandData,
+} from './_helpers.js';
 
 function getFlowEmailContent(flowType: string, stepIndex: number, brandName: string) {
   const defaults: Record<string, { heading: string; body: string; ctaText: string }[]> = {
@@ -67,7 +13,7 @@ function getFlowEmailContent(flowType: string, stepIndex: number, brandName: str
       { heading: 'Última oportunidad', body: `<p style="margin:0 0 16px;font-size:16px;color:#555;line-height:1.6;">Tu carrito está por expirar. ¡Aprovecha ahora!</p>`, ctaText: 'Comprar ahora' },
     ],
     welcome_series: [
-      { heading: `¡Bienvenido/a a ${brandName}!`, body: `<p style="margin:0 0 16px;font-size:16px;color:#555;line-height:1.6;">Estamos felices de tenerte. Conoce nuestra historia y lo que nos hace especiales.</p>`, ctaText: 'Conocer más' },
+      { heading: `¡Bienvenido/a a ${escapeHtml(brandName)}!`, body: `<p style="margin:0 0 16px;font-size:16px;color:#555;line-height:1.6;">Estamos felices de tenerte. Conoce nuestra historia y lo que nos hace especiales.</p>`, ctaText: 'Conocer más' },
       { heading: 'Nuestros productos más populares', body: `<p style="margin:0 0 16px;font-size:16px;color:#555;line-height:1.6;">Descubre lo que más aman nuestros clientes.</p>`, ctaText: 'Ver productos' },
       { heading: 'Un regalo especial para ti', body: `<p style="margin:0 0 16px;font-size:16px;color:#555;line-height:1.6;">Queremos premiarte por ser parte de nuestra comunidad.</p>`, ctaText: 'Usar mi descuento' },
     ],
@@ -84,7 +30,6 @@ function getFlowEmailContent(flowType: string, stepIndex: number, brandName: str
 
 function generateProductBlockHtml(products: any[], productStrategy: string): string {
   if (productStrategy === 'cart_items') {
-    // Dynamic Klaviyo cart items using event merge tags
     return `
         <tr><td class="mobile-padding" style="padding:8px 40px 24px;">
           <p style="margin:0 0 16px;font-size:13px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:1px;">Tu carrito</p>
@@ -110,8 +55,8 @@ function generateProductBlockHtml(products: any[], productStrategy: string): str
 
   const productCells = products.slice(0, 3).map((p: any) => `
                 <td width="33%" valign="top" style="padding:0 6px;text-align:center;">
-                  <img src="${p.image_url || 'https://placehold.co/160x160/f5f5f5/999?text=Producto'}" alt="${p.title}" width="160" style="display:block;margin:0 auto 8px;border-radius:6px;border:1px solid #eee;max-width:100%;">
-                  <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#1a1a1a;line-height:1.3;">${p.title}</p>
+                  <img src="${p.image_url || 'https://placehold.co/160x160/f5f5f5/999?text=Producto'}" alt="${escapeHtml(p.title)}" width="160" style="display:block;margin:0 auto 8px;border-radius:6px;border:1px solid #eee;max-width:100%;">
+                  <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#1a1a1a;line-height:1.3;">${escapeHtml(p.title)}</p>
                   ${p.price ? `<p style="margin:0;font-size:14px;font-weight:700;color:#C8A84E;">$${p.price}</p>` : ''}
                 </td>`).join('\n');
 
@@ -136,7 +81,7 @@ function generateDiscountBlockHtml(discount: { code: string; value: number; type
         <tr><td class="mobile-padding" style="padding:8px 40px 24px;">
           <div style="background:#f8f6f0;border:2px dashed #C8A84E;border-radius:8px;padding:24px;text-align:center;">
             <p style="margin:0 0 4px;font-size:12px;color:#666;text-transform:uppercase;letter-spacing:2px;font-weight:600;">Tu código exclusivo</p>
-            <p style="margin:0 0 8px;font-size:28px;font-weight:700;color:#1a1a1a;letter-spacing:3px;">${discount.code}</p>
+            <p style="margin:0 0 8px;font-size:28px;font-weight:700;color:#1a1a1a;letter-spacing:3px;">${escapeHtml(discount.code)}</p>
             <p style="margin:0;font-size:14px;color:#555;">${descText}${discount.expiry ? ` · Válido hasta ${discount.expiry}` : ''}</p>
           </div>
         </td></tr>`;
@@ -159,20 +104,17 @@ function generateBrandedEmailHtml(
   }
 ): string {
   const logoBlock = brand.logoUrl
-    ? `<img src="${brand.logoUrl}" alt="${brand.name}" width="150" style="display:block;margin:0 auto;">`
-    : `<div style="font-size:24px;font-weight:700;color:#ffffff;letter-spacing:3px;font-family:Georgia,serif;text-align:center;">${brand.name.toUpperCase()}</div>`;
+    ? `<img src="${brand.logoUrl}" alt="${escapeHtml(brand.name)}" width="150" style="display:block;margin:0 auto;">`
+    : `<div style="font-size:24px;font-weight:700;color:#ffffff;letter-spacing:3px;font-family:Georgia,serif;text-align:center;">${escapeHtml(brand.name).toUpperCase()}</div>`;
 
-  // Product block: show on first email if productStrategy is set
   const showProducts = config.productStrategy && config.productStrategy !== 'none' && config.stepIndex === 0;
   const productBlock = showProducts
     ? generateProductBlockHtml(config.products || [], config.productStrategy!)
     : '';
 
-  // Discount block: show on the designated email
   const showDiscount = config.discount && config.discountEmailIndex === config.stepIndex;
   const discountBlock = showDiscount ? generateDiscountBlockHtml(config.discount!) : '';
 
-  // Use Steve's rich bodyHtml if available, otherwise fall back to hardcoded content
   let bodyContent: string;
   let effectiveCtaText: string;
   if (config.bodyHtml) {
@@ -189,7 +131,7 @@ function generateBrandedEmailHtml(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${config.subject}</title>
+  <title>${escapeHtml(config.subject)}</title>
   <style>
     @media only screen and (max-width:620px) {
       .email-container { width:100% !important; }
@@ -200,7 +142,7 @@ function generateBrandedEmailHtml(
   </style>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;">
-  ${config.previewText ? `<div style="display:none;max-height:0;overflow:hidden;">${config.previewText}</div>` : ''}
+  ${config.previewText ? `<div style="display:none;max-height:0;overflow:hidden;">${escapeHtml(config.previewText)}</div>` : ''}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;">
     <tr><td align="center" style="padding:24px 10px;">
       <table role="presentation" class="email-container" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;">
@@ -283,7 +225,7 @@ export async function previewFlowEmails(c: Context) {
       return c.json({ error: 'Token decryption failed' }, 500);
     }
 
-    // Fetch brand data
+    // Fetch brand data (uses shared helper with fast /images/ API)
     const brand = await fetchClientBrand(serviceClient, clientData.id, apiKey, connection.store_name);
 
     // Generate branded HTML for each email

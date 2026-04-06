@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import {
-  ArrowLeft, Zap, Loader2, Check, Clock, Mail, Monitor, Smartphone, Tag, Package, ExternalLink, PartyPopper,
+  ArrowLeft, Zap, Loader2, Check, Clock, Mail, Monitor, Smartphone, Tag, Package, ExternalLink, PartyPopper, AlertTriangle, Play,
 } from 'lucide-react';
 import { type FlowTemplate } from '../FlowTemplates';
 import { type FlowWizardState } from '../FlowWizard';
@@ -29,6 +29,8 @@ function formatDelay(hours: number): string {
 
 export function FlowPublishStep({ template, clientId, state, flowCreated, onFlowCreated, onBack, onClose }: FlowPublishStepProps) {
   const [publishing, setPublishing] = useState(false);
+  const [activating, setActivating] = useState(false);
+  const [flowLive, setFlowLive] = useState(false);
   const [previewIdx, setPreviewIdx] = useState(0);
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [flowId, setFlowId] = useState<string | null>(null);
@@ -63,11 +65,16 @@ export function FlowPublishStep({ template, clientId, state, flowCreated, onFlow
       });
 
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.success === false) throw new Error(data.message || data.error || 'Error al crear flujo');
 
       setFlowId(data?.flowId || null);
       onFlowCreated();
-      toast.success(`Flujo "${template.nameEs}" creado en Klaviyo`);
+
+      if (data?.flowCreated) {
+        toast.success(`Flujo "${template.nameEs}" creado en Klaviyo`);
+      } else {
+        toast.warning('No se pudo crear el flow completo en Klaviyo. Revisa el dashboard de Klaviyo para más detalles.');
+      }
     } catch (err: any) {
       // Error handled by toast below
       toast.error(`Error al publicar: ${err.message || 'Intenta de nuevo'}`);
@@ -76,20 +83,69 @@ export function FlowPublishStep({ template, clientId, state, flowCreated, onFlow
     }
   };
 
+  const handleActivateFlow = async () => {
+    if (!flowId || !state.klaviyoConnectionId) return;
+    setActivating(true);
+    try {
+      const { data, error } = await callApi('klaviyo-manage-flows', {
+        body: {
+          action: 'activate_flow',
+          connectionId: state.klaviyoConnectionId,
+          flowId,
+        },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Error al activar');
+      setFlowLive(true);
+      toast.success('Flow activado — los emails se enviaran automaticamente');
+    } catch (err: any) {
+      toast.error(`Error al activar: ${err.message || 'Intenta de nuevo'}`);
+    } finally {
+      setActivating(false);
+    }
+  };
+
   if (flowCreated) {
+    const isFullFlow = !!flowId;
     return (
       <div className="max-w-2xl mx-auto px-6 py-16 flex flex-col items-center gap-6 text-center">
-        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
-          <PartyPopper className="w-10 h-10 text-green-600" />
+        <div className={`w-20 h-20 rounded-full flex items-center justify-center ${
+          flowLive ? 'bg-green-100' : isFullFlow ? 'bg-blue-100' : 'bg-amber-100'
+        }`}>
+          {flowLive ? (
+            <PartyPopper className="w-10 h-10 text-green-600" />
+          ) : isFullFlow ? (
+            <Check className="w-10 h-10 text-blue-600" />
+          ) : (
+            <AlertTriangle className="w-10 h-10 text-amber-600" />
+          )}
         </div>
         <div>
-          <h2 className="text-2xl font-semibold">Flujo creado exitosamente</h2>
+          <h2 className="text-2xl font-semibold">
+            {flowLive
+              ? 'Flow activo'
+              : isFullFlow
+              ? 'Flujo creado — listo para activar'
+              : 'Flow no pudo crearse automaticamente'}
+          </h2>
           <p className="text-muted-foreground mt-2">
-            "{template.nameEs}" esta listo en tu cuenta de Klaviyo.
-            Los emails se activaran automaticamente segun el trigger configurado.
+            {flowLive
+              ? `"${template.nameEs}" esta activo en Klaviyo. Los emails se enviaran automaticamente segun el trigger configurado.`
+              : isFullFlow
+              ? `"${template.nameEs}" fue creado en Klaviyo en modo borrador. Activalo para que empiece a enviar emails automaticamente.`
+              : `No fue posible crear el flow completo en Klaviyo. Los templates fueron limpiados. Puedes intentar de nuevo o crear el flow manualmente en Klaviyo.`}
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {isFullFlow && !flowLive && (
+            <Button onClick={handleActivateFlow} disabled={activating}>
+              {activating ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Activando...</>
+              ) : (
+                <><Play className="w-4 h-4 mr-2" />Activar flow</>
+              )}
+            </Button>
+          )}
           {flowId && (
             <Button variant="outline" asChild>
               <a
@@ -102,7 +158,7 @@ export function FlowPublishStep({ template, clientId, state, flowCreated, onFlow
               </a>
             </Button>
           )}
-          <Button onClick={onClose}>
+          <Button variant={isFullFlow && !flowLive ? 'ghost' : 'default'} onClick={onClose}>
             Volver a flujos
           </Button>
         </div>

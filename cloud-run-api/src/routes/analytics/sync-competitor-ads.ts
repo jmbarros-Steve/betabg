@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 
 interface AdLibraryAd {
   id: string;
@@ -428,7 +429,7 @@ export async function syncCompetitorAds(c: Context) {
     // Get Meta access token — needed for fallback (ig_handle only) path
     const { data: metaConn } = await supabase
       .from('platform_connections')
-      .select('access_token_encrypted')
+      .select('id, access_token_encrypted, connection_type')
       .eq('client_id', client_id)
       .eq('platform', 'meta')
       .eq('is_active', true)
@@ -438,12 +439,11 @@ export async function syncCompetitorAds(c: Context) {
     let accessToken = '';
     let tokenSource = '';
 
-    if (metaConn?.access_token_encrypted) {
-      const { data: decrypted } = await supabase
-        .rpc('decrypt_platform_token', { encrypted_token: metaConn.access_token_encrypted });
-      if (decrypted) {
-        accessToken = decrypted;
-        tokenSource = 'user_token';
+    if (metaConn) {
+      const resolved = await getTokenForConnection(supabase, metaConn);
+      if (resolved) {
+        accessToken = resolved;
+        tokenSource = metaConn.connection_type === 'bm_partner' ? 'bm_partner' : 'user_token';
       }
     }
 

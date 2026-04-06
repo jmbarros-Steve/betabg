@@ -144,9 +144,8 @@ export async function fetchKlaviyoTopProducts(c: Context) {
       }
     }
 
-    // Build product list, optionally enriching with Shopify data
-    const products = [];
-    for (const [title, count] of sorted) {
+    // Build product list, optionally enriching with Shopify data (parallel)
+    const products = await Promise.all(sorted.map(async ([title, count]) => {
       let image_url = '';
       let price = '';
       let handle = '';
@@ -174,8 +173,8 @@ export async function fetchKlaviyoTopProducts(c: Context) {
         }
       }
 
-      products.push({ title, image_url, price, handle, url, count });
-    }
+      return { title, image_url, price, handle, url, count };
+    }));
 
     return c.json({ products });
   } catch (error: unknown) {

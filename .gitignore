@@ -35,3 +35,5 @@ qa-script*.ts
 analisis-costos.html
 ANALISIS_COSTOS_PLATAFORMA.md
 .gstack/
+coverage/
+test-results/

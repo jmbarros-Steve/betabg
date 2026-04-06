@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { criterioEmailEvaluate } from '../ai/criterio-email.js';
 import { detectAngle } from '../../lib/angle-detector.js';
+import { deleteKlaviyoTemplate, sendCampaignJob } from './_helpers.js';
 
 export async function uploadKlaviyoDrafts(c: Context) {
   try {
@@ -19,7 +20,7 @@ export async function uploadKlaviyoDrafts(c: Context) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    const { connectionId, campaign } = await c.req.json();
+    const { connectionId, campaign, send_strategy, scheduled_at } = await c.req.json();
     console.log('upload-klaviyo-drafts received:', JSON.stringify({
       connectionId,
       campaignName: campaign?.name,
@@ -30,7 +31,7 @@ export async function uploadKlaviyoDrafts(c: Context) {
     }));
 
     if (!connectionId || !campaign) {
-      throw new Error('connectionId and campaign are required');
+      return c.json({ error: 'connectionId and campaign are required' }, 400);
     }
 
     // Verify connection ownership
@@ -43,13 +44,28 @@ export async function uploadKlaviyoDrafts(c: Context) {
 
     if (connErr || !conn) {
       console.error('Connection not found:', connErr?.message);
-      throw new Error('Connection not found');
+      return c.json({ error: 'Connection not found' }, 404);
     }
 
     const clientData = (conn as any).clients as { user_id: string; client_user_id: string | null };
     if (clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
       return c.json({ error: 'Forbidden' }, 403);
     }
+
+    // Decrypt API key first (needed for all operations)
+    if (!conn.api_key_encrypted) {
+      console.error('[upload-klaviyo-drafts] No encrypted API key for connection:', connectionId);
+      return c.json({ error: 'No encrypted API key found for this connection' }, 500);
+    }
+    const { data: apiKeyData, error: decryptError } = await supabase.rpc('decrypt_platform_token', {
+      encrypted_token: conn.api_key_encrypted
+    });
+    if (decryptError) {
+      console.error('[upload-klaviyo-drafts] decrypt_platform_token failed:', decryptError.message, decryptError.code);
+    }
+    const apiKey = apiKeyData as string;
+    if (!apiKey) return c.json({ error: 'No API key found for Klaviyo connection' }, 500);
+    console.log('Klaviyo API key found, length:', apiKey.length);
 
     // CRITERIO pre-flight check
     const { data: connClient } = await supabase
@@ -81,24 +97,10 @@ export async function uploadKlaviyoDrafts(c: Context) {
       }
     }
 
-    if (!conn.api_key_encrypted) {
-      console.error('[upload-klaviyo-drafts] No encrypted API key for connection:', connectionId);
-      return c.json({ error: 'No encrypted API key found for this connection' }, 500);
-    }
-    const { data: apiKeyData, error: decryptError } = await supabase.rpc('decrypt_platform_token', {
-      encrypted_token: conn.api_key_encrypted
-    });
-    if (decryptError) {
-      console.error('[upload-klaviyo-drafts] decrypt_platform_token failed:', decryptError.message, decryptError.code);
-    }
-    const apiKey = apiKeyData as string;
-    if (!apiKey) throw new Error('No API key found for Klaviyo connection');
-    console.log('Klaviyo API key found, length:', apiKey.length);
-
     const klaviyoHeaders = {
       'Authorization': `Klaviyo-API-Key ${apiKey}`,
-      'Content-Type': 'application/json',
-      'revision': '2024-10-15',
+      'Content-Type': 'application/vnd.api+json',
+      'revision': '2025-01-15',
     };
 
     // 1. Create template in Klaviyo
@@ -122,7 +124,7 @@ export async function uploadKlaviyoDrafts(c: Context) {
     if (!tplResp.ok) {
       const errBody = await tplResp.text();
       console.error('Klaviyo template creation error:', tplResp.status, errBody);
-      throw new Error(`Template creation failed: ${tplResp.status} - ${errBody.substring(0, 200)}`);
+      return c.json({ error: `Template creation failed: ${tplResp.status} - ${errBody.substring(0, 200)}` }, 500);
     }
 
     const tplData: any = await tplResp.json();
@@ -131,7 +133,7 @@ export async function uploadKlaviyoDrafts(c: Context) {
 
     await new Promise(r => setTimeout(r, 1000));
 
-    // 2. Create campaign with campaign-messages (without template -- assigned separately)
+    // 2. Create campaign with campaign-messages
     const campaignPayload = {
       data: {
         type: 'campaign',
@@ -156,12 +158,16 @@ export async function uploadKlaviyoDrafts(c: Context) {
               },
             }]
           },
-          send_strategy: {
-            method: 'static',
-            options_static: {
-              datetime: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-            },
-          },
+          send_strategy: send_strategy === 'smart_send'
+            ? { method: 'smart_send_time' }
+            : {
+                method: 'static',
+                options_static: {
+                  datetime: (send_strategy === 'scheduled' && scheduled_at)
+                    ? scheduled_at
+                    : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                },
+              },
         }
       }
     };
@@ -177,7 +183,11 @@ export async function uploadKlaviyoDrafts(c: Context) {
     if (!campResp.ok) {
       const errBody = await campResp.text();
       console.error('Klaviyo campaign creation error:', campResp.status, errBody);
-      throw new Error(`Campaign creation failed: ${campResp.status} - ${errBody.substring(0, 300)}`);
+      // Cleanup: delete the orphaned template
+      if (templateId) {
+        await deleteKlaviyoTemplate(apiKey, templateId);
+      }
+      return c.json({ error: `Campaign creation failed: ${campResp.status} - ${errBody.substring(0, 300)}` }, 500);
     }
 
     const campData: any = await campResp.json();
@@ -208,9 +218,25 @@ export async function uploadKlaviyoDrafts(c: Context) {
         console.error('Template assign error:', assignResp.status, await assignResp.text());
       } else {
         console.log(`Template ${templateId} assigned to message ${messageId}`);
+        // Delete the Steve-created template (Klaviyo already copied the HTML into the message)
+        await deleteKlaviyoTemplate(apiKey, templateId);
+        console.log(`Template cleaned up: ${templateId}`);
       }
     }
-    console.log(`Campaign created as draft: ${campaignId}`);
+    // Trigger send job if strategy is not draft
+    let finalStatus = 'draft';
+    if (send_strategy && send_strategy !== 'draft' && campaignId) {
+      try {
+        await sendCampaignJob(apiKey, campaignId);
+        finalStatus = send_strategy === 'immediate' ? 'queued' : 'scheduled';
+        console.log(`Campaign ${finalStatus}: ${campaignId}`);
+      } catch (sendErr: any) {
+        console.error(`Failed to trigger send for campaign ${campaignId}:`, sendErr.message);
+        finalStatus = 'draft';
+      }
+    } else {
+      console.log(`Campaign created as draft: ${campaignId}`);
+    }
 
     // D.6: Save to creative_history with angle + criterio_score
     if (clientId) {
@@ -239,6 +265,7 @@ export async function uploadKlaviyoDrafts(c: Context) {
       success: true,
       campaignId,
       templateId,
+      status: finalStatus,
     });
 
   } catch (err: any) {

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 
 // ---------------------------------------------------------------------------
 // In-memory cache (5 min TTL)
@@ -93,7 +94,7 @@ export async function fetchMetaAdAccounts(c: Context) {
     // Step 1: Get connection
     const { data: connection, error: connError } = await supabase
       .from('platform_connections')
-      .select('id, platform, access_token_encrypted, client_id')
+      .select('id, platform, access_token_encrypted, client_id, connection_type')
       .eq('id', connection_id)
       .eq('platform', 'meta')
       .maybeSingle();
@@ -130,13 +131,11 @@ export async function fetchMetaAdAccounts(c: Context) {
       return c.json({ error: 'Missing Meta access token' }, 400);
     }
 
-    // Decrypt access token
-    const { data: decryptedToken, error: decryptError } = await supabase
-      .rpc('decrypt_platform_token', { encrypted_token: connection.access_token_encrypted });
-
-    if (decryptError || !decryptedToken) {
-      console.error('Token decryption error:', decryptError);
-      return c.json({ error: 'Failed to decrypt token' }, 500);
+    // Resolve access token (supports both direct decrypt and BM Partner SUAT)
+    const decryptedToken = await getTokenForConnection(supabase, connection);
+    if (!decryptedToken) {
+      console.error('[fetch-meta-ad-accounts] Token resolution failed');
+      return c.json({ error: 'Failed to resolve token' }, 500);
     }
 
     // No circuit breaker — let Meta handle its own rate limits

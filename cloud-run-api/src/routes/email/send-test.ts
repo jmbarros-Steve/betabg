@@ -40,9 +40,13 @@ export async function sendTestEmail(c: Context) {
       return c.json({ error: 'RESEND_API_KEY not configured' }, 500);
     }
 
+    if (!from_email) {
+      return c.json({ error: 'from_email is required' }, 400);
+    }
+
     const resend = new Resend(resendApiKey);
     const senderName = from_name || 'Steve Ads';
-    const senderEmail = from_email || 'test@steveads.com';
+    const senderEmail = from_email;
 
     const { data, error } = await resend.emails.send({
       from: `${senderName} <${senderEmail}>`,

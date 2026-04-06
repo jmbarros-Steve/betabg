@@ -6,8 +6,8 @@ export async function importKlaviyoTemplates(c: Context) {
     const supabase = getSupabaseAdmin();
 
     const authHeader = c.req.header('Authorization');
-    if (!authHeader) {
-      return c.json({ error: 'No authorization header' }, 401);
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ error: 'Unauthorized' }, 401);
     }
 
     const { data: { user }, error: authError } = await supabase.auth.getUser(
@@ -67,7 +67,7 @@ export async function importKlaviyoTemplates(c: Context) {
 
       const data: any = await resp.json();
       const pageTemplates = data.data || [];
-      allTemplates = [...allTemplates, ...pageTemplates];
+      allTemplates.push(...pageTemplates);
       pageCount++;
 
       console.log(`Page ${pageCount}: ${pageTemplates.length} templates (total: ${allTemplates.length})`);
@@ -89,37 +89,44 @@ export async function importKlaviyoTemplates(c: Context) {
     console.log('Top 10 (most recent by date):');
     top10.forEach((t: any) => console.log(`  "${t.attributes?.name}" - created: ${t.attributes?.created} - updated: ${t.attributes?.updated}`));
 
-    // PASO 3: Traer HTML de cada una
-    const templates = [];
-    for (const t of top10) {
-      try {
-        const detailResp = await fetch(`https://a.klaviyo.com/api/templates/${t.id}/`, { headers });
-        if (detailResp.ok) {
-          const detail: any = await detailResp.json();
-          const html = detail.data?.attributes?.html || '';
-          const colorMatches = html.match(/#[0-9a-fA-F]{6}/g) || [];
-          const uniqueColors = [...new Set(colorMatches)].slice(0, 10);
-
-          templates.push({
-            id: t.id,
-            name: detail.data?.attributes?.name || t.attributes?.name || 'Sin nombre',
-            html,
-            text: detail.data?.attributes?.text || '',
-            hasHtml: html.length > 0,
-            htmlLength: html.length,
-            created: t.attributes?.created,
-            updated: t.attributes?.updated,
-            extractedColors: uniqueColors,
-          });
-          console.log(`"${t.attributes?.name}": ${html.length} chars`);
-        } else {
-          const errText = await detailResp.text();
-          console.log(`Template ${t.id} detail error: ${detailResp.status}`, errText);
+    // PASO 3: Traer HTML de cada una (max 3 concurrent)
+    const templates: any[] = [];
+    const CONCURRENCY = 3;
+    for (let i = 0; i < top10.length; i += CONCURRENCY) {
+      const batch = top10.slice(i, i + CONCURRENCY);
+      const batchResults = await Promise.all(batch.map(async (t: any) => {
+        try {
+          const detailResp = await fetch(`https://a.klaviyo.com/api/templates/${t.id}/`, { headers });
+          if (detailResp.ok) {
+            const detail: any = await detailResp.json();
+            const html = detail.data?.attributes?.html || '';
+            const colorMatches = html.match(/#[0-9a-fA-F]{6}/g) || [];
+            const uniqueColors = [...new Set(colorMatches)].slice(0, 10);
+            console.log(`"${t.attributes?.name}": ${html.length} chars`);
+            return {
+              id: t.id,
+              name: detail.data?.attributes?.name || t.attributes?.name || 'Sin nombre',
+              html,
+              text: detail.data?.attributes?.text || '',
+              hasHtml: html.length > 0,
+              htmlLength: html.length,
+              created: t.attributes?.created,
+              updated: t.attributes?.updated,
+              extractedColors: uniqueColors,
+            };
+          } else {
+            const errText = await detailResp.text();
+            console.log(`Template ${t.id} detail error: ${detailResp.status}`, errText);
+            return null;
+          }
+        } catch (e: any) {
+          console.log(`Error fetching template ${t.id}:`, e.message);
+          return null;
         }
-      } catch (e: any) {
-        console.log(`Error fetching template ${t.id}:`, e.message);
+      }));
+      for (const r of batchResults) {
+        if (r) templates.push(r);
       }
-      await new Promise(r => setTimeout(r, 300));
     }
 
     return c.json({

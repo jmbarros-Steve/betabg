@@ -1,23 +1,17 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-
-const KLAVIYO_REVISION = '2024-10-15';
+import {
+  KLAVIYO_BASE, KLAVIYO_REVISION,
+  makeKlaviyoGetHeaders, makeKlaviyoPostHeaders,
+  findConversionMetricId,
+} from './_helpers.js';
 
 function makeHeaders(apiKey: string) {
-  return {
-    'Authorization': `Klaviyo-API-Key ${apiKey}`,
-    'accept': 'application/json',
-    'revision': KLAVIYO_REVISION,
-  };
+  return makeKlaviyoGetHeaders(apiKey);
 }
 
 function makePostHeaders(apiKey: string) {
-  return {
-    'Authorization': `Klaviyo-API-Key ${apiKey}`,
-    'accept': 'application/json',
-    'content-type': 'application/json',
-    'revision': '2025-01-15',
-  };
+  return makeKlaviyoPostHeaders(apiKey);
 }
 
 async function klaviyoGet(url: string, apiKey: string): Promise<any> {
@@ -26,24 +20,10 @@ async function klaviyoGet(url: string, apiKey: string): Promise<any> {
   return res.json();
 }
 
-// Find "Placed Order" metric ID
-async function findConversionMetricId(apiKey: string): Promise<string | null> {
-  const data: any = await klaviyoGet('https://a.klaviyo.com/api/metrics/', apiKey);
-  if (!data) return null;
-  const metrics = data.data || [];
-  const placed = metrics.find((m: any) => (m.attributes?.name || '').toLowerCase() === 'placed order');
-  if (placed) return placed.id;
-  const fallback = metrics.find((m: any) => {
-    const name = (m.attributes?.name || '').toLowerCase();
-    return name.includes('order') || name.includes('purchase');
-  });
-  return fallback?.id || null;
-}
-
 // Fetch flows (paginated)
 async function fetchFlows(apiKey: string) {
   const allFlows: any[] = [];
-  let url: string | null = 'https://a.klaviyo.com/api/flows/';
+  let url: string | null = `${KLAVIYO_BASE}/flows/`;
   while (url) {
     const data: any = await klaviyoGet(url, apiKey);
     if (!data) break;
@@ -65,7 +45,7 @@ async function fetchFlows(apiKey: string) {
 // Fetch campaigns (paginated)
 async function fetchCampaigns(apiKey: string) {
   const allCampaigns: any[] = [];
-  let url: string | null = 'https://a.klaviyo.com/api/campaigns/?filter=equals(messages.channel,"email")&sort=-updated_at';
+  let url: string | null = `${KLAVIYO_BASE}/campaigns/?filter=equals(messages.channel,"email")&sort=-updated_at`;
   while (url) {
     const data: any = await klaviyoGet(url, apiKey);
     if (!data) break;
@@ -86,7 +66,7 @@ async function fetchCampaigns(apiKey: string) {
 
 // Fetch lists (first page only -- fast)
 async function fetchLists(apiKey: string): Promise<any[]> {
-  const data: any = await klaviyoGet('https://a.klaviyo.com/api/lists/', apiKey);
+  const data: any = await klaviyoGet(`${KLAVIYO_BASE}/lists/`, apiKey);
   if (!data) return [];
   return (data.data || []).map((l: any) => ({
     id: l.id,
@@ -98,7 +78,7 @@ async function fetchLists(apiKey: string): Promise<any[]> {
 
 // Fetch segments (first page only -- fast)
 async function fetchSegments(apiKey: string): Promise<any[]> {
-  const data: any = await klaviyoGet('https://a.klaviyo.com/api/segments/', apiKey);
+  const data: any = await klaviyoGet(`${KLAVIYO_BASE}/segments/`, apiKey);
   if (!data) return [];
   return (data.data || []).map((s: any) => ({
     id: s.id,
@@ -124,21 +104,21 @@ async function countProfiles(apiKey: string, entityType: string, entityId: strin
   }
 }
 
-// Quick total profiles estimate (1 API call)
-async function estimateTotalProfiles(apiKey: string): Promise<number | string> {
+// Quick total profiles estimate (1 API call). Returns -1 if there are more than 100.
+async function estimateTotalProfiles(apiKey: string): Promise<number> {
   const data: any = await klaviyoGet(
-    'https://a.klaviyo.com/api/profiles/?page[size]=100&fields[profile]=email',
+    `${KLAVIYO_BASE}/profiles/?page[size]=100&fields[profile]=email`,
     apiKey
   );
   if (!data) return 0;
   const count = (data.data || []).length;
   const hasMore = !!data.links?.next;
-  return hasMore ? `${count}+` : count;
+  return hasMore ? -1 : count;
 }
 
 // Flow values report
 async function fetchFlowReport(apiKey: string, conversionMetricId: string, timeframe: string) {
-  const res = await fetch('https://a.klaviyo.com/api/flow-values-reports/', {
+  const res = await fetch(`${KLAVIYO_BASE}/flow-values-reports/`, {
     method: 'POST',
     headers: makePostHeaders(apiKey),
     body: JSON.stringify({
@@ -172,7 +152,7 @@ async function fetchFlowReport(apiKey: string, conversionMetricId: string, timef
 
 // Campaign values report
 async function fetchCampaignReport(apiKey: string, conversionMetricId: string, timeframe: string) {
-  const res = await fetch('https://a.klaviyo.com/api/campaign-values-reports/', {
+  const res = await fetch(`${KLAVIYO_BASE}/campaign-values-reports/`, {
     method: 'POST',
     headers: makePostHeaders(apiKey),
     body: JSON.stringify({
@@ -347,7 +327,7 @@ export async function syncKlaviyoMetrics(c: Context) {
     console.log(`[klaviyo] Total flow revenue from API: $${totalFlowRevenue.toFixed(2)} (${Object.keys(flowMetrics).length} flows with metrics)`);
 
     const globalStats = {
-      totalProfiles,
+      totalProfiles: totalProfiles >= 0 ? totalProfiles : '100+',
       newProfiles: 0,
       totalFlows: nonArchivedFlows.length,
       activeFlows: nonArchivedFlows.filter((f: any) => f.status === 'live').length,
@@ -371,10 +351,7 @@ export async function syncKlaviyoMetrics(c: Context) {
 
     const metricsToSave = [
       { connection_id: connectionId, metric_date: today, metric_type: 'bounce_rate', metric_value: avgBounceRate },
-      { connection_id: connectionId, metric_date: today, metric_type: 'spam_rate', metric_value: 0 },
-      { connection_id: connectionId, metric_date: today, metric_type: 'spf_pass', metric_value: 1 },
-      { connection_id: connectionId, metric_date: today, metric_type: 'dkim_pass', metric_value: 1 },
-      { connection_id: connectionId, metric_date: today, metric_type: 'subscriber_count', metric_value: typeof totalProfiles === 'number' ? totalProfiles : 100 },
+      { connection_id: connectionId, metric_date: today, metric_type: 'subscriber_count', metric_value: totalProfiles >= 0 ? totalProfiles : 100 },
       { connection_id: connectionId, metric_date: today, metric_type: 'open_rate', metric_value: avgOpenRate },
       { connection_id: connectionId, metric_date: today, metric_type: 'click_rate', metric_value: avgClickRate },
       { connection_id: connectionId, metric_date: today, metric_type: 'unsubscribe_rate', metric_value: unsubscribeRate },

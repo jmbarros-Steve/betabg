@@ -29,7 +29,6 @@ import {
   Users,
   FolderOpen,
   BarChart3,
-  MessageSquare,
   Zap,
   Swords,
   DollarSign,
@@ -65,7 +64,6 @@ import MetaCampaignManager from './MetaCampaignManager';
 import MetaAudienceManager from './MetaAudienceManager';
 import MetaAnalyticsDashboard from './MetaAnalyticsDashboard';
 import MetaHealthBanner from './MetaHealthBanner';
-import MetaSocialInbox from './MetaSocialInbox';
 import MetaAutomatedRules from './MetaAutomatedRules';
 
 // New professional components
@@ -103,7 +101,6 @@ type SectionKey =
   | 'audiences'
   | 'library'
   | 'analytics'
-  | 'social-inbox'
   | 'rules'
   | 'competitors'
   | 'drafts'
@@ -166,7 +163,6 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'pixel', label: 'Pixel', icon: Crosshair },
   { key: 'library', label: 'Biblioteca', icon: FolderOpen },
   { key: 'analytics', label: 'Análisis', icon: BarChart3 },
-  { key: 'social-inbox', label: 'Bandeja Social', icon: MessageSquare },
   { key: 'rules', label: 'Reglas', icon: Zap },
   { key: 'creative-perf', label: 'Creativos', icon: Sparkles },
   { key: 'competitors', label: 'Competencia', icon: Swords },
@@ -959,7 +955,6 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
       'create-ad': 'Conecta Meta Ads para crear anuncios',
       'audiences': 'Conecta Meta Ads para crear audiencias',
       'analytics': 'Conecta Meta Ads para ver análisis',
-      'social-inbox': 'Conecta Meta Ads para tu bandeja social',
       'rules': 'Conecta Meta Ads para crear reglas automáticas',
       'drafts': 'Conecta Meta Ads para ver borradores',
       'pixel': 'Configurar Meta Pixel',
@@ -976,7 +971,6 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
       'create-ad': 'Diseña anuncios con IA: genera copys, imágenes y videos optimizados.',
       'audiences': 'Crea audiencias personalizadas y lookalikes basadas en tus datos de clientes.',
       'analytics': 'Análisis detallado de rendimiento con gráficos de tendencia y comparativas.',
-      'social-inbox': 'Responde mensajes de Facebook e Instagram desde un solo lugar.',
       'rules': 'Automatiza acciones como pausar campañas con bajo ROAS o escalar las que funcionan.',
       'drafts': 'Tus borradores de campañas y anuncios aparecerán aquí.',
       'pixel': 'El Meta Pixel te permite rastrear conversiones en tu sitio web. Puedes configurarlo desde Meta Business Suite o pedirle a tu desarrollador que lo instale.',
@@ -1042,7 +1036,6 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
             />
           </PlanGate>
         )}
-        {key === 'social-inbox' && <MetaSocialInbox clientId={clientId} />}
         {key === 'rules' && <MetaAutomatedRules clientId={clientId} />}
         {key === 'drafts' && <DraftsManager clientId={clientId} onEditDraft={() => { handleNavClick('create-wizard'); }} />}
         {key === 'pixel' && <PixelSetupWizard clientId={clientId} />}

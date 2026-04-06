@@ -107,6 +107,10 @@ import { detectAudienceOverlap } from './meta/detect-audience-overlap.js';
 import { syncKlaviyoToMetaAudience } from './meta/sync-klaviyo-to-meta-audience.js';
 import { metaCatalogs } from './meta/meta-catalogs.js';
 import { metaAdsetAction } from './meta/meta-adset-action.js';
+import { discoverClientAssets } from './meta/discover-client-assets.js';
+
+// Webhooks
+import { leadsieWebhook } from './webhooks/leadsie-webhook.js';
 
 // Instagram
 import { fetchInstagramInsights } from './instagram/fetch-instagram-insights.js';
@@ -335,6 +339,10 @@ export function registerRoutes(app: Hono) {
   app.post('/api/sync-klaviyo-to-meta-audience', authMiddleware, syncKlaviyoToMetaAudience);
   app.post('/api/meta-catalogs', authMiddleware, metaCatalogs);
   app.post('/api/meta-adset-action', authMiddleware, metaAdsetAction);
+  app.post('/api/discover-client-assets', authMiddleware, discoverClientAssets);
+
+  // Leadsie webhook (public — validated via X-Leadsie-Secret header)
+  app.post('/api/webhooks/leadsie', leadsieWebhook);
 
   // ============================================================
   // Phase 3: Platform Integrations (Instagram)

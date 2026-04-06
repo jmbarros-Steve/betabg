@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
@@ -403,7 +404,7 @@ export async function manageMetaRules(c: Context) {
       // Get connection for Meta API access
       const { data: connection, error: connError } = await supabase
         .from('platform_connections')
-        .select('id, account_id, access_token_encrypted')
+        .select('id, account_id, access_token_encrypted, connection_type')
         .eq('id', connection_id)
         .eq('platform', 'meta')
         .single();
@@ -412,12 +413,10 @@ export async function manageMetaRules(c: Context) {
         return c.json({ error: 'Connection not found' }, 404);
       }
 
-      const { data: decryptedToken, error: decryptError } = await supabase
-        .rpc('decrypt_platform_token', { encrypted_token: connection.access_token_encrypted });
-
-      if (decryptError || !decryptedToken) {
-        console.error('[manage-meta-rules] Token decryption error:', decryptError);
-        return c.json({ error: 'Failed to decrypt token' }, 500);
+      const decryptedToken = await getTokenForConnection(supabase, connection);
+      if (!decryptedToken) {
+        console.error('[manage-meta-rules] Token resolution failed');
+        return c.json({ error: 'Failed to resolve token' }, 500);
       }
 
       const accountId = connection.account_id!.replace(/^act_/, '');

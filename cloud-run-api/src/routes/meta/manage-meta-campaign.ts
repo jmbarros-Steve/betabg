@@ -4,6 +4,7 @@ import { criterioMeta } from '../ai/criterio-meta.js';
 
 import { espejoAd } from '../ai/espejo.js';
 import { detectAngle } from '../../lib/angle-detector.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
@@ -1397,6 +1398,7 @@ export async function manageMetaCampaign(c: Context) {
         platform,
         account_id,
         access_token_encrypted,
+        connection_type,
         client_id,
         clients!inner(user_id, client_user_id)
       `)
@@ -1429,13 +1431,11 @@ export async function manageMetaCampaign(c: Context) {
       return c.json({ error: 'Missing Meta credentials (access token or account ID)' }, 400);
     }
 
-    // Decrypt access token
-    const { data: decryptedToken, error: decryptError } = await supabase
-      .rpc('decrypt_platform_token', { encrypted_token: connection.access_token_encrypted });
-
-    if (decryptError || !decryptedToken) {
-      console.error('[manage-meta-campaign] Token decryption error:', decryptError);
-      return c.json({ error: 'Failed to decrypt access token' }, 500);
+    // Resolve token (SUAT for bm_partner, decrypt for oauth)
+    const decryptedToken = await getTokenForConnection(supabase, connection);
+    if (!decryptedToken) {
+      console.error('[manage-meta-campaign] Token resolution failed');
+      return c.json({ error: 'Failed to resolve access token' }, 500);
     }
 
     // Normalize account_id (strip act_ prefix if present, we add it where needed)

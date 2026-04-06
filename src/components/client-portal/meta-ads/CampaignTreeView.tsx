@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Megaphone,
   FolderOpen,
   FileImage,
@@ -353,6 +354,45 @@ function CampaignRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [budgetOpen, setBudgetOpen] = useState(false);
+  const [budgetAmount, setBudgetAmount] = useState('');
+  const [budgetLoading, setBudgetLoading] = useState(false);
+
+  const handleBudgetUpdate = async (mode: 'plus10' | 'minus10' | 'set') => {
+    if (connectionIds.length === 0) return;
+    setBudgetLoading(true);
+    try {
+      let newBudget: number;
+      if (mode === 'plus10') {
+        newBudget = Math.round(campaign.daily_budget * 1.1);
+      } else if (mode === 'minus10') {
+        newBudget = Math.max(1000, Math.round(campaign.daily_budget * 0.9));
+      } else {
+        newBudget = parseInt(budgetAmount, 10);
+        if (isNaN(newBudget) || newBudget < 1000) {
+          toast.error('Monto mínimo: $1.000');
+          setBudgetLoading(false);
+          return;
+        }
+      }
+      const { error } = await callApi('manage-meta-campaign', {
+        body: {
+          action: 'update_budget',
+          campaign_id: campaign.campaign_id,
+          connection_id: connectionIds[0],
+          data: { daily_budget: newBudget },
+        },
+      });
+      if (error) throw error;
+      campaign.daily_budget = newBudget;
+      toast.success(`Presupuesto actualizado a ${fmtCLP(newBudget)}/día`);
+      setBudgetAmount('');
+    } catch {
+      toast.error('Error al actualizar presupuesto');
+    } finally {
+      setBudgetLoading(false);
+    }
+  };
 
   const handleExpand = () => {
     const next = !expanded;
@@ -457,7 +497,66 @@ function CampaignRow({
             >
               {campaign.status === 'ACTIVE' ? <><Pause className="w-3 h-3 mr-1" />Pausar</> : <><Play className="w-3 h-3 mr-1" />Reanudar</>}
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={(e) => { e.stopPropagation(); setBudgetOpen(!budgetOpen); }}
+            >
+              <DollarSign className="w-3 h-3 mr-1" />Presupuesto
+            </Button>
           </div>
+          {/* Budget inline panel */}
+          {budgetOpen && (
+            <div className="px-4 py-3 border-t border-border/30 bg-muted/20 space-y-3">
+              <div className="flex items-center gap-2 text-sm">
+                <DollarSign className="w-4 h-4 text-green-600" />
+                <span className="font-medium">Presupuesto diario:</span>
+                <span className="font-bold">{fmtCLP(campaign.daily_budget)}/día</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs text-green-700 border-green-300 hover:bg-green-50"
+                  onClick={(e) => { e.stopPropagation(); handleBudgetUpdate('plus10'); }}
+                  disabled={budgetLoading}
+                >
+                  {budgetLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <ChevronUp className="w-3 h-3 mr-1" />}
+                  +10% ({fmtCLP(Math.round(campaign.daily_budget * 1.1))})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs text-red-700 border-red-300 hover:bg-red-50"
+                  onClick={(e) => { e.stopPropagation(); handleBudgetUpdate('minus10'); }}
+                  disabled={budgetLoading}
+                >
+                  {budgetLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <ChevronDown className="w-3 h-3 mr-1" />}
+                  -10% ({fmtCLP(Math.max(1000, Math.round(campaign.daily_budget * 0.9)))})
+                </Button>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    placeholder="Monto"
+                    value={budgetAmount}
+                    onChange={(e) => setBudgetAmount(e.target.value)}
+                    className="h-8 w-28 text-xs"
+                    min={1000}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={(e) => { e.stopPropagation(); handleBudgetUpdate('set'); }}
+                    disabled={budgetLoading || !budgetAmount}
+                  >
+                    {budgetLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Aplicar'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

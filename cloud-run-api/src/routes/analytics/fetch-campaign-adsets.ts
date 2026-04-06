@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 
 interface AdSetInsight {
   id: string;
@@ -40,6 +41,7 @@ export async function fetchCampaignAdsets(c: Context) {
       platform,
       account_id,
       access_token_encrypted,
+      connection_type,
       client_id,
       clients!inner(user_id, client_user_id)
     `)
@@ -57,17 +59,10 @@ export async function fetchCampaignAdsets(c: Context) {
     return c.json({ error: 'Unauthorized' }, 403);
   }
 
-  // Decrypt access token
-  if (!connection.access_token_encrypted) {
-    console.error('[fetch-campaign-adsets] No encrypted token for connection:', connection.id);
-    return c.json({ error: 'No encrypted token found for this connection' }, 500);
-  }
-  const { data: decryptedToken, error: decryptError } = await supabase
-    .rpc('decrypt_platform_token', { encrypted_token: connection.access_token_encrypted });
-
-  if (decryptError || !decryptedToken) {
-    console.error('[fetch-campaign-adsets] decrypt_platform_token failed:', decryptError?.message, decryptError?.code);
-    return c.json({ error: 'Failed to decrypt token' }, 500);
+  const decryptedToken = await getTokenForConnection(supabase, connection);
+  if (!decryptedToken) {
+    console.error('[fetch-campaign-adsets] Token resolution failed for connection:', connection.id);
+    return c.json({ error: 'Failed to resolve token' }, 500);
   }
 
   // Date range: last 30 days

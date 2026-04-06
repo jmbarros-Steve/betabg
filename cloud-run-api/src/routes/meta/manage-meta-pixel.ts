@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
@@ -154,7 +155,7 @@ export async function manageMetaPixel(c: Context) {
     const { data: connection, error: connError } = await supabase
       .from('platform_connections')
       .select(`
-        id, platform, account_id, access_token_encrypted, client_id,
+        id, platform, account_id, access_token_encrypted, connection_type, client_id,
         clients!inner(user_id, client_user_id)
       `)
       .eq('id', connection_id)
@@ -178,17 +179,14 @@ export async function manageMetaPixel(c: Context) {
       }
     }
 
-    if (!connection.access_token_encrypted || !connection.account_id) {
-      return c.json({ error: 'Missing Meta credentials (access token or account ID)' }, 400);
+    if (!connection.account_id) {
+      return c.json({ error: 'Missing Meta account ID' }, 400);
     }
 
-    // Decrypt access token
-    const { data: decryptedToken, error: decryptError } = await supabase
-      .rpc('decrypt_platform_token', { encrypted_token: connection.access_token_encrypted });
-
-    if (decryptError || !decryptedToken) {
-      console.error('[manage-meta-pixel] Token decryption error:', decryptError);
-      return c.json({ error: 'Failed to decrypt access token' }, 500);
+    const decryptedToken = await getTokenForConnection(supabase, connection);
+    if (!decryptedToken) {
+      console.error('[manage-meta-pixel] Token resolution failed');
+      return c.json({ error: 'Failed to resolve access token' }, 500);
     }
 
     const accountId = connection.account_id.replace(/^act_/, '');

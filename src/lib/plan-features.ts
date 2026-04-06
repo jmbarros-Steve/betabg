@@ -167,7 +167,7 @@ export const TAB_MIN_PLAN: Record<string, PlanSlug> = {
   deepdive: 'estrategia',
   estrategia: 'estrategia',
   copies: 'visual',       // ver = visual, crear = full (gated internamente)
-  instagram: 'visual',
+  social: 'visual',
   google: 'visual',
   klaviyo: 'visual',
   email: 'full',

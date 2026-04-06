@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { checkRateLimit } from '../../lib/rate-limiter.js';
 import { metaApiFetch, metaApiJson } from '../../lib/meta-fetch.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 
 // Currency conversion utilities
 const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
@@ -185,6 +186,7 @@ export async function syncMetaMetrics(c: Context) {
         platform,
         account_id,
         access_token_encrypted,
+        connection_type,
         client_id,
         clients!inner(user_id, client_user_id)
       `)
@@ -213,17 +215,15 @@ export async function syncMetaMetrics(c: Context) {
       }
     }
 
-    if (!connection.access_token_encrypted || !connection.account_id) {
-      return c.json({ error: 'Missing Meta credentials' }, 400);
+    if (!connection.account_id) {
+      return c.json({ error: 'Missing Meta account_id' }, 400);
     }
 
-    // Decrypt access token
-    const { data: decryptedToken, error: decryptError } = await supabase
-      .rpc('decrypt_platform_token', { encrypted_token: connection.access_token_encrypted });
-
-    if (decryptError || !decryptedToken) {
-      console.error('Token decryption error:', decryptError);
-      return c.json({ error: 'Failed to decrypt token' }, 500);
+    // Resolve token (SUAT for bm_partner, decrypt for oauth)
+    const decryptedToken = await getTokenForConnection(supabase, connection);
+    if (!decryptedToken) {
+      console.error('Token resolution failed for connection', connection.id);
+      return c.json({ error: 'Failed to resolve token' }, 500);
     }
 
     // Prepare ad account ID (Meta requires act_ prefix)

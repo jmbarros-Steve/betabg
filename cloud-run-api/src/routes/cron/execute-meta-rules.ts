@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { metaApiFetch } from '../../lib/meta-fetch.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 
 /**
  * Cron: Execute all active Meta automated rules across all clients.
@@ -22,7 +23,7 @@ export async function executeMetaRulesCron(c: Context) {
     // Fetch all active rules grouped by connection
     const { data: activeRules, error } = await supabase
       .from('meta_automated_rules')
-      .select('*, platform_connections!inner(id, account_id, access_token_encrypted, client_id)')
+      .select('*, platform_connections!inner(id, account_id, access_token_encrypted, client_id, connection_type)')
       .eq('is_active', true);
 
     if (error) {
@@ -52,12 +53,10 @@ export async function executeMetaRulesCron(c: Context) {
       const conn = (rules[0] as any).platform_connections;
       if (!conn?.access_token_encrypted || !conn?.account_id) continue;
 
-      // Decrypt token
-      const { data: decryptedToken, error: decryptError } = await supabase
-        .rpc('decrypt_platform_token', { encrypted_token: conn.access_token_encrypted });
-
-      if (decryptError || !decryptedToken) {
-        errors.push(`Connection ${connectionId}: token decrypt failed`);
+      // Resolve token (supports both encrypted and system tokens)
+      const decryptedToken = await getTokenForConnection(supabase, conn);
+      if (!decryptedToken) {
+        errors.push(`Connection ${connectionId}: token resolution failed`);
         continue;
       }
 

@@ -1,5 +1,10 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import {
+  KLAVIYO_BASE, KLAVIYO_REVISION,
+  makeKlaviyoGetHeaders, makeKlaviyoPostHeaders,
+  findConversionMetricId,
+} from './_helpers.js';
 
 /**
  * GET /api/klaviyo/flow-metrics?connection_id=xxx&flow_id=yyy&timeframe=last_90_days
@@ -54,35 +59,16 @@ export async function klaviyoFlowMetrics(c: Context) {
     });
     if (!apiKey) return c.json({ error: 'Failed to decrypt API key' }, 500);
 
-    // Find conversion metric (Placed Order)
-    const metricsRes = await fetch('https://a.klaviyo.com/api/metrics/', {
-      headers: {
-        'Authorization': `Klaviyo-API-Key ${apiKey}`,
-        'accept': 'application/json',
-        'revision': '2024-10-15',
-      },
-    });
-    let conversionMetricId: string | null = null;
-    if (metricsRes.ok) {
-      const metricsData = await metricsRes.json() as any;
-      const metrics = metricsData.data || [];
-      const placed = metrics.find((m: any) => (m.attributes?.name || '').toLowerCase() === 'placed order');
-      conversionMetricId = placed?.id || metrics.find((m: any) =>
-        (m.attributes?.name || '').toLowerCase().includes('order')
-      )?.id || null;
-    }
+    // Find conversion metric (Placed Order) — shared helper
+    const conversionMetricId = await findConversionMetricId(apiKey);
 
     if (!conversionMetricId) {
       return c.json({ error: 'No conversion metric found in Klaviyo account' }, 404);
     }
 
     // Fetch flow details
-    const flowRes = await fetch(`https://a.klaviyo.com/api/flows/${flowId}/`, {
-      headers: {
-        'Authorization': `Klaviyo-API-Key ${apiKey}`,
-        'accept': 'application/json',
-        'revision': '2024-10-15',
-      },
+    const flowRes = await fetch(`${KLAVIYO_BASE}/flows/${flowId}/`, {
+      headers: makeKlaviyoGetHeaders(apiKey),
     });
 
     let flowName = 'Unknown';
@@ -94,14 +80,9 @@ export async function klaviyoFlowMetrics(c: Context) {
     }
 
     // Fetch flow values report
-    const reportRes = await fetch('https://a.klaviyo.com/api/flow-values-reports/', {
+    const reportRes = await fetch(`${KLAVIYO_BASE}/flow-values-reports/`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Klaviyo-API-Key ${apiKey}`,
-        'accept': 'application/json',
-        'content-type': 'application/json',
-        'revision': '2025-01-15',
-      },
+      headers: makeKlaviyoPostHeaders(apiKey),
       body: JSON.stringify({
         data: {
           type: 'flow-values-report',

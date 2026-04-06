@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Link2, CheckCircle, XCircle, RefreshCw, ExternalLink, ShoppingBag, Key, Mail, Unlink, Smartphone, Check } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { MetaAdAccountSelector } from './MetaAdAccountSelector';
+import { MetaPartnerSetup } from './meta-ads/MetaPartnerSetup';
 import logoShopify from '@/assets/logo-shopify-clean.png';
 import logoMeta from '@/assets/logo-meta-clean.png';
 import logoGoogle from '@/assets/logo-google-ads.png';
@@ -45,6 +46,7 @@ interface Connection {
   account_id: string | null;
   is_active: boolean;
   last_sync_at: string | null;
+  connection_type?: string;
 }
 
 const platformConfig: Record<string, { name: string; logo: string | null; color: string }> = {
@@ -74,6 +76,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   const [loading, setLoading] = useState(true);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connectingMeta, setConnectingMeta] = useState(false);
+  const [showMetaPartnerSetup, setShowMetaPartnerSetup] = useState(false);
   const [showShopifyWizard, setShowShopifyWizard] = useState(false);
   const [connectingGoogle, setConnectingGoogle] = useState(false);
   const [showKlaviyoDialog, setShowKlaviyoDialog] = useState(false);
@@ -137,7 +140,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
     try {
       const { data, error } = await supabase
         .from('platform_connections')
-        .select('id, platform, store_name, store_url, account_id, is_active, last_sync_at')
+        .select('id, platform, store_name, store_url, account_id, is_active, last_sync_at, connection_type')
         .eq('client_id', clientId);
 
       if (error) throw error;
@@ -151,38 +154,8 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   }
 
   const handleConnectMeta = () => {
-    setConnectingMeta(true);
-    
-    const redirectUri = `${window.location.origin}/oauth/meta/callback`;
-    const scopes = [
-      'ads_read',
-      'ads_management',
-      'business_management',
-      'read_insights',
-      'pages_read_engagement',
-      'pages_manage_ads',
-      'pages_manage_metadata',
-      'pages_messaging',
-      'pages_show_list',
-      'catalog_management',
-      'instagram_basic',
-      'instagram_content_publish',
-      'instagram_manage_comments',
-      'instagram_manage_insights',
-      'instagram_manage_messages',
-      'public_profile',
-      'email',
-    ].join(',');
-
-    // Generate CSRF-safe state: random nonce + clientId
-    const nonce = crypto.randomUUID();
-    const oauthState = `${nonce}:${clientId}`;
-    sessionStorage.setItem('meta_oauth_state', oauthState);
-    sessionStorage.setItem('meta_oauth_client_id', clientId);
-
-    const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code&state=${encodeURIComponent(oauthState)}`;
-
-    window.location.href = authUrl;
+    // Open BM Partner setup (Leadsie) instead of direct OAuth
+    setShowMetaPartnerSetup(true);
   };
 
   const handleConnectShopify = () => {
@@ -378,6 +351,9 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                           <><XCircle className="w-3.5 h-3.5 mr-1" /> Inactivo</>
                         )}
                       </Badge>
+                      {isMeta && connection.connection_type === 'bm_partner' && (
+                        <Badge variant="outline" className="text-xs">BM Partner</Badge>
+                      )}
                       {!isKlaviyo && (
                         <Button
                           data-testid={`sync-${connection.platform}-btn`}
@@ -702,6 +678,28 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
           setShowShopifyWizard(false);
         }}
       />
+
+      {/* Meta BM Partner Setup (Leadsie) */}
+      <Dialog open={showMetaPartnerSetup} onOpenChange={setShowMetaPartnerSetup}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <img src={logoMeta} alt="Meta" className="h-5 w-5 object-contain" />
+              Conectar Meta Ads
+            </DialogTitle>
+            <DialogDescription>
+              Conecta tu cuenta publicitaria de Meta para gestionar campanas con Steve.
+            </DialogDescription>
+          </DialogHeader>
+          <MetaPartnerSetup
+            clientId={clientId}
+            onConnected={() => {
+              fetchConnections();
+              setShowMetaPartnerSetup(false);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
         <AlertDialogContent>

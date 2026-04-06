@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 
 const META_API = 'https://graph.facebook.com/v21.0';
 
@@ -647,7 +648,7 @@ export async function metaSocialInbox(c: Context) {
     const { data: connection, error: connError } = await supabase
       .from('platform_connections')
       .select(`
-        id, platform, access_token_encrypted, client_id,
+        id, platform, access_token_encrypted, client_id, connection_type,
         clients!inner(user_id, client_user_id)
       `)
       .eq('id', connection_id)
@@ -673,13 +674,11 @@ export async function metaSocialInbox(c: Context) {
       return c.json({ error: 'Missing Meta access token' }, 400);
     }
 
-    // Decrypt token
-    const { data: decryptedToken, error: decryptError } = await supabase
-      .rpc('decrypt_platform_token', { encrypted_token: connection.access_token_encrypted });
-
-    if (decryptError || !decryptedToken) {
-      console.error('Token decryption error:', decryptError);
-      return c.json({ error: 'Failed to decrypt token' }, 500);
+    // Resolve token (supports both encrypted and system tokens)
+    const decryptedToken = await getTokenForConnection(supabase, connection);
+    if (!decryptedToken) {
+      console.error('[meta-social-inbox] Token resolution failed');
+      return c.json({ error: 'Failed to resolve token' }, 500);
     }
 
     // Route to action handler

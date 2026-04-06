@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
@@ -34,7 +35,7 @@ export async function metaAdsetAction(c: Context) {
     // Fetch connection and verify ownership
     const { data: connection, error: connError } = await supabase
       .from('platform_connections')
-      .select('id, platform, access_token_encrypted, client_id, clients!inner(user_id, client_user_id)')
+      .select('id, platform, access_token_encrypted, connection_type, client_id, clients!inner(user_id, client_user_id)')
       .eq('id', connection_id)
       .eq('platform', 'meta')
       .single();
@@ -49,15 +50,11 @@ export async function metaAdsetAction(c: Context) {
       return c.json({ error: 'Forbidden' }, 403);
     }
 
-    // Decrypt token
-    const { data: decryptResult } = await supabase.rpc('decrypt_platform_token', {
-      encrypted_token: connection.access_token_encrypted,
-    });
-    if (!decryptResult) {
-      console.error('[meta-adset-action] Failed to decrypt token for connection', connection_id);
-      return c.json({ error: 'Failed to decrypt Meta token' }, 500);
+    const decryptedToken = await getTokenForConnection(supabase, connection);
+    if (!decryptedToken) {
+      console.error('[meta-adset-action] Failed to resolve token for connection', connection_id);
+      return c.json({ error: 'Failed to resolve Meta token' }, 500);
     }
-    const decryptedToken = decryptResult;
 
     // Call Meta API to update ad set status
     const newStatus = action === 'pause' ? 'PAUSED' : 'ACTIVE';

@@ -20,6 +20,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { metaApiFetch, metaApiJson } from '../../lib/meta-fetch.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -29,7 +30,7 @@ async function getMetaToken(supabase: any, clientId: string): Promise<{ token: s
   // Get meta connection — read ig_account_id + page_id from DB
   const { data: conn } = await supabase
     .from('platform_connections')
-    .select('id, access_token_encrypted, ig_account_id, page_id')
+    .select('id, access_token_encrypted, ig_account_id, page_id, connection_type')
     .eq('client_id', clientId)
     .eq('platform', 'meta')
     .eq('is_active', true)
@@ -37,10 +38,7 @@ async function getMetaToken(supabase: any, clientId: string): Promise<{ token: s
 
   if (!conn?.access_token_encrypted) return null;
 
-  const { data: token } = await supabase.rpc('decrypt_platform_token', {
-    encrypted_token: conn.access_token_encrypted,
-  });
-
+  const token = await getTokenForConnection(supabase, conn);
   if (!token) return null;
 
   let igUserId = conn.ig_account_id;

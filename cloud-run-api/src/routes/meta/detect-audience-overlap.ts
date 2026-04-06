@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { metaApiJson } from '../../lib/meta-fetch.js';
 
 interface TargetingInfo {
@@ -52,19 +53,17 @@ export async function detectAudienceOverlap(c: Context) {
   // Get Meta token
   const { data: conn } = await supabase
     .from('platform_connections')
-    .select('access_token_encrypted')
+    .select('id, access_token_encrypted, connection_type')
     .eq('client_id', client_id)
     .eq('platform', 'meta')
     .maybeSingle();
 
-  if (!conn?.access_token_encrypted) {
+  if (!conn) {
     return c.json({ error: 'No hay conexión a Meta' }, 404);
   }
 
-  const { data: token } = await supabase.rpc('decrypt_platform_token', {
-    encrypted_token: conn.access_token_encrypted,
-  });
-  if (!token) return c.json({ error: 'Error descifrando token' }, 500);
+  const token = await getTokenForConnection(supabase, conn);
+  if (!token) return c.json({ error: 'Error resolviendo token' }, 500);
 
   try {
     // Fetch ad sets for the campaign
