@@ -21,18 +21,26 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
 -- RLS: only super admins can read/write
 ALTER TABLE agent_sessions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Admins can do everything on agent_sessions"
-  ON agent_sessions FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin'
-    )
-  );
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Admins can do everything on agent_sessions' AND tablename = 'agent_sessions') THEN
+    CREATE POLICY "Admins can do everything on agent_sessions"
+      ON agent_sessions FOR ALL
+      USING (
+        EXISTS (
+          SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin'
+        )
+      );
+  END IF;
+END $$;
 
 -- Service role can always access (for Claude Code / API updates)
-CREATE POLICY "Service role full access on agent_sessions"
-  ON agent_sessions FOR ALL
-  USING (auth.role() = 'service_role');
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Service role full access on agent_sessions' AND tablename = 'agent_sessions') THEN
+    CREATE POLICY "Service role full access on agent_sessions"
+      ON agent_sessions FOR ALL
+      USING (auth.role() = 'service_role');
+  END IF;
+END $$;
 
 -- Seed with the 14 agents
 INSERT INTO agent_sessions (agent_code, agent_name, squad, module) VALUES
