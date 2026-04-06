@@ -81,9 +81,15 @@ import { klaviyoPushEmails } from './klaviyo/klaviyo-push-emails.js';
 import { klaviyoSmartFormat } from './klaviyo/klaviyo-smart-format.js';
 import { syncKlaviyoMetrics } from './klaviyo/sync-klaviyo-metrics.js';
 import { previewFlowEmails } from './klaviyo/preview-flow-emails.js';
+import { createKlaviyoCampaign } from './klaviyo/create-campaign.js';
+import { klaviyoFlowMetrics } from './klaviyo/flow-metrics.js';
 
 // Phase 3: Instagram
 import { publishInstagram, cronPublishInstagram } from './instagram/publish-instagram.js';
+
+// Phase 3: Facebook
+import { publishFacebook, cronPublishFacebook } from './facebook/publish-facebook.js';
+import { fetchFacebookInsights } from './facebook/fetch-facebook-insights.js';
 
 // Phase 3: Meta
 import { checkMetaScopes } from './meta/check-meta-scopes.js';
@@ -236,6 +242,8 @@ import { emailSendQueue } from './email/send-queue.js';
 import { emailListCleanup } from './email/list-cleanup.js';
 import { uploadEmailImage } from './email/upload-email-image.js';
 import { manageEmailLists } from './email/manage-email-lists.js';
+import { sendTestEmail } from './email/send-test.js';
+import { domainHealth } from './email/domain-health.js';
 
 /**
  * Registers all API routes on the Hono app.
@@ -306,6 +314,8 @@ export function registerRoutes(app: Hono) {
   app.post('/api/klaviyo-smart-format', authMiddleware, klaviyoSmartFormat);
   app.post('/api/sync-klaviyo-metrics', authMiddleware, syncKlaviyoMetrics);
   app.post('/api/preview-flow-emails', authMiddleware, previewFlowEmails);
+  app.post('/api/klaviyo/create-campaign', authMiddleware, createKlaviyoCampaign);
+  app.get('/api/klaviyo/flow-metrics', authMiddleware, klaviyoFlowMetrics);
 
   // ============================================================
   // Phase 3: Platform Integrations (Meta)
@@ -332,6 +342,13 @@ export function registerRoutes(app: Hono) {
   app.post('/api/publish-instagram', authMiddleware, publishInstagram);
   app.post('/api/cron/publish-instagram', cronPublishInstagram); // No JWT — uses X-Cron-Secret
   app.post('/api/fetch-instagram-insights', authMiddleware, fetchInstagramInsights);
+
+  // ============================================================
+  // Phase 3: Platform Integrations (Facebook)
+  // ============================================================
+  app.post('/api/publish-facebook', authMiddleware, publishFacebook);
+  app.post('/api/cron/publish-facebook', cronPublishFacebook); // No JWT — uses X-Cron-Secret
+  app.post('/api/fetch-facebook-insights', authMiddleware, fetchFacebookInsights);
 
   // ============================================================
   // Phase 3: Platform Integrations (Shopify)
@@ -386,6 +403,8 @@ export function registerRoutes(app: Hono) {
   app.post('/api/manage-email-flows', authMiddleware, manageEmailFlows);
   app.post('/api/query-email-subscribers', authMiddleware, queryEmailSubscribers);
   app.post('/api/manage-email-lists', authMiddleware, manageEmailLists);
+  app.post('/api/email/send-test', authMiddleware, sendTestEmail);
+  app.get('/api/email/domain-health', authMiddleware, domainHealth);
   app.post('/api/verify-email-domain', authMiddleware, verifyEmailDomain);
   app.post('/api/email-campaign-analytics', authMiddleware, emailCampaignAnalytics);
   app.post('/api/generate-steve-mail-content', authMiddleware, generateSteveMailContent);

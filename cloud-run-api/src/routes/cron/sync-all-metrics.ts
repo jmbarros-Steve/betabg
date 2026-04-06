@@ -21,11 +21,12 @@ export async function syncAllMetrics(c: Context) {
   const results: Array<{ connection_id: string; platform: string; status: string; error?: string }> = [];
 
   // Fetch all active connections with valid tokens
+  // Note: Meta/Shopify/Google use access_token_encrypted, Klaviyo uses api_key_encrypted
   const { data: connections, error: fetchErr } = await supabase
     .from('platform_connections')
-    .select('id, platform, account_id, access_token_encrypted, store_url, client_id')
+    .select('id, platform, account_id, access_token_encrypted, api_key_encrypted, store_url, client_id')
     .eq('is_active', true)
-    .not('access_token_encrypted', 'is', null);
+    .or('access_token_encrypted.not.is.null,api_key_encrypted.not.is.null');
 
   if (fetchErr || !connections) {
     console.error('[cron] Failed to fetch connections:', fetchErr);
@@ -70,7 +71,7 @@ export async function syncAllMetrics(c: Context) {
           break;
         case 'klaviyo':
           endpoint = '/api/sync-klaviyo-metrics';
-          body = { connection_id: conn.id };
+          body = { connectionId: conn.id };
           break;
         default:
           results.push({ connection_id: conn.id, platform: conn.platform, status: 'skipped' });

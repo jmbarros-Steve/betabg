@@ -206,17 +206,22 @@ async function fetchCampaignReport(apiKey: string, conversionMetricId: string, t
 
 export async function syncKlaviyoMetrics(c: Context) {
   try {
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
     const serviceClient = getSupabaseAdmin();
+    const isInternal = c.get('isInternal') === true;
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await serviceClient.auth.getUser(token);
-    if (authError || !user) {
-      return c.json({ error: 'Unauthorized' }, 401);
+    // Auth: allow internal calls (cron) or verify user JWT
+    let userId: string | null = null;
+    if (!isInternal) {
+      const authHeader = c.req.header('Authorization');
+      if (!authHeader?.startsWith('Bearer ')) {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: authError } = await serviceClient.auth.getUser(token);
+      if (authError || !user) {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+      userId = user.id;
     }
 
     const body = await c.req.json();
@@ -236,9 +241,12 @@ export async function syncKlaviyoMetrics(c: Context) {
       return c.json({ error: 'Connection not found' }, 404);
     }
 
-    const clientData = connection.clients as { user_id: string; client_user_id: string | null };
-    if (clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
-      return c.json({ error: 'Forbidden' }, 403);
+    // Skip ownership check for internal/cron calls
+    if (!isInternal) {
+      const clientData = connection.clients as { user_id: string; client_user_id: string | null };
+      if (clientData.user_id !== userId && clientData.client_user_id !== userId) {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
     }
 
     if (!connection.api_key_encrypted) {
@@ -383,6 +391,12 @@ export async function syncKlaviyoMetrics(c: Context) {
     } else {
       console.log(`[klaviyo] Saved ${metricsToSave.length} metrics to platform_metrics`);
     }
+
+    // Update last_sync_at on the connection
+    await serviceClient
+      .from('platform_connections')
+      .update({ last_sync_at: new Date().toISOString() })
+      .eq('id', connectionId);
 
     // Return non-archived flows to frontend (archived ones still contributed to revenue via report)
     const visibleFlows = enrichedFlows.filter((f: any) => f.status !== 'archived');
