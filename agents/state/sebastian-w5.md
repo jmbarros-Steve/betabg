@@ -1,52 +1,44 @@
 # Sebastián W5 — Infra & Cloud
-Squad: Infra | Última sesión: nunca
+Squad: Infra | Última sesión: 06/04/2026
 
-## Misión actual: FASE 1 — Health check completo de infraestructura
-
-### Objetivo
-Saber exactamente qué funciona y qué no de los 45 crons y 69 edge functions. Identificar silent failures.
+## Estado actual: FASE 1 completada — Monitoring activo
 
 ### Tareas pendientes
 
-#### 1. Health check de Cloud Run
-- [ ] Verificar que steve-api responda en todos los endpoints
-- [ ] Verificar las 20 env vars obligatorias
-- [ ] Revisar logs de Cloud Run por errores recientes
-- [ ] Verificar memoria/CPU del servicio
+- [ ] **M4 — Env vars faltantes**: GOOGLE_ADS_CLIENT_SECRET, GOOGLE_ADS_DEVELOPER_TOKEN, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET, SHOPIFY_WEBHOOK_SECRET — esperando credenciales del usuario
+- [ ] **learning_queue stuck**: 4 items >48h (IDs: f496b327, acd26a34, 0da5e133, 0649f9e0) — investigar causa raíz
+- [ ] **root-cause-analysis**: query DB OK, falla al parsear JSON de Claude — debug paso AI
+- [ ] **Crear agente steve_fix_queue**: tarea delegada de Javiera W12 — procesador automático de fix_queue
+- [ ] **Deduplicar criterio_results**: ~1000 entradas duplicadas — añadir deduplicación por check_number
 
-#### 2. Auditoría de los 45 crons
-- [ ] Crear un script que llame a cada endpoint de cron y verifique respuesta
-- [ ] Identificar crons que retornan 200 pero no hacen nada
-- [ ] Clasificar en: funciona / falla / funciona pero sin data
-- [ ] Priorizar: ¿cuáles son críticos para Fase 1?
+### Completado (sesión 06/04/2026)
 
-#### 3. Auditoría de edge functions
-- [ ] Verificar que las 69 funciones respondan (al menos 200/401, no 500)
-- [ ] Identificar funciones que dependen de env vars no configuradas
-- [ ] Pendientes de credenciales:
-  - Google Ads: GOOGLE_CLIENT_ID, GOOGLE_ADS_CLIENT_SECRET, GOOGLE_ADS_DEVELOPER_TOKEN
-  - Shopify App: SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET, SHOPIFY_WEBHOOK_SECRET
-  - Skyvern: SKYVERN_API_KEY, SKYVERN_API_URL
-
-#### 4. Verificar pipeline de datos end-to-end
-- [ ] Trazar: OAuth → sync → tabla → cron → qa_log
-- [ ] Identificar dónde se rompe la cadena
-- [ ] Documentar el flujo real vs el documentado
-
-#### 5. Monitoring
-- [ ] Verificar que Sentry esté recibiendo errores del backend
-- [ ] Verificar que health-check edge function funcione
-- [ ] Revisar qa_log (550 rows) — ¿qué tipos de errores hay?
-
-### Completado
-(nada aún)
+- [x] Fix cron sub-router (211 rutas excedían límite Hono RegExpRouter)
+- [x] Fix weekly-report: conteo errores solo `fail/warn/error/auto_fixed` (414 → 12 reales)
+- [x] Fix health-check: slow_endpoint ignora respuestas 4xx (cold start false positive)
+- [x] Fix TypeScript: null guards en chino/runner.ts (MerchantConn | null)
+- [x] Fix fatigue-detector: column names `access_token_encrypted`, `account_id`
+- [x] Fix root-cause-analysis: query usa `checked_at` (no `created_at`)
+- [x] Fix approve-knowledge: agrega `activo: true` al aprobar insights
+- [x] Renovar APIFY_TOKEN en Cloud Run
+- [x] M3 Edge Functions audit: deploy 10 funciones faltantes, eliminar 3 de LogisticSteve
+- [x] Eliminar integración Skyvern (0 tasks activas, nunca usado)
+- [x] Deploy health-check Edge Function
+- [x] Crear cron `health-check-5min` en Cloud Scheduler (cada 5 min)
+- [x] Crear páginas Notion: Sebastián W5 + Sesión 06/04/2026
 
 ### Blockers
-- gcloud project no está seteado por defecto (necesita --project=steveapp-agency)
-- Credenciales faltantes: Google Ads, Shopify App, Skyvern
 
-### Notas
-- Cloud Run: steve-api en us-central1, último deploy hoy
-- 45 crons ENABLED en Cloud Scheduler
-- 69 edge functions ACTIVE en Supabase
-- Sentry DSN configurado en Cloud Run y frontend
+- Credenciales pendientes: Google Ads, Shopify App (usuario debe proveer)
+
+### Deployments activos
+
+- Cloud Run: `steve-api-00380-j96` (último — Skyvern removal)
+- Edge Functions: 62 activas + health-check (63 total)
+- Crons: 46 activos (45 anteriores + health-check-5min)
+- Sentry: conectado en Cloud Run (`9ad73fc`)
+
+### Notion
+
+- Página padre: https://www.notion.so/33a9af51b58d81649825c7323af6f4b9
+- Sesión 06/04/2026: https://www.notion.so/33a9af51b58d81169850d354114a42c6
