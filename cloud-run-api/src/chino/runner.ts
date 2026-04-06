@@ -227,7 +227,6 @@ async function executeCheck(
         return await executePerformance(check, runId);
 
       case 'token_health':
-        if (!merchant) return { result: 'skip', error_message: 'No merchant for token_health', duration_ms: 0 };
         return await executeTokenHealth(supabase, check, merchant, decryptedToken);
 
       case 'performance':
@@ -237,7 +236,6 @@ async function executeCheck(
         return await executeVisual(supabase, check, merchant);
 
       case 'functional':
-        if (!merchant) return { result: 'skip', error_message: 'No merchant for functional', duration_ms: 0 };
         return await executeFunctional(supabase, check, merchant, decryptedToken);
 
       case 'data_quality':

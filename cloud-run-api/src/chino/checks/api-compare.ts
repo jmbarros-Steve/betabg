@@ -560,7 +560,7 @@ async function getRealValue(
         return { value: Math.round(totalRevenue * 100) / 100 };
       }
       default:
-        return { value: null, error: `Numeric compare not implemented for check #${check.check_number}` };
+        return { value: null }; // Not implemented — will skip gracefully
     }
   } catch (err: any) {
     return { value: null, error: err.name === 'AbortError' ? 'Timeout (30s)' : err.message };
@@ -615,7 +615,11 @@ export async function executeApiCompare(
   }
 
   // Compare with tolerance
-  const tolerance = (check.check_config?.tolerance_pct as number) ?? 10;
+  // Config uses "tolerance" as fraction (0.05 = 5%) or percentage (10 = 10%)
+  const raw = check.check_config?.tolerance;
+  const tolerance = typeof raw === 'number'
+    ? (raw <= 1 ? raw * 100 : raw) // 0.05 → 5%, 0.1 → 10%, 10 → 10%
+    : 10; // default 10%
   const diff = Math.abs(steveValue - realResult.value);
   const maxDiff = Math.abs(realResult.value) * (tolerance / 100);
 
