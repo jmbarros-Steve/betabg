@@ -3,6 +3,7 @@ import type { BlockProperties, Editor } from 'grapesjs';
 const icons = {
   product: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
   productRec: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="7" height="10" rx="1"/><rect x="9" y="3" width="7" height="10" rx="1"/><rect x="17" y="3" width="7" height="10" rx="1"/><line x1="1" y1="16" x2="24" y2="16"/></svg>',
+  cart: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>',
   coupon: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="2" cy="12" r="2"/><circle cx="22" cy="12" r="2"/><line x1="10" y1="8" x2="10" y2="16" stroke-dasharray="2 2"/></svg>',
   logo: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="4"/></svg>',
   review: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
@@ -40,16 +41,34 @@ Productos dinamicos - se cargan al enviar (best_sellers x4)
 </mj-raw>`,
     },
     {
+      id: 'steve-cart-products',
+      label: 'Carrito Abandonado',
+      category: 'Steve',
+      media: icons.cart,
+      activate: true,
+      select: true,
+      content: `<mj-text font-size="22px" font-weight="bold" align="center" padding-bottom="10px">Olvidaste esto en tu carrito</mj-text>
+<mj-raw>
+<div data-steve-products="true" data-dynamic-feed="true" data-product-type="abandoned_cart" data-product-count="4" data-columns="2" data-show-price="true" data-button-text="Completar compra" data-button-color="${c}" style="border:2px dashed ${c};border-radius:8px;padding:30px;text-align:center;color:${c};font-size:14px;">
+Productos del carrito - se reemplazan automaticamente con los productos reales al enviar
+</div>
+</mj-raw>`,
+    },
+    {
       id: 'steve-coupon',
-      label: 'Cupón',
+      label: 'Cupón Shopify',
       category: 'Steve',
       media: icons.coupon,
       activate: true,
       select: true,
-      content: `<mj-text font-size="14px" color="${c}" align="center" text-transform="uppercase" letter-spacing="2px">Código de descuento</mj-text>
-<mj-text font-size="28px" font-weight="bold" align="center" color="${c}" padding="5px 0">STEVE20</mj-text>
-<mj-text font-size="14px" color="#888888" align="center">20% de descuento en tu próxima compra</mj-text>
-<mj-button background-color="${c}" color="#ffffff" href="#" align="center" border-radius="6px">Usar cupón</mj-button>`,
+      content: `<mj-raw>
+<div data-steve-discount="true" data-discount-mode="shopify_create" data-discount-type="percentage" data-discount-value="10" data-expiration-days="7" style="border:2px dashed ${c};border-radius:8px;padding:24px;text-align:center;margin:16px 0;">
+  <p style="margin:0 0 6px;font-size:11px;color:#888;text-transform:uppercase;letter-spacing:2px;font-family:Arial,sans-serif;">Código exclusivo para ti</p>
+  <p style="margin:0;font-size:30px;font-weight:900;color:${c};letter-spacing:4px;font-family:monospace;">[[DISCOUNT_CODE]]</p>
+  <p style="margin:8px 0 0;font-size:13px;color:#888;font-family:Arial,sans-serif;">10% de descuento · Válido 7 días</p>
+</div>
+</mj-raw>
+<mj-button background-color="${c}" color="#ffffff" href="{{ cart.url }}" align="center" border-radius="6px">Usar cupón ahora</mj-button>`,
     },
     {
       id: 'steve-logo',

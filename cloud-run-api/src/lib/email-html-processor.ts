@@ -523,8 +523,10 @@ async function replaceDiscountBlocks(
         }
       }
 
-      // Replace {{discount_code}} placeholders within the block content
-      const updatedInner = block.inner.replace(/\{\{\s*discount_code\s*\}\}/g, escapeHtml(code));
+      // Replace [[DISCOUNT_CODE]] (preferred, Nunjucks-safe) or {{discount_code}} (legacy)
+      const updatedInner = block.inner
+        .replace(/\[\[DISCOUNT_CODE\]\]/gi, escapeHtml(code))
+        .replace(/\{\{\s*discount_code\s*\}\}/g, escapeHtml(code));
       // Reconstruct the block with updated inner content
       const updatedBlock = block.fullMatch.replace(block.inner, updatedInner);
       result = result.substring(0, block.startIndex) +
