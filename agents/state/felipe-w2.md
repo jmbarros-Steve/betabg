@@ -1,51 +1,59 @@
 # Felipe W2 — Meta Ads
-Squad: Marketing | Última sesión: nunca
+Squad: Marketing | Última sesión: 2026-04-06
 
-## Misión actual: FASE 1 — Conectar Meta Ads para cliente piloto
+## Estado actual: BM Partner migración completa, pendiente activación
 
-### Objetivo
-Que al menos 1 cliente tenga OAuth Meta funcionando, sync trayendo datos reales, y campaign_metrics creciendo diariamente.
+### Completado (sesión 06/04/2026)
 
-### Tareas pendientes
+#### Token Migration — getTokenForConnection
+- [x] Crear `cloud-run-api/src/lib/resolve-meta-token.ts` (getTokenForConnection + resolveMetaToken)
+- [x] Migrar 11 rutas Meta críticas a getTokenForConnection
+- [x] Migrar 13 rutas Meta secundarias a getTokenForConnection
+- [x] Verificar TypeScript compila sin errores
+- [x] Deploy Cloud Run: revisión `steve-api-00390-2kt`
 
-#### 1. Identificar cliente piloto
-- [ ] Revisar los 3 platform_connections existentes
-- [ ] Verificar cuál tiene token Meta válido (no expirado)
-- [ ] Si ninguno sirve, preparar el flujo OAuth para conectar uno nuevo
+#### BM Partner Backend
+- [x] `discover-client-assets.ts` — enumera activos compartidos con BM via SUAT
+- [x] `leadsie-webhook.ts` — webhook Admatic auto-crea conexión bm_partner
+- [x] Rutas registradas en `routes/index.ts`
+- [x] `sync-all-metrics.ts` incluye filtro bm_partner
+- [x] Migración `connection_type` aplicada en Supabase
 
-#### 2. Verificar flujo OAuth Meta
-- [ ] Probar meta-oauth-callback edge function
-- [ ] Verificar que el token se guarde encriptado en platform_connections
-- [ ] Verificar refresh token flow (tokens Meta expiran en 60 días)
+#### BM Partner Frontend
+- [x] `MetaPartnerSetup.tsx` — wizard 3 estados (leadsie→waiting→connected)
+- [x] Integrado en `ClientPortalConnections.tsx` via Dialog
 
-#### 3. Verificar syncs Meta
-- [ ] Probar sync-meta-metrics manualmente para el cliente piloto
-- [ ] Verificar que campaign_metrics reciba datos (actualmente: 25 rows)
-- [ ] Probar fetch-meta-ad-accounts, meta-fetch-campaigns, meta-fetch-adsets, meta-fetch-ads
-- [ ] Verificar que creative_history se pueble (actualmente: 53 rows)
+#### Social Hub
+- [x] `SocialHub.tsx` — 5 tabs: Publicar, Calendario, Métricas, Bandeja, Mejor Hora
+- [x] `SocialPublisher.tsx` — publicar en IG + FB
+- [x] `SocialCalendar.tsx` — calendario semanal drag-drop
+- [x] `SocialMetrics.tsx` — toggle IG/FB
+- [x] `FBMetricsDashboard.tsx` — insights Facebook
 
-#### 4. Verificar crons Meta
-- [ ] sync-all-metrics-6h: ¿trae datos de Meta?
-- [ ] performance-tracker-meta-8am: ¿mide algo?
-- [ ] execute-meta-rules-9am: ¿ejecuta reglas?
-- [ ] fatigue-detector-11am: ¿detecta fatiga en creativos reales?
+#### Facebook Routes
+- [x] `publish-facebook.ts` — publicar post/foto/video/link
+- [x] `fetch-facebook-insights.ts` — métricas page
 
-#### 5. Edge Functions Meta (verificar todas)
-- [ ] manage-meta-campaign
-- [ ] manage-meta-audiences
-- [ ] manage-meta-pixel
-- [ ] meta-social-inbox
-- [ ] fetch-meta-business-hierarchy
-- [ ] check-meta-scopes
+### Pendiente
 
-### Completado
-(nada aún)
+#### BM Partner — Activación (requiere JM)
+- [ ] Crear cuenta Admatic plan Agency ($79/mes)
+- [ ] Configurar Connect Profile en Admatic con BM ID de Steve
+- [ ] Obtener URL Connect Profile → `VITE_LEADSIE_REQUEST_URL`
+- [ ] Configurar webhook en Admatic → URL: `steve-api.../api/webhooks/leadsie`
+- [ ] Obtener webhook secret → `LEADSIE_WEBHOOK_SECRET`
+- [ ] Setear env vars Cloud Run: `META_SYSTEM_TOKEN`, `STEVE_BM_ID`, `LEADSIE_WEBHOOK_SECRET`
 
-### Blockers
-- Solo 3 platform_connections de 127 clientes
-- campaign_metrics tiene solo 25 rows (debería ser miles)
+#### Testing
+- [ ] Adaptar webhook handler si payload Admatic difiere de Leadsie
+- [ ] Test E2E: simular webhook → verificar conexión creada → sync métricas
+
+#### Supabase
+- [ ] Reparar migration history (mismatch con remoto: `supabase migration repair --status reverted 20260321 20260322 20260325`)
 
 ### Notas
-- META_APP_ID y META_APP_SECRET están en Cloud Run env vars
-- Edge functions Meta deployadas y ACTIVE
-- 69 edge functions totales, ~15 son de Meta
+- 24 rutas Meta total usan getTokenForConnection (0 usan decrypt inline para Meta tokens)
+- SUAT del BM de Steve nunca expira — no necesita refresh
+- check-meta-scopes retorna all scopes granted para bm_partner
+- Page Token para inbox/publishing: SUAT genera via `GET /{page_id}?fields=access_token`
+- Instagram DMs bloqueado: Meta App no tiene Instagram Messaging API habilitado
