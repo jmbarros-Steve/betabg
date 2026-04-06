@@ -321,14 +321,14 @@ export async function weeklyReport(c: Context) {
     .from('qa_log')
     .select('*')
     .gte('checked_at', weekAgo)
-    .neq('status', 'pass');
+    .in('status', ['fail', 'warn', 'error', 'auto_fixed']);
 
   const { data: lastWeekErrors } = await supabase
     .from('qa_log')
     .select('*')
     .gte('checked_at', twoWeeksAgo)
     .lt('checked_at', weekAgo)
-    .neq('status', 'pass');
+    .in('status', ['fail', 'warn', 'error', 'auto_fixed']);
 
   const thisWeekCount = thisWeekErrors?.length || 0;
   const lastWeekCount = lastWeekErrors?.length || 0;
