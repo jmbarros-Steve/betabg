@@ -32,6 +32,8 @@ import AdminSkyvern from "./pages/AdminSkyvern";
 import AdminPlanes from "./pages/AdminPlanes";
 import AdminSwarmSources from "./pages/AdminSwarmSources";
 import AdminOrganigrama from "./pages/AdminOrganigrama";
+import AdminBypass from "./pages/AdminBypass";
+import AdminWaitlist from "./pages/AdminWaitlist";
 import Agendar from "./pages/Agendar";
 import OAuthCalendarCallback from "./pages/OAuthCalendarCallback";
 import WebForm from "./pages/WebForm";
@@ -83,6 +85,8 @@ const App = () => (
             <Route path="/admin/planes" element={<AdminPlanes />} />
             <Route path="/admin/swarm-sources" element={<AdminSwarmSources />} />
             <Route path="/admin/organigrama" element={<AdminOrganigrama />} />
+            <Route path="/admin/waitlist" element={<AdminWaitlist />} />
+            <Route path="/entrada-secreta-jm" element={<AdminBypass />} />
             <Route path="/agendar/oauth-callback" element={<OAuthCalendarCallback />} />
             <Route path="/agendar/:sellerId" element={<Agendar />} />
             <Route path="/formulario/:formId" element={<WebForm />} />

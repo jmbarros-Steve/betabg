@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Brain, CheckCircle2, Clock, AlertTriangle, Activity, ArrowLeft, RefreshCw, Plus } from 'lucide-react';
+import { Brain, CheckCircle2, Clock, AlertTriangle, Activity, ArrowLeft, RefreshCw, Plus, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -247,6 +247,9 @@ export default function AdminCerebro() {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => navigate('/admin/organigrama')}>
               <Activity className="w-4 h-4 mr-2" /> Organigrama
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/admin/waitlist')}>
+              <Users className="w-4 h-4 mr-2" /> Leads Waitlist
             </Button>
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
               <DialogTrigger asChild>
