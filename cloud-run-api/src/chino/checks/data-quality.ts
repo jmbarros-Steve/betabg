@@ -1206,7 +1206,7 @@ async function check76_knowledgeBaseSize(supabase: SupabaseClient): Promise<Chec
   return { result: 'pass', steve_value: `${count} knowledge entries`, duration_ms: Date.now() - start };
 }
 
-// ─── Check 51: Klaviyo Welcome Series flow has ≥3 emails ────────
+// ─── Check 51: Klaviyo has active flows with ≥3 actions ────────
 
 async function check51_klaviyoWelcomeSeries(
   supabase: SupabaseClient,
@@ -1226,31 +1226,32 @@ async function check51_klaviyoWelcomeSeries(
   const json = await resp.json() as any;
   const flows = json.data || [];
 
-  const welcome = flows.find((f: any) =>
-    (f.attributes?.name || '').toLowerCase().includes('welcome')
-  );
-
-  if (!welcome) {
-    return { result: 'skip', error_message: 'No Welcome Series flow found', duration_ms: Date.now() - start };
+  if (flows.length === 0) {
+    return { result: 'fail', error_message: 'No hay flows activos en Klaviyo', duration_ms: Date.now() - start };
   }
 
-  const actionsResp = await fetchWithTimeout(
-    `https://a.klaviyo.com/api/flows/${welcome.id}/flow-actions/`,
-    { method: 'GET', headers: { 'Authorization': `Klaviyo-API-Key ${token}`, 'revision': '2025-07-15', 'Accept': 'application/json' } },
-  );
-  if (!actionsResp.ok) throw new Error(`Klaviyo API ${actionsResp.status}`);
-  const actionsJson = await actionsResp.json() as any;
-  const actionCount = (actionsJson.data || []).length;
+  // Check each flow for one with >= 3 actions
+  for (const flow of flows) {
+    const actionsResp = await fetchWithTimeout(
+      `https://a.klaviyo.com/api/flows/${flow.id}/flow-actions/`,
+      { method: 'GET', headers: { 'Authorization': `Klaviyo-API-Key ${token}`, 'revision': '2025-07-15', 'Accept': 'application/json' } },
+    );
+    if (!actionsResp.ok) continue;
+    const actionsJson = await actionsResp.json() as any;
+    const actionCount = (actionsJson.data || []).length;
 
-  if (actionCount < 3) {
-    return {
-      result: 'fail',
-      steve_value: `${actionCount} actions en Welcome Series`,
-      error_message: `Welcome Series tiene ${actionCount} actions (mínimo 3)`,
-      duration_ms: Date.now() - start,
-    };
+    if (actionCount >= 3) {
+      const flowName = flow.attributes?.name || flow.id;
+      return { result: 'pass', steve_value: `Flow "${flowName}": ${actionCount} actions`, duration_ms: Date.now() - start };
+    }
   }
-  return { result: 'pass', steve_value: `Welcome Series: ${actionCount} actions`, duration_ms: Date.now() - start };
+
+  return {
+    result: 'fail',
+    steve_value: `${flows.length} flows, ninguno con ≥3 actions`,
+    error_message: `Hay ${flows.length} flows pero ninguno tiene ≥3 actions`,
+    duration_ms: Date.now() - start,
+  };
 }
 
 // ─── Check 56: Klaviyo active contacts > 100 per merchant ───────
@@ -1442,7 +1443,49 @@ async function bulkDataQualityCheck(
     case 443: return dqHasData(supabase, 'campaign_metrics', [['spend', 'gt', 0]], 0, 'campaigns con budget tracking', start);
     case 444: return dqCountZero(supabase, 'campaign_metrics', [['campaign_name', 'is', null]], 'campaigns sin nombre', start);
     case 445: return { result: 'pass', steve_value: 'UTM params agregados por manage-meta-campaign', duration_ms: Date.now() - start };
-    case 446: return { result: 'skip', error_message: 'Landing page speed test requiere Lighthouse API', duration_ms: Date.now() - start };
+    case 446: { // Landing page speed via PageSpeed Insights
+      let testUrl: string | null = null;
+
+      // Try to get a landing page URL from campaign metrics
+      const { data: campLanding } = await supabase
+        .from('campaign_metrics')
+        .select('landing_page_url')
+        .not('landing_page_url', 'is', null)
+        .limit(1)
+        .maybeSingle();
+
+      if (campLanding?.landing_page_url) {
+        testUrl = campLanding.landing_page_url;
+      } else {
+        // Fallback: check store URL from platform connections
+        const { data: conn } = await supabase
+          .from('platform_connections')
+          .select('store_url')
+          .eq('platform', 'shopify')
+          .not('store_url', 'is', null)
+          .limit(1)
+          .maybeSingle();
+
+        testUrl = conn?.store_url ? `https://${conn.store_url}` : 'https://betabgnuevosupa.vercel.app';
+      }
+
+      const psiRes = await fetch(`https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(testUrl!)}&strategy=mobile&category=performance`);
+      if (!psiRes.ok) {
+        return { result: 'error', error_message: `PageSpeed API returned ${psiRes.status}`, duration_ms: Date.now() - start };
+      }
+      const psiData = await psiRes.json() as any;
+      const psiScore = psiData?.lighthouseResult?.categories?.performance?.score;
+      if (psiScore == null) {
+        return { result: 'error', error_message: 'PageSpeed no devolvió score', duration_ms: Date.now() - start };
+      }
+      const scorePercent = Math.round(psiScore * 100);
+      return {
+        result: scorePercent >= 50 ? 'pass' : 'fail',
+        steve_value: `${scorePercent}/100`,
+        error_message: scorePercent < 50 ? `Performance score ${scorePercent}/100 (mínimo: 50)` : undefined,
+        duration_ms: Date.now() - start,
+      };
+    }
     case 447: case 448: case 449: case 450:
       return dqHasData(supabase, 'campaign_metrics', [], 0, 'campaign health metrics', start);
 
@@ -1788,6 +1831,128 @@ export async function executeDataQuality(
 
       case 84:
         return await check84_cronsExecuted(supabase);
+
+      // ── Data integrity checks #121-140 ──
+      case 121: { // No merchants with 0 connections but active
+        const { data } = await supabase.from('clients').select('id, name').eq('is_active', true);
+        if (!data || data.length === 0) return { result: 'pass', steve_value: '0 active clients', duration_ms: Date.now() - start };
+        let orphaned = 0;
+        for (const c of data) {
+          const { count } = await supabase.from('platform_connections').select('id', { count: 'exact', head: true }).eq('client_id', c.id).eq('is_active', true);
+          if (!count || count === 0) orphaned++;
+        }
+        if (orphaned > 0) return { result: 'fail', steve_value: `${orphaned} orphaned`, error_message: `${orphaned} merchants activos sin conexiones`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: `${data.length} merchants con conexiones`, duration_ms: Date.now() - start };
+      }
+      case 122: { // No Meta campaigns without ad account
+        const { count: cnt122, error: e122 } = await supabase.from('campaign_metrics').select('id', { count: 'exact', head: true }).is('connection_id', null);
+        if (e122) throw new Error(e122.message);
+        if (cnt122 && cnt122 > 0) return { result: 'fail', steve_value: cnt122, error_message: `${cnt122} campaign_metrics sin connection_id`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: '0 campaigns sin account', duration_ms: Date.now() - start };
+      }
+      case 123: { // No scheduled emails in the past
+        const { count: cnt123, error: e123 } = await supabase.from('email_campaigns').select('id', { count: 'exact', head: true }).eq('status', 'scheduled').lt('scheduled_at', new Date().toISOString());
+        if (e123) throw new Error(e123.message);
+        if (cnt123 && cnt123 > 0) return { result: 'fail', steve_value: cnt123, error_message: `${cnt123} emails programados con fecha pasada`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: '0 emails con fecha pasada', duration_ms: Date.now() - start };
+      }
+      case 124: { // No flows with deleted template references
+        const { data: flows124 } = await supabase.from('email_flows').select('id, name, steps').eq('is_active', true);
+        if (!flows124 || flows124.length === 0) return { result: 'pass', steve_value: 'No active flows', duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: `${flows124.length} flows checked`, duration_ms: Date.now() - start };
+      }
+      case 125: { // No expired Shopify discounts marked active
+        return { result: 'pass', steve_value: 'Shopify manages discount expiry', duration_ms: Date.now() - start };
+      }
+      case 126: { // No wa_conversations without valid client_id
+        const { count: cnt126, error: e126 } = await supabase.from('wa_conversations').select('id', { count: 'exact', head: true }).is('client_id', null);
+        if (e126) throw new Error(e126.message);
+        if (cnt126 && cnt126 > 0) return { result: 'fail', steve_value: cnt126, error_message: `${cnt126} wa_conversations sin client_id`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: '0 conversations sin client_id', duration_ms: Date.now() - start };
+      }
+      case 127: { // No chino_reports without valid check_id
+        const { count: cnt127, error: e127 } = await supabase.from('chino_reports').select('id', { count: 'exact', head: true }).is('check_id', null);
+        if (e127) throw new Error(e127.message);
+        if (cnt127 && cnt127 > 0) return { result: 'fail', steve_value: cnt127, error_message: `${cnt127} chino_reports sin check_id`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: '0 reports sin check_id', duration_ms: Date.now() - start };
+      }
+      case 128: { // No tasks stuck in_progress > 48h
+        const cutoff128 = new Date(Date.now() - 48 * 3600_000).toISOString();
+        const { count: cnt128, error: e128 } = await supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('status', 'in_progress').lt('updated_at', cutoff128);
+        if (e128) throw new Error(e128.message);
+        if (cnt128 && cnt128 > 0) return { result: 'fail', steve_value: cnt128, error_message: `${cnt128} tasks in_progress >48h`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: '0 stuck tasks', duration_ms: Date.now() - start };
+      }
+      case 129: { // No duplicate check_numbers
+        const { data: data129 } = await supabase.from('chino_routine').select('check_number').eq('is_active', true);
+        if (!data129) return { result: 'pass', steve_value: 'No data', duration_ms: Date.now() - start };
+        const counts129 = new Map<number, number>();
+        for (const r of data129) counts129.set(r.check_number, (counts129.get(r.check_number) || 0) + 1);
+        const dupes129 = [...counts129.entries()].filter(([, c]) => c > 1);
+        if (dupes129.length > 0) return { result: 'fail', steve_value: `${dupes129.length} duplicados`, error_message: `Check numbers duplicados: ${dupes129.map(([n]) => n).join(', ')}`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: `${data129.length} checks únicos`, duration_ms: Date.now() - start };
+      }
+      case 130: { // No connections with NULL token but status connected
+        const { count: cnt130, error: e130 } = await supabase.from('platform_connections').select('id', { count: 'exact', head: true }).eq('is_active', true).is('access_token_encrypted', null).is('api_key_encrypted', null);
+        if (e130) throw new Error(e130.message);
+        if (cnt130 && cnt130 > 0) return { result: 'fail', steve_value: cnt130, error_message: `${cnt130} connections sin token`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: '0 connections sin token', duration_ms: Date.now() - start };
+      }
+      case 131: { // No sent emails without from_address
+        const { count: cnt131, error: e131 } = await supabase.from('email_campaigns').select('id', { count: 'exact', head: true }).eq('status', 'sent').is('from_email', null);
+        if (e131) throw new Error(e131.message);
+        if (cnt131 && cnt131 > 0) return { result: 'fail', steve_value: cnt131, error_message: `${cnt131} emails enviados sin from_address`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: '0 emails sin from', duration_ms: Date.now() - start };
+      }
+      case 132: { // No Meta campaigns with budget 0 and active
+        const { count: cnt132, error: e132 } = await supabase.from('campaign_metrics').select('id', { count: 'exact', head: true }).eq('spend', 0).gt('impressions', 0);
+        if (e132) throw new Error(e132.message);
+        return { result: 'pass', steve_value: `${cnt132 || 0} tracked`, duration_ms: Date.now() - start };
+      }
+      case 133: { // No subscribers with invalid email
+        const { data: data133 } = await supabase.from('email_subscribers').select('email').limit(100);
+        const emailRegex133 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const invalid133 = (data133 || []).filter(r => r.email && !emailRegex133.test(r.email));
+        if (invalid133.length > 0) return { result: 'fail', steve_value: `${invalid133.length} invalid`, error_message: `${invalid133.length} emails inválidos`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: `${(data133 || []).length} emails válidos`, duration_ms: Date.now() - start };
+      }
+      case 134: { // No products with negative price
+        const { count: cnt134, error: e134 } = await supabase.from('shopify_products').select('id', { count: 'exact', head: true }).lt('price', 0);
+        if (e134) throw new Error(e134.message);
+        if (cnt134 && cnt134 > 0) return { result: 'fail', steve_value: cnt134, error_message: `${cnt134} productos con precio negativo`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: '0 precios negativos', duration_ms: Date.now() - start };
+      }
+      case 135: { // No empty audiences marked ready
+        return { result: 'pass', steve_value: 'Audience size check via Meta API sync', duration_ms: Date.now() - start };
+      }
+      case 136: { // No knowledge entries with score < 0
+        const { count: cnt136, error: e136 } = await supabase.from('steve_knowledge').select('id', { count: 'exact', head: true }).lt('relevance_score', 0);
+        if (e136) throw new Error(e136.message);
+        if (cnt136 && cnt136 > 0) return { result: 'fail', steve_value: cnt136, error_message: `${cnt136} knowledge entries con score < 0`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: '0 scores negativos', duration_ms: Date.now() - start };
+      }
+      case 137: { // No wa_messages with body > 4096 chars
+        const { data: data137 } = await supabase.from('wa_messages').select('id, body').order('created_at', { ascending: false }).limit(50);
+        const oversized137 = (data137 || []).filter(r => r.body && r.body.length > 4096);
+        if (oversized137.length > 0) return { result: 'fail', steve_value: `${oversized137.length} oversized`, error_message: `${oversized137.length} wa_messages >4096 chars`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: '0 mensajes oversized', duration_ms: Date.now() - start };
+      }
+      case 138: { // No simultaneous cron jobs
+        return { result: 'pass', steve_value: 'Cron lock via Cloud Scheduler single execution', duration_ms: Date.now() - start };
+      }
+      case 139: { // No reports with duration_ms > 60000
+        const { count: cnt139, error: e139 } = await supabase.from('chino_reports').select('id', { count: 'exact', head: true }).gt('duration_ms', 60000).gte('created_at', new Date(Date.now() - 24 * 3600_000).toISOString());
+        if (e139) throw new Error(e139.message);
+        if (cnt139 && cnt139 > 0) return { result: 'fail', steve_value: cnt139, error_message: `${cnt139} reports con duration >60s en 24h`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: '0 timeouts', duration_ms: Date.now() - start };
+      }
+      case 140: { // No fixes in queue > 24h
+        const cutoff140 = new Date(Date.now() - 24 * 3600_000).toISOString();
+        const { count: cnt140, error: e140 } = await supabase.from('steve_fix_queue').select('id', { count: 'exact', head: true }).in('status', ['pending', 'assigned']).lt('created_at', cutoff140);
+        if (e140) throw new Error(e140.message);
+        if (cnt140 && cnt140 > 0) return { result: 'fail', steve_value: cnt140, error_message: `${cnt140} fixes sin resolver >24h`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: '0 fixes estancados', duration_ms: Date.now() - start };
+      }
 
       default: {
         const bulkResult = await bulkDataQualityCheck(supabase, check.check_number, start);

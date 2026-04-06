@@ -136,17 +136,35 @@ Responde SOLO el JSON, nada más.`,
 async function getTestEmailHtml(supabase: SupabaseClient): Promise<string | null> {
   const { data } = await supabase
     .from('email_templates')
-    .select('html_content')
+    .select('base_html')
     .eq('is_system', true)
     .limit(1)
     .maybeSingle();
 
-  return data?.html_content || null;
+  return data?.base_html || null;
+}
+
+// ─── Concurrency guard: only 1 browser at a time to avoid OOM ───
+let browserLock: Promise<void> = Promise.resolve();
+
+function withBrowserLock<T>(fn: () => Promise<T>): Promise<T> {
+  const prev = browserLock;
+  let resolve: () => void;
+  browserLock = new Promise<void>((r) => { resolve = r; });
+  return prev.then(fn).finally(() => resolve!());
 }
 
 // ─── Main visual check executor ─────────────────────────────────
 
 export async function executeVisual(
+  supabase: SupabaseClient,
+  check: ChinoCheck,
+  _merchant?: MerchantConn | null
+): Promise<CheckResult> {
+  return withBrowserLock(() => _executeVisualInner(supabase, check, _merchant));
+}
+
+async function _executeVisualInner(
   supabase: SupabaseClient,
   check: ChinoCheck,
   _merchant?: MerchantConn | null

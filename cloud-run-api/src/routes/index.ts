@@ -155,6 +155,7 @@ import { swarmResearch } from './cron/swarm-research.js';
 import { autoLearningDigest } from './cron/auto-learning-digest.js';
 import { knowledgePropagationCatchup } from './cron/knowledge-propagation-catchup.js';
 import { validateContexts } from './cron/validate-contexts.js';
+import { refreshPlatformTokens } from './cron/refresh-platform-tokens.js';
 
 // WhatsApp
 import { steveWAChat } from './whatsapp/steve-wa-chat.js';
@@ -517,6 +518,7 @@ export function registerRoutes(app: Hono) {
   cron.post('/auto-learning-digest', autoLearningDigest);
   cron.post('/knowledge-propagation-catchup', knowledgePropagationCatchup);
   cron.post('/validate-contexts', validateContexts);
+  cron.post('/refresh-platform-tokens', refreshPlatformTokens);
   app.route('/api/cron', cron);
 
   // ============================================================

@@ -551,6 +551,28 @@ export async function executePerformance(check: ChinoCheck, runId?: string): Pro
         return { result: 'pass', steve_value: `${errorRate.toFixed(1)}% error rate`, duration_ms: Date.now() - start };
       }
 
+      // #62 — SteveMail SES webhooks endpoint responds 200
+      case 62: {
+        const apiBase62 = process.env.STEVE_API_URL || 'https://steve-api-850416724643.us-central1.run.app';
+        const t0_62 = Date.now();
+        try {
+          const controller62 = new AbortController();
+          const timer62 = setTimeout(() => controller62.abort(), 15_000);
+          const res62 = await fetch(`${apiBase62}/api/email-ses-webhooks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ Type: 'SubscriptionConfirmation', system_test: true }),
+            signal: controller62.signal,
+          });
+          clearTimeout(timer62);
+          const elapsed62 = Date.now() - t0_62;
+          if (res62.status >= 500) return { result: 'error', error_message: `SES webhook returned ${res62.status}`, duration_ms: elapsed62 };
+          return { result: 'pass', steve_value: `${elapsed62}ms`, duration_ms: elapsed62 };
+        } catch (err62: any) {
+          return { result: 'error', error_message: err62.name === 'AbortError' ? 'Timeout' : err62.message, duration_ms: Date.now() - t0_62 };
+        }
+      }
+
       // ── Default: try check_config url+max_ms (api_exists, etc) ──
       default:
         return await perfSimpleFetch(check);

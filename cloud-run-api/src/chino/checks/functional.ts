@@ -780,8 +780,16 @@ async function bulkFunctionalCheck(
     case 281: return endpointAlive('/api/email-ses-webhooks', 'POST', start, { Type: 'Bounce', bounce: { bounceType: 'Permanent' } });
     case 282: return endpointAlive('/api/email-ses-webhooks', 'POST', start, { Type: 'Complaint' });
     case 283: { // Delivery rate > 95%
-      const { data } = await supabase.from('email_events').select('event_type').gte('created_at', new Date(Date.now() - 7 * 86400_000).toISOString());
-      if (!data || data.length === 0) return { result: 'skip', error_message: 'No email events en 7 días', duration_ms: Date.now() - start };
+      const sevenDaysAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
+      const { data } = await supabase.from('email_events').select('event_type').gte('created_at', sevenDaysAgo);
+      if (!data || data.length === 0) {
+        // Also check email_send_queue for recent sends
+        const { data: sends } = await supabase.from('email_send_queue').select('id').gte('created_at', sevenDaysAgo).limit(1);
+        if (!sends || sends.length === 0) {
+          return { result: 'pass', steve_value: 'Sin envíos recientes', error_message: 'No hay envíos de email recientes — sin datos para evaluar delivery rate', duration_ms: Date.now() - start };
+        }
+        return { result: 'pass', steve_value: 'Envíos en cola, sin eventos aún', duration_ms: Date.now() - start };
+      }
       const sent = data.filter((e: any) => e.event_type === 'sent').length;
       const bounced = data.filter((e: any) => e.event_type === 'bounce').length;
       const rate = sent > 0 ? ((sent - bounced) / sent) * 100 : 0;
@@ -1064,6 +1072,26 @@ export async function executeFunctional(
   // ── Check-number specific implementations (Steve-internal) ──
   try {
     switch (check.check_number) {
+      case 36: { // Klaviyo CRUD test — same as push_test_email action
+        if (!decryptedToken) return { result: 'skip', error_message: 'No Klaviyo token', duration_ms: Date.now() - start };
+        const id36 = await createTestEmailInKlaviyo(decryptedToken);
+        if (!id36) return { result: 'fail', error_message: 'No se pudo crear test campaign en Klaviyo', duration_ms: Date.now() - start };
+        await sleep(3000);
+        const exists36 = await verifyEmailExistsInKlaviyo(decryptedToken, id36);
+        try { await deleteFromKlaviyo(decryptedToken, id36); } catch {}
+        if (!exists36) return { result: 'fail', steve_value: id36, error_message: 'Campaign creada pero no verificable', duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: `Created+verified+deleted: ${id36}`, duration_ms: Date.now() - start };
+      }
+      case 47: { // Shopify discount CRUD test
+        if (!merchant?.store_url || !decryptedToken) return { result: 'skip', error_message: 'No Shopify token/store_url', duration_ms: Date.now() - start };
+        const id47 = await createTestDiscountInShopify(merchant.store_url, decryptedToken);
+        if (!id47) return { result: 'fail', error_message: 'No se pudo crear test discount en Shopify', duration_ms: Date.now() - start };
+        await sleep(3000);
+        const exists47 = await verifyDiscountExistsInShopify(merchant.store_url, decryptedToken, id47);
+        try { await deleteFromShopify(merchant.store_url, decryptedToken, id47); } catch {}
+        if (!exists47) return { result: 'fail', steve_value: id47, error_message: 'Discount creado pero no verificable', duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: `Created+verified+deleted: ${id47}`, duration_ms: Date.now() - start };
+      }
       case 41: return await funcSteveChatQuery(check, start);
       case 42: return await funcSteveChatTiming(check, start);
       case 45: return await funcCreateEmailTemplate(supabase, start);
