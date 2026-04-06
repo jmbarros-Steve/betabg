@@ -13,6 +13,7 @@ import { executeFunctional } from './checks/functional.js';
 import { executeDataQuality } from './checks/data-quality.js';
 import { executeSecurity } from './checks/security.js';
 import { generateFixPrompt } from './fix-generator.js';
+import { classifyFix, executeAutoFix } from './auto-fixer.js';
 import { sendCriticalAlert } from './whatsapp.js';
 import type { ChinoCheck, MerchantConn, CheckResult, PatrolResult, PatrolDetail } from './types.js';
 
@@ -148,7 +149,39 @@ async function enqueueFixIfNeeded(
       return;
     }
 
-    // Generate fix prompt via Claude
+    // Classify: auto (no Claude) or manual (Claude + approval)
+    const difficulty = classifyFix(check, result);
+
+    if (difficulty === 'auto') {
+      // Execute auto-fix inline — no Claude call, $0 cost
+      const autoResult = await executeAutoFix(check, result);
+      console.log(`[chino] Auto-fix for check #${check.check_number}: ${autoResult.action} (success: ${autoResult.success})`);
+
+      const { error } = await supabase.from('steve_fix_queue').insert({
+        check_id: check.id,
+        check_number: check.check_number,
+        check_result: {
+          steve_value: result.steve_value,
+          real_value: result.real_value,
+          error_message: result.error_message,
+          screenshot_url: result.screenshot_url,
+        },
+        fix_prompt: `[AUTO-FIX] ${autoResult.action}`,
+        probable_cause: autoResult.action,
+        files_to_check: [],
+        status: autoResult.success ? 'fixed' : 'pending',
+        difficulty: 'auto',
+        approval_status: autoResult.success ? 'auto_approved' : 'pending_approval',
+        attempt: 1,
+      });
+
+      if (error) {
+        console.error(`[chino] Error inserting auto-fix for check #${check.check_number}:`, error.message);
+      }
+      return;
+    }
+
+    // Manual: generate fix prompt via Claude ($0.012)
     const fix = await generateFixPrompt({
       check_number: check.check_number,
       description: check.description,
@@ -174,13 +207,15 @@ async function enqueueFixIfNeeded(
       probable_cause: fix.probable_cause,
       files_to_check: fix.files_to_check,
       status: 'pending',
+      difficulty: 'manual',
+      approval_status: 'pending_approval',
       attempt: 1,
     });
 
     if (error) {
       console.error(`[chino] Error inserting fix for check #${check.check_number}:`, error.message);
     } else {
-      console.log(`[chino] Fix enqueued for check #${check.check_number}: ${fix.probable_cause}`);
+      console.log(`[chino] Fix enqueued for check #${check.check_number} (manual, needs approval): ${fix.probable_cause}`);
     }
   } catch (err: any) {
     // Never let fix generation crash the patrol

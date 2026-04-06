@@ -218,11 +218,12 @@ export async function runChinoFixer(): Promise<FixerResult> {
     }
   }
 
-  // ── STEP B: Assign pending fixes to agents ──
+  // ── STEP B: Assign pending fixes to agents (only approved ones) ──
   const { data: pendingFixes } = await supabase
     .from('steve_fix_queue')
     .select('id')
     .eq('status', 'pending')
+    .eq('approval_status', 'approved')
     .order('created_at', { ascending: true })
     .limit(10);
 

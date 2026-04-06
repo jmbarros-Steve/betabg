@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { FixApprovalPanel } from '@/components/dashboard/FixApprovalPanel';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
@@ -400,6 +401,9 @@ export default function AdminCerebro() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Fix Approval Panel — Piloto Automático con Veto */}
+        <FixApprovalPanel />
 
         {/* Task counts summary */}
         <div className="grid grid-cols-3 md:grid-cols-5 gap-4">

@@ -100,6 +100,22 @@ ${passed} pasaron ✅ | ${failed} fallaron ❌ | ${errCount} errores ⚠️`;
     }
   }
 
+  // Fixes pending approval
+  const { data: pendingApproval } = await supabase
+    .from('steve_fix_queue')
+    .select('check_number, probable_cause')
+    .eq('approval_status', 'pending_approval')
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  if (pendingApproval && pendingApproval.length > 0) {
+    message += '\n\n*Esperan tu aprobación (' + pendingApproval.length + '):*';
+    for (const fix of pendingApproval) {
+      message += `\n• #${fix.check_number}: ${(fix.probable_cause || '').substring(0, 80)}`;
+    }
+    message += '\n\n👉 betabgnuevosupa.vercel.app/admin/cerebro';
+  }
+
   await sendToJM(message);
 }
 
