@@ -196,9 +196,10 @@ export default function AdminCerebro() {
       .slice(0, 10);
   }, [allTasks]);
 
-  // Health score
-  const healthScore = slos.length > 0
-    ? Math.round(slos.reduce((s, slo) => s + (slo.current_success_rate || 0), 0) / slos.length)
+  // Health score (only average SLOs that have actual data)
+  const measuredSlos = slos.filter((slo) => slo.current_success_rate !== null);
+  const healthScore = measuredSlos.length > 0
+    ? Math.round(measuredSlos.reduce((s, slo) => s + slo.current_success_rate!, 0) / measuredSlos.length)
     : null;
 
   async function handleCreateTask() {
