@@ -125,6 +125,14 @@ Guardado y entregado a JM para Sebastián W5. Incluye reglas de formato (solo ma
 
 ## Reglas Permanentes de Javiera W12
 
+### Sesión 06/04/2026 — Cierre
+- Git push: commit `645c094` en main
+- Cloud Run deploy: revision `steve-api-00382-8q4` (100% tráfico)
+- Env vars: 23/20 presentes
+- Notion: página padre + sesión creadas y formateadas
+- Prompt para Sebastián W5 entregado a JM
+- Estado: todo deployado y documentado
+
 ### Al terminar cada sesión SIEMPRE:
 1. Crear subpágina en Notion bajo "Javiera - QA - Chino" (id: 33a9af51b58d804c9e8de2fff7c6b02f) con título "Sesión {fecha}"
 2. Estructura de la subpágina:
