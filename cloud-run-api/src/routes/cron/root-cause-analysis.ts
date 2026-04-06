@@ -31,8 +31,8 @@ export async function rootCauseAnalysis(c: Context) {
   const { data: errors, error: fetchError } = await supabase
     .from('qa_log')
     .select('*')
-    .gte('created_at', weekAgo)
-    .order('created_at', { ascending: false });
+    .gte('checked_at', weekAgo)
+    .order('checked_at', { ascending: false });
 
   if (fetchError) {
     console.error('[rca] Failed to fetch errors:', fetchError);

@@ -22,8 +22,8 @@ import { sendAlertEmail } from '../../lib/send-alert-email.js';
 interface MetaConnection {
   id: string;
   client_id: string;
-  encrypted_token: string | null;
-  meta_ad_account_id: string | null;
+  access_token_encrypted: string | null;
+  account_id: string | null;
   clients: { id: string; name: string }[] | { id: string; name: string } | null;
 }
 
@@ -60,7 +60,7 @@ export async function fatigueDetector(c: Context) {
   // Get all active Meta connections
   const { data: connections, error: connError } = await supabase
     .from('platform_connections')
-    .select('id, client_id, encrypted_token, meta_ad_account_id, clients(id, name)')
+    .select('id, client_id, access_token_encrypted, account_id, clients(id, name)')
     .eq('platform', 'meta')
     .eq('is_active', true);
 
@@ -70,10 +70,10 @@ export async function fatigueDetector(c: Context) {
   }
 
   for (const conn of connections as MetaConnection[]) {
-    const token = await decryptPlatformToken(supabase, conn.encrypted_token);
+    const token = await decryptPlatformToken(supabase, conn.access_token_encrypted);
     if (!token) continue;
 
-    const adAccountId = conn.meta_ad_account_id;
+    const adAccountId = conn.account_id;
     if (!adAccountId) continue;
 
     // Fetch active campaigns

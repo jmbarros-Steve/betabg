@@ -54,10 +54,10 @@ Eres el tipo que revisa tres veces antes de hacer un ALTER TABLE. No confias en 
 ### M4: Fuentes del Brain
 **Scope:** Tablas que alimentan la inteligencia de Steve
 **Tablas críticas:**
-- `steve_sources` = **0 filas** (VACÍO — el Content Hunter corre para NADA)
+- `steve_sources` = **59 filas** (solo Future Commerce extrae reglas — 22. Las otras 58 tienen 0)
 - `swarm_sources` = **0 filas** (VACÍO — sin combustible para Swarm)
-- `steve_knowledge` = 487 reglas (funciona)
-- `swarm_runs` = 16 exitosos de 360 posibles (parcial)
+- `steve_knowledge` = 975 reglas (funciona)
+- `swarm_runs` = 40/40 completed (100% éxito)
 **Prompt sub-agente:** "Eres el especialista en fuentes de datos de Diego W8. Tu ÚNICO scope son las tablas steve_sources, swarm_sources, swarm_runs y steve_knowledge. Diagnostica por qué steve_sources y swarm_sources están VACÍAS. Verifica que los crons que las alimentan realmente insertan datos."
 
 ### M5: Encriptación & RPCs

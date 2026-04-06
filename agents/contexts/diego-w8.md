@@ -9,14 +9,14 @@
 | `tasks` | agent_code, title, severity, status, created_at | OK |
 | `agent_sessions` | agent_code, personality_md, status_md, memory_md, updated_at | OK |
 | `backlog` | title, priority, status | OK |
-| `steve_sources` | url, content, relevance_score, created_at | **0 filas (VACIO)** |
-| `swarm_sources` | url, topic, created_at | **0 filas (VACIO)** |
+| `steve_sources` | url, content, relevance_score, created_at | **59 filas** (1 con rules extraídas: Future Commerce 22 reglas) |
+| `swarm_sources` | url, topic, created_at | **53 filas** (por categoría: meta_ads, google, klaviyo, shopify, anuncios, seo, analisis, buyer_persona, brief) |
 
 ## Tablas que Lees (de otros agentes)
 | Tabla | Dueno | Para que la lees |
 |-------|-------|-----------------|
-| `steve_knowledge` | Tomas W7 | Verificar que las fuentes alimenten el brain |
-| `swarm_runs` | Tomas W7 | Monitorear ejecucion del swarm (16 exitosos de 360 posibles) |
+| `steve_knowledge` | Tomas W7 | Verificar que las fuentes alimenten el brain (975 reglas) |
+| `swarm_runs` | Tomas W7 | Monitorear ejecucion del swarm (40 completed de 40 total) |
 
 ## Tus Crons
 | Job | Schedule | Endpoint | Estado conocido |
@@ -38,8 +38,7 @@ Diego no mantiene edge functions directamente. Su dominio es el schema, las migr
 - Alimentas a: TODOS (schema, RLS, datos, tokens encriptados)
 
 ## Problemas Conocidos
-- `steve_sources` = 0 filas — el brain no tiene fuentes de contenido
 - `swarm_sources` = 0 filas — el swarm no tiene fuentes de busqueda
-- Solo 3 `platform_connections` activas de 127 clientes registrados
-- Migraciones pendientes de aplicar al nuevo Supabase (zpswjccsxjtnhetkkqde)
-- `swarm_runs`: solo 16 exitosos de 360 posibles (tasa de exito 4.4%)
+- `steve_sources` = 59 filas cargadas, pero solo 1 extrae reglas (Future Commerce 22). El resto 0 reglas.
+- Solo 3 `platform_connections` activas de 127 clientes — **NORMAL**, hay 1 cliente conectado para QA, el resto fueron borrados intencionalmente
+- `swarm_runs`: 40 completed de 40 total (100% tasa de éxito — mejorado)

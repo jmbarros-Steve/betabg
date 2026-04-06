@@ -12,13 +12,13 @@ export async function approveKnowledge(c: Context) {
 
   switch (action) {
     case 'approve': {
-      await supabase.from('steve_knowledge').update({ approval_status: 'approved', orden: 90 }).in('id', ids);
+      await supabase.from('steve_knowledge').update({ approval_status: 'approved', activo: true, orden: 90 }).in('id', ids);
       // Also approve siblings sharing the same insight_group_id
       const { data: rows } = await supabase.from('steve_knowledge').select('insight_group_id').in('id', ids);
       const groupIds = (rows || []).map((r: any) => r.insight_group_id).filter(Boolean);
       if (groupIds.length > 0) {
         await supabase.from('steve_knowledge')
-          .update({ approval_status: 'approved', orden: 90 })
+          .update({ approval_status: 'approved', activo: true, orden: 90 })
           .in('insight_group_id', groupIds)
           .eq('approval_status', 'pending');
       }

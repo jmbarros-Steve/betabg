@@ -465,68 +465,66 @@ export function registerRoutes(app: Hono) {
   app.post('/api/whatsapp/send-message', authMiddleware, waSendMessage); // Portal: merchant sends manual reply
   app.post('/api/whatsapp/send-campaign', authMiddleware, waSendCampaign); // Portal: send bulk WA campaign
   app.post('/api/whatsapp/shopify-checkout-webhook', shopifyCheckoutWebhook); // No JWT — Shopify HMAC
-  app.post('/api/cron/abandoned-cart-wa', abandonedCartWA); // No JWT — X-Cron-Secret, hourly: 0 * * * *
+  app.post('/api/task-completed', taskCompleted); // No JWT — uses X-Cron-Secret, called by Leonardo when task is done
 
   // ============================================================
-  // Cron / Scheduled Jobs
+  // Cron / Scheduled Jobs — sub-router to avoid Hono RegExpRouter limit
   // ============================================================
-  app.post('/api/cron/sync-all-metrics', syncAllMetrics); // No JWT — uses X-Cron-Secret
-  app.post('/api/cron/changelog-watcher', apiChangelogWatcher); // No JWT — uses X-Cron-Secret, daily 0 7 * * *
-  app.post('/api/cron/error-budget-calculator', errorBudgetCalculator); // No JWT — uses X-Cron-Secret, every 4h: 0 */4 * * *
-  app.post('/api/cron/reconciliation', reconciliation); // No JWT — uses X-Cron-Secret, every 6h: 0 */6 * * *
-  app.post('/api/cron/competitor-spy', competitorSpy); // No JWT — uses X-Cron-Secret, weekly: 0 6 * * 1 (Mon 6am Chile)
-  app.post('/api/cron/rule-calibrator', ruleCalibrator); // No JWT — uses X-Cron-Secret, weekly: 0 3 * * 0 (Sun 3am)
-  app.post('/api/cron/auto-rule-generator', autoRuleGenerator); // No JWT — uses X-Cron-Secret, on-demand from qa_log
-  app.post('/api/cron/weekly-report', weeklyReport); // No JWT — uses X-Cron-Secret, weekly: 0 11 * * 1 (Mon 11am UTC = 8am Chile)
-  app.post('/api/cron/root-cause-analysis', rootCauseAnalysis); // No JWT — uses X-Cron-Secret, weekly: 0 2 * * 0 (Sun 2am)
-  app.post('/api/cron/auto-postmortem', autoPostmortem); // No JWT — uses X-Cron-Secret, on-demand when critical task completes
-  app.post('/api/cron/restart-service', restartService); // No JWT — uses X-Cron-Secret, called by OJOS health-check
-  app.post('/api/cron/fatigue-detector', fatigueDetector); // No JWT — uses X-Cron-Secret, daily: 0 11 * * * (11am)
-  app.post('/api/cron/performance-evaluator', performanceEvaluator); // No JWT — uses X-Cron-Secret, daily: 0 10 * * * (10am)
-  app.post('/api/cron/performance-tracker-meta', performanceTrackerMeta); // No JWT — uses X-Cron-Secret, daily: 0 8 * * * (8am)
-  app.post('/api/cron/execute-meta-rules', executeMetaRulesCron); // No JWT — daily: 0 9 * * * (once per day)
-  app.post('/api/cron/task-prioritizer', taskPrioritizer); // No JWT — uses X-Cron-Secret, hourly: 0 */1 * * *
-  app.post('/api/task-completed', taskCompleted); // No JWT — uses X-Cron-Secret, called by Leonardo when task is done
-  app.post('/api/cron/detective-visual', detectiveVisual); // No JWT — uses X-Cron-Secret, every 2h: 0 8,10,12,14,16,18,20 * * *
-  app.post('/api/cron/skyvern-dispatcher', skyvernDispatcher); // No JWT — uses X-Cron-Secret, every 2min: */2 * * * *
-  app.post('/api/cron/prospect-followup', prospectFollowup); // No JWT — uses X-Cron-Secret, every 4h: 0 */4 * * *
-  app.post('/api/cron/prospect-rotting-detector', prospectRottingDetector); // No JWT — uses X-Cron-Secret, every 6h: 0 */6 * * *
-  app.post('/api/cron/meeting-reminder', meetingReminder); // No JWT — uses X-Cron-Secret, every 30min: */30 * * * *
-  app.post('/api/cron/prospect-email-nurture', prospectEmailNurture); // No JWT — uses X-Cron-Secret, daily 1pm UTC (10am Chile): 0 13 * * *
-  app.post('/api/cron/knowledge-decay', knowledgeDecay); // No JWT — uses X-Cron-Secret, monthly: 0 4 1 * *
-  app.post('/api/cron/knowledge-consolidator', knowledgeConsolidator); // No JWT — monthly: 0 5 1 * * (1st of month, 5am)
-  app.post('/api/cron/knowledge-dedup', knowledgeDedup); // No JWT — monthly: 0 6 1 * * (1st of month, 6am)
-  app.post('/api/cron/steve-content-hunter', steveContentHunter); // No JWT — every 20min: */20 * * * *
+  const cron = new Hono();
+  cron.post('/abandoned-cart-wa', abandonedCartWA);
+  cron.post('/sync-all-metrics', syncAllMetrics);
+  cron.post('/changelog-watcher', apiChangelogWatcher);
+  cron.post('/error-budget-calculator', errorBudgetCalculator);
+  cron.post('/reconciliation', reconciliation);
+  cron.post('/competitor-spy', competitorSpy);
+  cron.post('/rule-calibrator', ruleCalibrator);
+  cron.post('/auto-rule-generator', autoRuleGenerator);
+  cron.post('/weekly-report', weeklyReport);
+  cron.post('/root-cause-analysis', rootCauseAnalysis);
+  cron.post('/auto-postmortem', autoPostmortem);
+  cron.post('/restart-service', restartService);
+  cron.post('/fatigue-detector', fatigueDetector);
+  cron.post('/performance-evaluator', performanceEvaluator);
+  cron.post('/performance-tracker-meta', performanceTrackerMeta);
+  cron.post('/execute-meta-rules', executeMetaRulesCron);
+  cron.post('/task-prioritizer', taskPrioritizer);
+  cron.post('/detective-visual', detectiveVisual);
+  cron.post('/skyvern-dispatcher', skyvernDispatcher);
+  cron.post('/prospect-followup', prospectFollowup);
+  cron.post('/prospect-rotting-detector', prospectRottingDetector);
+  cron.post('/meeting-reminder', meetingReminder);
+  cron.post('/prospect-email-nurture', prospectEmailNurture);
+  cron.post('/knowledge-decay', knowledgeDecay);
+  cron.post('/knowledge-consolidator', knowledgeConsolidator);
+  cron.post('/knowledge-dedup', knowledgeDedup);
+  cron.post('/steve-content-hunter', steveContentHunter);
+  cron.post('/onboarding-wa', onboardingWA);
+  cron.post('/merchant-upsell', merchantUpsell);
+  cron.post('/churn-detector', churnDetector);
+  cron.post('/funnel-diagnosis', funnelDiagnosis);
+  cron.post('/predictive-alerts', predictiveAlerts);
+  cron.post('/anomaly-detector', anomalyDetector);
+  cron.post('/auto-brief-generator', autoBriefGenerator);
+  cron.post('/cross-client-learning', crossClientLearning);
+  cron.post('/revenue-attribution', revenueAttribution);
+  cron.post('/knowledge-quality-score', knowledgeQualityScore);
+  cron.post('/steve-agent-loop', steveAgentLoop);
+  cron.post('/steve-discoverer', steveDiscoverer);
+  cron.post('/steve-prompt-evolver', stevePromptEvolver);
+  cron.post('/wolf-night-mode', wolfNightMode);
+  cron.post('/wolf-morning-send', wolfMorningSend);
+  cron.post('/sales-learning-loop', salesLearningLoop);
+  cron.post('/wa-action-processor', waActionProcessor);
+  cron.post('/swarm-research', swarmResearch);
+  cron.post('/auto-learning-digest', autoLearningDigest);
+  cron.post('/knowledge-propagation-catchup', knowledgePropagationCatchup);
+  cron.post('/validate-contexts', validateContexts);
+  app.route('/api/cron', cron);
 
   // ============================================================
   // Steve Sales + Post-Venta
   // ============================================================
   app.post('/api/whatsapp/prospect-trial', prospectTrial); // No JWT — uses X-Internal-Key, triggered by [ACTIVATE_TRIAL] tag
-  app.post('/api/cron/onboarding-wa', onboardingWA); // No JWT — uses X-Cron-Secret, every 4h: 0 */4 * * *
-  app.post('/api/cron/merchant-upsell', merchantUpsell); // No JWT — uses X-Cron-Secret, weekly: 0 11 * * 0 (Sun 11am UTC)
-  app.post('/api/cron/churn-detector', churnDetector); // No JWT — uses X-Cron-Secret, daily: 0 14 * * *
-  app.post('/api/cron/funnel-diagnosis', funnelDiagnosis); // No JWT — uses X-Cron-Secret, weekly: 0 5 * * 1 (Mon 5am)
-  app.post('/api/cron/predictive-alerts', predictiveAlerts); // No JWT — uses X-Cron-Secret, every 6h: 0 */6 * * *
-  app.post('/api/cron/anomaly-detector', anomalyDetector); // No JWT — uses X-Cron-Secret, daily: 0 22 * * *
-  app.post('/api/cron/auto-brief-generator', autoBriefGenerator); // No JWT — uses X-Cron-Secret, daily: 0 7 * * *
-  app.post('/api/cron/cross-client-learning', crossClientLearning); // No JWT — uses X-Cron-Secret, monthly: 0 3 1 * *
-  app.post('/api/cron/revenue-attribution', revenueAttribution); // No JWT — uses X-Cron-Secret, weekly: 0 4 * * 0 (Sun 4am)
-  app.post('/api/cron/knowledge-quality-score', knowledgeQualityScore); // No JWT — uses X-Cron-Secret, weekly: 0 5 * * 0 (Sun 5am)
-  app.post('/api/cron/steve-agent-loop', steveAgentLoop); // No JWT — uses X-Cron-Secret, every 2h: 0 */2 * * *
-  app.post('/api/cron/steve-discoverer', steveDiscoverer); // No JWT — uses X-Cron-Secret, weekly: 0 2 * * 0 (Sun 2am)
-  app.post('/api/cron/steve-prompt-evolver', stevePromptEvolver); // No JWT — uses X-Cron-Secret, weekly: 0 3 * * 0 (Sun 3am)
-
-  // Steve Depredador — Autonomous Agent Crons
-  app.post('/api/cron/wolf-night-mode', wolfNightMode); // No JWT — X-Cron-Secret, daily 3am Chile: 0 6 * * *
-  app.post('/api/cron/wolf-morning-send', wolfMorningSend); // No JWT — X-Cron-Secret, daily 9am Chile: 0 12 * * *
-  app.post('/api/cron/sales-learning-loop', salesLearningLoop); // No JWT — X-Cron-Secret, daily 8pm Chile: 0 23 * * *
-  app.post('/api/cron/wa-action-processor', waActionProcessor); // No JWT — X-Cron-Secret, every 1min via Cloud Scheduler: * * * * *
-
-  // Steve Brain Swarm — parallel research + auto-learning
-  app.post('/api/cron/swarm-research', swarmResearch); // No JWT — X-Cron-Secret, every 2h: 0 */2 * * *
-  app.post('/api/cron/auto-learning-digest', autoLearningDigest); // No JWT — X-Cron-Secret, daily 9am Chile: 0 12 * * *
-  app.post('/api/cron/knowledge-propagation-catchup', knowledgePropagationCatchup); // No JWT — X-Cron-Secret, manual or piggyback on Sun 5am
-  app.post('/api/cron/validate-contexts', validateContexts); // No JWT — X-Cron-Secret, every 12h: 0 6,18 * * *
 
   // Public approval API (token-based, no JWT)
   app.get('/api/approve-rules-public', approveRulesPublic);

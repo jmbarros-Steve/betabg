@@ -8,21 +8,12 @@ Que la data fluya: las tablas de fuentes tienen datos, los crons no fallan silen
 
 ### Tareas pendientes
 
-#### 1. Poblar steve_sources (actualmente: 0 rows)
-- [ ] Insertar 20+ fuentes de marketing digital (blogs, newsletters)
-  - HubSpot Blog, Neil Patel, Search Engine Journal, Moz Blog
-  - Meta Business Help Center, Google Ads Blog
-  - Shopify Blog, Klaviyo Blog
-  - Marketing Brew, Morning Brew
-- [ ] Categorizar por tipo: blog, newsletter, youtube_channel, rss
-- [ ] Configurar check_interval_min para cada una
+#### 1. ~~Poblar steve_sources~~ ✅ COMPLETADO (2026-04-04)
+- [x] 59 fuentes cargadas (blogs, newsletters, youtube_channels, websites)
+- [ ] **PENDIENTE:** Solo Future Commerce extrae reglas (22). Las otras 58 tienen 0 reglas. Investigar por qué el content-hunter no procesa el resto.
 
-#### 2. Poblar swarm_sources (actualmente: 0 rows)
-- [ ] Insertar fuentes específicas para Swarm Research
-  - Canales YouTube de marketing digital
-  - RSS feeds de industria e-commerce
-  - Blogs de estrategia publicitaria
-- [ ] Verificar que content-hunter las pueda leer
+#### 2. ~~Poblar swarm_sources~~ ✅ COMPLETADO (2026-04-05)
+- [x] 53 fuentes insertadas por categoría (meta_ads, google, klaviyo, shopify, anuncios, seo, analisis, buyer_persona, brief)
 
 #### 3. Verificar integridad de crons
 - [ ] Crear query que revise los últimos 7 días de qa_log por cron
@@ -35,7 +26,8 @@ Que la data fluya: las tablas de fuentes tienen datos, los crons no fallan silen
 - [ ] Verificar RLS policies no bloqueen los crons
 
 ### Completado
-(nada aún)
+- [x] Poblar steve_sources — 59 fuentes (2026-04-04)
+- [x] swarm_runs funcionando — 40/40 completed (100%)
 
 ### Blockers
 (ninguno conocido)
