@@ -14,7 +14,7 @@ import {
   Sparkles, ShoppingCart, UserPlus, Package, UserX, X, Save, Settings2,
   Cake, Eye, Search,
 } from 'lucide-react';
-import { BlocksEditorWrapper, type BlocksEditorRef } from './BlocksEditorWrapper';
+import GrapesEmailEditor, { type UnlayerEditorRef } from './GrapesEmailEditor';
 import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { UniversalBlocksPanel } from './UniversalBlocksPanel';
 import { FlowCanvas } from './FlowCanvas';
@@ -176,7 +176,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [showEmailEditor, setShowEmailEditor] = useState(false);
   const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
-  const emailEditorRef = useRef<BlocksEditorRef>(null);
+  const emailEditorRef = useRef<UnlayerEditorRef>(null);
   const [, setEditorReady] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
@@ -351,9 +351,9 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
     setShowEmailEditor(true);
   };
 
-  const saveStepFromEditor = () => {
+  const saveStepFromEditor = async () => {
     if (!emailEditorRef.current) return;
-    const html = emailEditorRef.current.getHtml();
+    const html = await emailEditorRef.current.getHtml();
     const design = emailEditorRef.current.getProjectData();
 
     if (editingSubStep) {
@@ -393,7 +393,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
       <div className="fixed inset-0 z-[100] bg-background flex flex-col">
         <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/50 shrink-0">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={saveStepFromEditor}>
+            <Button variant="ghost" size="sm" onClick={() => { void saveStepFromEditor(); }}>
               <Save className="w-4 h-4 mr-1" /> Guardar y volver
             </Button>
             <span className="text-sm font-medium">
@@ -427,18 +427,20 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
         </div>
         <div className="flex-1 min-h-0 relative">
           <div className="absolute inset-0">
-            <BlocksEditorWrapper
+            <GrapesEmailEditor
               ref={emailEditorRef}
+              clientId={clientId}
               onReady={() => {
                 setEditorReady(true);
                 const step = editingSubStep
                   ? editingFlow?.steps?.[editingSubStep.pi]?.[editingSubStep.branch]?.[editingSubStep.si]
                   : editingFlow?.steps?.[editingStepIndex!];
-                if (step?.html_content || step?.design_json) {
-                  emailEditorRef.current?.loadDesign(step.html_content || '', step.design_json);
+                if (step?.design_json) {
+                  emailEditorRef.current?.loadDesign(step.design_json);
+                } else if (step?.html_content) {
+                  emailEditorRef.current?.setHtml(step.html_content);
                 }
               }}
-              style={{ height: '100%' }}
             />
           </div>
         </div>
@@ -448,16 +450,9 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
           onClose={() => setShowTemplateGallery(false)}
           onSelect={(design) => {
             setShowTemplateGallery(false);
-            if (design) {
-              const tryLoad = () => {
-                if (emailEditorRef.current) {
-                  const h = typeof design === 'string' ? design : (design as any).html || '';
-                  emailEditorRef.current.loadDesign(h);
-                } else {
-                  setTimeout(tryLoad, 200);
-                }
-              };
-              tryLoad();
+            if (design && emailEditorRef.current) {
+              const mjml = typeof design === 'string' ? design : (design as any).html || '';
+              emailEditorRef.current.setHtml(mjml);
             }
           }}
         />

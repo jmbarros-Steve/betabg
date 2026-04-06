@@ -30,7 +30,7 @@ import {
   MousePointerClick,
   FileDown,
 } from 'lucide-react';
-import { type BlocksEditorRef } from './BlocksEditorWrapper';
+import { type UnlayerEditorRef } from './GrapesEmailEditor';
 
 interface UniversalBlock {
   id: string;
@@ -43,7 +43,7 @@ interface UniversalBlock {
 
 interface UniversalBlocksPanelProps {
   clientId: string;
-  editor: BlocksEditorRef | null;
+  editor: UnlayerEditorRef | null;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -147,7 +147,7 @@ export function UniversalBlocksPanel({
           throw new Error('No hay componente seleccionado. Selecciona una sección en el editor.');
         }
       } else {
-        html = editor.getHtml();
+        html = await editor.getHtml();
       }
 
       if (!html) {
@@ -191,7 +191,7 @@ export function UniversalBlocksPanel({
     }
 
     try {
-      editor.addComponents(block.block_json);
+      editor.insertHtml(typeof block.block_json === 'string' ? block.block_json : JSON.stringify(block.block_json));
 
       // Increment usage count
       await callApi('universal-blocks', {

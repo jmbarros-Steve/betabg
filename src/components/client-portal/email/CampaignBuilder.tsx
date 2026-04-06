@@ -646,6 +646,38 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     return out;
   };
 
+  /** Converts a table-based HTML email template into MJML with one mj-section per row,
+   *  so each row is independently editable/movable in GrapeJS Studio. */
+  const htmlToMjmlSections = (html: string): string => {
+    // Strip outer wrapper table — keep only content of the inner 600px table
+    const innerMatch = html.match(/<table[^>]*max-width:600px[^>]*>([\s\S]*?)<\/table>\s*<\/td>/i)
+      || html.match(/<table[^>]*width="600"[^>]*>([\s\S]*?)<\/table>/i);
+    const inner = innerMatch?.[1] || html;
+
+    // Extract each <tr>...</tr> block
+    const rowMatches = [...inner.matchAll(/<tr(?:\s[^>]*)?>[\s\S]*?<\/tr>/gi)];
+
+    if (rowMatches.length === 0) {
+      // Fallback: one section with entire HTML
+      return `<mjml><mj-body background-color="#f4f4f5"><mj-section background-color="#ffffff" padding="0"><mj-column><mj-raw>${html}</mj-raw></mj-column></mj-section></mj-body></mjml>`;
+    }
+
+    let mjml = '<mjml><mj-body background-color="#f4f4f5">';
+    for (const match of rowMatches) {
+      const row = match[0];
+      // Extract td content (inner HTML of first <td>)
+      const tdMatch = row.match(/<td[^>]*>([\s\S]*?)<\/td>/i);
+      const content = tdMatch?.[1]?.trim() || '';
+      if (!content) continue;
+      // Extract background-color from td or tr style
+      const bgMatch = (row.match(/background-color:\s*(#[0-9a-fA-F]{3,6})/i) || row.match(/bgcolor="(#[0-9a-fA-F]{3,6})"/i));
+      const bg = bgMatch?.[1] || '#ffffff';
+      mjml += `\n<mj-section background-color="${bg}" padding="0"><mj-column><mj-raw>${content}</mj-raw></mj-column></mj-section>`;
+    }
+    mjml += '\n</mj-body></mjml>';
+    return mjml;
+  };
+
   const handleTemplateSelect = (templateDesign: any) => {
     setShowTemplateGallery(false);
     if (!templateDesign) return;
@@ -654,7 +686,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     if (typeof templateDesign === 'string') {
       const mjml = templateDesign.includes('<mjml')
         ? templateDesign
-        : `<mjml><mj-body><mj-section><mj-column><mj-raw>${templateDesign}</mj-raw></mj-column></mj-section></mj-body></mjml>`;
+        : htmlToMjmlSections(templateDesign);
       if (editorReady && emailEditorRef.current) {
         emailEditorRef.current.setHtml(mjml);
       } else {
