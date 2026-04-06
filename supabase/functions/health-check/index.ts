@@ -149,7 +149,8 @@ serve(async (req) => {
     }
 
     const failed = results.filter(r => !r.ok)
-    const slow = results.filter(r => r.ok && r.time_ms > 3000)
+    // Only flag slow if response was successful (2xx/3xx) — 4xx (e.g. 401 on cold start) are not perf issues
+    const slow = results.filter(r => r.ok && r.status < 400 && r.time_ms > 3000)
 
     // Registrar cada resultado en criterio_results
     for (const r of results) {
