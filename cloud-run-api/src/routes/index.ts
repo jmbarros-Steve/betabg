@@ -126,7 +126,6 @@ import { executeMetaRulesCron } from './cron/execute-meta-rules.js';
 import { taskPrioritizer } from './cron/task-prioritizer.js';
 import { taskCompleted } from './cron/task-completed.js';
 import { detectiveVisual } from './cron/detective-visual.js';
-import { skyvernDispatcher } from './cron/skyvern-dispatcher.js';
 import { prospectFollowup } from './cron/prospect-followup.js';
 import { prospectRottingDetector } from './cron/prospect-rotting-detector.js';
 import { meetingReminder } from './cron/meeting-reminder.js';
@@ -489,7 +488,6 @@ export function registerRoutes(app: Hono) {
   cron.post('/execute-meta-rules', executeMetaRulesCron);
   cron.post('/task-prioritizer', taskPrioritizer);
   cron.post('/detective-visual', detectiveVisual);
-  cron.post('/skyvern-dispatcher', skyvernDispatcher);
   cron.post('/prospect-followup', prospectFollowup);
   cron.post('/prospect-rotting-detector', prospectRottingDetector);
   cron.post('/meeting-reminder', meetingReminder);
