@@ -7,7 +7,7 @@ import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
-const SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.freebusy';
+const SCOPES = 'https://www.googleapis.com/auth/calendar';
 const REDIRECT_URI = window.location.origin + '/agendar/oauth-callback';
 
 interface Seller {
