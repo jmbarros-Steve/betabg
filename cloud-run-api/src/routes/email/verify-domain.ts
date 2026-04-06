@@ -88,10 +88,10 @@ export async function verifyEmailDomain(c: Context) {
       const cleanDomain = domain.toLowerCase().trim();
       const resend = getResendClient();
 
-      // Get resend_domain_id from DB
+      // Get resend_domain_id + existing dns_records (to preserve DMARC)
       const { data: domainRecord } = await supabase
         .from('email_domains')
-        .select('resend_domain_id')
+        .select('resend_domain_id, dns_records')
         .eq('client_id', client_id)
         .eq('domain', cleanDomain)
         .single();
@@ -109,24 +109,48 @@ export async function verifyEmailDomain(c: Context) {
 
       // Parse individual record verification status from Resend
       const records = domainInfo?.records || [];
-      const spfVerified = records.some((r: any) => (r.type === 'TXT' || r.record === 'SPF') && r.status === 'verified');
-      const dkimVerified = records.some((r: any) => (r.type === 'CNAME' || r.record === 'DKIM') && r.status === 'verified');
-      // DMARC is user-managed, check if record exists with our recommended value
-      const dmarcRecord = records.find((r: any) => r.name?.includes('_dmarc'));
-      const dmarcVerified = dmarcRecord?.status === 'verified';
+      // Use r.record label (DKIM/SPF) to avoid type collisions (both are TXT)
+      const spfVerified = records.some((r: any) =>
+        (r.record === 'SPF' || (r.value?.startsWith('v=spf1') && !r.name?.includes('_domainkey')))
+        && r.status === 'verified'
+      );
+      const dkimVerified = records.some((r: any) =>
+        (r.record === 'DKIM' || r.name?.includes('_domainkey'))
+        && r.status === 'verified'
+      );
+      // DMARC is user-managed — check existing DB record
+      const existingDmarc = (domainRecord.dns_records || []).find(
+        (r: any) => r.name?.includes('_dmarc') || r.purpose?.toLowerCase().includes('dmarc')
+      );
+      const dmarcVerified = existingDmarc?.status === 'verified';
+
+      // Build updated dns_records: Resend records + preserve existing DMARC recommendation
+      const updatedDnsRecords = records.map((r: any) => ({
+        type: r.type || r.record,
+        name: r.name,
+        value: r.value,
+        purpose: r.record || r.type,
+        status: r.status || 'pending',
+      }));
+      if (existingDmarc) {
+        updatedDnsRecords.push(existingDmarc);
+      } else {
+        // Add DMARC recommendation if not already present
+        updatedDnsRecords.push({
+          type: 'TXT',
+          name: `_dmarc.${cleanDomain}`,
+          value: `v=DMARC1; p=quarantine; rua=mailto:dmarc@${cleanDomain}`,
+          purpose: 'DMARC policy',
+          status: 'info',
+        });
+      }
 
       // Update database with verification details
       const updateData: any = {
         spf_verified: spfVerified,
         dkim_verified: dkimVerified,
         dmarc_verified: dmarcVerified,
-        dns_records: records.map((r: any) => ({
-          type: r.type || r.record,
-          name: r.name,
-          value: r.value,
-          purpose: r.record || r.type,
-          status: r.status || 'pending',
-        })),
+        dns_records: updatedDnsRecords,
       };
 
       if (isVerified) {

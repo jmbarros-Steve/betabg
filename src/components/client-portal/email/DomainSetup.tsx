@@ -234,6 +234,10 @@ export function DomainSetup({ clientId }: DomainSetupProps) {
                       </div>
                       {record.status === 'verified' ? (
                         <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                      ) : record.status === 'failed' ? (
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                      ) : record.status === 'info' ? (
+                        <Info className="w-3.5 h-3.5 text-blue-500" />
                       ) : (
                         <Clock className="w-3.5 h-3.5 text-yellow-600" />
                       )}

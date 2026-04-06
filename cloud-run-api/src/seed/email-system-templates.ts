@@ -540,10 +540,28 @@ const SYSTEM_TEMPLATES = [
 /**
  * Seed system email templates into Supabase.
  * Idempotent: skips templates that already exist by name + is_system.
+ *
+ * Note: email_templates.client_id has NOT NULL + FK(clients) constraint.
+ * System templates (is_system=true) are visible to all clients via service role,
+ * so we use the first available client_id as a placeholder owner.
  */
 export async function seedSystemEmailTemplates() {
   const supabase = getSupabaseAdmin();
   const results: string[] = [];
+
+  // Get a valid client_id to satisfy the NOT NULL + FK constraint
+  // System templates are queried by is_system=true (not by client_id), so any valid client works
+  const { data: anyClient } = await supabase
+    .from('clients')
+    .select('id')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  const systemClientId = anyClient?.id;
+  if (!systemClientId) {
+    return { results: ['ERROR: No clients found — cannot seed system templates'], total: 0 };
+  }
 
   for (const tpl of SYSTEM_TEMPLATES) {
     // Check if already exists
@@ -566,10 +584,11 @@ export async function seedSystemEmailTemplates() {
         .eq('id', existing.id);
       results.push(error ? `${tpl.name}: ERROR ${error.message}` : `${tpl.name}: actualizado`);
     } else {
-      // Insert new
+      // Insert new with valid client_id placeholder
       const { error } = await supabase
         .from('email_templates')
         .insert({
+          client_id: systemClientId,
           name: tpl.name,
           description: tpl.description,
           category: tpl.category,
