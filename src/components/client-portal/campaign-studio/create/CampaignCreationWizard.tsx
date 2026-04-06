@@ -12,6 +12,7 @@ import { TemplateSelector } from './TemplateSelector';
 import { ContentConfigurator } from './ContentConfigurator';
 import { PreviewEditor } from './PreviewEditor';
 import { SchedulePublish } from './SchedulePublish';
+import { GrapesStudioEmailEditor } from '../shared/GrapesStudioEmailEditor';
 import type { EmailBlock } from '../../email-blocks/blockTypes';
 
 export interface CampaignData {
@@ -29,11 +30,12 @@ export interface CampaignData {
   ctaText: string;
   ctaUrl: string;
   htmlContent: string;
+  designJson?: any | null;
   collectionId: string;
   collectionName: string;
 }
 
-const STEP_LABELS = ['Tipo', 'Contenido', 'Preview', 'Programar'];
+const STEP_LABELS = ['Tipo', 'Contenido', 'Editar', 'Preview', 'Programar'];
 
 interface CampaignCreationWizardProps {
   clientId: string;
@@ -64,6 +66,7 @@ function buildInitialData(type: CampaignType, editCampaign?: any): CampaignData 
       ctaText: editCampaign.ctaText || '',
       ctaUrl: editCampaign.ctaUrl || '',
       htmlContent: editCampaign.htmlContent || '',
+      designJson: editCampaign.designJson || null,
       collectionId: editCampaign.collectionId || '',
       collectionName: editCampaign.collectionName || '',
     };
@@ -84,6 +87,7 @@ function buildInitialData(type: CampaignType, editCampaign?: any): CampaignData 
     ctaText: '',
     ctaUrl: '',
     htmlContent: '',
+    designJson: null,
     collectionId: '',
     collectionName: '',
   };
@@ -103,6 +107,7 @@ export function CampaignCreationWizard({
     buildInitialData(campaignType, editCampaign)
   );
   const [publishing, setPublishing] = useState(false);
+  const [showGrapesEditor, setShowGrapesEditor] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -153,15 +158,20 @@ export function CampaignCreationWizard({
     });
   }, [brand, campaignData]);
 
+  // Effective HTML: user-edited takes priority over auto-generated
+  const effectiveHtml = campaignData.htmlContent || htmlContent;
+
   const canAdvance = useMemo(() => {
     switch (step) {
       case 0:
         return !!campaignData.type;
       case 1:
         return !!campaignData.subject.trim() && !!campaignData.title.trim();
-      case 2:
+      case 2: // Editar — always passable (editor is optional)
         return true;
-      case 3:
+      case 3: // Preview
+        return true;
+      case 4: // Programar
         return true;
       default:
         return false;
@@ -169,7 +179,12 @@ export function CampaignCreationWizard({
   }, [step, campaignData]);
 
   const handleNext = useCallback(() => {
-    if (step < 3 && canAdvance) {
+    if (step === 2) {
+      // Step "Editar": open fullscreen GrapesJS editor
+      setShowGrapesEditor(true);
+      return;
+    }
+    if (step < 4 && canAdvance) {
       setStep(s => s + 1);
     }
   }, [step, canAdvance]);
@@ -179,6 +194,25 @@ export function CampaignCreationWizard({
       setStep(s => s - 1);
     }
   }, [step]);
+
+  const handleGrapesEditorSave = useCallback((emails: { subject: string; previewText: string; htmlContent: string; designJson?: any }[]) => {
+    const edited = emails[0];
+    if (edited) {
+      setCampaignData(prev => ({
+        ...prev,
+        htmlContent: edited.htmlContent,
+        designJson: edited.designJson || null,
+        subject: edited.subject || prev.subject,
+        previewText: edited.previewText || prev.previewText,
+      }));
+    }
+    setShowGrapesEditor(false);
+    setStep(3); // Advance to Preview
+  }, []);
+
+  const handleGrapesEditorCancel = useCallback(() => {
+    setShowGrapesEditor(false);
+  }, []);
 
   const handlePublish = useCallback((result: any) => {
     setPublishing(false);
@@ -193,7 +227,7 @@ export function CampaignCreationWizard({
             {editCampaign ? 'Editar Campaña' : 'Crear Campaña'}
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            {CAMPAIGN_TEMPLATES[campaignData.type].label} — Paso {step + 1} de 4
+            {CAMPAIGN_TEMPLATES[campaignData.type].label} — Paso {step + 1} de 5
           </DialogDescription>
         </DialogHeader>
 
@@ -252,21 +286,36 @@ export function CampaignCreationWizard({
           )}
 
           {step === 2 && (
+            <div className="space-y-4 text-center py-8">
+              <h3 className="font-semibold text-base">Editar con drag & drop</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Abre el editor visual para personalizar tu email: arrastra bloques, cambia colores, agrega productos y mas.
+              </p>
+              {campaignData.designJson && (
+                <p className="text-xs text-green-600">Ya editaste este email. Puedes editarlo de nuevo o continuar.</p>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => setStep(3)} className="text-xs text-muted-foreground">
+                Saltar y usar template original
+              </Button>
+            </div>
+          )}
+
+          {step === 3 && (
             <PreviewEditor
               brand={brand}
               campaignType={campaignData.type}
               campaignData={campaignData}
               onUpdate={handleUpdate}
-              htmlContent={htmlContent}
+              htmlContent={effectiveHtml}
             />
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <SchedulePublish
               clientId={clientId}
               brand={brand}
               campaignData={campaignData}
-              htmlContent={htmlContent}
+              htmlContent={effectiveHtml}
               onPublish={handlePublish}
             />
           )}
@@ -289,14 +338,30 @@ export function CampaignCreationWizard({
             )}
           </Button>
 
-          {step < 3 && (
+          {step < 4 && (
             <Button onClick={handleNext} disabled={!canAdvance}>
-              Siguiente
+              {step === 2 ? 'Abrir editor' : 'Siguiente'}
               <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
           )}
         </div>
       </DialogContent>
+
+      {/* GrapesJS fullscreen editor — rendered outside DialogContent */}
+      {showGrapesEditor && (
+        <GrapesStudioEmailEditor
+          emails={[{
+            subject: campaignData.subject,
+            previewText: campaignData.previewText,
+            htmlContent: campaignData.htmlContent || htmlContent,
+            designJson: campaignData.designJson,
+          }]}
+          onSave={handleGrapesEditorSave}
+          onCancel={handleGrapesEditorCancel}
+          clientId={clientId}
+          brandColor={brand.colors.primary}
+        />
+      )}
     </Dialog>
   );
 }

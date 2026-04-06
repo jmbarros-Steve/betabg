@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { X, Check, ChevronRight } from 'lucide-react';
 import { type FlowTemplate, type DiscountType } from './FlowTemplates';
-import { type EditorEmail } from '../../klaviyo/UnlayerEmailEditor';
+import { type EditorEmail } from '../shared/GrapesStudioEmailEditor';
 import { FlowConfigStep } from './steps/FlowConfigStep';
 import { FlowContentStep } from './steps/FlowContentStep';
 import { FlowEditStep } from './steps/FlowEditStep';
@@ -157,6 +157,7 @@ export function FlowWizard({ template, clientId, onClose, onFlowCreated }: FlowW
             updateState={updateState}
             onNext={() => setStep(3)}
             onBack={() => setStep(1)}
+            clientId={clientId}
           />
         )}
         {step === 3 && (

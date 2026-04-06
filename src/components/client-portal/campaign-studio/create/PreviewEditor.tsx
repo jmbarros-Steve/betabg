@@ -26,9 +26,9 @@ export function PreviewEditor({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const template = CAMPAIGN_TEMPLATES[campaignType];
 
-  // Update the stored HTML content whenever it changes
+  // Update the stored HTML content whenever it changes — but only if user hasn't edited via GrapesJS
   useEffect(() => {
-    if (htmlContent && htmlContent !== campaignData.htmlContent) {
+    if (htmlContent && htmlContent !== campaignData.htmlContent && !campaignData.designJson) {
       onUpdate({ htmlContent });
     }
   }, [htmlContent]);
@@ -47,7 +47,7 @@ export function PreviewEditor({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onUpdate({ htmlContent: '' })}
+          onClick={() => onUpdate({ htmlContent: '', designJson: null })}
           className="flex items-center gap-1.5 text-xs"
         >
           <RefreshCw className="w-3.5 h-3.5" />

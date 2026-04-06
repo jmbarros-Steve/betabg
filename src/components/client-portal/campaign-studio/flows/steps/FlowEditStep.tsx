@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, ArrowLeft, Paintbrush } from 'lucide-react';
 import { type FlowTemplate } from '../FlowTemplates';
 import { type FlowWizardState } from '../FlowWizard';
-import { UnlayerEmailEditor, type EditorEmail } from '../../../klaviyo/UnlayerEmailEditor';
+import { GrapesStudioEmailEditor, type EditorEmail } from '../../shared/GrapesStudioEmailEditor';
 
 interface FlowEditStepProps {
   template: FlowTemplate;
@@ -11,9 +11,10 @@ interface FlowEditStepProps {
   updateState: (partial: Partial<FlowWizardState>) => void;
   onNext: () => void;
   onBack: () => void;
+  clientId?: string;
 }
 
-export function FlowEditStep({ template, state, updateState, onNext, onBack }: FlowEditStepProps) {
+export function FlowEditStep({ template, state, updateState, onNext, onBack, clientId }: FlowEditStepProps) {
   const [showEditor, setShowEditor] = useState(false);
 
   const handleOpenEditor = () => {
@@ -36,10 +37,11 @@ export function FlowEditStep({ template, state, updateState, onNext, onBack }: F
   // Editor is rendered at root level to avoid z-index / transform issues
   if (showEditor) {
     return (
-      <UnlayerEmailEditor
+      <GrapesStudioEmailEditor
         emails={state.editedEmails.length > 0 ? state.editedEmails : state.generatedEmails}
         onSave={handleEditorSave}
         onCancel={handleEditorCancel}
+        clientId={clientId}
       />
     );
   }

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { type FlowTemplate } from '../FlowTemplates';
 import { type FlowWizardState } from '../FlowWizard';
-import { type EditorEmail } from '../../../klaviyo/UnlayerEmailEditor';
+import { type EditorEmail } from '../../shared/GrapesStudioEmailEditor';
 
 interface FlowContentStepProps {
   template: FlowTemplate;
