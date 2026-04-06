@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node';
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { corsMiddleware } from './middleware/cors.js';
@@ -5,11 +6,20 @@ import { errorHandler } from './middleware/error-handler.js';
 import { registerRoutes } from './routes/index.js';
 import { checkRateLimit } from './lib/rate-limiter.js';
 
+// Sentry — error monitoring backend
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: 'production',
+  tracesSampleRate: 0.2,
+});
+
 // Catch silent crashes
 process.on('uncaughtException', (err) => {
+  Sentry.captureException(err);
   console.error('[FATAL] uncaughtException:', err.message, err.stack);
 });
 process.on('unhandledRejection', (reason) => {
+  Sentry.captureException(reason);
   console.error('[FATAL] unhandledRejection:', reason);
 });
 process.on('SIGTERM', () => {
