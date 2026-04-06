@@ -229,13 +229,23 @@ export async function emailFlowExecute(c: Context) {
   const fromDomain = domain?.domain || process.env.DEFAULT_FROM_DOMAIN || 'steve.cl';
   const fromEmail = currentStep.from_email || `noreply@${fromDomain}`;
   // Use merchant's business name as sender, not generic "Steve"
-  const { data: flowClient } = await supabase.from('clients').select('name, company').eq('id', enrollment.client_id).maybeSingle();
+  const { data: flowClient } = await supabase.from('clients').select('name, company, logo_url, brand_color, brand_secondary_color, brand_font, website_url, shop_domain').eq('id', enrollment.client_id).maybeSingle();
   const fromName = currentStep.from_name || flowClient?.company || flowClient?.name || 'Steve';
+
+  // Build brand info from client record (enrollment.metadata.brand is rarely populated)
+  const clientBrandInfo = {
+    name: flowClient?.company || flowClient?.name || '',
+    logo_url: flowClient?.logo_url || '',
+    color: flowClient?.brand_color || '#000000',
+    secondary_color: flowClient?.brand_secondary_color || '#666666',
+    font: flowClient?.brand_font || 'Arial, sans-serif',
+    shop_url: flowClient?.website_url || (flowClient?.shop_domain ? `https://${flowClient.shop_domain}` : ''),
+  };
 
   let htmlContent = currentStep.html_content || '';
   let subject = currentStep.subject || '';
 
-  htmlContent = replaceMergeTags(htmlContent, subscriber, enrollment.metadata);
+  htmlContent = replaceMergeTags(htmlContent, subscriber, { ...enrollment.metadata, brand: clientBrandInfo });
   subject = replaceMergeTags(subject, subscriber, enrollment.metadata);
 
   // Process custom blocks (products, discounts, conditionals) per subscriber
@@ -258,7 +268,7 @@ export async function emailFlowExecute(c: Context) {
           cart_total: enrollment.metadata?.total_price,
           discount_code: enrollment.metadata?.discount_code,
         },
-        enrollment.metadata?.brand || {},
+        { ...clientBrandInfo, ...enrollment.metadata?.brand },
         enrollment.metadata?.products || []
       );
 
