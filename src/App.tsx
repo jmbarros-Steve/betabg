@@ -33,6 +33,7 @@ import AdminPlanes from "./pages/AdminPlanes";
 import AdminSwarmSources from "./pages/AdminSwarmSources";
 import AdminOrganigrama from "./pages/AdminOrganigrama";
 import Agendar from "./pages/Agendar";
+import OAuthCalendarCallback from "./pages/OAuthCalendarCallback";
 import WebForm from "./pages/WebForm";
 import NotFound from "./pages/NotFound";
 import { Sentry } from "./lib/sentry";
@@ -82,6 +83,7 @@ const App = () => (
             <Route path="/admin/planes" element={<AdminPlanes />} />
             <Route path="/admin/swarm-sources" element={<AdminSwarmSources />} />
             <Route path="/admin/organigrama" element={<AdminOrganigrama />} />
+            <Route path="/agendar/oauth-callback" element={<OAuthCalendarCallback />} />
             <Route path="/agendar/:sellerId" element={<Agendar />} />
             <Route path="/formulario/:formId" element={<WebForm />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
