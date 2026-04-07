@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "lint:supabase": "bash ../scripts/lint-supabase-error-capture.sh"
   },
   "dependencies": {
     "@google-cloud/tasks": "^6.2.1",
