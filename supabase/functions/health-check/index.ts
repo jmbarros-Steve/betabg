@@ -91,24 +91,64 @@ serve(async (req) => {
 
     // Endpoints críticos: Cloud Run API (activo) + frontend
     // NOTA: Las Edge Functions de Supabase son dead code — todo el tráfico real va por Cloud Run
+    // Cobertura ampliada Javiera W12 (2026-04-07): 11 → 36 endpoints (14% → >50% de los 69 críticos)
+    // Reviewed-By: Isidora W6
+    // Filosofía: status < 500 es OK (401 del middleware es esperado, 5xx es real)
     const endpoints = [
-      // Cloud Run — Core AI
+      // ─── Core AI / Steve ────────────────────────────────────────
       { name: 'steve-chat', url: `${CLOUD_RUN_URL}/api/steve-chat`, method: 'POST', body: { message: 'ping', client_id: 'health-check' } },
-      // Cloud Run — Shopify
+      { name: 'steve-strategy', url: `${CLOUD_RUN_URL}/api/steve-strategy`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'steve-email-content', url: `${CLOUD_RUN_URL}/api/steve-email-content`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'analyze-brand', url: `${CLOUD_RUN_URL}/api/analyze-brand`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'generate-meta-copy', url: `${CLOUD_RUN_URL}/api/generate-meta-copy`, method: 'POST', body: { client_id: 'health-check' } },
+
+      // ─── Shopify ────────────────────────────────────────────────
       { name: 'fetch-shopify-analytics', url: `${CLOUD_RUN_URL}/api/fetch-shopify-analytics`, method: 'POST', body: { client_id: 'health-check' } },
       { name: 'fetch-shopify-products', url: `${CLOUD_RUN_URL}/api/fetch-shopify-products`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'fetch-shopify-collections', url: `${CLOUD_RUN_URL}/api/fetch-shopify-collections`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'fetch-shopify-customers', url: `${CLOUD_RUN_URL}/api/fetch-shopify-customers`, method: 'POST', body: { client_id: 'health-check' } },
       { name: 'sync-shopify-metrics', url: `${CLOUD_RUN_URL}/api/sync-shopify-metrics`, method: 'POST', body: { client_id: 'health-check' } },
-      // Cloud Run — Meta
+
+      // ─── Meta Ads ───────────────────────────────────────────────
       { name: 'sync-meta-metrics', url: `${CLOUD_RUN_URL}/api/sync-meta-metrics`, method: 'POST', body: { client_id: 'health-check' } },
       { name: 'check-meta-scopes', url: `${CLOUD_RUN_URL}/api/check-meta-scopes`, method: 'POST', body: { client_id: 'health-check' } },
-      // Cloud Run — Klaviyo
+      { name: 'fetch-meta-ad-accounts', url: `${CLOUD_RUN_URL}/api/fetch-meta-ad-accounts`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'fetch-meta-business-hierarchy', url: `${CLOUD_RUN_URL}/api/fetch-meta-business-hierarchy`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'manage-meta-campaign', url: `${CLOUD_RUN_URL}/api/manage-meta-campaign`, method: 'POST', body: { client_id: 'health-check', action: 'list' } },
+      { name: 'meta-social-inbox', url: `${CLOUD_RUN_URL}/api/meta-social-inbox`, method: 'POST', body: { client_id: 'health-check' } },
+
+      // ─── Klaviyo ────────────────────────────────────────────────
       { name: 'klaviyo-push-emails', url: `${CLOUD_RUN_URL}/api/klaviyo-push-emails`, method: 'POST', body: { client_id: 'health-check' } },
       { name: 'sync-klaviyo-metrics', url: `${CLOUD_RUN_URL}/api/sync-klaviyo-metrics`, method: 'POST', body: { client_id: 'health-check' } },
-      // Cloud Run — Email
-      { name: 'steve-email-content', url: `${CLOUD_RUN_URL}/api/steve-email-content`, method: 'POST', body: { client_id: 'health-check' } },
-      // Frontend
+      { name: 'fetch-klaviyo-top-products', url: `${CLOUD_RUN_URL}/api/fetch-klaviyo-top-products`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'import-klaviyo-templates', url: `${CLOUD_RUN_URL}/api/import-klaviyo-templates`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'klaviyo-manage-flows', url: `${CLOUD_RUN_URL}/api/klaviyo-manage-flows`, method: 'POST', body: { client_id: 'health-check' } },
+
+      // ─── Google Ads ─────────────────────────────────────────────
+      { name: 'sync-google-ads-metrics', url: `${CLOUD_RUN_URL}/api/sync-google-ads-metrics`, method: 'POST', body: { client_id: 'health-check' } },
+
+      // ─── Instagram / Facebook ──────────────────────────────────
+      { name: 'publish-instagram', url: `${CLOUD_RUN_URL}/api/publish-instagram`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'publish-facebook', url: `${CLOUD_RUN_URL}/api/publish-facebook`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'fetch-instagram-insights', url: `${CLOUD_RUN_URL}/api/fetch-instagram-insights`, method: 'POST', body: { client_id: 'health-check' } },
+
+      // ─── Steve Mail ─────────────────────────────────────────────
+      { name: 'manage-email-campaigns', url: `${CLOUD_RUN_URL}/api/manage-email-campaigns`, method: 'POST', body: { client_id: 'health-check', action: 'list' } },
+      { name: 'manage-email-flows', url: `${CLOUD_RUN_URL}/api/manage-email-flows`, method: 'POST', body: { client_id: 'health-check', action: 'list' } },
+      { name: 'query-email-subscribers', url: `${CLOUD_RUN_URL}/api/query-email-subscribers`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'email-campaign-analytics', url: `${CLOUD_RUN_URL}/api/email-campaign-analytics`, method: 'POST', body: { client_id: 'health-check' } },
+
+      // ─── WhatsApp ───────────────────────────────────────────────
+      { name: 'wa-send-message', url: `${CLOUD_RUN_URL}/api/whatsapp/send-message`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'wa-send-campaign', url: `${CLOUD_RUN_URL}/api/whatsapp/send-campaign`, method: 'POST', body: { client_id: 'health-check' } },
+
+      // ─── CRM ────────────────────────────────────────────────────
+      { name: 'crm-prospects-kanban', url: `${CLOUD_RUN_URL}/api/crm/prospects/kanban`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'crm-proposals', url: `${CLOUD_RUN_URL}/api/crm/proposals`, method: 'POST', body: { action: 'list', client_id: 'health-check' } },
+      { name: 'crm-sales-tasks', url: `${CLOUD_RUN_URL}/api/crm/tasks`, method: 'POST', body: { action: 'list', client_id: 'health-check' } },
+
+      // ─── Infra / Root ───────────────────────────────────────────
       { name: 'frontend', url: 'https://www.steve.cl', method: 'GET' },
-      // Cloud Run — root health
       { name: 'cloud-run-root', url: `${CLOUD_RUN_URL}/`, method: 'GET' },
     ]
 
