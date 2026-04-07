@@ -7,6 +7,44 @@ import { espejoEmail } from '../ai/espejo.js';
 import { detectAngle } from '../../lib/angle-detector.js';
 
 /**
+ * Enqueue helper — inserta items personalizados en email_send_queue en chunks de 500.
+ * Usado cuando email_send_settings.use_send_queue=true para el cliente.
+ */
+async function enqueueCampaignItems(
+  supabase: any,
+  items: Array<{
+    client_id: string;
+    campaign_id: string | null;
+    flow_id: string | null;
+    subscriber_id: string;
+    subject: string;
+    html_content: string;
+    from_email: string;
+    from_name: string;
+    reply_to: string | null;
+    ab_variant: 'a' | 'b' | null;
+    priority: number;
+  }>,
+): Promise<number> {
+  let inserted = 0;
+  const CHUNK = 500;
+  for (let i = 0; i < items.length; i += CHUNK) {
+    const batch = items.slice(i, i + CHUNK).map((item) => ({
+      ...item,
+      status: 'queued' as const,
+      scheduled_for: new Date().toISOString(),
+    }));
+    const { error } = await supabase.from('email_send_queue').insert(batch);
+    if (error) {
+      console.error(`[enqueueCampaignItems] batch ${i} error:`, error.message);
+    } else {
+      inserted += batch.length;
+    }
+  }
+  return inserted;
+}
+
+/**
  * Campaign management: CRUD + send + schedule.
  * POST /api/manage-email-campaigns
  */
@@ -232,6 +270,14 @@ export async function manageEmailCampaigns(c: Context) {
         abTest = existingTest;
       }
 
+      // Read feature flag: use queue vs direct send
+      const { data: sendSettings } = await supabase
+        .from('email_send_settings')
+        .select('use_send_queue')
+        .eq('client_id', client_id)
+        .maybeSingle();
+      const useSendQueue = sendSettings?.use_send_queue === true;
+
       // Mark as sending
       await supabase
         .from('email_campaigns')
@@ -307,25 +353,29 @@ export async function manageEmailCampaigns(c: Context) {
           })
           .eq('id', abTest.id);
 
-        // Helper: per-subscriber processing for A/B test
+        // Helper: personalizar un sub (shared entre queue path y direct path)
+        const personalizeForSub = async (sub: any, html: string, subject: string) => {
+          const ctx = buildTemplateContext(
+            { first_name: sub.first_name ?? undefined, last_name: sub.last_name ?? undefined, email: sub.email, tags: sub.tags, total_orders: sub.total_orders, total_spent: sub.total_spent, last_order_at: sub.last_order_at, custom_fields: sub.custom_fields },
+            { discount_code: campaign.recommendation_config?.discount_code },
+            brandInfo,
+            []
+          );
+          let personalizedHtml = usesNunjucks ? renderEmailTemplate(html, ctx) : html;
+          const personalizedSubject = usesNunjucks ? renderEmailTemplate(subject, ctx) : subject;
+          const hasCustomBlocks = personalizedHtml.includes('data-steve-') || personalizedHtml.includes('product_recommendations');
+          if (hasCustomBlocks) {
+            personalizedHtml = await processEmailHtml(personalizedHtml, {
+              clientId: client_id, subscriberId: sub.id, templateContext: ctx, recommendationConfig: recConfig,
+            });
+          }
+          return { personalizedHtml, personalizedSubject };
+        };
+
+        // Helper: DIRECT path per-sub processing
         const processAndSend = async (sub: any, html: string, subject: string, variant: 'a' | 'b') => {
           try {
-            const ctx = buildTemplateContext(
-              { first_name: sub.first_name ?? undefined, last_name: sub.last_name ?? undefined, email: sub.email, tags: sub.tags, total_orders: sub.total_orders, total_spent: sub.total_spent, last_order_at: sub.last_order_at, custom_fields: sub.custom_fields },
-              { discount_code: campaign.recommendation_config?.discount_code },
-              brandInfo,
-              []
-            );
-            let personalizedHtml = usesNunjucks ? renderEmailTemplate(html, ctx) : html;
-            let personalizedSubject = usesNunjucks ? renderEmailTemplate(subject, ctx) : subject;
-
-            const hasCustomBlocks = personalizedHtml.includes('data-steve-') || personalizedHtml.includes('product_recommendations');
-            if (hasCustomBlocks) {
-              personalizedHtml = await processEmailHtml(personalizedHtml, {
-                clientId: client_id, subscriberId: sub.id, templateContext: ctx, recommendationConfig: recConfig,
-              });
-            }
-
+            const { personalizedHtml, personalizedSubject } = await personalizeForSub(sub, html, subject);
             const r = await sendSingleEmail({
               to: sub.email, subject: personalizedSubject, htmlContent: personalizedHtml,
               fromEmail, fromName, replyTo: campaign.reply_to || undefined,
@@ -339,43 +389,141 @@ export async function manageEmailCampaigns(c: Context) {
           }
         };
 
-        // Send variant A
-        for (let i = 0; i < groupA.length; i += batchSize) {
-          const batch = groupA.slice(i, i + batchSize);
-          await Promise.all(batch.map((sub) => processAndSend(sub, baseHtml, campaign.subject, 'a')));
+        let enqueuedAb = 0;
+        if (useSendQueue) {
+          // === A/B QUEUE PATH: build items for both variants and enqueue ===
+          const abItems: Array<any> = [];
+          for (const sub of groupA) {
+            try {
+              const { personalizedHtml, personalizedSubject } = await personalizeForSub(sub, baseHtml, campaign.subject);
+              abItems.push({
+                client_id, campaign_id, flow_id: null, subscriber_id: sub.id,
+                subject: personalizedSubject, html_content: personalizedHtml,
+                from_email: fromEmail, from_name: fromName, reply_to: campaign.reply_to || null,
+                ab_variant: 'a' as const, priority: 5,
+              });
+            } catch (err) { console.error('[A/B enqueue A] error:', err); }
+          }
+          for (const sub of groupB) {
+            try {
+              const { personalizedHtml, personalizedSubject } = await personalizeForSub(sub, variantBHtml, variantBSubject);
+              abItems.push({
+                client_id, campaign_id, flow_id: null, subscriber_id: sub.id,
+                subject: personalizedSubject, html_content: personalizedHtml,
+                from_email: fromEmail, from_name: fromName, reply_to: campaign.reply_to || null,
+                ab_variant: 'b' as const, priority: 5,
+              });
+            } catch (err) { console.error('[A/B enqueue B] error:', err); }
+          }
+          enqueuedAb = await enqueueCampaignItems(supabase, abItems);
+        } else {
+          // === A/B DIRECT PATH ===
+          // Send variant A
+          for (let i = 0; i < groupA.length; i += batchSize) {
+            const batch = groupA.slice(i, i + batchSize);
+            await Promise.all(batch.map((sub) => processAndSend(sub, baseHtml, campaign.subject, 'a')));
+          }
+          // Send variant B
+          for (let i = 0; i < groupB.length; i += batchSize) {
+            const batch = groupB.slice(i, i + batchSize);
+            await Promise.all(batch.map((sub) => processAndSend(sub, variantBHtml, variantBSubject, 'b')));
+          }
         }
 
-        // Send variant B
-        for (let i = 0; i < groupB.length; i += batchSize) {
-          const batch = groupB.slice(i, i + batchSize);
-          await Promise.all(batch.map((sub) => processAndSend(sub, variantBHtml, variantBSubject, 'b')));
-        }
-
-        // Schedule Cloud Task to pick winner after test_duration_hours
+        // Schedule Cloud Task to pick winner after test_duration_hours.
+        // For the QUEUE path we add a safety margin so items have time to be
+        // actually delivered by the cron tick before we measure open/click rates.
         try {
-          const winnerTime = new Date(Date.now() + (abTest.test_duration_hours || 4) * 3600 * 1000);
+          const baseHours = abTest.test_duration_hours || 4;
+          const safetyMinutes = useSendQueue ? 10 : 0;
+          const winnerTime = new Date(Date.now() + baseHours * 3600 * 1000 + safetyMinutes * 60 * 1000);
           await scheduleAbTestWinner(abTest.id, client_id, winnerTime);
         } catch (err) {
           console.error('Failed to schedule A/B test winner task:', err);
         }
 
-        // Mark campaign as sent (test portion)
-        await supabase
-          .from('email_campaigns')
-          .update({ status: 'sent', sent_count: sentCount, updated_at: new Date().toISOString() })
-          .eq('id', campaign_id);
+        if (useSendQueue) {
+          // QUEUE path: do NOT mark campaign as 'sent'. Leave it in 'sending' —
+          // the send-queue 'process' handler transitions it to 'sent' once the
+          // queue is drained (C1 sweep).
+          await supabase
+            .from('email_campaigns')
+            .update({ status: 'sending', updated_at: new Date().toISOString() })
+            .eq('id', campaign_id);
+        } else {
+          // DIRECT path: mark campaign as sent with live sentCount.
+          await supabase
+            .from('email_campaigns')
+            .update({ status: 'sent', sent_count: sentCount, updated_at: new Date().toISOString() })
+            .eq('id', campaign_id);
+        }
 
         return c.json({
           success: true,
           ab_test: true,
-          variant_a_sent: groupA.length,
-          variant_b_sent: groupB.length,
+          queued: useSendQueue,
+          variant_a_sent: useSendQueue ? 0 : groupA.length,
+          variant_b_sent: useSendQueue ? 0 : groupB.length,
+          enqueued: useSendQueue ? enqueuedAb : undefined,
           remaining: remainder.length,
-          sent_count: sentCount,
+          sent_count: useSendQueue ? 0 : sentCount,
         });
       }
 
-      // === Normal send (no A/B test) ===
+      // === Normal send (no A/B test) — QUEUE PATH ===
+      if (useSendQueue) {
+        const items: Array<any> = [];
+        for (const sub of subscribers) {
+          try {
+            const ctx = buildTemplateContext(
+              { first_name: sub.first_name ?? undefined, last_name: sub.last_name ?? undefined, email: sub.email, tags: sub.tags, total_orders: sub.total_orders, total_spent: sub.total_spent, last_order_at: sub.last_order_at ?? undefined, custom_fields: sub.custom_fields ?? undefined },
+              { discount_code: campaign.recommendation_config?.discount_code },
+              brandInfo,
+              []
+            );
+            let personalizedHtml = usesNunjucks ? renderEmailTemplate(baseHtml, ctx) : baseHtml;
+            const personalizedSubject = usesNunjucks ? renderEmailTemplate(campaign.subject, ctx) : campaign.subject;
+            const hasCustomBlocks = personalizedHtml.includes('data-steve-') || personalizedHtml.includes('product_recommendations');
+            if (hasCustomBlocks) {
+              personalizedHtml = await processEmailHtml(personalizedHtml, {
+                clientId: client_id, subscriberId: sub.id, templateContext: ctx, recommendationConfig: recConfig,
+              });
+            }
+            items.push({
+              client_id,
+              campaign_id,
+              flow_id: null,
+              subscriber_id: sub.id,
+              subject: personalizedSubject,
+              html_content: personalizedHtml,
+              from_email: fromEmail,
+              from_name: fromName,
+              reply_to: campaign.reply_to || null,
+              ab_variant: null,
+              priority: 5,
+            });
+          } catch (err) {
+            console.error(`[manage-campaigns] queue build error for sub ${sub.id}:`, err);
+          }
+        }
+
+        const queued = await enqueueCampaignItems(supabase, items);
+
+        // Mark campaign as queued (the cron tick will flip to 'sent' once processed)
+        await supabase
+          .from('email_campaigns')
+          .update({ status: 'sending', updated_at: new Date().toISOString() })
+          .eq('id', campaign_id);
+
+        return c.json({
+          success: true,
+          queued: true,
+          total_recipients: subscribers.length,
+          queued_count: queued,
+        });
+      }
+
+      // === Normal send (no A/B test) — DIRECT PATH ===
       for (let i = 0; i < subscribers.length; i += batchSize) {
         const batch = subscribers.slice(i, i + batchSize);
 

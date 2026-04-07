@@ -168,11 +168,16 @@ export async function emailSendQueue(c: Context) {
         return c.json({ processed: 0, message: 'No emails to process' });
       }
 
-      // Mark as processing (optimistic lock)
+      // Mark as processing (optimistic lock).
+      // We set processed_at = now() here as a "last touched" marker so the
+      // email-queue-tick sweeper can detect items stuck in 'processing' and
+      // recover them. processed_at will be overwritten on success/failure.
+      // It's safe for the rate-limit query because that query filters by
+      // status='sent' (processing items won't count).
       const itemIds = queueItems.map(q => q.id);
       await supabase
         .from('email_send_queue')
-        .update({ status: 'processing' })
+        .update({ status: 'processing', processed_at: new Date().toISOString() })
         .in('id', itemIds);
 
       let sent = 0;
@@ -247,18 +252,37 @@ export async function emailSendQueue(c: Context) {
         }
       }
 
-      // Update campaign sent_count if applicable
-      if (queueItems[0]?.campaign_id) {
-        const campaignId = queueItems[0].campaign_id;
+      // Update campaign sent_count and status if applicable.
+      // Collect all distinct campaign_ids in this batch (could be multiple if
+      // several campaigns are being processed together).
+      const campaignIds = [...new Set(queueItems.map((q) => q.campaign_id).filter(Boolean) as string[])];
+      for (const campaignId of campaignIds) {
         const { count: totalSent } = await supabase
           .from('email_send_queue')
           .select('*', { count: 'exact', head: true })
           .eq('campaign_id', campaignId)
           .eq('status', 'sent');
 
+        // Check if there are still pending items (queued or processing) for this campaign.
+        const { count: stillPending } = await supabase
+          .from('email_send_queue')
+          .select('*', { count: 'exact', head: true })
+          .eq('campaign_id', campaignId)
+          .in('status', ['queued', 'processing']);
+
+        const update: Record<string, any> = {
+          sent_count: totalSent || 0,
+          updated_at: new Date().toISOString(),
+        };
+
+        // Only transition to 'sent' when there is nothing left to process.
+        if ((stillPending || 0) === 0) {
+          update.status = 'sent';
+        }
+
         await supabase
           .from('email_campaigns')
-          .update({ sent_count: totalSent || 0 })
+          .update(update)
           .eq('id', campaignId);
       }
 

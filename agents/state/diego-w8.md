@@ -51,10 +51,10 @@ Que la data fluya: las tablas de fuentes tienen datos, los crons no fallan silen
 - [x] Poblar swarm_sources — 53 fuentes (2026-04-05)
 - [x] swarm_runs funcionando — 40/40 completed (100%)
 
-### Blockers
-- **🔴 PAT GitHub expuesto** (`<PAT_REDACTED_ROTATE_IN_GITHUB>` visible en `.git/config`) — JM debe rotar
-- **🟡 Remote `origin` mal** en `~/betabg/.git/config` (apunta a `claude-memory` en vez de `betabg`) — riesgo de push al repo equivocado
-- **🟡 16 archivos modificados ajenos** en working tree (Klaviyo, Chino fixer, email-html-processor) — no los toqué, no son de Diego
+### Blockers (2026-04-07 post-sesión)
+- ~~🔴 PAT GitHub expuesto en `.git/config`~~ → MOVIDO a macOS Keychain (`git credential-osxkeychain store`). El URL del remote `origin` ya no tiene el token en plain text. **AÚN ASÍ JM debe rotar el PAT en GitHub UI** — GitHub secret scanning lo detectó durante este mismo push y sigue válido
+- ~~🟡 Remote `origin` mal apuntado a claude-memory~~ → FIXED. Eliminé el origin viejo, renombré `betabg` → `origin` apuntando a `jmbarros-Steve/betabg.git`
+- **🟡 Archivos modificados ajenos** en working tree (Valentina W1: email routes, Javiera W12: state) — no los toqué, no son de Diego. 6 estaban pre-staged por sesiones previas, tuve que unstage-arlos para no arrastrarlos en mis commits
 
 ### Notas
 - Supabase ref: zpswjccsxjtnhetkkqde

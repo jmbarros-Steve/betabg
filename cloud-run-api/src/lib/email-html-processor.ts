@@ -213,18 +213,28 @@ export async function processEmailHtml(
 // ---------------------------------------------------------------------------
 
 /**
- * If `html` already contains a full document (<html> or <!doctype>), return
- * as-is. Otherwise wrap the fragment in a minimal mobile-friendly document
- * that includes viewport meta and a base @media query for screens ≤600px.
+ * If `html` already contains a full document (<html>, <!doctype>, or a
+ * fragment that already declares <head>/<body>), return as-is. Otherwise
+ * wrap the fragment in a minimal mobile-friendly document that includes
+ * viewport meta and a base @media query for screens ≤600px.
  *
  * Safe for re-runs (idempotent — full HTML is detected and skipped).
+ *
+ * Detection rules:
+ *   1. Starts with <!doctype (anchored at start after whitespace) → full doc
+ *   2. Contains <html tag anywhere → full doc
+ *   3. Contains BOTH <head and <body tags → full doc (partial without <html>)
+ *   4. Contains <body only → full doc (we don't want to wrap twice)
+ *   5. Contains <head only → full doc (idem)
  */
 function ensureMobileWrap(html: string): string {
   if (!html) return html;
-  const lower = html.toLowerCase();
-  if (lower.includes('<!doctype') || lower.includes('<html')) {
-    return html;
-  }
+
+  const trimmed = html.trimStart();
+  if (/^<!doctype\s/i.test(trimmed)) return html;
+  if (/<html[\s>]/i.test(html)) return html;
+  if (/<head[\s>]/i.test(html)) return html;
+  if (/<body[\s>]/i.test(html)) return html;
 
   return `<!DOCTYPE html>
 <html lang="es">
