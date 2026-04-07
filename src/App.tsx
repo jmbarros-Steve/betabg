@@ -88,6 +88,7 @@ const App = () => (
             <Route path="/admin/waitlist" element={<AdminWaitlist />} />
             <Route path="/entrada-secreta-jm" element={<AdminBypass />} />
             <Route path="/agendar/oauth-callback" element={<OAuthCalendarCallback />} />
+            <Route path="/agendar/steve" element={<Navigate to="/agendar/5af514ca-4478-4383-89c8-c669e0641b33" replace />} />
             <Route path="/agendar/:sellerId" element={<Agendar />} />
             <Route path="/formulario/:formId" element={<WebForm />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
