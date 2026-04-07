@@ -91,8 +91,15 @@ export async function steveAgentLoop(c: Context) {
     // ========== 2. REASON ==========
     log.push('=== REASON ===');
 
+    // Fix Tomás W7 (2026-04-07, Fase 1 deuda técnica):
+    // Isidora W6 observó que cuando `alertsError` ocurre, el LLM recibía
+    // alerts="" igual que si no hubiera alertas → razonaba con info falsa.
+    // Ahora marcamos FETCH_ERROR explícitamente para que el agente lo sepa
+    // y pueda degradar a "no action" en vez de decidir a ciegas.
     const worldState = {
-      alerts: (recentAlerts || []).map(a => `${a.check_type}: ${a.status}`).join(', '),
+      alerts: alertsError
+        ? `FETCH_ERROR: ${alertsError.message}`
+        : (recentAlerts || []).map(a => `${a.check_type}: ${a.status}`).join(', '),
       knowledge: `${activeCount} active rules in ${categories.length} categories, ${pendingCount} pending approval`,
       feedback: `${positiveFb} positive, ${negativeFb} negative in last 24h`,
       performance: `Overall ROAS: ${overallROAS.toFixed(2)}x, spend: $${totalSpend.toFixed(0)}, revenue: $${totalRevenue.toFixed(0)}`,
@@ -252,9 +259,13 @@ Máx 500 chars. Solo la regla mejorada.`,
     // Fix Tomás W7 (2026-04-07): agregar `agreed_date` al SELECT. Antes no
     // estaba, entonces `commit.agreed_date` era undefined → `|| now` → age=0
     // → ningún commitment se marcaba como expired jamás.
+    // Fix Tomás W7 (2026-04-07, Fase 1 deuda técnica): Isidora W6 observó
+    // que si `agreed_date` viniera null por alguna razón, el fallback `|| now`
+    // daba age=0 (pesimista). Ahora cascada: agreed_date → created_at → now.
+    // created_at siempre existe en steve_commitments (verified).
     const { data: dueCommitments } = await supabase
       .from('steve_commitments')
-      .select('id, client_id, commitment, agreed_date')
+      .select('id, client_id, commitment, agreed_date, created_at')
       .eq('status', 'pending')
       .lte('follow_up_date', now.toISOString())
       .limit(5);
@@ -263,7 +274,7 @@ Máx 500 chars. Solo la regla mejorada.`,
       log.push(`${dueCommitments.length} commitments due for follow-up`);
       // Mark as expired if older than 30 days
       for (const commit of dueCommitments) {
-        const age = now.getTime() - new Date(commit.agreed_date || now).getTime();
+        const age = now.getTime() - new Date(commit.agreed_date || commit.created_at || now).getTime();
         if (age > 30 * 24 * 60 * 60 * 1000) {
           await supabase.from('steve_commitments').update({ status: 'expired' }).eq('id', commit.id);
         }
