@@ -136,12 +136,24 @@ async function enqueueFixIfNeeded(
   if (result.result !== 'fail') return;
 
   try {
-    // Only generate fix if no active fix already exists for this check
+    // Bugfix Javiera W12 (2026-04-07, re-review por Isidora W6):
+    // Estado original (2026-04-07): 2682 entries en steve_fix_queue para
+    // 449 checks únicos = 5.9x duplicación. Cada patrol creaba un fix nuevo
+    // para el mismo check porque solo deduplicaba contra status intermedios.
+    //
+    // Solución: dedup por status intermedio + ventana temporal de 1h. Esto:
+    //  1) Previene duplicación rápida (varios patrols seguidos del mismo check)
+    //  2) Permite re-detectar regresiones después de 1h (si JM parchea a mano
+    //     un check que estaba 'failed'/'fixed'/'escalated', el siguiente patrol
+    //     vuelve a enqueuear si el problema persiste)
+    //  3) NO bloquea para siempre los checks que entraron en estado terminal
+    const dedupWindow = new Date(Date.now() - 60 * 60_000).toISOString();
     const { data: existingFix } = await supabase
       .from('steve_fix_queue')
       .select('id, status')
       .eq('check_id', check.id)
       .in('status', ['pending', 'assigned', 'fixing', 'deployed', 'verifying'])
+      .gte('created_at', dedupWindow)
       .maybeSingle();
 
     if (existingFix) {

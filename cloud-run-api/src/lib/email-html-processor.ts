@@ -195,7 +195,65 @@ export async function processEmailHtml(
     }
   }
 
+  // 5. Mobile-safe wrap: if html is a fragment (no <html>/<!doctype>), wrap it
+  // with a full document including viewport meta + base mobile media queries.
+  // This ensures every email sent via Steve Mail renders correctly on mobile,
+  // even if the author/AI forgot to include the wrapper.
+  try {
+    result = ensureMobileWrap(result);
+  } catch (err) {
+    console.error('[email-html-processor] Mobile wrap failed:', err);
+  }
+
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Mobile wrap: ensures every email has viewport + responsive base styles
+// ---------------------------------------------------------------------------
+
+/**
+ * If `html` already contains a full document (<html> or <!doctype>), return
+ * as-is. Otherwise wrap the fragment in a minimal mobile-friendly document
+ * that includes viewport meta and a base @media query for screens ≤600px.
+ *
+ * Safe for re-runs (idempotent — full HTML is detected and skipped).
+ */
+function ensureMobileWrap(html: string): string {
+  if (!html) return html;
+  const lower = html.toLowerCase();
+  if (lower.includes('<!doctype') || lower.includes('<html')) {
+    return html;
+  }
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="x-apple-disable-message-reformatting">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title></title>
+<style>
+  body { margin:0; padding:0; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+  table { border-collapse:collapse; mso-table-lspace:0; mso-table-rspace:0; }
+  img { border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; max-width:100%; height:auto; }
+  a { text-decoration:none; }
+  @media only screen and (max-width: 600px) {
+    table[width="560"], table[width="600"] { width:100% !important; max-width:100% !important; }
+    td[style*="padding:32px"], td[style*="padding: 32px"] { padding:20px !important; }
+    h1 { font-size:22px !important; line-height:1.3 !important; }
+    h2 { font-size:19px !important; line-height:1.3 !important; }
+    .steve-mobile-stack { display:block !important; width:100% !important; }
+    img { max-width:100% !important; height:auto !important; }
+    a[href][style*="padding:16px 40px"], a[href][style*="padding: 16px 40px"] { padding:14px 24px !important; display:block !important; }
+  }
+</style>
+</head>
+<body>
+${html}
+</body>
+</html>`;
 }
 
 // ---------------------------------------------------------------------------

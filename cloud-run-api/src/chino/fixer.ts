@@ -219,20 +219,41 @@ export async function runChinoFixer(): Promise<FixerResult> {
   }
 
   // ── STEP B: Assign pending fixes to agents (only approved ones) ──
-  const { data: pendingFixes } = await supabase
+  // Bugfix Javiera W12 (2026-04-07, re-review por Isidora W6):
+  // El runner crea fixes con 'auto_approved' (auto-fix exitoso) o
+  // 'pending_approval' (manual esperando humano). El frontend
+  // FixApprovalPanel.tsx:169 actualiza los manuales aprobados a 'approved'.
+  // Por lo tanto, este STEP B debe aceptar AMBOS: 'auto_approved' (auto) y
+  // 'approved' (manual aprobado por humano). El filtro original buscaba solo
+  // 'approved' y nunca veía los auto-fixes — pipeline quedaba muerto para
+  // auto-fixes. Tampoco veía los manuales hasta que JM los aprobaba.
+  const { data: pendingFixes, error: selectErr } = await supabase
     .from('steve_fix_queue')
     .select('id')
     .eq('status', 'pending')
-    .eq('approval_status', 'approved')
+    .in('approval_status', ['auto_approved', 'approved'])
     .order('created_at', { ascending: true })
     .limit(10);
 
+  if (selectErr) {
+    console.error('[chino/fixer] STEP B select error:', selectErr.message);
+  }
+
   for (const fix of pendingFixes || []) {
-    await supabase
+    // Optimistic lock: solo asignar si sigue en 'pending' (race protection)
+    const { data: locked, error: updateErr } = await supabase
       .from('steve_fix_queue')
       .update({ status: 'assigned' })
-      .eq('id', fix.id);
-    result.assigned++;
+      .eq('id', fix.id)
+      .eq('status', 'pending')
+      .select('id')
+      .maybeSingle();
+
+    if (updateErr) {
+      console.error(`[chino/fixer] STEP B update error for fix ${fix.id}:`, updateErr.message);
+      continue;
+    }
+    if (locked) result.assigned++;
   }
 
   console.log(`[chino/fixer] Done: ${result.verified} verified, ${result.fixed} fixed, ${result.retried} retried, ${result.escalated} escalated, ${result.assigned} assigned`);

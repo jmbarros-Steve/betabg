@@ -166,6 +166,7 @@ import { autoLearningDigest } from './cron/auto-learning-digest.js';
 import { knowledgePropagationCatchup } from './cron/knowledge-propagation-catchup.js';
 import { validateContexts } from './cron/validate-contexts.js';
 import { refreshPlatformTokens } from './cron/refresh-platform-tokens.js';
+import { chinoExecutor } from './cron/chino-executor.js';
 
 // WhatsApp
 import { steveWAChat } from './whatsapp/steve-wa-chat.js';
@@ -546,6 +547,7 @@ export function registerRoutes(app: Hono) {
   cron.post('/knowledge-propagation-catchup', knowledgePropagationCatchup);
   cron.post('/validate-contexts', validateContexts);
   cron.post('/refresh-platform-tokens', refreshPlatformTokens);
+  cron.post('/chino-executor', chinoExecutor);
   app.route('/api/cron', cron);
 
   // ============================================================
