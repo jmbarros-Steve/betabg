@@ -2,6 +2,39 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { snapshotBeforeUpdate } from '../../lib/knowledge-versioner.js';
 
+// Fórmula de scoring extraída para reutilizar después de auto-rewrite.
+// 5 criterios × 20 pts = 100 max.
+function computeQualityScore(
+  contenido: string,
+  ejemploReal: string | null,
+  vecesUsada: number | null,
+  createdAt: string,
+  now: number,
+): number {
+  let score = 0;
+
+  // Format (20pts): has CUANDO/HAZ/PORQUE
+  const hasFormat = contenido.includes('CUANDO') && contenido.includes('HAZ') && contenido.includes('PORQUE');
+  score += hasFormat ? 20 : (contenido.includes('1.') ? 10 : 5);
+
+  // Specificity (20pts): not too generic, has numbers or thresholds
+  const hasNumbers = /\d+%|\$\d+|\d+x|\d+ días/.test(contenido);
+  const isSpecific = contenido.length > 100 && contenido.length < 600;
+  score += (hasNumbers ? 10 : 0) + (isSpecific ? 10 : 5);
+
+  // Usage (20pts): veces_usada
+  score += Math.min(20, (vecesUsada || 0) * 4);
+
+  // Recency (20pts): newer = better
+  const ageDays = (now - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24);
+  score += ageDays < 30 ? 20 : ageDays < 90 ? 15 : ageDays < 180 ? 10 : 5;
+
+  // Real example (20pts)
+  score += ejemploReal ? 20 : 0;
+
+  return score;
+}
+
 export async function knowledgeQualityScore(c: Context) {
   const cronSecret = process.env.CRON_SECRET;
   const providedSecret = c.req.header('X-Cron-Secret');
@@ -23,30 +56,19 @@ export async function knowledgeQualityScore(c: Context) {
     const now = Date.now();
     let improved = 0;
     let deactivated = 0;
+    // Fix Tomás W7 (2026-04-07): acumular score local. El SELECT NO trae
+    // quality_score, así que el reduce previo siempre reportaba avg=0.
+    let totalScore = 0;
 
     for (const rule of rules) {
-      let score = 0;
-
-      // Format (20pts): has CUANDO/HAZ/PORQUE
-      const hasFormat = rule.contenido.includes('CUANDO') && rule.contenido.includes('HAZ') && rule.contenido.includes('PORQUE');
-      score += hasFormat ? 20 : (rule.contenido.includes('1.') ? 10 : 5);
-
-      // Specificity (20pts): not too generic, has numbers or thresholds
-      const hasNumbers = /\d+%|\$\d+|\d+x|\d+ días/.test(rule.contenido);
-      const isSpecific = rule.contenido.length > 100 && rule.contenido.length < 600;
-      score += (hasNumbers ? 10 : 0) + (isSpecific ? 10 : 5);
-
-      // Usage (20pts): veces_usada and recency
-      const usageScore = Math.min(20, (rule.veces_usada || 0) * 4);
-      score += usageScore;
-
-      // Recency (20pts): newer = better
-      const ageMs = now - new Date(rule.created_at).getTime();
-      const ageDays = ageMs / (1000 * 60 * 60 * 24);
-      score += ageDays < 30 ? 20 : ageDays < 90 ? 15 : ageDays < 180 ? 10 : 5;
-
-      // Real example (20pts)
-      score += rule.ejemplo_real ? 20 : 0;
+      let score = computeQualityScore(
+        rule.contenido,
+        rule.ejemplo_real,
+        rule.veces_usada,
+        rule.created_at,
+        now,
+      );
+      totalScore += score;
 
       // Update score
       await supabase.from('steve_knowledge')
@@ -87,9 +109,21 @@ Máximo 500 caracteres. Solo la regla mejorada, sin explicaciones.`,
             const data: any = await res.json();
             const improvedContent = (data.content?.[0]?.text || '').trim();
             if (improvedContent && improvedContent.length > 50 && improvedContent.length < 600) {
+              // Fix Tomás W7 (2026-04-07): re-evaluar con la fórmula real en lugar
+              // de hardcodear 60. Si el rewrite quedó mediocre, queremos saberlo.
+              const newScore = computeQualityScore(
+                improvedContent,
+                rule.ejemplo_real,
+                rule.veces_usada,
+                rule.created_at,
+                now,
+              );
               await supabase.from('steve_knowledge')
-                .update({ contenido: improvedContent, quality_score: 60 })
+                .update({ contenido: improvedContent, quality_score: newScore })
                 .eq('id', rule.id);
+              // Reflejar el nuevo score en el promedio del run.
+              totalScore += (newScore - score);
+              score = newScore;
               improved++;
             }
           }
@@ -118,19 +152,21 @@ Máximo 500 caracteres. Solo la regla mejorada, sin explicaciones.`,
       }
     }
 
+    const avgScore = rules.length > 0 ? Math.round(totalScore / rules.length) : 0;
+
     await supabase.from('qa_log').insert({
       check_type: 'knowledge_quality_score',
       status: 'pass',
       details: JSON.stringify({
         total_scored: rules.length,
-        avg_score: Math.round(rules.length > 0 ? rules.reduce((a, r) => a + (r as any).quality_score || 0, 0) / rules.length : 0),
+        avg_score: avgScore,
         improved,
         deactivated,
       }),
       detected_by: 'knowledge-quality-score',
     });
 
-    return c.json({ success: true, totalScored: rules.length, improved, deactivated });
+    return c.json({ success: true, totalScored: rules.length, avgScore, improved, deactivated });
   } catch (err: any) {
     console.error('[knowledge-quality-score]', err);
     return c.json({ error: err.message }, 500);
