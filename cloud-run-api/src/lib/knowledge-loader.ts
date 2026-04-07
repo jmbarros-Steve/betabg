@@ -28,6 +28,7 @@ export async function loadKnowledge(
     .in('categoria', categories)
     .eq('activo', true)
     .eq('approval_status', 'approved')
+    .is('purged_at', null) // Tomás W7 (2026-04-07): no inyectar reglas soft-deleted en ventana de rescate
     .order('orden', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -51,6 +52,7 @@ export async function loadKnowledge(
       .eq('client_id', clientId)
       .eq('activo', true)
       .eq('approval_status', 'approved')
+      .is('purged_at', null) // Tomás W7 (2026-04-07): no inyectar reglas soft-deleted en ventana de rescate
       .order('orden', { ascending: false })
       .limit(10);
     clientRulesData = data || [];
