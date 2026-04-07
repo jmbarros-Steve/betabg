@@ -15,13 +15,32 @@ export async function knowledgeDedup(c: Context) {
     return c.json({ error: 'ANTHROPIC_API_KEY not configured' }, 500);
   }
 
-  const { data: rules } = await supabase
-    .from('steve_knowledge')
-    .select('id, categoria, titulo, contenido, orden')
-    .eq('activo', true)
-    .order('orden', { ascending: false });
+  // Fix Tomás W7 (2026-04-07): paginar. PostgREST corta en 1000 filas por
+  // default y acá tenemos ~1434 activas. Antes el dedup solo consideraba las
+  // primeras 1000 y no detectaba duplicados fuera de esa ventana.
+  // Order estable: (orden DESC, id ASC) — `orden` puede tener empates, `id` los rompe.
+  const rules: Array<{ id: string; categoria: string; titulo: string; contenido: string; orden: number }> = [];
+  const BATCH_SIZE = 1000;
+  let offset = 0;
+  while (true) {
+    const { data: batch, error } = await supabase
+      .from('steve_knowledge')
+      .select('id, categoria, titulo, contenido, orden')
+      .eq('activo', true)
+      .order('orden', { ascending: false })
+      .order('id', { ascending: true })
+      .range(offset, offset + BATCH_SIZE - 1);
+    if (error) {
+      console.error('[knowledge-dedup] fetch error:', error);
+      return c.json({ error: 'Failed to fetch rules' }, 500);
+    }
+    if (!batch || batch.length === 0) break;
+    rules.push(...batch);
+    if (batch.length < BATCH_SIZE) break;
+    offset += BATCH_SIZE;
+  }
 
-  if (!rules || rules.length < 5) {
+  if (rules.length < 5) {
     return c.json({ message: 'Not enough rules to dedup' });
   }
 

@@ -22,20 +22,34 @@ export async function autoLearningDigest(c: Context) {
   }
 
   try {
-    // Query pending insights
-    const { data: pending, error: queryErr } = await supabase
-      .from('steve_knowledge')
-      .select('id, titulo, contenido, categoria, confidence, created_at')
-      .eq('approval_status', 'pending')
-      .eq('activo', true)
-      .order('confidence', { ascending: false });
+    // Fix Tomás W7 (2026-04-07): paginar. PostgREST corta en 1000 filas por
+    // default. Con 1041 pending actuales el conteo del digest era ≤1000,
+    // truncando el summary y las estadísticas por categoría.
+    // Order estable: (confidence DESC, id ASC) — tiebreaker `id` para paginación.
+    const pending: Array<{ id: string; titulo: string; contenido: string; categoria: string; confidence: number | null; created_at: string }> = [];
+    const BATCH_SIZE = 1000;
+    let offset = 0;
+    while (true) {
+      const { data: batch, error: queryErr } = await supabase
+        .from('steve_knowledge')
+        .select('id, titulo, contenido, categoria, confidence, created_at')
+        .eq('approval_status', 'pending')
+        .eq('activo', true)
+        .order('confidence', { ascending: false, nullsFirst: false })
+        .order('id', { ascending: true })
+        .range(offset, offset + BATCH_SIZE - 1);
 
-    if (queryErr) {
-      console.error('[digest] Query error:', queryErr);
-      return c.json({ error: 'Failed to query pending insights', details: queryErr.message }, 500);
+      if (queryErr) {
+        console.error('[digest] Query error:', queryErr);
+        return c.json({ error: 'Failed to query pending insights', details: queryErr.message }, 500);
+      }
+      if (!batch || batch.length === 0) break;
+      pending.push(...batch);
+      if (batch.length < BATCH_SIZE) break;
+      offset += BATCH_SIZE;
     }
 
-    if (!pending || pending.length === 0) {
+    if (pending.length === 0) {
       console.log('[digest] No pending insights — skipping digest');
       return c.json({ success: true, message: 'No pending insights', sent: false });
     }

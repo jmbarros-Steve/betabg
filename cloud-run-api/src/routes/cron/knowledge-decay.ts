@@ -33,15 +33,28 @@ export async function knowledgeDecay(c: Context) {
   const ninetyDaysAgo = new Date(now - 90 * 86400000).toISOString();
   const oneEightyDaysAgo = new Date(now - 180 * 86400000).toISOString();
 
-  // Fetch all active knowledge rules
-  const { data: rules, error: rulesError } = await supabase
-    .from('steve_knowledge')
-    .select('id, titulo, categoria, orden, updated_at')
-    .eq('activo', true);
+  // Fix Tomás W7 (2026-04-07): paginar. PostgREST corta en 1000 filas por
+  // default (max-rows). Antes solo se decayaban las primeras 1000 activas,
+  // el resto quedaba eternamente "fresco" aunque lleve >180d sin update.
+  const rules: Array<{ id: string; titulo: string; categoria: string; orden: number | null; updated_at: string | null }> = [];
+  const BATCH_SIZE = 1000;
+  let offset = 0;
+  while (true) {
+    const { data: batch, error: rulesError } = await supabase
+      .from('steve_knowledge')
+      .select('id, titulo, categoria, orden, updated_at')
+      .eq('activo', true)
+      .order('id', { ascending: true })
+      .range(offset, offset + BATCH_SIZE - 1);
 
-  if (rulesError || !rules) {
-    console.error('[knowledge-decay] Failed to fetch rules:', rulesError);
-    return c.json({ error: 'Failed to fetch knowledge rules' }, 500);
+    if (rulesError) {
+      console.error('[knowledge-decay] Failed to fetch rules:', rulesError);
+      return c.json({ error: 'Failed to fetch knowledge rules' }, 500);
+    }
+    if (!batch || batch.length === 0) break;
+    rules.push(...batch);
+    if (batch.length < BATCH_SIZE) break;
+    offset += BATCH_SIZE;
   }
 
   const decayed: DecayResult[] = [];

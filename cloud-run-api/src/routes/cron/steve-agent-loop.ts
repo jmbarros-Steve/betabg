@@ -28,15 +28,37 @@ export async function steveAgentLoop(c: Context) {
       .order('created_at', { ascending: false })
       .limit(10);
 
-    // Get knowledge stats
-    const { data: knowledgeStats } = await supabase
-      .from('steve_knowledge')
-      .select('categoria, approval_status, activo')
-      .eq('activo', true);
+    // Fix Tomás W7 (2026-04-07): paginar. PostgREST corta en 1000 filas por
+    // default. Antes los contadores (pending/active/categorías) del PERCEIVE
+    // quedaban sesgados hacia las primeras 1000 reglas, afectando el razonamiento
+    // downstream del agente autónomo.
+    const knowledgeStats: Array<{ id: string; categoria: string; approval_status: string; activo: boolean }> = [];
+    const BATCH_SIZE = 1000;
+    let offset = 0;
+    let knowledgeStatsError: string | null = null;
+    while (true) {
+      const { data: batch, error } = await supabase
+        .from('steve_knowledge')
+        .select('id, categoria, approval_status, activo')
+        .eq('activo', true)
+        .order('id', { ascending: true })
+        .range(offset, offset + BATCH_SIZE - 1);
+      if (error) {
+        // Isidora W6 review: antes solo `log.push+break` enmascaraba el error.
+        // Ahora lo capturamos para degradar el qa_log.status a 'warn' abajo.
+        knowledgeStatsError = error.message;
+        log.push(`knowledge-stats fetch error: ${error.message}`);
+        break;
+      }
+      if (!batch || batch.length === 0) break;
+      knowledgeStats.push(...batch);
+      if (batch.length < BATCH_SIZE) break;
+      offset += BATCH_SIZE;
+    }
 
-    const pendingCount = (knowledgeStats || []).filter(k => k.approval_status === 'pending').length;
-    const activeCount = (knowledgeStats || []).filter(k => k.approval_status === 'approved').length;
-    const categories = [...new Set((knowledgeStats || []).map(k => k.categoria))];
+    const pendingCount = knowledgeStats.filter(k => k.approval_status === 'pending').length;
+    const activeCount = knowledgeStats.filter(k => k.approval_status === 'approved').length;
+    const categories = [...new Set(knowledgeStats.map(k => k.categoria))];
 
     // Get recent feedback
     const { data: recentFeedback } = await supabase
@@ -239,11 +261,16 @@ Máx 500 chars. Solo la regla mejorada.`,
       data: { worldState, actions, log },
     });
 
-    // Log to qa_log
+    // Log to qa_log. Si el fetch paginado de knowledge_stats falló parcial,
+    // marcamos warn en lugar de pass para que Chino/OJOS lo detecten.
     await supabase.from('qa_log').insert({
       check_type: 'agent_loop',
-      status: 'pass',
-      details: JSON.stringify({ actions: actions.length, log }),
+      status: knowledgeStatsError ? 'warn' : 'pass',
+      details: JSON.stringify({
+        actions: actions.length,
+        log,
+        ...(knowledgeStatsError ? { knowledge_stats_error: knowledgeStatsError, degraded: true } : {}),
+      }),
       detected_by: 'steve-agent-loop',
     });
 

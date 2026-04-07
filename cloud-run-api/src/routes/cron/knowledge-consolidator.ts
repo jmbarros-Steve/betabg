@@ -16,14 +16,33 @@ export async function knowledgeConsolidator(c: Context) {
     return c.json({ error: 'ANTHROPIC_API_KEY not configured' }, 500);
   }
 
-  // Get categories with >15 active rules
-  const { data: allRules } = await supabase
-    .from('steve_knowledge')
-    .select('id, categoria, titulo, contenido, orden, veces_usada')
-    .eq('activo', true)
-    .order('orden', { ascending: false });
+  // Fix Tomás W7 (2026-04-07): paginar. PostgREST corta en 1000 filas por
+  // default. Antes el consolidator solo veía las top 1000 por `orden`, así
+  // que categorías grandes (>15 reglas) con reglas de baja prioridad quedaban
+  // truncadas y la consolidación LLM procesaba una vista incompleta.
+  // Order estable: (orden DESC, id ASC) — necesario para que `range()` no repita/saltee filas.
+  const allRules: Array<{ id: string; categoria: string; titulo: string; contenido: string; orden: number; veces_usada: number | null }> = [];
+  const BATCH_SIZE = 1000;
+  let offset = 0;
+  while (true) {
+    const { data: batch, error } = await supabase
+      .from('steve_knowledge')
+      .select('id, categoria, titulo, contenido, orden, veces_usada')
+      .eq('activo', true)
+      .order('orden', { ascending: false })
+      .order('id', { ascending: true })
+      .range(offset, offset + BATCH_SIZE - 1);
+    if (error) {
+      console.error('[knowledge-consolidator] fetch error:', error);
+      return c.json({ error: 'Failed to fetch rules' }, 500);
+    }
+    if (!batch || batch.length === 0) break;
+    allRules.push(...batch);
+    if (batch.length < BATCH_SIZE) break;
+    offset += BATCH_SIZE;
+  }
 
-  if (!allRules) return c.json({ message: 'No rules found' });
+  if (allRules.length === 0) return c.json({ message: 'No rules found' });
 
   const byCategory: Record<string, typeof allRules> = {};
   for (const r of allRules) {
