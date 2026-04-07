@@ -529,6 +529,9 @@ export function SteveChat({ clientId }: SteveChatProps) {
         toast.error('Error al enviar mensaje. Revisa tu conexión.');
       }
       setMessages(prev => prev.filter(m => m.id !== tempUserMsg.id));
+      // Fix Javiera W12 (2026-04-07): restaurar el texto en input para que el boton
+      // no quede disabled tras 503 y el usuario pueda reintentar sin reescribir.
+      setInput(userMessage);
     } finally {
       clearTimeout(safetyTimer);
       setIsLoading(false);

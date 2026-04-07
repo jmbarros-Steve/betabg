@@ -7,12 +7,20 @@ const corsHeaders = {
 }
 
 // ── Squad assignment por endpoint ──
+// Reviewed-By: Isidora W6 (2026-04-07) — fix de misclasificación detectada por Javiera W12
+// IMPORTANTE: producto va ANTES de marketing porque endpoints como `steve-email-content`
+// contienen `email` y `generate-meta-copy` contiene `meta`. Sin esto, marketing los captura primero.
 function getSquadForEndpoint(name: string): string {
+  // Ventas: WhatsApp + CRM + prospección
+  if (name.match(/whatsapp|wa-|twilio|crm|prospect|sales|web-form/)) return 'ventas';
+  // Producto PRIMERO (anclado con ^ para precisión): Steve AI/Brain
+  if (name.match(/^steve-chat|^steve-strategy|^steve-email-content|^analyze-brand|^generate-meta-copy|^generate-copy/)) return 'producto';
+  // Marketing: Meta + Google + Shopify + Klaviyo + Email/Steve Mail + Instagram/Facebook
   if (name.match(/meta|campaign|audience|pixel|social-inbox|competitor/)) return 'marketing';
-  if (name.match(/klaviyo|email|flow/)) return 'marketing';
-  if (name.match(/steve-chat|steve-strategy|generate-copy|analyze-brand/)) return 'producto';
-  if (name.match(/cloud-run|shopify-session|oauth/)) return 'infra';
-  if (name.match(/shopify|google/)) return 'marketing';
+  if (name.match(/klaviyo|email|flow|mail-|steve-mail|manage-email|query-email/)) return 'marketing';
+  if (name.match(/shopify|google|instagram|facebook|publish-/)) return 'marketing';
+  // Infra: cloud-run root, oauth, sesiones, frontend
+  if (name.match(/cloud-run|shopify-session|oauth|^frontend$/)) return 'infra';
   return 'producto';
 }
 

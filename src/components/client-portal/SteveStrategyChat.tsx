@@ -71,6 +71,9 @@ export function SteveStrategyChat({ clientId, onGoToBrief }: SteveStrategyChatPr
         toast.error('Error al enviar mensaje');
       }
       setMessages(prev => prev.filter(m => m !== userMsg));
+      // Fix Javiera W12 (2026-04-07): restaurar el texto en input para que el boton
+      // no quede disabled tras 503 y el usuario pueda reintentar sin reescribir.
+      setInput(userMsg.content);
     } finally {
       setIsLoading(false);
       textareaRef.current?.focus();

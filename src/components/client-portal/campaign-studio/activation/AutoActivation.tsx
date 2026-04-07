@@ -137,15 +137,17 @@ export function AutoActivation({
       }
 
       // Load brand info from clients table
+      // Fix Javiera W12 (2026-04-07): clients no tiene business_name ni industry.
+      // Usar columnas reales (company, name) y derivar industry desde brand_identity jsonb.
       const { data: client } = await supabase
         .from('clients')
-        .select('business_name, brand_identity, industry')
+        .select('name, company, brand_identity')
         .eq('id', clientId)
         .maybeSingle();
 
-      let brandName = client?.business_name || 'Tu Marca';
+      let brandName = client?.company || client?.name || 'Tu Marca';
       let tone = 'Profesional y cercano';
-      let industry = client?.industry || 'E-commerce';
+      let industry = 'E-commerce';
 
       // Try to extract from brand_identity if available
       if (client?.brand_identity) {
