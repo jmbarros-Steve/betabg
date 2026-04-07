@@ -3,11 +3,12 @@ import { motion } from 'framer-motion';
 import {
   Loader2, User, Building2, TrendingUp, MessageSquare,
   Calendar, GripVertical, Info, ChevronDown, ChevronUp,
-  DollarSign, AlertTriangle,
+  DollarSign, AlertTriangle, Trash2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { ProspectDetail } from './ProspectDetail';
 import { CalendarConnect } from './CalendarConnect';
 
@@ -151,6 +152,25 @@ export function ProspectKanban() {
     setDragOverStage(null);
   };
 
+  const handleDelete = async (e: React.MouseEvent, prospectId: string, prospectName: string) => {
+    e.stopPropagation();
+    if (!window.confirm(`¿Borrar a "${prospectName}"? Esta acción no se puede deshacer.`)) return;
+
+    const { error } = await supabase.from('wa_prospects').delete().eq('id', prospectId);
+    if (error) {
+      toast.error('Error al borrar prospecto');
+      return;
+    }
+    setKanban(prev => {
+      const updated = { ...prev };
+      for (const stage of Object.keys(updated)) {
+        updated[stage] = updated[stage].filter(p => p.id !== prospectId);
+      }
+      return updated;
+    });
+    toast.success(`"${prospectName}" eliminado`);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -269,7 +289,7 @@ export function ProspectKanban() {
                         onDragStart={(e) => handleDragStart(e as any, p.id)}
                         onDragEnd={handleDragEnd}
                         onClick={() => setSelectedProspectId(p.id)}
-                        className={`bg-white rounded-lg border p-2.5 cursor-grab active:cursor-grabbing hover:shadow-sm transition-all ${
+                        className={`group bg-white rounded-lg border p-2.5 cursor-grab active:cursor-grabbing hover:shadow-sm transition-all ${
                           dragProspectId === p.id ? 'opacity-40 scale-95' : ''
                         } ${isRotting ? 'border-orange-400 ring-1 ring-orange-200' : 'border-slate-200'}`}
                       >
@@ -286,6 +306,13 @@ export function ProspectKanban() {
                             )}
                           </div>
                           <ScoreBadge score={p.lead_score} />
+                          <button
+                            onClick={(e) => handleDelete(e, p.id, p.name || p.profile_name || p.phone)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-red-50 text-slate-300 hover:text-red-400"
+                            title="Eliminar prospecto"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
 
                         <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-400 flex-wrap">
