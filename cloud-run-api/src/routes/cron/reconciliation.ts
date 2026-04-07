@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { decryptPlatformToken } from '../../lib/decrypt-token.js';
 import { metaApiFetch } from '../../lib/meta-fetch.js';
 import { createTask } from '../../lib/task-creator.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Reconciliation Cron — Fase 6 paso B.6
@@ -124,13 +125,17 @@ async function checkMetaPhantomCampaigns(
 
         // Get campaigns we track in DB (last 30 days metrics)
         const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-        const { data: localCampaigns } = await supabase
-          .from('campaign_metrics')
-          .select('campaign_id, campaign_name')
-          .eq('connection_id', conn.id)
-          .gte('metric_date', thirtyDaysAgo);
+        const localCampaigns = await safeQueryOrDefault<{ campaign_id: string; campaign_name: string }>(
+          supabase
+            .from('campaign_metrics')
+            .select('campaign_id, campaign_name')
+            .eq('connection_id', conn.id)
+            .gte('metric_date', thirtyDaysAgo),
+          [],
+          'reconciliation.fetchLocalCampaigns',
+        );
 
-        if (!localCampaigns?.length) continue;
+        if (!localCampaigns.length) continue;
 
         // Deduplicate campaign IDs
         const uniqueIds = [...new Set(localCampaigns.map(c => c.campaign_id))];
@@ -203,12 +208,21 @@ async function checkDeadTokens(
 
     // Also find connections with no token_expires_at that haven't synced in 7 days
     const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-    const { data: stale } = await supabase
-      .from('platform_connections')
-      .select('id, client_id, platform, last_sync_at')
-      .not('access_token_encrypted', 'is', null)
-      .is('token_expires_at', null)
-      .lt('last_sync_at', sevenDaysAgo);
+    const stale = await safeQueryOrDefault<{
+      id: string;
+      client_id: string;
+      platform: string;
+      last_sync_at: string | null;
+    }>(
+      supabase
+        .from('platform_connections')
+        .select('id, client_id, platform, last_sync_at')
+        .not('access_token_encrypted', 'is', null)
+        .is('token_expires_at', null)
+        .lt('last_sync_at', sevenDaysAgo),
+      [],
+      'reconciliation.fetchStaleConnections',
+    );
 
     const deadTokens = [
       ...(expired || []).map(c => ({
@@ -218,7 +232,7 @@ async function checkDeadTokens(
         reason: 'token_expired',
         token_expires_at: c.token_expires_at,
       })),
-      ...(stale || []).map(c => ({
+      ...stale.map(c => ({
         connection_id: c.id,
         client_id: c.client_id,
         platform: c.platform,
@@ -234,7 +248,7 @@ async function checkDeadTokens(
         details: {
           message: `${deadTokens.length} dead/stale tokens found`,
           expired_count: (expired || []).length,
-          stale_count: (stale || []).length,
+          stale_count: stale.length,
           tokens: deadTokens.slice(0, 50),
         },
       };

@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-import { decryptPlatformToken } from '../../lib/decrypt-token.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
+import { safeQuerySingleOrDefault, safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * D.1 — Performance Tracker Meta
@@ -98,25 +99,37 @@ export async function performanceTrackerMeta(c: Context) {
         continue;
       }
 
-      // Get Meta token for this client
+      // Get Meta token for this client (handles SUAT for bm_partner/leadsie + OAuth)
       const clientId = creative.client_id || creative.shop_id;
-      const { data: connection } = await supabase
-        .from('platform_connections')
-        .select('access_token_encrypted')
-        .eq('client_id', clientId)
-        .eq('platform', 'meta')
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
+      const connection = await safeQuerySingleOrDefault<{
+        id: string;
+        access_token_encrypted: string | null;
+        connection_type: string | null;
+      }>(
+        supabase
+          .from('platform_connections')
+          .select('id, access_token_encrypted, connection_type')
+          .eq('client_id', clientId)
+          .eq('platform', 'meta')
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle() as any,
+        null,
+        'performanceTrackerMeta.fetchActiveMetaConnection',
+      );
 
-      if (!connection?.access_token_encrypted) {
+      if (!connection) {
         console.warn(`[perf-tracker-meta] No active Meta connection for client ${clientId}`);
         continue;
       }
 
-      const token = await decryptPlatformToken(supabase, connection.access_token_encrypted);
+      const token = await getTokenForConnection(supabase, {
+        id: connection.id,
+        connection_type: connection.connection_type ?? undefined,
+        access_token_encrypted: connection.access_token_encrypted,
+      });
       if (!token) {
-        console.warn(`[perf-tracker-meta] Failed to decrypt token for client ${clientId}`);
+        console.warn(`[perf-tracker-meta] Failed to resolve token for client ${clientId}`);
         continue;
       }
 
@@ -158,17 +171,25 @@ export async function performanceTrackerMeta(c: Context) {
       const { score, verdict } = calculatePerformanceScore(ctr, roas, cpa);
 
       // Compare against merchant's historical average (last 10 measured campaigns)
-      const { data: avgData } = await supabase
-        .from('creative_history')
-        .select('meta_ctr, meta_cpa, meta_roas')
-        .eq('client_id', creative.client_id)
-        .eq('channel', 'meta')
-        .not('meta_ctr', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(10);
+      const avgData = await safeQueryOrDefault<{
+        meta_ctr: number | null;
+        meta_cpa: number | null;
+        meta_roas: number | null;
+      }>(
+        supabase
+          .from('creative_history')
+          .select('meta_ctr, meta_cpa, meta_roas')
+          .eq('client_id', creative.client_id)
+          .eq('channel', 'meta')
+          .not('meta_ctr', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(10),
+        [],
+        'performanceTrackerMeta.fetchHistoricalAvg',
+      );
 
       let benchmarkComparison: Record<string, any> = {};
-      if (avgData && avgData.length > 0) {
+      if (avgData.length > 0) {
         const avgCTR = avgData.reduce((s, r) => s + (Number(r.meta_ctr) || 0), 0) / avgData.length;
         const avgROAS = avgData.reduce((s, r) => s + (Number(r.meta_roas) || 0), 0) / avgData.length;
 

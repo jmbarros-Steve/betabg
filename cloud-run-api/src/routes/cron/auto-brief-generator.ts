@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 export async function autoBriefGenerator(c: Context) {
   const cronSecret = process.env.CRON_SECRET;
@@ -19,28 +20,39 @@ export async function autoBriefGenerator(c: Context) {
 
   try {
     // Find Shopify connections
-    const { data: connections } = await supabase
-      .from('platform_connections')
-      .select('id, client_id, credentials, clients!inner(id, name)')
-      .eq('platform', 'shopify')
-      .eq('status', 'active');
+    const connections = await safeQuery<{
+      id: string;
+      client_id: string;
+      credentials: any;
+      clients: any;
+    }>(
+      supabase
+        .from('platform_connections')
+        .select('id, client_id, credentials, clients!inner(id, name)')
+        .eq('platform', 'shopify')
+        .eq('status', 'active'),
+      'autoBriefGenerator.fetchShopifyConnections',
+    );
 
-    if (!connections || connections.length === 0) {
+    if (connections.length === 0) {
       return c.json({ success: true, briefsGenerated: 0, message: 'No Shopify connections' });
     }
 
     for (const conn of connections) {
       try {
         // Check if client already has a brief
-        const { data: existingBrief } = await supabase
-          .from('steve_knowledge')
-          .select('id')
-          .eq('client_id', conn.client_id)
-          .eq('categoria', 'brief')
-          .eq('activo', true)
-          .limit(1);
+        const existingBrief = await safeQuery<{ id: string }>(
+          supabase
+            .from('steve_knowledge')
+            .select('id')
+            .eq('client_id', conn.client_id)
+            .eq('categoria', 'brief')
+            .eq('activo', true)
+            .limit(1),
+          'autoBriefGenerator.checkExistingBrief',
+        );
 
-        if (existingBrief && existingBrief.length > 0) continue;
+        if (existingBrief.length > 0) continue;
 
         // Get Shopify credentials
         const creds = typeof conn.credentials === 'string' ? JSON.parse(conn.credentials) : conn.credentials;

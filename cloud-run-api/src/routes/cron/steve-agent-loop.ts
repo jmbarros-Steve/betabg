@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 export async function steveAgentLoop(c: Context) {
   const cronSecret = process.env.CRON_SECRET;
@@ -67,22 +68,28 @@ export async function steveAgentLoop(c: Context) {
     const categories = [...new Set(knowledgeStats.map(k => k.categoria))];
 
     // Get recent feedback
-    const { data: recentFeedback } = await supabase
-      .from('steve_feedback')
-      .select('feedback_type, created_at')
-      .gte('created_at', new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString());
+    const recentFeedback = await safeQuery<{ feedback_type: string; created_at: string }>(
+      supabase
+        .from('steve_feedback')
+        .select('feedback_type, created_at')
+        .gte('created_at', new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()),
+      'steveAgentLoop.fetchRecentFeedback',
+    );
 
-    const positiveFb = (recentFeedback || []).filter(f => f.feedback_type === 'positive').length;
-    const negativeFb = (recentFeedback || []).filter(f => f.feedback_type === 'negative').length;
+    const positiveFb = recentFeedback.filter(f => f.feedback_type === 'positive').length;
+    const negativeFb = recentFeedback.filter(f => f.feedback_type === 'negative').length;
 
     // Get client metrics summary
-    const { data: recentMetrics } = await supabase
-      .from('campaign_metrics')
-      .select('connection_id, spend, conversion_value')
-      .gte('metric_date', new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+    const recentMetrics = await safeQuery<{ connection_id: string; spend: number | string; conversion_value: number | string }>(
+      supabase
+        .from('campaign_metrics')
+        .select('connection_id, spend, conversion_value')
+        .gte('metric_date', new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+      'steveAgentLoop.fetchRecentMetrics',
+    );
 
-    const totalSpend = (recentMetrics || []).reduce((a, m) => a + (Number(m.spend) || 0), 0);
-    const totalRevenue = (recentMetrics || []).reduce((a, m) => a + (Number(m.conversion_value) || 0), 0);
+    const totalSpend = recentMetrics.reduce((a, m) => a + (Number(m.spend) || 0), 0);
+    const totalRevenue = recentMetrics.reduce((a, m) => a + (Number(m.conversion_value) || 0), 0);
     const overallROAS = totalSpend > 0 ? totalRevenue / totalSpend : 0;
 
     log.push(`Alerts: ${(recentAlerts || []).length} | Knowledge: ${activeCount} active, ${pendingCount} pending`);
@@ -191,16 +198,19 @@ Sin markdown.`,
 
           case 'improve_knowledge': {
             // Find low-quality rules and improve them
-            const { data: lowQuality } = await supabase
-              .from('steve_knowledge')
-              .select('id, titulo, contenido, quality_score')
-              .eq('activo', true)
-              .eq('approval_status', 'approved')
-              .lt('quality_score', 40)
-              .order('quality_score', { ascending: true })
-              .limit(3);
+            const lowQuality = await safeQuery<{ id: string; titulo: string; contenido: string; quality_score: number }>(
+              supabase
+                .from('steve_knowledge')
+                .select('id, titulo, contenido, quality_score')
+                .eq('activo', true)
+                .eq('approval_status', 'approved')
+                .lt('quality_score', 40)
+                .order('quality_score', { ascending: true })
+                .limit(3),
+              'steveAgentLoop.fetchLowQuality',
+            );
 
-            for (const rule of (lowQuality || [])) {
+            for (const rule of lowQuality) {
               const improveRes = await fetch('https://api.anthropic.com/v1/messages', {
                 method: 'POST',
                 headers: {
@@ -233,7 +243,7 @@ Máx 500 chars. Solo la regla mejorada.`,
                 }
               }
             }
-            log.push(`Improved ${(lowQuality || []).length} low-quality rules`);
+            log.push(`Improved ${lowQuality.length} low-quality rules`);
             break;
           }
 
@@ -263,14 +273,17 @@ Máx 500 chars. Solo la regla mejorada.`,
     // que si `agreed_date` viniera null por alguna razón, el fallback `|| now`
     // daba age=0 (pesimista). Ahora cascada: agreed_date → created_at → now.
     // created_at siempre existe en steve_commitments (verified).
-    const { data: dueCommitments } = await supabase
-      .from('steve_commitments')
-      .select('id, client_id, commitment, agreed_date, created_at')
-      .eq('status', 'pending')
-      .lte('follow_up_date', now.toISOString())
-      .limit(5);
+    const dueCommitments = await safeQuery<{ id: string; client_id: string; commitment: string; agreed_date: string | null; created_at: string | null }>(
+      supabase
+        .from('steve_commitments')
+        .select('id, client_id, commitment, agreed_date, created_at')
+        .eq('status', 'pending')
+        .lte('follow_up_date', now.toISOString())
+        .limit(5),
+      'steveAgentLoop.fetchDueCommitments',
+    );
 
-    if (dueCommitments && dueCommitments.length > 0) {
+    if (dueCommitments.length > 0) {
       log.push(`${dueCommitments.length} commitments due for follow-up`);
       // Mark as expired if older than 30 days
       for (const commit of dueCommitments) {

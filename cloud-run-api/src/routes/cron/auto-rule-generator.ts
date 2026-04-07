@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 /**
  * C.5 — Auto-generación de reglas
@@ -29,14 +30,13 @@ export async function autoRuleGenerator(c: Context) {
   const supabase = getSupabaseAdmin();
 
   // 1. Fetch active rules (id + name + check only for prompt size)
-  const { data: existingRules } = await supabase
-    .from('criterio_rules')
-    .select('id, name, check_rule')
-    .eq('active', true);
-
-  if (!existingRules) {
-    return c.json({ error: 'Failed to fetch existing rules' }, 500);
-  }
+  const existingRules = await safeQuery<{ id: string; name: string; check_rule: string }>(
+    supabase
+      .from('criterio_rules')
+      .select('id, name, check_rule')
+      .eq('active', true),
+    'autoRuleGenerator.fetchActiveRules',
+  );
 
   // 2. Ask Claude Haiku if an existing rule should cover this, or generate a new one
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;

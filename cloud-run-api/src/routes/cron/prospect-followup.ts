@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
+import { safeQuery, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Prospect Follow-up — Steve Perro Lobo Paso 14-15
@@ -41,27 +42,34 @@ export async function prospectFollowup(c: Context) {
     // ============================================================
     // PART 1: Active follow-ups (stage not lost/converted)
     // ============================================================
-    const { data: prospects } = await supabase
-      .from('wa_prospects')
-      .select('id, phone, profile_name, name, what_they_sell, stage, followup_count, last_followup_at, updated_at, message_count, pain_points, audit_data, lead_score')
-      .not('stage', 'in', '("lost","converted")')
-      .lt('followup_count', 3)
-      .order('updated_at', { ascending: true })
-      .limit(50);
+    const prospects = await safeQuery<any>(
+      supabase
+        .from('wa_prospects')
+        .select('id, phone, profile_name, name, what_they_sell, stage, followup_count, last_followup_at, updated_at, message_count, pain_points, audit_data, lead_score')
+        .not('stage', 'in', '("lost","converted")')
+        .lt('followup_count', 3)
+        .order('updated_at', { ascending: true })
+        .limit(50),
+      'prospectFollowup.fetchActiveProspects',
+    );
 
-    if (prospects && prospects.length > 0) {
+    if (prospects.length > 0) {
       for (const prospect of prospects) {
         try {
           // Find last message for this prospect
-          const { data: lastMsg } = await supabase
-            .from('wa_messages')
-            .select('direction, created_at')
-            .eq('contact_phone', prospect.phone)
-            .eq('channel', 'prospect')
-            .is('client_id', null)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          const lastMsg = await safeQuerySingleOrDefault<any>(
+            supabase
+              .from('wa_messages')
+              .select('direction, created_at')
+              .eq('contact_phone', prospect.phone)
+              .eq('channel', 'prospect')
+              .is('client_id', null)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+            null,
+            'prospectFollowup.fetchLastMsg',
+          );
 
           // Skip if last message is inbound (prospect responded)
           if (!lastMsg || lastMsg.direction === 'inbound') continue;
@@ -166,36 +174,47 @@ export async function prospectFollowup(c: Context) {
       }
 
       // Mark prospects with 3+ follow-ups as lost
-      const { data: ghosted } = await supabase
-        .from('wa_prospects')
-        .select('id, phone')
-        .not('stage', 'in', '("lost","converted")')
-        .gte('followup_count', 3);
+      const ghosted = await safeQuery<{ id: string; phone: string }>(
+        supabase
+          .from('wa_prospects')
+          .select('id, phone')
+          .not('stage', 'in', '("lost","converted")')
+          .gte('followup_count', 3),
+        'prospectFollowup.fetchGhosted',
+      );
 
-      if (ghosted) {
+      if (ghosted.length > 0) {
         for (const g of ghosted) {
           // Verify they haven't responded since last follow-up
-          const { data: lastInbound } = await supabase
-            .from('wa_messages')
-            .select('created_at')
-            .eq('contact_phone', g.phone)
-            .eq('channel', 'prospect')
-            .eq('direction', 'inbound')
-            .is('client_id', null)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          const lastInbound = await safeQuerySingleOrDefault<any>(
+            supabase
+              .from('wa_messages')
+              .select('created_at')
+              .eq('contact_phone', g.phone)
+              .eq('channel', 'prospect')
+              .eq('direction', 'inbound')
+              .is('client_id', null)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+            null,
+            'prospectFollowup.fetchLastInbound',
+          );
 
-          const { data: lastOutbound } = await supabase
-            .from('wa_messages')
-            .select('created_at')
-            .eq('contact_phone', g.phone)
-            .eq('channel', 'prospect')
-            .eq('direction', 'outbound')
-            .is('client_id', null)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          const lastOutbound = await safeQuerySingleOrDefault<any>(
+            supabase
+              .from('wa_messages')
+              .select('created_at')
+              .eq('contact_phone', g.phone)
+              .eq('channel', 'prospect')
+              .eq('direction', 'outbound')
+              .is('client_id', null)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+            null,
+            'prospectFollowup.fetchLastOutbound',
+          );
 
           // Only mark lost if last msg is outbound (no response after follow-ups)
           if (lastOutbound && (!lastInbound || new Date(lastInbound.created_at) < new Date(lastOutbound.created_at))) {
@@ -216,16 +235,19 @@ export async function prospectFollowup(c: Context) {
     // ============================================================
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data: deadProspects } = await supabase
-      .from('wa_prospects')
-      .select('id, phone, profile_name, name, what_they_sell')
-      .eq('stage', 'lost')
-      .eq('lost_reason', 'ghosted')
-      .eq('resurrection_sent', false)
-      .lt('updated_at', fourteenDaysAgo)
-      .limit(10);
+    const deadProspects = await safeQuery<any>(
+      supabase
+        .from('wa_prospects')
+        .select('id, phone, profile_name, name, what_they_sell')
+        .eq('stage', 'lost')
+        .eq('lost_reason', 'ghosted')
+        .eq('resurrection_sent', false)
+        .lt('updated_at', fourteenDaysAgo)
+        .limit(10),
+      'prospectFollowup.fetchDeadProspects',
+    );
 
-    if (deadProspects && deadProspects.length > 0) {
+    if (deadProspects.length > 0) {
       for (const dead of deadProspects) {
         try {
           const deadName = dead.name || dead.profile_name || '';

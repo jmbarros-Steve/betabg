@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
+import { safeQuery, safeQuerySingle } from '../../lib/safe-supabase.js';
 
 /**
  * Onboarding WA Cron — Steve Post-Venta
@@ -30,18 +31,21 @@ export async function onboardingWA(c: Context) {
 
   try {
     // Find clients with pending/in_progress onboarding steps
-    const { data: pendingSteps } = await supabase
-      .from('merchant_onboarding')
-      .select(`
-        id, client_id, step, status, wa_message_sent, reminder_count, updated_at,
-        clients!inner(id, name, email, whatsapp_phone, onboarding_wa_started)
-      `)
-      .in('status', ['pending', 'in_progress'])
-      .lt('reminder_count', 3)
-      .order('updated_at', { ascending: true })
-      .limit(50);
+    const pendingSteps = await safeQuery<any>(
+      supabase
+        .from('merchant_onboarding')
+        .select(`
+          id, client_id, step, status, wa_message_sent, reminder_count, updated_at,
+          clients!inner(id, name, email, whatsapp_phone, onboarding_wa_started)
+        `)
+        .in('status', ['pending', 'in_progress'])
+        .lt('reminder_count', 3)
+        .order('updated_at', { ascending: true })
+        .limit(50),
+      'onboardingWA.fetchPendingSteps',
+    );
 
-    if (!pendingSteps || pendingSteps.length === 0) {
+    if (pendingSteps.length === 0) {
       return c.json({ success: true, message: 'No pending steps', ...results });
     }
 
@@ -58,11 +62,14 @@ export async function onboardingWA(c: Context) {
         if (hoursSinceUpdate < 24 && step.wa_message_sent) continue;
 
         // Check if step was completed externally (OAuth callbacks update this)
-        const { data: currentStep } = await supabase
-          .from('merchant_onboarding')
-          .select('status')
-          .eq('id', step.id)
-          .single();
+        const currentStep = await safeQuerySingle<{ status: string }>(
+          supabase
+            .from('merchant_onboarding')
+            .select('status')
+            .eq('id', step.id)
+            .single(),
+          'onboardingWA.checkCurrentStepStatus',
+        );
 
         if (currentStep?.status === 'completed') continue;
 

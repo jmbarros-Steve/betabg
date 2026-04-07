@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 export async function anomalyDetector(c: Context) {
   const cronSecret = process.env.CRON_SECRET;
@@ -17,12 +18,15 @@ export async function anomalyDetector(c: Context) {
     const dayOfWeek = today.getDay();
 
     // Get today's metrics per connection
-    const { data: todayMetrics } = await supabase
-      .from('campaign_metrics')
-      .select('connection_id, spend, conversion_value, impressions, clicks')
-      .eq('metric_date', todayStr);
+    const todayMetrics = await safeQuery<{ connection_id: string; spend: number | string; conversion_value: number | string; impressions: number; clicks: number }>(
+      supabase
+        .from('campaign_metrics')
+        .select('connection_id, spend, conversion_value, impressions, clicks')
+        .eq('metric_date', todayStr),
+      'anomalyDetector.fetchTodayMetrics',
+    );
 
-    if (!todayMetrics || todayMetrics.length === 0) {
+    if (todayMetrics.length === 0) {
       return c.json({ success: true, anomaliesDetected: 0 });
     }
 
@@ -33,12 +37,15 @@ export async function anomalyDetector(c: Context) {
       historicalDates.push(d.toISOString().split('T')[0]);
     }
 
-    const { data: historicalMetrics } = await supabase
-      .from('campaign_metrics')
-      .select('connection_id, metric_date, spend, conversion_value, impressions')
-      .in('metric_date', historicalDates);
+    const historicalMetrics = await safeQuery<{ connection_id: string; metric_date: string; spend: number | string; conversion_value: number | string; impressions: number }>(
+      supabase
+        .from('campaign_metrics')
+        .select('connection_id, metric_date, spend, conversion_value, impressions')
+        .in('metric_date', historicalDates),
+      'anomalyDetector.fetchHistoricalMetrics',
+    );
 
-    if (!historicalMetrics || historicalMetrics.length === 0) {
+    if (historicalMetrics.length === 0) {
       return c.json({ success: true, anomaliesDetected: 0 });
     }
 
@@ -58,12 +65,15 @@ export async function anomalyDetector(c: Context) {
 
     // Get connection details
     const connectionIds = Object.keys(todayByConn);
-    const { data: connections } = await supabase
-      .from('platform_connections')
-      .select('id, client_id, platform, clients!inner(name)')
-      .in('id', connectionIds);
+    const connections = await safeQuery<{ id: string; client_id: string; platform: string; clients: { name: string } | { name: string }[] }>(
+      supabase
+        .from('platform_connections')
+        .select('id, client_id, platform, clients!inner(name)')
+        .in('id', connectionIds),
+      'anomalyDetector.fetchConnections',
+    );
 
-    const connMap = new Map((connections || []).map(c => [c.id, c]));
+    const connMap = new Map(connections.map(c => [c.id, c]));
 
     for (const [connId, todayData] of Object.entries(todayByConn)) {
       const historical = histByConn[connId];

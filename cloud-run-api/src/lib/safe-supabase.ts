@@ -126,7 +126,7 @@ export async function safeQuery<T>(
  * @returns Fila única o null (solo si maybeSingle sin match).
  */
 export async function safeQuerySingle<T>(
-  promise: PromiseLike<PostgrestSingleResponse<T>>,
+  promise: PromiseLike<PostgrestSingleResponse<T | null>>,
   context: string,
 ): Promise<T | null> {
   const { data, error } = await promise;

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 export async function predictiveAlerts(c: Context) {
   const cronSecret = process.env.CRON_SECRET;
@@ -17,23 +18,38 @@ export async function predictiveAlerts(c: Context) {
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     // Get recent metrics
-    const { data: recentMetrics } = await supabase
-      .from('campaign_metrics')
-      .select('connection_id, campaign_name, spend, impressions, clicks, conversions, conversion_value, metric_date')
-      .gte('metric_date', fourteenDaysAgo);
+    const recentMetrics = await safeQuery<{
+      connection_id: string;
+      campaign_name: string;
+      spend: number | string | null;
+      impressions: number | string | null;
+      clicks: number | string | null;
+      conversions: number | string | null;
+      conversion_value: number | string | null;
+      metric_date: string;
+    }>(
+      supabase
+        .from('campaign_metrics')
+        .select('connection_id, campaign_name, spend, impressions, clicks, conversions, conversion_value, metric_date')
+        .gte('metric_date', fourteenDaysAgo),
+      'predictiveAlerts.fetchRecentMetrics',
+    );
 
-    if (!recentMetrics || recentMetrics.length === 0) {
+    if (recentMetrics.length === 0) {
       return c.json({ success: true, alertsSent: 0 });
     }
 
     // Get connection→client mapping with WhatsApp phone
     const connectionIds = [...new Set(recentMetrics.map(m => m.connection_id))];
-    const { data: connections } = await supabase
-      .from('platform_connections')
-      .select('id, client_id, clients!inner(name, whatsapp_phone)')
-      .in('id', connectionIds);
+    const connections = await safeQuery<{ id: string; client_id: string; clients: any }>(
+      supabase
+        .from('platform_connections')
+        .select('id, client_id, clients!inner(name, whatsapp_phone)')
+        .in('id', connectionIds),
+      'predictiveAlerts.fetchConnectionsWithClient',
+    );
 
-    if (!connections) return c.json({ success: true, alertsSent: 0 });
+    if (connections.length === 0) return c.json({ success: true, alertsSent: 0 });
 
     const connMap = new Map(connections.map(c => [c.id, c]));
 

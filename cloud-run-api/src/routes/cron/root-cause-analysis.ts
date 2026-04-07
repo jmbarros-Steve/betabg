@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingle } from '../../lib/safe-supabase.js';
 
 /**
  * Root Cause Analysis — Paso C.2
@@ -111,13 +112,16 @@ Responde en JSON:
       const taskTitle = `REFACTOR: ${pattern.name} (${pattern.count} veces esta semana)`;
 
       // Deduplicate
-      const { data: existing } = await supabase
-        .from('tasks')
-        .select('id')
-        .eq('title', taskTitle)
-        .in('status', ['pending', 'in_progress'])
-        .limit(1)
-        .maybeSingle();
+      const existing = await safeQuerySingle<{ id: string }>(
+        supabase
+          .from('tasks')
+          .select('id')
+          .eq('title', taskTitle)
+          .in('status', ['pending', 'in_progress'])
+          .limit(1)
+          .maybeSingle() as any,
+        'rootCauseAnalysis.findExistingRefactorTask',
+      );
 
       if (!existing) {
         await supabase.from('tasks').insert({

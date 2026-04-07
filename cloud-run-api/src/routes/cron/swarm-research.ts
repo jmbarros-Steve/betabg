@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 /**
  * POST /api/cron/swarm-research
@@ -94,12 +95,15 @@ export async function swarmResearch(c: Context) {
 
     // ── Step 4b: Update swarm_sources tracking (last_used_at, hits) ──
     try {
-      const { data: activeSources } = await supabase
-        .from('swarm_sources')
-        .select('id, url, hits')
-        .eq('active', true);
+      const activeSources = await safeQuery<{ id: string; url: string; hits: number | null }>(
+        supabase
+          .from('swarm_sources')
+          .select('id, url, hits')
+          .eq('active', true),
+        'swarmResearch.fetchActiveSources',
+      );
 
-      if (activeSources && activeSources.length > 0) {
+      if (activeSources.length > 0) {
         // Collect all source URLs from reports and insights
         const allReportUrls = reports.flatMap((r) => r.sources || []);
         const allInsightUrls = insights.flatMap((i: any) => i.sources || []);
@@ -243,22 +247,28 @@ async function generateQuestions(supabase: any, apiKey: string): Promise<string[
   const { theme, focus } = getCurrentTheme();
 
   // Get existing knowledge for this theme's categories to avoid repeats
-  const { data: existingKnowledge } = await supabase
-    .from('steve_knowledge')
-    .select('titulo')
-    .eq('activo', true)
-    .order('created_at', { ascending: false })
-    .limit(50);
+  const existingKnowledge = await safeQuery<{ titulo: string }>(
+    supabase
+      .from('steve_knowledge')
+      .select('titulo')
+      .eq('activo', true)
+      .order('created_at', { ascending: false })
+      .limit(50),
+    'swarmResearch.fetchExistingKnowledge',
+  );
 
-  const recentTitles = (existingKnowledge || []).map((k: any) => k.titulo).slice(0, 20);
+  const recentTitles = existingKnowledge.map((k: any) => k.titulo).slice(0, 20);
 
   // Load preferred sources for this theme
-  const { data: allSources } = await supabase
-    .from('swarm_sources')
-    .select('name, url, category')
-    .eq('active', true);
+  const allSources = await safeQuery<{ name: string; url: string; category: string }>(
+    supabase
+      .from('swarm_sources')
+      .select('name, url, category')
+      .eq('active', true),
+    'swarmResearch.fetchAllSources',
+  );
 
-  const sources = allSources || [];
+  const sources = allSources;
   const themeCategories = mapThemeToCategories(theme);
   const matchingSources = sources.filter((s: any) => themeCategories.includes(s.category));
   const otherSources = sources.filter((s: any) => !themeCategories.includes(s.category));

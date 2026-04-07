@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 /**
  * Churn Detector — Steve Post-Venta
@@ -30,15 +31,18 @@ export async function churnDetector(c: Context) {
 
   try {
     // Find clients with last_active_at tracking
-    const { data: clients } = await supabase
-      .from('clients')
-      .select('id, name, email, whatsapp_phone, last_active_at, churn_risk')
-      .not('last_active_at', 'is', null)
-      .not('whatsapp_phone', 'is', null)
-      .order('last_active_at', { ascending: true })
-      .limit(30);
+    const clients = await safeQuery<{ id: string; name: string | null; email: string | null; whatsapp_phone: string | null; last_active_at: string | null; churn_risk: string | null }>(
+      supabase
+        .from('clients')
+        .select('id, name, email, whatsapp_phone, last_active_at, churn_risk')
+        .not('last_active_at', 'is', null)
+        .not('whatsapp_phone', 'is', null)
+        .order('last_active_at', { ascending: true })
+        .limit(30),
+      'churnDetector.fetchClients',
+    );
 
-    if (!clients || clients.length === 0) {
+    if (clients.length === 0) {
       return c.json({ success: true, message: 'No clients with activity data', ...results });
     }
 
@@ -80,23 +84,29 @@ export async function churnDetector(c: Context) {
 
         if (newRisk === 'medium' || newRisk === 'high') {
           // Fetch a relevant metric to personalize the message
-          const { data: connections } = await supabase
-            .from('platform_connections')
-            .select('id')
-            .eq('client_id', client.id)
-            .eq('is_active', true)
-            .limit(3);
+          const connections = await safeQuery<{ id: string }>(
+            supabase
+              .from('platform_connections')
+              .select('id')
+              .eq('client_id', client.id)
+              .eq('is_active', true)
+              .limit(3),
+            'churnDetector.fetchConnections',
+          );
 
           let metricContext = '';
-          if (connections && connections.length > 0) {
-            const { data: recentMetrics } = await supabase
-              .from('platform_metrics')
-              .select('metric_type, metric_value')
-              .in('connection_id', connections.map((c: any) => c.id))
-              .order('metric_date', { ascending: false })
-              .limit(5);
+          if (connections.length > 0) {
+            const recentMetrics = await safeQuery<{ metric_type: string; metric_value: number | string }>(
+              supabase
+                .from('platform_metrics')
+                .select('metric_type, metric_value')
+                .in('connection_id', connections.map((c: any) => c.id))
+                .order('metric_date', { ascending: false })
+                .limit(5),
+              'churnDetector.fetchRecentMetrics',
+            );
 
-            if (recentMetrics && recentMetrics.length > 0) {
+            if (recentMetrics.length > 0) {
               metricContext = `Sus últimas métricas: ${recentMetrics.map((m: any) => `${m.metric_type}: ${m.metric_value}`).join(', ')}.`;
             }
           }

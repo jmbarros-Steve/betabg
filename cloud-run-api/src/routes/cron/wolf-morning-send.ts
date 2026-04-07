@@ -16,6 +16,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 
@@ -38,15 +39,26 @@ export async function wolfMorningSend(c: Context) {
     const todayStart = new Date();
     todayStart.setUTCHours(0, 0, 0, 0);
 
-    const { data: prospects } = await supabase
-      .from('wa_prospects')
-      .select('id, phone, profile_name, name, what_they_sell, wolf_findings, stage')
-      .not('wolf_findings', 'is', null)
-      .not('stage', 'in', '("lost","converted")')
-      .gte('wolf_checked_at', todayStart.toISOString())
-      .limit(20);
+    const prospects = await safeQuery<{
+      id: string;
+      phone: string;
+      profile_name: string | null;
+      name: string | null;
+      what_they_sell: string | null;
+      wolf_findings: { findings?: string[] } | null;
+      stage: string | null;
+    }>(
+      supabase
+        .from('wa_prospects')
+        .select('id, phone, profile_name, name, what_they_sell, wolf_findings, stage')
+        .not('wolf_findings', 'is', null)
+        .not('stage', 'in', '("lost","converted")')
+        .gte('wolf_checked_at', todayStart.toISOString())
+        .limit(20),
+      'wolfMorningSend.fetchProspectsWithFindings',
+    );
 
-    if (!prospects?.length) {
+    if (prospects.length === 0) {
       return c.json({ success: true, message: 'No wolf findings today', ...results });
     }
 

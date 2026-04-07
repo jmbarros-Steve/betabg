@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 export async function steveContentHunter(c: Context) {
   const cronSecret = process.env.CRON_SECRET;
@@ -34,14 +35,17 @@ export async function steveContentHunter(c: Context) {
 
   try {
     // Get enabled sources that need checking
-    const { data: sources } = await supabase
-      .from('steve_sources')
-      .select('*')
-      .eq('enabled', true)
-      .order('last_checked_at', { ascending: true, nullsFirst: true })
-      .limit(5); // Process max 5 sources per run
+    const sources = await safeQuery<any>(
+      supabase
+        .from('steve_sources')
+        .select('*')
+        .eq('enabled', true)
+        .order('last_checked_at', { ascending: true, nullsFirst: true })
+        .limit(5), // Process max 5 sources per run
+      'steveContentHunter.fetchEnabledSources',
+    );
 
-    if (!sources || sources.length === 0) {
+    if (sources.length === 0) {
       return c.json({ success: true, message: 'No sources to check', totalExtracted: 0 });
     }
 

@@ -17,6 +17,7 @@
 
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 export async function salesLearningLoop(c: Context) {
   const cronSecret = c.req.header('X-Cron-Secret');
@@ -36,31 +37,37 @@ export async function salesLearningLoop(c: Context) {
     // ============================================================
     // STEP 1: Find unanalyzed converted/lost prospects
     // ============================================================
-    const { data: prospects } = await supabase
-      .from('wa_prospects')
-      .select('id, phone, name, profile_name, what_they_sell, stage, lead_score, lost_reason, pain_points, current_marketing, message_count')
-      .in('stage', ['converted', 'lost'])
-      .eq('learning_extracted', false)
-      .order('updated_at', { ascending: true })
-      .limit(10);
+    const prospects = await safeQuery<{ id: string; phone: string; name: string | null; profile_name: string | null; what_they_sell: string | null; stage: string; lead_score: number | null; lost_reason: string | null; pain_points: string[] | null; current_marketing: string | null; message_count: number | null }>(
+      supabase
+        .from('wa_prospects')
+        .select('id, phone, name, profile_name, what_they_sell, stage, lead_score, lost_reason, pain_points, current_marketing, message_count')
+        .in('stage', ['converted', 'lost'])
+        .eq('learning_extracted', false)
+        .order('updated_at', { ascending: true })
+        .limit(10),
+      'salesLearningLoop.fetchProspects',
+    );
 
-    if (!prospects?.length) {
+    if (!prospects.length) {
       return c.json({ success: true, message: 'No unanalyzed prospects', ...results });
     }
 
     for (const prospect of prospects) {
       try {
         // STEP 2: Load full conversation
-        const { data: messages } = await supabase
-          .from('wa_messages')
-          .select('direction, body, created_at')
-          .eq('contact_phone', prospect.phone)
-          .eq('channel', 'prospect')
-          .is('client_id', null)
-          .order('created_at', { ascending: true })
-          .limit(100);
+        const messages = await safeQuery<{ direction: string; body: string; created_at: string }>(
+          supabase
+            .from('wa_messages')
+            .select('direction, body, created_at')
+            .eq('contact_phone', prospect.phone)
+            .eq('channel', 'prospect')
+            .is('client_id', null)
+            .order('created_at', { ascending: true })
+            .limit(100),
+          'salesLearningLoop.fetchMessages',
+        );
 
-        if (!messages?.length || messages.length < 4) {
+        if (!messages.length || messages.length < 4) {
           // Too few messages to learn from
           await supabase
             .from('wa_prospects')
@@ -195,15 +202,18 @@ Analiza y responde SOLO con un JSON (sin markdown):
     if ((learningCount || 0) >= 10 && (learningCount || 0) > ((strategyCount || 0) * 10)) {
       try {
         // Load all learnings
-        const { data: allLearnings } = await supabase
-          .from('steve_knowledge')
-          .select('titulo, contenido')
-          .eq('categoria', 'sales_learning')
-          .eq('activo', true)
-          .order('created_at', { ascending: false })
-          .limit(30);
+        const allLearnings = await safeQuery<{ titulo: string; contenido: string }>(
+          supabase
+            .from('steve_knowledge')
+            .select('titulo, contenido')
+            .eq('categoria', 'sales_learning')
+            .eq('activo', true)
+            .order('created_at', { ascending: false })
+            .limit(30),
+          'salesLearningLoop.fetchAllLearnings',
+        );
 
-        if (allLearnings?.length) {
+        if (allLearnings.length) {
           const learningsSummary = allLearnings
             .map((l: any) => `${l.titulo}: ${(l.contenido || '').slice(0, 200)}`)
             .join('\n\n');

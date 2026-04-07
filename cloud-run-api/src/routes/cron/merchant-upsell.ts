@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 /**
  * Merchant Upsell — Steve Post-Venta
@@ -33,14 +34,17 @@ export async function merchantUpsell(c: Context) {
 
   try {
     // Load active clients with their connections
-    const { data: clients } = await supabase
-      .from('clients')
-      .select('id, name, email, whatsapp_phone, plan')
-      .not('whatsapp_phone', 'is', null)
-      .order('created_at', { ascending: true })
-      .limit(50);
+    const clients = await safeQuery<{ id: string; name: string | null; email: string | null; whatsapp_phone: string | null; plan: string | null }>(
+      supabase
+        .from('clients')
+        .select('id, name, email, whatsapp_phone, plan')
+        .not('whatsapp_phone', 'is', null)
+        .order('created_at', { ascending: true })
+        .limit(50),
+      'merchantUpsell.fetchClients',
+    );
 
-    if (!clients || clients.length === 0) {
+    if (clients.length === 0) {
       return c.json({ success: true, message: 'No clients', ...results });
     }
 
@@ -50,25 +54,31 @@ export async function merchantUpsell(c: Context) {
         const phone = client.whatsapp_phone.replace(/^\+/, '');
 
         // Check existing connections
-        const { data: connections } = await supabase
-          .from('platform_connections')
-          .select('platform, is_active')
-          .eq('client_id', client.id);
+        const connections = await safeQuery<{ id?: string; platform: string; is_active: boolean }>(
+          supabase
+            .from('platform_connections')
+            .select('platform, is_active')
+            .eq('client_id', client.id),
+          'merchantUpsell.fetchConnections',
+        );
 
-        const activePlatforms = (connections || []).filter((c: any) => c.is_active).map((c: any) => c.platform);
+        const activePlatforms = connections.filter((c: any) => c.is_active).map((c: any) => c.platform);
         const hasKlaviyo = activePlatforms.includes('klaviyo');
         const hasMeta = activePlatforms.includes('meta');
         const hasShopify = activePlatforms.includes('shopify');
 
         // Check recent metrics (revenue growth)
-        const { data: metrics } = await supabase
-          .from('platform_metrics')
-          .select('metric_type, metric_value')
-          .in('connection_id', (connections || []).map((c: any) => c.id).filter(Boolean))
-          .eq('metric_type', 'revenue')
-          .gte('metric_date', thirtyDaysAgo);
+        const metrics = await safeQuery<{ metric_type: string; metric_value: number | string }>(
+          supabase
+            .from('platform_metrics')
+            .select('metric_type, metric_value')
+            .in('connection_id', connections.map((c: any) => c.id).filter(Boolean))
+            .eq('metric_type', 'revenue')
+            .gte('metric_date', thirtyDaysAgo),
+          'merchantUpsell.fetchMetrics',
+        );
 
-        const totalRevenue = (metrics || []).reduce((sum: number, m: any) => sum + (Number(m.metric_value) || 0), 0);
+        const totalRevenue = metrics.reduce((sum: number, m: any) => sum + (Number(m.metric_value) || 0), 0);
 
         // Determine upsell opportunity
         let opportunity: { type: string; reason: string; metric_data: any } | null = null;
@@ -96,15 +106,18 @@ export async function merchantUpsell(c: Context) {
         if (!opportunity) continue;
 
         // Check if we already suggested this type recently (avoid spam)
-        const { data: recentUpsell } = await supabase
-          .from('merchant_upsell_opportunities')
-          .select('id')
-          .eq('client_id', client.id)
-          .eq('type', opportunity.type)
-          .gte('created_at', new Date(now.getTime() - 30 * 86400000).toISOString())
-          .limit(1);
+        const recentUpsell = await safeQuery<{ id: string }>(
+          supabase
+            .from('merchant_upsell_opportunities')
+            .select('id')
+            .eq('client_id', client.id)
+            .eq('type', opportunity.type)
+            .gte('created_at', new Date(now.getTime() - 30 * 86400000).toISOString())
+            .limit(1),
+          'merchantUpsell.fetchRecentUpsell',
+        );
 
-        if (recentUpsell && recentUpsell.length > 0) continue;
+        if (recentUpsell.length > 0) continue;
 
         // Insert opportunity
         await supabase.from('merchant_upsell_opportunities').insert({

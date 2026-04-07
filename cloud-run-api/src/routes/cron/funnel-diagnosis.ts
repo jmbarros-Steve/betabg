@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 export async function funnelDiagnosis(c: Context) {
   const cronSecret = process.env.CRON_SECRET;
@@ -15,21 +16,36 @@ export async function funnelDiagnosis(c: Context) {
   const results: Array<{ client_id: string; diagnosis: string }> = [];
 
   // Get campaign metrics from last 7 days grouped by client
-  const { data: metrics } = await supabase
-    .from('campaign_metrics')
-    .select('connection_id, campaign_name, impressions, clicks, conversions, conversion_value, spend, platform')
-    .gte('metric_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+  const metrics = await safeQuery<{
+    connection_id: string;
+    campaign_name: string;
+    impressions: number | string | null;
+    clicks: number | string | null;
+    conversions: number | string | null;
+    conversion_value: number | string | null;
+    spend: number | string | null;
+    platform: string;
+  }>(
+    supabase
+      .from('campaign_metrics')
+      .select('connection_id, campaign_name, impressions, clicks, conversions, conversion_value, spend, platform')
+      .gte('metric_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+    'funnelDiagnosis.fetchCampaignMetrics',
+  );
 
-  if (!metrics || metrics.length === 0) return c.json({ success: true, results: [] });
+  if (metrics.length === 0) return c.json({ success: true, results: [] });
 
   // Get connection→client mapping
   const connectionIds = [...new Set(metrics.map(m => m.connection_id))];
-  const { data: connections } = await supabase
-    .from('platform_connections')
-    .select('id, client_id, clients!inner(name)')
-    .in('id', connectionIds);
+  const connections = await safeQuery<{ id: string; client_id: string; clients: any }>(
+    supabase
+      .from('platform_connections')
+      .select('id, client_id, clients!inner(name)')
+      .in('id', connectionIds),
+    'funnelDiagnosis.fetchConnections',
+  );
 
-  if (!connections) return c.json({ success: true, results: [] });
+  if (connections.length === 0) return c.json({ success: true, results: [] });
 
   const connToClient = new Map(connections.map(c => [c.id, { client_id: c.client_id, name: (c.clients as any)?.name }]));
 

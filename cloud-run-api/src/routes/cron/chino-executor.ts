@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { anthropicFetch } from '../../lib/anthropic-fetch.js';
 import { sendEscalationWhatsApp } from '../../chino/whatsapp.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * POST /api/cron/chino-executor
@@ -309,11 +310,15 @@ async function processSingleFix(
     }
 
     // Cargar el check para enriquecer el WhatsApp
-    const { data: check } = await supabase
-      .from('chino_routine')
-      .select('*')
-      .eq('id', fix.check_id)
-      .maybeSingle();
+    const check = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('chino_routine')
+        .select('*')
+        .eq('id', fix.check_id)
+        .maybeSingle(),
+      null,
+      'chinoExecutor.loadCheckForEscalation',
+    );
 
     try {
       await sendEscalationWhatsApp({ ...fix, chino_routine: check });

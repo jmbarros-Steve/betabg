@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 /**
  * Meeting Reminder Cron — Mini CRM Pipeline
@@ -25,14 +26,30 @@ export async function meetingReminder(c: Context) {
 
   try {
     // Fetch all prospects with scheduled meetings that need action
-    const { data: prospects } = await supabase
-      .from('wa_prospects')
-      .select('id, phone, profile_name, name, apellido, meeting_at, meeting_url, meeting_status, reminder_24h_sent, reminder_2h_sent, lead_score, stage')
-      .in('meeting_status', ['scheduled', 'reminded_24h', 'reminded_2h'])
-      .not('meeting_at', 'is', null)
-      .limit(50);
+    const prospects = await safeQuery<{
+      id: string;
+      phone: string;
+      profile_name: string | null;
+      name: string | null;
+      apellido: string | null;
+      meeting_at: string;
+      meeting_url: string | null;
+      meeting_status: string | null;
+      reminder_24h_sent: boolean | null;
+      reminder_2h_sent: boolean | null;
+      lead_score: number | null;
+      stage: string | null;
+    }>(
+      supabase
+        .from('wa_prospects')
+        .select('id, phone, profile_name, name, apellido, meeting_at, meeting_url, meeting_status, reminder_24h_sent, reminder_2h_sent, lead_score, stage')
+        .in('meeting_status', ['scheduled', 'reminded_24h', 'reminded_2h'])
+        .not('meeting_at', 'is', null)
+        .limit(50),
+      'meetingReminder.fetchPendingMeetings',
+    );
 
-    if (!prospects || prospects.length === 0) {
+    if (prospects.length === 0) {
       return c.json({ success: true, message: 'No meetings to process', ...results });
     }
 

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 export async function steveDiscoverer(c: Context) {
   const cronSecret = process.env.CRON_SECRET;
@@ -19,24 +20,33 @@ export async function steveDiscoverer(c: Context) {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     // Campaign metrics by day of week and platform
-    const { data: metrics } = await supabase
-      .from('campaign_metrics')
-      .select('platform, metric_date, spend, impressions, clicks, conversions, conversion_value')
-      .gte('metric_date', thirtyDaysAgo);
+    const metrics = await safeQuery<{ platform: string; metric_date: string; spend: number | string; impressions: number; clicks: number; conversions: number; conversion_value: number | string }>(
+      supabase
+        .from('campaign_metrics')
+        .select('platform, metric_date, spend, impressions, clicks, conversions, conversion_value')
+        .gte('metric_date', thirtyDaysAgo),
+      'steveDiscoverer.fetchMetrics',
+    );
 
     // Creative history performance
-    const { data: creatives } = await supabase
-      .from('creative_history')
-      .select('channel, angle, verdict, score, created_at')
-      .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+    const creatives = await safeQuery<{ channel: string; angle: string | null; verdict: string | null; score: number | null; created_at: string }>(
+      supabase
+        .from('creative_history')
+        .select('channel, angle, verdict, score, created_at')
+        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+      'steveDiscoverer.fetchCreatives',
+    );
 
     // Email campaign performance
-    const { data: emails } = await supabase
-      .from('email_campaigns')
-      .select('subject, send_count, open_count, click_count, created_at')
-      .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+    const emails = await safeQuery<{ subject: string | null; send_count: number; open_count: number; click_count: number; created_at: string }>(
+      supabase
+        .from('email_campaigns')
+        .select('subject, send_count, open_count, click_count, created_at')
+        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+      'steveDiscoverer.fetchEmails',
+    );
 
-    if (!metrics || metrics.length < 20) {
+    if (metrics.length < 20) {
       return c.json({ success: true, message: 'Not enough data for discovery' });
     }
 
@@ -51,7 +61,7 @@ export async function steveDiscoverer(c: Context) {
     }
 
     const anglePerf: Record<string, { good: number; bad: number; total: number }> = {};
-    for (const cr of (creatives || [])) {
+    for (const cr of creatives) {
       if (!cr.angle) continue;
       if (!anglePerf[cr.angle]) anglePerf[cr.angle] = { good: 0, bad: 0, total: 0 };
       anglePerf[cr.angle].total++;
@@ -59,7 +69,7 @@ export async function steveDiscoverer(c: Context) {
       if (cr.verdict === 'malo' || (cr.score && cr.score < 40)) anglePerf[cr.angle].bad++;
     }
 
-    const emailPerf = (emails || []).map(e => ({
+    const emailPerf = emails.map(e => ({
       subject_length: (e.subject || '').length,
       has_emoji: /[\u{1F600}-\u{1F64F}]/u.test(e.subject || ''),
       has_number: /\d/.test(e.subject || ''),

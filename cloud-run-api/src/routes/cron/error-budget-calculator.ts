@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery, safeQuerySingle } from '../../lib/safe-supabase.js';
 
 /**
  * Error Budget Calculator — Paso C.1
@@ -140,13 +141,16 @@ export async function errorBudgetCalculator(c: Context) {
 
       // Create a critical task to signal the freeze
       const freezeTitle = `FREEZE: Error budget ${slo.id} agotado`;
-      const { data: existingTask } = await supabase
-        .from('tasks')
-        .select('id')
-        .eq('title', freezeTitle)
-        .in('status', ['pending', 'in_progress'])
-        .limit(1)
-        .maybeSingle();
+      const existingTask = await safeQuerySingle<{ id: string }>(
+        supabase
+          .from('tasks')
+          .select('id')
+          .eq('title', freezeTitle)
+          .in('status', ['pending', 'in_progress'])
+          .limit(1)
+          .maybeSingle() as any,
+        'errorBudgetCalculator.fetchExistingFreezeTask',
+      );
 
       if (!existingTask) {
         await supabase.from('tasks').insert({
@@ -180,22 +184,28 @@ export async function errorBudgetCalculator(c: Context) {
   }
 
   // Feature freeze enforcement: block feature/mejora tasks when any SLO is frozen
-  const { data: frozenSLOs } = await supabase
-    .from('slo_config')
-    .select('id, name')
-    .eq('status', 'frozen');
+  const frozenSLOs = await safeQuery<{ id: string; name: string }>(
+    supabase
+      .from('slo_config')
+      .select('id, name')
+      .eq('status', 'frozen'),
+    'errorBudgetCalculator.fetchFrozenSLOs',
+  );
 
-  if (frozenSLOs && frozenSLOs.length > 0) {
+  if (frozenSLOs.length > 0) {
     const freezeReason = `Bloqueada por freeze: ${frozenSLOs.map((s: { name: string }) => s.name).join(', ')}`;
 
     // Block pending feature/mejora tasks
-    const { data: featureTasks } = await supabase
-      .from('tasks')
-      .select('id, title')
-      .in('type', ['feature', 'mejora'])
-      .eq('status', 'pending');
+    const featureTasks = await safeQuery<{ id: string; title: string }>(
+      supabase
+        .from('tasks')
+        .select('id, title')
+        .in('type', ['feature', 'mejora'])
+        .eq('status', 'pending'),
+      'errorBudgetCalculator.fetchFeatureTasks',
+    );
 
-    if (featureTasks && featureTasks.length > 0) {
+    if (featureTasks.length > 0) {
       for (const task of featureTasks) {
         await supabase
           .from('tasks')
@@ -211,6 +221,6 @@ export async function errorBudgetCalculator(c: Context) {
     success: true,
     calculated_at: new Date().toISOString(),
     slos: results,
-    frozen_count: frozenSLOs?.length || 0,
+    frozen_count: frozenSLOs.length,
   });
 }

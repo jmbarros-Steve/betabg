@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 /**
  * Task Prioritizer — Paso C.1 (Regla del Freeze)
@@ -54,14 +55,17 @@ export async function taskPrioritizer(c: Context) {
   // ─────────────────────────────────────────────
   // 1. Check for SLO freeze
   // ─────────────────────────────────────────────
-  const { data: frozenSLOs } = await supabase
-    .from('slo_config')
-    .select('id, name')
-    .eq('status', 'frozen');
+  const frozenSLOs = await safeQuery<{ id: string; name: string }>(
+    supabase
+      .from('slo_config')
+      .select('id, name')
+      .eq('status', 'frozen'),
+    'taskPrioritizer.fetchFrozenSLOs',
+  );
 
-  const isFrozen = frozenSLOs && frozenSLOs.length > 0;
+  const isFrozen = frozenSLOs.length > 0;
   const freezeReason = isFrozen
-    ? `Bloqueada por freeze: ${frozenSLOs!.map((s: { name: string }) => s.name).join(', ')}`
+    ? `Bloqueada por freeze: ${frozenSLOs.map((s: { name: string }) => s.name).join(', ')}`
     : null;
 
   // ─────────────────────────────────────────────
@@ -125,7 +129,7 @@ export async function taskPrioritizer(c: Context) {
 
     if (blocked.length > 0) {
       console.warn(
-        `[task-prioritizer] 🔴 FREEZE active — blocked ${blocked.length} non-critical tasks: ${frozenSLOs!.map((s: { name: string }) => s.name).join(', ')}`
+        `[task-prioritizer] 🔴 FREEZE active — blocked ${blocked.length} non-critical tasks: ${frozenSLOs.map((s: { name: string }) => s.name).join(', ')}`
       );
     }
   } else {
@@ -133,12 +137,15 @@ export async function taskPrioritizer(c: Context) {
     blocked = [];
 
     // Unblock previously frozen tasks (restore to pending)
-    const { data: blockedTasks } = await supabase
-      .from('tasks')
-      .select('id')
-      .eq('status', 'blocked');
+    const blockedTasks = await safeQuery<{ id: string }>(
+      supabase
+        .from('tasks')
+        .select('id')
+        .eq('status', 'blocked'),
+      'taskPrioritizer.fetchBlockedTasks',
+    );
 
-    if (blockedTasks && blockedTasks.length > 0) {
+    if (blockedTasks.length > 0) {
       for (const task of blockedTasks) {
         await supabase
           .from('tasks')
@@ -191,7 +198,7 @@ export async function taskPrioritizer(c: Context) {
     success: true,
     processed_at: new Date().toISOString(),
     frozen: isFrozen,
-    frozen_slos: frozenSLOs?.map((s: { id: string; name: string }) => s.name) || [],
+    frozen_slos: frozenSLOs.map((s: { id: string; name: string }) => s.name),
     total_pending: pendingTasks.length,
     to_process: toProcess.length,
     blocked: blocked.length,
@@ -206,43 +213,52 @@ export async function taskPrioritizer(c: Context) {
  */
 async function promoteFromBacklog(supabase: ReturnType<typeof getSupabaseAdmin>) {
   // Find agents currently working (have in_progress tasks)
-  const { data: busyTasks } = await supabase
-    .from('tasks')
-    .select('assigned_agent, assigned_squad')
-    .eq('status', 'in_progress');
+  const busyTasks = await safeQuery<{ assigned_agent: string | null; assigned_squad: string | null }>(
+    supabase
+      .from('tasks')
+      .select('assigned_agent, assigned_squad')
+      .eq('status', 'in_progress'),
+    'taskPrioritizer.fetchBusyTasks',
+  );
 
   const busyAgents = new Set(
-    (busyTasks || [])
-      .map((t: { assigned_agent: string | null }) => t.assigned_agent)
+    busyTasks
+      .map((t) => t.assigned_agent)
       .filter(Boolean)
   );
   const busySquads = new Set(
-    (busyTasks || [])
-      .map((t: { assigned_squad: string | null }) => t.assigned_squad)
+    busyTasks
+      .map((t) => t.assigned_squad)
       .filter(Boolean)
   );
 
   // Also count pending tasks per squad to avoid overloading
-  const { data: pendingBySquad } = await supabase
-    .from('tasks')
-    .select('assigned_squad')
-    .eq('status', 'pending');
+  const pendingBySquad = await safeQuery<{ assigned_squad: string | null }>(
+    supabase
+      .from('tasks')
+      .select('assigned_squad')
+      .eq('status', 'pending'),
+    'taskPrioritizer.fetchPendingBySquad',
+  );
 
   const pendingSquadCounts: Record<string, number> = {};
-  for (const t of pendingBySquad || []) {
-    const sq = (t as { assigned_squad: string | null }).assigned_squad;
+  for (const t of pendingBySquad) {
+    const sq = t.assigned_squad;
     if (sq) pendingSquadCounts[sq] = (pendingSquadCounts[sq] || 0) + 1;
   }
 
   // Find highest-priority queued backlog items
-  const { data: backlogItems } = await supabase
-    .from('backlog')
-    .select('*')
-    .eq('status', 'queued')
-    .order('priority', { ascending: true }) // critica first (alphabetical works: alta < baja < critica < media)
-    .limit(5);
+  const backlogItems = await safeQuery<any>(
+    supabase
+      .from('backlog')
+      .select('*')
+      .eq('status', 'queued')
+      .order('priority', { ascending: true }) // critica first (alphabetical works: alta < baja < critica < media)
+      .limit(5),
+    'taskPrioritizer.fetchBacklogItems',
+  );
 
-  if (!backlogItems || backlogItems.length === 0) {
+  if (backlogItems.length === 0) {
     return { promoted: 0, message: 'Backlog empty' };
   }
 

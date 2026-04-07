@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { decryptPlatformToken } from '../../lib/decrypt-token.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 /**
  * Detective Visual — Compares Steve data vs real platform data every 2 hours.
@@ -45,24 +46,30 @@ function withinTolerance(steveVal: number, realVal: number, tolerance: number): 
 async function checkMetaCampaigns(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<ComparisonResult[]> {
   const results: ComparisonResult[] = [];
 
-  const { data: connections } = await supabase
-    .from('platform_connections')
-    .select('id, client_id, account_id, access_token_encrypted')
-    .eq('platform', 'meta')
-    .eq('is_active', true);
+  const connections = await safeQuery<{ id: string; client_id: string; account_id: string; access_token_encrypted: string }>(
+    supabase
+      .from('platform_connections')
+      .select('id, client_id, account_id, access_token_encrypted')
+      .eq('platform', 'meta')
+      .eq('is_active', true),
+    'detectiveVisual.fetchMetaConnections',
+  );
 
-  if (!connections?.length) return results;
+  if (!connections.length) return results;
 
   for (const conn of connections.slice(0, 5)) {
     const clientId = conn.client_id;
-    const { data: steveCampaigns } = await supabase
-      .from('campaign_metrics')
-      .select('id, campaign_name, campaign_status, metric_date, spend')
-      .eq('connection_id', conn.id)
-      .order('metric_date', { ascending: false })
-      .limit(50);
+    const steveCampaigns = await safeQuery<{ id: string; campaign_name: string | null; campaign_status: string | null; metric_date: string; spend: number | null }>(
+      supabase
+        .from('campaign_metrics')
+        .select('id, campaign_name, campaign_status, metric_date, spend')
+        .eq('connection_id', conn.id)
+        .order('metric_date', { ascending: false })
+        .limit(50),
+      'detectiveVisual.fetchSteveCampaigns',
+    );
 
-    if (!steveCampaigns?.length) continue;
+    if (!steveCampaigns.length) continue;
 
     const accessToken = await decryptPlatformToken(supabase, conn.access_token_encrypted);
     const adAccountId = conn.account_id;
@@ -118,13 +125,16 @@ async function checkMetaCampaigns(supabase: ReturnType<typeof getSupabaseAdmin>)
 async function checkShopifyProducts(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<ComparisonResult[]> {
   const results: ComparisonResult[] = [];
 
-  const { data: connections } = await supabase
-    .from('platform_connections')
-    .select('id, client_id, shop_domain, access_token_encrypted')
-    .eq('platform', 'shopify')
-    .eq('is_active', true);
+  const connections = await safeQuery<{ id: string; client_id: string; shop_domain: string | null; access_token_encrypted: string }>(
+    supabase
+      .from('platform_connections')
+      .select('id, client_id, shop_domain, access_token_encrypted')
+      .eq('platform', 'shopify')
+      .eq('is_active', true),
+    'detectiveVisual.fetchShopifyConnections',
+  );
 
-  if (!connections?.length) return results;
+  if (!connections.length) return results;
 
   for (const conn of connections.slice(0, 5)) {
     const clientId = conn.client_id;
@@ -132,13 +142,16 @@ async function checkShopifyProducts(supabase: ReturnType<typeof getSupabaseAdmin
     const accessToken = await decryptPlatformToken(supabase, conn.access_token_encrypted);
     if (!shopDomain || !accessToken) continue;
 
-    const { data: steveProducts } = await supabase
-      .from('shopify_products')
-      .select('id, title, price, shopify_product_id')
-      .eq('client_id', clientId)
-      .limit(50);
+    const steveProducts = await safeQuery<{ id: string; title: string | null; price: number | null; shopify_product_id: string }>(
+      supabase
+        .from('shopify_products')
+        .select('id, title, price, shopify_product_id')
+        .eq('client_id', clientId)
+        .limit(50),
+      'detectiveVisual.fetchSteveProducts',
+    );
 
-    if (!steveProducts?.length) continue;
+    if (!steveProducts.length) continue;
 
     try {
       const shopifyRes = await fetch(
@@ -236,8 +249,11 @@ export async function detectiveVisual(c: Context) {
   const criticals = allResults.filter(r => r.severity === 'CRITICAL' && r.status !== 'PASS');
   for (const cr of criticals) {
     const title = `[DETECTIVE] ${cr.severity}: ${cr.details.slice(0, 80)}`;
-    const { data: existing } = await supabase.from('tasks').select('id').eq('title', title).in('status', ['pending', 'in_progress']).limit(1);
-    if (!existing?.length) {
+    const existing = await safeQuery<{ id: string }>(
+      supabase.from('tasks').select('id').eq('title', title).in('status', ['pending', 'in_progress']).limit(1),
+      'detectiveVisual.fetchExistingTask',
+    );
+    if (!existing.length) {
       await supabase.from('tasks').insert({
         title, description: `Detective run ${runId}.\nModule: ${cr.module}\nMismatch: ${cr.mismatched_fields.join(', ')}`,
         priority: 'critica', type: 'bug', source: 'detective', assigned_agent: AGENT_MAP[cr.module] || 'W5', status: 'pending', attempts: 0,

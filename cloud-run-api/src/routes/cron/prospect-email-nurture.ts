@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery, safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Prospect Email Nurture — Steve Perro Lobo Paso 16
@@ -107,17 +108,20 @@ export async function prospectEmailNurture(c: Context) {
 
   try {
     // Find prospects eligible for email nurture
-    const { data: prospects } = await supabase
-      .from('wa_prospects')
-      .select('id, phone, name, profile_name, email, what_they_sell, company, lead_score, email_sequence_step, last_email_at, stage')
-      .not('email', 'is', null)
-      .gte('lead_score', 30)
-      .not('stage', 'in', '("lost","converted")')
-      .lt('email_sequence_step', 3)
-      .order('email_sequence_step', { ascending: true })
-      .limit(30);
+    const prospects = await safeQuery<any>(
+      supabase
+        .from('wa_prospects')
+        .select('id, phone, name, profile_name, email, what_they_sell, company, lead_score, email_sequence_step, last_email_at, stage')
+        .not('email', 'is', null)
+        .gte('lead_score', 30)
+        .not('stage', 'in', '("lost","converted")')
+        .lt('email_sequence_step', 3)
+        .order('email_sequence_step', { ascending: true })
+        .limit(30),
+      'prospectEmailNurture.fetchEligibleProspects',
+    );
 
-    if (!prospects || prospects.length === 0) {
+    if (prospects.length === 0) {
       return c.json({ success: true, message: 'No prospects eligible', ...results });
     }
 
@@ -133,16 +137,20 @@ export async function prospectEmailNurture(c: Context) {
         }
 
         // Load conversation history for context
-        const { data: messages } = await supabase
-          .from('wa_messages')
-          .select('direction, body')
-          .eq('contact_phone', prospect.phone)
-          .eq('channel', 'prospect')
-          .is('client_id', null)
-          .order('created_at', { ascending: false })
-          .limit(20);
+        const messages = await safeQueryOrDefault<{ direction: string; body: string }>(
+          supabase
+            .from('wa_messages')
+            .select('direction, body')
+            .eq('contact_phone', prospect.phone)
+            .eq('channel', 'prospect')
+            .is('client_id', null)
+            .order('created_at', { ascending: false })
+            .limit(20),
+          [],
+          'prospectEmailNurture.fetchConversationHistory',
+        );
 
-        const conversationSummary = (messages || [])
+        const conversationSummary = messages
           .reverse()
           .map((m: any) => `${m.direction === 'inbound' ? 'Prospecto' : 'Steve'}: ${m.body}`)
           .join('\n')

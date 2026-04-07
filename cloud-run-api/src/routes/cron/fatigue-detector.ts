@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { decryptPlatformToken } from '../../lib/decrypt-token.js';
 import { metaApiJson } from '../../lib/meta-fetch.js';
 import { sendAlertEmail } from '../../lib/send-alert-email.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Fatigue Detector — Paso D.5
@@ -141,15 +142,23 @@ export async function fatigueDetector(c: Context) {
         let suggestionDetail = 'mejor score histórico';
         if (shopId) {
           // Query all good-performing angles for this client
-          const { data: goodAngles } = await supabase
-            .from('creative_history')
-            .select('angle, performance_score, measured_at')
-            .eq('shop_id', shopId)
-            .eq('channel', 'meta')
-            .eq('performance_verdict', 'bueno')
-            .not('angle', 'is', null);
+          const goodAngles = await safeQueryOrDefault<{
+            angle: string;
+            performance_score: number | null;
+            measured_at: string | null;
+          }>(
+            supabase
+              .from('creative_history')
+              .select('angle, performance_score, measured_at')
+              .eq('shop_id', shopId)
+              .eq('channel', 'meta')
+              .eq('performance_verdict', 'bueno')
+              .not('angle', 'is', null),
+            [],
+            'fatigueDetector.fetchGoodAngles',
+          );
 
-          if (goodAngles && goodAngles.length > 0) {
+          if (goodAngles.length > 0) {
             // Find angles used in the last 30 days (to filter out)
             const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
             const recentAngles = new Set(

@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery, safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Weekly Report — Merchant-facing + QA Scorecard
@@ -170,14 +171,17 @@ export async function weeklyReport(c: Context) {
   // ─────────────────────────────────────────────
 
   // Get all active clients with their users
-  const { data: clients } = await supabase
-    .from('clients')
-    .select('id, name, user_id')
-    .eq('active', true);
+  const clients = await safeQuery<{ id: string; name: string; user_id: string }>(
+    supabase
+      .from('clients')
+      .select('id, name, user_id')
+      .eq('active', true),
+    'weeklyReport.fetchActiveClients',
+  );
 
   const merchantResults: Array<{ client_id: string; name: string; email_sent: boolean; error?: string }> = [];
 
-  for (const client of clients || []) {
+  for (const client of clients) {
     try {
       // Get merchant email
       const { data: userData } = await supabase.auth.admin.getUserById(client.user_id);
@@ -188,40 +192,52 @@ export async function weeklyReport(c: Context) {
       }
 
       // This week's campaign metrics
-      const { data: thisWeekMetrics } = await supabase
-        .from('campaign_metrics')
-        .select('campaign_name, spend, results, cpa, date')
-        .eq('client_id', client.id)
-        .gte('date', weekAgo.split('T')[0]);
+      const thisWeekMetrics = await safeQuery<any>(
+        supabase
+          .from('campaign_metrics')
+          .select('campaign_name, spend, results, cpa, date')
+          .eq('client_id', client.id)
+          .gte('date', weekAgo.split('T')[0]),
+        'weeklyReport.fetchThisWeekMetrics',
+      );
 
       // Last week's campaign metrics
-      const { data: lastWeekMetrics } = await supabase
-        .from('campaign_metrics')
-        .select('spend, results, cpa')
-        .eq('client_id', client.id)
-        .gte('date', twoWeeksAgo.split('T')[0])
-        .lt('date', weekAgo.split('T')[0]);
+      const lastWeekMetrics = await safeQuery<any>(
+        supabase
+          .from('campaign_metrics')
+          .select('spend, results, cpa')
+          .eq('client_id', client.id)
+          .gte('date', twoWeeksAgo.split('T')[0])
+          .lt('date', weekAgo.split('T')[0]),
+        'weeklyReport.fetchLastWeekMetrics',
+      );
 
       // Shopify revenue this week
-      const { data: shopifyThisWeek } = await supabase
-        .from('shopify_metrics')
-        .select('total_sales')
-        .eq('client_id', client.id)
-        .gte('date', weekAgo.split('T')[0]);
+      const shopifyThisWeek = await safeQuery<{ total_sales: number | null }>(
+        supabase
+          .from('shopify_metrics')
+          .select('total_sales')
+          .eq('client_id', client.id)
+          .gte('date', weekAgo.split('T')[0]),
+        'weeklyReport.fetchShopifyThisWeek',
+      );
 
-      const { data: shopifyLastWeek } = await supabase
-        .from('shopify_metrics')
-        .select('total_sales')
-        .eq('client_id', client.id)
-        .gte('date', twoWeeksAgo.split('T')[0])
-        .lt('date', weekAgo.split('T')[0]);
+      const shopifyLastWeek = await safeQuery<{ total_sales: number | null }>(
+        supabase
+          .from('shopify_metrics')
+          .select('total_sales')
+          .eq('client_id', client.id)
+          .gte('date', twoWeeksAgo.split('T')[0])
+          .lt('date', weekAgo.split('T')[0]),
+        'weeklyReport.fetchShopifyLastWeek',
+      );
 
-      const totalSales = (shopifyThisWeek || []).reduce((s: number, r: any) => s + (r.total_sales || 0), 0);
-      const lastWeekSales = (shopifyLastWeek || []).reduce((s: number, r: any) => s + (r.total_sales || 0), 0);
+      const totalSales = shopifyThisWeek.reduce((s: number, r: any) => s + (r.total_sales || 0), 0);
+      const lastWeekSales = shopifyLastWeek.reduce((s: number, r: any) => s + (r.total_sales || 0), 0);
 
       // Top campaign by results
       const campaignTotals: Record<string, { spend: number; results: number; cpa: number[] }> = {};
-      for (const m of thisWeekMetrics || []) {
+      for (const m of thisWeekMetrics) {
         const key = (m as any).campaign_name || 'Unknown';
         if (!campaignTotals[key]) campaignTotals[key] = { spend: 0, results: 0, cpa: [] };
         campaignTotals[key].spend += (m as any).spend || 0;
@@ -235,22 +251,25 @@ export async function weeklyReport(c: Context) {
       const topCampaignResults = topCampaign?.[1]?.results || 0;
 
       // Average CPA
-      const allCpas = (thisWeekMetrics || []).filter((m: any) => m.cpa > 0).map((m: any) => m.cpa);
+      const allCpas = thisWeekMetrics.filter((m: any) => m.cpa > 0).map((m: any) => m.cpa);
       const cpaThisWeek = allCpas.length > 0 ? allCpas.reduce((a: number, b: number) => a + b, 0) / allCpas.length : null;
 
-      const lastCpas = (lastWeekMetrics || []).filter((m: any) => m.cpa > 0).map((m: any) => m.cpa);
+      const lastCpas = lastWeekMetrics.filter((m: any) => m.cpa > 0).map((m: any) => m.cpa);
       const cpaLastWeek = lastCpas.length > 0 ? lastCpas.reduce((a: number, b: number) => a + b, 0) / lastCpas.length : null;
 
       // Creative score
-      const { data: creativeData } = await supabase
-        .from('creative_history')
-        .select('performance_score')
-        .eq('shop_id', client.id)
-        .not('performance_score', 'is', null)
-        .gte('measured_at', weekAgo);
+      const creativeData = await safeQuery<{ performance_score: number }>(
+        supabase
+          .from('creative_history')
+          .select('performance_score')
+          .eq('shop_id', client.id)
+          .not('performance_score', 'is', null)
+          .gte('measured_at', weekAgo),
+        'weeklyReport.fetchCreativeScores',
+      );
 
-      const creativeScore = creativeData && creativeData.length > 0
-        ? Math.round((creativeData as any[]).reduce((s, c) => s + c.performance_score, 0) / creativeData.length)
+      const creativeScore = creativeData.length > 0
+        ? Math.round(creativeData.reduce((s, c) => s + c.performance_score, 0) / creativeData.length)
         : null;
 
       const salesDelta = lastWeekSales > 0 ? Math.round(((totalSales - lastWeekSales) / lastWeekSales) * 100) : 0;
@@ -317,35 +336,50 @@ export async function weeklyReport(c: Context) {
   // C.7 — QA SCORECARD (internal)
   // ─────────────────────────────────────────────
 
-  const { data: thisWeekErrors } = await supabase
-    .from('qa_log')
-    .select('*')
-    .gte('checked_at', weekAgo)
-    .in('status', ['fail', 'warn', 'error', 'auto_fixed']);
+  // QA scorecard is internal reporting; degrade gracefully to preserve
+  // merchant results already computed above. If qa_log query fails, log
+  // and continue with empty arrays.
+  const thisWeekErrors = await safeQueryOrDefault<any>(
+    supabase
+      .from('qa_log')
+      .select('*')
+      .gte('checked_at', weekAgo)
+      .in('status', ['fail', 'warn', 'error', 'auto_fixed']),
+    [],
+    'weeklyReport.fetchThisWeekErrors',
+  );
 
-  const { data: lastWeekErrors } = await supabase
-    .from('qa_log')
-    .select('*')
-    .gte('checked_at', twoWeeksAgo)
-    .lt('checked_at', weekAgo)
-    .in('status', ['fail', 'warn', 'error', 'auto_fixed']);
+  const lastWeekErrors = await safeQueryOrDefault<any>(
+    supabase
+      .from('qa_log')
+      .select('*')
+      .gte('checked_at', twoWeeksAgo)
+      .lt('checked_at', weekAgo)
+      .in('status', ['fail', 'warn', 'error', 'auto_fixed']),
+    [],
+    'weeklyReport.fetchLastWeekErrors',
+  );
 
-  const thisWeekCount = thisWeekErrors?.length || 0;
-  const lastWeekCount = lastWeekErrors?.length || 0;
+  const thisWeekCount = thisWeekErrors.length;
+  const lastWeekCount = lastWeekErrors.length;
   const errorTrend = thisWeekCount < lastWeekCount ? 'bajando' : thisWeekCount > lastWeekCount ? 'subiendo' : 'estable';
 
-  const autoFixed = (thisWeekErrors || []).filter((e: any) => e.status === 'auto_fixed').length;
+  const autoFixed = thisWeekErrors.filter((e: any) => e.status === 'auto_fixed').length;
   const autofixRate = thisWeekCount > 0 ? Math.round((autoFixed / thisWeekCount) * 100) : 0;
 
-  const selfHealed = (thisWeekErrors || []).filter((e: any) => e.check_type === 'test_self_healed').length;
+  const selfHealed = thisWeekErrors.filter((e: any) => e.check_type === 'test_self_healed').length;
 
-  const { data: newRulesData } = await supabase
-    .from('criterio_rules')
-    .select('id')
-    .gte('created_at', weekAgo);
-  const newRules = newRulesData?.length || 0;
+  const newRulesData = await safeQueryOrDefault<{ id: string }>(
+    supabase
+      .from('criterio_rules')
+      .select('id')
+      .gte('created_at', weekAgo),
+    [],
+    'weeklyReport.fetchNewRules',
+  );
+  const newRules = newRulesData.length;
 
-  const failErrors = (thisWeekErrors || []).filter((e: any) => e.status === 'fail');
+  const failErrors = thisWeekErrors.filter((e: any) => e.status === 'fail');
   const errorCounts: Record<string, number> = {};
   for (const e of failErrors) {
     const key = (e as any).check_type;
@@ -354,7 +388,7 @@ export async function weeklyReport(c: Context) {
   const repeatedErrors = Object.values(errorCounts).filter((c) => c >= 2).length;
 
   // MTTR
-  const fixedEntries = (thisWeekErrors || []).filter((e: any) => e.status === 'auto_fixed');
+  const fixedEntries = thisWeekErrors.filter((e: any) => e.status === 'auto_fixed');
   let mttrMinutes: number | null = null;
   if (failErrors.length > 0 && fixedEntries.length > 0) {
     const mttrSamples: number[] = [];
@@ -381,44 +415,56 @@ export async function weeklyReport(c: Context) {
 
   // ─── Mejora Continua ──────────────────────────
 
-  const { data: weekCreatives } = await supabase
-    .from('creative_history')
-    .select('performance_score, performance_verdict')
-    .not('performance_score', 'is', null)
-    .gte('measured_at', weekAgo);
+  const weekCreatives = await safeQueryOrDefault<{ performance_score: number; performance_verdict: string }>(
+    supabase
+      .from('creative_history')
+      .select('performance_score, performance_verdict')
+      .not('performance_score', 'is', null)
+      .gte('measured_at', weekAgo),
+    [],
+    'weeklyReport.fetchWeekCreatives',
+  );
 
-  const creativeCount = weekCreatives?.length || 0;
+  const creativeCount = weekCreatives.length;
   const avgScore = creativeCount > 0
-    ? Math.round((weekCreatives as any[]).reduce((s, c) => s + c.performance_score, 0) / creativeCount)
+    ? Math.round(weekCreatives.reduce((s, c) => s + c.performance_score, 0) / creativeCount)
     : null;
 
-  const buenos = (weekCreatives || []).filter((c: any) => c.performance_verdict === 'bueno').length;
-  const malos = (weekCreatives || []).filter((c: any) => c.performance_verdict === 'malo').length;
+  const buenos = weekCreatives.filter((c: any) => c.performance_verdict === 'bueno').length;
+  const malos = weekCreatives.filter((c: any) => c.performance_verdict === 'malo').length;
 
-  const { data: lastWeekCreatives } = await supabase
-    .from('creative_history')
-    .select('performance_score')
-    .not('performance_score', 'is', null)
-    .gte('measured_at', twoWeeksAgo)
-    .lt('measured_at', weekAgo);
+  const lastWeekCreatives = await safeQueryOrDefault<{ performance_score: number }>(
+    supabase
+      .from('creative_history')
+      .select('performance_score')
+      .not('performance_score', 'is', null)
+      .gte('measured_at', twoWeeksAgo)
+      .lt('measured_at', weekAgo),
+    [],
+    'weeklyReport.fetchLastWeekCreatives',
+  );
 
-  const lastAvgScore = lastWeekCreatives && lastWeekCreatives.length > 0
-    ? Math.round((lastWeekCreatives as any[]).reduce((s, c) => s + c.performance_score, 0) / lastWeekCreatives.length)
+  const lastAvgScore = lastWeekCreatives.length > 0
+    ? Math.round(lastWeekCreatives.reduce((s, c) => s + c.performance_score, 0) / lastWeekCreatives.length)
     : null;
 
   const scoreTrend = avgScore !== null && lastAvgScore !== null
     ? avgScore > lastAvgScore ? 'mejorando' : avgScore < lastAvgScore ? 'empeorando' : 'estable'
     : null;
 
-  const { data: fatigueData } = await supabase
-    .from('qa_log')
-    .select('id')
-    .eq('check_type', 'creative_fatigue')
-    .gte('checked_at', weekAgo);
+  const fatigueData = await safeQueryOrDefault<{ id: string }>(
+    supabase
+      .from('qa_log')
+      .select('id')
+      .eq('check_type', 'creative_fatigue')
+      .gte('checked_at', weekAgo),
+    [],
+    'weeklyReport.fetchFatigueData',
+  );
 
   const mejoraContinua = {
     creatives_measured: creativeCount, avg_score: avgScore, last_week_avg_score: lastAvgScore,
-    score_trend: scoreTrend, buenos, malos, fatigue_detected: fatigueData?.length || 0,
+    score_trend: scoreTrend, buenos, malos, fatigue_detected: fatigueData.length,
   };
 
   // ─── Save internal report ─────────────────────
@@ -443,14 +489,17 @@ export async function weeklyReport(c: Context) {
   try {
     if (ANTHROPIC_API_KEY) {
       // Get wa_messages from last 7 days
-      const { data: recentMessages } = await supabase
-        .from('wa_messages')
-        .select('client_id, contact_phone, channel, direction, body, created_at')
-        .gte('created_at', weekAgo)
-        .not('body', 'is', null)
-        .order('created_at', { ascending: true });
+      const recentMessages = await safeQuery<any>(
+        supabase
+          .from('wa_messages')
+          .select('client_id, contact_phone, channel, direction, body, created_at')
+          .gte('created_at', weekAgo)
+          .not('body', 'is', null)
+          .order('created_at', { ascending: true }),
+        'weeklyReport.fetchRecentMessages',
+      );
 
-      if (recentMessages && recentMessages.length > 0) {
+      if (recentMessages.length > 0) {
         // Group by client_id + contact_phone (acts as conversation_id)
         const conversations: Record<string, Array<{ direction: string; body: string }>> = {};
         for (const msg of recentMessages) {
@@ -534,13 +583,16 @@ ${transcript.substring(0, 2000)}`
   try {
     if (ANTHROPIC_API_KEY) {
       // Query creative_history from last 7 days with verdict
-      const { data: verdictCreatives } = await supabase
-        .from('creative_history')
-        .select('angle, content_summary, channel, performance_score, performance_verdict')
-        .not('performance_verdict', 'is', null)
-        .gte('measured_at', weekAgo);
+      const verdictCreatives = await safeQuery<any>(
+        supabase
+          .from('creative_history')
+          .select('angle, content_summary, channel, performance_score, performance_verdict')
+          .not('performance_verdict', 'is', null)
+          .gte('measured_at', weekAgo),
+        'weeklyReport.fetchVerdictCreatives',
+      );
 
-      if (verdictCreatives && verdictCreatives.length >= 3) {
+      if (verdictCreatives.length >= 3) {
         // Group by verdict
         const buenos = verdictCreatives.filter((c: any) => c.performance_verdict === 'bueno');
         const malos = verdictCreatives.filter((c: any) => c.performance_verdict === 'malo');
@@ -609,7 +661,7 @@ ${summaryLines.join('\n').substring(0, 2000)}`
           }
         }
       } else {
-        console.log(`[weekly-report] Only ${verdictCreatives?.length || 0} measured creatives, need 3+ for post-mortem`);
+        console.log(`[weekly-report] Only ${verdictCreatives.length} measured creatives, need 3+ for post-mortem`);
       }
     }
   } catch (postmortemErr) {

@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { createTask } from '../../lib/task-creator.js';
 import { sendAlertEmail } from '../../lib/send-alert-email.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Performance Evaluator — Paso D.2
@@ -149,14 +150,23 @@ VS PROMEDIO MERCHANT: ${JSON.stringify(creative.benchmark_comparison || {})}
   try {
     // Fetch all measured creatives from last 30 days with angle + verdict
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
-    const { data: recentCreatives } = await supabase
-      .from('creative_history')
-      .select('angle, channel, performance_score, performance_verdict')
-      .not('angle', 'is', null)
-      .not('performance_verdict', 'is', null)
-      .gte('measured_at', thirtyDaysAgo);
+    const recentCreatives = await safeQueryOrDefault<{
+      angle: string;
+      channel: string;
+      performance_score: number;
+      performance_verdict: string;
+    }>(
+      supabase
+        .from('creative_history')
+        .select('angle, channel, performance_score, performance_verdict')
+        .not('angle', 'is', null)
+        .not('performance_verdict', 'is', null)
+        .gte('measured_at', thirtyDaysAgo),
+      [],
+      'performanceEvaluator.fetchRecentCreatives',
+    );
 
-    if (recentCreatives && recentCreatives.length >= 5) {
+    if (recentCreatives.length >= 5) {
       // Group by angle+channel
       const groups: Record<string, { scores: number[]; verdicts: string[] }> = {};
       for (const c of recentCreatives) {
@@ -217,14 +227,21 @@ VS PROMEDIO MERCHANT: ${JSON.stringify(creative.benchmark_comparison || {})}
   let effectivenessUpdated = 0;
   try {
     const thirtyDaysAgo2 = new Date(Date.now() - 30 * 86400000).toISOString();
-    const { data: scored } = await supabase
-      .from('creative_history')
-      .select('rules_applied, performance_score')
-      .not('rules_applied', 'is', null)
-      .not('performance_score', 'is', null)
-      .gte('measured_at', thirtyDaysAgo2);
+    const scored = await safeQueryOrDefault<{
+      rules_applied: string[] | null;
+      performance_score: number;
+    }>(
+      supabase
+        .from('creative_history')
+        .select('rules_applied, performance_score')
+        .not('rules_applied', 'is', null)
+        .not('performance_score', 'is', null)
+        .gte('measured_at', thirtyDaysAgo2),
+      [],
+      'performanceEvaluator.fetchScoredCreatives',
+    );
 
-    if (scored && scored.length > 0) {
+    if (scored.length > 0) {
       // Group performance_score by rule_id
       const ruleScores: Record<string, number[]> = {};
       for (const row of scored) {

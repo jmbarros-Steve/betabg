@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { metaApiFetch } from '../../lib/meta-fetch.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 /**
  * Cron: Execute all active Meta automated rules across all clients.
@@ -63,13 +64,16 @@ export async function executeMetaRulesCron(c: Context) {
       const accountId = conn.account_id.replace(/^act_/, '');
 
       // Pre-fetch metrics for the widest time window needed
-      const { data: metrics } = await supabase
-        .from('campaign_metrics')
-        .select('*')
-        .eq('connection_id', connectionId)
-        .gte('metric_date', new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]);
+      const metrics = await safeQuery<any>(
+        supabase
+          .from('campaign_metrics')
+          .select('*')
+          .eq('connection_id', connectionId)
+          .gte('metric_date', new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]),
+        'executeMetaRules.fetchCampaignMetrics',
+      );
 
-      if (!metrics?.length) continue;
+      if (!metrics.length) continue;
 
       for (const rule of rules) {
         totalEvaluated++;

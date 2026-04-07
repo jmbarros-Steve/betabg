@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 export async function revenueAttribution(c: Context) {
   const cronSecret = process.env.CRON_SECRET;
@@ -15,13 +16,16 @@ export async function revenueAttribution(c: Context) {
     const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data: recommendations } = await supabase
-      .from('campaign_recommendations')
-      .select('campaign_id, connection_id, platform, recommendation_type, recommendation_text, created_at')
-      .gte('created_at', fourteenDaysAgo)
-      .lte('created_at', sevenDaysAgo);
+    const recommendations = await safeQuery<{ campaign_id: string; connection_id: string; platform: string; recommendation_type: string; recommendation_text: string; created_at: string }>(
+      supabase
+        .from('campaign_recommendations')
+        .select('campaign_id, connection_id, platform, recommendation_type, recommendation_text, created_at')
+        .gte('created_at', fourteenDaysAgo)
+        .lte('created_at', sevenDaysAgo),
+      'revenueAttribution.fetchRecommendations',
+    );
 
-    if (!recommendations || recommendations.length === 0) {
+    if (recommendations.length === 0) {
       return c.json({ success: true, message: 'No recommendations to evaluate' });
     }
 
@@ -42,22 +46,28 @@ export async function revenueAttribution(c: Context) {
       const afterEnd = new Date(recDate.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
       // Get before metrics
-      const { data: beforeMetrics } = await supabase
-        .from('campaign_metrics')
-        .select('spend, conversion_value')
-        .eq('campaign_id', campaignId)
-        .gte('metric_date', beforeStart)
-        .lt('metric_date', beforeEnd);
+      const beforeMetrics = await safeQuery<{ spend: number | string; conversion_value: number | string }>(
+        supabase
+          .from('campaign_metrics')
+          .select('spend, conversion_value')
+          .eq('campaign_id', campaignId)
+          .gte('metric_date', beforeStart)
+          .lt('metric_date', beforeEnd),
+        'revenueAttribution.fetchBeforeMetrics',
+      );
 
       // Get after metrics
-      const { data: afterMetrics } = await supabase
-        .from('campaign_metrics')
-        .select('spend, conversion_value')
-        .eq('campaign_id', campaignId)
-        .gte('metric_date', afterStart)
-        .lt('metric_date', afterEnd);
+      const afterMetrics = await safeQuery<{ spend: number | string; conversion_value: number | string }>(
+        supabase
+          .from('campaign_metrics')
+          .select('spend, conversion_value')
+          .eq('campaign_id', campaignId)
+          .gte('metric_date', afterStart)
+          .lt('metric_date', afterEnd),
+        'revenueAttribution.fetchAfterMetrics',
+      );
 
-      if (!beforeMetrics?.length || !afterMetrics?.length) continue;
+      if (!beforeMetrics.length || !afterMetrics.length) continue;
 
       const beforeSpend = beforeMetrics.reduce((a, m) => a + (Number(m.spend) || 0), 0);
       const beforeRevenue = beforeMetrics.reduce((a, m) => a + (Number(m.conversion_value) || 0), 0);

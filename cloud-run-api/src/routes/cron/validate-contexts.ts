@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Validate Context Files — checks that agent context files match reality
@@ -58,12 +59,16 @@ export async function validateContexts(c: Context) {
 
   if (tablesErr || !tablesRaw) {
     // Fallback: query information_schema
-    const { data: fallback } = await supabase
-      .from('information_schema.tables' as any)
-      .select('table_name')
-      .eq('table_schema', 'public');
+    const fallback = await safeQueryOrDefault<{ table_name: string }>(
+      supabase
+        .from('information_schema.tables' as any)
+        .select('table_name')
+        .eq('table_schema', 'public') as any,
+      [],
+      'validateContexts.fetchInformationSchemaTables',
+    );
 
-    if (fallback) {
+    if (fallback.length > 0) {
       realTables = fallback.map((r: any) => r.table_name);
     } else {
       results.push({

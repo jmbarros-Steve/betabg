@@ -11,6 +11,7 @@
 
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery, safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 export async function wolfNightMode(c: Context) {
   const cronSecret = c.req.header('X-Cron-Secret');
@@ -28,15 +29,24 @@ export async function wolfNightMode(c: Context) {
 
   try {
     // Find active prospects with store URLs
-    const { data: prospects } = await supabase
-      .from('wa_prospects')
-      .select('id, phone, what_they_sell, audit_data, investigation_data')
-      .not('stage', 'in', '("lost","converted")')
-      .not('audit_data', 'is', null)
-      .order('updated_at', { ascending: true })
-      .limit(20);
+    const prospects = await safeQuery<{
+      id: string;
+      phone: string;
+      what_they_sell: string | null;
+      audit_data: any;
+      investigation_data: any;
+    }>(
+      supabase
+        .from('wa_prospects')
+        .select('id, phone, what_they_sell, audit_data, investigation_data')
+        .not('stage', 'in', '("lost","converted")')
+        .not('audit_data', 'is', null)
+        .order('updated_at', { ascending: true })
+        .limit(20),
+      'wolfNightMode.fetchActiveProspects',
+    );
 
-    if (!prospects?.length) {
+    if (!prospects.length) {
       return c.json({ success: true, message: 'No prospects to check', ...results });
     }
 
@@ -137,14 +147,18 @@ export async function wolfNightMode(c: Context) {
           const keywords = prospect.what_they_sell.toLowerCase().split(/[\s,;]+/).filter((w: string) => w.length >= 3);
           if (keywords.length > 0) {
             const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-            const { data: newAds } = await supabase
-              .from('competitor_ads')
-              .select('ad_headline, ad_text')
-              .ilike('ad_text', `%${keywords[0]}%`)
-              .gte('created_at', yesterday)
-              .limit(5);
+            const newAds = await safeQueryOrDefault<{ ad_headline: string | null; ad_text: string | null }>(
+              supabase
+                .from('competitor_ads')
+                .select('ad_headline, ad_text')
+                .ilike('ad_text', `%${keywords[0]}%`)
+                .gte('created_at', yesterday)
+                .limit(5),
+              [],
+              'wolfNightMode.fetchCompetitorAds',
+            );
 
-            if (newAds?.length) {
+            if (newAds.length) {
               findings.push(`${newAds.length} anuncio(s) nuevo(s) de competencia en ${prospect.what_they_sell}`);
             }
           }

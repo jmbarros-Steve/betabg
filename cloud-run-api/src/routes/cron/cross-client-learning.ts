@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuery } from '../../lib/safe-supabase.js';
 
 export async function crossClientLearning(c: Context) {
   const cronSecret = process.env.CRON_SECRET;
@@ -16,12 +17,24 @@ export async function crossClientLearning(c: Context) {
     // Get last 30 days campaign metrics with connection details
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    const { data: metrics } = await supabase
-      .from('campaign_metrics')
-      .select('connection_id, campaign_name, platform, spend, impressions, clicks, conversions, conversion_value')
-      .gte('metric_date', thirtyDaysAgo);
+    const metrics = await safeQuery<{
+      connection_id: string;
+      campaign_name: string;
+      platform: string;
+      spend: number | string | null;
+      impressions: number | string | null;
+      clicks: number | string | null;
+      conversions: number | string | null;
+      conversion_value: number | string | null;
+    }>(
+      supabase
+        .from('campaign_metrics')
+        .select('connection_id, campaign_name, platform, spend, impressions, clicks, conversions, conversion_value')
+        .gte('metric_date', thirtyDaysAgo),
+      'crossClientLearning.fetchMetrics',
+    );
 
-    if (!metrics || metrics.length < 50) {
+    if (metrics.length < 50) {
       return c.json({ success: true, message: 'Not enough data for cross-client analysis' });
     }
 

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingle } from '../../lib/safe-supabase.js';
 
 /**
  * Auto Postmortem — Paso C.3
@@ -127,13 +128,16 @@ Responde en JSON:
       const preventionTitle = `${mapping.prefix}: ${(pa.description || '').substring(0, 80)}`;
 
       // Deduplicate
-      const { data: existing } = await supabase
-        .from('tasks')
-        .select('id')
-        .eq('title', preventionTitle)
-        .in('status', ['pending', 'in_progress'])
-        .limit(1)
-        .maybeSingle();
+      const existing = await safeQuerySingle<{ id: string }>(
+        supabase
+          .from('tasks')
+          .select('id')
+          .eq('title', preventionTitle)
+          .in('status', ['pending', 'in_progress'])
+          .limit(1)
+          .maybeSingle() as any,
+        'autoPostmortem.findExistingPreventionTask',
+      );
 
       if (!existing) {
         await supabase.from('tasks').insert({
