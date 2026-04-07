@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
+import { sendMetaCAPIEvent } from '../../lib/meta-capi.js';
 
 /**
  * Booking API — Public endpoints for meeting scheduling
@@ -408,6 +409,18 @@ export async function bookingConfirm(c: Context) {
     }
 
     console.log(`[booking-api] Meeting booked: ${prospect_name} at ${meetingTimeStr} | Meet: ${meetLink}`);
+
+    // Fire Meta CAPI Schedule event (fire & forget)
+    sendMetaCAPIEvent({
+      eventName: 'Schedule',
+      eventId: `schedule-${seller_id}-${startTime.getTime()}`,
+      userData: {
+        phone: prospect_phone,
+        name: prospect_name,
+        country: 'cl',
+      },
+      customData: { content_name: 'Consultoría Steve Ads' },
+    }).catch(() => {});
 
     return c.json({
       success: true,

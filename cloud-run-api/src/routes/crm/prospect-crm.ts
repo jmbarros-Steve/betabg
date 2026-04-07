@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { logProspectEvent } from '../../lib/prospect-event-logger.js';
+import { sendMetaCAPIEvent } from '../../lib/meta-capi.js';
 
 /** Update deal value, win probability, expected close date */
 export async function prospectUpdateDeal(c: Context) {
@@ -230,7 +231,7 @@ export async function prospectMoveStage(c: Context) {
     const supabase = getSupabaseAdmin();
     const user = c.get('user');
 
-    const { data: prospect } = await supabase.from('wa_prospects').select('stage').eq('id', prospect_id).single();
+    const { data: prospect } = await supabase.from('wa_prospects').select('stage, phone, name, profile_name, deal_value').eq('id', prospect_id).single();
     const oldStage = prospect?.stage || 'unknown';
 
     if (oldStage === new_stage) return c.json({ success: true, moved: false });
@@ -243,6 +244,25 @@ export async function prospectMoveStage(c: Context) {
     if (error) return c.json({ error: error.message }, 500);
 
     logProspectEvent(prospect_id, 'stage_change', { from: oldStage, to: new_stage, method: 'drag_drop' }, `admin:${user?.id || 'unknown'}`);
+
+    // Fire Meta CAPI Purchase event when prospect is converted (fire & forget)
+    if (new_stage === 'converted' && prospect?.phone) {
+      sendMetaCAPIEvent({
+        eventName: 'Purchase',
+        eventId: `purchase-${prospect_id}`,
+        userData: {
+          phone: prospect.phone,
+          name: prospect.name || prospect.profile_name || undefined,
+          country: 'cl',
+        },
+        customData: {
+          value: prospect.deal_value || 0,
+          currency: 'CLP',
+          content_name: 'Cliente Steve Ads',
+          status: 'converted',
+        },
+      }).catch(() => {});
+    }
 
     return c.json({ success: true, moved: true, from: oldStage, to: new_stage });
   } catch (error: any) {

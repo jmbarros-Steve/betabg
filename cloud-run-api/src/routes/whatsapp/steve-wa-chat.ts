@@ -30,6 +30,7 @@ import { runInvestigator, runStrategist, runConversationalist } from '../../lib/
 import { investigateProspectBackground } from '../../lib/steve-investigator.js';
 import { generateProspectMockup } from '../../lib/steve-mockup-generator.js';
 import { generateAndSendSalesDeck } from '../../lib/steve-sales-deck.js';
+import { sendMetaCAPIEvent } from '../../lib/meta-capi.js';
 import { enqueueWAAction } from '../../lib/wa-task-queue.js';
 import { scrubPII } from '../../lib/pii-scrubber.js';
 import { isSupportedAudio, transcribeAudio } from '../../lib/audio-transcriber.js';
@@ -489,6 +490,14 @@ async function handleProspect(
         message_count: 1,
         lead_score: 0,
       };
+
+      // Fire Meta CAPI Lead event (fire & forget)
+      sendMetaCAPIEvent({
+        eventName: 'Lead',
+        eventId: `lead-${phone}-${Date.now()}`,
+        userData: { phone, name: profileName || undefined, country: 'cl' },
+        customData: { content_name: 'WhatsApp Lead', status: 'new' },
+      }).catch(() => {});
     }
 
     // 2. Save inbound message (PII scrubbed)
