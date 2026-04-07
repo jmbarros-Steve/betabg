@@ -1,5 +1,108 @@
 # Javiera W12 — Journal de QA (El Chino)
 
+## 2026-04-07 — Pipeline Auto-Fix RESUCITADO + OJOS Ampliado
+
+### Contexto
+Regreso del descubrimiento del 2026-04-06. Un día después: lo que encontré ayer no era "1000 fixes stuck", era **2682 entries para 449 checks únicos (5.9x duplicación)** + un bug tipográfico crítico en `fixer.ts:226` que mataba el pipeline completo.
+
+### Los 2 bugs raíz del pipeline muerto
+
+**Bug #1 — Typo en filtro de approval_status (`fixer.ts:226`)**
+```typescript
+// ANTES (roto):
+.eq('approval_status', 'approved')
+```
+El runner crea fixes con `'auto_approved'` (auto-fix exitoso) o `'pending_approval'` (manual esperando humano). `FixApprovalPanel.tsx:169` sube los manuales aprobados a `'approved'`. Pero el filtro solo buscaba `'approved'` — valor que **nunca existía desde el runner**. Los auto-fixes quedaban invisibles para el STEP B de asignación. Pipeline muerto para auto-fixes, y también para manuales hasta que un humano los aprobara.
+
+**Fix:**
+```typescript
+.in('approval_status', ['auto_approved', 'approved'])
+```
+
+**Bug #2 — Dedup incompleto en runner (`runner.ts:144`)**
+El `enqueueFixIfNeeded()` solo deduplicaba contra status intermedios. Cada patrol creaba un fix nuevo para el mismo check → 5.9x duplicación. Mi **primer intento** (incluir `failed`/`fixed`/`escalated` en el filtro) fue RECHAZADO por Isidora W6: mataba permanentemente los checks que fallaban dos veces, sin posibilidad de re-detectar regresiones. **Fix final**: ventana temporal de 1h + status intermedios.
+
+```typescript
+const dedupWindow = new Date(Date.now() - 60 * 60_000).toISOString();
+const { data: existingFix } = await supabase
+  .from('steve_fix_queue')
+  .select('id, status')
+  .eq('check_id', check.id)
+  .in('status', ['pending', 'assigned', 'fixing', 'deployed', 'verifying'])
+  .gte('created_at', dedupWindow)
+  .maybeSingle();
+```
+
+### Lecciones
+
+1. **Los filtros contra valores enum son frágiles**: cambiar un string value en un lugar (runner) sin sincronizar con los consumidores (fixer, frontend) rompe pipelines silenciosamente. Idealmente: constantes compartidas en `types.ts`.
+
+2. **Dedup permanente por status terminal es un antipatrón**: rompe la capacidad de re-detectar regresiones. La solución correcta es dedup por **ventana temporal** — si el mismo problema persiste después de 1h, es una regresión real que merece re-detección, no spam.
+
+3. **Optimistic locking obligatorio en updates de queue**: race condition si dos crons corren (el de `chino-fixer` cada 10min y puede haber overlap). Patrón canónico:
+   ```typescript
+   .update({ status: 'assigned' })
+   .eq('id', fix.id)
+   .eq('status', 'pending')  // lock
+   .select('id')
+   .maybeSingle();
+   ```
+
+4. **Cross-review NO es opcional**: mi primera versión tenía 4 problemas (2 bloqueantes). Si no fuera por el protocolo obligatorio de CLAUDE.md, hubiera deployado código que dejaba MORIR permanentemente cualquier check que fallara dos veces. Isidora W6 me salvó.
+
+### Nuevo sistema: chino-executor (delegado a Sebastián W5)
+
+Mientras yo arreglaba los bugs, Sebastián W5 construyó en paralelo `cloud-run-api/src/routes/cron/chino-executor.ts` — 601 líneas, el componente que faltaba del pipeline.
+
+**Arquitectura**:
+- `POST /api/cron/chino-executor` (cada 15min via Scheduler)
+- Toma fixes `assigned` (lock optimista `WHERE status='assigned'`)
+- Claude Sonnet 4 planea un JSON `{can_fix, operations[]}`
+- Valida TODAS las operations antes de aplicar ninguna
+- **Whitelist** de 17 tablas mutables + **blacklist** defensa en profundidad
+- Sin SQL crudo (todo via cliente Supabase con `.from().update/insert/delete()`)
+- Escalación a JM via WhatsApp si `difficulty='manual'` + `files_to_check` (requiere código)
+- Sin rollback parcial (documentado) — el fixer STEP A re-testeará
+
+**Costo**: ~$5.76/día máximo (5 fixes × 4 runs/h × 24h × $0.012 Sonnet).
+
+**Limitación intencional**: solo fixes de DATA. Los fixes que requieren cambios de código se escalan automáticamente a JM por WhatsApp. Sebastián eligió paranoia sobre cobertura.
+
+### OJOS — Ampliación de cobertura
+
+De 11 a 36 endpoints (14% → 52% sobre los 69 críticos). Agregué 25 nuevos cubriendo todos los squads:
+- Core AI/Steve, Shopify, Meta Ads, Klaviyo, Google Ads, IG/FB, Steve Mail, WhatsApp, CRM.
+
+**Patrón crítico aprendido**: todos los endpoints están protegidos por `authMiddleware` → el Bearer `ANON_KEY` devuelve 401 **antes** de ejecutar side-effects. Esto significa que puedo incluir endpoints "peligrosos" como `publish-instagram`, `send-email`, `wa-send-campaign` sin riesgo de ejecutarlos accidentalmente. El 401 cuenta como OK (`status < 500`). Los únicos que NO puedo incluir son:
+- Webhooks públicos con HMAC (rechazan sin firma válida, irían a 400-401 igual, pero conceptualmente no es un health check útil)
+- Endpoints sin auth que ejecutan side-effects (audit-store, self-signup, form-submit)
+- Crons con `X-Cron-Secret`
+
+Isidora W6 verificó los 36 uno por uno contra `routes/index.ts`. APROBADO.
+
+### Estado final del queue (post todas las operaciones)
+- **458 entries** total
+- **245 failed**: data histórica de la sesión anterior marcada como stale — ya no se regeneran gracias al dedup de 1h
+- **209 pending + pending_approval + difficulty=manual**: esperan aprobación humana de JM en FixApprovalPanel.tsx (fixes que requieren código)
+- **4 escalated**: procesados por el executor en el primer smoke test, correctamente escalados
+
+### Commits y deploys
+- `fdb515a` — chino bugfixes + chino-executor (push a betabg)
+- `1538ef7` — OJOS coverage 14→52% (push a betabg)
+- Cloud Run: `steve-api-00391-kfx`
+- Edge function `health-check` deployada en Supabase
+- Scheduler nuevo: `chino-executor` (`*/15 * * * *`)
+- Cross-reviews: Isidora W6 × 3 (fixer/runner, chino-executor, OJOS)
+
+### Alertas operacionales descubiertas
+
+1. **PAT GitHub expuesto en `.git/config`** — también flagged por Diego W8. CRÍTICO. Visible en ambos remotes.
+2. **Remote `origin` apunta a claude-memory, no betabg** — pusheé a claude-memory accidentalmente primero. Workaround: usar `git push betabg main` explícito hasta que JM repare.
+3. **19 tasks de squad "producto" acumuladas** sin dueño activo. OJOS las genera pero nadie las atiende.
+4. **Valentina W1 tiene código sin deployar** en `email-html-processor.ts`, `manage-campaigns.ts`, `routes/index.ts`. Mi deploy NO lo incluye. Coordinar.
+
+---
+
 ## 2026-04-06 — Hallazgo Crítico: steve_fix_queue sin ejecutor
 
 ### Contexto
