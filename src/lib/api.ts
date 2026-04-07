@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
-const API_URL = import.meta.env.VITE_API_URL as string;
+// .trim() defends against env vars with trailing whitespace/newlines (Vercel quirk)
+const API_URL = ((import.meta.env.VITE_API_URL as string) || '').trim();
 
 interface ApiResponse<T = any> {
   data: T | null;

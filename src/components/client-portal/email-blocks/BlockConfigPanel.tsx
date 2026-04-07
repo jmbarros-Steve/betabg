@@ -171,7 +171,7 @@ function ImageConfig({ p, set, assets }: { p: any; set: (k: string, v: any) => v
       const formData = new FormData();
       formData.append('file', file);
 
-      const apiUrl = import.meta.env.VITE_API_URL;
+      const apiUrl = (import.meta.env.VITE_API_URL || '').trim();
       const res = await fetch(`${apiUrl}/api/upload-email-image`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}` },

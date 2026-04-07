@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import logoShopify from '@/assets/logo-shopify-clean.png';
 import logoMeta from '@/assets/logo-meta-clean.png';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://steve-api-850416724643.us-central1.run.app';
+const API_BASE = (import.meta.env.VITE_API_URL || 'https://steve-api-850416724643.us-central1.run.app').trim();
 
 interface Client {
   id: string;

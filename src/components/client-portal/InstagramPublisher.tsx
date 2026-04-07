@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 
 type ImageSourceMode = 'upload' | 'ai' | 'url';
 
-const API_URL = import.meta.env.VITE_API_URL as string;
+const API_URL = ((import.meta.env.VITE_API_URL as string) || '').trim();
 
 /* ── Image Picker: upload / AI / URL ── */
 function ImagePicker({

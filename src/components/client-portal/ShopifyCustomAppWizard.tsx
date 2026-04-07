@@ -23,7 +23,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://steve-api-850416724643.us-central1.run.app';
+const API_BASE = (import.meta.env.VITE_API_URL || 'https://steve-api-850416724643.us-central1.run.app').trim();
 
 const REQUIRED_SCOPES = [
   'read_products',
