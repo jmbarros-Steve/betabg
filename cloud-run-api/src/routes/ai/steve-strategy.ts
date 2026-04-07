@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -74,34 +75,46 @@ export async function steveStrategy(c: Context) {
   const categories = lastUserMsg ? detectRelevantCategories(lastUserMsg.content) : ['meta_ads', 'brief', 'anuncios'];
 
   // Fetch knowledge rules
-  const { data: knowledge } = await supabase
-    .from('steve_knowledge')
-    .select('categoria, titulo, contenido, orden')
-    .in('categoria', categories)
-    .eq('activo', true)
-    .eq('approval_status', 'approved')
-    .order('orden', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(30);
+  const knowledge = await safeQueryOrDefault<{ categoria: string; titulo: string; contenido: string; orden: number }>(
+    supabase
+      .from('steve_knowledge')
+      .select('categoria, titulo, contenido, orden')
+      .in('categoria', categories)
+      .eq('activo', true)
+      .eq('approval_status', 'approved')
+      .order('orden', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(30),
+    [],
+    'steve-strategy.fetchKnowledge',
+  );
 
   // Fetch client brief context
   let clientContext = '';
   if (client_id) {
-    const { data: client } = await supabase
-      .from('clients')
-      .select('name, company, website_url, fase_negocio, presupuesto_ads')
-      .eq('id', client_id)
-      .single();
+    const client = await safeQuerySingleOrDefault<{ name: string; company: string | null; website_url: string | null; fase_negocio: string | null; presupuesto_ads: number | null }>(
+      supabase
+        .from('clients')
+        .select('name, company, website_url, fase_negocio, presupuesto_ads')
+        .eq('id', client_id)
+        .single(),
+      null,
+      'steve-strategy.fetchClient',
+    );
     if (client) {
       clientContext = `\n\nCLIENTE ACTUAL: ${client.name}${client.company ? ` (${client.company})` : ''}${client.website_url ? ` | Web: ${client.website_url}` : ''}${client.fase_negocio ? ` | Fase: ${client.fase_negocio}` : ''}${client.presupuesto_ads ? ` | Budget Ads: $${client.presupuesto_ads}` : ''}`;
     }
 
     // Also fetch buyer persona if exists
-    const { data: persona } = await supabase
-      .from('buyer_personas')
-      .select('persona_data, is_complete')
-      .eq('client_id', client_id)
-      .maybeSingle();
+    const persona = await safeQuerySingleOrDefault<{ persona_data: any; is_complete: boolean | null }>(
+      supabase
+        .from('buyer_personas')
+        .select('persona_data, is_complete')
+        .eq('client_id', client_id)
+        .maybeSingle(),
+      null,
+      'steve-strategy.fetchPersona',
+    );
     if (persona?.is_complete && persona?.persona_data) {
       clientContext += `\nBRIEF COMPLETADO: Sí. Buyer persona disponible.`;
     }

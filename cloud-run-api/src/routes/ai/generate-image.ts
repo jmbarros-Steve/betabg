@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { loadKnowledge } from '../../lib/knowledge-loader.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const IMAGE_CREDIT_COST = 2;
 const DIVERSITY_STYLES = [
@@ -32,12 +33,16 @@ export async function generateImage(c: Context) {
   if (!user || !clientId) {
     return c.json({ error: 'Missing authentication or clientId' }, 401);
   }
-  const { data: ownerCheck } = await supabase
-    .from('clients')
-    .select('id')
-    .eq('id', clientId)
-    .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
-    .maybeSingle();
+  const ownerCheck = await safeQuerySingleOrDefault<{ id: string }>(
+    supabase
+      .from('clients')
+      .select('id')
+      .eq('id', clientId)
+      .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+      .maybeSingle(),
+    null,
+    'generate-image.ownerCheck',
+  );
   if (!ownerCheck) {
     return c.json({ error: 'No tienes acceso a este cliente' }, 403);
   }
@@ -57,12 +62,16 @@ export async function generateImage(c: Context) {
     const supabaseForQuery = getSupabaseAdmin();
 
     // Get ALL Shopify product images with titles for matching
-    const { data: shopifyProducts } = await supabaseForQuery
-      .from('shopify_products')
-      .select('image_url, title')
-      .eq('client_id', clientId)
-      .not('image_url', 'is', null)
-      .limit(50);
+    const shopifyProducts = await safeQueryOrDefault<{ image_url: string | null; title: string | null }>(
+      supabaseForQuery
+        .from('shopify_products')
+        .select('image_url, title')
+        .eq('client_id', clientId)
+        .not('image_url', 'is', null)
+        .limit(50),
+      [],
+      'generate-image.fetchShopifyProducts',
+    );
 
     // Try to match a product mentioned in the copy/prompt text
     if (shopifyProducts && shopifyProducts.length > 0 && promptGeneracion) {
@@ -91,13 +100,17 @@ export async function generateImage(c: Context) {
 
     // Fallback: brand assets or random product photo
     if (!effectiveFotoBase) {
-      const { data: brandAssets } = await supabaseForQuery
-        .from('ad_assets')
-        .select('asset_url')
-        .eq('client_id', clientId)
-        .eq('tipo', 'imagen')
-        .order('created_at', { ascending: false })
-        .limit(5);
+      const brandAssets = await safeQueryOrDefault<{ asset_url: string | null }>(
+        supabaseForQuery
+          .from('ad_assets')
+          .select('asset_url')
+          .eq('client_id', clientId)
+          .eq('tipo', 'imagen')
+          .order('created_at', { ascending: false })
+          .limit(5),
+        [],
+        'generate-image.fetchBrandAssets',
+      );
 
       const allPhotos: string[] = [];
       if (brandAssets) allPhotos.push(...brandAssets.map((a: any) => a.asset_url).filter(Boolean));

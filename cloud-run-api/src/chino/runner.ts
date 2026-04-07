@@ -4,6 +4,7 @@
 
 import { randomUUID } from 'crypto';
 import { getSupabaseAdmin } from '../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../lib/safe-supabase.js';
 import { decryptPlatformToken } from '../lib/decrypt-token.js';
 import { executeApiCompare } from './checks/api-compare.js';
 import { executeTokenHealth } from './checks/token-health.js';
@@ -148,13 +149,17 @@ async function enqueueFixIfNeeded(
     //     vuelve a enqueuear si el problema persiste)
     //  3) NO bloquea para siempre los checks que entraron en estado terminal
     const dedupWindow = new Date(Date.now() - 60 * 60_000).toISOString();
-    const { data: existingFix } = await supabase
-      .from('steve_fix_queue')
-      .select('id, status')
-      .eq('check_id', check.id)
-      .in('status', ['pending', 'assigned', 'fixing', 'deployed', 'verifying'])
-      .gte('created_at', dedupWindow)
-      .maybeSingle();
+    const existingFix = await safeQuerySingleOrDefault<{ id: string; status: string }>(
+      supabase
+        .from('steve_fix_queue')
+        .select('id, status')
+        .eq('check_id', check.id)
+        .in('status', ['pending', 'assigned', 'fixing', 'deployed', 'verifying'])
+        .gte('created_at', dedupWindow)
+        .maybeSingle(),
+      null,
+      'chinoRunner.dedupExistingFix',
+    );
 
     if (existingFix) {
       console.log(`[chino] Fix already in queue for check #${check.check_number} (status: ${existingFix.status})`);

@@ -6,6 +6,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { decryptPlatformToken } from '../../lib/decrypt-token.js';
 import type { ChinoCheck, MerchantConn, CheckResult } from '../types.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const TIMEOUT = 30_000;
@@ -310,7 +311,11 @@ async function funcCreateEmailTemplate(supabase: SupabaseClient, start: number):
     if (error) return { result: 'fail', error_message: `Insert failed: ${error.message}`, duration_ms: Date.now() - start };
     templateId = data.id;
     // Verify it exists
-    const { data: found } = await supabase.from('email_templates').select('id').eq('id', templateId).single();
+    const found = await safeQuerySingleOrDefault<{ id: string }>(
+      supabase.from('email_templates').select('id').eq('id', templateId).single(),
+      null,
+      'functional.funcCreateEmailTemplate.verify',
+    );
     if (!found) return { result: 'fail', error_message: 'Template insertado pero no encontrado en re-lectura', duration_ms: Date.now() - start };
     return { result: 'pass', steve_value: `Created template ${templateId}`, duration_ms: Date.now() - start };
   } catch (err: any) {
@@ -769,8 +774,12 @@ async function bulkFunctionalCheck(
     case 278: return { result: 'pass', steve_value: 'Templates usan max-width:600px por defecto', duration_ms: Date.now() - start };
     case 279: return dbCountZero(supabase, 'email_campaigns', [['preheader', 'is', null], ['status', 'eq', 'sent']], 'Campañas sin preheader', start);
     case 280: { // Check for unreplaced merge tags
-      const { data } = await supabase.from('email_campaigns').select('id, subject, html_content').eq('status', 'sent').order('created_at', { ascending: false }).limit(10);
-      const unreplaced = (data || []).filter((c: any) => {
+      const data = await safeQueryOrDefault<{ id: string; subject: string | null; html_content: string | null }>(
+        supabase.from('email_campaigns').select('id, subject, html_content').eq('status', 'sent').order('created_at', { ascending: false }).limit(10),
+        [],
+        'functional.case280_unreplacedMergeTags',
+      );
+      const unreplaced = data.filter((c) => {
         const content = (c.html_content || '') + (c.subject || '');
         return /\{\{[a-z_]+\}\}/i.test(content);
       });
@@ -781,17 +790,25 @@ async function bulkFunctionalCheck(
     case 282: return endpointAlive('/api/email-ses-webhooks', 'POST', start, { Type: 'Complaint' });
     case 283: { // Delivery rate > 95%
       const sevenDaysAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
-      const { data } = await supabase.from('email_events').select('event_type').gte('created_at', sevenDaysAgo);
-      if (!data || data.length === 0) {
+      const data = await safeQueryOrDefault<{ event_type: string }>(
+        supabase.from('email_events').select('event_type').gte('created_at', sevenDaysAgo),
+        [],
+        'functional.case283_emailEventsDeliveryRate',
+      );
+      if (data.length === 0) {
         // Also check email_send_queue for recent sends
-        const { data: sends } = await supabase.from('email_send_queue').select('id').gte('created_at', sevenDaysAgo).limit(1);
-        if (!sends || sends.length === 0) {
+        const sends = await safeQueryOrDefault<{ id: string }>(
+          supabase.from('email_send_queue').select('id').gte('created_at', sevenDaysAgo).limit(1),
+          [],
+          'functional.case283_emailSendQueueRecent',
+        );
+        if (sends.length === 0) {
           return { result: 'pass', steve_value: 'Sin envíos recientes', error_message: 'No hay envíos de email recientes — sin datos para evaluar delivery rate', duration_ms: Date.now() - start };
         }
         return { result: 'pass', steve_value: 'Envíos en cola, sin eventos aún', duration_ms: Date.now() - start };
       }
-      const sent = data.filter((e: any) => e.event_type === 'sent').length;
-      const bounced = data.filter((e: any) => e.event_type === 'bounce').length;
+      const sent = data.filter((e) => e.event_type === 'sent').length;
+      const bounced = data.filter((e) => e.event_type === 'bounce').length;
       const rate = sent > 0 ? ((sent - bounced) / sent) * 100 : 0;
       if (rate < 95) return { result: 'fail', steve_value: `${rate.toFixed(1)}%`, error_message: `Delivery rate ${rate.toFixed(1)}% < 95%`, duration_ms: Date.now() - start };
       return { result: 'pass', steve_value: `${rate.toFixed(1)}% delivery`, duration_ms: Date.now() - start };
@@ -843,8 +860,12 @@ async function bulkFunctionalCheck(
     case 333: return dbHasData(supabase, 'campaign_metrics', [], 1, 'campaign_metrics', start);
     case 334: case 335: return endpointAlive('/api/manage-meta-campaign', 'POST', start, { action: 'health_check' });
     case 336: { // ROAS calculation
-      const { data } = await supabase.from('campaign_metrics').select('spend, revenue').gt('spend', 0).order('metric_date', { ascending: false }).limit(10);
-      if (!data || data.length === 0) return { result: 'skip', error_message: 'No campaign_metrics con spend > 0', duration_ms: Date.now() - start };
+      const data = await safeQueryOrDefault<{ spend: number | null; revenue: number | null }>(
+        supabase.from('campaign_metrics').select('spend, revenue').gt('spend', 0).order('metric_date', { ascending: false }).limit(10),
+        [],
+        'functional.case336_roasCalc',
+      );
+      if (data.length === 0) return { result: 'skip', error_message: 'No campaign_metrics con spend > 0', duration_ms: Date.now() - start };
       return { result: 'pass', steve_value: `${data.length} métricas con ROAS calculable`, duration_ms: Date.now() - start };
     }
     case 337: return dbHasData(supabase, 'campaign_metrics', [['spend', 'gt', 0]], 0, 'métricas con CPA', start);

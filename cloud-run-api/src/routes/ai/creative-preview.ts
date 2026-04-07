@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const PREVIEW_CREDIT_COST = 1;
 
@@ -44,12 +45,16 @@ export async function creativePreview(c: Context) {
     if (!user || !clientId) return c.json({ error: 'Missing authentication or clientId' }, 401);
     if (!copyText) return c.json({ error: 'copyText is required' }, 400);
 
-    const { data: ownerCheck } = await supabase
-      .from('clients')
-      .select('id')
-      .eq('id', clientId)
-      .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
-      .maybeSingle();
+    const ownerCheck = await safeQuerySingleOrDefault<{ id: string }>(
+      supabase
+        .from('clients')
+        .select('id')
+        .eq('id', clientId)
+        .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+        .maybeSingle(),
+      null,
+      'creative-preview.ownerCheck',
+    );
     if (!ownerCheck) return c.json({ error: 'No tienes acceso a este cliente' }, 403);
 
     // Deduct credits
@@ -65,12 +70,16 @@ export async function creativePreview(c: Context) {
 
     // Try to find a product photo matching the copy
     let productPhotoUrl: string | null = null;
-    const { data: shopifyProducts } = await supabase
-      .from('shopify_products')
-      .select('image_url, title')
-      .eq('client_id', clientId)
-      .not('image_url', 'is', null)
-      .limit(50);
+    const shopifyProducts = await safeQueryOrDefault<{ image_url: string | null; title: string | null }>(
+      supabase
+        .from('shopify_products')
+        .select('image_url, title')
+        .eq('client_id', clientId)
+        .not('image_url', 'is', null)
+        .limit(50),
+      [],
+      'creative-preview.fetchShopifyProducts',
+    );
 
     if (shopifyProducts && shopifyProducts.length > 0) {
       const copyLower = copyText.toLowerCase();
@@ -91,13 +100,17 @@ export async function creativePreview(c: Context) {
 
     // Fallback to brand assets
     if (!productPhotoUrl) {
-      const { data: assets } = await supabase
-        .from('ad_assets')
-        .select('asset_url')
-        .eq('client_id', clientId)
-        .eq('tipo', 'imagen')
-        .order('created_at', { ascending: false })
-        .limit(1);
+      const assets = await safeQueryOrDefault<{ asset_url: string | null }>(
+        supabase
+          .from('ad_assets')
+          .select('asset_url')
+          .eq('client_id', clientId)
+          .eq('tipo', 'imagen')
+          .order('created_at', { ascending: false })
+          .limit(1),
+        [],
+        'creative-preview.fetchAssets',
+      );
       if (assets?.[0]?.asset_url) productPhotoUrl = assets[0].asset_url;
     }
 

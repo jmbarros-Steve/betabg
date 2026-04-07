@@ -1,4 +1,23 @@
 import { getSupabaseAdmin } from './supabase.js';
+import { safeQueryOrDefault } from './safe-supabase.js';
+
+interface CreativeRow {
+  angle: string | null;
+  content_summary: string | null;
+  cqs_score: number;
+  channel: string;
+}
+
+interface AngleRow {
+  angle: string | null;
+  cqs_score: number;
+}
+
+interface ProductCreativeRow {
+  angle: string | null;
+  cqs_score: number;
+  content_summary: string | null;
+}
 
 /**
  * D.3/D.4: Fetch creative performance history for a merchant.
@@ -13,50 +32,66 @@ export async function getCreativeContext(
   const supabase = getSupabaseAdmin();
 
   // 1. Best creatives for this merchant
-  const { data: best } = await supabase
-    .from('creative_history')
-    .select('angle, content_summary, cqs_score, channel')
-    .eq('client_id', client_id)
-    .eq('channel', channel)
-    .not('cqs_score', 'is', null)
-    .gte('cqs_score', 65)
-    .order('cqs_score', { ascending: false })
-    .limit(5);
+  const best = await safeQueryOrDefault<CreativeRow>(
+    supabase
+      .from('creative_history')
+      .select('angle, content_summary, cqs_score, channel')
+      .eq('client_id', client_id)
+      .eq('channel', channel)
+      .not('cqs_score', 'is', null)
+      .gte('cqs_score', 65)
+      .order('cqs_score', { ascending: false })
+      .limit(5),
+    [],
+    'creativeContext.bestCreatives',
+  );
 
   // 2. Worst creatives (to avoid)
-  const { data: worst } = await supabase
-    .from('creative_history')
-    .select('angle, content_summary, cqs_score, channel')
-    .eq('client_id', client_id)
-    .eq('channel', channel)
-    .not('cqs_score', 'is', null)
-    .lt('cqs_score', 40)
-    .order('cqs_score', { ascending: true })
-    .limit(5);
+  const worst = await safeQueryOrDefault<CreativeRow>(
+    supabase
+      .from('creative_history')
+      .select('angle, content_summary, cqs_score, channel')
+      .eq('client_id', client_id)
+      .eq('channel', channel)
+      .not('cqs_score', 'is', null)
+      .lt('cqs_score', 40)
+      .order('cqs_score', { ascending: true })
+      .limit(5),
+    [],
+    'creativeContext.worstCreatives',
+  );
 
   // 3. Product-specific history
-  let productBest: any[] | null = null;
+  let productBest: ProductCreativeRow[] | null = null;
   if (product_name) {
-    const { data: pb } = await supabase
-      .from('creative_history')
-      .select('angle, cqs_score, content_summary')
-      .eq('client_id', client_id)
-      .ilike('content_summary', `%${product_name}%`)
-      .not('cqs_score', 'is', null)
-      .order('cqs_score', { ascending: false })
-      .limit(3);
+    const pb = await safeQueryOrDefault<ProductCreativeRow>(
+      supabase
+        .from('creative_history')
+        .select('angle, cqs_score, content_summary')
+        .eq('client_id', client_id)
+        .ilike('content_summary', `%${product_name}%`)
+        .not('cqs_score', 'is', null)
+        .order('cqs_score', { ascending: false })
+        .limit(3),
+      [],
+      'creativeContext.productBest',
+    );
     productBest = pb;
   }
 
   // 4. Angle ranking — query ALL scored creatives for this client+channel
   //    to get accurate counts for [VALIDADO]/[DESCARTADO] markers
-  const { data: allAngleData } = await supabase
-    .from('creative_history')
-    .select('angle, cqs_score')
-    .eq('client_id', client_id)
-    .eq('channel', channel)
-    .not('cqs_score', 'is', null)
-    .not('angle', 'is', null);
+  const allAngleData = await safeQueryOrDefault<AngleRow>(
+    supabase
+      .from('creative_history')
+      .select('angle, cqs_score')
+      .eq('client_id', client_id)
+      .eq('channel', channel)
+      .not('cqs_score', 'is', null)
+      .not('angle', 'is', null),
+    [],
+    'creativeContext.allAngleData',
+  );
 
   const angles: Record<string, { scores: number[]; count: number }> = {};
   for (const c of allAngleData || []) {

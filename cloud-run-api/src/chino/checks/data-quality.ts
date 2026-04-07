@@ -3,6 +3,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ChinoCheck, MerchantConn, CheckResult } from '../types.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 // ─── Shared helper: fetch with timeout ───────────────────────────
 
@@ -223,14 +224,18 @@ async function check18_productImagesLoad(
   const sampleSize = (check.check_config?.sample_size as number) || 10;
 
   // Try DB first
-  const { data: dbProducts } = await supabase
-    .from('shopify_products')
-    .select('image_url')
-    .eq('client_id', merchant.client_id)
-    .not('image_url', 'is', null)
-    .limit(sampleSize);
+  const dbProducts = await safeQueryOrDefault<{ image_url: string | null }>(
+    supabase
+      .from('shopify_products')
+      .select('image_url')
+      .eq('client_id', merchant.client_id)
+      .not('image_url', 'is', null)
+      .limit(sampleSize),
+    [],
+    'dataQuality.check18_productImagesLoad',
+  );
 
-  let imageUrls: string[] = (dbProducts || []).map((p) => p.image_url).filter(Boolean);
+  let imageUrls: string[] = dbProducts.map((p) => p.image_url).filter((u): u is string => Boolean(u));
 
   // Fallback to Shopify API if DB is empty
   if (imageUrls.length === 0) {
@@ -537,14 +542,18 @@ async function check38_bounceRate(
   const maxBounce = (check.check_config?.max_bounce as number) || 0.01;
 
   // Try DB first
-  const { data } = await supabase
-    .from('platform_metrics')
-    .select('metric_value')
-    .eq('connection_id', merchant.connection_id)
-    .eq('metric_type', 'bounce_rate')
-    .order('metric_date', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const data = await safeQuerySingleOrDefault<{ metric_value: number | string | null }>(
+    supabase
+      .from('platform_metrics')
+      .select('metric_value')
+      .eq('connection_id', merchant.connection_id)
+      .eq('metric_type', 'bounce_rate')
+      .order('metric_date', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    null,
+    'dataQuality.check38_bounceRate',
+  );
 
   if (data?.metric_value != null) {
     const rate = Number(data.metric_value);
@@ -576,14 +585,18 @@ async function check39_spamRate(
   const start = Date.now();
   const maxSpam = (check.check_config?.max_spam as number) || 0.001;
 
-  const { data } = await supabase
-    .from('platform_metrics')
-    .select('metric_value')
-    .eq('connection_id', merchant.connection_id)
-    .eq('metric_type', 'spam_rate')
-    .order('metric_date', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const data = await safeQuerySingleOrDefault<{ metric_value: number | string | null }>(
+    supabase
+      .from('platform_metrics')
+      .select('metric_value')
+      .eq('connection_id', merchant.connection_id)
+      .eq('metric_type', 'spam_rate')
+      .order('metric_date', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    null,
+    'dataQuality.check39_spamRate',
+  );
 
   if (data?.metric_value != null) {
     const rate = Number(data.metric_value);
@@ -614,23 +627,31 @@ async function check40_deliverability(
   const start = Date.now();
 
   // Check platform_metrics for spf_pass and dkim_pass
-  const { data: spfData } = await supabase
-    .from('platform_metrics')
-    .select('metric_value')
-    .eq('connection_id', merchant.connection_id)
-    .eq('metric_type', 'spf_pass')
-    .order('metric_date', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const spfData = await safeQuerySingleOrDefault<{ metric_value: number | string | null }>(
+    supabase
+      .from('platform_metrics')
+      .select('metric_value')
+      .eq('connection_id', merchant.connection_id)
+      .eq('metric_type', 'spf_pass')
+      .order('metric_date', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    null,
+    'dataQuality.check40_spfPass',
+  );
 
-  const { data: dkimData } = await supabase
-    .from('platform_metrics')
-    .select('metric_value')
-    .eq('connection_id', merchant.connection_id)
-    .eq('metric_type', 'dkim_pass')
-    .order('metric_date', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const dkimData = await safeQuerySingleOrDefault<{ metric_value: number | string | null }>(
+    supabase
+      .from('platform_metrics')
+      .select('metric_value')
+      .eq('connection_id', merchant.connection_id)
+      .eq('metric_type', 'dkim_pass')
+      .order('metric_date', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    null,
+    'dataQuality.check40_dkimPass',
+  );
 
   if (!spfData && !dkimData) {
     return { result: 'skip', error_message: 'No SPF/DKIM data in platform_metrics', duration_ms: Date.now() - start };
@@ -669,11 +690,15 @@ async function check43_chatSpanish(supabase: SupabaseClient): Promise<CheckResul
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
   // Need a client_id for the chat endpoint
-  const { data: anyClient } = await supabase
-    .from('clients')
-    .select('id')
-    .limit(1)
-    .single();
+  const anyClient = await safeQuerySingleOrDefault<{ id: string }>(
+    supabase
+      .from('clients')
+      .select('id')
+      .limit(1)
+      .single(),
+    null,
+    'dataQuality.check43_chatSpanish.anyClient',
+  );
 
   if (!anyClient) {
     return { result: 'skip', error_message: 'No clients in DB for chat test', duration_ms: Date.now() - start };
@@ -767,12 +792,16 @@ async function check49_briefMentionsRealData(
   }
 
   // Get merchant names
-  const { data: clients } = await supabase
-    .from('clients')
-    .select('id, name')
-    .limit(50);
+  const clients = await safeQueryOrDefault<{ id: string; name: string | null }>(
+    supabase
+      .from('clients')
+      .select('id, name')
+      .limit(50),
+    [],
+    'dataQuality.check49_briefMentionsRealData.clients',
+  );
 
-  const clientNames = (clients || []).map((c) => c.name?.toLowerCase()).filter(Boolean) as string[];
+  const clientNames = clients.map((c) => c.name?.toLowerCase()).filter(Boolean) as string[];
 
   if (clientNames.length === 0) {
     return { result: 'skip', error_message: 'No clients in DB', duration_ms: Date.now() - start };
@@ -1447,24 +1476,32 @@ async function bulkDataQualityCheck(
       let testUrl: string | null = null;
 
       // Try to get a landing page URL from campaign metrics
-      const { data: campLanding } = await supabase
-        .from('campaign_metrics')
-        .select('landing_page_url')
-        .not('landing_page_url', 'is', null)
-        .limit(1)
-        .maybeSingle();
+      const campLanding = await safeQuerySingleOrDefault<{ landing_page_url: string | null }>(
+        supabase
+          .from('campaign_metrics')
+          .select('landing_page_url')
+          .not('landing_page_url', 'is', null)
+          .limit(1)
+          .maybeSingle(),
+        null,
+        'dataQuality.case446_campLanding',
+      );
 
       if (campLanding?.landing_page_url) {
         testUrl = campLanding.landing_page_url;
       } else {
         // Fallback: check store URL from platform connections
-        const { data: conn } = await supabase
-          .from('platform_connections')
-          .select('store_url')
-          .eq('platform', 'shopify')
-          .not('store_url', 'is', null)
-          .limit(1)
-          .maybeSingle();
+        const conn = await safeQuerySingleOrDefault<{ store_url: string | null }>(
+          supabase
+            .from('platform_connections')
+            .select('store_url')
+            .eq('platform', 'shopify')
+            .not('store_url', 'is', null)
+            .limit(1)
+            .maybeSingle(),
+          null,
+          'dataQuality.case446_shopifyConn',
+        );
 
         testUrl = conn?.store_url ? `https://${conn.store_url}` : 'https://betabgnuevosupa.vercel.app';
       }
@@ -1598,12 +1635,16 @@ async function bulkDataQualityCheck(
     case 699: return { result: 'pass', steve_value: 'Currency conversion en Shopify/Meta sync', duration_ms: Date.now() - start };
     case 700: { // Data freshness < 6h across all platforms
       const cutoff = new Date(Date.now() - 6 * 3600_000).toISOString();
-      const { data: stale } = await supabase.from('platform_connections')
-        .select('platform, last_sync_at')
-        .eq('is_active', true)
-        .or(`last_sync_at.is.null,last_sync_at.lt.${cutoff}`);
-      if (stale && stale.length > 0) {
-        const platforms = stale.map((s: any) => s.platform).join(', ');
+      const stale = await safeQueryOrDefault<{ platform: string; last_sync_at: string | null }>(
+        supabase.from('platform_connections')
+          .select('platform, last_sync_at')
+          .eq('is_active', true)
+          .or(`last_sync_at.is.null,last_sync_at.lt.${cutoff}`),
+        [],
+        'dataQuality.case700_dataFreshness',
+      );
+      if (stale.length > 0) {
+        const platforms = stale.map((s) => s.platform).join(', ');
         return { result: 'fail', steve_value: `${stale.length} stale`, error_message: `Datos >6h: ${platforms}`, duration_ms: Date.now() - start };
       }
       return { result: 'pass', steve_value: 'Todas las plataformas synced <6h', duration_ms: Date.now() - start };
@@ -1834,8 +1875,12 @@ export async function executeDataQuality(
 
       // ── Data integrity checks #121-140 ──
       case 121: { // No merchants with 0 connections but active
-        const { data } = await supabase.from('clients').select('id, name').eq('is_active', true);
-        if (!data || data.length === 0) return { result: 'pass', steve_value: '0 active clients', duration_ms: Date.now() - start };
+        const data = await safeQueryOrDefault<{ id: string; name: string | null }>(
+          supabase.from('clients').select('id, name').eq('is_active', true),
+          [],
+          'dataQuality.case121_orphanedMerchants',
+        );
+        if (data.length === 0) return { result: 'pass', steve_value: '0 active clients', duration_ms: Date.now() - start };
         let orphaned = 0;
         for (const c of data) {
           const { count } = await supabase.from('platform_connections').select('id', { count: 'exact', head: true }).eq('client_id', c.id).eq('is_active', true);
@@ -1857,8 +1902,12 @@ export async function executeDataQuality(
         return { result: 'pass', steve_value: '0 emails con fecha pasada', duration_ms: Date.now() - start };
       }
       case 124: { // No flows with deleted template references
-        const { data: flows124 } = await supabase.from('email_flows').select('id, name, steps').eq('is_active', true);
-        if (!flows124 || flows124.length === 0) return { result: 'pass', steve_value: 'No active flows', duration_ms: Date.now() - start };
+        const flows124 = await safeQueryOrDefault<{ id: string; name: string | null; steps: unknown }>(
+          supabase.from('email_flows').select('id, name, steps').eq('is_active', true),
+          [],
+          'dataQuality.case124_emailFlows',
+        );
+        if (flows124.length === 0) return { result: 'pass', steve_value: 'No active flows', duration_ms: Date.now() - start };
         return { result: 'pass', steve_value: `${flows124.length} flows checked`, duration_ms: Date.now() - start };
       }
       case 125: { // No expired Shopify discounts marked active
@@ -1884,8 +1933,12 @@ export async function executeDataQuality(
         return { result: 'pass', steve_value: '0 stuck tasks', duration_ms: Date.now() - start };
       }
       case 129: { // No duplicate check_numbers
-        const { data: data129 } = await supabase.from('chino_routine').select('check_number').eq('is_active', true);
-        if (!data129) return { result: 'pass', steve_value: 'No data', duration_ms: Date.now() - start };
+        const data129 = await safeQueryOrDefault<{ check_number: number }>(
+          supabase.from('chino_routine').select('check_number').eq('is_active', true),
+          [],
+          'dataQuality.case129_duplicateCheckNumbers',
+        );
+        if (data129.length === 0) return { result: 'pass', steve_value: 'No data', duration_ms: Date.now() - start };
         const counts129 = new Map<number, number>();
         for (const r of data129) counts129.set(r.check_number, (counts129.get(r.check_number) || 0) + 1);
         const dupes129 = [...counts129.entries()].filter(([, c]) => c > 1);
@@ -1910,11 +1963,15 @@ export async function executeDataQuality(
         return { result: 'pass', steve_value: `${cnt132 || 0} tracked`, duration_ms: Date.now() - start };
       }
       case 133: { // No subscribers with invalid email
-        const { data: data133 } = await supabase.from('email_subscribers').select('email').limit(100);
+        const data133 = await safeQueryOrDefault<{ email: string | null }>(
+          supabase.from('email_subscribers').select('email').limit(100),
+          [],
+          'dataQuality.case133_invalidEmails',
+        );
         const emailRegex133 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const invalid133 = (data133 || []).filter(r => r.email && !emailRegex133.test(r.email));
+        const invalid133 = data133.filter(r => r.email && !emailRegex133.test(r.email));
         if (invalid133.length > 0) return { result: 'fail', steve_value: `${invalid133.length} invalid`, error_message: `${invalid133.length} emails inválidos`, duration_ms: Date.now() - start };
-        return { result: 'pass', steve_value: `${(data133 || []).length} emails válidos`, duration_ms: Date.now() - start };
+        return { result: 'pass', steve_value: `${data133.length} emails válidos`, duration_ms: Date.now() - start };
       }
       case 134: { // No products with negative price
         const { count: cnt134, error: e134 } = await supabase.from('shopify_products').select('id', { count: 'exact', head: true }).lt('price', 0);
@@ -1932,8 +1989,12 @@ export async function executeDataQuality(
         return { result: 'pass', steve_value: '0 scores negativos', duration_ms: Date.now() - start };
       }
       case 137: { // No wa_messages with body > 4096 chars
-        const { data: data137 } = await supabase.from('wa_messages').select('id, body').order('created_at', { ascending: false }).limit(50);
-        const oversized137 = (data137 || []).filter(r => r.body && r.body.length > 4096);
+        const data137 = await safeQueryOrDefault<{ id: string; body: string | null }>(
+          supabase.from('wa_messages').select('id, body').order('created_at', { ascending: false }).limit(50),
+          [],
+          'dataQuality.case137_oversizedWaMessages',
+        );
+        const oversized137 = data137.filter(r => r.body && r.body.length > 4096);
         if (oversized137.length > 0) return { result: 'fail', steve_value: `${oversized137.length} oversized`, error_message: `${oversized137.length} wa_messages >4096 chars`, duration_ms: Date.now() - start };
         return { result: 'pass', steve_value: '0 mensajes oversized', duration_ms: Date.now() - start };
       }

@@ -13,6 +13,7 @@
  */
 
 import { getSupabaseAdmin } from './supabase.js';
+import { safeQuerySingleOrDefault } from './safe-supabase.js';
 import { sendWhatsApp, sendWhatsAppMedia } from './twilio-client.js';
 import { enqueueWAAction } from './wa-task-queue.js';
 import type { ProspectRecord } from './steve-wa-brain.js';
@@ -44,11 +45,15 @@ export async function generateAndSendSalesDeck(
 
   try {
     // 1. Gather prospect data
-    const { data: fresh } = await supabase
-      .from('wa_prospects')
-      .select('investigation_data, audit_data, deck_sent')
-      .eq('id', prospect.id)
-      .maybeSingle();
+    const fresh = await safeQuerySingleOrDefault<{ investigation_data: any; audit_data: any; deck_sent: boolean | null }>(
+      supabase
+        .from('wa_prospects')
+        .select('investigation_data, audit_data, deck_sent')
+        .eq('id', prospect.id)
+        .maybeSingle(),
+      null,
+      'steve-sales-deck.fetchProspect',
+    );
 
     // Don't send again if already sent
     if (fresh?.deck_sent) {

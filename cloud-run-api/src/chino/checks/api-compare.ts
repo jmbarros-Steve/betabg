@@ -5,6 +5,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ChinoCheck, MerchantConn, CheckResult } from '../types.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 // ─── Platform API fetchers ────────────────────────────────────────
 
@@ -154,22 +155,30 @@ async function getSteveValue(
 ): Promise<number | null> {
   switch (check.check_number) {
     case 11: { // Shopify revenue 7d
-      const { data } = await supabase
-        .from('platform_metrics')
-        .select('metric_value')
-        .eq('connection_id', merchant.connection_id)
-        .eq('metric_type', 'revenue')
-        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      return data?.reduce((sum, r) => sum + (Number(r.metric_value) || 0), 0) ?? null;
+      const data = await safeQueryOrDefault<{ metric_value: number | string | null }>(
+        supabase
+          .from('platform_metrics')
+          .select('metric_value')
+          .eq('connection_id', merchant.connection_id)
+          .eq('metric_type', 'revenue')
+          .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case11_shopifyRevenue7d',
+      );
+      return data.length > 0 ? data.reduce((sum, r) => sum + (Number(r.metric_value) || 0), 0) : null;
     }
     case 12: { // Shopify orders 7d
-      const { data } = await supabase
-        .from('platform_metrics')
-        .select('metric_value')
-        .eq('connection_id', merchant.connection_id)
-        .eq('metric_type', 'orders')
-        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      return data?.reduce((sum, r) => sum + (Number(r.metric_value) || 0), 0) ?? null;
+      const data = await safeQueryOrDefault<{ metric_value: number | string | null }>(
+        supabase
+          .from('platform_metrics')
+          .select('metric_value')
+          .eq('connection_id', merchant.connection_id)
+          .eq('metric_type', 'orders')
+          .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case12_shopifyOrders7d',
+      );
+      return data.length > 0 ? data.reduce((sum, r) => sum + (Number(r.metric_value) || 0), 0) : null;
     }
     case 13: { // Shopify products count
       const { count } = await supabase
@@ -194,21 +203,29 @@ async function getSteveValue(
       return count ?? null;
     }
     case 21: { // Meta spend 7d
-      const { data } = await supabase
-        .from('campaign_metrics')
-        .select('spend')
-        .eq('connection_id', merchant.connection_id)
-        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      return data?.reduce((sum, r) => sum + (Number(r.spend) || 0), 0) ?? null;
+      const data = await safeQueryOrDefault<{ spend: number | null }>(
+        supabase
+          .from('campaign_metrics')
+          .select('spend')
+          .eq('connection_id', merchant.connection_id)
+          .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case21_metaSpend7d',
+      );
+      return data.length > 0 ? data.reduce((sum, r) => sum + (Number(r.spend) || 0), 0) : null;
     }
     case 22: { // Meta ROAS 7d
-      const { data } = await supabase
-        .from('campaign_metrics')
-        .select('spend, revenue')
-        .eq('connection_id', merchant.connection_id)
-        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      const totalSpend = data?.reduce((s, r) => s + (Number(r.spend) || 0), 0) ?? 0;
-      const totalRevenue = data?.reduce((s, r) => s + (Number(r.revenue) || 0), 0) ?? 0;
+      const data = await safeQueryOrDefault<{ spend: number | null; revenue: number | null }>(
+        supabase
+          .from('campaign_metrics')
+          .select('spend, revenue')
+          .eq('connection_id', merchant.connection_id)
+          .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case22_metaRoas7d',
+      );
+      const totalSpend = data.reduce((s, r) => s + (Number(r.spend) || 0), 0);
+      const totalRevenue = data.reduce((s, r) => s + (Number(r.revenue) || 0), 0);
       return totalSpend > 0 ? Math.round((totalRevenue / totalSpend) * 100) / 100 : null;
     }
     case 23: { // Meta active campaigns count
@@ -222,98 +239,138 @@ async function getSteveValue(
       return count ?? null;
     }
     case 24: { // Meta reach 7d
-      const { data } = await supabase
-        .from('campaign_metrics')
-        .select('reach')
-        .eq('connection_id', merchant.connection_id)
-        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      return data?.reduce((sum, r) => sum + (Number(r.reach) || 0), 0) ?? null;
+      const data = await safeQueryOrDefault<{ reach: number | null }>(
+        supabase
+          .from('campaign_metrics')
+          .select('reach')
+          .eq('connection_id', merchant.connection_id)
+          .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case24_metaReach7d',
+      );
+      return data.length > 0 ? data.reduce((sum, r) => sum + (Number(r.reach) || 0), 0) : null;
     }
     case 25: { // Meta impressions 7d
-      const { data } = await supabase
-        .from('campaign_metrics')
-        .select('impressions')
-        .eq('connection_id', merchant.connection_id)
-        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      return data?.reduce((sum, r) => sum + (Number(r.impressions) || 0), 0) ?? null;
+      const data = await safeQueryOrDefault<{ impressions: number | null }>(
+        supabase
+          .from('campaign_metrics')
+          .select('impressions')
+          .eq('connection_id', merchant.connection_id)
+          .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case25_metaImpressions7d',
+      );
+      return data.length > 0 ? data.reduce((sum, r) => sum + (Number(r.impressions) || 0), 0) : null;
     }
     case 26: { // Meta clicks 7d
-      const { data } = await supabase
-        .from('campaign_metrics')
-        .select('clicks')
-        .eq('connection_id', merchant.connection_id)
-        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      return data?.reduce((sum, r) => sum + (Number(r.clicks) || 0), 0) ?? null;
+      const data = await safeQueryOrDefault<{ clicks: number | null }>(
+        supabase
+          .from('campaign_metrics')
+          .select('clicks')
+          .eq('connection_id', merchant.connection_id)
+          .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case26_metaClicks7d',
+      );
+      return data.length > 0 ? data.reduce((sum, r) => sum + (Number(r.clicks) || 0), 0) : null;
     }
     case 27: { // Meta CPC 7d
-      const { data } = await supabase
-        .from('campaign_metrics')
-        .select('spend, clicks')
-        .eq('connection_id', merchant.connection_id)
-        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      const totalSpend = data?.reduce((s, r) => s + (Number(r.spend) || 0), 0) ?? 0;
-      const totalClicks = data?.reduce((s, r) => s + (Number(r.clicks) || 0), 0) ?? 0;
+      const data = await safeQueryOrDefault<{ spend: number | null; clicks: number | null }>(
+        supabase
+          .from('campaign_metrics')
+          .select('spend, clicks')
+          .eq('connection_id', merchant.connection_id)
+          .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case27_metaCpc7d',
+      );
+      const totalSpend = data.reduce((s, r) => s + (Number(r.spend) || 0), 0);
+      const totalClicks = data.reduce((s, r) => s + (Number(r.clicks) || 0), 0);
       return totalClicks > 0 ? Math.round((totalSpend / totalClicks) * 100) / 100 : null;
     }
     case 28: { // Meta CPM 7d
-      const { data } = await supabase
-        .from('campaign_metrics')
-        .select('spend, impressions')
-        .eq('connection_id', merchant.connection_id)
-        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      const totalSpend = data?.reduce((s, r) => s + (Number(r.spend) || 0), 0) ?? 0;
-      const totalImpressions = data?.reduce((s, r) => s + (Number(r.impressions) || 0), 0) ?? 0;
+      const data = await safeQueryOrDefault<{ spend: number | null; impressions: number | null }>(
+        supabase
+          .from('campaign_metrics')
+          .select('spend, impressions')
+          .eq('connection_id', merchant.connection_id)
+          .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case28_metaCpm7d',
+      );
+      const totalSpend = data.reduce((s, r) => s + (Number(r.spend) || 0), 0);
+      const totalImpressions = data.reduce((s, r) => s + (Number(r.impressions) || 0), 0);
       return totalImpressions > 0 ? Math.round((totalSpend / totalImpressions * 1000) * 100) / 100 : null;
     }
     case 31: { // Klaviyo open_rate 7d
-      const { data } = await supabase
-        .from('platform_metrics')
-        .select('metric_value')
-        .eq('connection_id', merchant.connection_id)
-        .eq('metric_type', 'open_rate')
-        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10))
-        .order('metric_date', { ascending: false })
-        .limit(1);
-      return data?.[0] ? Math.round(Number(data[0].metric_value) * 100) / 100 : null;
+      const data = await safeQueryOrDefault<{ metric_value: number | string | null }>(
+        supabase
+          .from('platform_metrics')
+          .select('metric_value')
+          .eq('connection_id', merchant.connection_id)
+          .eq('metric_type', 'open_rate')
+          .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10))
+          .order('metric_date', { ascending: false })
+          .limit(1),
+        [],
+        'apiCompare.case31_klaviyoOpenRate7d',
+      );
+      return data[0] ? Math.round(Number(data[0].metric_value) * 100) / 100 : null;
     }
     case 32: { // Klaviyo click_rate 7d
-      const { data } = await supabase
-        .from('platform_metrics')
-        .select('metric_value')
-        .eq('connection_id', merchant.connection_id)
-        .eq('metric_type', 'click_rate')
-        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10))
-        .order('metric_date', { ascending: false })
-        .limit(1);
-      return data?.[0] ? Math.round(Number(data[0].metric_value) * 100) / 100 : null;
+      const data = await safeQueryOrDefault<{ metric_value: number | string | null }>(
+        supabase
+          .from('platform_metrics')
+          .select('metric_value')
+          .eq('connection_id', merchant.connection_id)
+          .eq('metric_type', 'click_rate')
+          .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10))
+          .order('metric_date', { ascending: false })
+          .limit(1),
+        [],
+        'apiCompare.case32_klaviyoClickRate7d',
+      );
+      return data[0] ? Math.round(Number(data[0].metric_value) * 100) / 100 : null;
     }
     case 33: { // Klaviyo emails_sent 7d
-      const { data } = await supabase
-        .from('platform_metrics')
-        .select('metric_value')
-        .eq('connection_id', merchant.connection_id)
-        .eq('metric_type', 'emails_sent')
-        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      return data?.reduce((sum, r) => sum + (Number(r.metric_value) || 0), 0) ?? null;
+      const data = await safeQueryOrDefault<{ metric_value: number | string | null }>(
+        supabase
+          .from('platform_metrics')
+          .select('metric_value')
+          .eq('connection_id', merchant.connection_id)
+          .eq('metric_type', 'emails_sent')
+          .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case33_klaviyoEmailsSent7d',
+      );
+      return data.length > 0 ? data.reduce((sum, r) => sum + (Number(r.metric_value) || 0), 0) : null;
     }
     case 34: { // Klaviyo subscriber_count
-      const { data } = await supabase
-        .from('platform_metrics')
-        .select('metric_value')
-        .eq('connection_id', merchant.connection_id)
-        .eq('metric_type', 'subscriber_count')
-        .order('metric_date', { ascending: false })
-        .limit(1);
-      return data?.[0] ? Math.round(Number(data[0].metric_value)) : null;
+      const data = await safeQueryOrDefault<{ metric_value: number | string | null }>(
+        supabase
+          .from('platform_metrics')
+          .select('metric_value')
+          .eq('connection_id', merchant.connection_id)
+          .eq('metric_type', 'subscriber_count')
+          .order('metric_date', { ascending: false })
+          .limit(1),
+        [],
+        'apiCompare.case34_klaviyoSubscriberCount',
+      );
+      return data[0] ? Math.round(Number(data[0].metric_value)) : null;
     }
     case 35: { // Klaviyo revenue 7d
-      const { data } = await supabase
-        .from('platform_metrics')
-        .select('metric_value')
-        .eq('connection_id', merchant.connection_id)
-        .eq('metric_type', 'revenue')
-        .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      return data?.reduce((sum, r) => sum + (Number(r.metric_value) || 0), 0) ?? null;
+      const data = await safeQueryOrDefault<{ metric_value: number | string | null }>(
+        supabase
+          .from('platform_metrics')
+          .select('metric_value')
+          .eq('connection_id', merchant.connection_id)
+          .eq('metric_type', 'revenue')
+          .gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case35_klaviyoRevenue7d',
+      );
+      return data.length > 0 ? data.reduce((sum, r) => sum + (Number(r.metric_value) || 0), 0) : null;
     }
 
     // ── Meta API compare #401-420 ──
@@ -330,43 +387,75 @@ async function getSteveValue(
       return count ?? null;
     }
     case 404: { // Meta spend total
-      const { data } = await supabase.from('campaign_metrics').select('spend').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10));
-      return data?.reduce((s, r) => s + (Number(r.spend) || 0), 0) ?? null;
+      const data = await safeQueryOrDefault<{ spend: number | null }>(
+        supabase.from('campaign_metrics').select('spend').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case404_metaSpend30d',
+      );
+      return data.length > 0 ? data.reduce((s, r) => s + (Number(r.spend) || 0), 0) : null;
     }
     case 405: { // Meta impressions
-      const { data } = await supabase.from('campaign_metrics').select('impressions').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      return data?.reduce((s, r) => s + (Number(r.impressions) || 0), 0) ?? null;
+      const data = await safeQueryOrDefault<{ impressions: number | null }>(
+        supabase.from('campaign_metrics').select('impressions').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case405_metaImpressions7d',
+      );
+      return data.length > 0 ? data.reduce((s, r) => s + (Number(r.impressions) || 0), 0) : null;
     }
     case 406: { // Meta clicks
-      const { data } = await supabase.from('campaign_metrics').select('clicks').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      return data?.reduce((s, r) => s + (Number(r.clicks) || 0), 0) ?? null;
+      const data = await safeQueryOrDefault<{ clicks: number | null }>(
+        supabase.from('campaign_metrics').select('clicks').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case406_metaClicks7d',
+      );
+      return data.length > 0 ? data.reduce((s, r) => s + (Number(r.clicks) || 0), 0) : null;
     }
     case 407: { // Meta conversions
-      const { data } = await supabase.from('campaign_metrics').select('conversions').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      return data?.reduce((s, r) => s + (Number(r.conversions) || 0), 0) ?? null;
+      const data = await safeQueryOrDefault<{ conversions: number | null }>(
+        supabase.from('campaign_metrics').select('conversions').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case407_metaConversions7d',
+      );
+      return data.length > 0 ? data.reduce((s, r) => s + (Number(r.conversions) || 0), 0) : null;
     }
     case 408: { // Meta CPC
-      const { data } = await supabase.from('campaign_metrics').select('spend, clicks').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      const spend = data?.reduce((s, r) => s + (Number(r.spend) || 0), 0) ?? 0;
-      const clicks = data?.reduce((s, r) => s + (Number(r.clicks) || 0), 0) ?? 0;
+      const data = await safeQueryOrDefault<{ spend: number | null; clicks: number | null }>(
+        supabase.from('campaign_metrics').select('spend, clicks').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case408_metaCpc7d',
+      );
+      const spend = data.reduce((s, r) => s + (Number(r.spend) || 0), 0);
+      const clicks = data.reduce((s, r) => s + (Number(r.clicks) || 0), 0);
       return clicks > 0 ? Math.round((spend / clicks) * 100) / 100 : null;
     }
     case 409: { // Meta CPM
-      const { data } = await supabase.from('campaign_metrics').select('spend, impressions').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      const spend = data?.reduce((s, r) => s + (Number(r.spend) || 0), 0) ?? 0;
-      const imps = data?.reduce((s, r) => s + (Number(r.impressions) || 0), 0) ?? 0;
+      const data = await safeQueryOrDefault<{ spend: number | null; impressions: number | null }>(
+        supabase.from('campaign_metrics').select('spend, impressions').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case409_metaCpm7d',
+      );
+      const spend = data.reduce((s, r) => s + (Number(r.spend) || 0), 0);
+      const imps = data.reduce((s, r) => s + (Number(r.impressions) || 0), 0);
       return imps > 0 ? Math.round((spend / imps * 1000) * 100) / 100 : null;
     }
     case 410: { // Meta CTR
-      const { data } = await supabase.from('campaign_metrics').select('clicks, impressions').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      const clicks = data?.reduce((s, r) => s + (Number(r.clicks) || 0), 0) ?? 0;
-      const imps = data?.reduce((s, r) => s + (Number(r.impressions) || 0), 0) ?? 0;
+      const data = await safeQueryOrDefault<{ clicks: number | null; impressions: number | null }>(
+        supabase.from('campaign_metrics').select('clicks, impressions').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case410_metaCtr7d',
+      );
+      const clicks = data.reduce((s, r) => s + (Number(r.clicks) || 0), 0);
+      const imps = data.reduce((s, r) => s + (Number(r.impressions) || 0), 0);
       return imps > 0 ? Math.round((clicks / imps) * 10000) / 10000 : null;
     }
     case 411: { // Meta ROAS
-      const { data } = await supabase.from('campaign_metrics').select('spend, revenue').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      const spend = data?.reduce((s, r) => s + (Number(r.spend) || 0), 0) ?? 0;
-      const rev = data?.reduce((s, r) => s + (Number(r.revenue) || 0), 0) ?? 0;
+      const data = await safeQueryOrDefault<{ spend: number | null; revenue: number | null }>(
+        supabase.from('campaign_metrics').select('spend, revenue').eq('connection_id', merchant.connection_id).gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case411_metaRoas7d',
+      );
+      const spend = data.reduce((s, r) => s + (Number(r.spend) || 0), 0);
+      const rev = data.reduce((s, r) => s + (Number(r.revenue) || 0), 0);
       return spend > 0 ? Math.round((rev / spend) * 100) / 100 : null;
     }
     case 412: case 413: case 414: case 415: case 416: case 417: case 418: case 419: case 420: {
@@ -403,24 +492,44 @@ async function getSteveValue(
       return count ?? null;
     }
     case 508: { // Revenue attribution
-      const { data } = await supabase.from('platform_metrics').select('metric_value').eq('connection_id', merchant.connection_id).eq('metric_type', 'revenue').gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10));
-      return data?.reduce((s, r) => s + (Number(r.metric_value) || 0), 0) ?? null;
+      const data = await safeQueryOrDefault<{ metric_value: number | string | null }>(
+        supabase.from('platform_metrics').select('metric_value').eq('connection_id', merchant.connection_id).eq('metric_type', 'revenue').gte('metric_date', new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case508_klaviyoRevenueAttribution',
+      );
+      return data.length > 0 ? data.reduce((s, r) => s + (Number(r.metric_value) || 0), 0) : null;
     }
     case 509: { // Open rates
-      const { data } = await supabase.from('platform_metrics').select('metric_value').eq('connection_id', merchant.connection_id).eq('metric_type', 'open_rate').order('metric_date', { ascending: false }).limit(1);
-      return data?.[0] ? Math.round(Number(data[0].metric_value) * 10000) / 10000 : null;
+      const data = await safeQueryOrDefault<{ metric_value: number | string | null }>(
+        supabase.from('platform_metrics').select('metric_value').eq('connection_id', merchant.connection_id).eq('metric_type', 'open_rate').order('metric_date', { ascending: false }).limit(1),
+        [],
+        'apiCompare.case509_klaviyoOpenRate',
+      );
+      return data[0] ? Math.round(Number(data[0].metric_value) * 10000) / 10000 : null;
     }
     case 510: { // Click rates
-      const { data } = await supabase.from('platform_metrics').select('metric_value').eq('connection_id', merchant.connection_id).eq('metric_type', 'click_rate').order('metric_date', { ascending: false }).limit(1);
-      return data?.[0] ? Math.round(Number(data[0].metric_value) * 10000) / 10000 : null;
+      const data = await safeQueryOrDefault<{ metric_value: number | string | null }>(
+        supabase.from('platform_metrics').select('metric_value').eq('connection_id', merchant.connection_id).eq('metric_type', 'click_rate').order('metric_date', { ascending: false }).limit(1),
+        [],
+        'apiCompare.case510_klaviyoClickRate',
+      );
+      return data[0] ? Math.round(Number(data[0].metric_value) * 10000) / 10000 : null;
     }
     case 511: { // Bounce rates
-      const { data } = await supabase.from('platform_metrics').select('metric_value').eq('connection_id', merchant.connection_id).eq('metric_type', 'bounce_rate').order('metric_date', { ascending: false }).limit(1);
-      return data?.[0] ? Math.round(Number(data[0].metric_value) * 10000) / 10000 : null;
+      const data = await safeQueryOrDefault<{ metric_value: number | string | null }>(
+        supabase.from('platform_metrics').select('metric_value').eq('connection_id', merchant.connection_id).eq('metric_type', 'bounce_rate').order('metric_date', { ascending: false }).limit(1),
+        [],
+        'apiCompare.case511_klaviyoBounceRate',
+      );
+      return data[0] ? Math.round(Number(data[0].metric_value) * 10000) / 10000 : null;
     }
     case 512: { // Unsubscribe rates
-      const { data } = await supabase.from('platform_metrics').select('metric_value').eq('connection_id', merchant.connection_id).eq('metric_type', 'unsubscribe_rate').order('metric_date', { ascending: false }).limit(1);
-      return data?.[0] ? Math.round(Number(data[0].metric_value) * 10000) / 10000 : null;
+      const data = await safeQueryOrDefault<{ metric_value: number | string | null }>(
+        supabase.from('platform_metrics').select('metric_value').eq('connection_id', merchant.connection_id).eq('metric_type', 'unsubscribe_rate').order('metric_date', { ascending: false }).limit(1),
+        [],
+        'apiCompare.case512_klaviyoUnsubscribeRate',
+      );
+      return data[0] ? Math.round(Number(data[0].metric_value) * 10000) / 10000 : null;
     }
     case 513: case 514: case 515: {
       // Flow performance, send count, list growth — use metric count as proxy
@@ -434,8 +543,12 @@ async function getSteveValue(
       return count ?? null;
     }
     case 602: { // Order count 30d
-      const { data } = await supabase.from('platform_metrics').select('metric_value').eq('connection_id', merchant.connection_id).eq('metric_type', 'orders').gte('metric_date', new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10));
-      return data?.reduce((s, r) => s + (Number(r.metric_value) || 0), 0) ?? null;
+      const data = await safeQueryOrDefault<{ metric_value: number | string | null }>(
+        supabase.from('platform_metrics').select('metric_value').eq('connection_id', merchant.connection_id).eq('metric_type', 'orders').gte('metric_date', new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10)),
+        [],
+        'apiCompare.case602_shopifyOrders30d',
+      );
+      return data.length > 0 ? data.reduce((s, r) => s + (Number(r.metric_value) || 0), 0) : null;
     }
     case 603: { // Collection count
       const { count } = await supabase.from('shopify_collections').select('id', { count: 'exact', head: true }).eq('client_id', merchant.client_id);

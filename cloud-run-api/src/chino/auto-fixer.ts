@@ -4,6 +4,7 @@
 // Everything else → manual (requires JM approval).
 
 import { getSupabaseAdmin } from '../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../lib/safe-supabase.js';
 import { handleTokenExpired } from '../lib/meta-token-refresh.js';
 import type { ChinoCheck, CheckResult } from './types.js';
 
@@ -62,13 +63,17 @@ export async function executeAutoFix(
   try {
     // Token refresh
     if (check.check_type === 'token_health' && check.platform === 'meta') {
-      const { data: conn } = await supabase
-        .from('platform_connections')
-        .select('id')
-        .eq('platform', 'meta')
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
+      const conn = await safeQuerySingleOrDefault<{ id: string }>(
+        supabase
+          .from('platform_connections')
+          .select('id')
+          .eq('platform', 'meta')
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle(),
+        null,
+        'autoFixer.findActiveMetaConnection',
+      );
 
       if (conn) {
         const newToken = await handleTokenExpired(conn.id);

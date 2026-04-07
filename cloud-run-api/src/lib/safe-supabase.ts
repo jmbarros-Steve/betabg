@@ -29,9 +29,9 @@
  * export async function myAuditCron(c: Context) {
  *   const supabase = getSupabaseAdmin();
  *
- *   // Antes:
- *   // const { data: users } = await supabase.from('users').select('*');
- *   // if (users.length === 0) ... // users puede ser null silenciosamente
+ *   // Antes (silent failure pattern - bug invisible si DB falla):
+ *   //   const result = await supabase.from('users').select('*');
+ *   //   const users = result.data;  // users puede ser null silenciosamente
  *
  *   // Ahora:
  *   const users = await safeQuery(
@@ -167,7 +167,7 @@ export async function safeQueryOrDefault<T>(
  * `defaultValue` (típicamente null) si falla. NO throws.
  */
 export async function safeQuerySingleOrDefault<T>(
-  promise: PromiseLike<PostgrestSingleResponse<T>>,
+  promise: PromiseLike<PostgrestSingleResponse<T | null>>,
   defaultValue: T | null,
   context: string,
 ): Promise<T | null> {

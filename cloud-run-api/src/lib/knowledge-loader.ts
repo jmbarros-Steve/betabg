@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from './supabase.js';
+import { safeQueryOrDefault } from './safe-supabase.js';
 
 interface KnowledgeResult {
   knowledgeBlock: string;
@@ -46,16 +47,19 @@ export async function loadKnowledge(
 
   let clientRulesData: any[] = [];
   if (clientId) {
-    const { data } = await supabase
-      .from('steve_knowledge')
-      .select('id, titulo, contenido, categoria')
-      .eq('client_id', clientId)
-      .eq('activo', true)
-      .eq('approval_status', 'approved')
-      .is('purged_at', null) // Tomás W7 (2026-04-07): no inyectar reglas soft-deleted en ventana de rescate
-      .order('orden', { ascending: false })
-      .limit(10);
-    clientRulesData = data || [];
+    clientRulesData = await safeQueryOrDefault<any>(
+      supabase
+        .from('steve_knowledge')
+        .select('id, titulo, contenido, categoria')
+        .eq('client_id', clientId)
+        .eq('activo', true)
+        .eq('approval_status', 'approved')
+        .is('purged_at', null) // Tomás W7 (2026-04-07): no inyectar reglas soft-deleted en ventana de rescate
+        .order('orden', { ascending: false })
+        .limit(10),
+      [],
+      'knowledge-loader.clientRules',
+    );
   }
   const globalRules = knowledgeRes.data || [];
   const bugs = bugsRes.data || [];

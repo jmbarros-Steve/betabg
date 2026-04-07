@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from './supabase.js';
+import { safeQuerySingleOrDefault } from './safe-supabase.js';
 
 const META_API_VERSION = 'v21.0';
 const REFRESH_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
@@ -90,11 +91,15 @@ export async function getValidMetaToken(connectionId: string): Promise<string | 
 export async function handleTokenExpired(connectionId: string): Promise<string | null> {
   const supabase = getSupabaseAdmin();
 
-  const { data: conn } = await supabase
-    .from('platform_connections')
-    .select('access_token_encrypted')
-    .eq('id', connectionId)
-    .single();
+  const conn = await safeQuerySingleOrDefault<{ access_token_encrypted: string | null }>(
+    supabase
+      .from('platform_connections')
+      .select('access_token_encrypted')
+      .eq('id', connectionId)
+      .single(),
+    null,
+    'meta-token-refresh.handleTokenExpired.fetchConnection',
+  );
 
   if (!conn?.access_token_encrypted) return null;
 

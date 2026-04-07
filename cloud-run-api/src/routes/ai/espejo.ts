@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { createTask } from '../../lib/task-creator.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 // ─── Claude Vision prompts ───────────────────────────────────────────────────
 
@@ -46,15 +47,19 @@ async function loadDynamicVisualCriteria(entityType: 'email' | 'ad'): Promise<st
       ? ['klaviyo', 'brief', 'anuncios', 'steve_accuracy']
       : ['meta_ads', 'anuncios', 'brief', 'steve_accuracy'];
 
-    const { data: criteria } = await supabase
-      .from('steve_knowledge')
-      .select('titulo, contenido')
-      .eq('visual_relevant', true)
-      .eq('approval_status', 'approved')
-      .eq('activo', true)
-      .in('categoria', relevantCategories)
-      .order('orden', { ascending: false })
-      .limit(10);
+    const criteria = await safeQueryOrDefault<{ titulo: string; contenido: string }>(
+      supabase
+        .from('steve_knowledge')
+        .select('titulo, contenido')
+        .eq('visual_relevant', true)
+        .eq('approval_status', 'approved')
+        .eq('activo', true)
+        .in('categoria', relevantCategories)
+        .order('orden', { ascending: false })
+        .limit(10),
+      [],
+      'espejo.loadDynamicVisualCriteria',
+    );
 
     if (!criteria || criteria.length === 0) return '';
 

@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from './supabase.js';
+import { safeQueryOrDefault } from './safe-supabase.js';
 
 export type TaskPriority = 'critica' | 'alta' | 'media' | 'baja';
 export type TaskType = 'bug' | 'mejora' | 'feature' | 'adaptacion' | 'seguridad';
@@ -19,12 +20,16 @@ export async function createTask(input: TaskInput) {
   const supabase = getSupabaseAdmin();
 
   // Deduplicación: no crear si ya existe título igual con status pending/in_progress
-  const { data: existing } = await supabase
-    .from('tasks')
-    .select('id')
-    .eq('title', input.title)
-    .in('status', ['pending', 'in_progress'])
-    .limit(1);
+  const existing = await safeQueryOrDefault<{ id: string }>(
+    supabase
+      .from('tasks')
+      .select('id')
+      .eq('title', input.title)
+      .in('status', ['pending', 'in_progress'])
+      .limit(1),
+    [],
+    'task-creator.checkDuplicate',
+  );
 
   if (existing && existing.length > 0) {
     return { created: false, reason: 'duplicate', existing_id: existing[0].id };

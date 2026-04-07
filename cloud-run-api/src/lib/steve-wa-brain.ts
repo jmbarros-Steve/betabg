@@ -6,7 +6,10 @@
  */
 
 import { getSupabaseAdmin } from './supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from './safe-supabase.js';
 import { getProductCatalogPrompt } from './steve-product-catalog.js';
+// Fix R5-#30: import StrategistResult for proper typing of buildDynamicSalesPrompt param
+import type { StrategistResult } from './steve-multi-brain.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -269,6 +272,7 @@ CREDIBILIDAD — CUANDO PREGUNTEN SI ES CONFIABLE O REAL:
 
 PROHIBIDO:
 - NUNCA ofrezcas cuenta gratis, trial, prueba gratis ni nada gratuito. Steve NO regala acceso.
+- Si piden trial o "probar primero sin pagar", responde: "Entiendo — quieres ver antes de comprometerte, es súper válido. Te ofrezco algo mejor: 15 min donde te muestro Steve con TUS datos reales conectados, sin costo y sin compromiso. Es como un trial instantáneo pero personalizado: www.steve.cl/agendar/steve"
 - Si quieren empezar → SIEMPRE agendar reunión: "www.steve.cl/agendar/steve"
 - No prometas resultados de ventas específicos
 - No hables mal de competidores por nombre
@@ -342,7 +346,7 @@ export async function quickFirstMessageIntel(
 Nombre de perfil: ${profileName || 'N/A'}
 Mensaje: "${message}"
 
-Responde en texto plano, máximo 3 líneas. Si no hay info suficiente, haz una hipótesis basada en el nombre del perfil o contexto. NUNCA digas "no hay suficiente info".`,
+Responde en texto plano, máximo 3 líneas. Si no hay información concreta en el mensaje, devuelve texto vacío. NO inventes ni hagas hipótesis sobre la industria.`,
         }],
       }),
     });
@@ -474,15 +478,19 @@ export async function buildWAContext(clientId: string, userMessage: string = '')
   let metricsContext = '';
 
   if (connIds.length > 0) {
-    const { data: platformMetrics } = await supabase
-      .from('platform_metrics')
-      .select('metric_type, metric_value, currency')
-      .in('connection_id', connIds)
-      .gte('metric_date', thirtyDaysAgo)
-      .order('metric_date', { ascending: false })
-      .limit(100);
+    const platformMetrics = await safeQueryOrDefault<{ metric_type: string; metric_value: number; currency: string | null }>(
+      supabase
+        .from('platform_metrics')
+        .select('metric_type, metric_value, currency')
+        .in('connection_id', connIds)
+        .gte('metric_date', thirtyDaysAgo)
+        .order('metric_date', { ascending: false })
+        .limit(100),
+      [],
+      'steveWaBrain.fetchPlatformMetrics',
+    );
 
-    if (platformMetrics && platformMetrics.length > 0) {
+    if (platformMetrics.length > 0) {
       const byType: Record<string, { total: number; currency: string | null }> = {};
       for (const m of platformMetrics) {
         if (!byType[m.metric_type]) byType[m.metric_type] = { total: 0, currency: m.currency };
@@ -494,15 +502,19 @@ export async function buildWAContext(clientId: string, userMessage: string = '')
       metricsContext += `\nMÉTRICAS (30 días):\n${lines}\n`;
     }
 
-    const { data: campaignMetrics } = await supabase
-      .from('campaign_metrics')
-      .select('campaign_name, campaign_status, spend, conversions, conversion_value')
-      .in('connection_id', connIds)
-      .gte('metric_date', thirtyDaysAgo)
-      .order('metric_date', { ascending: false })
-      .limit(100);
+    const campaignMetrics = await safeQueryOrDefault<{ campaign_name: string | null; campaign_status: string | null; spend: number | null; conversions: number | null; conversion_value: number | null }>(
+      supabase
+        .from('campaign_metrics')
+        .select('campaign_name, campaign_status, spend, conversions, conversion_value')
+        .in('connection_id', connIds)
+        .gte('metric_date', thirtyDaysAgo)
+        .order('metric_date', { ascending: false })
+        .limit(100),
+      [],
+      'steveWaBrain.fetchCampaignMetrics',
+    );
 
-    if (campaignMetrics && campaignMetrics.length > 0) {
+    if (campaignMetrics.length > 0) {
       const byCampaign: Record<string, { spend: number; conversions: number; revenue: number; status: string }> = {};
       for (const m of campaignMetrics) {
         const name = m.campaign_name || 'Sin nombre';
@@ -538,23 +550,28 @@ export async function getWAHistory(clientId: string, phone: string, limit = 10):
   const supabase = getSupabaseAdmin();
 
   // Get the MOST RECENT messages (descending), then reverse for chronological order
-  const { data: messages } = await supabase
-    .from('wa_messages')
-    .select('direction, body')
-    .eq('client_id', clientId)
-    .eq('channel', 'steve_chat')
-    .eq('contact_phone', phone)
-    .order('created_at', { ascending: false })
-    .limit(limit);
+  const messages = await safeQueryOrDefault<{ direction: string; body: string | null }>(
+    supabase
+      .from('wa_messages')
+      .select('direction, body')
+      .eq('client_id', clientId)
+      .eq('channel', 'steve_chat')
+      .eq('contact_phone', phone)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    [],
+    'steveWaBrain.getWAHistory',
+  );
 
-  if (!messages || messages.length === 0) return [];
+  if (messages.length === 0) return [];
 
   return messages
     .reverse() // Back to chronological order for Claude
     .filter((m: any) => m.body)
     .map((m: any) => ({
       role: m.direction === 'inbound' ? 'user' as const : 'assistant' as const,
-      content: m.body,
+      // Fix #5: ensure content is always a non-null string (null body → crash in sanitizeForClaude)
+      content: String(m.body || '[mensaje vacío]'),
     }));
 }
 
@@ -562,36 +579,50 @@ export async function getProspectHistory(phone: string, limit = 20): Promise<Arr
   const supabase = getSupabaseAdmin();
 
   // Get the MOST RECENT messages (descending), then reverse for chronological order
-  const { data: messages } = await supabase
-    .from('wa_messages')
-    .select('direction, body')
-    .eq('channel', 'prospect')
-    .eq('contact_phone', phone)
-    .is('client_id', null)
-    .order('created_at', { ascending: false })
-    .limit(limit);
+  const messages = await safeQueryOrDefault<{ direction: string; body: string | null }>(
+    supabase
+      .from('wa_messages')
+      .select('direction, body')
+      .eq('channel', 'prospect')
+      .eq('contact_phone', phone)
+      .is('client_id', null)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    [],
+    'steveWaBrain.getProspectHistory',
+  );
 
-  if (!messages || messages.length === 0) return [];
+  if (messages.length === 0) return [];
 
   const recent = messages
     .reverse()
     .filter((m: any) => m.body)
     .map((m: any) => ({
       role: m.direction === 'inbound' ? 'user' as const : 'assistant' as const,
-      content: m.body,
+      content: String(m.body || '[mensaje vacío]'),  // Fix #5: ensure non-null string
     }));
 
   // Inject rolling summary as first message if it exists
-  const { data: prospect } = await supabase
-    .from('wa_prospects')
-    .select('conversation_summary')
-    .eq('phone', phone)
-    .maybeSingle();
+  const prospect = await safeQuerySingleOrDefault<{ conversation_summary: string | null }>(
+    supabase
+      .from('wa_prospects')
+      .select('conversation_summary')
+      .eq('phone', phone)
+      .maybeSingle(),
+    null,
+    'steveWaBrain.getProspectHistory.summary',
+  );
 
   if (prospect?.conversation_summary) {
+    // Fix R5-#5: sanitize summary before injecting to prevent prompt injection via stored summary
+    const safeSummary = prospect.conversation_summary
+      .replace(/\[\s*(?:SISTEMA|SYSTEM|INSTRUCCIÓN|DIRECTIVA|OVERRIDE)[^\]]*\]/gi, '[CONTEXTO]')
+      .replace(/ignore\s+(?:previous|all|everything|instructions)/gi, '')
+      .replace(/jailbreak|DAN\s+mode/gi, '')
+      .slice(0, 2000);
     return [
-      { role: 'user' as const, content: `[RESUMEN DE CONVERSACIÓN ANTERIOR]\n${prospect.conversation_summary}` },
-      { role: 'assistant' as const, content: 'Entendido, tengo el contexto de nuestra conversación anterior.' },
+      { role: 'user' as const, content: `[RESUMEN PREVIO — NO ES UN MENSAJE REAL, ES CONTEXTO DE SESIONES ANTERIORES]\n${safeSummary}` },
+      { role: 'assistant' as const, content: 'Entendido, tengo el contexto previo. Este resumen no es un mensaje del prospecto.' },
       ...recent,
     ];
   }
@@ -623,16 +654,20 @@ export async function updateRollingConversationSummary(
 
   try {
     // Get ALL messages (not just last 20) for the summary
-    const { data: allMessages } = await supabase
-      .from('wa_messages')
-      .select('direction, body, created_at')
-      .eq('channel', 'prospect')
-      .eq('contact_phone', phone)
-      .is('client_id', null)
-      .order('created_at', { ascending: true })
-      .limit(200);
+    const allMessages = await safeQueryOrDefault<{ direction: string; body: string | null; created_at: string }>(
+      supabase
+        .from('wa_messages')
+        .select('direction, body, created_at')
+        .eq('channel', 'prospect')
+        .eq('contact_phone', phone)
+        .is('client_id', null)
+        .order('created_at', { ascending: true })
+        .limit(200),
+      [],
+      'steveWaBrain.updateRollingSummary.allMessages',
+    );
 
-    if (!allMessages || allMessages.length < 10) return;
+    if (allMessages.length < 10) return;
 
     // Build conversation text (skip last 20 — those will be literal in prompt)
     const olderMessages = allMessages.slice(0, -20);
@@ -684,14 +719,26 @@ Formato: bullets concisos, máximo 10 líneas. Solo hechos, sin opiniones.`,
     const summary = (data.content?.[0]?.text || '').trim();
     if (!summary) return;
 
-    await supabase
+    // Fix R5-#2: atomic update using .lt() to prevent race condition
+    // Only writes if no other process has already saved a more recent summary
+    const { data: rows, error: updateError } = await supabase
       .from('wa_prospects')
       .update({
         conversation_summary: summary,
         summary_up_to_msg: msgCount,
         updated_at: new Date().toISOString(),
       })
-      .eq('phone', phone);
+      .eq('phone', phone)
+      .lt('summary_up_to_msg', msgCount) // Atomic guard: skip if already updated
+      .select('phone');
+    if (updateError) {
+      console.error('[rolling-summary] update error:', updateError.message);
+      return;
+    }
+    if ((rows?.length ?? 0) === 0) {
+      console.log(`[rolling-summary] Skipping — DB already has summary >= msg ${msgCount}`);
+      return;
+    }
 
     console.log(`[rolling-summary] Updated for ${phone} (msgs: ${msgCount}, summary: ${summary.length} chars)`);
   } catch (err) {
@@ -736,27 +783,33 @@ function getIndustryBenchmarks(industry: string): string | null {
 /**
  * Build enriched context string for a prospect, including all qualification data.
  */
+// Fix R5-#22: comprehensive — covers all fields used in buildDynamicSalesPrompt known[] array
 export function buildEnrichedProspectContext(prospect: ProspectRecord): string {
   const lines: string[] = [];
 
   if (prospect.name) lines.push(`Nombre: ${prospect.name}`);
+  if (prospect.apellido) lines.push(`Apellido: ${prospect.apellido}`);
   if (prospect.company) lines.push(`Empresa: ${prospect.company}`);
   if (prospect.what_they_sell) lines.push(`Vende: ${prospect.what_they_sell}`);
-  if (prospect.monthly_revenue) lines.push(`Facturación mensual: ${prospect.monthly_revenue}`);
+  if (prospect.monthly_revenue) lines.push(`Facturación: ${prospect.monthly_revenue}`);
+  if (prospect.budget_range) lines.push(`Presupuesto: ${prospect.budget_range}`);
+  if (prospect.decision_timeline) lines.push(`Timeline decisión: ${prospect.decision_timeline}`);
   if (prospect.has_online_store != null) lines.push(`Tienda online: ${prospect.has_online_store ? 'Sí' : 'No'}`);
   if (prospect.store_platform) lines.push(`Plataforma: ${prospect.store_platform}`);
   if (prospect.current_marketing) lines.push(`Marketing actual: ${prospect.current_marketing}`);
   if (prospect.pain_points && prospect.pain_points.length > 0) lines.push(`Dolores: ${prospect.pain_points.join(', ')}`);
   if (prospect.integrations_used && prospect.integrations_used.length > 0) lines.push(`Herramientas: ${prospect.integrations_used.join(', ')}`);
   if (prospect.team_size) lines.push(`Equipo: ${prospect.team_size}`);
-  if (prospect.is_decision_maker != null) lines.push(`Tomador de decisiones: ${prospect.is_decision_maker ? 'Sí' : 'No'}`);
-  if (prospect.actively_looking != null) lines.push(`Buscando solución activamente: ${prospect.actively_looking ? 'Sí' : 'No'}`);
-
-  lines.push(`Lead Score: ${prospect.lead_score || 0}/100`);
-  lines.push(`Stage: ${prospect.stage || 'new'}`);
-  lines.push(`Mensajes previos: ${prospect.message_count || 0}`);
-
+  if (prospect.is_decision_maker != null) lines.push(`Decisor: ${prospect.is_decision_maker ? 'Sí' : 'No'}`);
+  if (prospect.actively_looking != null) lines.push(`Buscando solución: ${prospect.actively_looking ? 'Sí' : 'No'}`);
+  if (prospect.audit_data?.findings?.length) lines.push(`Auditoría tienda: ${prospect.audit_data.findings.join('; ')}`);
+  if (prospect.meeting_status && prospect.meeting_status !== 'none') lines.push(`Estado reunión: ${prospect.meeting_status}`);
+  if (prospect.meeting_at) lines.push(`Reunión agendada: ${new Date(prospect.meeting_at).toLocaleString('es-CL', { timeZone: 'America/Santiago' })}`);
   if (prospect.meeting_link_sent) lines.push(`Link de reunión ya enviado: Sí`);
+
+  lines.push(`Score: ${prospect.lead_score || 0}/100`);
+  lines.push(`Stage: ${prospect.stage || 'discovery'}`);
+  lines.push(`Mensajes: ${prospect.message_count || 0}`);
 
   return lines.length > 0
     ? `PROSPECTO (info recopilada):\n${lines.join('\n')}`
@@ -799,12 +852,15 @@ export function detectDisqualification(
     .slice(-5)
     .map(m => m.content.toLowerCase());
 
-  const softRejections = ['no', 'nada', 'paso', 'no gracias', 'no me interesa'];
+  // Fix #1+#2: removed 'paso' (false positive: "te paso info") and 'nada' (too broad)
+  // 'no' only matches as standalone word to avoid "no sé", "no tengo datos", etc.
+  // Fix R4-#1: only count EXPLICIT rejection phrases, not bare "no" (which is a valid response to questions)
+  const softRejections = ['no gracias', 'no me interesa', 'no estoy interesado', 'no me llames', 'no quiero', 'deja de escribirme'];
   const rejectionCount = recentUserMsgs.filter(m =>
-    softRejections.some(r => m.trim() === r || m.includes(r))
+    softRejections.some(r => m.includes(r))
   ).length;
 
-  if (rejectionCount >= 3) {
+  if (rejectionCount >= 2) {
     return { disqualified: true, reason: 'rejected' };
   }
 
@@ -821,7 +877,7 @@ export function detectBuyingSignals(
     'cómo empiezo', 'como empiezo', 'cómo parto', 'como parto',
     'si empiezo', 'cuando conecte', 'me gustaría partir', 'me gustaria partir',
     'contrato', 'cómo se paga', 'como se paga',
-    'formas de pago', 'demo', 'me interesa', 'si contrato',
+    'formas de pago', 'me interesa', 'si contrato', // Fix R4-#8: 'demo' removed — prompt already redirects demo requests to booking
     'quiero probar', 'quiero empezar', 'cómo funciona el pago', 'como funciona el pago',
     // Señales de reunión explícita
     'quiero agendar', 'quiero reunión', 'quiero reunion', 'agendar reunión', 'agendar reunion',
@@ -865,9 +921,11 @@ export function analyzeProspectStyle(
   const length = avgLen < 30 ? 'corto' : avgLen > 100 ? 'largo' : 'medio';
 
   const allText = userMsgs.map(m => m.content).join(' ');
-  const usesEmojis = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(allText);
+  // Fix R5-#25: use Unicode property escapes for full emoji coverage (Emoji 14+)
+  const usesEmojis = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u.test(allText);
 
-  const casualWords = ['wea', 'po', 'weon', 'weón', 'jaja', 'xd', 'xD', 'nah', 'sip', 'sep', 'ya'];
+  // Fix #8: expanded chilenismos list
+  const casualWords = ['wea', 'po', 'weon', 'weón', 'jaja', 'xd', 'xD', 'nah', 'sip', 'sep', 'ya', 'huevón', 'bacán', 'fome', 'cacha', 'cachái', 'onda', 'gallo', 'piola', 'vai', 'bro', 'mano'];
   const formality = casualWords.some(w => allText.toLowerCase().includes(w)) ? 'casual' : 'formal';
 
   return { length, usesEmojis, formality };
@@ -875,9 +933,12 @@ export function analyzeProspectStyle(
 
 /** Paso 4: Get Chile time-based tone instruction. */
 export function getChileTimeContext(): string {
-  // Chile = UTC-4 (CLT) or UTC-3 (CLST summer). Use -4 as default.
+  // Use Intl.DateTimeFormat to respect DST (CLT=UTC-4, CLST=UTC-3)
   const now = new Date();
-  const chileHour = (now.getUTCHours() - 4 + 24) % 24;
+  const chileHour = parseInt(
+    new Intl.DateTimeFormat('es-CL', { hour: 'numeric', hour12: false, timeZone: 'America/Santiago' }).format(now),
+    10,
+  );
 
   if (chileHour >= 8 && chileHour < 12) return 'Tono energético, es de mañana en Chile. Buenos días.';
   if (chileHour >= 12 && chileHour < 18) return 'Tono profesional, horario de trabajo.';
@@ -885,10 +946,12 @@ export function getChileTimeContext(): string {
   return 'Es muy tarde/madrugada en Chile. Sé breve y casual, no lo abrumes a esta hora.';
 }
 
-/** Paso 10: Market deadlines by month. */
-export function getMarketDeadline(): string | null {
+/** Paso 10: Market deadlines by month.
+ * @param seed Optional stable seed (e.g. prospect.id) — ensures same prospect always sees same deadline.
+ */
+export function getMarketDeadline(seed?: string): string | null {
   const month = new Date().getMonth(); // 0-indexed
-  // Multiple deadlines per month — pick one randomly so Steve doesn't repeat the same every time
+  // Multiple deadlines per month — pick deterministically if seed provided
   const deadlines: Record<number, string[]> = {
     0: ['Vuelta a clases (marzo) — marcas de moda y accesorios venden fuerte', 'Verano en LATAM — buen momento para marcas de outdoor, deporte y skincare'],
     1: ['Día de la Mujer (8 marzo) — las marcas que preparan con tiempo venden 3x más', 'Vuelta a clases terminando — buen momento para pensar en la estrategia del semestre'],
@@ -905,6 +968,12 @@ export function getMarketDeadline(): string | null {
   };
   const options = deadlines[month] || [];
   if (options.length === 0) return null;
+  // Fix #6: use stable seed to avoid deadline changing on each call for same prospect
+  if (seed) {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) & 0x7fffffff;
+    return options[hash % options.length];
+  }
   return options[Math.floor(Math.random() * options.length)];
 }
 
@@ -928,10 +997,12 @@ export function calculateLostMoney(monthlyRevenue: string | null | undefined): {
   }
   // If number is too small to be CLP (likely USD or thousands)
   if (amount < 10_000) return null;
+  // Fix #4: cap at 2B CLP to prevent absurd outputs (e.g. "500 millones" → 500M, not 500B)
+  if (amount > 2_000_000_000) amount = 2_000_000_000;
 
-  // Assume current ROAS ~2x (industry average), optimized ~4x
+  // Conservative 40% uplift — more credible than 2x claim
   const currentEstimate = amount;
-  const optimizedEstimate = amount * 2; // double revenue with better ROAS
+  const optimizedEstimate = Math.round(amount * 1.4);
   const difference = optimizedEstimate - currentEstimate;
 
   return { currentEstimate, optimizedEstimate, difference };
@@ -939,46 +1010,60 @@ export function calculateLostMoney(monthlyRevenue: string | null | undefined): {
 
 /** Paso 13: Load case studies from wa_case_studies matching prospect's industry keywords. */
 export async function loadIndustryCaseStudy(whatTheySell: string | null | undefined): Promise<CaseStudyResult | null> {
-  if (!whatTheySell) return null;
+  if (!whatTheySell?.trim()) return null;
   const supabase = getSupabaseAdmin();
 
-  // Extract keywords from what they sell
-  const keywords = whatTheySell.toLowerCase().split(/[\s,;]+/).filter(w => w.length >= 3);
+  // Extract keywords from what they sell — with singular/plural normalization
+  // Fix #9: "zapatos" matches "zapato" and vice versa — reduces missed case studies
+  const baseKeywords = whatTheySell.toLowerCase().split(/[\s,;]+/).filter(w => w.length >= 3);
+  if (baseKeywords.length === 0) return null;
+  const keywords = [...new Set(baseKeywords.flatMap(k => [k, k + 's', k.replace(/s$/, '')]))];
   if (keywords.length === 0) return null;
 
   // Try overlap query with industry_keywords array
-  const { data } = await supabase
-    .from('wa_case_studies')
-    .select('title, summary, metrics, media_url, industry_keywords')
-    .eq('active', true)
-    .overlaps('industry_keywords', keywords)
-    .limit(1);
+  let data = await safeQueryOrDefault<{ title: string; summary: string; metrics: any; media_url: string | null; industry_keywords: string[] | null }>(
+    supabase
+      .from('wa_case_studies')
+      .select('title, summary, metrics, media_url, industry_keywords')
+      .eq('active', true)
+      .overlaps('industry_keywords', keywords)
+      .limit(1),
+    [],
+    'steveWaBrain.loadCaseStudy.overlap',
+  );
 
-  if (data && data.length > 0) {
+  // Fix R5-#13: fallback to ILIKE search if overlaps returns nothing
+  if (data.length === 0 && keywords.length > 0) {
+    const fallback = await safeQueryOrDefault<{ title: string; summary: string; metrics: any; media_url: string | null; industry_keywords: string[] | null }>(
+      supabase
+        .from('wa_case_studies')
+        .select('title, summary, metrics, media_url, industry_keywords')
+        .eq('active', true)
+        .ilike('title', `%${keywords[0]}%`)
+        .limit(1),
+      [],
+      'steveWaBrain.loadCaseStudy.ilikeFallback',
+    );
+    if (fallback.length > 0) data = fallback;
+  }
+
+  if (data.length > 0) {
+    // Fix R5-#24: validate returned case study is actually relevant to current industry
+    const item = data[0];
+    const itemText = `${item.title || ''} ${item.summary || ''}`.toLowerCase();
+    const isRelevant = baseKeywords.some(kw => itemText.includes(kw));
+    if (!isRelevant) {
+      console.log(`[loadIndustryCaseStudy] Skipping irrelevant case study "${item.title}" for industry: ${whatTheySell}`);
+      return null;
+    }
     return {
-      title: data[0].title,
-      summary: data[0].summary,
-      mediaUrl: data[0].media_url || null,
+      title: item.title,
+      summary: item.summary,
+      mediaUrl: item.media_url || null,
     };
   }
 
-  // Fallback: fuzzy match on first keyword via steve_knowledge
-  const { data: fallback } = await supabase
-    .from('steve_knowledge')
-    .select('id, titulo, contenido')
-    .eq('activo', true)
-    .eq('approval_status', 'approved')
-    .ilike('contenido', `%${keywords[0]}%`)
-    .limit(1);
-
-  if (fallback && fallback.length > 0) {
-    return {
-      title: fallback[0].titulo || 'Caso de éxito',
-      summary: (fallback[0].contenido || '').slice(0, 400),
-      mediaUrl: null,
-    };
-  }
-
+  // No match in wa_case_studies — return null (don't use generic knowledge entries as fake case studies)
   return null;
 }
 
@@ -986,26 +1071,37 @@ export async function loadIndustryCaseStudy(whatTheySell: string | null | undefi
 // Creative performance insights (real social proof for sales)
 // ---------------------------------------------------------------------------
 
+// Fix R5-#19: in-memory cache to avoid repeated DB queries on every message (5 min TTL)
+let _creativeInsightsCache: { data: string; ts: number } | null = null;
+const CREATIVE_INSIGHTS_TTL_MS = 5 * 60_000;
+
 /**
  * Load aggregated creative performance insights from creative_history.
  * Returns a short text block with real data Steve can cite in sales conversations.
  * Only loads data with measured performance (not pending).
  */
 export async function loadCreativeInsights(): Promise<string> {
+  if (_creativeInsightsCache && Date.now() - _creativeInsightsCache.ts < CREATIVE_INSIGHTS_TTL_MS) {
+    return _creativeInsightsCache.data;
+  }
   const supabase = getSupabaseAdmin();
 
   try {
     // Get top-performing creatives with real metrics (last 90 days)
     const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000).toISOString();
-    const { data: topCreatives } = await supabase
-      .from('creative_history')
-      .select('channel, angle, performance_verdict, meta_roas, meta_ctr, meta_cpa, klaviyo_open_rate, klaviyo_click_rate, performance_score')
-      .not('measured_at', 'is', null)
-      .gte('created_at', ninetyDaysAgo)
-      .order('performance_score', { ascending: false })
-      .limit(30);
+    const topCreatives = await safeQueryOrDefault<{ channel: string; angle: string | null; performance_verdict: string | null; meta_roas: number | null; meta_ctr: number | null; meta_cpa: number | null; klaviyo_open_rate: number | null; klaviyo_click_rate: number | null; performance_score: number | null }>(
+      supabase
+        .from('creative_history')
+        .select('channel, angle, performance_verdict, meta_roas, meta_ctr, meta_cpa, klaviyo_open_rate, klaviyo_click_rate, performance_score')
+        .not('measured_at', 'is', null)
+        .gte('created_at', ninetyDaysAgo)
+        .order('performance_score', { ascending: false })
+        .limit(30),
+      [],
+      'steveWaBrain.loadCreativeInsights',
+    );
 
-    if (!topCreatives || topCreatives.length < 3) return '';
+    if (topCreatives.length < 3) return '';
 
     // Aggregate by channel
     const metaCreatives = topCreatives.filter(c => c.channel === 'meta' && c.meta_roas);
@@ -1041,7 +1137,9 @@ export async function loadCreativeInsights(): Promise<string> {
 
     if (lines.length === 0) return '';
 
-    return `\n📈 DATOS CREATIVOS REALES DE LA PLATAFORMA (usa como social proof — son datos REALES, no inventados):\n${lines.map(l => `- ${l}`).join('\n')}`;
+    const result = `\n📈 DATOS CREATIVOS REALES DE LA PLATAFORMA (usa como social proof — son datos REALES, no inventados):\n${lines.map(l => `- ${l}`).join('\n')}`;
+    _creativeInsightsCache = { data: result, ts: Date.now() }; // Fix R5-#19: cache result
+    return result;
   } catch (err) {
     console.error('[creative-insights] Error loading:', err);
     return '';
@@ -1062,16 +1160,20 @@ export async function loadSalesLearnings(industry: string | null | undefined): P
 
   const keywords = industry.toLowerCase().split(/[\s,;]+/).filter(w => w.length >= 3);
 
-  const { data: learnings } = await supabase
-    .from('steve_knowledge')
-    .select('id, titulo, contenido')
-    .eq('categoria', 'sales_learning')
-    .eq('activo', true)
-    .eq('approval_status', 'approved')
-    .order('created_at', { ascending: false })
-    .limit(10);
+  const learnings = await safeQueryOrDefault<{ id: string; titulo: string; contenido: string }>(
+    supabase
+      .from('steve_knowledge')
+      .select('id, titulo, contenido')
+      .eq('categoria', 'sales_learning')
+      .eq('activo', true)
+      .eq('approval_status', 'approved')
+      .order('created_at', { ascending: false })
+      .limit(10),
+    [],
+    'steveWaBrain.loadSalesLearnings',
+  );
 
-  if (!learnings?.length) return { text: '', ruleIds: [] };
+  if (!learnings.length) return { text: '', ruleIds: [] };
 
   // Filter by industry relevance, fallback to generic
   const relevant = keywords.length > 0
@@ -1095,11 +1197,15 @@ export async function loadInvestigationContext(prospectId: string): Promise<stri
   if (!prospectId) return '';
   const supabase = getSupabaseAdmin();
 
-  const { data } = await supabase
-    .from('wa_prospects')
-    .select('investigation_data')
-    .eq('id', prospectId)
-    .maybeSingle();
+  const data = await safeQuerySingleOrDefault<{ investigation_data: any }>(
+    supabase
+      .from('wa_prospects')
+      .select('investigation_data')
+      .eq('id', prospectId)
+      .maybeSingle(),
+    null,
+    'steveWaBrain.loadInvestigationContext',
+  );
 
   const inv = data?.investigation_data;
   if (!inv) return '';
@@ -1178,11 +1284,13 @@ function detectTicketInsight(priceRange: string): string {
 // Dynamic sales prompt builder (per-stage)
 // ---------------------------------------------------------------------------
 
-/** Map lead score to effective stage. */
+/** Map lead score to effective stage.
+ * Fix #14: raised thresholds — 30 for qualifying, 55 for pitching (was 20/50 — too low).
+ */
 function scoreToStage(score: number): string {
   if (score >= 75) return 'closing';
-  if (score >= 50) return 'pitching';
-  if (score >= 20) return 'qualifying';
+  if (score >= 55) return 'pitching';
+  if (score >= 30) return 'qualifying';
   return 'discovery';
 }
 
@@ -1203,7 +1311,8 @@ export async function buildDynamicSalesPrompt(
   prospect: ProspectRecord,
   lastMessage?: string,
   history?: Array<{ role: 'user' | 'assistant'; content: string }>,
-  strategistBrief?: string,
+  // Fix R5-#30: typed as StrategistResult | null (was string)
+  strategistBrief?: StrategistResult | null,
   quickIntel?: string,
 ): Promise<DynamicPromptResult> {
   const supabase = getSupabaseAdmin();
@@ -1259,51 +1368,26 @@ export async function buildDynamicSalesPrompt(
   const closerMode = lastMessage ? detectBuyingSignals(lastMessage, historyArr) : false;
   const prospectStyle = analyzeProspectStyle(historyArr);
   const chileTime = getChileTimeContext();
-  const deadline = getMarketDeadline();
+  // Fix #6: stable deadline per prospect (same prospect always sees same deadline this month)
+  const deadline = getMarketDeadline(prospect.id);
   const lostMoney = calculateLostMoney(prospect.monthly_revenue);
   const caseStudy = await loadIndustryCaseStudy(prospect.what_they_sell);
 
   // ============================================================
   // Build KNOWN / MISSING data lists
+  // Fix R5-#22: use buildEnrichedProspectContext instead of manual known[] array
   // ============================================================
 
-  const known: string[] = [];
+  // Known data: single canonical source of truth
+  const knownBlock = buildEnrichedProspectContext(prospect);
+
+  // Missing data: still need to track separately for qualification directives
   const missing: string[] = [];
-
-  if (prospect.name) known.push(`Nombre: ${prospect.name}`);
-  if (prospect.company) known.push(`Empresa: ${prospect.company}`);
-  if (prospect.what_they_sell) known.push(`Vende: ${prospect.what_they_sell}`);
-  else missing.push('Qué vende');
-
-  if (prospect.has_online_store != null) known.push(`Tienda online: ${prospect.has_online_store ? 'Sí' : 'No'}`);
-  else missing.push('Si tiene tienda online');
-
-  if (prospect.store_platform) known.push(`Plataforma: ${prospect.store_platform}`);
-  else if (prospect.has_online_store === true) missing.push('Plataforma de e-commerce');
-
-  if (prospect.monthly_revenue) known.push(`Facturación: ${prospect.monthly_revenue}`);
-  else missing.push('Facturación mensual aprox.');
-
-  if (prospect.current_marketing) known.push(`Marketing actual: ${prospect.current_marketing}`);
-  else missing.push('Cómo maneja su marketing hoy');
-
-  if (prospect.pain_points?.length) known.push(`Dolores: ${prospect.pain_points.join(', ')}`);
-  if (prospect.team_size) known.push(`Equipo: ${prospect.team_size}`);
-  if (prospect.is_decision_maker != null) known.push(`Decisor: ${prospect.is_decision_maker ? 'Sí' : 'No'}`);
-  if (prospect.integrations_used?.length) known.push(`Herramientas: ${prospect.integrations_used.join(', ')}`);
-  if (prospect.actively_looking != null) known.push(`Buscando solución: ${prospect.actively_looking ? 'Sí' : 'No'}`);
-  if (prospect.budget_range) known.push(`Presupuesto: ${prospect.budget_range}`);
-  if (prospect.decision_timeline) known.push(`Timeline decisión: ${prospect.decision_timeline}`);
-  if (prospect.audit_data?.findings?.length) known.push(`Auditoría tienda: ${prospect.audit_data.findings.join('; ')}`);
-
-  if (prospect.apellido) known.push(`Apellido: ${prospect.apellido}`);
-  if (prospect.meeting_status && prospect.meeting_status !== 'none') known.push(`Estado reunión: ${prospect.meeting_status}`);
-  if (prospect.meeting_at) known.push(`Reunión agendada: ${new Date(prospect.meeting_at).toLocaleString('es-CL', { timeZone: 'America/Santiago' })}`);
-
-  known.push(`Score: ${prospect.lead_score || 0}/100`);
-  known.push(`Stage: ${prospect.stage || 'discovery'}`);
-  known.push(`Mensajes: ${prospect.message_count || 0}`);
-  if (prospect.meeting_link_sent) known.push('Link de reunión ya enviado: Sí');
+  if (!prospect.what_they_sell && !prospect.audit_data?.url) missing.push('Qué vende');
+  if (prospect.has_online_store == null) missing.push('Si tiene tienda online');
+  if (!prospect.store_platform && prospect.has_online_store === true) missing.push('Plataforma de e-commerce');
+  if (!prospect.monthly_revenue) missing.push('Facturación mensual aprox.');
+  if (!prospect.current_marketing) missing.push('Cómo maneja su marketing hoy');
 
   // ============================================================
   // Load sales learnings + investigation + creative insights (parallel)
@@ -1327,28 +1411,14 @@ export async function buildDynamicSalesPrompt(
   // 0. PRODUCT CATALOG (so Steve knows what he's selling)
   prompt += getProductCatalogPrompt() + '\n\n';
 
-  // 0. CORRECTIONS — injected with MAXIMUM priority so Steve learns from past mistakes
-  if (corrections?.length) {
-    prompt += `🚨 CORRECCIONES RECIENTES (PRIORIDAD MÁXIMA — sigue estas directrices):\n`;
-    for (const c of corrections) {
-      prompt += `### ${c.titulo}\n${c.contenido}\n\n`;
-    }
-  }
-
-  // 0.1 KNOWN BUGS — anti-patterns Steve must avoid
-  if (salesBugs?.length) {
-    prompt += `🚫 ERRORES CONOCIDOS — EVITAR OBLIGATORIAMENTE:\n`;
-    for (const bug of salesBugs) {
-      prompt += `❌ ${bug.descripcion}`;
-      if (bug.ejemplo_bueno) prompt += ` → CORRECTO: ${bug.ejemplo_bueno}`;
-      prompt += '\n';
-    }
-    prompt += '\n';
-  }
+  // Fix #20: corrections moved to END of prompt for maximum recency/priority
+  // (see bottom of function, before return)
 
   // 0. STRATEGIST BRIEF (injected by multi-brain pipeline)
-  if (strategistBrief) {
-    prompt += `🧠 BRIEF DEL ESTRATEGA (SIGUE ESTA DIRECTRIZ):\n${strategistBrief}\n\n`;
+  // Fix R4-#5: only inject if brief has actual content (not empty/whitespace-only)
+  // Fix R5-#30: properly typed as StrategistResult | null
+  if (strategistBrief?.brief?.trim()) {
+    prompt += `🧠 BRIEF DEL ESTRATEGA (SIGUE ESTA DIRECTRIZ):\n${strategistBrief.brief.trim()}\n\n`;
   }
 
   // 0.25. STAGE STRATEGY — at the TOP so it's the primary directive (Cambio 4a)
@@ -1357,13 +1427,17 @@ export async function buildDynamicSalesPrompt(
   }
 
   // 0.5. FIRST MESSAGE INTEL (quick Haiku analysis for msg 1)
-  if (quickIntel) {
+  // Fix #14: ignore whitespace-only quickIntel
+  // Fix R5-#9: skip generic intel responses that add no value
+  const GENERIC_INTEL_PHRASES = ['no hay información', 'sin datos', 'no se puede determinar', 'información insuficiente', 'no tengo información', 'no se detectó'];
+  const isGenericIntel = !quickIntel?.trim() || quickIntel.length < 30 || GENERIC_INTEL_PHRASES.some(p => quickIntel.toLowerCase().includes(p));
+  if (!isGenericIntel) {
     prompt += `🎯 PRIMERA IMPRESIÓN (lo que captaste del primer mensaje):\n${quickIntel}\n→ USA esta info para impresionar desde el primer mensaje. NO digas "déjame revisar" ni "dame un minuto".\n\n`;
   }
 
-  // 1. KNOWN DATA
+  // 1. KNOWN DATA (Fix R5-#22: use buildEnrichedProspectContext)
   prompt += `⛔ DATOS CONOCIDOS — PROHIBIDO preguntar esto (ya lo sabes):\n`;
-  prompt += known.map(k => `- ${k}`).join('\n');
+  prompt += knownBlock;
 
   // 1.5 INVESTIGATION INTEL
   if (investigationText) {
@@ -1417,7 +1491,12 @@ export async function buildDynamicSalesPrompt(
   const prospectStage = prospect.stage || 'discovery';
   const bookingBaseUrl = process.env.BOOKING_BASE_URL || 'https://www.steve.cl/agendar';
 
-  if (prospectScore >= 70 && meetingStatus === 'none' && (prospectStage === 'qualifying' || prospectStage === 'pitching' || prospectStage === 'closing')) {
+  // Fix #3: solo proponer reunión desde Mini CRM si no aparece link en los 4 mensajes recientes
+  // (all-history check was preventing proposal after a few conversations)
+  const miniCrmAlreadyProposed = historyArr.slice(-4).some(m =>
+    m.role === 'assistant' && m.content.includes('steve.cl/agendar'),
+  );
+  if (prospectScore >= 70 && meetingStatus === 'none' && !miniCrmAlreadyProposed && (prospectStage === 'qualifying' || prospectStage === 'pitching' || prospectStage === 'closing')) {
     // Check if there's an assigned seller with booking link
     const bookingLink = prospect.assigned_seller_id
       ? `${bookingBaseUrl}/${prospect.assigned_seller_id}`
@@ -1432,10 +1511,15 @@ export async function buildDynamicSalesPrompt(
     prompt += `\n📞 Ya le propusiste reunión. Si confirma un horario, responde con entusiasmo y confirma la hora. Si propone otro horario, acepta si es razonable. Si rechaza, respétalo y sigue la conversación normalmente.\n`;
   } else if (meetingStatus === 'scheduled' || meetingStatus === 'reminded_24h' || meetingStatus === 'reminded_2h') {
     prompt += `\n📞 Ya hay reunión agendada (${prospect.meeting_at ? new Date(prospect.meeting_at).toLocaleString('es-CL', { timeZone: 'America/Santiago' }) : 'pendiente'}). NO vuelvas a proponer reunión. Si el prospecto pregunta, confirma la hora.\n`;
+  } else if (meetingStatus === 'cancelled') {
+    // Fix R5-#7: don't re-propose meeting after explicit rejection
+    prompt += `\n📞 REUNIÓN RECHAZADA: El prospecto rechazó la reunión explícitamente. NO vuelvas a proponer reunión. Resuelve objeciones y genera más confianza antes de intentarlo de nuevo.\n`;
+  } else if (meetingStatus === 'deferred') {
+    prompt += `\n📞 REUNIÓN POSPUESTA: El prospecto pospuso la reunión. Puedes volver a mencionarla suavemente si hay señales de interés, pero sin presionar.\n`;
   }
 
-  // Detect if prospect asked a question
-  const hasQuestion = lastMessage?.includes('?');
+  // Fix #7: require length > 15 to avoid false positives like "¿ok?" or "¿sí?"
+  const hasQuestion = (lastMessage?.includes('?') ?? false) && (lastMessage?.length ?? 0) > 15;
   if (hasQuestion) {
     prompt += `El prospecto te hizo una pregunta. Respóndela primero — después si quieres puedes preguntar algo tú.\n`;
   }
@@ -1447,9 +1531,14 @@ export async function buildDynamicSalesPrompt(
     prompt += `⚠️ Ya hiciste una pregunta en tu mensaje anterior. En ESTE mensaje, aporta valor (dato, opinión, insight, reacción) sin hacer otra pregunta. Que no se sienta como interrogatorio.\n`;
   }
 
-  // Paso 1: No-tienda ya NO es descalificación — ofrecer armarla
+  // Paso 1: No-tienda ya NO es descalificación — ofrecer armarla (solo si no se ha ofrecido antes)
   if (prospect.has_online_store === false) {
-    prompt += `No tiene tienda online. Ofrécele: "También podemos armarte una, háblalo con la consultora. Andan alrededor de 1 millón de pesos." Sigue vendiéndole Steve normalmente.\n`;
+    const alreadyOfferedStore = historyArr.some(m =>
+      m.role === 'assistant' && m.content.includes('1 millón'),
+    );
+    if (!alreadyOfferedStore) {
+      prompt += `No tiene tienda online. Ofrécele UNA VEZ: "También podemos armarte una, háblalo con la consultora. Andan alrededor de 1 millón de pesos." Sigue vendiéndole Steve normalmente.\n`;
+    }
   }
 
   // Paso 11: Pedir URL de tienda
@@ -1467,14 +1556,20 @@ export async function buildDynamicSalesPrompt(
     prompt += `Usa agencia. Haz preguntas que expongan debilidades: "¿Te dan acceso al Business Manager? ¿Ves los números reales o solo reportes bonitos?"\n`;
   }
 
-  // Paso 8: Quiz — exponer lagunas (discovery/qualifying)
-  if (effectiveStage === 'discovery' || effectiveStage === 'qualifying') {
+  // Paso 8: Quiz — exponer lagunas (discovery/qualifying, mínimo 3 mensajes para no abrumar)
+  // Fix #10: don't quiz before 3 messages — too early feels hostile
+  if ((effectiveStage === 'discovery' || effectiveStage === 'qualifying') && msgCount >= 3) {
     prompt += `Puedes hacer quiz: "¿Sabes tu CAC? ¿Y tu LTV?" Si no sabe → "Eso Steve lo calcula automático."\n`;
   }
 
-  // Paso 9: FOMO de cupos (pitching/closing)
+  // Paso 9: FOMO de cupos (pitching/closing) — solo si no se ha mencionado antes
   if (effectiveStage === 'pitching' || effectiveStage === 'closing') {
-    prompt += `Steve trabaja máximo 3 marcas por categoría para no competir entre clientes. Puedes mencionarlo si es natural.\n`;
+    const alreadyMentionedFomo = historyArr.some(m =>
+      m.role === 'assistant' && (m.content.includes('3 marcas') || m.content.includes('cupos') || m.content.includes('categoría')),
+    );
+    if (!alreadyMentionedFomo) {
+      prompt += `Steve trabaja máximo 3 marcas por categoría para no competir entre clientes. Puedes mencionarlo UNA SOLA VEZ si es natural.\n`;
+    }
   }
 
   // Paso 10: Deadline real del mercado (solo mencionar 1 vez en toda la conversación)
@@ -1486,15 +1581,22 @@ export async function buildDynamicSalesPrompt(
   }
 
   // Paso 12: Calculadora de plata perdida
+  // Fix #22: explain the mechanism so it's credible (not magic numbers)
   if (lostMoney) {
     const fmt = (n: number) => `$${Math.round(n).toLocaleString('es-CL')}`;
-    prompt += `Con lo que factura (~${fmt(lostMoney.currentEstimate)}/mes), optimizando podría estar generando ~${fmt(lostMoney.difference)} más. Menciónalo si es natural.\n`;
+    prompt += `Con lo que factura (~${fmt(lostMoney.currentEstimate)}/mes), mejorando ROAS un 40% con mejor segmentación y creativos, podría estar generando ~${fmt(lostMoney.difference)} más al mes. Menciónalo si es natural.\n`;
   }
 
   // Industry benchmarks (for "espejo" technique)
   const industry = (prospect.what_they_sell || '').toLowerCase();
   const benchmarks = getIndustryBenchmarks(industry);
-  if (benchmarks) {
+  // Fix #1: Solo inyectar benchmarks si Steve no ha mencionado ROAS recientemente (evita repetición 3x)
+  const steveRecentMsgs = historyArr.filter(m => m.role === 'assistant').slice(-5);
+  const alreadyMentionedRoas = steveRecentMsgs.some(m =>
+    m.content.toLowerCase().includes('roas') || m.content.toLowerCase().includes('retorno sobre'),
+  );
+  // Fix #11: no benchmarks in closer mode or closing stage — prospect already sold, don't info-dump
+  if (benchmarks && !alreadyMentionedRoas && !closerMode && effectiveStage !== 'closing') {
     prompt += `📊 DATOS DE SU INDUSTRIA (úsalos como espejo para que revele info sin sentir interrogatorio):\n${benchmarks}\n`;
   }
 
@@ -1514,10 +1616,15 @@ export async function buildDynamicSalesPrompt(
   }
 
   // Meeting trigger — organic (lowered from 8 to 4 messages)
+  // Fix #8: verificar también historial reciente para evitar proponer reunión 3+ veces
+  const steveAlreadySentLink = historyArr.some(m =>
+    m.role === 'assistant' && m.content.includes('steve.cl/agendar'),
+  );
   if (
     (prospect.lead_score || 0) >= 75 &&
     (prospect.message_count || 0) >= 4 &&
     !prospect.meeting_link_sent &&
+    !steveAlreadySentLink &&
     prospect.pain_points?.length
   ) {
     prompt += `Ya tienes suficiente info y el prospecto mostró interés. Si sientes que fluye, propón una llamada corta: "¿Te tinca que nos juntemos 15 min? Te muestro cómo se ve con tus datos → www.steve.cl/agendar/steve"\n`;
@@ -1536,19 +1643,21 @@ export async function buildDynamicSalesPrompt(
   // Paso 6: Double text instruction
   prompt += `\n\n📱 Si quieres enviar 2 mensajes separados (ej: uno con respuesta y otro con dato extra), usa [SPLIT] para dividirlos. Máximo 2 partes.`;
 
-  // Mockup trigger (pitching/closing with product images)
+  // Mockup trigger (pitching/closing with product images) — mínimo 6 mensajes para no proponer demasiado temprano
   if (
     (effectiveStage === 'pitching' || effectiveStage === 'closing') &&
+    (prospect.message_count || 0) >= 6 &&
     (prospect as any).investigation_data?.store?.product_images?.length &&
     !(prospect as any).mockup_sent
   ) {
     prompt += `\n\n🎨 MOCKUP: Si quieres enviarle un ejemplo visual de cómo se vería un anuncio de su marca, incluye [SEND_MOCKUP] al final de tu mensaje.`;
   }
 
-  // Sales deck trigger (pitching/closing with qualification data) — Cambio 6
+  // Sales deck trigger (pitching/closing with qualification data) — mínimo 6 mensajes
   if (
     (effectiveStage === 'pitching' || effectiveStage === 'closing') &&
-    prospect.what_they_sell &&
+    (prospect.message_count || 0) >= 6 &&
+    prospect.what_they_sell?.trim() &&
     (prospect.pain_points?.length || prospect.current_marketing) &&
     !(prospect as any).deck_sent
   ) {
@@ -1621,6 +1730,23 @@ Si ya mencionaste una fecha comercial, NO la repitas. Si ya hablaste de CPA, hab
     }
   }
 
+  // Fix #20: CORRECTIONS at END for maximum recency — last thing Claude reads before responding
+  if (corrections?.length) {
+    prompt += `\n\n🚨 CORRECCIONES RECIENTES (PRIORIDAD MÁXIMA — sigue estas directrices EXACTAS):\n`;
+    for (const c of corrections) {
+      prompt += `### ${c.titulo}\n${c.contenido}\n\n`;
+    }
+  }
+  if (salesBugs?.length) {
+    prompt += `\n🚫 ERRORES CONOCIDOS — EVITAR OBLIGATORIAMENTE:\n`;
+    for (const bug of salesBugs) {
+      prompt += `❌ ${bug.descripcion}`;
+      if (bug.ejemplo_bueno) prompt += ` → CORRECTO: ${bug.ejemplo_bueno}`;
+      prompt += '\n';
+    }
+    prompt += '\n';
+  }
+
   // Audit trail: fire-and-forget qa_log insert (non-blocking)
   if (collectedRuleIds.length > 0) {
     supabase.from('qa_log').insert({
@@ -1652,10 +1778,14 @@ Si ya mencionaste una fecha comercial, NO la repitas. Si ya hablaste de CPA, hab
  * Returns deduplicated array (max 8 items). Falls back to slice(-8) on error.
  */
 export async function consolidatePainPoints(painPoints: string[]): Promise<string[]> {
-  if (painPoints.length <= 8) return painPoints;
+  // Fix #13: always dedup exact literal duplicates first (before the early return)
+  const deduped = painPoints.filter(
+    (p, i, arr) => arr.findIndex(q => q.toLowerCase().trim() === p.toLowerCase().trim()) === i,
+  );
+  if (deduped.length <= 8) return deduped;
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-  if (!ANTHROPIC_API_KEY) return painPoints.slice(-8);
+  if (!ANTHROPIC_API_KEY) return deduped; // return all — don't drop early pain points
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1673,7 +1803,7 @@ export async function consolidatePainPoints(painPoints: string[]): Promise<strin
           content: `Consolida estos pain points eliminando duplicados semánticos. Dos items son duplicados si expresan la MISMA frustración con distintas palabras.
 
 Pain points actuales:
-${JSON.stringify(painPoints)}
+${JSON.stringify(deduped)}
 
 Reglas:
 - Máximo 8 items únicos en el resultado
@@ -1690,21 +1820,50 @@ Ejemplo:
 
     if (!response.ok) {
       console.error('[consolidatePainPoints] API error:', response.status);
-      return painPoints.slice(-8);
+      return deduped; // return all — don't drop early pain points on API error
     }
 
     const data: any = await response.json();
     const text = (data.content?.[0]?.text || '').trim();
     const jsonStr = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
-    const parsed = JSON.parse(jsonStr);
+    // Fix R5-#21: robust JSON parse — try inline array recovery if parse fails
+    let parsed: any;
+    try { parsed = JSON.parse(jsonStr); } catch {
+      const m = jsonStr.match(/\[[\s\S]*?\]/);
+      if (m) { try { parsed = JSON.parse(m[0]); } catch { /* fall through */ } }
+    }
 
     if (Array.isArray(parsed) && parsed.length > 0) {
       return parsed.slice(0, 8);
     }
-    return painPoints.slice(-8);
+    return deduped; // return all — don't drop early pain points on API error
   } catch (err) {
     console.error('[consolidatePainPoints] Error:', err);
-    return painPoints.slice(-8);
+    // Fix R4-#3: semantic bucket dedup — catches synonyms like "no sé cuánto gastar" ≈ "desconozco el presupuesto"
+    // Fix R5-#28: order buckets by sales specificity (highest-impact first)
+    const painBuckets: Record<string, string[]> = {
+      revenue: ['perder dinero', 'gastar mal', 'malgastar', 'sin retorno', 'roi', 'retorno', 'rentabilidad', 'facturar', 'ventas bajas'],
+      budget: ['presupuesto', 'costo', 'inversión', 'cuánto vale', 'precio', 'no tengo plata'],
+      measurement: ['medir', 'resultados', 'métricas', 'datos', 'analytics', 'números', 'validar', 'saber si'],
+      expertise: ['no sé', 'no se', 'desconozco', 'falta conocimiento', 'aprender', 'capacitación', 'ignorancia', 'no entiendo'],
+      time: ['tiempo', 'manual', 'automatizar', 'carga', 'horas', 'dedicación', 'tedioso', 'proceso'],
+      tools: ['herramienta', 'software', 'plataforma', 'integración', 'conexión', 'sistema'],
+    };
+    const bucketed: Record<string, string> = {};
+    for (const pain of deduped) {
+      let matched = false;
+      for (const [bucket, keywords] of Object.entries(painBuckets)) {
+        if (keywords.some(k => pain.toLowerCase().includes(k))) {
+          if (!bucketed[bucket]) bucketed[bucket] = pain;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched && Object.keys(bucketed).length < 8) {
+        bucketed[`other_${Object.keys(bucketed).length}`] = pain;
+      }
+    }
+    return Object.values(bucketed).slice(0, 8);
   }
 }
 
@@ -1775,55 +1934,68 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown, sin explicación). Solo 
   "has_online_store": true/false — solo si lo confirmó explícitamente,
   "store_platform": "Shopify/WooCommerce/etc — solo si lo nombró",
   "is_decision_maker": true/false — solo si dijo 'soy el dueño/fundador/CEO',
-  "actively_looking": true/false — solo si expresó búsqueda activa,
+  "actively_looking": true/false — true si expresó búsqueda activa o urgencia temporal. Señales: "para el CyberDay", "lo necesito ya", "urgente", "estamos explorando", "buscando opciones", "cotizando alternativas", "queremos solucionar", "resolviendo en Q1/Q2", "próximo mes", "buscamos herramienta", "estamos comparando", "necesitamos mejorar", "quiero empezar pronto" — Fix R4-#2: incluir variantes LATAM semánticas,
   "current_marketing": "cómo manejan marketing — solo si lo describió",
   "pain_points": ["dolor genuinamente NUEVO"] — solo si NO está ya cubierto semánticamente en la lista existente. Si no hay nuevos → [],
   "integrations_used": ["Meta"] — solo herramientas que el prospecto NOMBRÓ,
   "team_size": "tamaño del equipo — solo si lo mencionó",
   "budget_range": "presupuesto de marketing mensual — solo si dio rango o cifra (ej: '$500K/mes', 'entre 1-2 millones')",
-  "decision_timeline": "cuándo quiere empezar — solo si lo dijo (ej: 'este mes', 'después de CyberDay', 'lo antes posible')"
+  "decision_timeline": "cuándo quiere empezar — SOLO fechas FUTURAS o intenciones futuras (ej: 'este mes', 'después de CyberDay', 'lo antes posible', 'próximo trimestre', 'Q2'). EXCLUIR menciones del pasado ('el mes pasado', 'antes quería', 'pensé en', 'iba a'). Si es pasado → null"
 }`;
 
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 500,
-        messages: [{ role: 'user', content: extractionPrompt }],
-      }),
-    });
+  // Fix #18: retry once on API failure to avoid silent score=0
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 500,
+          messages: [{ role: 'user', content: extractionPrompt }],
+        }),
+      });
 
-    if (!response.ok) {
-      console.error('[steve-wa-brain] Extraction API error:', response.status);
+      if (!response.ok) {
+        console.error(`[steve-wa-brain] Extraction API error (attempt ${attempt + 1}):`, response.status);
+        if (attempt < 1) { await new Promise(r => setTimeout(r, 800)); continue; }
+        return null;
+      }
+
+      const data: any = await response.json();
+      const text = (data.content?.[0]?.text || '').trim();
+
+      // Parse JSON — handle potential markdown fences
+      const jsonStr = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+      const parsed = JSON.parse(jsonStr);
+
+      // Fix #4: whitelist — only keep known fields to prevent hallucinated fields from corrupting DB
+      const ALLOWED_EXTRACT_FIELDS = new Set([
+        'name', 'apellido', 'email', 'company', 'what_they_sell', 'monthly_revenue',
+        'has_online_store', 'store_platform', 'is_decision_maker',
+        'actively_looking', 'current_marketing', 'pain_points',
+        'integrations_used', 'team_size', 'budget_range', 'decision_timeline',
+      ]);
+      const cleaned: Record<string, any> = {};
+      for (const [key, value] of Object.entries(parsed)) {
+        if (!ALLOWED_EXTRACT_FIELDS.has(key)) continue;  // Drop unknown fields
+        if (value != null && value !== '' && !(Array.isArray(value) && value.length === 0)) {
+          cleaned[key] = value;
+        }
+      }
+
+      return Object.keys(cleaned).length > 0 ? (cleaned as ExtractedProspectInfo) : null;
+    } catch (err) {
+      console.error(`[steve-wa-brain] extractProspectInfo error (attempt ${attempt + 1}):`, err);
+      if (attempt < 1) { await new Promise(r => setTimeout(r, 800)); continue; }
       return null;
     }
-
-    const data: any = await response.json();
-    const text = (data.content?.[0]?.text || '').trim();
-
-    // Parse JSON — handle potential markdown fences
-    const jsonStr = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
-    const parsed = JSON.parse(jsonStr);
-
-    // Remove empty/null/undefined fields
-    const cleaned: Record<string, any> = {};
-    for (const [key, value] of Object.entries(parsed)) {
-      if (value != null && value !== '' && !(Array.isArray(value) && value.length === 0)) {
-        cleaned[key] = value;
-      }
-    }
-
-    return Object.keys(cleaned).length > 0 ? (cleaned as ExtractedProspectInfo) : null;
-  } catch (err) {
-    console.error('[steve-wa-brain] extractProspectInfo error:', err);
-    return null;
   }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1854,12 +2026,27 @@ export function calculateLeadScore(
 
   // --- BUDGET (0-25): Monthly revenue + budget range ---
   if (prospect.monthly_revenue) {
-    const rev = prospect.monthly_revenue.toLowerCase();
+    // Fix R5-#12: normalize number notation before parsing (handles "2,500" vs "2.500" vs "2,5mm")
+    const normalizeNumStr = (s: string) => {
+      // If has both comma AND dot → comma is thousands separator
+      if (s.includes(',') && s.includes('.')) return s.replace(/,/g, '');
+      // Comma with 3 digits after → thousands separator: "1,500" → "1500"
+      if (/,\d{3}(?!\d)/.test(s)) return s.replace(/,/g, '');
+      // Comma with 1-2 digits → decimal: "1,5" → "1.5"
+      return s.replace(',', '.');
+    };
+    const rev = normalizeNumStr(prospect.monthly_revenue.toLowerCase());
+    // Fix #11: extract FIRST number to handle ranges like "2-3 millones" → first number is 2
+    const firstNumMatch = rev.match(/\d[\d.]*/);
+    const firstNumStr = firstNumMatch ? firstNumMatch[0].replace(/\./g, '') : '';
     const digits = rev.replace(/\D/g, '');
-    // Only score if there's an actual number in the string
-    if (digits.length >= 3) {
-      if (rev.includes('millón') || rev.includes('millon') || rev.includes('mm') || /\d{7,}/.test(digits)) {
-        breakdown.budget += 25; // High revenue
+    // Fix #12: require digit before "millón" to avoid false positives ("un millón de problemas")
+    // Score if mentions millones keyword WITH a preceding number, OR has a significant number
+    if (/\d[\d,.]*\s*(millón|millon|mm\b)/i.test(rev)) {
+      breakdown.budget += 25; // "2 millones", "1.5mm", etc. = high revenue
+    } else if (firstNumStr.length >= 3 || digits.length >= 3) {
+      if (/\d{7,}/.test(digits)) {
+        breakdown.budget += 25; // High revenue (raw 7+ digit number)
       } else if (/\d{5,6}/.test(digits)) {
         breakdown.budget += 20; // Medium revenue ($10K-$999K)
       } else {
@@ -1871,7 +2058,10 @@ export function calculateLeadScore(
   // Bonus: explicit budget range shared
   if (prospect.budget_range) {
     const budgetLower = prospect.budget_range.toLowerCase();
-    if (budgetLower.includes('millón') || budgetLower.includes('millon') || /\d{6,}/.test(budgetLower.replace(/\D/g, ''))) {
+    // Fix R4-#18: "no tengo presupuesto" = confirmed disqualifier, not just missing data
+    if (budgetLower.includes('no tengo') || budgetLower.includes('cero') || budgetLower.includes('sin presupuesto') || budgetLower.includes('no hay presupuesto')) {
+      breakdown.budget = 0; // Explicitly confirmed no budget — leave at 0
+    } else if (budgetLower.includes('millón') || budgetLower.includes('millon') || /\d{6,}/.test(budgetLower.replace(/\D/g, ''))) {
       breakdown.budget = Math.min(breakdown.budget + 10, 25); // High budget
     } else {
       breakdown.budget = Math.min(breakdown.budget + 5, 25);
@@ -1885,9 +2075,18 @@ export function calculateLeadScore(
   // Unknown authority → 0 pts (not 5). Don't assume.
 
   // --- TIMELINE (0-20): Actively looking + pain points + decision_timeline = urgency ---
-  if (prospect.actively_looking === true) breakdown.timeline += 10;
-  if (prospect.pain_points && prospect.pain_points.length > 0) {
-    breakdown.timeline += Math.min(prospect.pain_points.length * 5, 10);
+  if (prospect.actively_looking === true) {
+    breakdown.timeline += 10;
+    // Fix #17: actively looking also boosts FIT (they're in buying mode, makes Steve a better fit)
+    breakdown.fit = Math.min(breakdown.fit + 5, 15);
+  }
+  // Fix #17: differentiate pain_point depth — 3+ = full credit, 1 = partial
+  if (prospect.pain_points && prospect.pain_points.length >= 3) {
+    breakdown.timeline += 10;
+  } else if (prospect.pain_points && prospect.pain_points.length === 2) {
+    breakdown.timeline += 7;
+  } else if (prospect.pain_points && prospect.pain_points.length === 1) {
+    breakdown.timeline += 4;
   }
   // Bonus: explicit decision timeline
   if (prospect.decision_timeline) {
@@ -1896,6 +2095,9 @@ export function calculateLeadScore(
       breakdown.timeline = Math.min(breakdown.timeline + 10, 20);
     } else if (tl.includes('próximo mes') || tl.includes('proximo mes') || tl.includes('pronto')) {
       breakdown.timeline = Math.min(breakdown.timeline + 5, 20);
+    } else if (tl.includes('después') || tl.includes('despues') || tl.includes('cuando') || tl.includes('tras') || tl.includes('post') || tl.includes('siguiente') || /q[1-4]/i.test(tl)) {
+      // Fix R4-#10: future date = has a plan, even if not urgent
+      breakdown.timeline = Math.min(breakdown.timeline + 3, 20);
     }
   }
 
@@ -1913,9 +2115,17 @@ export function calculateLeadScore(
     ).length;
     breakdown.fit += Math.min(matchCount * 3, 5);
   }
-  // Bonus: audit data available (we scraped their store)
+  // Fix R4-#17: audit bonus only if findings are positive/neutral (not if findings say store is broken)
   if (prospect.audit_data?.findings?.length) {
-    breakdown.fit = Math.min(breakdown.fit + 5, 15);
+    const findingsText = prospect.audit_data.findings.join(' ').toLowerCase();
+    const hasPositive = /\b(bien|bueno|correcto|funciona|organizado|estructura|sólid)\b/.test(findingsText);
+    const hasNegative = /\b(problema|mal|débil|falta|desorganizado|roto|sin estrategia)\b/.test(findingsText);
+    if (hasPositive && !hasNegative) {
+      breakdown.fit = Math.min(breakdown.fit + 5, 15);
+    } else if (!hasNegative) {
+      breakdown.fit = Math.min(breakdown.fit + 2, 15); // Neutral findings → small bonus
+    }
+    // Negative findings → no bonus
   }
 
   let score = Object.values(breakdown).reduce((a, b) => a + b, 0);
@@ -1934,6 +2144,12 @@ export function calculateLeadScore(
   if (filledFields < 3 && score > 50) {
     score = 50;
   }
+
+  // Fix R4-#19: cap score by message count — prevent inflated scores from just 1-2 messages
+  const msgCount = prospect.message_count || 0;
+  if (msgCount < 2 && score > 45) score = 45;
+  else if (msgCount < 4 && score > 60) score = 60;
+  else if (msgCount < 6 && score > 75) score = 75;
 
   // Paso 1 Perro Lobo: no-tienda ya NO descalifica. Score normal, need baja a 5.
   // La descalificación real ahora viene de detectDisqualification() en el chat handler.

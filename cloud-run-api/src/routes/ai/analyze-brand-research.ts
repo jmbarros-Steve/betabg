@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 export async function analyzeBrandResearch(c: Context) {
   try {
@@ -32,11 +33,15 @@ export async function analyzeBrandResearch(c: Context) {
     return c.json({ error: 'Missing client_id' }, 400);
   }
 
-  const { data: client } = await supabase
-    .from('clients')
-    .select('id, client_user_id, user_id, name, company')
-    .eq('id', client_id)
-    .single();
+  const client = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('clients')
+      .select('id, client_user_id, user_id, name, company')
+      .eq('id', client_id)
+      .single(),
+    null,
+    'analyze-brand-research.fetchClient',
+  );
 
   if (!client) {
     return c.json({ error: 'Client not found' }, 404);
@@ -87,11 +92,15 @@ export async function analyzeBrandResearch(c: Context) {
   }
 
   // 2. Extract competitor URLs from brief
-  const { data: persona } = await supabase
-    .from('buyer_personas')
-    .select('persona_data')
-    .eq('client_id', client_id)
-    .maybeSingle();
+  const persona = await safeQuerySingleOrDefault<{ persona_data: any }>(
+    supabase
+      .from('buyer_personas')
+      .select('persona_data')
+      .eq('client_id', client_id)
+      .maybeSingle(),
+    null,
+    'analyze-brand-research.fetchPersona',
+  );
   const briefContext = persona?.persona_data as any || {};
 
   let briefCompetitorUrls: string[] = [];

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 // ── 12 secciones individuales para llamadas paralelas ──
 const SECTIONS = [
@@ -1122,8 +1123,12 @@ export async function analyzeBrandStrategy(c: Context) {
     // Secciones ya guardadas progresivamente en el .then() de cada llamada
     // Solo guardamos las que fallaron en el guardado progresivo (fallback)
     for (const key of completedSections) {
-      const { data: existing } = await supabase.from('brand_research')
-        .select('id').eq('client_id', client_id).eq('research_type', key).maybeSingle();
+      const existing = await safeQuerySingleOrDefault<{ id: string }>(
+        supabase.from('brand_research')
+          .select('id').eq('client_id', client_id).eq('research_type', key).maybeSingle(),
+        null,
+        'analyze-brand-strategy.fallbackSaveCheck',
+      );
       if (!existing) {
         const value = finalBrief[key];
         const sectionResearchData = key === 'executive_summary'

@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { loadKnowledge } from '../../lib/knowledge-loader.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Image editing via Google Gemini 2.0 Flash (native image generation).
@@ -46,11 +47,15 @@ export async function editImageGemini(c: Context) {
 
     // Check credits (1 credit for edits, 2 for generation)
     const creditCost = ['generate_email_banner', 'variation'].includes(action) ? 2 : 1;
-    const { data: credits } = await supabase
-      .from('client_credits')
-      .select('id, creditos_disponibles, creditos_usados')
-      .eq('client_id', clientId)
-      .maybeSingle();
+    const credits = await safeQuerySingleOrDefault<{ id: string; creditos_disponibles: number | null; creditos_usados: number | null }>(
+      supabase
+        .from('client_credits')
+        .select('id, creditos_disponibles, creditos_usados')
+        .eq('client_id', clientId)
+        .maybeSingle(),
+      null,
+      'edit-image-gemini.fetchCredits',
+    );
 
     if (!credits) {
       return c.json(

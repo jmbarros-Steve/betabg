@@ -3,6 +3,7 @@
 
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../lib/safe-supabase.js';
 import { runChinoPatrol } from './runner.js';
 import { runChinoFixer } from './fixer.js';
 import { sendPeriodicReport } from './whatsapp.js';
@@ -172,13 +173,17 @@ export async function chinoFixNext(c: Context) {
 
   try {
     const supabase = getSupabaseAdmin();
-    const { data } = await supabase
-      .from('steve_fix_queue')
-      .select('*')
-      .eq('status', 'assigned')
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle();
+    const data = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('steve_fix_queue')
+        .select('*')
+        .eq('status', 'assigned')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+      null,
+      'chinoFixNext.getNextAssigned',
+    );
 
     if (!data) {
       return c.json({ message: 'No hay fixes pendientes' }, 404);

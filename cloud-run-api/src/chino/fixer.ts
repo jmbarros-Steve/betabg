@@ -3,6 +3,7 @@
 // Called via POST /api/chino/fixer (cron every 5-10 minutes)
 
 import { getSupabaseAdmin } from '../lib/supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../lib/safe-supabase.js';
 import { decryptPlatformToken } from '../lib/decrypt-token.js';
 import { generateFixPrompt } from './fix-generator.js';
 import { sendEscalationWhatsApp } from './whatsapp.js';
@@ -110,15 +111,19 @@ export async function runChinoFixer(): Promise<FixerResult> {
   // ── STEP A: Re-test deployed fixes (deployed > 5 minutes ago) ──
   const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
 
-  const { data: deployedFixes } = await supabase
-    .from('steve_fix_queue')
-    .select('*')
-    .eq('status', 'deployed')
-    .lt('deploy_timestamp', fiveMinAgo)
-    .order('created_at', { ascending: true })
-    .limit(10); // Process max 10 per run
+  const deployedFixes = await safeQueryOrDefault<any>(
+    supabase
+      .from('steve_fix_queue')
+      .select('*')
+      .eq('status', 'deployed')
+      .lt('deploy_timestamp', fiveMinAgo)
+      .order('created_at', { ascending: true })
+      .limit(10), // Process max 10 per run
+    [],
+    'chinoFixer.fetchDeployedFixes',
+  );
 
-  for (const fix of deployedFixes || []) {
+  for (const fix of deployedFixes) {
     result.verified++;
 
     // Mark as verifying
@@ -128,11 +133,15 @@ export async function runChinoFixer(): Promise<FixerResult> {
       .eq('id', fix.id);
 
     // Get the check definition
-    const { data: check } = await supabase
-      .from('chino_routine')
-      .select('*')
-      .eq('id', fix.check_id)
-      .maybeSingle();
+    const check = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('chino_routine')
+        .select('*')
+        .eq('id', fix.check_id)
+        .maybeSingle(),
+      null,
+      'chinoFixer.fetchCheckDefinition',
+    );
 
     if (!check) {
       await supabase

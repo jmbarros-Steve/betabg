@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -239,12 +240,16 @@ export async function criterioMeta(campaignData: Record<string, any>, shopId: st
   const supabase = getSupabaseAdmin();
 
   // 1. Fetch active META rules
-  const { data: rules } = await supabase
-    .from('criterio_rules')
-    .select('*')
-    .eq('organ', 'CRITERIO')
-    .like('category', 'META%')
-    .eq('active', true);
+  const rules = await safeQueryOrDefault<any>(
+    supabase
+      .from('criterio_rules')
+      .select('*')
+      .eq('organ', 'CRITERIO')
+      .like('category', 'META%')
+      .eq('active', true),
+    [],
+    'criterio-meta.fetchRules',
+  );
 
   if (!rules || rules.length === 0) {
     console.log('[criterio-meta] No active META rules found, allowing publish');
@@ -252,29 +257,40 @@ export async function criterioMeta(campaignData: Record<string, any>, shopId: st
   }
 
   // 2. Fetch brand research brief
-  const { data: brief } = await supabase
-    .from('brand_research')
-    .select('*')
-    .eq('shop_id', shopId)
-    .single();
+  const brief = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('brand_research')
+      .select('*')
+      .eq('shop_id', shopId)
+      .single(),
+    null,
+    'criterio-meta.fetchBrief',
+  );
 
   // 3. Fetch creative history (last 5)
-  const { data: history } = await supabase
-    .from('creative_history')
-    .select('angle, theme')
-    .eq('client_id', clientId || shopId)
-    .eq('channel', 'meta')
-    .order('created_at', { ascending: false })
-    .limit(5);
+  const history = await safeQueryOrDefault<{ angle: string; theme: string }>(
+    supabase
+      .from('creative_history')
+      .select('angle, theme')
+      .eq('client_id', clientId || shopId)
+      .eq('channel', 'meta')
+      .order('created_at', { ascending: false })
+      .limit(5),
+    [],
+    'criterio-meta.fetchHistory',
+  );
 
   // 4. Fetch Shopify products if product_ids provided
   let products: Array<Record<string, any>> = [];
   if (campaignData.product_ids && campaignData.product_ids.length > 0) {
-    const { data: prods } = await supabase
-      .from('shopify_products')
-      .select('title, price, inventory')
-      .in('id', campaignData.product_ids);
-    products = prods || [];
+    products = await safeQueryOrDefault<Record<string, any>>(
+      supabase
+        .from('shopify_products')
+        .select('title, price, inventory')
+        .in('id', campaignData.product_ids),
+      [],
+      'criterio-meta.fetchShopifyProducts',
+    );
   }
 
   // 5. Evaluate each rule
@@ -322,15 +338,19 @@ export async function criterioMeta(campaignData: Record<string, any>, shopId: st
   if (clientId) {
     const copyText = (campaignData.primary_text || '').substring(0, 200);
     // Try to update an existing record first (created by generate-meta-copy)
-    const { data: updated } = await supabase
-      .from('creative_history')
-      .update({ cqs_score: evalResult.score, criterio_score: evalResult.score })
-      .eq('client_id', clientId)
-      .eq('channel', 'meta')
-      .is('criterio_score', null)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .select('id');
+    const updated = await safeQueryOrDefault<{ id: string }>(
+      supabase
+        .from('creative_history')
+        .update({ cqs_score: evalResult.score, criterio_score: evalResult.score })
+        .eq('client_id', clientId)
+        .eq('channel', 'meta')
+        .is('criterio_score', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .select('id'),
+      [],
+      'criterio-meta.updateCreativeHistory',
+    );
 
     // If no record to update, insert a new one
     if (!updated || updated.length === 0) {

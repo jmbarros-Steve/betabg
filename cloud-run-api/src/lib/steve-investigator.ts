@@ -11,6 +11,7 @@
  */
 
 import { getSupabaseAdmin } from './supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from './safe-supabase.js';
 import type { ProspectRecord } from './steve-wa-brain.js';
 
 /**
@@ -29,11 +30,15 @@ export async function investigateProspectBackground(
   if (!prospect.id) return;
 
   // Load current investigation data
-  const { data: freshProspect } = await supabase
-    .from('wa_prospects')
-    .select('investigation_data, audit_data')
-    .eq('id', prospect.id)
-    .maybeSingle();
+  const freshProspect = await safeQuerySingleOrDefault<{ investigation_data: any; audit_data: any }>(
+    supabase
+      .from('wa_prospects')
+      .select('investigation_data, audit_data')
+      .eq('id', prospect.id)
+      .maybeSingle(),
+    null,
+    'steveInvestigator.loadFreshProspect',
+  );
 
   const currentInv = freshProspect?.investigation_data || {};
   const updates: Record<string, any> = { ...currentInv };
@@ -291,14 +296,18 @@ async function findCompetitorAds(industry: string): Promise<Array<{ headline: st
   if (keywords.length === 0) return [];
 
   // Search competitor_ads by industry keyword in ad_text
-  const { data: ads } = await supabase
-    .from('competitor_ads')
-    .select('ad_headline, ad_text, impressions_lower')
-    .ilike('ad_text', `%${keywords[0]}%`)
-    .order('impressions_lower', { ascending: false })
-    .limit(5);
+  const ads = await safeQueryOrDefault<{ ad_headline: string | null; ad_text: string | null; impressions_lower: number | null }>(
+    supabase
+      .from('competitor_ads')
+      .select('ad_headline, ad_text, impressions_lower')
+      .ilike('ad_text', `%${keywords[0]}%`)
+      .order('impressions_lower', { ascending: false })
+      .limit(5),
+    [],
+    'steveInvestigator.findCompetitorAds',
+  );
 
-  if (!ads?.length) return [];
+  if (!ads.length) return [];
 
   return ads.map((ad: any) => ({
     headline: ad.ad_headline || '',

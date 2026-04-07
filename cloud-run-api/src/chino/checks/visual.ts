@@ -4,6 +4,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { anthropicFetch } from '../../lib/anthropic-fetch.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import type { ChinoCheck, MerchantConn, CheckResult } from '../types.js';
 
 const VISION_MODEL = 'claude-haiku-4-5-20251001';
@@ -134,12 +135,16 @@ Responde SOLO el JSON, nada más.`,
 // ─── Get a test email HTML for check #46 ─────────────────────────
 
 async function getTestEmailHtml(supabase: SupabaseClient): Promise<string | null> {
-  const { data } = await supabase
-    .from('email_templates')
-    .select('base_html')
-    .eq('is_system', true)
-    .limit(1)
-    .maybeSingle();
+  const data = await safeQuerySingleOrDefault<{ base_html: string | null }>(
+    supabase
+      .from('email_templates')
+      .select('base_html')
+      .eq('is_system', true)
+      .limit(1)
+      .maybeSingle(),
+    null,
+    'chinoVisual.getTestEmailHtml',
+  );
 
   return data?.base_html || null;
 }

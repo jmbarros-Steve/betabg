@@ -4,6 +4,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ChinoCheck, MerchantConn, CheckResult } from '../types.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const TIMEOUT = 30_000;
 
@@ -74,13 +75,17 @@ async function testCrossMerchantAccess(
     }
 
     // Step 2: Test actual data isolation — verify merchant A can't see merchant B
-    const { data: otherConn } = await supabase
-      .from('platform_connections')
-      .select('client_id')
-      .eq('is_active', true)
-      .neq('client_id', merchant.client_id)
-      .limit(1)
-      .maybeSingle();
+    const otherConn = await safeQuerySingleOrDefault<{ client_id: string }>(
+      supabase
+        .from('platform_connections')
+        .select('client_id')
+        .eq('is_active', true)
+        .neq('client_id', merchant.client_id)
+        .limit(1)
+        .maybeSingle(),
+      null,
+      'security.testCrossMerchantAccess.otherConn',
+    );
 
     if (!otherConn) {
       return {
@@ -419,22 +424,30 @@ async function testNoPlaintextKeys(supabase: SupabaseClient): Promise<CheckResul
   const sensitivePatterns = ['sk-', 'shpat_', 'EAA'];
 
   // Check wa_messages
-  const { data: msgs } = await supabase
-    .from('wa_messages')
-    .select('id, body')
-    .order('created_at', { ascending: false })
-    .limit(200);
+  const msgs = await safeQueryOrDefault<{ id: string; body: string | null }>(
+    supabase
+      .from('wa_messages')
+      .select('id, body')
+      .order('created_at', { ascending: false })
+      .limit(200),
+    [],
+    'security.testNoPlaintextKeys.waMessages',
+  );
 
   // Check steve_knowledge
-  const { data: knowledge } = await supabase
-    .from('steve_knowledge')
-    .select('id, contenido')
-    .order('created_at', { ascending: false })
-    .limit(200);
+  const knowledge = await safeQueryOrDefault<{ id: string; contenido: string | null }>(
+    supabase
+      .from('steve_knowledge')
+      .select('id, contenido')
+      .order('created_at', { ascending: false })
+      .limit(200),
+    [],
+    'security.testNoPlaintextKeys.steveKnowledge',
+  );
 
   const leaks: string[] = [];
 
-  for (const msg of msgs || []) {
+  for (const msg of msgs) {
     const body = msg.body || '';
     for (const pat of sensitivePatterns) {
       if (body.includes(pat)) {
@@ -444,7 +457,7 @@ async function testNoPlaintextKeys(supabase: SupabaseClient): Promise<CheckResul
     }
   }
 
-  for (const k of knowledge || []) {
+  for (const k of knowledge) {
     const content = k.contenido || '';
     for (const pat of sensitivePatterns) {
       if (content.includes(pat)) {
@@ -944,32 +957,44 @@ async function executeSecurityByNumber(
         .select('*', { count: 'exact', head: true });
       // If we can count all rows with service_role_key, RLS is permissive for admin — expected
       // Check that client_id column exists and is NOT NULL on all rows
-      const { data: nullClients } = await supabase
-        .from('steve_conversations')
-        .select('id')
-        .is('client_id', null)
-        .limit(1);
-      if (nullClients && nullClients.length > 0) {
+      const nullClients = await safeQueryOrDefault<{ id: string }>(
+        supabase
+          .from('steve_conversations')
+          .select('id')
+          .is('client_id', null)
+          .limit(1),
+        [],
+        'security.case44_steveConversationsNullClients',
+      );
+      if (nullClients.length > 0) {
         return { result: 'fail', error_message: 'steve_conversations tiene rows sin client_id — RLS bypass posible', duration_ms: Date.now() - start };
       }
       return { result: 'pass', steve_value: `${count || 0} conversations, todas con client_id`, duration_ms: Date.now() - start };
     }
     case 74: { // PII scrubber active
-      const { data: piiData } = await supabase.from('wa_messages').select('body').order('created_at', { ascending: false }).limit(20);
+      const piiData = await safeQueryOrDefault<{ body: string | null }>(
+        supabase.from('wa_messages').select('body').order('created_at', { ascending: false }).limit(20),
+        [],
+        'security.case74_piiScrubber',
+      );
       const rutRegex74 = /\b\d{1,2}\.\d{3}\.\d{3}[-]\d{1}\b/;
-      const emailInBody = (piiData || []).filter(r => r.body && /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/.test(r.body));
-      const rutInBody = (piiData || []).filter(r => r.body && rutRegex74.test(r.body));
+      const emailInBody = piiData.filter(r => r.body && /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/.test(r.body));
+      const rutInBody = piiData.filter(r => r.body && rutRegex74.test(r.body));
       if (emailInBody.length > 0 || rutInBody.length > 0) {
         return { result: 'fail', steve_value: `${emailInBody.length} emails, ${rutInBody.length} RUTs`, error_message: 'PII found in wa_messages body', duration_ms: Date.now() - start };
       }
       return { result: 'pass', steve_value: '0 PII en últimos 20 mensajes', duration_ms: Date.now() - start };
     }
     case 91: { // No expired tokens in platform_connections
-      const { data: tokenData91 } = await supabase.from('platform_connections').select('id, platform, updated_at').eq('is_active', true);
+      const tokenData91 = await safeQueryOrDefault<{ id: string; platform: string; updated_at: string | null }>(
+        supabase.from('platform_connections').select('id, platform, updated_at').eq('is_active', true),
+        [],
+        'security.case91_expiredTokens',
+      );
       const cutoff90d = Date.now() - 90 * 86400_000;
-      const expired91 = (tokenData91 || []).filter(r => r.updated_at && new Date(r.updated_at).getTime() < cutoff90d);
+      const expired91 = tokenData91.filter(r => r.updated_at && new Date(r.updated_at).getTime() < cutoff90d);
       if (expired91.length > 0) return { result: 'fail', steve_value: `${expired91.length} posibles tokens viejos`, error_message: `${expired91.length} connections no actualizadas en 90+ días`, duration_ms: Date.now() - start };
-      return { result: 'pass', steve_value: `${(tokenData91 || []).length} tokens fresh`, duration_ms: Date.now() - start };
+      return { result: 'pass', steve_value: `${tokenData91.length} tokens fresh`, duration_ms: Date.now() - start };
     }
     case 92: { // RLS policies active
       return { result: 'pass', steve_value: 'RLS enforced en todas las tablas con client_id', duration_ms: Date.now() - start };
@@ -1027,12 +1052,22 @@ async function executeSecurityByNumber(
 
 // Get a fallback merchant when runner passes null (security platform checks)
 async function getFallbackMerchant(supabase: SupabaseClient): Promise<MerchantConn | null> {
-  const { data } = await supabase
-    .from('platform_connections')
-    .select('client_id, platform, id, store_url, account_id')
-    .eq('is_active', true)
-    .limit(1)
-    .single();
+  const data = await safeQuerySingleOrDefault<{
+    client_id: string;
+    platform: string;
+    id: string;
+    store_url: string | null;
+    account_id: string | null;
+  }>(
+    supabase
+      .from('platform_connections')
+      .select('client_id, platform, id, store_url, account_id')
+      .eq('is_active', true)
+      .limit(1)
+      .single(),
+    null,
+    'security.getFallbackMerchant',
+  );
 
   if (!data) return null;
 

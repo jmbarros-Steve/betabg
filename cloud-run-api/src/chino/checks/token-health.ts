@@ -2,6 +2,7 @@
 // Checks 4-5, 59, 86-88: verify tokens are valid and not expired
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import type { ChinoCheck, MerchantConn, CheckResult } from '../types.js';
 
 const FETCH_TIMEOUT = 30_000;
@@ -185,11 +186,15 @@ export async function executeTokenHealth(
         // Check token age if max_age_days is configured
         const maxAgeDays = check.check_config?.max_age_days as number | undefined;
         if (maxAgeDays && merchant?.connection_id) {
-          const { data: conn } = await supabase
-            .from('platform_connections')
-            .select('updated_at')
-            .eq('id', merchant!.connection_id)
-            .single();
+          const conn = await safeQuerySingleOrDefault<{ updated_at: string }>(
+            supabase
+              .from('platform_connections')
+              .select('updated_at')
+              .eq('id', merchant!.connection_id)
+              .single(),
+            null,
+            'tokenHealth.fetchConnectionUpdatedAt',
+          );
 
           if (conn?.updated_at) {
             const ageDays = (Date.now() - new Date(conn.updated_at).getTime()) / 86400_000;

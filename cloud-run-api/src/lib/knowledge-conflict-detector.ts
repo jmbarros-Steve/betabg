@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { safeQueryOrDefault } from './safe-supabase.js';
 
 interface KnowledgeRule {
   categoria: string;
@@ -44,13 +45,17 @@ export async function detectKnowledgeConflicts(
   const categories = [...new Set(newRules.map(r => r.categoria))];
 
   // Fetch existing rules in the same categories
-  const { data: existing } = await supabase
-    .from('steve_knowledge')
-    .select('categoria, titulo, contenido')
-    .in('categoria', categories)
-    .eq('activo', true)
-    .order('orden', { ascending: false })
-    .limit(50);
+  const existing = await safeQueryOrDefault<{ categoria: string; titulo: string; contenido: string }>(
+    supabase
+      .from('steve_knowledge')
+      .select('categoria, titulo, contenido')
+      .in('categoria', categories)
+      .eq('activo', true)
+      .order('orden', { ascending: false })
+      .limit(50),
+    [],
+    'knowledge-conflict-detector.fetchExisting',
+  );
 
   if (!existing || existing.length === 0) {
     result.safeRules = newRules;

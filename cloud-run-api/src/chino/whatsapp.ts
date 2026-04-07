@@ -2,6 +2,7 @@
 // Uses existing Twilio integration from lib/twilio-client.ts
 
 import { getSupabaseAdmin } from '../lib/supabase.js';
+import { safeQueryOrDefault } from '../lib/safe-supabase.js';
 import { sendWhatsApp, sendWhatsAppMedia } from '../lib/twilio-client.js';
 import { isChinoInstruction, handleChinoInstruction } from './instruction-handler.js';
 
@@ -45,25 +46,33 @@ export async function sendPeriodicReport(): Promise<void> {
   const sixHoursAgo = new Date(Date.now() - 6 * 3600_000).toISOString();
 
   // Get report stats
-  const { data: reports } = await supabase
-    .from('chino_reports')
-    .select('result')
-    .gte('created_at', sixHoursAgo);
+  const reports = await safeQueryOrDefault<{ result: string }>(
+    supabase
+      .from('chino_reports')
+      .select('result')
+      .gte('created_at', sixHoursAgo),
+    [],
+    'chinoWhatsapp.fetchPeriodicReports',
+  );
 
-  const total = reports?.length || 0;
-  const passed = reports?.filter((r) => r.result === 'pass').length || 0;
-  const failed = reports?.filter((r) => r.result === 'fail').length || 0;
-  const errCount = reports?.filter((r) => r.result === 'error').length || 0;
+  const total = reports.length;
+  const passed = reports.filter((r) => r.result === 'pass').length;
+  const failed = reports.filter((r) => r.result === 'fail').length;
+  const errCount = reports.filter((r) => r.result === 'error').length;
 
   // Get recent fixes
-  const { data: fixes } = await supabase
-    .from('steve_fix_queue')
-    .select('check_number, status, probable_cause')
-    .gte('created_at', sixHoursAgo);
+  const fixes = await safeQueryOrDefault<{ check_number: number; status: string; probable_cause: string | null }>(
+    supabase
+      .from('steve_fix_queue')
+      .select('check_number, status, probable_cause')
+      .gte('created_at', sixHoursAgo),
+    [],
+    'chinoWhatsapp.fetchPeriodicFixes',
+  );
 
-  const autoFixed = fixes?.filter((f) => f.status === 'fixed') || [];
-  const escalated = fixes?.filter((f) => f.status === 'escalated') || [];
-  const pending = fixes?.filter((f) => ['pending', 'assigned', 'fixing'].includes(f.status)) || [];
+  const autoFixed = fixes.filter((f) => f.status === 'fixed');
+  const escalated = fixes.filter((f) => f.status === 'escalated');
+  const pending = fixes.filter((f) => ['pending', 'assigned', 'fixing'].includes(f.status));
 
   const time = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Santiago' });
 
@@ -101,14 +110,18 @@ ${passed} pasaron ✅ | ${failed} fallaron ❌ | ${errCount} errores ⚠️`;
   }
 
   // Fixes pending approval
-  const { data: pendingApproval } = await supabase
-    .from('steve_fix_queue')
-    .select('check_number, probable_cause')
-    .eq('approval_status', 'pending_approval')
-    .order('created_at', { ascending: false })
-    .limit(5);
+  const pendingApproval = await safeQueryOrDefault<{ check_number: number; probable_cause: string | null }>(
+    supabase
+      .from('steve_fix_queue')
+      .select('check_number, probable_cause')
+      .eq('approval_status', 'pending_approval')
+      .order('created_at', { ascending: false })
+      .limit(5),
+    [],
+    'chinoWhatsapp.fetchPendingApproval',
+  );
 
-  if (pendingApproval && pendingApproval.length > 0) {
+  if (pendingApproval.length > 0) {
     message += '\n\n*Esperan tu aprobación (' + pendingApproval.length + '):*';
     for (const fix of pendingApproval) {
       message += `\n• #${fix.check_number}: ${(fix.probable_cause || '').substring(0, 80)}`;
@@ -182,11 +195,15 @@ const CMD_FALLOS = /\b(qu[eé]\s*fall[oó]|errores\s*hoy|fallos)\b/i;
 
 async function cmdResumen(): Promise<string> {
   const supabase = getSupabaseAdmin();
-  const { data } = await supabase
-    .from('chino_routine')
-    .select('platform, is_active');
+  const data = await safeQueryOrDefault<{ platform: string; is_active: boolean }>(
+    supabase
+      .from('chino_routine')
+      .select('platform, is_active'),
+    [],
+    'chinoWhatsapp.cmdResumen',
+  );
 
-  if (!data || data.length === 0) return 'No hay checks configurados todavía.';
+  if (data.length === 0) return 'No hay checks configurados todavía.';
 
   const active = data.filter((r) => r.is_active);
   const byPlatform: Record<string, number> = {};
@@ -237,16 +254,24 @@ async function cmdEstado(): Promise<string> {
   const supabase = getSupabaseAdmin();
   const oneHourAgo = new Date(Date.now() - 3600_000).toISOString();
 
-  const [{ data: reports }, { data: routine }] = await Promise.all([
-    supabase.from('chino_reports').select('result').gte('created_at', oneHourAgo),
-    supabase.from('chino_routine').select('is_active').eq('is_active', true),
+  const [reports, routine] = await Promise.all([
+    safeQueryOrDefault<{ result: string }>(
+      supabase.from('chino_reports').select('result').gte('created_at', oneHourAgo),
+      [],
+      'chinoWhatsapp.cmdEstado.reports',
+    ),
+    safeQueryOrDefault<{ is_active: boolean }>(
+      supabase.from('chino_routine').select('is_active').eq('is_active', true),
+      [],
+      'chinoWhatsapp.cmdEstado.routine',
+    ),
   ]);
 
-  const total = reports?.length || 0;
-  const passed = reports?.filter((r) => r.result === 'pass').length || 0;
-  const failed = reports?.filter((r) => r.result === 'fail').length || 0;
-  const errors = reports?.filter((r) => r.result === 'error').length || 0;
-  const activeChecks = routine?.length || 0;
+  const total = reports.length;
+  const passed = reports.filter((r) => r.result === 'pass').length;
+  const failed = reports.filter((r) => r.result === 'fail').length;
+  const errors = reports.filter((r) => r.result === 'error').length;
+  const activeChecks = routine.length;
 
   if (total === 0) {
     return `🔵 *EL CHINO — Estado*
@@ -265,15 +290,19 @@ async function cmdFallos(): Promise<string> {
   const supabase = getSupabaseAdmin();
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 3600_000).toISOString();
 
-  const { data: failures } = await supabase
-    .from('chino_reports')
-    .select('check_number, error_message, result, created_at')
-    .in('result', ['fail', 'error'])
-    .gte('created_at', twentyFourHoursAgo)
-    .order('created_at', { ascending: false })
-    .limit(15);
+  const failures = await safeQueryOrDefault<{ check_number: number; error_message: string | null; result: string; created_at: string }>(
+    supabase
+      .from('chino_reports')
+      .select('check_number, error_message, result, created_at')
+      .in('result', ['fail', 'error'])
+      .gte('created_at', twentyFourHoursAgo)
+      .order('created_at', { ascending: false })
+      .limit(15),
+    [],
+    'chinoWhatsapp.cmdFallos',
+  );
 
-  if (!failures || failures.length === 0) {
+  if (failures.length === 0) {
     return '✅ *EL CHINO* — Sin fallos en las últimas 24 horas. Todo limpio jefe.';
   }
 

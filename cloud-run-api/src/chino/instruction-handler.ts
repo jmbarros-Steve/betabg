@@ -3,6 +3,7 @@
 // Claude converts it to a new check in chino_routine.
 
 import { getSupabaseAdmin } from '../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../lib/safe-supabase.js';
 import { anthropicFetch } from '../lib/anthropic-fetch.js';
 
 const INSTRUCTION_MODEL = 'claude-sonnet-4-20250514';
@@ -71,12 +72,16 @@ Responde SOLO el JSON.`,
   }
 
   // Get next check_number
-  const { data: maxCheck } = await supabase
-    .from('chino_routine')
-    .select('check_number')
-    .order('check_number', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const maxCheck = await safeQuerySingleOrDefault<{ check_number: number }>(
+    supabase
+      .from('chino_routine')
+      .select('check_number')
+      .order('check_number', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    null,
+    'chinoInstruction.getMaxCheckNumber',
+  );
 
   const nextNumber = (maxCheck?.check_number || 50) + 1;
 

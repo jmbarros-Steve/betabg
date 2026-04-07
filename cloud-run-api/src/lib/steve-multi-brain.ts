@@ -9,6 +9,7 @@
  */
 
 import { getSupabaseAdmin } from './supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from './safe-supabase.js';
 import { anthropicFetch } from './anthropic-fetch.js';
 import type { ProspectRecord } from './steve-wa-brain.js';
 
@@ -53,45 +54,53 @@ export async function runInvestigator(
   try {
     // 1. Load investigation_data (pre-scraped store/social/competitor data)
     if (prospect.id) {
-      const { data: fresh } = await supabase
-        .from('wa_prospects')
-        .select('investigation_data')
-        .eq('id', prospect.id)
-        .maybeSingle();
+      const fresh = await safeQuerySingleOrDefault<{ investigation_data: any }>(
+        supabase
+          .from('wa_prospects')
+          .select('investigation_data')
+          .eq('id', prospect.id)
+          .maybeSingle(),
+        null,
+        'multiBrain.loadInvestigationData',
+      );
 
       const invData = fresh?.investigation_data;
-      if (invData) {
+      // Fix R5-#17: validate invData structure before accessing fields to handle corruption
+      if (invData && typeof invData === 'object') {
         const parts: string[] = [];
-
-        if (invData.store) {
-          const store = invData.store;
-          // Format products with names and prices (expert observations)
-          if (store.top_products?.length) {
-            const products = store.top_products.slice(0, 5).map((p: any) => {
-              if (typeof p === 'string') return p;
-              return `${p.name}${p.price ? ` (${p.price})` : ''}`;
-            });
-            parts.push(`Productos: ${products.join(', ')}`);
+        try {
+          if (invData.store && typeof invData.store === 'object') {
+            const store = invData.store;
+            // Format products with names and prices (expert observations)
+            if (store.top_products?.length) {
+              const products = store.top_products.slice(0, 5).map((p: any) => {
+                if (typeof p === 'string') return p;
+                return `${p.name}${p.price ? ` (${p.price})` : ''}`;
+              });
+              parts.push(`Productos: ${products.join(', ')}`);
+            }
+            if (store.brand_style) parts.push(`Estilo: ${store.brand_style}`);
+            if (store.price_range) parts.push(`Rango precios: ${store.price_range}`);
+            if (store.category_summary) parts.push(`Tipo tienda: ${store.category_summary}`);
+            if (store.product_images?.length) parts.push(`${store.product_images.length} productos publicados`);
           }
-          if (store.brand_style) parts.push(`Estilo: ${store.brand_style}`);
-          if (store.price_range) parts.push(`Rango precios: ${store.price_range}`);
-          if (store.category_summary) parts.push(`Tipo tienda: ${store.category_summary}`);
-          if (store.product_images?.length) parts.push(`${store.product_images.length} productos publicados`);
-        }
 
-        if (invData.social) {
-          const social = invData.social;
-          if (social.followers) parts.push(`IG: ${social.followers.toLocaleString()} followers`);
-          if (social.engagement_rate) parts.push(`Engagement: ${social.engagement_rate}`);
-        }
+          if (invData.social && typeof invData.social === 'object') {
+            const social = invData.social;
+            if (social.followers) parts.push(`IG: ${social.followers.toLocaleString()} followers`);
+            if (social.engagement_rate) parts.push(`Engagement: ${social.engagement_rate}`);
+          }
 
-        if (invData.competitor_ads?.length) {
-          const topAds = invData.competitor_ads.slice(0, 3);
-          parts.push(`Ads competencia: ${topAds.map((a: any) => a.headline || a.ad_text?.slice(0, 50)).join(' | ')}`);
-        }
+          if (Array.isArray(invData.competitor_ads) && invData.competitor_ads.length > 0) {
+            const topAds = invData.competitor_ads.slice(0, 3);
+            parts.push(`Ads competencia: ${topAds.map((a: any) => a.headline || a.ad_text?.slice(0, 50)).join(' | ')}`);
+          }
 
-        if (parts.length > 0) {
-          result.investigationContext = `TIENDA DEL PROSPECTO:\n${parts.join('\n')}`;
+          if (parts.length > 0) {
+            result.investigationContext = `TIENDA DEL PROSPECTO:\n${parts.join('\n')}`;
+          }
+        } catch (parseErr) {
+          console.error(`[investigator] Corrupted investigation_data for ${prospect.phone}:`, parseErr);
         }
       }
     }
@@ -101,14 +110,18 @@ export async function runInvestigator(
     if (industry) {
       const keywords = industry.split(/[\s,;]+/).filter(w => w.length >= 3);
       if (keywords.length > 0) {
-        const { data: compAds } = await supabase
-          .from('competitor_ads')
-          .select('ad_text, ad_headline, ad_type, impressions_lower')
-          .ilike('ad_text', `%${keywords[0]}%`)
-          .order('impressions_lower', { ascending: false })
-          .limit(3);
+        const compAds = await safeQueryOrDefault<{ ad_text: string | null; ad_headline: string | null; ad_type: string | null; impressions_lower: number | null }>(
+          supabase
+            .from('competitor_ads')
+            .select('ad_text, ad_headline, ad_type, impressions_lower')
+            .ilike('ad_text', `%${keywords[0]}%`)
+            .order('impressions_lower', { ascending: false })
+            .limit(3),
+          [],
+          'multiBrain.fetchCompetitorAds',
+        );
 
-        if (compAds?.length) {
+        if (compAds.length) {
           const adLines = compAds.map((ad: any) =>
             `- "${(ad.ad_headline || ad.ad_text || '').slice(0, 80)}" (${ad.ad_type || 'image'}, ~${ad.impressions_lower || '?'} impresiones)`
           ).join('\n');
@@ -118,16 +131,20 @@ export async function runInvestigator(
     }
 
     // 3. Load sales learnings from steve_knowledge
-    const { data: learnings } = await supabase
-      .from('steve_knowledge')
-      .select('id, titulo, contenido')
-      .eq('categoria', 'sales_learning')
-      .eq('activo', true)
-      .eq('approval_status', 'approved')
-      .order('created_at', { ascending: false })
-      .limit(5);
+    const learnings = await safeQueryOrDefault<{ id: string; titulo: string; contenido: string }>(
+      supabase
+        .from('steve_knowledge')
+        .select('id, titulo, contenido')
+        .eq('categoria', 'sales_learning')
+        .eq('activo', true)
+        .eq('approval_status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(5),
+      [],
+      'multiBrain.fetchSalesLearnings',
+    );
 
-    if (learnings?.length) {
+    if (learnings.length) {
       // Filter learnings relevant to this prospect's industry
       const relevant = industry
         ? learnings.filter((l: any) =>
@@ -144,6 +161,11 @@ export async function runInvestigator(
     }
   } catch (err) {
     console.error('[multi-brain/investigator] Error:', err);
+  }
+
+  // Fix R5-#27: log when investigator returns entirely empty (helps diagnose missing data)
+  if (!result.investigationContext && !result.competitorInsights && !result.salesLearnings) {
+    console.warn(`[multi-brain/investigator] Empty result for prospect ${prospect.phone} — no investigation data, competitor ads, or learnings found`);
   }
 
   return result;
@@ -218,11 +240,16 @@ Responde SOLO con un JSON (sin markdown):
     const jsonStr = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
     const parsed = JSON.parse(jsonStr);
 
-    return {
+    const result = {
       brief: parsed.brief || '',
       suggestedAction: parsed.suggestedAction || 'continue_discovery',
       tone: parsed.tone || 'friendly',
     };
+    // Fix R5-#29: warn if brief is empty after successful API call (unexpected)
+    if (!result.brief.trim()) {
+      console.warn(`[multi-brain/strategist] Brief is empty after successful API call for prospect`);
+    }
+    return result;
   } catch (err) {
     console.error('[multi-brain/strategist] Error:', err);
     return { brief: '', suggestedAction: 'continue_discovery', tone: 'friendly' };
@@ -252,8 +279,10 @@ export async function runConversationalist(
     // Prepend strategist brief to the dynamic prompt
     let systemPrompt = dynamicPrompt;
     if (strategistBrief.brief) {
+      // Fix R5-#23: truncate brief to max 400 chars to prevent system prompt bloat
+      const truncatedBrief = strategistBrief.brief.slice(0, 400);
       systemPrompt = `🧠 BRIEF DEL ESTRATEGA (SIGUE ESTA DIRECTRIZ):
-${strategistBrief.brief}
+${truncatedBrief}
 Acción sugerida: ${strategistBrief.suggestedAction}
 Tono: ${strategistBrief.tone}
 

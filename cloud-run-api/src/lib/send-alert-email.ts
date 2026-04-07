@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from './supabase.js';
+import { safeQuerySingleOrDefault } from './safe-supabase.js';
 
 /**
  * Send a system alert email to a merchant via Resend.
@@ -19,11 +20,15 @@ export async function sendAlertEmail(
   try {
     // Get merchant email from clients table
     const supabase = getSupabaseAdmin();
-    const { data: client } = await supabase
-      .from('clients')
-      .select('name, company, client_user_id')
-      .eq('id', clientId)
-      .single();
+    const client = await safeQuerySingleOrDefault<{ name: string; company: string | null; client_user_id: string | null }>(
+      supabase
+        .from('clients')
+        .select('name, company, client_user_id')
+        .eq('id', clientId)
+        .single(),
+      null,
+      'send-alert-email.fetchClient',
+    );
 
     if (!client?.client_user_id) {
       console.warn(`[send-alert-email] No client_user_id for ${clientId}`);

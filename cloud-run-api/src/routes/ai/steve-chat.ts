@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getCreativeContext } from '../../lib/creative-context.js';
 import { checkRateLimit } from '../../lib/rate-limiter.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -779,14 +780,18 @@ export async function steveChat(c: Context) {
 
     // Create or reuse conversation
     if (!estrategiaConvId) {
-      const { data: existingConv } = await supabase
-        .from('steve_conversations')
-        .select('id')
-        .eq('client_id', client_id)
-        .eq('conversation_type', 'estrategia')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const existingConv = await safeQuerySingleOrDefault<{ id: string }>(
+        supabase
+          .from('steve_conversations')
+          .select('id')
+          .eq('client_id', client_id)
+          .eq('conversation_type', 'estrategia')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        null,
+        'steve-chat.estrategia.fetchExistingConv',
+      );
 
       if (existingConv) {
         estrategiaConvId = existingConv.id;
@@ -1657,11 +1662,15 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
 
   // CRITICAL: If last turn was a rejection, we're in "retry" mode -- same question, don't advance
   // Fetch convRow before inserting (needs current state)
-  const { data: convRow } = await supabase
-    .from('steve_conversations')
-    .select('pending_question_index')
-    .eq('id', activeConversationId)
-    .maybeSingle();
+  const convRow = await safeQuerySingleOrDefault<{ pending_question_index: number | null }>(
+    supabase
+      .from('steve_conversations')
+      .select('pending_question_index')
+      .eq('id', activeConversationId)
+      .maybeSingle(),
+    null,
+    'steve-chat.brief.fetchConvRow',
+  );
   const pendingQuestionIndex = convRow?.pending_question_index ?? null;
   const isRetryMode = pendingQuestionIndex != null;
 
@@ -2084,14 +2093,18 @@ REGLAS ABSOLUTAS:
     : storedRawResponses.slice(0, currentQuestionIndex);
 
   if (isRejection) {
-    const { data: lastUserMsg } = await supabase
-      .from('steve_messages')
-      .select('id')
-      .eq('conversation_id', activeConversationId)
-      .eq('role', 'user')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const lastUserMsg = await safeQuerySingleOrDefault<{ id: string }>(
+      supabase
+        .from('steve_messages')
+        .select('id')
+        .eq('conversation_id', activeConversationId)
+        .eq('role', 'user')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      null,
+      'steve-chat.brief.fetchLastUserMsg',
+    );
     if (lastUserMsg?.id) {
       await supabase.from('steve_messages').delete().eq('id', lastUserMsg.id);
     }

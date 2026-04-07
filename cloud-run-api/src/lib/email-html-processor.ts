@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from './supabase.js';
+import { safeQuerySingleOrDefault } from './safe-supabase.js';
 import { evaluateBlockConditions, type BlockCondition, type TemplateContext } from './template-engine.js';
 import {
   getProductCatalog,
@@ -629,13 +630,17 @@ interface CreateDiscountParams {
 async function createDiscountCode(params: CreateDiscountParams): Promise<string | null> {
   const supabase = getSupabaseAdmin();
 
-  const { data: connection } = await supabase
-    .from('platform_connections')
-    .select('*')
-    .eq('client_id', params.clientId)
-    .eq('platform', 'shopify')
-    .eq('is_active', true)
-    .maybeSingle();
+  const connection = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('platform_connections')
+      .select('*')
+      .eq('client_id', params.clientId)
+      .eq('platform', 'shopify')
+      .eq('is_active', true)
+      .maybeSingle(),
+    null,
+    'email-html-processor.createDiscountCode.shopifyConnection',
+  );
 
   if (!connection) {
     console.error('[createDiscountCode] No Shopify connection for client', params.clientId);

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -185,34 +186,50 @@ async function criterioEmailEvaluate(emailData: EmailData, shopId: string): Prom
   const supabase = getSupabaseAdmin();
 
   // 1. Fetch active EMAIL rules
-  const { data: rules } = await supabase
-    .from('criterio_rules')
-    .select('*')
-    .eq('organ', 'CRITERIO')
-    .like('category', 'EMAIL%')
-    .eq('active', true);
+  const rules = await safeQueryOrDefault<any>(
+    supabase
+      .from('criterio_rules')
+      .select('*')
+      .eq('organ', 'CRITERIO')
+      .like('category', 'EMAIL%')
+      .eq('active', true),
+    [],
+    'criterio-email.fetchRules',
+  );
 
   // 2. Fetch context data
-  const { data: brief } = await supabase
-    .from('brand_research')
-    .select('*')
-    .eq('shop_id', shopId)
-    .single();
+  const brief = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('brand_research')
+      .select('*')
+      .eq('shop_id', shopId)
+      .single(),
+    null,
+    'criterio-email.fetchBrief',
+  );
 
-  const { data: recentEmails } = await supabase
-    .from('email_campaigns')
-    .select('subject, sent_at')
-    .eq('shop_id', shopId)
-    .order('created_at', { ascending: false })
-    .limit(5);
+  const recentEmails = await safeQueryOrDefault<{ subject: string | null; sent_at: string | null }>(
+    supabase
+      .from('email_campaigns')
+      .select('subject, sent_at')
+      .eq('shop_id', shopId)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    [],
+    'criterio-email.fetchRecentEmails',
+  );
 
-  const { data: history } = await supabase
-    .from('creative_history')
-    .select('angle, theme')
-    .eq('shop_id', shopId)
-    .eq('channel', 'email')
-    .order('created_at', { ascending: false })
-    .limit(5);
+  const history = await safeQueryOrDefault<{ angle: string | null; theme: string | null }>(
+    supabase
+      .from('creative_history')
+      .select('angle, theme')
+      .eq('shop_id', shopId)
+      .eq('channel', 'email')
+      .order('created_at', { ascending: false })
+      .limit(5),
+    [],
+    'criterio-email.fetchHistory',
+  );
 
   if (!rules || rules.length === 0) {
     return { can_publish: true, score: 100, reason: 'No active EMAIL rules found', failed_rules: [] };
@@ -253,14 +270,18 @@ async function criterioEmailEvaluate(emailData: EmailData, shopId: string): Prom
 
   // 5. Save criterio_score to creative_history (update existing or insert new)
   {
-    const { data: updated } = await supabase
-      .from('creative_history')
-      .update({ cqs_score: evalResponse.score, criterio_score: evalResponse.score })
-      .eq('channel', 'email')
-      .is('criterio_score', null)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .select('id');
+    const updated = await safeQueryOrDefault<{ id: string }>(
+      supabase
+        .from('creative_history')
+        .update({ cqs_score: evalResponse.score, criterio_score: evalResponse.score })
+        .eq('channel', 'email')
+        .is('criterio_score', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .select('id'),
+      [],
+      'criterio-email.updateCreativeHistory',
+    );
 
     if (!updated || updated.length === 0) {
       await supabase.from('creative_history').insert({

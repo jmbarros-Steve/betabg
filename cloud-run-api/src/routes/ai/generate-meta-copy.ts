@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getCreativeContext } from '../../lib/creative-context.js';
 import { detectAngle } from '../../lib/angle-detector.js';
 import { checkRateLimit } from '../../lib/rate-limiter.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Fetches active CRITERIO rules for meta/creative/copy categories
@@ -606,20 +607,28 @@ const CREATIVE_ANGLES_CATALOG = [
  */
 async function buildAntiRepetitionContext(supabase: any, clientId: string): Promise<string> {
   // Fetch recent ad creatives
-  const { data: recentCreatives } = await supabase
-    .from('ad_creatives')
-    .select('titulo, texto_principal, angulo')
-    .eq('client_id', clientId)
-    .order('created_at', { ascending: false })
-    .limit(10);
+  const recentCreatives = await safeQueryOrDefault<{ titulo: string | null; texto_principal: string | null; angulo: string | null }>(
+    supabase
+      .from('ad_creatives')
+      .select('titulo, texto_principal, angulo')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false })
+      .limit(10),
+    [],
+    'generate-meta-copy.fetchRecentCreatives',
+  );
 
   // Fetch recent saved copies
-  const { data: recentSaved } = await supabase
-    .from('saved_meta_copies')
-    .select('headlines, primary_texts')
-    .eq('client_id', clientId)
-    .order('created_at', { ascending: false })
-    .limit(5);
+  const recentSaved = await safeQueryOrDefault<{ headlines: string[] | null; primary_texts: string[] | null }>(
+    supabase
+      .from('saved_meta_copies')
+      .select('headlines, primary_texts')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    [],
+    'generate-meta-copy.fetchRecentSaved',
+  );
 
   const previousCopies: string[] = [];
   const usedAngles: string[] = [];
@@ -720,12 +729,16 @@ export async function generateMetaCopy(c: Context) {
   // Verify the authenticated user owns this client
   const user = c.get('user');
   if (user) {
-    const { data: ownerCheck } = await supabase
-      .from('clients')
-      .select('id')
-      .eq('id', resolvedClientId)
-      .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
-      .maybeSingle();
+    const ownerCheck = await safeQuerySingleOrDefault<{ id: string }>(
+      supabase
+        .from('clients')
+        .select('id')
+        .eq('id', resolvedClientId)
+        .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+        .maybeSingle(),
+      null,
+      'generate-meta-copy.ownerCheck',
+    );
     if (!ownerCheck) {
       return c.json({ error: 'No tienes acceso a este cliente' }, 403);
     }
@@ -769,17 +782,25 @@ export async function generateMetaCopy(c: Context) {
     }
 
     // Fetch Shopify products for concrete context
-    const { data: shopifyProducts } = await supabase
-      .from('shopify_products')
-      .select('title, product_type, price, image_url')
-      .eq('client_id', cId)
-      .limit(10);
+    const shopifyProducts = await safeQueryOrDefault<{ title: string | null; product_type: string | null; price: any; image_url: string | null }>(
+      supabase
+        .from('shopify_products')
+        .select('title, product_type, price, image_url')
+        .eq('client_id', cId)
+        .limit(10),
+      [],
+      'generate-meta-copy.instruction.fetchShopifyProducts',
+    );
 
-    const { data: clientInfo } = await supabase
-      .from('clients')
-      .select('name, company, shop_domain')
-      .eq('id', cId)
-      .maybeSingle();
+    const clientInfo = await safeQuerySingleOrDefault<{ name: string | null; company: string | null; shop_domain: string | null }>(
+      supabase
+        .from('clients')
+        .select('name, company, shop_domain')
+        .eq('id', cId)
+        .maybeSingle(),
+      null,
+      'generate-meta-copy.instruction.fetchClientInfo',
+    );
 
     const shopifySection = shopifyProducts && shopifyProducts.length > 0
       ? `\nPRODUCTOS REALES DE LA TIENDA:\n${shopifyProducts.map((p: any) => `- ${p.title} ($${Number(p.price).toLocaleString('es-CL')} CLP) — ${p.product_type || 'general'}`).join('\n')}\n`
@@ -844,9 +865,13 @@ export async function generateMetaCopy(c: Context) {
 
   // ── VARIACIONES MODE ──────────────────────────────────────────────────────
   if (mode === 'variaciones') {
-    const { data: briefData } = await supabase
-      .from('buyer_personas').select('*').eq('client_id', clientId).eq('is_complete', true)
-      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const briefData = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('buyer_personas').select('*').eq('client_id', clientId).eq('is_complete', true)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      null,
+      'generate-meta-copy.variaciones.fetchBrief',
+    );
 
     const rawData = briefData?.persona_data || briefData?.raw_data || {};
 
@@ -958,9 +983,13 @@ Responde SOLO en JSON válido sin markdown ni backticks:
 
   // ── BRIEF VISUAL MODE ─────────────────────────────────────────────────────
   if (mode === 'brief_visual') {
-    const { data: briefData } = await supabase
-      .from('buyer_personas').select('*').eq('client_id', clientId).eq('is_complete', true)
-      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const briefData = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('buyer_personas').select('*').eq('client_id', clientId).eq('is_complete', true)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      null,
+      'generate-meta-copy.briefVisual.fetchBrief',
+    );
 
     const rawData = briefData?.persona_data || briefData?.raw_data || {};
 
@@ -1057,20 +1086,28 @@ ${adType === 'static'
   }
 
   // Dual-layer learning (global = aggregate stats only, no raw text to prevent cross-client contamination)
-  const { data: globalFeedback } = await supabase
-    .from('steve_feedback')
-    .select('rating, content_type')
-    .eq('content_type', 'meta_copy')
-    .order('created_at', { ascending: false })
-    .limit(50);
+  const globalFeedback = await safeQueryOrDefault<{ rating: number | null; content_type: string | null }>(
+    supabase
+      .from('steve_feedback')
+      .select('rating, content_type')
+      .eq('content_type', 'meta_copy')
+      .order('created_at', { ascending: false })
+      .limit(50),
+    [],
+    'generate-meta-copy.fetchGlobalFeedback',
+  );
 
-  const { data: clientFeedback } = await supabase
-    .from('steve_feedback')
-    .select('rating, feedback_text, content_type, improvement_notes')
-    .eq('client_id', clientId)
-    .eq('content_type', 'meta_copy')
-    .order('created_at', { ascending: false })
-    .limit(10);
+  const clientFeedback = await safeQueryOrDefault<{ rating: number | null; feedback_text: string | null; content_type: string | null; improvement_notes: string | null }>(
+    supabase
+      .from('steve_feedback')
+      .select('rating, feedback_text, content_type, improvement_notes')
+      .eq('client_id', clientId)
+      .eq('content_type', 'meta_copy')
+      .order('created_at', { ascending: false })
+      .limit(10),
+    [],
+    'generate-meta-copy.fetchClientFeedback',
+  );
 
   let learningContext = '';
 
