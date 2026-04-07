@@ -57,7 +57,8 @@ export async function importKlaviyoTemplates(c: Context) {
     let nextUrl: string | null = 'https://a.klaviyo.com/api/templates/';
     let pageCount = 0;
 
-    while (nextUrl) {
+    const MAX_TEMPLATE_PAGES = 10; // cap a ~1000 templates para evitar timeout Cloud Run
+    while (nextUrl && pageCount < MAX_TEMPLATE_PAGES) {
       const resp = await fetch(nextUrl, { headers });
       if (!resp.ok) {
         const errText = await resp.text();
@@ -74,6 +75,9 @@ export async function importKlaviyoTemplates(c: Context) {
 
       nextUrl = data.links?.next || null;
       if (nextUrl) await new Promise(r => setTimeout(r, 300));
+    }
+    if (pageCount >= MAX_TEMPLATE_PAGES) {
+      console.warn(`[import-klaviyo-templates] Reached page cap (${MAX_TEMPLATE_PAGES}). ${allTemplates.length} templates loaded, more may exist.`);
     }
 
     console.log(`Total templates in Klaviyo: ${allTemplates.length}`);

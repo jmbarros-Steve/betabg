@@ -144,20 +144,32 @@ export async function fetchKlaviyoTopProducts(c: Context) {
       }
     }
 
-    // Build product list, optionally enriching with Shopify data (parallel)
+    // Build product list, optionally enriching with Shopify data (parallel with timeout)
+    let shopifyTokenExpired = false;
     const products = await Promise.all(sorted.map(async ([title, count]) => {
       let image_url = '';
       let price = '';
       let handle = '';
       let url = '';
 
-      if (shopifyToken && shopifyDomain) {
+      if (shopifyToken && shopifyDomain && !shopifyTokenExpired) {
         try {
           const searchUrl = `https://${shopifyDomain}/admin/api/2024-01/products.json?title=${encodeURIComponent(title)}&limit=1&fields=id,title,handle,images,variants`;
-          const shopRes = await fetch(searchUrl, {
-            headers: { 'X-Shopify-Access-Token': shopifyToken, 'Content-Type': 'application/json' },
-          });
-          if (shopRes.ok) {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 5000);
+          let shopRes: Response;
+          try {
+            shopRes = await fetch(searchUrl, {
+              headers: { 'X-Shopify-Access-Token': shopifyToken, 'Content-Type': 'application/json' },
+              signal: controller.signal,
+            });
+          } finally {
+            clearTimeout(timeout);
+          }
+          if (shopRes.status === 401 || shopRes.status === 403) {
+            shopifyTokenExpired = true;
+            console.warn(`[fetch-klaviyo-top-products] Shopify token expired (${shopRes.status}) — skipping enrichment`);
+          } else if (shopRes.ok) {
             const shopData: any = await shopRes.json();
             const shopProducts = shopData.products;
             if (shopProducts?.length > 0) {
@@ -168,13 +180,21 @@ export async function fetchKlaviyoTopProducts(c: Context) {
               url = `https://${shopifyDomain}/products/${handle}`;
             }
           }
-        } catch (err) {
-          console.warn(`Failed to fetch Shopify data for "${title}":`, err);
+        } catch (err: any) {
+          if (err?.name === 'AbortError') {
+            console.warn(`[fetch-klaviyo-top-products] Shopify timeout for "${title}"`);
+          } else {
+            console.warn(`Failed to fetch Shopify data for "${title}":`, err);
+          }
         }
       }
 
       return { title, image_url, price, handle, url, count };
     }));
+
+    if (shopifyTokenExpired) {
+      console.warn('[fetch-klaviyo-top-products] Shopify enrichment skipped — token expired or unauthorized');
+    }
 
     return c.json({ products });
   } catch (error: unknown) {

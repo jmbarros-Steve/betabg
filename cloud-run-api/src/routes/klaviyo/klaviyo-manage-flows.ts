@@ -444,7 +444,10 @@ function buildFlowDefinition(
     });
 
     if (i < templateIds.length - 1) {
-      const delayHours = emails[i + 1]?.delayHours || Math.floor((emails[i + 1]?.delaySeconds || 0) / 3600) || 24;
+      const nextEmail = emails[i + 1];
+      // Use ?? (nullish) not || so that 0 is treated as 0, not as "missing"
+      const totalDelayHours = (nextEmail?.delayDays ?? 0) * 24 + (nextEmail?.delayHours ?? 0);
+      const delayHours = totalDelayHours > 0 ? totalDelayHours : 24; // default 24h if not set
       actions.push({
         temporary_id: delayActionId,
         type: 'time-delay',
@@ -453,7 +456,8 @@ function buildFlowDefinition(
         },
         data: {
           unit: delayHours >= 24 ? 'days' : 'hours',
-          value: delayHours >= 24 ? Math.round(delayHours / 24) : delayHours,
+          // Math.max(1,...) prevents value:0 which Klaviyo rejects
+          value: delayHours >= 24 ? Math.max(1, Math.round(delayHours / 24)) : Math.max(1, delayHours),
           secondary_value: 0,
           timezone: 'profile',
           delay_until_time: null,
@@ -468,6 +472,9 @@ function buildFlowDefinition(
     triggers.push({ type: 'list', id: listId, trigger_filter: null });
   } else if (triggerMetricId) {
     triggers.push({ type: 'metric', id: triggerMetricId, trigger_filter: null });
+  } else {
+    // No valid trigger — Klaviyo rechaza flows sin trigger
+    throw new Error(`Flow tipo "${triggerType}" requiere triggerMetricId. Tipos válidos sin metricId: welcome_series (necesita listId).`);
   }
 
   return {

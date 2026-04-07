@@ -210,6 +210,11 @@ export async function syncKlaviyoMetrics(c: Context) {
       return c.json({ error: 'connectionId required' }, 400);
     }
 
+    const VALID_TIMEFRAMES = ['last_24_hours', 'last_7_days', 'last_30_days', 'last_60_days', 'last_90_days', 'last_365_days'];
+    if (!VALID_TIMEFRAMES.includes(timeframe)) {
+      return c.json({ error: `Invalid timeframe. Valid values: ${VALID_TIMEFRAMES.join(', ')}` }, 400);
+    }
+
     const { data: connection, error: connError } = await serviceClient
       .from('platform_connections')
       .select('*, clients!inner(user_id, client_user_id)')
@@ -306,14 +311,14 @@ export async function syncKlaviyoMetrics(c: Context) {
       const cnt = listCounts.find((lc: any) => lc.id === l.id);
       const count = cnt?.count ?? 0;
       const hasMore = cnt?.hasMore ?? false;
-      return { ...l, profile_count: (count >= 100 && hasMore) ? '100+' : count, profile_count_raw: count, has_more: hasMore };
+      return { ...l, profile_count: hasMore ? `${count}+` : count, profile_count_raw: count, has_more: hasMore };
     });
 
     const segmentsWithCounts = klaviyoSegments.map((s: any) => {
       const cnt = segCounts.find((sc: any) => sc.id === s.id);
       const count = cnt?.count ?? 0;
       const hasMore = cnt?.hasMore ?? false;
-      return { ...s, profile_count: (count >= 100 && hasMore) ? '100+' : count, profile_count_raw: count, has_more: hasMore };
+      return { ...s, profile_count: hasMore ? `${count}+` : count, profile_count_raw: count, has_more: hasMore };
     });
 
     // Filter out archived flows for counts (but keep them in enrichedFlows for revenue display)

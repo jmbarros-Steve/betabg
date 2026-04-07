@@ -289,6 +289,7 @@ export async function klaviyoPushEmails(c: Context) {
     const clientId = (connData as any)?.client_id;
 
     // CRITERIO pre-flight: evaluate each email before pushing
+    const criterioWarnings: Array<{ email_subject: string; score: number; warnings: any[] }> = [];
     if (shopId) {
       for (const emailToCheck of emails) {
         const criterioResult = await criterioEmailEvaluate({
@@ -306,6 +307,14 @@ export async function klaviyoPushEmails(c: Context) {
             failed_rules: criterioResult.failed_rules,
           }, 422);
         }
+        // Collect warnings (passed but with low score or minor issues)
+        if (criterioResult.score < 80 || (criterioResult.failed_rules?.length ?? 0) > 0) {
+          criterioWarnings.push({
+            email_subject: emailToCheck.subject,
+            score: criterioResult.score,
+            warnings: criterioResult.failed_rules ?? [],
+          });
+        }
       }
     }
 
@@ -314,6 +323,7 @@ export async function klaviyoPushEmails(c: Context) {
 
     const apiKey = await decryptKlaviyoApiKey(supabase, connection_id);
     const results: Array<{ email_subject: string; template_id: string; campaign_id: string; status: string }> = [];
+    const createdTemplateIds: string[] = []; // Track for cleanup on partial failure
 
     // Fetch brand info for ESPEJO evaluation
     let brandInfo: { brand_name?: string; colors?: string } | null = null;
@@ -325,6 +335,9 @@ export async function klaviyoPushEmails(c: Context) {
         .maybeSingle();
       brandInfo = bi;
     }
+
+    // Cumulative scheduled date — each email's delay adds on top of the previous
+    let cumulativeDate = scheduled_at ? new Date(scheduled_at) : null;
 
     for (let i = 0; i < emails.length; i++) {
       const email = emails[i];
@@ -359,21 +372,26 @@ export async function klaviyoPushEmails(c: Context) {
       }
 
       // 1. Create template
-      const templateId = await createTemplate(
-        apiKey,
-        emailName,
-        emailHtml,
-        email.content,
-      );
+      let templateId: string;
+      try {
+        templateId = await createTemplate(apiKey, emailName, emailHtml, email.content);
+      } catch (tplErr: any) {
+        // Cleanup all templates created so far
+        await Promise.allSettled(createdTemplateIds.map(id => deleteKlaviyoTemplate(apiKey, id)));
+        throw new Error(`Error creando template para "${email.subject}": ${tplErr.message}`);
+      }
+      createdTemplateIds.push(templateId);
       console.log(`  Template created: ${templateId}`);
 
-      // 2. Calculate scheduled time for this email
-      let emailScheduledAt = scheduled_at;
-      if (scheduled_at && (email.delayDays > 0 || email.delayHours > 0)) {
-        const baseDate = new Date(scheduled_at);
-        baseDate.setDate(baseDate.getDate() + email.delayDays);
-        baseDate.setHours(baseDate.getHours() + email.delayHours);
-        emailScheduledAt = baseDate.toISOString();
+      // 2. Calculate scheduled time — cumulative: each delay adds on top of previous
+      const emailScheduledAt = cumulativeDate?.toISOString() ?? scheduled_at;
+      // Advance cumulative date for the next email
+      if (cumulativeDate && i < emails.length - 1) {
+        const nextEmail = emails[i + 1];
+        const next = new Date(cumulativeDate);
+        next.setDate(next.getDate() + (nextEmail.delayDays ?? 0));
+        next.setHours(next.getHours() + (nextEmail.delayHours ?? 0));
+        cumulativeDate = next;
       }
 
       // 3. Create campaign
@@ -400,7 +418,10 @@ export async function klaviyoPushEmails(c: Context) {
       await assignTemplateToMessage(apiKey, messageId, templateId);
       console.log(`  Template assigned to message`);
 
-      // 6. Delete the Steve-created template (Klaviyo already copied the HTML)
+      // 6. Small wait so Klaviyo finishes copying the HTML before we delete the template
+      await new Promise(r => setTimeout(r, 500));
+
+      // 7. Delete the Steve-created template (Klaviyo already copied the HTML)
       await deleteKlaviyoTemplate(apiKey, templateId);
       console.log(`  Template cleaned up: ${templateId}`);
 
@@ -437,6 +458,7 @@ export async function klaviyoPushEmails(c: Context) {
     return c.json({
       success: true,
       message: `${results.length} campanas creadas en Klaviyo`,
+      criterio_warnings: criterioWarnings.length > 0 ? criterioWarnings : undefined,
       campaigns: results,
     });
   } catch (error: unknown) {

@@ -151,20 +151,33 @@ ${content}
 
 Convierte esto en HTML optimizado para Klaviyo con todas las variables, bloques de productos, botones y features que detectes.`;
 
-    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userMessage }],
-      }),
-    });
+    const anthropicController = new AbortController();
+    const anthropicTimeout = setTimeout(() => anthropicController.abort(), 25_000);
+    let anthropicRes: Response;
+    try {
+      anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userMessage }],
+        }),
+        signal: anthropicController.signal,
+      });
+    } catch (fetchErr: any) {
+      if (fetchErr?.name === 'AbortError') {
+        return c.json({ error: 'AI processing timed out (25s) — intenta de nuevo' }, 504);
+      }
+      throw fetchErr;
+    } finally {
+      clearTimeout(anthropicTimeout);
+    }
 
     if (!anthropicRes.ok) {
       const errText = await anthropicRes.text();

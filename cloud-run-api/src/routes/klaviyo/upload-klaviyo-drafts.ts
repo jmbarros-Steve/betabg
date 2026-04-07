@@ -65,7 +65,6 @@ export async function uploadKlaviyoDrafts(c: Context) {
     }
     const apiKey = apiKeyData as string;
     if (!apiKey) return c.json({ error: 'No API key found for Klaviyo connection' }, 500);
-    console.log('Klaviyo API key found, length:', apiKey.length);
 
     // CRITERIO pre-flight check
     const { data: connClient } = await supabase
