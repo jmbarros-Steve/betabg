@@ -16,6 +16,22 @@ export async function steveContentHunter(c: Context) {
   let totalExtracted = 0;
   const results: Array<{ source: string; newContent: number; rulesExtracted: number }> = [];
 
+  // Helper: log a per-content fail to qa_log so we can aggregate by error_type
+  // Each fail point inserts ONE row — supports `SELECT error_type, count(*) ... GROUP BY error_type`
+  const logSourceFail = async (sourceName: string, sourceType: string, reason: string, detail: string) => {
+    try {
+      await supabase.from('qa_log').insert({
+        check_type: 'content_hunt_source_fail',
+        status: 'warn',
+        error_type: reason,
+        error_detail: `[${sourceType}] ${sourceName}: ${detail}`.slice(0, 500),
+        detected_by: 'steve-content-hunter',
+      });
+    } catch (e) {
+      console.error('[content-hunter] logSourceFail failed:', e);
+    }
+  };
+
   try {
     // Get enabled sources that need checking
     const { data: sources } = await supabase
@@ -111,6 +127,7 @@ export async function steveContentHunter(c: Context) {
         }
 
         if (newContentUrls.length === 0) {
+          // Normal case: feed already processed up to last_content_id. Don't spam qa_log.
           await supabase.from('steve_sources').update({ last_checked_at: now.toISOString() }).eq('id', source.id);
           continue;
         }
@@ -178,7 +195,10 @@ export async function steveContentHunter(c: Context) {
               }
             }
 
-            if (!text || text.length < 200) continue;
+            if (!text || text.length < 200) {
+              await logSourceFail(source.name, source.source_type, 'text_too_short', `length=${text?.length || 0} url=${content.url}`);
+              continue;
+            }
 
             // Extract rules with Haiku
             const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -212,13 +232,30 @@ Responde SOLO JSON array. Sin markdown.`,
               }),
             });
 
-            if (!aiRes.ok) continue;
+            if (!aiRes.ok) {
+              await logSourceFail(source.name, source.source_type, `ai_http_${aiRes.status}`, `url=${content.url}`);
+              continue;
+            }
 
             const aiData: any = await aiRes.json();
             const rawText = (aiData.content?.[0]?.text || '[]').trim();
-            const rules = JSON.parse(rawText.replace(/```json|```/g, '').trim());
+            let rules: any;
+            try {
+              rules = JSON.parse(rawText.replace(/```json|```/g, '').trim());
+            } catch {
+              const sample = rawText.slice(0, 120).replace(/[\r\n]+/g, ' ');
+              await logSourceFail(source.name, source.source_type, 'ai_parse_error', `sample=${sample} url=${content.url}`);
+              continue;
+            }
 
-            if (!Array.isArray(rules)) continue;
+            if (!Array.isArray(rules)) {
+              await logSourceFail(source.name, source.source_type, 'ai_not_array', `type=${typeof rules} url=${content.url}`);
+              continue;
+            }
+            if (rules.length === 0) {
+              await logSourceFail(source.name, source.source_type, 'ai_returned_empty', `url=${content.url} text_len=${text.length}`);
+              continue;
+            }
 
             for (const rule of rules) {
               if (!rule.titulo || !rule.contenido || !rule.categoria) continue;
@@ -237,22 +274,27 @@ Responde SOLO JSON array. Sin markdown.`,
 
               if (!error) rulesExtracted++;
             }
-          } catch (err) {
+          } catch (err: any) {
+            await logSourceFail(source.name, source.source_type, 'content_exception', `${err?.message?.slice(0, 200) || 'unknown'} url=${content.url}`);
             console.error(`[content-hunter] Error processing ${content.url}:`, err);
           }
         }
 
-        // Update source
-        const latestContentId = newContentUrls[0]?.url?.match(/v=([a-zA-Z0-9_-]{11})/)?.[1] || newContentUrls[0]?.url || '';
-        await supabase.from('steve_sources').update({
-          last_checked_at: now.toISOString(),
-          last_content_id: latestContentId,
-          total_rules_extracted: (source.total_rules_extracted || 0) + rulesExtracted,
-        }).eq('id', source.id);
+        // Update source. last_checked_at always advances (don't re-process every 20 min).
+        // last_content_id ONLY advances when we extracted rules — otherwise we'd silently skip
+        // failing sources forever and lose the chance to fix them by improving the extractor.
+        const updatePayload: Record<string, any> = { last_checked_at: now.toISOString() };
+        if (rulesExtracted > 0) {
+          const latestContentId = newContentUrls[0]?.url?.match(/v=([a-zA-Z0-9_-]{11})/)?.[1] || newContentUrls[0]?.url || '';
+          updatePayload.last_content_id = latestContentId;
+          updatePayload.total_rules_extracted = (source.total_rules_extracted || 0) + rulesExtracted;
+        }
+        await supabase.from('steve_sources').update(updatePayload).eq('id', source.id);
 
         totalExtracted += rulesExtracted;
         results.push({ source: source.name, newContent: newContentUrls.length, rulesExtracted });
-      } catch (err) {
+      } catch (err: any) {
+        await logSourceFail(source.name, source.source_type, 'outer_exception', err?.message?.slice(0, 200) || 'unknown');
         console.error(`[content-hunter] Error with source ${source.name}:`, err);
       }
     }
