@@ -82,40 +82,25 @@ TypeScript compila limpio. Sin regresiones detectadas. Observaciones menores no 
 
 **Follow-up Javiera W12 (S-1)**: crear migración separada antes de GA para `REVOKE UPDATE (use_send_queue) ON email_send_settings FROM authenticated;`.
 
-## Pasos de activación pendientes (requieren autorización JM)
+## Rollout ejecutado (sesión 2026-04-08)
 
-1. **Aplicar migración SQL:**
-   ```bash
-   cd ~/betabg && npx supabase db push
-   ```
+| # | Paso | Estado | Detalle |
+|---|------|--------|---------|
+| 1 | Commit | ✅ | `312a8d5` — feat(email): email_send_queue feature flag + mobile wrap + 5 review fixes (Reviewed-By: Isidora W6) |
+| 2 | Migración SQL | ✅ | `use_send_queue` column aplicada vía `supabase migration repair --status reverted 20260321 20260322 20260325` + `db push --include-all`. Verificada vía REST API. |
+| 3 | Deploy Cloud Run | ✅ | `steve-api-00396-29h` al 100% del tráfico. (1er intento falló por TS error en klaviyo-push-emails.ts:315 — fix de Rodrigo `cec4493` desbloqueó.) |
+| 4 | Cloud Scheduler | ✅ | `email-queue-tick-1m` ENABLED, `* * * * *`. 5 ejecuciones consecutivas verificadas con HTTP 200 + ~250ms latencia, payload `{processed_clients:0,total_sent:0,total_failed:0,recovered_stuck:0}`. |
+| 5 | Activar flag cliente | ⏸️ DIFERIDO | Tabla `email_send_settings` está **completamente vacía** en producción (0 filas). No hay cliente al cual `UPDATE`. Activar requiere `INSERT` de fila completa con `from_email`, `from_name`, `daily_limit`, etc. → necesita decisión de producto + cliente real configurado en onboarding. |
+| 6 | Prueba e2e | ⏸️ BLOCKED por #5 | Se hará cuando exista el primer cliente con `email_send_settings` configurado. La infra está lista para ejecutar el flujo end-to-end sin más cambios de código. |
 
-2. **Deploy backend Cloud Run:**
-   ```bash
-   cd ~/betabg/cloud-run-api && gcloud run deploy steve-api --source . --project steveapp-agency --region us-central1
-   ```
+**Estado de la infraestructura:** ✅ **Operativa y dormante** — el cron tick está vivo y funcional, esperando que algún cliente tenga `use_send_queue=true`. El default `false` preserva el comportamiento actual (envío directo) para todos los clientes futuros hasta que JM/producto decida activar.
 
-3. **Crear job Cloud Scheduler (después del deploy):**
-   ```bash
-   gcloud scheduler jobs create http email-queue-tick-1m \
-     --schedule="* * * * *" \
-     --uri="https://steve-api-850416724643.us-central1.run.app/api/cron/email-queue-tick" \
-     --http-method=POST \
-     --headers="X-Cron-Secret=steve-cron-secret-2024,Content-Type=application/json" \
-     --location=us-central1 --project=steveapp-agency
-   ```
-
-4. **Activar flag para cliente de prueba:**
-   ```sql
-   UPDATE email_send_settings SET use_send_queue = true WHERE client_id = '<tu_client_id>';
-   ```
-
-5. **Prueba e2e:** mandar campaña real de ~10 subs, verificar:
-   - `email_send_queue` tiene 10 filas `status='queued'` después del envío.
-   - Después de ≤1 min, las filas pasan a `status='sent'`.
-   - `email_events` event_type='sent' tiene 10 nuevos registros.
-   - `email_campaigns.sent_count` = 10.
-
-6. **Rollout gradual:** activar flag por cliente; si todo va bien 1 semana, eventualmente deprecar el path directo.
+**Follow-ups conocidos (no bloqueantes):**
+- **Javiera W12 S-1**: crear migración separada antes de GA → `REVOKE UPDATE (use_send_queue) ON email_send_settings FROM authenticated;`
+- Smart-send bypass en A/B QUEUE path (preexistente)
+- Sweep error sin Sentry capture (cosmetic)
+- `STUCK_PROCESSING_MINUTES=30` env-configurable (cosmetic)
+- Decidir trigger de onboarding que crea la primera fila en `email_send_settings` y si por default debería traer `use_send_queue=true`.
 
 ## Problemas conocidos pendientes (no tocados esta sesión)
 - Cloud Tasks IAM: `steve-api` service account sin permiso `cloudtasks.tasks.create` → flows solo se auto-programan si el IAM está OK (Sebastián W5).
