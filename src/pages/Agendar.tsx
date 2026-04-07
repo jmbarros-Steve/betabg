@@ -119,7 +119,7 @@ export default function Agendar() {
         <div className="text-center mb-6">
           <img src={logo} alt="Steve" className="w-16 h-16 rounded-full mx-auto mb-3 shadow-md" />
           <h1 className="text-xl font-bold text-slate-800">
-            Agendar con {sellerName || 'Steve Ads'}
+            Agenda con tu consultor
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             Elige el horario que te acomode
@@ -212,7 +212,7 @@ export default function Agendar() {
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1">
                   <DollarSign className="w-3.5 h-3.5 inline mr-1" />
-                  Inversión mensual en marketing (USD)
+                  Inversión mensual en marketing (CLP)
                 </label>
                 <select
                   value={monthlyBudget}
@@ -220,11 +220,11 @@ export default function Agendar() {
                   className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
                 >
                   <option value="">Seleccionar rango</option>
-                  <option value="0-500">Menos de $500</option>
-                  <option value="500-1500">$500 — $1,500</option>
-                  <option value="1500-5000">$1,500 — $5,000</option>
-                  <option value="5000-15000">$5,000 — $15,000</option>
-                  <option value="15000+">Más de $15,000</option>
+                  <option value="menos-300k">Menos de $300.000</option>
+                  <option value="300k-1M">$300.000 — $1.000.000</option>
+                  <option value="1M-3M">$1.000.000 — $3.000.000</option>
+                  <option value="3M-8M">$3.000.000 — $8.000.000</option>
+                  <option value="8M+">Más de $8.000.000</option>
                 </select>
               </div>
             </div>

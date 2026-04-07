@@ -115,31 +115,41 @@ export async function bookingSlots(c: Context) {
   const workEnd = seller.working_hours_end || 18;
   const workDays = seller.working_days || [1, 2, 3, 4, 5];
 
-  const now = new Date();
-  // Use Chile timezone
-  const chileNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+  // Helper: convert a Chile local datetime to proper UTC
+  // (server runs in UTC — setHours would set UTC hours, not Chile hours)
+  const chileLocalToUTC = (y: number, mo: number, d: number, h: number, min: number): Date => {
+    const approx = new Date(Date.UTC(y, mo - 1, d, h, min, 0));
+    const chileDisp = new Date(approx.toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+    const offsetMs = approx.getTime() - chileDisp.getTime();
+    return new Date(approx.getTime() + offsetMs);
+  };
+
+  // Get today in Chile time
+  const nowUTC = new Date();
+  const chileToday = new Date(nowUTC.toLocaleString('en-US', { timeZone: 'America/Santiago' }));
 
   const candidateSlots: { start: Date; end: Date }[] = [];
   let daysChecked = 0;
   let dayOffset = 1; // Start tomorrow
 
   while (daysChecked < 5 && dayOffset < 14) {
-    const day = new Date(chileNow);
-    day.setDate(day.getDate() + dayOffset);
-    const dayOfWeek = day.getDay() === 0 ? 7 : day.getDay(); // 1=Mon, 7=Sun
+    // Target day in Chile time
+    const targetUTC = new Date(Date.UTC(chileToday.getFullYear(), chileToday.getMonth(), chileToday.getDate() + dayOffset));
+    const targetChile = new Date(targetUTC.toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+    const dayOfWeek = targetChile.getDay() === 0 ? 7 : targetChile.getDay(); // 1=Mon, 7=Sun
 
     if (workDays.includes(dayOfWeek)) {
-      // Generate slots for this day
+      const ty = targetChile.getFullYear();
+      const tm = targetChile.getMonth() + 1;
+      const td = targetChile.getDate();
+
       for (let hour = workStart; hour < workEnd; hour++) {
         for (let min = 0; min < 60; min += slotDuration + buffer) {
-          if (hour === workEnd - 1 && min + slotDuration > 60) break;
-
-          const slotStart = new Date(day);
-          slotStart.setHours(hour, min, 0, 0);
-
+          const slotStart = chileLocalToUTC(ty, tm, td, hour, min);
           const slotEnd = new Date(slotStart.getTime() + slotDuration * 60 * 1000);
-          if (slotEnd.getHours() > workEnd || (slotEnd.getHours() === workEnd && slotEnd.getMinutes() > 0)) break;
-
+          // Verify end doesn't exceed workEnd in Chile
+          const endChile = new Date(slotEnd.toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+          if (endChile.getHours() > workEnd || (endChile.getHours() === workEnd && endChile.getMinutes() > 0)) break;
           candidateSlots.push({ start: slotStart, end: slotEnd });
         }
       }
@@ -152,18 +162,9 @@ export async function bookingSlots(c: Context) {
     return c.json({ seller_name: seller.seller_name, slots: [] });
   }
 
-  // Query Google Calendar free/busy for the date range
+  // Slots are already in proper UTC — use directly for Google Calendar API
   const timeMin = candidateSlots[0].start;
   const timeMax = candidateSlots[candidateSlots.length - 1].end;
-
-  // Convert Chile local dates to UTC for API
-  const toUTC = (d: Date) => {
-    // d is in Chile local time, convert to UTC
-    const utcStr = new Date(d.toLocaleString('en-US', { timeZone: 'UTC' }));
-    // Actually, we need to convert from Chile to UTC properly
-    const chileOffset = -3; // Chile standard time (simplified, DST varies)
-    return new Date(d.getTime() - chileOffset * 60 * 60 * 1000);
-  };
 
   try {
     const freeBusyRes = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
@@ -173,8 +174,8 @@ export async function bookingSlots(c: Context) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        timeMin: toUTC(timeMin).toISOString(),
-        timeMax: toUTC(timeMax).toISOString(),
+        timeMin: timeMin.toISOString(),
+        timeMax: timeMax.toISOString(),
         timeZone: 'America/Santiago',
         items: [{ id: seller.google_calendar_id || 'primary' }],
       }),
@@ -190,15 +191,14 @@ export async function bookingSlots(c: Context) {
     const calendarId = seller.google_calendar_id || 'primary';
     const busySlots: Array<{ start: string; end: string }> = freeBusyData.calendars?.[calendarId]?.busy || [];
 
-    // Filter out busy slots
+    // Filter out busy slots (slots are already UTC)
     const availableSlots = candidateSlots.filter(candidate => {
-      const candidateStartUTC = toUTC(candidate.start).getTime();
-      const candidateEndUTC = toUTC(candidate.end).getTime();
+      const candidateStartUTC = candidate.start.getTime();
+      const candidateEndUTC = candidate.end.getTime();
 
       return !busySlots.some(busy => {
         const busyStart = new Date(busy.start).getTime();
         const busyEnd = new Date(busy.end).getTime();
-        // Overlap check
         return candidateStartUTC < busyEnd && candidateEndUTC > busyStart;
       });
     });
@@ -294,7 +294,7 @@ export async function bookingConfirm(c: Context) {
   const calendarId = seller.google_calendar_id || 'primary';
   const eventBody = {
     summary: `Llamada Steve Ads — ${prospect_name}`,
-    description: `Reunión agendada por ${prospect_name}${prospect_phone ? ` (${prospect_phone})` : ''} vía Steve Ads.${website ? `\n🌐 Web: ${website}` : ''}${monthly_budget ? `\n💰 Inversión: ${monthly_budget} USD/mes` : ''}\n\nAgendado automáticamente.`,
+    description: `Reunión agendada por ${prospect_name}${prospect_phone ? ` (${prospect_phone})` : ''} vía Steve Ads.${website ? `\n🌐 Web: ${website}` : ''}${monthly_budget ? `\n💰 Inversión: ${monthly_budget} CLP/mes` : ''}\n\nAgendado automáticamente.`,
     start: {
       dateTime: startTime.toISOString(),
       timeZone: 'America/Santiago',
