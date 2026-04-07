@@ -46,12 +46,27 @@ export async function knowledgeQualityScore(c: Context) {
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
   try {
-    const { data: rules } = await supabase
-      .from('steve_knowledge')
-      .select('id, titulo, contenido, orden, veces_usada, ultima_vez_usada, ejemplo_real, created_at, merged_from, effectiveness_score')
-      .eq('activo', true);
+    // Fix Tomás W7 (2026-04-07): paginar. PostgREST corta en 1000 filas por
+    // default (max-rows). Antes solo se scoreaban las primeras 1000 activas
+    // y las restantes quedaban con quality_score stale (o null).
+    const rules: any[] = [];
+    const BATCH_SIZE = 1000;
+    let offset = 0;
+    while (true) {
+      const { data: batch, error } = await supabase
+        .from('steve_knowledge')
+        .select('id, titulo, contenido, orden, veces_usada, ultima_vez_usada, ejemplo_real, created_at, merged_from, effectiveness_score')
+        .eq('activo', true)
+        .order('id', { ascending: true })
+        .range(offset, offset + BATCH_SIZE - 1);
+      if (error) throw error;
+      if (!batch || batch.length === 0) break;
+      rules.push(...batch);
+      if (batch.length < BATCH_SIZE) break;
+      offset += BATCH_SIZE;
+    }
 
-    if (!rules) return c.json({ success: true, message: 'No rules to score' });
+    if (rules.length === 0) return c.json({ success: true, message: 'No rules to score' });
 
     const now = Date.now();
     let improved = 0;
