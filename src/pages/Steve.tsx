@@ -29,7 +29,6 @@ import { ClientLogosSection } from '@/components/steve-landing/ClientLogosSectio
 import { TestimonialsSection } from '@/components/steve-landing/TestimonialsSection';
 import { SteveFooter } from '@/components/steve-landing/SteveFooter';
 import { FloatingWhatsAppButton } from '@/components/steve-landing/FloatingWhatsAppButton';
-import { WaitlistModal } from '@/components/steve-landing/WaitlistModal';
 
 const loginSchema = z.object({
   email: z.string().trim().email('Email inválido').max(255),
@@ -52,15 +51,6 @@ export default function Steve() {
   const navigate = useNavigate();
 
   if (authLoading || roleLoading) return null;
-
-  // Waitlist gate: bloquea la landing pública mientras Steve Ads está pre-launch.
-  // Bypass:
-  //   - usuario logueado (cualquier rol)
-  //   - flag localStorage seteado vía /entrada-secreta-jm
-  const hasLocalBypass =
-    typeof window !== 'undefined' &&
-    localStorage.getItem('steve_admin_bypass') === 'true';
-  const showWaitlist = !user && !hasLocalBypass;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,42 +77,31 @@ export default function Steve() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div
-        className={
-          showWaitlist
-            ? 'blur-sm pointer-events-none select-none transition-all'
-            : 'transition-all'
-        }
-        aria-hidden={showWaitlist || undefined}
-      >
-        <SteveNavbar
-          user={user}
-          isAdmin={isAdmin}
-          isClient={isClient}
-          onOpenAuth={openAuth}
-          onNavigate={(path) => navigate(path)}
-          onSignOut={async () => { await signOut(); toast.success('Sesión cerrada'); }}
-        />
+      <SteveNavbar
+        user={user}
+        isAdmin={isAdmin}
+        isClient={isClient}
+        onOpenAuth={openAuth}
+        onNavigate={(path) => navigate(path)}
+        onSignOut={async () => { await signOut(); toast.success('Sesión cerrada'); }}
+      />
 
-        <SteveHero onOpenAuth={openAuth} />
-        <LogoBar />
-        <ProductShowcase />
-        <FeatureBento />
-        <HowItWorks />
-        <StatsSection />
-        <StevePersonality />
-        <ClientLogosSection />
-        <TestimonialsSection />
-        <PricingSection onOpenAuth={openAuth} />
-        <FinalCTA onOpenAuth={openAuth} />
-        <SteveFooter />
-        <FloatingWhatsAppButton />
-      </div>
-
-      {showWaitlist && <WaitlistModal />}
+      <SteveHero onOpenAuth={openAuth} />
+      <LogoBar />
+      <ProductShowcase />
+      <FeatureBento />
+      <HowItWorks />
+      <StatsSection />
+      <StevePersonality />
+      <ClientLogosSection />
+      <TestimonialsSection />
+      <PricingSection onOpenAuth={openAuth} />
+      <FinalCTA onOpenAuth={openAuth} />
+      <SteveFooter />
+      <FloatingWhatsAppButton />
 
       {/* Auth Modal */}
-      {!showWaitlist && showAuth && (
+      {showAuth && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
