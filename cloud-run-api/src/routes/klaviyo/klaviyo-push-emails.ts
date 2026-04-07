@@ -267,7 +267,17 @@ export async function klaviyoPushEmails(c: Context) {
 
     // Parse emails once and reuse
     const rawEmails = plan.emails;
-    const emails: EmailStep[] = typeof rawEmails === 'string' ? JSON.parse(rawEmails) : rawEmails as EmailStep[];
+    let emails: EmailStep[];
+    try {
+      emails = typeof rawEmails === 'string'
+        ? JSON.parse(rawEmails)
+        : Array.isArray(rawEmails) ? rawEmails as EmailStep[] : [];
+    } catch {
+      return c.json({ error: 'Formato inválido de emails en el plan' }, 400);
+    }
+    if (!Array.isArray(emails) || emails.length === 0) {
+      return c.json({ error: 'El plan no tiene emails válidos' }, 400);
+    }
 
     // Get shop_id from the plan's client connection
     const { data: connData } = await supabase

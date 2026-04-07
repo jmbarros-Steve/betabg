@@ -262,7 +262,8 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
       const raw = localStorage.getItem(getCacheKey(connId, tf));
       if (!raw) return false;
       const { data: cached, cachedAt: ts } = JSON.parse(raw);
-      if (Date.now() - new Date(ts).getTime() > CACHE_TTL_MS) return false;
+      const tsTime = new Date(ts).getTime();
+      if (isNaN(tsTime) || Date.now() - tsTime > CACHE_TTL_MS) return false;
       if (cached.flows) setFlows(cached.flows);
       if (cached.campaigns) setCampaigns(cached.campaigns);
       if (cached.lists) setLists(cached.lists);
@@ -288,12 +289,15 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
     if (data) {
       setConnectionId(data.id);
       setHasConnection(true);
-      populateFromCache(data.id, 'last_90_days');
+      populateFromCache(data.id, timeframe);
     }
   };
 
   const fetchMetrics = async (tf?: string) => {
-    if (!connectionId) return;
+    if (!connectionId) {
+      toast.error('Conexión de Klaviyo no disponible');
+      return;
+    }
     const activeTimeframe = tf || timeframe;
     setLoading(true);
     try {

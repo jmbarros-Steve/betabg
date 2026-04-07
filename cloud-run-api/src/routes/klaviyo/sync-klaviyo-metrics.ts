@@ -257,7 +257,7 @@ export async function syncKlaviyoMetrics(c: Context) {
     console.log('[klaviyo] Starting parallel fetch...');
     const t0 = Date.now();
 
-    const [conversionMetricId, flows, campaigns, klaviyoLists, klaviyoSegments, totalProfiles] = await Promise.all([
+    const phase1 = await Promise.allSettled([
       findConversionMetricId(apiKey),
       fetchFlows(apiKey),
       fetchCampaigns(apiKey),
@@ -265,6 +265,21 @@ export async function syncKlaviyoMetrics(c: Context) {
       fetchSegments(apiKey),
       estimateTotalProfiles(apiKey),
     ]);
+
+    const conversionMetricId: string | null = phase1[0].status === 'fulfilled' ? phase1[0].value as string : null;
+    const flows: any[]       = phase1[1].status === 'fulfilled' ? phase1[1].value as any[] : [];
+    const campaigns: any[]   = phase1[2].status === 'fulfilled' ? phase1[2].value as any[] : [];
+    const klaviyoLists: any[] = phase1[3].status === 'fulfilled' ? phase1[3].value as any[] : [];
+    const klaviyoSegments: any[] = phase1[4].status === 'fulfilled' ? phase1[4].value as any[] : [];
+    const totalProfiles: number = phase1[5].status === 'fulfilled' ? phase1[5].value as number : 0;
+
+    // Log any partial failures
+    phase1.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        const names = ['conversionMetricId', 'flows', 'campaigns', 'lists', 'segments', 'totalProfiles'];
+        console.warn(`[klaviyo] Phase 1 partial failure [${names[i]}]:`, r.reason?.message ?? r.reason);
+      }
+    });
 
     console.log(`[klaviyo] Phase 1 done in ${Date.now() - t0}ms: ${flows.length} flows, ${campaigns.length} campaigns, ${klaviyoLists.length} lists, ${klaviyoSegments.length} segments`);
 

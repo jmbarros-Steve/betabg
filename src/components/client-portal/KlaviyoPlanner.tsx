@@ -179,14 +179,14 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
         flow_type: newPlanType,
         name: data.name,
         status: 'draft',
-        emails: data.emails as unknown,
+        emails: data.emails as unknown as Record<string, unknown>[],
         client_notes: data.notes || null,
         campaign_date: data.campaignDate || null,
       };
 
       const { data: dbData, error } = await supabase
         .from('klaviyo_email_plans')
-        .insert(insertData as never)
+        .insert(insertData)
         .select()
         .single();
 
@@ -295,10 +295,11 @@ export function KlaviyoPlanner({ clientId }: KlaviyoPlannerProps) {
     const updatedEmails = plan.emails.map((email, idx) =>
       idx === emailIndex ? { ...email, ...updates } : email
     );
-    
-    setPlans(prev => prev.map(p => 
+
+    setPlans(prev => prev.map(p =>
       p.id === planId ? { ...p, emails: updatedEmails } : p
     ));
+    updatePlan(planId, { emails: updatedEmails });
   }
 
   function removeEmailFromPlan(planId: string, emailIndex: number) {
@@ -983,24 +984,23 @@ function PushToKlaviyoDialog({
 
   async function loadConnection() {
     setLoadingLists(true);
-    const { data: connections } = await supabase
-      .from('platform_connections')
-      .select('id')
-      .eq('client_id', clientId)
-      .eq('platform', 'klaviyo')
-      .eq('is_active', true)
-      .limit(1);
-
-    if (!connections || connections.length === 0) {
-      toast.error('No hay conexión de Klaviyo activa para este cliente');
-      setLoadingLists(false);
-      return;
-    }
-
-    const connId = connections[0].id;
-    setConnectionId(connId);
-
     try {
+      const { data: connections } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('platform', 'klaviyo')
+        .eq('is_active', true)
+        .limit(1);
+
+      if (!connections || connections.length === 0) {
+        toast.error('No hay conexión de Klaviyo activa para este cliente');
+        return;
+      }
+
+      const connId = connections[0].id;
+      setConnectionId(connId);
+
       const { data, error } = await callApi('klaviyo-push-emails', {
         body: { action: 'fetch_lists', connection_id: connId },
       });
@@ -1008,7 +1008,6 @@ function PushToKlaviyoDialog({
       setLists(data.lists || []);
       if (data.lists?.length > 0) setSelectedList(data.lists[0].id);
     } catch {
-      // Error handled by toast
       toast.error('Error al obtener las listas de Klaviyo');
     } finally {
       setLoadingLists(false);
@@ -1021,7 +1020,14 @@ function PushToKlaviyoDialog({
   }
 
   async function handlePush() {
-    if (!connectionId || !selectedList) return;
+    if (!connectionId) {
+      toast.error('Conexión de Klaviyo no disponible');
+      return;
+    }
+    if (!selectedList) {
+      toast.error('Selecciona una lista de Klaviyo');
+      return;
+    }
     setPushing(true);
     try {
       const { data, error } = await callApi('klaviyo-push-emails', {
@@ -1277,9 +1283,11 @@ function BulkImportDialog({ clientId, onComplete, onClose }: BulkImportDialogPro
 
   function parseEmails(text: string): EmailStep[] {
     if (!text.trim()) return [];
-    
-    // Split by --- or === or ### or numbered patterns like "Email 1:", "Correo 2:"
-    const blocks = text.split(/\n\s*(?:---+|===+|###\s*Email\s*\d+|###\s*Correo\s*\d+)\s*\n/i)
+
+    // Split by: ---, ===, ### Email N, ### Correo N, "Email N:" / "Correo N:" al inicio de línea
+    const blocks = text.split(
+      /\n\s*(?:---+|===+|###\s*(?:Email|Correo)\s*\d+|(?:Email|Correo)\s*\d+\s*:)\s*\n/i
+    )
       .map(b => b.trim())
       .filter(b => b.length > 0);
 
@@ -1338,13 +1346,13 @@ function BulkImportDialog({ clientId, onComplete, onClose }: BulkImportDialogPro
         flow_type: 'campaign',
         name: planName,
         status: 'draft',
-        emails: parsed as unknown,
+        emails: parsed as unknown as Record<string, unknown>[],
         client_notes: `Importado desde texto (${parsed.length} emails)`,
       };
 
       const { data, error } = await supabase
         .from('klaviyo_email_plans')
-        .insert(insertData as never)
+        .insert(insertData)
         .select()
         .single();
 
@@ -1485,6 +1493,7 @@ function EmailStepCard({ email, index, isFirst, flowType, onUpdate, onRemove }: 
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      if (!data?.html) throw new Error('La IA no generó HTML — intenta de nuevo');
 
       setSmartHtml(data.html);
       setDetectedFeatures(data.features_detected || []);

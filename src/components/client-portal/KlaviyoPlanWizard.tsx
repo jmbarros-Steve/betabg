@@ -221,8 +221,9 @@ export function KlaviyoPlanWizard({
             setTopProducts(mapped);
           }
         }
-      } catch {
-        // silently ignore — textarea manual remains visible
+      } catch (err) {
+        console.warn('[KlaviyoPlanWizard] fetch-klaviyo-top-products no disponible:', err);
+        // textarea manual remains visible
       } finally {
         setLoadingProducts(false);
       }
