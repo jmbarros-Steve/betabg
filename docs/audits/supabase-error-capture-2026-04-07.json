@@ -1,0 +1,2744 @@
+[
+  {
+    "file": "cloud-run-api/src/routes/cron/anomaly-detector.ts",
+    "line": 20,
+    "severity": "CRITICAL",
+    "destructured": "data: todayMetrics"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/anomaly-detector.ts",
+    "line": 36,
+    "severity": "CRITICAL",
+    "destructured": "data: historicalMetrics"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/anomaly-detector.ts",
+    "line": 61,
+    "severity": "CRITICAL",
+    "destructured": "data: connections"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/auto-brief-generator.ts",
+    "line": 22,
+    "severity": "CRITICAL",
+    "destructured": "data: connections"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/auto-brief-generator.ts",
+    "line": 35,
+    "severity": "CRITICAL",
+    "destructured": "data: existingBrief"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/auto-postmortem.ts",
+    "line": 130,
+    "severity": "CRITICAL",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/auto-rule-generator.ts",
+    "line": 32,
+    "severity": "CRITICAL",
+    "destructured": "data: existingRules"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/chino-executor.ts",
+    "line": 312,
+    "severity": "CRITICAL",
+    "destructured": "data: check"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/churn-detector.ts",
+    "line": 33,
+    "severity": "CRITICAL",
+    "destructured": "data: clients"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/churn-detector.ts",
+    "line": 83,
+    "severity": "CRITICAL",
+    "destructured": "data: connections"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/churn-detector.ts",
+    "line": 92,
+    "severity": "CRITICAL",
+    "destructured": "data: recentMetrics"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/cross-client-learning.ts",
+    "line": 19,
+    "severity": "CRITICAL",
+    "destructured": "data: metrics"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/detective-visual.ts",
+    "line": 48,
+    "severity": "CRITICAL",
+    "destructured": "data: connections"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/detective-visual.ts",
+    "line": 58,
+    "severity": "CRITICAL",
+    "destructured": "data: steveCampaigns"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/detective-visual.ts",
+    "line": 121,
+    "severity": "CRITICAL",
+    "destructured": "data: connections"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/detective-visual.ts",
+    "line": 135,
+    "severity": "CRITICAL",
+    "destructured": "data: steveProducts"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/detective-visual.ts",
+    "line": 239,
+    "severity": "CRITICAL",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/error-budget-calculator.ts",
+    "line": 143,
+    "severity": "CRITICAL",
+    "destructured": "data: existingTask"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/error-budget-calculator.ts",
+    "line": 183,
+    "severity": "CRITICAL",
+    "destructured": "data: frozenSLOs"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/error-budget-calculator.ts",
+    "line": 192,
+    "severity": "CRITICAL",
+    "destructured": "data: featureTasks"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/execute-meta-rules.ts",
+    "line": 66,
+    "severity": "CRITICAL",
+    "destructured": "data: metrics"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/fatigue-detector.ts",
+    "line": 144,
+    "severity": "CRITICAL",
+    "destructured": "data: goodAngles"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/funnel-diagnosis.ts",
+    "line": 18,
+    "severity": "CRITICAL",
+    "destructured": "data: metrics"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/funnel-diagnosis.ts",
+    "line": 27,
+    "severity": "CRITICAL",
+    "destructured": "data: connections"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/meeting-reminder.ts",
+    "line": 28,
+    "severity": "CRITICAL",
+    "destructured": "data: prospects"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/merchant-upsell.ts",
+    "line": 36,
+    "severity": "CRITICAL",
+    "destructured": "data: clients"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/merchant-upsell.ts",
+    "line": 53,
+    "severity": "CRITICAL",
+    "destructured": "data: connections"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/merchant-upsell.ts",
+    "line": 64,
+    "severity": "CRITICAL",
+    "destructured": "data: metrics"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/merchant-upsell.ts",
+    "line": 99,
+    "severity": "CRITICAL",
+    "destructured": "data: recentUpsell"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/onboarding-wa.ts",
+    "line": 33,
+    "severity": "CRITICAL",
+    "destructured": "data: pendingSteps"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/onboarding-wa.ts",
+    "line": 61,
+    "severity": "CRITICAL",
+    "destructured": "data: currentStep"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/performance-evaluator.ts",
+    "line": 152,
+    "severity": "CRITICAL",
+    "destructured": "data: recentCreatives"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/performance-evaluator.ts",
+    "line": 220,
+    "severity": "CRITICAL",
+    "destructured": "data: scored"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/performance-tracker-meta.ts",
+    "line": 103,
+    "severity": "CRITICAL",
+    "destructured": "data: connection"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/performance-tracker-meta.ts",
+    "line": 161,
+    "severity": "CRITICAL",
+    "destructured": "data: avgData"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/predictive-alerts.ts",
+    "line": 20,
+    "severity": "CRITICAL",
+    "destructured": "data: recentMetrics"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/predictive-alerts.ts",
+    "line": 31,
+    "severity": "CRITICAL",
+    "destructured": "data: connections"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/prospect-email-nurture.ts",
+    "line": 110,
+    "severity": "CRITICAL",
+    "destructured": "data: prospects"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/prospect-email-nurture.ts",
+    "line": 136,
+    "severity": "CRITICAL",
+    "destructured": "data: messages"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/prospect-followup.ts",
+    "line": 44,
+    "severity": "CRITICAL",
+    "destructured": "data: prospects"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/prospect-followup.ts",
+    "line": 56,
+    "severity": "CRITICAL",
+    "destructured": "data: lastMsg"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/prospect-followup.ts",
+    "line": 169,
+    "severity": "CRITICAL",
+    "destructured": "data: ghosted"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/prospect-followup.ts",
+    "line": 178,
+    "severity": "CRITICAL",
+    "destructured": "data: lastInbound"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/prospect-followup.ts",
+    "line": 189,
+    "severity": "CRITICAL",
+    "destructured": "data: lastOutbound"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/prospect-followup.ts",
+    "line": 219,
+    "severity": "CRITICAL",
+    "destructured": "data: deadProspects"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/reconciliation.ts",
+    "line": 127,
+    "severity": "CRITICAL",
+    "destructured": "data: localCampaigns"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/reconciliation.ts",
+    "line": 206,
+    "severity": "CRITICAL",
+    "destructured": "data: stale"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/revenue-attribution.ts",
+    "line": 18,
+    "severity": "CRITICAL",
+    "destructured": "data: recommendations"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/revenue-attribution.ts",
+    "line": 45,
+    "severity": "CRITICAL",
+    "destructured": "data: beforeMetrics"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/revenue-attribution.ts",
+    "line": 53,
+    "severity": "CRITICAL",
+    "destructured": "data: afterMetrics"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/root-cause-analysis.ts",
+    "line": 114,
+    "severity": "CRITICAL",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/rule-calibrator.ts",
+    "line": 107,
+    "severity": "CRITICAL",
+    "destructured": "data: prevLog"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/sales-learning-loop.ts",
+    "line": 39,
+    "severity": "CRITICAL",
+    "destructured": "data: prospects"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/sales-learning-loop.ts",
+    "line": 54,
+    "severity": "CRITICAL",
+    "destructured": "data: messages"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/sales-learning-loop.ts",
+    "line": 198,
+    "severity": "CRITICAL",
+    "destructured": "data: allLearnings"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/steve-agent-loop.ts",
+    "line": 70,
+    "severity": "CRITICAL",
+    "destructured": "data: recentFeedback"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/steve-agent-loop.ts",
+    "line": 79,
+    "severity": "CRITICAL",
+    "destructured": "data: recentMetrics"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/steve-agent-loop.ts",
+    "line": 194,
+    "severity": "CRITICAL",
+    "destructured": "data: lowQuality"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/steve-agent-loop.ts",
+    "line": 266,
+    "severity": "CRITICAL",
+    "destructured": "data: dueCommitments"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/steve-content-hunter.ts",
+    "line": 37,
+    "severity": "CRITICAL",
+    "destructured": "data: sources"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/steve-discoverer.ts",
+    "line": 22,
+    "severity": "CRITICAL",
+    "destructured": "data: metrics"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/steve-discoverer.ts",
+    "line": 28,
+    "severity": "CRITICAL",
+    "destructured": "data: creatives"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/steve-discoverer.ts",
+    "line": 34,
+    "severity": "CRITICAL",
+    "destructured": "data: emails"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/swarm-research.ts",
+    "line": 97,
+    "severity": "CRITICAL",
+    "destructured": "data: activeSources"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/swarm-research.ts",
+    "line": 246,
+    "severity": "CRITICAL",
+    "destructured": "data: existingKnowledge"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/swarm-research.ts",
+    "line": 256,
+    "severity": "CRITICAL",
+    "destructured": "data: allSources"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/task-prioritizer.ts",
+    "line": 57,
+    "severity": "CRITICAL",
+    "destructured": "data: frozenSLOs"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/task-prioritizer.ts",
+    "line": 136,
+    "severity": "CRITICAL",
+    "destructured": "data: blockedTasks"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/task-prioritizer.ts",
+    "line": 209,
+    "severity": "CRITICAL",
+    "destructured": "data: busyTasks"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/task-prioritizer.ts",
+    "line": 226,
+    "severity": "CRITICAL",
+    "destructured": "data: pendingBySquad"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/task-prioritizer.ts",
+    "line": 238,
+    "severity": "CRITICAL",
+    "destructured": "data: backlogItems"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/validate-contexts.ts",
+    "line": 61,
+    "severity": "CRITICAL",
+    "destructured": "data: fallback"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/weekly-report.ts",
+    "line": 173,
+    "severity": "CRITICAL",
+    "destructured": "data: clients"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/weekly-report.ts",
+    "line": 191,
+    "severity": "CRITICAL",
+    "destructured": "data: thisWeekMetrics"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/weekly-report.ts",
+    "line": 198,
+    "severity": "CRITICAL",
+    "destructured": "data: lastWeekMetrics"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/weekly-report.ts",
+    "line": 206,
+    "severity": "CRITICAL",
+    "destructured": "data: shopifyThisWeek"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/weekly-report.ts",
+    "line": 212,
+    "severity": "CRITICAL",
+    "destructured": "data: shopifyLastWeek"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/weekly-report.ts",
+    "line": 245,
+    "severity": "CRITICAL",
+    "destructured": "data: creativeData"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/weekly-report.ts",
+    "line": 320,
+    "severity": "CRITICAL",
+    "destructured": "data: thisWeekErrors"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/weekly-report.ts",
+    "line": 326,
+    "severity": "CRITICAL",
+    "destructured": "data: lastWeekErrors"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/weekly-report.ts",
+    "line": 342,
+    "severity": "CRITICAL",
+    "destructured": "data: newRulesData"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/weekly-report.ts",
+    "line": 384,
+    "severity": "CRITICAL",
+    "destructured": "data: weekCreatives"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/weekly-report.ts",
+    "line": 398,
+    "severity": "CRITICAL",
+    "destructured": "data: lastWeekCreatives"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/weekly-report.ts",
+    "line": 413,
+    "severity": "CRITICAL",
+    "destructured": "data: fatigueData"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/weekly-report.ts",
+    "line": 446,
+    "severity": "CRITICAL",
+    "destructured": "data: recentMessages"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/weekly-report.ts",
+    "line": 537,
+    "severity": "CRITICAL",
+    "destructured": "data: verdictCreatives"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/wolf-morning-send.ts",
+    "line": 41,
+    "severity": "CRITICAL",
+    "destructured": "data: prospects"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/wolf-night-mode.ts",
+    "line": 31,
+    "severity": "CRITICAL",
+    "destructured": "data: prospects"
+  },
+  {
+    "file": "cloud-run-api/src/routes/cron/wolf-night-mode.ts",
+    "line": 140,
+    "severity": "CRITICAL",
+    "destructured": "data: newAds"
+  },
+  {
+    "file": "cloud-run-api/src/chino/auto-fixer.ts",
+    "line": 65,
+    "severity": "HIGH",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 157,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 166,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 197,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 205,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 225,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 233,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 241,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 249,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 259,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 269,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 280,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 291,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 300,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 310,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 333,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 337,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 341,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 345,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 349,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 355,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 361,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 367,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 406,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 410,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 414,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 418,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 422,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/api-compare.ts",
+    "line": 437,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/data-quality.ts",
+    "line": 226,
+    "severity": "HIGH",
+    "destructured": "data: dbProducts"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/data-quality.ts",
+    "line": 540,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/data-quality.ts",
+    "line": 579,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/data-quality.ts",
+    "line": 617,
+    "severity": "HIGH",
+    "destructured": "data: spfData"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/data-quality.ts",
+    "line": 626,
+    "severity": "HIGH",
+    "destructured": "data: dkimData"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/data-quality.ts",
+    "line": 672,
+    "severity": "HIGH",
+    "destructured": "data: anyClient"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/data-quality.ts",
+    "line": 770,
+    "severity": "HIGH",
+    "destructured": "data: clients"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/data-quality.ts",
+    "line": 1450,
+    "severity": "HIGH",
+    "destructured": "data: campLanding"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/data-quality.ts",
+    "line": 1461,
+    "severity": "HIGH",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/data-quality.ts",
+    "line": 1601,
+    "severity": "HIGH",
+    "destructured": "data: stale"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/data-quality.ts",
+    "line": 1837,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/data-quality.ts",
+    "line": 1860,
+    "severity": "HIGH",
+    "destructured": "data: flows124"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/data-quality.ts",
+    "line": 1887,
+    "severity": "HIGH",
+    "destructured": "data: data129"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/data-quality.ts",
+    "line": 1913,
+    "severity": "HIGH",
+    "destructured": "data: data133"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/data-quality.ts",
+    "line": 1935,
+    "severity": "HIGH",
+    "destructured": "data: data137"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/functional.ts",
+    "line": 313,
+    "severity": "HIGH",
+    "destructured": "data: found"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/functional.ts",
+    "line": 772,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/functional.ts",
+    "line": 784,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/functional.ts",
+    "line": 787,
+    "severity": "HIGH",
+    "destructured": "data: sends"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/functional.ts",
+    "line": 846,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/security.ts",
+    "line": 77,
+    "severity": "HIGH",
+    "destructured": "data: otherConn"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/security.ts",
+    "line": 422,
+    "severity": "HIGH",
+    "destructured": "data: msgs"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/security.ts",
+    "line": 429,
+    "severity": "HIGH",
+    "destructured": "data: knowledge"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/security.ts",
+    "line": 947,
+    "severity": "HIGH",
+    "destructured": "data: nullClients"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/security.ts",
+    "line": 958,
+    "severity": "HIGH",
+    "destructured": "data: piiData"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/security.ts",
+    "line": 968,
+    "severity": "HIGH",
+    "destructured": "data: tokenData91"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/security.ts",
+    "line": 1030,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/token-health.ts",
+    "line": 188,
+    "severity": "HIGH",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/chino/checks/visual.ts",
+    "line": 137,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/endpoints.ts",
+    "line": 175,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/fixer.ts",
+    "line": 113,
+    "severity": "HIGH",
+    "destructured": "data: deployedFixes"
+  },
+  {
+    "file": "cloud-run-api/src/chino/fixer.ts",
+    "line": 131,
+    "severity": "HIGH",
+    "destructured": "data: check"
+  },
+  {
+    "file": "cloud-run-api/src/chino/instruction-handler.ts",
+    "line": 74,
+    "severity": "HIGH",
+    "destructured": "data: maxCheck"
+  },
+  {
+    "file": "cloud-run-api/src/chino/runner.ts",
+    "line": 151,
+    "severity": "HIGH",
+    "destructured": "data: existingFix"
+  },
+  {
+    "file": "cloud-run-api/src/chino/whatsapp.ts",
+    "line": 48,
+    "severity": "HIGH",
+    "destructured": "data: reports"
+  },
+  {
+    "file": "cloud-run-api/src/chino/whatsapp.ts",
+    "line": 59,
+    "severity": "HIGH",
+    "destructured": "data: fixes"
+  },
+  {
+    "file": "cloud-run-api/src/chino/whatsapp.ts",
+    "line": 104,
+    "severity": "HIGH",
+    "destructured": "data: pendingApproval"
+  },
+  {
+    "file": "cloud-run-api/src/chino/whatsapp.ts",
+    "line": 185,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/chino/whatsapp.ts",
+    "line": 268,
+    "severity": "HIGH",
+    "destructured": "data: failures"
+  },
+  {
+    "file": "cloud-run-api/src/lib/creative-context.ts",
+    "line": 16,
+    "severity": "HIGH",
+    "destructured": "data: best"
+  },
+  {
+    "file": "cloud-run-api/src/lib/creative-context.ts",
+    "line": 27,
+    "severity": "HIGH",
+    "destructured": "data: worst"
+  },
+  {
+    "file": "cloud-run-api/src/lib/creative-context.ts",
+    "line": 40,
+    "severity": "HIGH",
+    "destructured": "data: pb"
+  },
+  {
+    "file": "cloud-run-api/src/lib/creative-context.ts",
+    "line": 53,
+    "severity": "HIGH",
+    "destructured": "data: allAngleData"
+  },
+  {
+    "file": "cloud-run-api/src/lib/email-html-processor.ts",
+    "line": 632,
+    "severity": "HIGH",
+    "destructured": "data: connection"
+  },
+  {
+    "file": "cloud-run-api/src/lib/knowledge-conflict-detector.ts",
+    "line": 47,
+    "severity": "HIGH",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/lib/knowledge-loader.ts",
+    "line": 49,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/lib/meta-token-refresh.ts",
+    "line": 93,
+    "severity": "HIGH",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/lib/send-alert-email.ts",
+    "line": 22,
+    "severity": "HIGH",
+    "destructured": "data: client"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-investigator.ts",
+    "line": 32,
+    "severity": "HIGH",
+    "destructured": "data: freshProspect"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-investigator.ts",
+    "line": 294,
+    "severity": "HIGH",
+    "destructured": "data: ads"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-multi-brain.ts",
+    "line": 56,
+    "severity": "HIGH",
+    "destructured": "data: fresh"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-multi-brain.ts",
+    "line": 104,
+    "severity": "HIGH",
+    "destructured": "data: compAds"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-multi-brain.ts",
+    "line": 121,
+    "severity": "HIGH",
+    "destructured": "data: learnings"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-sales-deck.ts",
+    "line": 47,
+    "severity": "HIGH",
+    "destructured": "data: fresh"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-wa-brain.ts",
+    "line": 477,
+    "severity": "HIGH",
+    "destructured": "data: platformMetrics"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-wa-brain.ts",
+    "line": 497,
+    "severity": "HIGH",
+    "destructured": "data: campaignMetrics"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-wa-brain.ts",
+    "line": 541,
+    "severity": "HIGH",
+    "destructured": "data: messages"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-wa-brain.ts",
+    "line": 565,
+    "severity": "HIGH",
+    "destructured": "data: messages"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-wa-brain.ts",
+    "line": 585,
+    "severity": "HIGH",
+    "destructured": "data: prospect"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-wa-brain.ts",
+    "line": 627,
+    "severity": "HIGH",
+    "destructured": "data: allMessages"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-wa-brain.ts",
+    "line": 970,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-wa-brain.ts",
+    "line": 1004,
+    "severity": "HIGH",
+    "destructured": "data: topCreatives"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-wa-brain.ts",
+    "line": 1069,
+    "severity": "HIGH",
+    "destructured": "data: learnings"
+  },
+  {
+    "file": "cloud-run-api/src/lib/steve-wa-brain.ts",
+    "line": 1102,
+    "severity": "HIGH",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/lib/task-creator.ts",
+    "line": 22,
+    "severity": "HIGH",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/analyze-brand-research.ts",
+    "line": 35,
+    "severity": "HIGH",
+    "destructured": "data: client"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/analyze-brand-research.ts",
+    "line": 90,
+    "severity": "HIGH",
+    "destructured": "data: persona"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/analyze-brand-strategy.ts",
+    "line": 1125,
+    "severity": "HIGH",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/creative-preview.ts",
+    "line": 47,
+    "severity": "HIGH",
+    "destructured": "data: ownerCheck"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/creative-preview.ts",
+    "line": 68,
+    "severity": "HIGH",
+    "destructured": "data: shopifyProducts"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/creative-preview.ts",
+    "line": 94,
+    "severity": "HIGH",
+    "destructured": "data: assets"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/criterio-email.ts",
+    "line": 188,
+    "severity": "HIGH",
+    "destructured": "data: rules"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/criterio-email.ts",
+    "line": 196,
+    "severity": "HIGH",
+    "destructured": "data: brief"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/criterio-email.ts",
+    "line": 202,
+    "severity": "HIGH",
+    "destructured": "data: recentEmails"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/criterio-email.ts",
+    "line": 209,
+    "severity": "HIGH",
+    "destructured": "data: history"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/criterio-email.ts",
+    "line": 256,
+    "severity": "HIGH",
+    "destructured": "data: updated"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/criterio-meta.ts",
+    "line": 242,
+    "severity": "HIGH",
+    "destructured": "data: rules"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/criterio-meta.ts",
+    "line": 255,
+    "severity": "HIGH",
+    "destructured": "data: brief"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/criterio-meta.ts",
+    "line": 262,
+    "severity": "HIGH",
+    "destructured": "data: history"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/criterio-meta.ts",
+    "line": 273,
+    "severity": "HIGH",
+    "destructured": "data: prods"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/criterio-meta.ts",
+    "line": 325,
+    "severity": "HIGH",
+    "destructured": "data: updated"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/edit-image-gemini.ts",
+    "line": 49,
+    "severity": "HIGH",
+    "destructured": "data: credits"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/espejo.ts",
+    "line": 49,
+    "severity": "HIGH",
+    "destructured": "data: criteria"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/generate-image.ts",
+    "line": 35,
+    "severity": "HIGH",
+    "destructured": "data: ownerCheck"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/generate-image.ts",
+    "line": 60,
+    "severity": "HIGH",
+    "destructured": "data: shopifyProducts"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/generate-image.ts",
+    "line": 94,
+    "severity": "HIGH",
+    "destructured": "data: brandAssets"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/generate-meta-copy.ts",
+    "line": 609,
+    "severity": "HIGH",
+    "destructured": "data: recentCreatives"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/generate-meta-copy.ts",
+    "line": 617,
+    "severity": "HIGH",
+    "destructured": "data: recentSaved"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/generate-meta-copy.ts",
+    "line": 723,
+    "severity": "HIGH",
+    "destructured": "data: ownerCheck"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/generate-meta-copy.ts",
+    "line": 772,
+    "severity": "HIGH",
+    "destructured": "data: shopifyProducts"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/generate-meta-copy.ts",
+    "line": 778,
+    "severity": "HIGH",
+    "destructured": "data: clientInfo"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/generate-meta-copy.ts",
+    "line": 847,
+    "severity": "HIGH",
+    "destructured": "data: briefData"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/generate-meta-copy.ts",
+    "line": 961,
+    "severity": "HIGH",
+    "destructured": "data: briefData"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/generate-meta-copy.ts",
+    "line": 1060,
+    "severity": "HIGH",
+    "destructured": "data: globalFeedback"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/generate-meta-copy.ts",
+    "line": 1067,
+    "severity": "HIGH",
+    "destructured": "data: clientFeedback"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/steve-chat.ts",
+    "line": 782,
+    "severity": "HIGH",
+    "destructured": "data: existingConv"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/steve-chat.ts",
+    "line": 1660,
+    "severity": "HIGH",
+    "destructured": "data: convRow"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/steve-chat.ts",
+    "line": 2087,
+    "severity": "HIGH",
+    "destructured": "data: lastUserMsg"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/steve-strategy.ts",
+    "line": 77,
+    "severity": "HIGH",
+    "destructured": "data: knowledge"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/steve-strategy.ts",
+    "line": 90,
+    "severity": "HIGH",
+    "destructured": "data: client"
+  },
+  {
+    "file": "cloud-run-api/src/routes/ai/steve-strategy.ts",
+    "line": 100,
+    "severity": "HIGH",
+    "destructured": "data: persona"
+  },
+  {
+    "file": "cloud-run-api/src/routes/klaviyo/create-campaign.ts",
+    "line": 51,
+    "severity": "MEDIUM",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/klaviyo/fetch-klaviyo-top-products.ts",
+    "line": 80,
+    "severity": "MEDIUM",
+    "destructured": "data: klaviyoConn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/klaviyo/fetch-klaviyo-top-products.ts",
+    "line": 128,
+    "severity": "MEDIUM",
+    "destructured": "data: shopifyConn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/klaviyo/flow-metrics.ts",
+    "line": 39,
+    "severity": "MEDIUM",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/klaviyo/import-klaviyo-templates.ts",
+    "line": 28,
+    "severity": "MEDIUM",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/klaviyo/klaviyo-push-emails.ts",
+    "line": 283,
+    "severity": "MEDIUM",
+    "destructured": "data: connData"
+  },
+  {
+    "file": "cloud-run-api/src/routes/klaviyo/klaviyo-push-emails.ts",
+    "line": 331,
+    "severity": "MEDIUM",
+    "destructured": "data: bi"
+  },
+  {
+    "file": "cloud-run-api/src/routes/klaviyo/klaviyo-smart-format.ts",
+    "line": 46,
+    "severity": "MEDIUM",
+    "destructured": "data: connection"
+  },
+  {
+    "file": "cloud-run-api/src/routes/klaviyo/store-klaviyo-connection.ts",
+    "line": 59,
+    "severity": "MEDIUM",
+    "destructured": "data: existingConn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/klaviyo/upload-klaviyo-drafts.ts",
+    "line": 70,
+    "severity": "MEDIUM",
+    "destructured": "data: connClient"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/check-meta-scopes.ts",
+    "line": 46,
+    "severity": "MEDIUM",
+    "destructured": "data: adminRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/detect-audience-overlap.ts",
+    "line": 45,
+    "severity": "MEDIUM",
+    "destructured": "data: ownerCheck"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/detect-audience-overlap.ts",
+    "line": 54,
+    "severity": "MEDIUM",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/discover-client-assets.ts",
+    "line": 57,
+    "severity": "MEDIUM",
+    "destructured": "data: adminRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/fetch-meta-ad-accounts.ts",
+    "line": 108,
+    "severity": "MEDIUM",
+    "destructured": "data: clientData"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/fetch-meta-ad-accounts.ts",
+    "line": 115,
+    "severity": "MEDIUM",
+    "destructured": "data: adminRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/fetch-meta-business-hierarchy.ts",
+    "line": 314,
+    "severity": "MEDIUM",
+    "destructured": "data: roleData"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/manage-meta-audiences.ts",
+    "line": 500,
+    "severity": "MEDIUM",
+    "destructured": "data: adminRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/manage-meta-campaign.ts",
+    "line": 1419,
+    "severity": "MEDIUM",
+    "destructured": "data: adminRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/manage-meta-campaign.ts",
+    "line": 1520,
+    "severity": "MEDIUM",
+    "destructured": "data: brandInfo"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/manage-meta-pixel.ts",
+    "line": 174,
+    "severity": "MEDIUM",
+    "destructured": "data: adminRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/manage-meta-rules.ts",
+    "line": 259,
+    "severity": "MEDIUM",
+    "destructured": "data: adminRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/manage-meta-rules.ts",
+    "line": 368,
+    "severity": "MEDIUM",
+    "destructured": "data: currentRule"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/meta-adset-action.ts",
+    "line": 47,
+    "severity": "MEDIUM",
+    "destructured": "data: profile"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/meta-catalogs.ts",
+    "line": 48,
+    "severity": "MEDIUM",
+    "destructured": "data: adminRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/meta-data-deletion.ts",
+    "line": 89,
+    "severity": "MEDIUM",
+    "destructured": "data: connections"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/meta-social-inbox.ts",
+    "line": 665,
+    "severity": "MEDIUM",
+    "destructured": "data: adminRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/meta-targeting-search.ts",
+    "line": 76,
+    "severity": "MEDIUM",
+    "destructured": "data: adminRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/sync-klaviyo-to-meta-audience.ts",
+    "line": 32,
+    "severity": "MEDIUM",
+    "destructured": "data: klaviyoConn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/sync-klaviyo-to-meta-audience.ts",
+    "line": 46,
+    "severity": "MEDIUM",
+    "destructured": "data: adminRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/sync-klaviyo-to-meta-audience.ts",
+    "line": 57,
+    "severity": "MEDIUM",
+    "destructured": "data: metaConn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/meta/sync-meta-metrics.ts",
+    "line": 208,
+    "severity": "MEDIUM",
+    "destructured": "data: adminRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/collection-revenue.ts",
+    "line": 45,
+    "severity": "MEDIUM",
+    "destructured": "data: roleRow"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/compute-cross-sell.ts",
+    "line": 44,
+    "severity": "MEDIUM",
+    "destructured": "data: roleRow"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/create-shopify-combo.ts",
+    "line": 48,
+    "severity": "MEDIUM",
+    "destructured": "data: roleRow"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/fetch-shopify-customers.ts",
+    "line": 50,
+    "severity": "MEDIUM",
+    "destructured": "data: roleRow"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/fetch-shopify-products.ts",
+    "line": 23,
+    "severity": "MEDIUM",
+    "destructured": "data: client"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/fetch-shopify-products.ts",
+    "line": 68,
+    "severity": "MEDIUM",
+    "destructured": "data: roleRow"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/generate-product-description.ts",
+    "line": 45,
+    "severity": "MEDIUM",
+    "destructured": "data: roleRow"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/shopify-fulfillment-webhooks.ts",
+    "line": 115,
+    "severity": "MEDIUM",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/shopify-gdpr-webhooks.ts",
+    "line": 94,
+    "severity": "MEDIUM",
+    "destructured": "data: clients"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/shopify-gdpr-webhooks.ts",
+    "line": 110,
+    "severity": "MEDIUM",
+    "destructured": "data: convs"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/shopify-install.ts",
+    "line": 118,
+    "severity": "MEDIUM",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/shopify-oauth-callback.ts",
+    "line": 122,
+    "severity": "MEDIUM",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/shopify-oauth-callback.ts",
+    "line": 218,
+    "severity": "MEDIUM",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/shopify-oauth-callback.ts",
+    "line": 316,
+    "severity": "MEDIUM",
+    "destructured": "data: existingConn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/shopify-oauth-callback.ts",
+    "line": 390,
+    "severity": "MEDIUM",
+    "destructured": "data: preRegisteredClient"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/shopify-oauth-callback.ts",
+    "line": 417,
+    "severity": "MEDIUM",
+    "destructured": "data: existingClient"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/shopify-oauth-callback.ts",
+    "line": 487,
+    "severity": "MEDIUM",
+    "destructured": "data: freePlan"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/shopify-oauth-callback.ts",
+    "line": 511,
+    "severity": "MEDIUM",
+    "destructured": "data: existingConnection"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/store-shopify-credentials.ts",
+    "line": 35,
+    "severity": "MEDIUM",
+    "destructured": "data: client"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/store-shopify-credentials.ts",
+    "line": 43,
+    "severity": "MEDIUM",
+    "destructured": "data: role"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/store-shopify-credentials.ts",
+    "line": 65,
+    "severity": "MEDIUM",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/store-shopify-token.ts",
+    "line": 47,
+    "severity": "MEDIUM",
+    "destructured": "data: client"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/store-shopify-token.ts",
+    "line": 55,
+    "severity": "MEDIUM",
+    "destructured": "data: role"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/store-shopify-token.ts",
+    "line": 112,
+    "severity": "MEDIUM",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/shopify/update-shopify-product.ts",
+    "line": 49,
+    "severity": "MEDIUM",
+    "destructured": "data: roleRow"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/abandoned-cart-wa.ts",
+    "line": 58,
+    "severity": "MEDIUM",
+    "destructured": "data: automation"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/abandoned-cart-wa.ts",
+    "line": 73,
+    "severity": "MEDIUM",
+    "destructured": "data: credits"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/abandoned-cart-wa.ts",
+    "line": 85,
+    "severity": "MEDIUM",
+    "destructured": "data: waAccount"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/merchant-wa.ts",
+    "line": 39,
+    "severity": "MEDIUM",
+    "destructured": "data: client"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/merchant-wa.ts",
+    "line": 46,
+    "severity": "MEDIUM",
+    "destructured": "data: brief"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/merchant-wa.ts",
+    "line": 59,
+    "severity": "MEDIUM",
+    "destructured": "data: products"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/merchant-wa.ts",
+    "line": 85,
+    "severity": "MEDIUM",
+    "destructured": "data: messages"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/merchant-wa.ts",
+    "line": 122,
+    "severity": "MEDIUM",
+    "destructured": "data: waAccount"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/merchant-wa.ts",
+    "line": 147,
+    "severity": "MEDIUM",
+    "destructured": "data: existingConv"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/merchant-wa.ts",
+    "line": 183,
+    "severity": "MEDIUM",
+    "destructured": "data: merchant"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/merchant-wa.ts",
+    "line": 200,
+    "severity": "MEDIUM",
+    "destructured": "data: creditCheck"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/merchant-wa.ts",
+    "line": 299,
+    "severity": "MEDIUM",
+    "destructured": "data: merchant"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/prospect-trial.ts",
+    "line": 55,
+    "severity": "MEDIUM",
+    "destructured": "data: newClient"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/send-campaign.ts",
+    "line": 42,
+    "severity": "MEDIUM",
+    "destructured": "data: waAccount"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/send-campaign.ts",
+    "line": 58,
+    "severity": "MEDIUM",
+    "destructured": "data: contacts"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/send-campaign.ts",
+    "line": 84,
+    "severity": "MEDIUM",
+    "destructured": "data: creditCheck"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/send-message.ts",
+    "line": 25,
+    "severity": "MEDIUM",
+    "destructured": "data: waAccount"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/send-message.ts",
+    "line": 37,
+    "severity": "MEDIUM",
+    "destructured": "data: creditCheck"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/setup-merchant.ts",
+    "line": 165,
+    "severity": "MEDIUM",
+    "destructured": "data: existingCredits"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/setup-merchant.ts",
+    "line": 219,
+    "severity": "MEDIUM",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/setup-merchant.ts",
+    "line": 246,
+    "severity": "MEDIUM",
+    "destructured": "data: account"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/setup-merchant.ts",
+    "line": 253,
+    "severity": "MEDIUM",
+    "destructured": "data: credits"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/shopify-checkout-webhook.ts",
+    "line": 26,
+    "severity": "MEDIUM",
+    "destructured": "data: client"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/status-callback.ts",
+    "line": 33,
+    "severity": "MEDIUM",
+    "destructured": "data: msg"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/steve-wa-chat.ts",
+    "line": 262,
+    "severity": "MEDIUM",
+    "destructured": "data: client"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/steve-wa-chat.ts",
+    "line": 427,
+    "severity": "MEDIUM",
+    "destructured": "data: p"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/steve-wa-chat.ts",
+    "line": 439,
+    "severity": "MEDIUM",
+    "destructured": "data: existingProspect"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/steve-wa-chat.ts",
+    "line": 481,
+    "severity": "MEDIUM",
+    "destructured": "data: newProspect"
+  },
+  {
+    "file": "cloud-run-api/src/routes/whatsapp/steve-wa-chat.ts",
+    "line": 893,
+    "severity": "MEDIUM",
+    "destructured": "data: freshDeck"
+  },
+  {
+    "file": "cloud-run-api/src/routes/analytics/deep-dive-competitor.ts",
+    "line": 428,
+    "severity": "LOW",
+    "destructured": "data: client"
+  },
+  {
+    "file": "cloud-run-api/src/routes/analytics/sync-competitor-ads.ts",
+    "line": 430,
+    "severity": "LOW",
+    "destructured": "data: metaConn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/auth/admin-create-client.ts",
+    "line": 137,
+    "severity": "LOW",
+    "destructured": "data: shopifyConns"
+  },
+  {
+    "file": "cloud-run-api/src/routes/auth/admin-create-client.ts",
+    "line": 154,
+    "severity": "LOW",
+    "destructured": "data: klaviyoConns"
+  },
+  {
+    "file": "cloud-run-api/src/routes/auth/admin-create-client.ts",
+    "line": 169,
+    "severity": "LOW",
+    "destructured": "data: dupeConns"
+  },
+  {
+    "file": "cloud-run-api/src/routes/auth/admin-create-client.ts",
+    "line": 183,
+    "severity": "LOW",
+    "destructured": "data: dupeClients"
+  },
+  {
+    "file": "cloud-run-api/src/routes/auth/admin-create-client.ts",
+    "line": 199,
+    "severity": "LOW",
+    "destructured": "data: finalClient"
+  },
+  {
+    "file": "cloud-run-api/src/routes/auth/admin-create-client.ts",
+    "line": 200,
+    "severity": "LOW",
+    "destructured": "data: finalConns"
+  },
+  {
+    "file": "cloud-run-api/src/routes/auth/admin-create-client.ts",
+    "line": 211,
+    "severity": "LOW",
+    "destructured": "data: allClients"
+  },
+  {
+    "file": "cloud-run-api/src/routes/auth/admin-create-client.ts",
+    "line": 212,
+    "severity": "LOW",
+    "destructured": "data: allConns"
+  },
+  {
+    "file": "cloud-run-api/src/routes/auth/admin-create-client.ts",
+    "line": 213,
+    "severity": "LOW",
+    "destructured": "data: allRoles"
+  },
+  {
+    "file": "cloud-run-api/src/routes/auth/create-client-user.ts",
+    "line": 24,
+    "severity": "LOW",
+    "destructured": "data: adminRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/auth/self-signup.ts",
+    "line": 61,
+    "severity": "LOW",
+    "destructured": "data: newClient"
+  },
+  {
+    "file": "cloud-run-api/src/routes/auth/self-signup.ts",
+    "line": 86,
+    "severity": "LOW",
+    "destructured": "data: prospect"
+  },
+  {
+    "file": "cloud-run-api/src/routes/booking/booking-api.ts",
+    "line": 98,
+    "severity": "LOW",
+    "destructured": "data: seller"
+  },
+  {
+    "file": "cloud-run-api/src/routes/booking/booking-api.ts",
+    "line": 254,
+    "severity": "LOW",
+    "destructured": "data: seller"
+  },
+  {
+    "file": "cloud-run-api/src/routes/crm/proposals.ts",
+    "line": 112,
+    "severity": "LOW",
+    "destructured": "data: messages"
+  },
+  {
+    "file": "cloud-run-api/src/routes/crm/prospect-crm.ts",
+    "line": 64,
+    "severity": "LOW",
+    "destructured": "data: messages"
+  },
+  {
+    "file": "cloud-run-api/src/routes/crm/prospect-crm.ts",
+    "line": 120,
+    "severity": "LOW",
+    "destructured": "data: prospect"
+  },
+  {
+    "file": "cloud-run-api/src/routes/crm/prospect-crm.ts",
+    "line": 234,
+    "severity": "LOW",
+    "destructured": "data: prospect"
+  },
+  {
+    "file": "cloud-run-api/src/routes/crm/sales-tasks.ts",
+    "line": 112,
+    "severity": "LOW",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/routes/crm/sales-tasks.ts",
+    "line": 115,
+    "severity": "LOW",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/routes/crm/sales-tasks.ts",
+    "line": 126,
+    "severity": "LOW",
+    "destructured": "data: existingTasks"
+  },
+  {
+    "file": "cloud-run-api/src/routes/crm/web-forms.ts",
+    "line": 133,
+    "severity": "LOW",
+    "destructured": "data: byPhone"
+  },
+  {
+    "file": "cloud-run-api/src/routes/crm/web-forms.ts",
+    "line": 141,
+    "severity": "LOW",
+    "destructured": "data: byEmail"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/ab-testing.ts",
+    "line": 44,
+    "severity": "LOW",
+    "destructured": "data: conversionEvents"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/ab-testing.ts",
+    "line": 266,
+    "severity": "LOW",
+    "destructured": "data: alreadySentEvents"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/ab-testing.ts",
+    "line": 301,
+    "severity": "LOW",
+    "destructured": "data: brandInfo"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/campaign-analytics.ts",
+    "line": 53,
+    "severity": "LOW",
+    "destructured": "data: roleRow"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/campaign-analytics.ts",
+    "line": 93,
+    "severity": "LOW",
+    "destructured": "data: uniqueOpens"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/campaign-analytics.ts",
+    "line": 99,
+    "severity": "LOW",
+    "destructured": "data: uniqueClicks"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/campaign-analytics.ts",
+    "line": 121,
+    "severity": "LOW",
+    "destructured": "data: clickEvents"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/campaign-analytics.ts",
+    "line": 138,
+    "severity": "LOW",
+    "destructured": "data: conversions"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/campaign-analytics.ts",
+    "line": 163,
+    "severity": "LOW",
+    "destructured": "data: campaigns"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/campaign-analytics.ts",
+    "line": 357,
+    "severity": "LOW",
+    "destructured": "data: domains"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/campaign-analytics.ts",
+    "line": 371,
+    "severity": "LOW",
+    "destructured": "data: bounceEvents"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/campaign-analytics.ts",
+    "line": 387,
+    "severity": "LOW",
+    "destructured": "data: trendEvents"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-engine.ts",
+    "line": 223,
+    "severity": "LOW",
+    "destructured": "data: domain"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-engine.ts",
+    "line": 234,
+    "severity": "LOW",
+    "destructured": "data: flowClient"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-engine.ts",
+    "line": 306,
+    "severity": "LOW",
+    "destructured": "data: evt"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-engine.ts",
+    "line": 724,
+    "severity": "LOW",
+    "destructured": "data: activeEnrollments"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 64,
+    "severity": "LOW",
+    "destructured": "data: connection"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 157,
+    "severity": "LOW",
+    "destructured": "data: flows"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 239,
+    "severity": "LOW",
+    "destructured": "data: flows"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 304,
+    "severity": "LOW",
+    "destructured": "data: subscriber"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 324,
+    "severity": "LOW",
+    "destructured": "data: activeEnrollments"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 333,
+    "severity": "LOW",
+    "destructured": "data: flow"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 362,
+    "severity": "LOW",
+    "destructured": "data: recentEvent"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 391,
+    "severity": "LOW",
+    "destructured": "data: postPurchaseFlows"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 502,
+    "severity": "LOW",
+    "destructured": "data: bisAlerts"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 536,
+    "severity": "LOW",
+    "destructured": "data: priceAlerts"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 580,
+    "severity": "LOW",
+    "destructured": "data: flows"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 590,
+    "severity": "LOW",
+    "destructured": "data: alerts"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 650,
+    "severity": "LOW",
+    "destructured": "data: flows"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 668,
+    "severity": "LOW",
+    "destructured": "data: candidates"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 727,
+    "severity": "LOW",
+    "destructured": "data: flows"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 747,
+    "severity": "LOW",
+    "destructured": "data: subscribers"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 835,
+    "severity": "LOW",
+    "destructured": "data: subscriber"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 847,
+    "severity": "LOW",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/flow-webhooks.ts",
+    "line": 879,
+    "severity": "LOW",
+    "destructured": "data: flows"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/list-cleanup.ts",
+    "line": 147,
+    "severity": "LOW",
+    "destructured": "data: recentlyActive"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/manage-campaigns.ts",
+    "line": 144,
+    "severity": "LOW",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/manage-campaigns.ts",
+    "line": 211,
+    "severity": "LOW",
+    "destructured": "data: brandInfo"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/manage-campaigns.ts",
+    "line": 247,
+    "severity": "LOW",
+    "destructured": "data: newTest"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/manage-campaigns.ts",
+    "line": 263,
+    "severity": "LOW",
+    "destructured": "data: existingTest"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/manage-campaigns.ts",
+    "line": 274,
+    "severity": "LOW",
+    "destructured": "data: sendSettings"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/manage-campaigns.ts",
+    "line": 299,
+    "severity": "LOW",
+    "destructured": "data: senderClient"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/manage-campaigns.ts",
+    "line": 307,
+    "severity": "LOW",
+    "destructured": "data: brandClient"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/manage-campaigns.ts",
+    "line": 670,
+    "severity": "LOW",
+    "destructured": "data: client"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/manage-campaigns.ts",
+    "line": 679,
+    "severity": "LOW",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/manage-campaigns.ts",
+    "line": 927,
+    "severity": "LOW",
+    "destructured": "data: campaign"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/product-alerts.ts",
+    "line": 64,
+    "severity": "LOW",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/product-alerts.ts",
+    "line": 226,
+    "severity": "LOW",
+    "destructured": "data: clientData"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/product-alerts.ts",
+    "line": 232,
+    "severity": "LOW",
+    "destructured": "data: domainData"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/product-recommendation-engine.ts",
+    "line": 355,
+    "severity": "LOW",
+    "destructured": "data: events"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/product-recommendations.ts",
+    "line": 94,
+    "severity": "LOW",
+    "destructured": "data: connection"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/product-recommendations.ts",
+    "line": 184,
+    "severity": "LOW",
+    "destructured": "data: events"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/product-recommendations.ts",
+    "line": 224,
+    "severity": "LOW",
+    "destructured": "data: lastEvent"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/product-recommendations.ts",
+    "line": 258,
+    "severity": "LOW",
+    "destructured": "data: clickEvents"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/product-recommendations.ts",
+    "line": 293,
+    "severity": "LOW",
+    "destructured": "data: enrollments"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/product-recommendations.ts",
+    "line": 356,
+    "severity": "LOW",
+    "destructured": "data: connection"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/query-subscribers.ts",
+    "line": 93,
+    "severity": "LOW",
+    "destructured": "data: events"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/revenue-attribution.ts",
+    "line": 45,
+    "severity": "LOW",
+    "destructured": "data: roleRow"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/revenue-attribution.ts",
+    "line": 111,
+    "severity": "LOW",
+    "destructured": "data: shopifyConn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/revenue-attribution.ts",
+    "line": 275,
+    "severity": "LOW",
+    "destructured": "data: shopifyConn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/revenue-attribution.ts",
+    "line": 335,
+    "severity": "LOW",
+    "destructured": "data: sentEvents"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/revenue-attribution.ts",
+    "line": 359,
+    "severity": "LOW",
+    "destructured": "data: subs"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/send-email.ts",
+    "line": 236,
+    "severity": "LOW",
+    "destructured": "data: subscriber"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/send-queue.ts",
+    "line": 46,
+    "severity": "LOW",
+    "destructured": "data: settings"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/send-queue.ts",
+    "line": 61,
+    "severity": "LOW",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/send-queue.ts",
+    "line": 126,
+    "severity": "LOW",
+    "destructured": "data: settings"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/send-queue.ts",
+    "line": 188,
+    "severity": "LOW",
+    "destructured": "data: subs"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/signup-forms.ts",
+    "line": 221,
+    "severity": "LOW",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/signup-forms.ts",
+    "line": 276,
+    "severity": "LOW",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/sync-subscribers.ts",
+    "line": 223,
+    "severity": "LOW",
+    "destructured": "data: subscribedCount"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/sync-subscribers.ts",
+    "line": 228,
+    "severity": "LOW",
+    "destructured": "data: _uC, count: unsubscribedCount"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/sync-subscribers.ts",
+    "line": 233,
+    "severity": "LOW",
+    "destructured": "data: _bC, count: bouncedCount"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/track-events.ts",
+    "line": 19,
+    "severity": "LOW",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/track-events.ts",
+    "line": 95,
+    "severity": "LOW",
+    "destructured": "data"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/track-events.ts",
+    "line": 178,
+    "severity": "LOW",
+    "destructured": "data: subscribers"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/track-events.ts",
+    "line": 232,
+    "severity": "LOW",
+    "destructured": "data: subscribers"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/track-events.ts",
+    "line": 258,
+    "severity": "LOW",
+    "destructured": "data: event"
+  },
+  {
+    "file": "cloud-run-api/src/routes/email/verify-domain.ts",
+    "line": 92,
+    "severity": "LOW",
+    "destructured": "data: domainRecord"
+  },
+  {
+    "file": "cloud-run-api/src/routes/facebook/fetch-facebook-insights.ts",
+    "line": 26,
+    "severity": "LOW",
+    "destructured": "data: ownerCheck"
+  },
+  {
+    "file": "cloud-run-api/src/routes/facebook/fetch-facebook-insights.ts",
+    "line": 35,
+    "severity": "LOW",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/facebook/publish-facebook.ts",
+    "line": 38,
+    "severity": "LOW",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/facebook/publish-facebook.ts",
+    "line": 391,
+    "severity": "LOW",
+    "destructured": "data: duePosts"
+  },
+  {
+    "file": "cloud-run-api/src/routes/instagram/fetch-instagram-insights.ts",
+    "line": 25,
+    "severity": "LOW",
+    "destructured": "data: ownerCheck"
+  },
+  {
+    "file": "cloud-run-api/src/routes/instagram/fetch-instagram-insights.ts",
+    "line": 34,
+    "severity": "LOW",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/instagram/publish-instagram.ts",
+    "line": 31,
+    "severity": "LOW",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/instagram/publish-instagram.ts",
+    "line": 501,
+    "severity": "LOW",
+    "destructured": "data: duePosts"
+  },
+  {
+    "file": "cloud-run-api/src/routes/oauth/google-ads-oauth-callback.ts",
+    "line": 166,
+    "severity": "LOW",
+    "destructured": "data: existingConnection"
+  },
+  {
+    "file": "cloud-run-api/src/routes/oauth/google-calendar-oauth-callback.ts",
+    "line": 101,
+    "severity": "LOW",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/oauth/meta-oauth-callback.ts",
+    "line": 43,
+    "severity": "LOW",
+    "destructured": "data: fullClient"
+  },
+  {
+    "file": "cloud-run-api/src/routes/oauth/meta-oauth-callback.ts",
+    "line": 44,
+    "severity": "LOW",
+    "destructured": "data: profile"
+  },
+  {
+    "file": "cloud-run-api/src/routes/oauth/meta-oauth-callback.ts",
+    "line": 132,
+    "severity": "LOW",
+    "destructured": "data: existingConnection"
+  },
+  {
+    "file": "cloud-run-api/src/routes/public/approve-rules-public.ts",
+    "line": 99,
+    "severity": "LOW",
+    "destructured": "data: rows"
+  },
+  {
+    "file": "cloud-run-api/src/routes/public/approve-rules-public.ts",
+    "line": 111,
+    "severity": "LOW",
+    "destructured": "data: siblingRows"
+  },
+  {
+    "file": "cloud-run-api/src/routes/public/approve-rules-public.ts",
+    "line": 126,
+    "severity": "LOW",
+    "destructured": "data: rejRows"
+  },
+  {
+    "file": "cloud-run-api/src/routes/public/approve-rules-public.ts",
+    "line": 138,
+    "severity": "LOW",
+    "destructured": "data: pendingRows"
+  },
+  {
+    "file": "cloud-run-api/src/routes/triggers/api-changelog-watcher.ts",
+    "line": 153,
+    "severity": "LOW",
+    "destructured": "data: lastRun"
+  },
+  {
+    "file": "cloud-run-api/src/routes/triggers/api-changelog-watcher.ts",
+    "line": 192,
+    "severity": "LOW",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/triggers/competitor-spy.ts",
+    "line": 242,
+    "severity": "LOW",
+    "destructured": "data: lastRun"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/approve-knowledge.ts",
+    "line": 17,
+    "severity": "LOW",
+    "destructured": "data: rows"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/approve-knowledge.ts",
+    "line": 27,
+    "severity": "LOW",
+    "destructured": "data: siblingRows"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/approve-knowledge.ts",
+    "line": 36,
+    "severity": "LOW",
+    "destructured": "data: rejRows"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/approve-knowledge.ts",
+    "line": 47,
+    "severity": "LOW",
+    "destructured": "data: pending"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/creative-review-feed.ts",
+    "line": 14,
+    "severity": "LOW",
+    "destructured": "data: userRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/creative-review-feed.ts",
+    "line": 76,
+    "severity": "LOW",
+    "destructured": "data: clients"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/creative-review-feed.ts",
+    "line": 91,
+    "severity": "LOW",
+    "destructured": "data: statsData"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/creative-review-feed.ts",
+    "line": 111,
+    "severity": "LOW",
+    "destructured": "data: rulesData"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/creative-review-feed.ts",
+    "line": 148,
+    "severity": "LOW",
+    "destructured": "data: client"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/creative-review-feed.ts",
+    "line": 154,
+    "severity": "LOW",
+    "destructured": "data: brandRes"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/export-all-data.ts",
+    "line": 27,
+    "severity": "LOW",
+    "destructured": "data: userRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/generate-copy.ts",
+    "line": 19,
+    "severity": "LOW",
+    "destructured": "data: ownerCheck"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/generate-google-copy.ts",
+    "line": 104,
+    "severity": "LOW",
+    "destructured": "data: globalFeedback"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/generate-google-copy.ts",
+    "line": 111,
+    "severity": "LOW",
+    "destructured": "data: clientFeedback"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/learn-from-source.ts",
+    "line": 14,
+    "severity": "LOW",
+    "destructured": "data: userRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/learn-from-source.ts",
+    "line": 32,
+    "severity": "LOW",
+    "destructured": "data: existing"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/manage-sources.ts",
+    "line": 19,
+    "severity": "LOW",
+    "destructured": "data: sources"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/onboarding-bot.ts",
+    "line": 95,
+    "severity": "LOW",
+    "destructured": "data: job"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/onboarding-bot.ts",
+    "line": 107,
+    "severity": "LOW",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/process-queue-item.ts",
+    "line": 246,
+    "severity": "LOW",
+    "destructured": "data: existingRules"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/submit-correction.ts",
+    "line": 51,
+    "severity": "LOW",
+    "destructured": "data: prospect"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/submit-correction.ts",
+    "line": 86,
+    "severity": "LOW",
+    "destructured": "data: rule"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/submit-correction.ts",
+    "line": 127,
+    "severity": "LOW",
+    "destructured": "data: rule"
+  },
+  {
+    "file": "cloud-run-api/src/routes/utilities/train-steve.ts",
+    "line": 15,
+    "severity": "LOW",
+    "destructured": "data: userRole"
+  },
+  {
+    "file": "cloud-run-api/src/routes/webhooks/leadsie-webhook.ts",
+    "line": 113,
+    "severity": "LOW",
+    "destructured": "data: byId"
+  },
+  {
+    "file": "cloud-run-api/src/routes/webhooks/leadsie-webhook.ts",
+    "line": 123,
+    "severity": "LOW",
+    "destructured": "data: byName"
+  },
+  {
+    "file": "cloud-run-api/src/routes/webhooks/leadsie-webhook.ts",
+    "line": 260,
+    "severity": "LOW",
+    "destructured": "data: conn"
+  },
+  {
+    "file": "cloud-run-api/src/seed/email-system-templates.ts",
+    "line": 554,
+    "severity": "LOW",
+    "destructured": "data: anyClient"
+  },
+  {
+    "file": "cloud-run-api/src/seed/email-system-templates.ts",
+    "line": 568,
+    "severity": "LOW",
+    "destructured": "data: existing"
+  }
+]
