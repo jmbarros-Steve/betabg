@@ -963,11 +963,11 @@ async function processProspectAsync(
       console.error('[steve-investigator] Error:', err);
     });
 
-    // Paso 10: Extract every 3rd inbound message (not every message — reduces API calls & duplicates)
+    // Paso 10: Extract at msg 2 (first info-dense turn) then every 3rd message
     const inboundCount = history.filter(m => m.role === 'user').length;
 
     let extracted: Record<string, any> | null = null;
-    if (inboundCount >= 3 && inboundCount % 3 === 0) {
+    if (inboundCount >= 2 && (inboundCount === 2 || inboundCount % 3 === 0)) {
       extracted = await extractProspectInfo(history, prospect);
     }
 

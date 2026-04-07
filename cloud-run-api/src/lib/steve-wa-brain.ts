@@ -148,6 +148,7 @@ Eres el director de marketing AI de una plataforma de e-commerce. Hablas por Wha
 TU PERSONALIDAD:
 - Profesional pero cercano. Simpático, nunca frío — pero tampoco coloquial en exceso.
 - Habla en ESPAÑOL NEUTRO. NUNCA uses voseo ("vos", "vendés", "tenés"). Usa TÚ siempre. Nada de "wena", "cachai", "dale", "che", "boludo".
+- SIEMPRE responde en español, sin importar el idioma en que escriba el prospecto. Si escribe en inglés, francés u otro idioma, IGUAL respondes en español neutro.
 - Puedes tutear y ser cálido, pero siempre con la autoridad de alguien que sabe de marketing.
 - Ejemplo de tono correcto: "Hola, revisé tus campañas y hay un par de cosas que me llamaron la atención."
 
@@ -822,6 +823,13 @@ export function detectBuyingSignals(
     'contrato', 'cómo se paga', 'como se paga',
     'formas de pago', 'demo', 'me interesa', 'si contrato',
     'quiero probar', 'quiero empezar', 'cómo funciona el pago', 'como funciona el pago',
+    // Señales de reunión explícita
+    'quiero agendar', 'quiero reunión', 'quiero reunion', 'agendar reunión', 'agendar reunion',
+    'cuándo podemos hablar', 'cuando podemos hablar', 'cuándo podemos', 'cuando podemos',
+    'quiero hablar', 'podemos hablar', 'podemos reunirnos', 'nos reunimos',
+    'lo antes posible', 'ya mismo', 'quiero solucionar', 'necesito solucionar',
+    'quiero empezar ya', 'empezar ya', 'cuándo empezamos', 'cuando empezamos',
+    'me interesa reunirme', 'interesa agendar', '¿cuándo?', '¿cuando?',
   ];
 
   const msg = lastMessage.toLowerCase();
@@ -1400,7 +1408,7 @@ export async function buildDynamicSalesPrompt(
 
   // Paso 3: Closer mode — buying signals
   if (closerMode) {
-    prompt += `🔥 SEÑAL DE COMPRA DETECTADA. Responde su duda directamente y propón agendar llamada de 15 minutos.\n`;
+    prompt += `🔥 SEÑAL DE COMPRA DETECTADA. Responde su duda directamente y propón agendar llamada de 15 minutos. Incluye SIEMPRE el link: www.steve.cl/agendar/steve\n`;
   }
 
   // Mini CRM: Meeting auto-suggestion when score is high enough
@@ -1409,7 +1417,7 @@ export async function buildDynamicSalesPrompt(
   const prospectStage = prospect.stage || 'discovery';
   const bookingBaseUrl = process.env.BOOKING_BASE_URL || 'https://www.steve.cl/agendar';
 
-  if (prospectScore >= 70 && meetingStatus === 'none' && (prospectStage === 'qualifying' || prospectStage === 'pitching')) {
+  if (prospectScore >= 70 && meetingStatus === 'none' && (prospectStage === 'qualifying' || prospectStage === 'pitching' || prospectStage === 'closing')) {
     // Check if there's an assigned seller with booking link
     const bookingLink = prospect.assigned_seller_id
       ? `${bookingBaseUrl}/${prospect.assigned_seller_id}`
@@ -1501,14 +1509,14 @@ export async function buildDynamicSalesPrompt(
   }
 
   // Closing — siempre agendar reunión, NUNCA activar cuentas gratis
-  if (closerMode && (effectiveStage === 'pitching' || effectiveStage === 'closing')) {
+  if (closerMode || effectiveStage === 'pitching' || effectiveStage === 'closing') {
     prompt += `IMPORTANTE: Steve NO activa cuentas gratis ni trials. SIEMPRE dirige a agendar reunión: "Te muestro cómo se ve con tus datos → www.steve.cl/agendar/steve". Esa es la única forma de empezar.\n`;
   }
 
-  // Meeting trigger — organic
+  // Meeting trigger — organic (lowered from 8 to 4 messages)
   if (
     (prospect.lead_score || 0) >= 75 &&
-    (prospect.message_count || 0) >= 8 &&
+    (prospect.message_count || 0) >= 4 &&
     !prospect.meeting_link_sent &&
     prospect.pain_points?.length
   ) {
