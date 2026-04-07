@@ -20,13 +20,19 @@ export async function steveAgentLoop(c: Context) {
     log.push('=== PERCEIVE ===');
 
     // Get recent alerts
-    const { data: recentAlerts } = await supabase
+    // Fix Tomás W7 (2026-04-07): qa_log usa `checked_at`, no `created_at`.
+    // Antes la query fallaba silenciosamente y el LLM recibía alerts="" siempre
+    // → el agente autónomo tomaba decisiones a ciegas.
+    const { data: recentAlerts, error: alertsError } = await supabase
       .from('qa_log')
-      .select('check_type, status, details, created_at')
+      .select('check_type, status, details, checked_at')
       .in('status', ['fail', 'warn'])
-      .gte('created_at', new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString())
-      .order('created_at', { ascending: false })
+      .gte('checked_at', new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString())
+      .order('checked_at', { ascending: false })
       .limit(10);
+    if (alertsError) {
+      log.push(`recent-alerts fetch error: ${alertsError.message}`);
+    }
 
     // Fix Tomás W7 (2026-04-07): paginar. PostgREST corta en 1000 filas por
     // default. Antes los contadores (pending/active/categorías) del PERCEIVE
@@ -129,8 +135,15 @@ Sin markdown.`,
     if (reasonRes.ok) {
       const reasonData: any = await reasonRes.json();
       const text = (reasonData.content?.[0]?.text || '{"actions":[]}').trim();
-      const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
-      actions = parsed.actions || [];
+      // Fix Tomás W7 (2026-04-07): try/catch en JSON.parse. Antes si Haiku
+      // devolvía texto no-JSON, crasheaba el loop completo con 500.
+      try {
+        const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+        actions = parsed.actions || [];
+      } catch (parseErr: any) {
+        log.push(`reason JSON parse failed: ${parseErr.message}. Raw: ${text.slice(0, 200)}`);
+        actions = [];
+      }
     }
 
     log.push(`Decided: ${actions.map(a => `${a.type}(${a.detail})`).join(', ')}`);
@@ -236,9 +249,12 @@ Máx 500 chars. Solo la regla mejorada.`,
     log.push('=== EVALUATE ===');
 
     // Check commitments that need follow-up
+    // Fix Tomás W7 (2026-04-07): agregar `agreed_date` al SELECT. Antes no
+    // estaba, entonces `commit.agreed_date` era undefined → `|| now` → age=0
+    // → ningún commitment se marcaba como expired jamás.
     const { data: dueCommitments } = await supabase
       .from('steve_commitments')
-      .select('id, client_id, commitment')
+      .select('id, client_id, commitment, agreed_date')
       .eq('status', 'pending')
       .lte('follow_up_date', now.toISOString())
       .limit(5);
@@ -247,7 +263,7 @@ Máx 500 chars. Solo la regla mejorada.`,
       log.push(`${dueCommitments.length} commitments due for follow-up`);
       // Mark as expired if older than 30 days
       for (const commit of dueCommitments) {
-        const age = now.getTime() - new Date((commit as any).agreed_date || now).getTime();
+        const age = now.getTime() - new Date(commit.agreed_date || now).getTime();
         if (age > 30 * 24 * 60 * 60 * 1000) {
           await supabase.from('steve_commitments').update({ status: 'expired' }).eq('id', commit.id);
         }

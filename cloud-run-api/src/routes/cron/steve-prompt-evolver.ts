@@ -21,10 +21,13 @@ export async function stevePromptEvolver(c: Context) {
         .select('feedback_rating, original_recommendation, improved_recommendation, feedback_notes')
         .gte('created_at', thirtyDaysAgo)
         .limit(20),
+      // Fix Tomás W7 (2026-04-07): qa_log usa `checked_at`, no `created_at`.
+      // Antes esta query siempre devolvía vacío → los prompts de Steve nunca
+      // evolucionaban con feedback real del juez nocturno.
       supabase.from('qa_log')
         .select('check_type, status, details')
         .eq('check_type', 'juez_nocturno')
-        .gte('created_at', thirtyDaysAgo)
+        .gte('checked_at', thirtyDaysAgo)
         .limit(10),
       supabase.from('steve_knowledge')
         .select('titulo, contenido, veces_usada, quality_score')

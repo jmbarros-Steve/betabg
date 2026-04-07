@@ -975,7 +975,16 @@ async function executeSecurityByNumber(
       return { result: 'pass', steve_value: 'RLS enforced en todas las tablas con client_id', duration_ms: Date.now() - start };
     }
     case 93: { // No API keys in plain text in logs
-      const { count: cnt93 } = await supabase.from('qa_log').select('id', { count: 'exact', head: true }).or('message.ilike.%sk-%,message.ilike.%api_key%,message.ilike.%secret%').gte('created_at', new Date(Date.now() - 24 * 3600_000).toISOString());
+      // Fix Tomás W7 (2026-04-07): doble bug — `message` no existe (columnas
+      // son details/error_detail) y `created_at` tampoco (es checked_at).
+      // Antes este check siempre devolvía pass con 0 secrets (false negative
+      // permanente en seguridad). Ahora busca en error_detail (text column).
+      const since93 = new Date(Date.now() - 24 * 3600_000).toISOString();
+      const { count: cnt93, error: err93 } = await supabase.from('qa_log')
+        .select('id', { count: 'exact', head: true })
+        .or('error_detail.ilike.%sk-%,error_detail.ilike.%api_key%,error_detail.ilike.%secret%')
+        .gte('checked_at', since93);
+      if (err93) return { result: 'error', error_message: `DB error: ${err93.message}`, duration_ms: Date.now() - start };
       if (cnt93 && cnt93 > 0) return { result: 'fail', steve_value: cnt93, error_message: `${cnt93} log entries posiblemente con secrets`, duration_ms: Date.now() - start };
       return { result: 'pass', steve_value: '0 secrets en logs', duration_ms: Date.now() - start };
     }

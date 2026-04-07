@@ -28,13 +28,26 @@ export async function restartService(c: Context) {
   const supabase = getSupabaseAdmin();
 
   // Check cooldown: don't restart more than once per 10 minutes
+  // Fix Tomás W7 (2026-04-07): qa_log usa `checked_at`, no `created_at`.
+  // Antes el cooldown check fallaba silenciosamente (data=null → length=0) →
+  // riesgo de restart loop infinito si múltiples triggers llegaban seguidos.
+  // Isidora W6 review: además del rename de columna, capturar `error` del
+  // destructuring. Si la query falla por timeout/network/permissions, antes
+  // `recentRestart=null` → `length=0` → cooldown bypassed → mismo riesgo de
+  // loop infinito por otra causa. Fail-closed: si no podemos verificar el
+  // cooldown, mejor NO restartear.
   const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-  const { data: recentRestart } = await supabase
+  const { data: recentRestart, error: cooldownError } = await supabase
     .from('qa_log')
     .select('id')
     .eq('check_type', 'service_restart')
-    .gte('created_at', tenMinAgo)
+    .gte('checked_at', tenMinAgo)
     .limit(1);
+
+  if (cooldownError) {
+    console.error('[restart-service] cooldown check failed, failing closed:', cooldownError.message);
+    return c.json({ restarted: false, reason: `cooldown_check_failed: ${cooldownError.message}` }, 500);
+  }
 
   if (recentRestart && recentRestart.length > 0) {
     console.log(`[restart-service] Cooldown active, skipping restart for ${endpoint}`);
