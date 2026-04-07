@@ -165,24 +165,23 @@ export function ClickHeatmapPanel({ campaignId, clientId, htmlContent }: ClickHe
       a.appendChild(badge);
     });
 
-    // Disable all link navigation in the iframe
-    const scriptBlock = `
-      <script>
-        document.addEventListener('click', function(e) {
-          var a = e.target.closest('a');
-          if (a) { e.preventDefault(); e.stopPropagation(); }
-        }, true);
-      </script>
+    // Disable all link navigation in the iframe via CSS (sandbox sin allow-scripts)
+    const linkBlockCss = `
+      <style>
+        a[href] { pointer-events: none !important; cursor: default !important; }
+        .steve-heat-overlay, .steve-heat-badge { pointer-events: none !important; }
+      </style>
     `;
 
     const headClose = doc.querySelector('head');
     if (headClose) {
       headClose.insertAdjacentHTML('beforeend', styleBlock);
+      headClose.insertAdjacentHTML('beforeend', linkBlockCss);
     } else {
       // No head, prepend styles
       doc.documentElement.insertAdjacentHTML('afterbegin', styleBlock);
+      doc.documentElement.insertAdjacentHTML('afterbegin', linkBlockCss);
     }
-    doc.body.insertAdjacentHTML('beforeend', scriptBlock);
 
     return doc.documentElement.outerHTML;
   }, [htmlContent, urlHeatMap]);
@@ -258,7 +257,7 @@ export function ClickHeatmapPanel({ campaignId, clientId, htmlContent }: ClickHe
                   title="Email heatmap"
                   className="w-full border-0"
                   style={{ minHeight: 500, height: 600 }}
-                  sandbox="allow-same-origin allow-scripts"
+                  sandbox="allow-same-origin"
                 />
               </div>
 

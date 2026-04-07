@@ -350,7 +350,7 @@ export function UniversalBlocksPanel({
                     {typeof block.block_json === 'string' ? (
                       <iframe
                         srcDoc={block.block_json}
-                        sandbox="allow-same-origin allow-scripts"
+                        sandbox="allow-same-origin"
                         className="origin-top-left scale-[0.25] w-[400%] h-[400%] pointer-events-none border-0"
                         title={`Preview: ${block.name}`}
                       />

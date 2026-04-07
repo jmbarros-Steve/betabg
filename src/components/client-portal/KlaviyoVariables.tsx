@@ -30,7 +30,7 @@ const klaviyoVariables: VariableCategory[] = [
     name: 'Carrito Abandonado',
     variables: [
       { variable: '{{ event.extra.line_items.0.product.title }}', label: 'Producto', description: 'Nombre del primer producto', example: 'Zapatillas Running' },
-      { variable: '{{ event.extra.line_items.0.product.images.0.src }}', label: 'Imagen', description: 'URL de imagen del producto', example: 'https://...' },
+      { variable: '{{ event.extra.line_items.0.product.image.src }}', label: 'Imagen', description: 'URL de imagen del producto', example: 'https://...' },
       { variable: '{{ event.extra.line_items.0.line_price }}', label: 'Precio', description: 'Precio del producto', example: '$49.990' },
       { variable: '{{ event.extra.checkout_url }}', label: 'Link Checkout', description: 'URL para completar compra', example: 'https://tienda.com/checkout/...' },
       { variable: '{{ event.extra.total_price }}', label: 'Total Carrito', description: 'Monto total del carrito', example: '$89.990' },
@@ -48,7 +48,7 @@ const klaviyoVariables: VariableCategory[] = [
   {
     name: 'Descuentos',
     variables: [
-      { variable: '{{ coupon_code }}', label: 'Código', description: 'Código de descuento', example: 'BIENVENIDO10' },
+      { variable: '{{ coupon.code }}', label: 'Código', description: 'Código de descuento', example: 'BIENVENIDO10' },
       { variable: '{{ event.extra.discounts.0.code }}', label: 'Descuento Aplicado', description: 'Código usado en el carrito', example: 'SALE20' },
     ],
   },

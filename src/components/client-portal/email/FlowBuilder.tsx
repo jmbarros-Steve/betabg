@@ -641,7 +641,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
           <DialogContent className="max-w-3xl max-h-[90vh]">
             <DialogHeader><DialogTitle>Vista previa del email</DialogTitle></DialogHeader>
             <div className="border rounded-lg overflow-hidden bg-white">
-              <iframe srcDoc={previewHtml} className="w-full min-h-[500px]" title="Email Preview" sandbox="allow-same-origin allow-scripts" />
+              <iframe srcDoc={previewHtml} className="w-full min-h-[500px]" title="Email Preview" sandbox="allow-same-origin" />
             </div>
           </DialogContent>
         </Dialog>
@@ -771,7 +771,7 @@ export function FlowBuilder({ clientId }: FlowBuilderProps) {
         <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader><DialogTitle>Vista previa</DialogTitle></DialogHeader>
           <div className="border rounded-lg overflow-hidden bg-white">
-            <iframe srcDoc={previewHtml} className="w-full min-h-[500px]" title="Preview" sandbox="allow-same-origin allow-scripts" />
+            <iframe srcDoc={previewHtml} className="w-full min-h-[500px]" title="Preview" sandbox="allow-same-origin" />
           </div>
         </DialogContent>
       </Dialog>

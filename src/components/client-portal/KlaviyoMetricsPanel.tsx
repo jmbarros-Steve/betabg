@@ -234,6 +234,12 @@ function CampaignRow({ campaign }: { campaign: KlaviyoCampaign }) {
   );
 }
 
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 horas
+
+function getCacheKey(connId: string, tf: string) {
+  return `klaviyo_metrics_${connId}_${tf}`;
+}
+
 export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
   const [loading, setLoading] = useState(false);
   const [flows, setFlows] = useState<KlaviyoFlow[]>([]);
@@ -245,10 +251,29 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
   const [hasConnection, setHasConnection] = useState(false);
   const [timeframe, setTimeframe] = useState('last_90_days');
   const [debugResult, setDebugResult] = useState<string | null>(null);
+  const [cachedAt, setCachedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     checkConnection();
   }, [clientId]);
+
+  const populateFromCache = (connId: string, tf: string): boolean => {
+    try {
+      const raw = localStorage.getItem(getCacheKey(connId, tf));
+      if (!raw) return false;
+      const { data: cached, cachedAt: ts } = JSON.parse(raw);
+      if (Date.now() - new Date(ts).getTime() > CACHE_TTL_MS) return false;
+      if (cached.flows) setFlows(cached.flows);
+      if (cached.campaigns) setCampaigns(cached.campaigns);
+      if (cached.lists) setLists(cached.lists);
+      if (cached.segments) setSegments(cached.segments);
+      if (cached.globalStats) setGlobalStats(cached.globalStats);
+      setCachedAt(new Date(ts));
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
   const checkConnection = async () => {
     const { data } = await supabase
@@ -263,15 +288,17 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
     if (data) {
       setConnectionId(data.id);
       setHasConnection(true);
+      populateFromCache(data.id, 'last_90_days');
     }
   };
 
   const fetchMetrics = async (tf?: string) => {
     if (!connectionId) return;
+    const activeTimeframe = tf || timeframe;
     setLoading(true);
     try {
       const { data, error } = await callApi('sync-klaviyo-metrics', {
-        body: { connectionId, timeframe: tf || timeframe },
+        body: { connectionId, timeframe: activeTimeframe },
       });
 
       if (error) {
@@ -284,6 +311,23 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
       if (data?.lists) setLists(data.lists);
       if (data?.segments) setSegments(data.segments);
       if (data?.globalStats) setGlobalStats(data.globalStats);
+
+      // Guardar en cache localStorage
+      const now = new Date().toISOString();
+      try {
+        localStorage.setItem(getCacheKey(connectionId, activeTimeframe), JSON.stringify({
+          data: {
+            flows: data.flows,
+            campaigns: data.campaigns,
+            lists: data.lists,
+            segments: data.segments,
+            globalStats: data.globalStats,
+          },
+          cachedAt: now,
+        }));
+        setCachedAt(new Date(now));
+      } catch { /* quota exceeded — ignorar */ }
+
       toast.success('Métricas de Klaviyo actualizadas');
     } catch (err: any) {
       toast.error('Error: ' + err.message);
@@ -294,8 +338,11 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
 
   const handleTimeframeChange = (value: string) => {
     setTimeframe(value);
-    if (globalStats) {
-      fetchMetrics(value);
+    if (connectionId) {
+      const fromCache = populateFromCache(connectionId, value);
+      if (!fromCache) {
+        fetchMetrics(value);
+      }
     }
   };
 
@@ -323,7 +370,14 @@ export function KlaviyoMetricsPanel({ clientId }: KlaviyoMetricsPanelProps) {
               <BarChart3 className="w-4 h-4" />
               Rendimiento de Klaviyo
             </CardTitle>
-            <CardDescription>Métricas de los últimos {timeframeLabel}</CardDescription>
+            <CardDescription>
+              Métricas de los últimos {timeframeLabel}
+              {cachedAt && (
+                <span className="ml-2 text-[10px] text-muted-foreground/60">
+                  · Actualizado {new Date(cachedAt).toLocaleString('es-CL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </CardDescription>
           </div>
           <div className="flex items-center gap-2">
             <Select value={timeframe} onValueChange={handleTimeframeChange}>

@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { ShopifyDiscountDialog } from './ShopifyDiscountDialog';
 
@@ -191,43 +192,37 @@ export function KlaviyoPlanWizard({
 
   const totalSteps = flowType === 'campaign' ? 4 : 3;
 
-  // Fetch top products from Shopify metrics
+  // Fetch top products from Klaviyo metrics
   useEffect(() => {
     async function fetchTopProducts() {
       setLoadingProducts(true);
       try {
-        // Check if client has Shopify connection
         const { data: connections } = await supabase
           .from('platform_connections')
-          .select('id, platform')
+          .select('id')
           .eq('client_id', clientId)
-          .eq('platform', 'shopify')
+          .eq('platform', 'klaviyo')
           .eq('is_active', true);
 
         if (connections && connections.length > 0) {
           setHasShopifyConnection(true);
-          
-          // Fetch sales metrics to identify top products
-          const { data: metrics } = await supabase
-            .from('platform_metrics')
-            .select('*')
-            .eq('connection_id', connections[0].id)
-            .order('metric_value', { ascending: false })
-            .limit(20);
+          const connectionId = connections[0].id;
 
-          // For demo purposes, we'll create sample top products
-          // In production, this would come from actual Shopify product data
-          const sampleProducts: TopProduct[] = [
-            { title: 'Producto Estrella #1', sales: 150, revenue: 45000 },
-            { title: 'Producto Popular #2', sales: 120, revenue: 36000 },
-            { title: 'Producto Tendencia #3', sales: 95, revenue: 28500 },
-            { title: 'Producto Clásico #4', sales: 80, revenue: 24000 },
-            { title: 'Producto Nuevo #5', sales: 65, revenue: 19500 },
-          ];
-          setTopProducts(sampleProducts);
+          const { data } = await callApi('fetch-klaviyo-top-products', {
+            body: { connectionId, metric: 'ordered', timeframe: '30d', limit: 5 },
+          });
+
+          if (data?.products && data.products.length > 0) {
+            const mapped: TopProduct[] = data.products.map((p: any) => ({
+              title: p.title,
+              sales: p.count,
+              revenue: p.totalRevenue,
+            }));
+            setTopProducts(mapped);
+          }
         }
       } catch {
-        // silently ignore
+        // silently ignore — textarea manual remains visible
       } finally {
         setLoadingProducts(false);
       }

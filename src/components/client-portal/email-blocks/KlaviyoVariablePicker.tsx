@@ -34,14 +34,7 @@ const VARIABLE_GROUPS: VariableGroup[] = [
     variables: [
       { key: '{{ event.value }}', label: 'Valor del evento' },
       { key: '{{ event.items.0.product.title }}', label: 'Producto del evento' },
-      { key: '{{ event.extra.discount_code }}', label: 'Código descuento usado' },
-    ],
-  },
-  {
-    label: '📅 Fecha',
-    variables: [
-      { key: '{{ current_date }}', label: 'Fecha actual' },
-      { key: '{{ current_year }}', label: 'Año actual' },
+      { key: '{{ coupon.code }}', label: 'Código descuento usado' },
     ],
   },
 ];

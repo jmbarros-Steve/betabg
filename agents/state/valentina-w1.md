@@ -37,3 +37,18 @@
 - [ ] Verificar scope `write_discounts` en Shopify connection de Jardín de Eva
 - [ ] Fix IAM para Cloud Tasks (Sebastián W5)
 - [ ] Revisar mobile responsiveness de templates de flow
+- [ ] **Deuda técnica heredada de Rodrigo:** `KlaviyoPlanner.tsx` tiene iframe sin sandbox (mismo issue que ImportKlaviyoDialog). Trabajar coordinado con Rodrigo W0 en próxima sesión.
+
+## Coordinación cruzada activa con Rodrigo W0 (semana 07/04)
+
+Rodrigo confirmó 3 puntos antes de su PR semanal — anotado para no chocar:
+
+1. **Tabla `klaviyo_metrics_cache`** (nueva, suya): solo FK a `clients(id)`, sin relación con `email_campaigns`/`email_flows`/`email_send_queue`. Sin riesgo para mis migraciones.
+
+2. **Fix de variables `KlaviyoVariables.tsx` + `KlaviyoVariablePicker.tsx`**: cambio limitado al UI de Klaviyo. **NO toca** `email-html-processor.ts` ni `flow-engine.ts` (mis procesadores Nunjucks). Mis variables `{{ current_date }}` y `{{ coupon_code }}` siguen vivas en Steve Mail. El cambio es legítimo: Klaviyo usa motor Django-style, no Nunjucks.
+
+3. **Sandbox iframes**: limitado a `campaign-studio/templates/ImportKlaviyoDialog.tsx`. NO toca `GrapesEmailEditor.tsx` ni nada en `client-portal/email/`.
+
+**Mis iframes pendientes de auditar yo (no de Rodrigo):**
+- `GrapesEmailEditor.tsx` — el editor base, iframe interno de GrapesJS (configurado por la lib)
+- Cualquier preview en `client-portal/email/`
