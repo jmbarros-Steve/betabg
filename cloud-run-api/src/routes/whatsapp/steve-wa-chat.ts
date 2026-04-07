@@ -576,7 +576,7 @@ async function handleProspect(
       'hablar con humano', 'eres un bot', 'eres robot', 'eres una ia',
     ];
     if (humanEscalationTriggers.some(t => lowerMsgEarly.includes(t))) {
-      replyText = 'Sí, soy un asistente de IA del equipo de Steve. Te conecto con José Manuel — te va a escribir pronto por este mismo chat. Si prefieres agendar directo: meetings.hubspot.com/jose-manuel15';
+      replyText = 'Sí, soy un asistente de IA del equipo de Steve. Te conecto con José Manuel — te va a escribir pronto por este mismo chat. Si prefieres agendar directo: www.steve.cl/agendar/steve';
       skipMultiBrain = true;
       // Fire & forget: create escalation task
       supabase.from('tasks').insert({
@@ -903,7 +903,7 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
 
   } catch (error: any) {
     console.error('[steve-wa-chat] Prospect handler error:', error);
-    const twiml = `<Response><Message>Perdón, tuve un problema técnico. ¿Me puedes repetir eso? Si prefieres hablar con alguien del equipo: meetings.hubspot.com/jose-manuel15</Message></Response>`;
+    const twiml = `<Response><Message>Perdón, tuve un problema técnico. ¿Me puedes repetir eso? Si prefieres hablar con alguien del equipo: www.steve.cl/agendar/steve</Message></Response>`;
     return c.text(twiml, 200, { 'Content-Type': 'text/xml' });
   }
 }
