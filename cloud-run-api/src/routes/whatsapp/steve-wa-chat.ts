@@ -881,7 +881,7 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
     fullHistory.push({ role: 'assistant', content: fullReplyText });
 
     // Detect if Steve sent meeting link in this reply
-    const meetingLinkSent = fullReplyText.includes('meetings.hubspot.com');
+    const meetingLinkSent = fullReplyText.includes('meetings.hubspot.com') || fullReplyText.includes('steve.cl/agendar');
 
     // Detect if Steve proposed meeting times (Mini CRM)
     const meetingProposed = /(?:llamada|reunión|videollamada|call).*(?:\d{1,2}[:\.]?\d{0,2}\s*(?:am|pm|hrs|h)?|mañana|lunes|martes|miércoles|jueves|viernes)/i.test(fullReplyText)

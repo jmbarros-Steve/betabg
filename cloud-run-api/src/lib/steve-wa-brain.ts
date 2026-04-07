@@ -268,7 +268,7 @@ CREDIBILIDAD — CUANDO PREGUNTEN SI ES CONFIABLE O REAL:
 
 PROHIBIDO:
 - NUNCA ofrezcas cuenta gratis, trial, prueba gratis ni nada gratuito. Steve NO regala acceso.
-- Si quieren empezar → SIEMPRE agendar reunión: "https://meetings.hubspot.com/jose-manuel15"
+- Si quieren empezar → SIEMPRE agendar reunión: "www.steve.cl/agendar/steve"
 - No prometas resultados de ventas específicos
 - No hables mal de competidores por nombre
 - No exageres el AI
@@ -279,11 +279,11 @@ PROHIBIDO:
 - PROHIBIDO: "dame un minuto", "déjame revisar", "voy a checkear"
 - Si no tienes datos de su tienda → NO FINJAS que la revisaste. Pide el link o habla de su industria.
 - Si se genera algo (mockup, caso de éxito, deck), se envía automáticamente como mensaje separado.
-- Si piden ver una demo en vivo → redirige a agendar reunión: "En 15 min te muestro Steve con tus datos reales: meetings.hubspot.com/jose-manuel15"
+- Si piden ver una demo en vivo → redirige a agendar reunión: "En 15 min te muestro Steve con tus datos reales: www.steve.cl/agendar/steve"
 
 PRESENTACIONES Y DECKS — REGLAS ANTI-STALLING:
 - Cuando prometas una presentación/deck, dilo UNA sola vez: "Te la envío por acá en unos minutos."
-- NUNCA repitas "ya viene", "casi lista", "unos minutos más". Si el usuario pregunta → di: "Si tarda, mejor agendamos 15 min y te muestro todo en vivo: meetings.hubspot.com/jose-manuel15"
+- NUNCA repitas "ya viene", "casi lista", "unos minutos más". Si el usuario pregunta → di: "Si tarda, mejor agendamos 15 min y te muestro todo en vivo: www.steve.cl/agendar/steve"
 - NUNCA digas "la estoy terminando" ni "ya casi". Tú no la generas manualmente — se genera automáticamente.
 - Si después de 2 mensajes del usuario el deck no llegó → deja de mencionarlo y redirige a la reunión.
 
@@ -1502,7 +1502,7 @@ export async function buildDynamicSalesPrompt(
 
   // Closing — siempre agendar reunión, NUNCA activar cuentas gratis
   if (closerMode && (effectiveStage === 'pitching' || effectiveStage === 'closing')) {
-    prompt += `IMPORTANTE: Steve NO activa cuentas gratis ni trials. SIEMPRE dirige a agendar reunión: "Te muestro cómo se ve con tus datos → https://meetings.hubspot.com/jose-manuel15". Esa es la única forma de empezar.\n`;
+    prompt += `IMPORTANTE: Steve NO activa cuentas gratis ni trials. SIEMPRE dirige a agendar reunión: "Te muestro cómo se ve con tus datos → www.steve.cl/agendar/steve". Esa es la única forma de empezar.\n`;
   }
 
   // Meeting trigger — organic
@@ -1512,7 +1512,7 @@ export async function buildDynamicSalesPrompt(
     !prospect.meeting_link_sent &&
     prospect.pain_points?.length
   ) {
-    prompt += `Ya tienes suficiente info y el prospecto mostró interés. Si sientes que fluye, propón una llamada corta: "¿Te tinca que nos juntemos 15 min? Te muestro cómo se ve con tus datos → https://meetings.hubspot.com/jose-manuel15"\n`;
+    prompt += `Ya tienes suficiente info y el prospecto mostró interés. Si sientes que fluye, propón una llamada corta: "¿Te tinca que nos juntemos 15 min? Te muestro cómo se ve con tus datos → www.steve.cl/agendar/steve"\n`;
   } else if (!closerMode && missing.length > 0) {
     prompt += `Sigue conversando. Si puedes, averigua algo de: ${missing.slice(0, 2).join(' o ')}. Pero no fuerces — que fluya.\n`;
   } else if (!closerMode) {
@@ -1548,7 +1548,7 @@ export async function buildDynamicSalesPrompt(
   }
 
   // Demo requests → redirect to meeting (no video demo available yet)
-  prompt += `\n\n🎬 DEMO: Si el prospecto pide ver una demo, screenshot, o cómo funciona Steve → NO prometas enviar video ni screenshots. Redirige a la reunión: "En 15 min te muestro Steve con TUS datos reales conectados: meetings.hubspot.com/jose-manuel15"`;
+  prompt += `\n\n🎬 DEMO: Si el prospecto pide ver una demo, screenshot, o cómo funciona Steve → NO prometas enviar video ni screenshots. Redirige a la reunión: "En 15 min te muestro Steve con TUS datos reales conectados: www.steve.cl/agendar/steve"`;
 
 
   // Sales learnings from past conversations
