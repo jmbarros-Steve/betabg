@@ -174,10 +174,12 @@ import { knowledgePropagationCatchup } from './cron/knowledge-propagation-catchu
 import { validateContexts } from './cron/validate-contexts.js';
 import { refreshPlatformTokens } from './cron/refresh-platform-tokens.js';
 import { chinoExecutor } from './cron/chino-executor.js';
+import { chinoCodeExecutor } from './cron/chino-code-executor.js';
 
 // Steve Social
 import { socialFeed } from './social/feed.js';
 import { socialSubscribe } from './social/subscribe.js';
+import { socialReact } from './social/react.js';
 import { socialPostGenerator } from './cron/social-post-generator.js';
 import { socialReplyGenerator } from './cron/social-reply-generator.js';
 import { socialDigestSender } from './cron/social-digest-sender.js';
@@ -417,6 +419,7 @@ export function registerRoutes(app: Hono) {
   // Steve Social (public — no JWT)
   app.get('/api/social/feed', socialFeed);
   app.post('/api/social/subscribe', socialSubscribe);
+  app.post('/api/social/react', socialReact);
 
   // ============================================================
   // Phase 4: Auth & OAuth
@@ -582,6 +585,7 @@ export function registerRoutes(app: Hono) {
   cron.post('/validate-contexts', validateContexts);
   cron.post('/refresh-platform-tokens', refreshPlatformTokens);
   cron.post('/chino-executor', chinoExecutor);
+  cron.post('/chino-code-executor', chinoCodeExecutor);
   cron.post('/social-post-generator', socialPostGenerator);
   cron.post('/social-reply-generator', socialReplyGenerator);
   cron.post('/social-digest-sender', socialDigestSender);

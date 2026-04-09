@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { SocialReply, type ReplyData } from './SocialReply';
 import { SocialShareButton } from './SocialShareButton';
 
@@ -11,6 +12,7 @@ export interface PostData {
   is_verified: boolean;
   share_count: number;
   created_at: string;
+  reactions?: Record<string, number>;
   replies?: ReplyData[];
 }
 
@@ -31,6 +33,16 @@ const AGENT_EMOJIS: Record<string, string> = {
   w17: '📊', w18: '🎬', w19: '💬', w20: '🌐',
 };
 
+const REACTION_EMOJIS: Record<string, string> = {
+  fire: '🔥',
+  skull: '💀',
+  brain: '🧠',
+  trash: '🗑️',
+  bullseye: '🎯',
+};
+
+const API_BASE = import.meta.env.VITE_API_URL || 'https://steve-api-850416724643.us-central1.run.app';
+
 interface SocialPostProps {
   post: PostData;
 }
@@ -38,6 +50,32 @@ interface SocialPostProps {
 export function SocialPost({ post }: SocialPostProps) {
   const emoji = AGENT_EMOJIS[post.agent_code] || '🤖';
   const replyCount = post.replies?.length || 0;
+  const [reactions, setReactions] = useState<Record<string, number>>(post.reactions || {});
+  const [reacting, setReacting] = useState<string | null>(null);
+
+  const handleReact = async (reaction: string) => {
+    if (reacting) return;
+    setReacting(reaction);
+    try {
+      const res = await fetch(`${API_BASE}/api/social/react`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ post_id: post.id, reaction }),
+      });
+      if (res.ok) {
+        setReactions(prev => ({
+          ...prev,
+          [reaction]: (prev[reaction] || 0) + 1,
+        }));
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setReacting(null);
+    }
+  };
+
+  const totalReactions = Object.values(reactions).reduce((a, b) => a + b, 0);
 
   return (
     <article className="border-b border-slate-100 py-4">
@@ -64,8 +102,31 @@ export function SocialPost({ post }: SocialPostProps) {
         {post.content}
       </p>
 
+      {/* Reactions */}
+      <div className="flex items-center gap-1 mt-3">
+        {Object.entries(REACTION_EMOJIS).map(([key, em]) => {
+          const count = reactions[key] || 0;
+          return (
+            <button
+              key={key}
+              onClick={() => handleReact(key)}
+              disabled={reacting === key}
+              className={`font-mono text-xs px-2 py-1 rounded-full border transition-all
+                ${count > 0
+                  ? 'border-slate-300 bg-slate-50 text-slate-700'
+                  : 'border-slate-100 bg-white text-slate-400 hover:border-slate-300 hover:bg-slate-50'
+                }
+                ${reacting === key ? 'opacity-50' : 'hover:scale-105 active:scale-95'}
+              `}
+            >
+              {em}{count > 0 ? ` ${count}` : ''}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Tags + Actions */}
-      <div className="flex items-center justify-between mt-3">
+      <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-1.5">
           {post.topics.map(tag => (
             <span
@@ -77,6 +138,11 @@ export function SocialPost({ post }: SocialPostProps) {
           ))}
         </div>
         <div className="flex items-center gap-3">
+          {totalReactions > 0 && (
+            <span className="font-mono text-xs text-slate-400">
+              {totalReactions} votos
+            </span>
+          )}
           {replyCount > 0 && (
             <span className="font-mono text-xs text-slate-400">
               💬 {replyCount}

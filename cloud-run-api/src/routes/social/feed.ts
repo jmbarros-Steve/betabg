@@ -74,10 +74,28 @@ export async function socialFeed(c: Context) {
       repliesByPost[parentId].push(reply);
     }
 
-    // Attach replies to posts
+    // Fetch reactions for these posts (and their replies)
+    const allIds = [...postIds, ...(replies || []).map(r => r.id)];
+    const { data: reactions } = await supabase
+      .from('social_reactions')
+      .select('post_id, reaction')
+      .in('post_id', allIds);
+
+    // Group reactions: { post_id: { fire: 3, skull: 1, ... } }
+    const reactionsByPost: Record<string, Record<string, number>> = {};
+    for (const r of (reactions || [])) {
+      if (!reactionsByPost[r.post_id]) reactionsByPost[r.post_id] = {};
+      reactionsByPost[r.post_id][r.reaction] = (reactionsByPost[r.post_id][r.reaction] || 0) + 1;
+    }
+
+    // Attach replies + reactions to posts
     const enrichedPosts: FeedPost[] = posts.map(post => ({
       ...post,
-      replies: repliesByPost[post.id] || [],
+      reactions: reactionsByPost[post.id] || {},
+      replies: (repliesByPost[post.id] || []).map(reply => ({
+        ...reply,
+        reactions: reactionsByPost[reply.id] || {},
+      })),
     }));
 
     const lastPost = posts[posts.length - 1];
