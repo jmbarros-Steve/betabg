@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { anthropicFetch } from '../../lib/anthropic-fetch.js';
 import { logProspectEvent } from '../../lib/prospect-event-logger.js';
 import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
+import { getUserClientIds, verifyProspectOwnership } from '../../lib/user-scoping.js';
 
 /** CRUD for proposals: list, create, get */
 export async function proposalsCrud(c: Context) {
@@ -11,12 +12,28 @@ export async function proposalsCrud(c: Context) {
     const { action } = body;
     const supabase = getSupabaseAdmin();
     const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Multi-tenant scoping
+    const { isSuperAdmin } = await getUserClientIds(supabase, user.id);
 
     switch (action) {
       case 'list': {
         const { prospect_id } = body;
+
+        // If filtering by prospect, verify ownership
+        if (prospect_id && !isSuperAdmin) {
+          const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
+          if (!allowed) return c.json({ error: 'Forbidden' }, 403);
+        }
+
         let query = supabase.from('proposals').select('*, wa_prospects(id, phone, name, profile_name, company)');
         if (prospect_id) query = query.eq('prospect_id', prospect_id);
+
+        // Non-admin without prospect filter: only see their own proposals
+        if (!isSuperAdmin && !prospect_id) {
+          query = query.eq('created_by', user.id);
+        }
 
         const { data, error } = await query.order('created_at', { ascending: false });
         if (error) return c.json({ error: error.message }, 500);
@@ -29,11 +46,17 @@ export async function proposalsCrud(c: Context) {
           return c.json({ error: 'prospect_id, title, and content required' }, 400);
         }
 
+        // Verify ownership of the prospect
+        if (!isSuperAdmin) {
+          const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
+          if (!allowed) return c.json({ error: 'Forbidden' }, 403);
+        }
+
         const { data, error } = await supabase
           .from('proposals')
           .insert({
             prospect_id,
-            created_by: user?.id || null,
+            created_by: user.id,
             title,
             content,
             plan_type: plan_type || null,
@@ -44,7 +67,7 @@ export async function proposalsCrud(c: Context) {
 
         if (error) return c.json({ error: error.message }, 500);
 
-        logProspectEvent(prospect_id, 'proposal_sent', { proposal_id: data.id, plan_type, title }, `admin:${user?.id || 'unknown'}`);
+        logProspectEvent(prospect_id, 'proposal_sent', { proposal_id: data.id, plan_type, title }, `admin:${user.id}`);
 
         return c.json({ proposal: data });
       }
@@ -60,6 +83,17 @@ export async function proposalsCrud(c: Context) {
           .single();
 
         if (error) return c.json({ error: error.message }, 500);
+
+        // Verify ownership: check if user created this proposal or owns the prospect
+        if (!isSuperAdmin && data.created_by !== user.id) {
+          if (data.prospect_id) {
+            const { allowed } = await verifyProspectOwnership(supabase, data.prospect_id, user.id);
+            if (!allowed) return c.json({ error: 'Forbidden' }, 403);
+          } else {
+            return c.json({ error: 'Forbidden' }, 403);
+          }
+        }
+
         return c.json({ proposal: data });
       }
 
@@ -69,6 +103,16 @@ export async function proposalsCrud(c: Context) {
 
         const validStatuses = ['draft', 'sent', 'viewed', 'accepted', 'rejected'];
         if (!validStatuses.includes(status)) return c.json({ error: 'Invalid status' }, 400);
+
+        // Verify ownership before updating
+        if (!isSuperAdmin) {
+          const { data: proposal } = await supabase
+            .from('proposals')
+            .select('created_by')
+            .eq('id', proposal_id)
+            .maybeSingle();
+          if (!proposal || proposal.created_by !== user.id) return c.json({ error: 'Forbidden' }, 403);
+        }
 
         const update: Record<string, any> = { status };
         if (status === 'sent') update.sent_at = new Date().toISOString();
@@ -99,6 +143,12 @@ export async function proposalsGenerate(c: Context) {
     if (!prospect_id) return c.json({ error: 'prospect_id required' }, 400);
 
     const supabase = getSupabaseAdmin();
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Multi-tenant: verify ownership
+    const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
+    if (!allowed) return c.json({ error: 'Forbidden' }, 403);
 
     // Fetch prospect data
     const { data: prospect, error: pErr } = await supabase

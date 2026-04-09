@@ -16,16 +16,25 @@ export async function metaOauthCallback(c: Context) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    const payload: OAuthPayload = await c.req.json();
-    const { code, client_id, redirect_uri } = payload;
+    const payload = await c.req.json() as OAuthPayload & { state?: string };
+    const { code, client_id, redirect_uri, state } = payload;
 
     if (!code || !client_id || !redirect_uri) {
       return c.json({ error: 'Missing required parameters' }, 400);
     }
 
-    // CSRF state validation is handled by the frontend (OAuthMetaCallback.tsx)
-    // which checks sessionStorage before calling this endpoint.
-    // Backend security is enforced by authMiddleware (JWT) + client ownership check below.
+    // Backend CSRF state validation (supplements frontend check in OAuthMetaCallback.tsx)
+    if (state) {
+      const { data: stateCheck } = await supabase
+        .from('oauth_states')
+        .select('id')
+        .eq('state', state)
+        .maybeSingle();
+      if (!stateCheck) {
+        console.warn('[meta-oauth] Invalid state parameter — possible CSRF');
+        // Don't block for now (backwards compat) but log it
+      }
+    }
 
     const { data: client, error: clientError } = await supabase
       .from('clients')

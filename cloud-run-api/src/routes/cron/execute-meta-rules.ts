@@ -52,7 +52,7 @@ export async function executeMetaRulesCron(c: Context) {
 
     for (const [connectionId, rules] of byConnection) {
       const conn = (rules[0] as any).platform_connections;
-      if (!conn?.access_token_encrypted || !conn?.account_id) continue;
+      if (!conn?.account_id) continue;
 
       // Resolve token (supports both encrypted and system tokens)
       const decryptedToken = await getTokenForConnection(supabase, conn);

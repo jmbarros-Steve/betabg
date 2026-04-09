@@ -1432,8 +1432,8 @@ export async function manageMetaCampaign(c: Context) {
       }
     }
 
-    if (!connection.access_token_encrypted || !connection.account_id) {
-      return c.json({ error: 'Missing Meta credentials (access token or account ID)' }, 400);
+    if (!connection.account_id) {
+      return c.json({ error: 'Missing Meta account ID' }, 400);
     }
 
     // Resolve token (SUAT for bm_partner, decrypt for oauth)

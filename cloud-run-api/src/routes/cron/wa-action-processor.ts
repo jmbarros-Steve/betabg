@@ -21,9 +21,9 @@ const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_
 const MEETING_LINK = 'https://meetings.hubspot.com/jose-manuel15';
 
 export async function waActionProcessor(c: Context) {
-  const cronSecret = c.req.header('X-Cron-Secret') || '';
-  const expectedSecret = process.env.CRON_SECRET || '';
-  if (expectedSecret && cronSecret !== expectedSecret) {
+  const cronSecret = c.req.header('X-Cron-Secret')?.trim();
+  const expected = process.env.CRON_SECRET;
+  if (!expected || cronSecret !== expected) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

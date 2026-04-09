@@ -10,8 +10,10 @@ import { sendPeriodicReport } from './whatsapp.js';
 import { handleChinoInstruction } from './instruction-handler.js';
 
 function verifyCronSecret(c: Context): boolean {
-  const secret = c.req.header('X-Cron-Secret');
-  return secret === process.env.CRON_SECRET;
+  const secret = c.req.header('X-Cron-Secret')?.trim();
+  const expected = process.env.CRON_SECRET;
+  if (!expected || secret !== expected) return false;
+  return true;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -189,11 +191,19 @@ export async function chinoFixNext(c: Context) {
       return c.json({ message: 'No hay fixes pendientes' }, 404);
     }
 
-    // Mark as fixing
-    await supabase
+    // Optimistic lock: only claim if still 'assigned' (prevents race condition)
+    const { data: claimed } = await supabase
       .from('steve_fix_queue')
-      .update({ status: 'fixing' })
-      .eq('id', data.id);
+      .update({ status: 'fixing', updated_at: new Date().toISOString() })
+      .eq('id', data.id)
+      .eq('status', 'assigned')
+      .select()
+      .maybeSingle();
+
+    if (!claimed) {
+      // Another agent already took this fix
+      return c.json({ error: 'Fix already claimed' }, 409);
+    }
 
     return c.json(data);
   } catch (err: any) {

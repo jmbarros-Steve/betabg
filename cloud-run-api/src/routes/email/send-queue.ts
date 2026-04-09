@@ -6,6 +6,7 @@ import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-sup
 /**
  * Email Send Queue — throttled sending with priority and rate limiting.
  * POST /api/email-send-queue
+ * Auth: protected by authMiddleware at the router level (routes/index.ts).
  *
  * Actions:
  *   - enqueue: Add emails to the queue (used by campaign send)
@@ -181,23 +182,29 @@ export async function emailSendQueue(c: Context) {
         return c.json({ processed: 0, message: 'No emails to process' });
       }
 
-      // Mark as processing (optimistic lock).
-      // We set processed_at = now() here as a "last touched" marker so the
-      // email-queue-tick sweeper can detect items stuck in 'processing' and
-      // recover them. processed_at will be overwritten on success/failure.
-      // It's safe for the rate-limit query because that query filters by
-      // status='sent' (processing items won't count).
+      // Optimistic lock: atomically claim items by updating only those still 'queued'.
+      // This prevents double-processing when multiple workers run concurrently.
       const itemIds = queueItems.map(q => q.id);
-      await supabase
+      const { data: claimed } = await supabase
         .from('email_send_queue')
         .update({ status: 'processing', processed_at: new Date().toISOString() })
-        .in('id', itemIds);
+        .eq('status', 'queued')
+        .in('id', itemIds)
+        .select('id');
+
+      // Only process the items we actually claimed
+      const claimedIds = new Set((claimed || []).map((cl: any) => cl.id));
+      const itemsToProcess = queueItems.filter((i: any) => claimedIds.has(i.id));
+
+      if (itemsToProcess.length === 0) {
+        return c.json({ processed: 0, message: 'No emails claimed (another worker took them)' });
+      }
 
       let sent = 0;
       let failed = 0;
 
       // Pre-fetch subscriber emails
-      const subIds = [...new Set(queueItems.map(q => q.subscriber_id))];
+      const subIds = [...new Set(itemsToProcess.map((q: any) => q.subscriber_id))];
       const subs = await safeQueryOrDefault<any>(
         supabase
           .from('email_subscribers')
@@ -209,7 +216,7 @@ export async function emailSendQueue(c: Context) {
       const emailMap: Record<string, string> = {};
       for (const s of subs || []) emailMap[s.id] = s.email;
 
-      for (const item of queueItems) {
+      for (const item of itemsToProcess) {
         const subscriberEmail = emailMap[item.subscriber_id];
         if (!subscriberEmail) {
           await supabase.from('email_send_queue').update({ status: 'failed', last_error: 'Subscriber not found' }).eq('id', item.id);
@@ -272,7 +279,7 @@ export async function emailSendQueue(c: Context) {
       // Update campaign sent_count and status if applicable.
       // Collect all distinct campaign_ids in this batch (could be multiple if
       // several campaigns are being processed together).
-      const campaignIds = [...new Set(queueItems.map((q) => q.campaign_id).filter(Boolean) as string[])];
+      const campaignIds = [...new Set(itemsToProcess.map((q: any) => q.campaign_id).filter(Boolean) as string[])];
       for (const campaignId of campaignIds) {
         const { count: totalSent } = await supabase
           .from('email_send_queue')
@@ -303,7 +310,7 @@ export async function emailSendQueue(c: Context) {
           .eq('id', campaignId);
       }
 
-      return c.json({ processed: queueItems.length, sent, failed, rate_limit: rateLimit });
+      return c.json({ processed: itemsToProcess.length, sent, failed, rate_limit: rateLimit });
     }
 
     case 'status': {

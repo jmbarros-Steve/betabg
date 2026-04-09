@@ -1,4 +1,5 @@
 import { Context } from 'hono';
+import { randomBytes } from 'node:crypto';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
 import { safeMutateSingle } from '../../lib/safe-supabase.js';
@@ -29,7 +30,7 @@ export async function prospectTrial(c: Context) {
 
   try {
     // 1. Create user in Supabase Auth (auto-confirmed)
-    const tempPassword = `Steve${Date.now().toString(36)}!`;
+    const tempPassword = `Steve${randomBytes(8).toString('hex')}!`;
     const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
       email,
       password: tempPassword,
@@ -96,7 +97,7 @@ export async function prospectTrial(c: Context) {
     await supabase.from('merchant_onboarding').insert(onboardingSteps);
 
     // 6. Send welcome WA message
-    const welcomeMsg = `🎉 ¡Bienvenido a Steve!\n\nTu cuenta está lista. Entra a steve.cl con tu email (${email}) y la clave temporal que te enviamos.\n\nPróximo paso: conectar tu Shopify para que empiece la magia 🚀\n\n¿Necesitas ayuda? Solo escríbeme aquí.`;
+    const welcomeMsg = `🎉 ¡Bienvenido a Steve!\n\nTu cuenta está lista. Entra a steve.cl con tu email (${email}) y esta clave temporal:\n\n🔑 ${tempPassword}\n\nCámbiala apenas entres.\n\nPróximo paso: conectar tu Shopify para que empiece la magia 🚀\n\n¿Necesitas ayuda? Solo escríbeme aquí.`;
 
     await sendWhatsApp(`+${phone}`, welcomeMsg);
 

@@ -1,8 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
-import { createHmac, timingSafeEqual } from 'node:crypto';
-import { resolveShopifyCredentials } from '../../lib/shopify-credentials.js';
 
 // ---------------------------------------------------------------------------
 // TypeScript interfaces for webhook payloads
@@ -39,42 +37,8 @@ interface ShopifyOrderPayload {
   [key: string]: unknown;  // allow additional fields
 }
 
-// ---------------------------------------------------------------------------
-// HMAC verification — timing-safe, raw body, SHA-256, Base64
-// ---------------------------------------------------------------------------
-
-/**
- * Verify the X-Shopify-Hmac-Sha256 header against the raw request body.
- * Returns true only when the signature is valid.
- */
-function verifyWebhookHmac(
-  rawBody: string,
-  hmacHeader: string,
-  secret: string,
-): boolean {
-  try {
-    if (!hmacHeader || !secret) {
-      console.error('[HMAC] Missing header or secret');
-      return false;
-    }
-
-    // Compute expected HMAC
-    const computed = createHmac('sha256', secret)
-      .update(rawBody, 'utf8')
-      .digest('base64');
-
-    // Timing-safe comparison
-    const encoder = new TextEncoder();
-    const a = encoder.encode(computed);
-    const b = encoder.encode(hmacHeader);
-
-    if (a.length !== b.length) return false;
-    return timingSafeEqual(a, b);
-  } catch (err) {
-    console.error('[HMAC] Verification error:', err);
-    return false;
-  }
-}
+// NOTE: HMAC verification is now handled by shopifyHmacMiddleware in index.ts.
+// The middleware stores the parsed body in c.set('parsedBody', ...) and raw body in c.set('rawBody', ...).
 
 // ---------------------------------------------------------------------------
 // Background / async processing placeholder
@@ -181,50 +145,19 @@ async function handleOrderCancelled(
  */
 export async function shopifyFulfillmentWebhooks(c: Context) {
   // Extract Shopify headers
-  const hmacHeader = c.req.header('x-shopify-hmac-sha256') || '';
   const topic      = c.req.header('x-shopify-topic') || '';
   const shopDomain = c.req.header('x-shopify-shop-domain') || '';
   const webhookId  = c.req.header('x-shopify-webhook-id') || 'unknown';
 
   console.log(`[Fulfillment ${webhookId}] Received — topic=${topic}, shop=${shopDomain}`);
 
-  // Read raw body BEFORE any parsing (required for HMAC)
-  const rawBody = await c.req.text();
+  // HMAC verification is handled by shopifyHmacMiddleware (applied in index.ts).
+  // The middleware stores the parsed body via c.set('parsedBody', ...).
+  console.log(`[Fulfillment ${webhookId}] HMAC verified by middleware`);
 
-  // Dual-mode HMAC verification:
-  //   custom_app → client_secret per-connection (resuelto desde DB via shopDomain)
-  //   app_store  → SHOPIFY_WEBHOOK_SECRET global (env var)
-  // El resolver devuelve el webhookSecret correcto segun connection_mode.
-  let shopifySecret: string | null = null;
-  try {
-    const creds = await resolveShopifyCredentials(shopDomain);
-    if (creds?.webhookSecret) shopifySecret = creds.webhookSecret;
-  } catch (err) {
-    console.error('[Fulfillment] resolveShopifyCredentials threw:', err);
-  }
-  // Fallback: env vars (util si SHOPIFY_MODE=appstore/both o si el webhook llega
-  // antes de que la conexion este registrada — p.ej. en el primer install).
-  if (!shopifySecret) {
-    shopifySecret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET || null;
-  }
-  if (!shopifySecret) {
-    console.error(`[Fulfillment] No webhook secret resolvable for shop=${shopDomain}`);
-    return c.json({ error: 'Server misconfiguration — no webhook secret' }, 500);
-  }
-
-  if (!verifyWebhookHmac(rawBody, hmacHeader, shopifySecret)) {
-    console.error(`[Fulfillment ${webhookId}] HMAC verification FAILED — rejecting`);
-    // DO NOT process the body — return immediately
-    return c.json({ error: 'Unauthorized — HMAC mismatch' }, 401);
-  }
-
-  console.log(`[Fulfillment ${webhookId}] HMAC verified`);
-
-  // Parse payload
-  let payload: ShopifyOrderPayload;
-  try {
-    payload = JSON.parse(rawBody);
-  } catch {
+  // Get pre-parsed payload from middleware
+  const payload: ShopifyOrderPayload = c.get('parsedBody');
+  if (!payload) {
     return c.json({ error: 'Invalid JSON' }, 400);
   }
 

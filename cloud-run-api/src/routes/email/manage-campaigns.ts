@@ -48,6 +48,7 @@ async function enqueueCampaignItems(
 /**
  * Campaign management: CRUD + send + schedule.
  * POST /api/manage-email-campaigns
+ * Auth: protected by authMiddleware at the router level (routes/index.ts).
  */
 export async function manageEmailCampaigns(c: Context) {
   const body = await c.req.json();

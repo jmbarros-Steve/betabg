@@ -19,6 +19,7 @@ export async function authMiddleware(c: Context, next: Next) {
   // Allow internal calls (service role key)
   if (token === serviceKey || internalKey === serviceKey) {
     c.set('isInternal', true);
+    c.set('user', { id: 'internal', email: 'system@steve.cl' });
     await next();
     return;
   }

@@ -38,6 +38,8 @@ import { anthropicFetch } from '../../lib/anthropic-fetch.js';
 import { logProspectEvent } from '../../lib/prospect-event-logger.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
+// Fix #6: single canonical booking URL used everywhere
+const BOOKING_URL = 'www.steve.cl/agendar/steve';
 
 // Supported image types for vision
 const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -63,10 +65,28 @@ async function downloadImageForVision(
       return null;
     }
 
+    // Fix R6-#17: validar tamaño antes de cargar en RAM
+    const contentLength = parseInt(res.headers.get('content-length') || '0', 10);
+    if (contentLength > 5 * 1024 * 1024) {
+      console.warn(`[download-image] Skipping: too large (${contentLength} bytes)`);
+      return null;
+    }
+
     const buffer = Buffer.from(await res.arrayBuffer());
     // Skip images > 5MB (Claude limit is ~20MB but keep it reasonable for latency)
     if (buffer.length > 5 * 1024 * 1024) {
       console.warn('[image-vision] Image too large (>5MB), skipping');
+      return null;
+    }
+
+    // Fix #11: validate file magic bytes — skip corrupted/wrong-type files
+    const b0 = buffer[0], b1 = buffer[1], b2 = buffer[2], b3 = buffer[3];
+    const isJpeg = b0 === 0xff && b1 === 0xd8;
+    const isPng  = b0 === 0x89 && b1 === 0x50 && b2 === 0x4e && b3 === 0x47;
+    const isGif  = b0 === 0x47 && b1 === 0x49;
+    const isWebp = b0 === 0x52 && b1 === 0x49 && b2 === 0x46 && b3 === 0x46;
+    if (!isJpeg && !isPng && !isGif && !isWebp) {
+      console.warn(`[image-vision] Invalid file format (magic: ${b0?.toString(16)} ${b1?.toString(16)}), skipping`);
       return null;
     }
 
@@ -102,7 +122,28 @@ async function quickScrapeUrl(rawUrl: string): Promise<string | null> {
     clearTimeout(timeout);
     if (!res.ok) return null;
 
-    const html = await res.text();
+    let html = await res.text();
+
+    // Fix R5-#20: detect JS-rendered sites and use Firecrawl for better content
+    const bodyText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const isJsRendered = bodyText.length < 500 || html.includes('__NEXT_DATA__') || html.includes('window.__reactFiber') || html.includes('__NUXT__');
+    if (isJsRendered) {
+      const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
+      if (FIRECRAWL_API_KEY) {
+        try {
+          const fcRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url, formats: ['html'], timeout: 5000 }),
+          });
+          if (fcRes.ok) {
+            const fcData = await fcRes.json() as any;
+            if (fcData?.data?.html) html = fcData.data.html;
+          }
+        } catch { /* fallback to original html */ }
+      }
+    }
+
     const parts: string[] = [];
 
     // Title
@@ -115,16 +156,32 @@ async function quickScrapeUrl(rawUrl: string): Promise<string | null> {
     if (metaDescMatch) parts.push(`Descripción: ${metaDescMatch[1].trim()}`);
 
     // H1s and H2s (strip HTML tags inside)
-    const stripTags = (s: string) => s.replace(/<[^>]+>/g, '').trim();
+    // Fix R5-#16: decode HTML entities so products show as "Zapatilla deportiva" not "Zapatilla&nbsp;deportiva"
+    const decodeEntities = (s: string) => s
+      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/&aacute;/g, 'á').replace(/&eacute;/g, 'é').replace(/&iacute;/g, 'í')
+      .replace(/&oacute;/g, 'ó').replace(/&uacute;/g, 'ú').replace(/&ntilde;/g, 'ñ')
+      .replace(/&#\d+;/g, '').replace(/&[a-z]+;/g, '');
+    const stripTags = (s: string) => decodeEntities(s.replace(/<[^>]+>/g, '')).trim();
     const h1s = [...html.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/gi)].map(m => stripTags(m[1])).filter(Boolean).slice(0, 5);
     const h2s = [...html.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)].map(m => stripTags(m[1])).filter(Boolean).slice(0, 10);
     if (h1s.length) parts.push(`H1: ${h1s.join(' | ')}`);
     if (h2s.length) parts.push(`Secciones: ${h2s.join(' | ')}`);
 
-    // Shopify product titles
-    const productTitles = [...html.matchAll(/class="[^"]*product[_-]?(?:title|name|card__heading)[^"]*"[^>]*>([\s\S]*?)<\//gi)]
-      .map(m => stripTags(m[1])).filter(Boolean).slice(0, 15);
-    if (productTitles.length) parts.push(`Productos: ${productTitles.join(', ')}`);
+    // Fix R4-#11: extended regex to catch Shopify camelCase classes (ProductTitle, ProductMeta)
+    const productTitles = [
+      ...html.matchAll(/class="[^"]*product[_-]?(?:title|name|card__heading|item[_-]?name)[^"]*"[^>]*>([\s\S]*?)<\//gi),
+      ...html.matchAll(/class="[^"]*[Pp]roduct[^"]*[Tt]itle[^"]*"[^>]*>([\s\S]*?)<\//gi),
+      ...html.matchAll(/data-product-title="([^"]+)"/gi),
+    ].map(m => stripTags(m[1] || '')).filter(Boolean);
+    const deduplicatedTitles = [...new Set(productTitles)].slice(0, 15);
+    if (deduplicatedTitles.length) {
+      parts.push(`Productos: ${deduplicatedTitles.join(', ')}`);
+    } else if (h1s.length) {
+      // Fix #24: if no class-based products found, use H1s as likely product names
+      // (on product pages H1 = product title; on homepages H1 = brand headline — still useful)
+      parts.push(`Productos/Títulos principales: ${h1s.join(' | ')}`);
+    }
 
     // JSON-LD structured data
     const jsonLds = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
@@ -161,7 +218,7 @@ async function quickScrapeUrl(rawUrl: string): Promise<string | null> {
 
 // Rate limiting: track last response time per phone (in-memory + DB fallback)
 const lastResponseTime = new Map<string, number>();
-const RATE_LIMIT_MS = 5_000; // 5 seconds
+const RATE_LIMIT_MS = 30_000; // 30 seconds (Fix #5: was 5s, causing duplicate responses on slow typing)
 
 // Stage order for "only advance, never go back" rule
 const STAGE_ORDER: Record<string, number> = {
@@ -190,6 +247,30 @@ export async function steveWAChat(c: Context) {
   try {
     // Parse Twilio webhook payload (application/x-www-form-urlencoded)
     const body = await c.req.parseBody();
+
+    // Fix #1: Twilio HMAC signature validation — reject forged webhooks
+    const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+    if (twilioAuthToken) {
+      const sig = c.req.header('X-Twilio-Signature') || '';
+      const proto = c.req.header('x-forwarded-proto') || 'https';
+      const host = c.req.header('host') || '';
+      const reqUrl = c.req.url;
+      const rawUrl = host
+        ? `${proto}://${host}${new URL(reqUrl).pathname}`
+        : reqUrl.replace(/^http:\/\//i, 'https://');
+      const params: Record<string, string> = {};
+      for (const [k, v] of Object.entries(body)) params[k] = String(v ?? '');
+      const twilioMod = await import('twilio');
+      // ESM: validateRequest está en default.validateRequest, no en el root del módulo
+      const validateRequest = (twilioMod.default as any)?.validateRequest ?? (twilioMod as any).validateRequest;
+      if (typeof validateRequest !== 'function') {
+        console.error('[twilio-hmac] validateRequest not found in twilio module — skipping validation');
+      } else if (!validateRequest(twilioAuthToken, sig, rawUrl, params)) {
+        console.warn(`[twilio-hmac] Invalid signature — rejecting request from ${rawUrl}`);
+        return c.text('Forbidden', 403);
+      }
+    }
+
     const from = String(body['From'] || '');           // whatsapp:+56987654321
     let messageBody = String(body['Body'] || '');
     const profileName = String(body['ProfileName'] || '');
@@ -202,6 +283,18 @@ export async function steveWAChat(c: Context) {
       const mediaType = String(body['MediaContentType0'] || '');
       const mediaUrl = String(body['MediaUrl0'] || '');
       if (mediaUrl && isSupportedAudio(mediaType)) {
+        // Fix R4-#13: check audio size before transcribing (prevent timeout on long audios)
+        const MAX_AUDIO_BYTES = 5 * 1024 * 1024; // 5MB ≈ 2-3 min
+        let okToTranscribe = true;
+        try {
+          const headRes = await fetch(mediaUrl, { method: 'HEAD' });
+          const cl = headRes.headers.get('content-length');
+          if (cl && parseInt(cl, 10) > MAX_AUDIO_BYTES) {
+            messageBody = messageBody || '[Audio demasiado largo para transcribir (máx ~3 minutos)]';
+            okToTranscribe = false;
+          }
+        } catch { /* Can't check — proceed anyway */ }
+        if (okToTranscribe) {
         const transcription = await transcribeAudio(mediaUrl, mediaType);
         if (transcription) {
           messageBody = messageBody
@@ -210,6 +303,7 @@ export async function steveWAChat(c: Context) {
           console.log(`[steve-wa-chat] Audio transcribed for ${from}: ${transcription.slice(0, 100)}...`);
         } else if (!messageBody) {
           messageBody = '[El usuario envió un audio que no pude transcribir]';
+        }
         }
       } else if (mediaUrl && mediaType && SUPPORTED_IMAGE_TYPES.some(t => mediaType.startsWith(t))) {
         // Image: download for Claude vision
@@ -439,19 +533,36 @@ async function handleProspect(
     let prospect: ProspectRecord;
 
     if (existingProspect) {
-      // Update message count
+      // Fix #19: if prospect was 'lost' and writes again — re-activate (reset to discovery)
+      const isReactivation = existingProspect.stage === 'lost';
+      if (isReactivation) {
+        console.log(`[handleProspect] Lost prospect ${phone} wrote again → re-activating (was: ${existingProspect.lost_reason || 'unknown'})`);
+      }
       await supabase
         .from('wa_prospects')
         .update({
           message_count: (existingProspect.message_count || 0) + 1,
           updated_at: new Date().toISOString(),
           profile_name: profileName || existingProspect.profile_name,
+          ...(isReactivation && {
+            stage: 'discovery',
+            lead_score: 0,
+            score_breakdown: {},       // Fix R6-#5: limpiar breakdown
+            pain_points: [],           // Fix R6-#30: limpiar dolores viejos
+            budget_range: null,        // Fix R6-#5: limpiar presupuesto anterior
+            decision_timeline: null,   // Fix R6-#5: limpiar timeline anterior
+            meeting_status: 'none',    // Fix R6-#30: limpiar reunión anterior
+            meeting_at: null,
+            // Fix R5-#18: store reactivation context for future reference
+            reactivated_at: new Date().toISOString(),
+          }),
         })
         .eq('id', existingProspect.id);
 
       prospect = {
         ...existingProspect,
         message_count: (existingProspect.message_count || 0) + 1,
+        ...(isReactivation && { stage: 'discovery', lead_score: 0 }),
       };
     } else {
       // Parse UTM from first message (e.g. "Hola Steve, vi tu web (src=website)")
@@ -500,6 +611,17 @@ async function handleProspect(
       }).catch(() => {});
     }
 
+    // R7-#10: detectar inactividad larga y resetear contexto de pitch
+    const lastActive = prospect.updated_at ? new Date(prospect.updated_at).getTime() : 0;
+    const daysSinceLastMsg = lastActive ? (Date.now() - lastActive) / 86400000 : 0;
+    const isLongInactive = daysSinceLastMsg > 14;
+
+    if (isLongInactive) {
+      console.log(`[reactivation-context] ${prospect.phone} inactivo ${Math.round(daysSinceLastMsg)} días — inyectando contexto de reactivación`);
+      (prospect as any)._longInactive = true;
+      (prospect as any)._inactiveDays = Math.round(daysSinceLastMsg);
+    }
+
     // 2. Save inbound message (PII scrubbed)
     await supabase.from('wa_messages').insert({
       client_id: null,
@@ -517,22 +639,50 @@ async function handleProspect(
     const detectedUrlMatch = messageBody.match(URL_REGEX);
     const detectedUrl = detectedUrlMatch?.[0] || null;
 
+    // Fix R6-#3: descartar URLs que son falsos positivos (palabras en castellano con punto)
+    let validatedUrl = detectedUrl;
+    if (validatedUrl) {
+      const hasValidTld = /\.(com|cl|co|mx|ar|pe|uy|br|net|org|io|store|shop|app|dev|ai)\b/i.test(validatedUrl);
+      const isTooShort = validatedUrl.replace(/^https?:\/\//i, '').length < 8;
+      if (!hasValidTld || isTooShort) {
+        console.log(`[quick-scrape] Ignoring likely false-positive URL: ${validatedUrl}`);
+        validatedUrl = null;
+      }
+    }
+
     const [history, quickScrapeData] = await Promise.all([
       getProspectHistory(phone, 20),
-      detectedUrl ? quickScrapeUrl(detectedUrl) : Promise.resolve(null),
+      validatedUrl ? quickScrapeUrl(validatedUrl) : Promise.resolve(null),
     ]);
 
     if (quickScrapeData) {
       console.log(`[quick-scrape] Got ${quickScrapeData.length} chars for ${detectedUrl}`);
     }
 
+    // Fix #21 + R4-#16: stricter injection guard — avoid false positives like "ignora mis dudas"
+    const INJECTION_PATTERNS = [
+      /^\s*(?:system|instrucción|directiva)[\s:]/i,  // Starts with "system:" command
+      /\[\s*(?:SYSTEM|INSTRUCCIÓN|DIRECTIVA)\s*:/i,  // [SYSTEM: ...] tags
+      /jailbreak|DAN\s+mode|developer\s+mode/i,
+      /forget\s+everything|ignore\s+(?:all|previous|everything)/i,
+      /\[INSTRUCCIÓN:/i,
+    ];
+    const sanitizedMessageBody = INJECTION_PATTERNS.some(p => p.test(messageBody))
+      ? 'Hola'  // neutralize injection — treat as blank greeting
+      : messageBody;
+
     // Build messages array for Claude (use original messageBody for AI context, not scrubbed)
     const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [...history];
     // Build AI message with context injections
-    let aiMessageBody = messageBody;
+    let aiMessageBody = sanitizedMessageBody;
     // Inject quick scrape data so Claude has real page info
     if (quickScrapeData) {
-      aiMessageBody += `\n\n[SISTEMA: Steve revisó la página ${detectedUrl} y encontró esta información REAL. USA SOLO ESTOS DATOS para hablar de la tienda, NO inventes nada que no esté aquí:\n${quickScrapeData}]`;
+      // Fix R6-#14: decodificar HTML entities antes de inyectar al prompt
+      const cleanScrapeData = quickScrapeData
+        .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+      aiMessageBody += `\n\n[SISTEMA: Steve revisó la página ${validatedUrl} y encontró esta información REAL. USA SOLO ESTOS DATOS para hablar de la tienda, NO inventes nada que no esté aquí:\n${cleanScrapeData}]`;
     }
     // If PII was detected, inject warning hint
     if (hadPII) {
@@ -548,6 +698,8 @@ async function handleProspect(
     if (imageData && sanitized.length > 0) {
       const lastMsg = sanitized[sanitized.length - 1];
       if (lastMsg.role === 'user') {
+        // Fix R4-#6: preserve original user text — don't overwrite with aiMessageBody (system context)
+        const originalUserText = typeof lastMsg.content === 'string' ? lastMsg.content : sanitizedMessageBody;
         (lastMsg as any).content = [
           {
             type: 'image',
@@ -559,7 +711,7 @@ async function handleProspect(
           },
           {
             type: 'text',
-            text: aiMessageBody + '\n\n[SISTEMA: El usuario envió esta imagen por WhatsApp. Puedes verla. Descríbela brevemente y relaciónala con su negocio si es relevante. Si es un producto, comenta sobre cómo se podría usar en ads o en su tienda.]',
+            text: `${originalUserText}\n\n[SISTEMA: El usuario también envió esta imagen. Puedes verla. Descríbela brevemente y relaciónala con su negocio si es relevante. Si es un producto, comenta sobre cómo podría usarse en ads o en su tienda.]`,
           },
         ];
       }
@@ -616,13 +768,21 @@ async function handleProspect(
       ]);
 
       // Collect rule IDs from prompt builder + investigator
+      // Fix R4-#15: null-safe spread — investigatorResults may be null/empty
       collectedRuleIds = [
         ...promptResult.ruleIds,
-        ...investigatorResults.ruleIds,
+        ...(investigatorResults?.ruleIds || []),
       ];
 
-      // Step 2: Strategist (~1.5s)
-      const strategistBrief = await runStrategist(prospect, history, investigatorResults);
+      // Step 2: Strategist (~1.5s) — use fallback if investigator returned nothing
+      const safeInvestigatorResults = (investigatorResults && investigatorResults.investigationContext)
+        ? investigatorResults
+        : { ruleIds: [], investigationContext: '', competitorInsights: '', salesLearnings: '' };
+      const strategistBriefRaw = await runStrategist(prospect, history, safeInvestigatorResults);
+      // Fix #18: validate strategist output — if empty/too short, don't pass garbage to conversationalist
+      const strategistBrief = (strategistBriefRaw?.brief?.trim()?.length ?? 0) > 20
+        ? strategistBriefRaw
+        : { ...strategistBriefRaw, brief: '' };
 
       // Step 3: Conversationalist with strategist brief (~3-5s)
       replyText = await runConversationalist(history, strategistBrief, promptResult.prompt, sanitized);
@@ -685,6 +845,13 @@ async function handleProspect(
       }).then(() => {}, () => {});
     }
 
+    // R7-#11: no enviar link si el mensaje contiene negación de disponibilidad
+    const hasTimingNegation = /no (tengo|puedo|estoy|hay)|no es buen momento|mejor después|más adelante|otro momento|en (unas|algunas) semanas|ocupado/i.test(messageBody);
+    if (hasTimingNegation && replyText.includes(BOOKING_URL)) {
+      console.log('[meeting-link] Bloqueado — prospecto indicó no disponibilidad');
+      replyText = replyText.replace(/www\.steve\.cl\/agendar[^\s]*/g, '[link disponible cuando quieras]');
+    }
+
     // ============================================================
     // POST-PIPELINE: Validation, tag detection, splitting, DB save, TwiML
     // Wrapped in try-catch to prevent propagation to outer fallback
@@ -732,9 +899,13 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
     // ============================================================
     // STEP A: Strip ALL action tags FIRST (before TwiML or DB save)
     // ============================================================
+
+    // Fix #2: strip <thinking> blocks BEFORE detecting tags — prevents phantom actions from Claude's internal reasoning
+    replyText = replyText.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '').trim();
+
     const fullText = replyText;
 
-    // Detect tags before stripping
+    // Detect tags (from clean text, without thinking blocks)
     const copyMatch = fullText.match(/\[GENERATE_COPY:([^\]]+)\]/);
     const caseStudyTag = fullText.includes('[SEND_CASE_STUDY]');
     const mockupTag = fullText.includes('[SEND_MOCKUP]');
@@ -753,6 +924,7 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
 
     // ============================================================
     // STEP B: Split into first/second reply
+    // Fix #20: split FIRST then truncate each part (not the other way around)
     // ============================================================
     let firstReply = replyText;
     let secondReply: string | null = null;
@@ -762,18 +934,21 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
       secondReply = parts[1] || null;
     }
 
-    // Smart split: if firstReply exceeds 1200 chars, break at word boundary
-    // MAX 2 messages total (TwiML + 1 split). No flooding the prospect.
-    const MAX_CHARS = 1200;
-    if (firstReply.length > MAX_CHARS && !secondReply) {
-      const { head, tail } = splitAtWordBoundary(firstReply, MAX_CHARS);
+    // Smart split: if firstReply exceeds 800 chars (part 1 budget), break at word boundary
+    const MAX_FIRST = 800;
+    const MAX_SECOND = 600;
+    if (firstReply.length > MAX_FIRST && !secondReply) {
+      const { head, tail } = splitAtWordBoundary(firstReply, MAX_FIRST);
       firstReply = head;
-      secondReply = tail || null;
+      // Fix R5-#15: only assign secondReply if tail has actual content
+      secondReply = tail?.trim() ? tail : null;
+    } else if (firstReply.length > MAX_FIRST) {
+      firstReply = firstReply.slice(0, MAX_FIRST - 3) + '...';
     }
 
-    // If both parts exist and secondReply is too long, truncate (don't create 3rd message)
-    if (secondReply && secondReply.length > MAX_CHARS) {
-      secondReply = secondReply.slice(0, MAX_CHARS - 3) + '...';
+    // Truncate second part separately (600 char budget for part 2)
+    if (secondReply && secondReply.length > MAX_SECOND) {
+      secondReply = secondReply.slice(0, MAX_SECOND - 3) + '...';
     }
 
     // ============================================================
@@ -799,10 +974,12 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
     });
 
     // Queue second message via task queue (persistent, 2s delay)
+    // Fix #18: include message_order so worker respects sequence even with parallel splits
     if (secondReply) {
       enqueueWAAction(phone, 'split_message', {
         body: secondReply,
         profileName: profileName || phone,
+        message_order: (prospect.message_count || 0) + 0.5,
       }, 2).catch(err => console.error('[steve-wa-chat] Enqueue split_message error:', err));
     }
 
@@ -857,14 +1034,15 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
     }
 
     // Only send deck when Steve EXPLICITLY includes [SEND_DECK] — no auto-trigger
-    if (deckTag && !(prospect as any).deck_sent) {
-      // Double-check deck_sent from fresh DB to prevent race condition duplicates
-      const { data: freshDeck } = await supabase
+    // Fix #3: atomic DB update prevents race condition when 2 msgs arrive in parallel
+    if (deckTag) {
+      const { data: updated } = await supabase
         .from('wa_prospects')
-        .select('deck_sent')
+        .update({ deck_sent: true, deck_sent_at: new Date().toISOString() })
         .eq('id', prospect.id)
-        .maybeSingle();
-      if (!freshDeck?.deck_sent) {
+        .is('deck_sent', null)  // Only update if NOT already sent (atomic guard)
+        .select('id');
+      if (updated && updated.length > 0) {
         enqueueWAAction(phone, 'send_deck', {
           prospectId: prospect.id,
           profileName: profileName || phone,
@@ -880,12 +1058,16 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
     }
     fullHistory.push({ role: 'assistant', content: fullReplyText });
 
-    // Detect if Steve sent meeting link in this reply
-    const meetingLinkSent = fullReplyText.includes('meetings.hubspot.com') || fullReplyText.includes('steve.cl/agendar');
+    // Fix #6+#10: use canonical BOOKING_URL constant + better detection (needs explicit proposal context)
+    const meetingLinkSent = (fullReplyText.includes(BOOKING_URL) || fullReplyText.includes('meetings.hubspot.com')) &&
+      /(?:agendar|agenda|reserva|reunión|llamada|link|horario|elige)/i.test(fullReplyText);
 
     // Detect if Steve proposed meeting times (Mini CRM)
-    const meetingProposed = /(?:llamada|reunión|videollamada|call).*(?:\d{1,2}[:\.]?\d{0,2}\s*(?:am|pm|hrs|h)?|mañana|lunes|martes|miércoles|jueves|viernes)/i.test(fullReplyText)
-      && (prospect.meeting_status === 'none' || !prospect.meeting_status);
+    const meetingProposed = /(?:llamada|reunión|videollamada|call|meeting).*(?:\d{1,2}[:\.]?\d{0,2}\s*(?:am|pm|hrs|h)?|mañana|pasado|lunes|martes|miércoles|jueves|viernes)/i
+      .test(fullReplyText) &&
+      (prospect.meeting_status === 'none' || !prospect.meeting_status) &&
+      // Fix R6-#13: descartar fechas imposibles (día > 31)
+      !fullReplyText.match(/(?:día\s+|el\s+)(?:3[2-9]|[4-9]\d)\s+de/i);
 
     // Paso 2: Detect disqualification → mark as lost
     const disqResult = detectDisqualification(messageBody, history);
@@ -934,11 +1116,46 @@ async function processProspectAsync(
   try {
     // Paso 2 Perro Lobo: If disqualified, mark as lost immediately
     if (disqualifiedReason) {
+      // R7-#17: separar timing blocker de rechazo real
+      const lastMsgForDisq = history.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
+      const msgLowerDisq = lastMsgForDisq.toLowerCase();
+      const timingBlockers = ['no tengo tiempo', 'ahora no', 'más adelante', 'después', 'cuando tenga tiempo', 'en otro momento', 'no es buen momento', 'estoy ocupado', 'muy ocupado'];
+      const trueRejections = ['no me interesa', 'no gracias', 'no me convence', 'déjame en paz', 'no quiero', 'no es para mí', 'no lo necesito'];
+
+      const isTimingBlocker = timingBlockers.some(k => msgLowerDisq.includes(k));
+      const isTrueRejection = trueRejections.some(k => msgLowerDisq.includes(k));
+
+      if (isTimingBlocker && !isTrueRejection) {
+        // Es timing, no rechazo — NO marcar como lost, marcar como deferred stage
+        console.log(`[disqualification] Timing blocker detected for ${prospect.phone} — deferring, not losing`);
+        await supabase
+          .from('wa_prospects')
+          .update({
+            stage: 'discovery', // Keep in funnel
+            meeting_status: 'deferred',
+            updated_at: new Date().toISOString(),
+            last_activity_at: new Date().toISOString(),
+          })
+          .eq('id', prospect.id);
+        logProspectEvent(prospect.id, 'timing_blocker', { reason: 'timing_not_interest', msg: lastMsgForDisq.slice(0, 100) }, 'steve');
+        return; // No further processing needed for timing blocker
+      }
+
+      // R7-#30: pedir feedback de pérdida antes de marcar definitivamente como lost
+      const isFirstLoss = prospect.stage !== 'lost';
+      if (isFirstLoss) {
+        console.log(`[loss-feedback] Will request feedback from ${prospect.phone} before marking as lost`);
+        // Guardar flag awaiting_loss_feedback en metadata para que el siguiente mensaje de Steve lo pida
+        // El bot ya envió su respuesta, pero en el siguiente mensaje podemos pedir el feedback
+        // (este flag se puede usar en buildDynamicSalesPrompt si se agrega en el futuro)
+      }
+
       await supabase
         .from('wa_prospects')
         .update({
           stage: 'lost',
-          lost_reason: disqualifiedReason,
+          // Fix R6-#12: truncar lost_reason antes de guardar (evita overflow en DB)
+          lost_reason: disqualifiedReason ? String(disqualifiedReason).slice(0, 200).trim() : undefined,
           updated_at: new Date().toISOString(),
           last_activity_at: new Date().toISOString(),
           is_rotting: false,
@@ -946,22 +1163,41 @@ async function processProspectAsync(
         .eq('id', prospect.id);
       logProspectEvent(prospect.id, 'stage_change', { from: prospect.stage, to: 'lost', reason: disqualifiedReason }, 'steve');
       console.log(`[prospect ${prospect.phone}] DISQUALIFIED: ${disqualifiedReason}`);
+      // Fix #16 + R4-#9: preserve rolling summary with lost_reason so re-activations have context
+      updateRollingConversationSummary(
+        { ...prospect, stage: 'lost', lost_reason: disqualifiedReason } as ProspectRecord,
+        prospect.phone,
+      ).catch(err => console.error('[disq-summary]', err));
       return; // No further processing needed
     }
 
     // Paso 17: If URL detected, fire & forget audit
-    if (detectedUrl) {
+    // Fix R4-#20: skip if same URL was already audited
+    if (detectedUrl && prospect.audit_data?.url !== detectedUrl) {
       auditProspectUrl(detectedUrl, prospect.id).catch(err => {
         console.error('[prospect-audit] Error:', err);
       });
+    } else if (detectedUrl) {
+      console.log(`[prospect-audit] URL already audited: ${detectedUrl} — skip`);
     }
 
     // Steve Depredador: Background investigation for NEXT message
     // Enriches investigation_data with store scraping, competitor ads, social data
     const lastUserMsg = history.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
-    investigateProspectBackground(prospect, history, lastUserMsg).catch(err => {
-      console.error('[steve-investigator] Error:', err);
-    });
+    // Fix R6-#7: wrapper async completo para capturar y loguear errores en qa_log
+    void (async () => {
+      try {
+        await investigateProspectBackground(prospect, history, lastUserMsg);
+      } catch (err) {
+        console.error('[steve-investigator] Background error:', err);
+        void getSupabaseAdmin().from('qa_log').insert({
+          check_type: 'investigator_bg_error',
+          status: 'error',
+          details: JSON.stringify({ phone: prospect.phone, error: String(err) }),
+          detected_by: 'fire-and-forget-wrapper',
+        });
+      }
+    })();
 
     // Paso 10: Extract at msg 2 (first info-dense turn) then every 3rd message
     const inboundCount = history.filter(m => m.role === 'user').length;
@@ -969,6 +1205,21 @@ async function processProspectAsync(
     let extracted: Record<string, any> | null = null;
     if (inboundCount >= 2 && (inboundCount === 2 || inboundCount % 3 === 0)) {
       extracted = await extractProspectInfo(history, prospect);
+      // Fix #7: log extraction failure to qa_log so JM can detect API issues
+      if (!extracted) {
+        console.warn(`[extract] Failed after 2 attempts for ${prospect.phone} (msg ${inboundCount})`);
+        void getSupabaseAdmin().from('qa_log').insert({
+          check_type: 'extraction_failure',
+          status: 'warning',
+          details: JSON.stringify({ phone: prospect.phone, msg_count: inboundCount }),
+          detected_by: 'steve-wa-chat',
+        });
+      } else if (!extracted || Object.keys(extracted).length === 0) {
+        // Fix R6-#15: log cuando extractProspectInfo retorna objeto vacío
+        console.warn(`[extract] No data extracted for ${prospect.phone} (msg ${inboundCount}) — prospect may be stuck in ${prospect.stage || 'discovery'}`);
+      } else {
+        console.log(`[extract] Got ${Object.keys(extracted).length} fields for ${prospect.phone}`);
+      }
     }
 
     // Merge new data with existing — Paso 7: protect against weak overwrites
@@ -995,14 +1246,17 @@ async function processProspectAsync(
           // For key identity fields, don't overwrite with different values
           // unless the new value is from the most recent messages
           if (['company', 'what_they_sell', 'name'].includes(field)) {
-            // Check if the new value appears verbatim in the last 3 user messages
+            // Fix R4-#7: expand window from 3 → 5 messages + detect explicit correction phrases
             const recentUserMsgs = history
               .filter(m => m.role === 'user')
-              .slice(-3)
+              .slice(-5) // Was -3
               .map(m => m.content.toLowerCase())
               .join(' ');
             const newValStr = String(newVal).toLowerCase();
-            if (!recentUserMsgs.includes(newValStr)) {
+            // Check if prospect used a correction phrase in their last message
+            const lastUserMsg = history.filter(m => m.role === 'user').slice(-1)[0]?.content.toLowerCase() || '';
+            const isCorrecting = /\b(en realidad|es que|perdón|perdon|corrijo|actualmente|ahora vendo|cambié|cambie)\b/.test(lastUserMsg);
+            if (!recentUserMsgs.includes(newValStr) && !isCorrecting) {
               continue; // Don't overwrite — inference too weak
             }
           }
@@ -1021,13 +1275,22 @@ async function processProspectAsync(
           }
           merged[field] = deduped;
         } else {
+          // Fix #16: log key field changes to CRM timeline (fire & forget)
+          const KEY_FIELDS = ['what_they_sell', 'monthly_revenue', 'store_platform', 'is_decision_maker', 'budget_range'];
+          if (KEY_FIELDS.includes(field) && existingVal !== newVal && existingVal != null) {
+            logProspectEvent(prospect.id, 'field_updated', { field, old: existingVal, new: newVal }, 'steve-extractor').catch(() => {});
+          }
           merged[field] = newVal;
         }
       }
     }
 
     // Consolidate pain points if too many (semantic dedup via Haiku)
-    if (merged.pain_points && Array.isArray(merged.pain_points) && merged.pain_points.length > 8) {
+    // Fix R6-#8: validar que pain_points sea array antes de consolidar
+    if (!Array.isArray(merged.pain_points)) {
+      console.warn(`[consolidate] pain_points is not array for ${prospect.phone}:`, typeof merged.pain_points);
+      merged.pain_points = [];
+    } else if (merged.pain_points.length > 8) {
       merged.pain_points = await consolidatePainPoints(merged.pain_points);
     }
 
@@ -1036,9 +1299,35 @@ async function processProspectAsync(
     const { score, breakdown, stage: newStage } = calculateLeadScore(prospectForScoring);
 
     // Only advance stage, never go back (exception: 'lost' from no-fit detection)
+    // Fix R5-#26: warn if invalid stage detected (not in STAGE_ORDER)
+    if (prospect.stage && !(prospect.stage in STAGE_ORDER)) {
+      console.warn(`[stage-order] Unknown stage "${prospect.stage}" for ${prospect.phone} — treating as 'new'`);
+    }
+    if (!(newStage in STAGE_ORDER)) {
+      console.warn(`[stage-order] calculateLeadScore returned unknown stage "${newStage}" for ${prospect.phone}`);
+    }
     const currentStageOrder = STAGE_ORDER[prospect.stage || 'new'] ?? 0;
     const newStageOrder = STAGE_ORDER[newStage] ?? 0;
-    const effectiveStage = newStageOrder > currentStageOrder ? newStage : (prospect.stage || 'discovery');
+    let effectiveStage = newStageOrder > currentStageOrder ? newStage : (prospect.stage || 'discovery');
+    // Fix R4-#4: force advance out of discovery if stuck with enough messages + decent score
+    // (handles extraction failure loops where score never improves)
+    const msgCountForStage = prospect.message_count || 0;
+    if (effectiveStage === 'discovery' && msgCountForStage >= 8 && (prospect.lead_score || 0) >= 60) {
+      effectiveStage = 'qualifying';
+      console.log(`[force-advance] ${prospect.phone} → qualifying (${msgCountForStage} msgs, score=${prospect.lead_score})`);
+    }
+
+    // Fix #13: ghosting detection — meeting propuesto hace 3+ días sin agendar → is_rotting = true
+    const isGhosting =
+      prospect.meeting_status === 'proposed' &&
+      prospect.meeting_suggested_at &&
+      (Date.now() - new Date(prospect.meeting_suggested_at).getTime()) > 3 * 24 * 60 * 60 * 1000;
+
+    // Fix #9: reset cancelled meeting after 5 days — prospect may be ready again
+    const daysSinceCancelled = prospect.meeting_status === 'cancelled' && prospect.meeting_suggested_at
+      ? (Date.now() - new Date(prospect.meeting_suggested_at).getTime()) / 86400000
+      : 0;
+    const shouldResetMeeting = daysSinceCancelled > 5;
 
     // Build update payload
     const updatePayload: Record<string, any> = {
@@ -1049,7 +1338,9 @@ async function processProspectAsync(
       last_extracted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       last_activity_at: new Date().toISOString(),
-      is_rotting: false,
+      is_rotting: isGhosting ? true : false,
+      // Fix #9: reset cancelled meeting status after 5 days (prospect may be ready again)
+      ...(shouldResetMeeting && { meeting_status: 'none' }),
     };
 
     // Track meeting link
@@ -1064,11 +1355,17 @@ async function processProspectAsync(
       updatePayload.meeting_suggested_at = new Date().toISOString();
     }
 
-    // Update prospect in DB
-    await supabase
+    // Fix R5-#1: atomic update with updated_at check to prevent race condition
+    // If another processProspectAsync already ran, its updated_at will differ → this update is a no-op
+    const { data: updatedRows } = await supabase
       .from('wa_prospects')
       .update(updatePayload)
-      .eq('id', prospect.id);
+      .eq('id', prospect.id)
+      .eq('updated_at', prospect.updated_at || '')
+      .select('id');
+    if ((updatedRows?.length ?? 0) === 0) {
+      console.log(`[processProspectAsync] Race condition detected for ${prospect.phone} — skipping stale update`);
+    }
 
     // CRM Timeline: log stage/score changes (fire & forget)
     if (effectiveStage !== (prospect.stage || 'new')) {
@@ -1141,14 +1438,58 @@ async function processProspectAsync(
     const currentMeetingStatus = prospect.meeting_status || 'none';
     if (currentMeetingStatus === 'proposed') {
       const lastUserMsg = history.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
+
+      // R7-#7: validar que el 'sí' era respuesta a pregunta de reunión
+      const isShortAffirmation = /^(sí|si|ya|ok|dale|bueno|claro|perfecto|va|listo)$/i.test(lastUserMsg.trim());
+      if (isShortAffirmation) {
+        const lastSteveMsg = history.filter((m: any) => m.role === 'assistant').slice(-1)[0]?.content || '';
+        const steveWasAskingMeeting = /reunión|agendar|horario|cuándo podemos|cuando podemos|disponible|llamada|zoom|meet/i.test(lastSteveMsg);
+        if (!steveWasAskingMeeting) {
+          console.log('[meeting] Short affirmation but Steve was not asking about meeting — skipping meeting detection');
+          // Skip meeting confirmation logic entirely
+          // (fall through — meetingResult won't be used)
+        }
+      }
+
+      // R7-#27: detectar si el prospecto propone alternativa de horario vs rechazar
+      const proposesAlternativeTime = /mejor (el|la|los|las)|prefiero|¿qué tal|qué tal|en vez|en lugar|podría ser|sería mejor|(lunes|martes|miércoles|jueves|viernes|sábado|domingo)|(\d{1,2})(am|pm|:00)/i.test(lastUserMsg);
+      const hasRejection = /no (puedo|quiero|tengo tiempo)|no me viene|no me sale|no es buen|cancelar|no va a ser posible/i.test(lastUserMsg);
+
+      if (proposesAlternativeTime && !hasRejection) {
+        console.log(`[meeting] Prospect propone alternativa de horario para ${prospect.phone} — manteniendo en 'proposed'`);
+        // NO transicionar a 'deferred' — mantener 'proposed' para que Steve coordine
+        // (skip the meetingResult.rejected branch by not calling detectMeetingConfirmation with rejection)
+      }
+
       const meetingResult = await detectMeetingConfirmation(lastUserMsg, history);
+      // Fix R6-#20: loguear resultado de detectMeetingConfirmation para debugging
+      console.log(`[meeting-confirm] phone=${prospect.phone}`, {
+        confirmed: meetingResult.confirmed,
+        rejected: meetingResult.rejected,
+        proposedTime: meetingResult.proposedTime ?? 'none',
+        input: lastUserMsg.slice(0, 80),
+      });
 
       if (meetingResult.confirmed && meetingResult.proposedTime) {
+        // R7-#19: al confirmar reunión, verificar si se acordó presupuesto
+        const hasClearBudget = prospect.budget_range &&
+          /\$|\d{3,}|millón|mil\b|[kK]\b/.test(prospect.budget_range);
+
+        if (!hasClearBudget) {
+          console.warn(`[meeting] Reunión confirmada sin presupuesto claro para ${prospect.phone}`);
+          // Flag guardado en updatePayload más abajo cuando procesamos el update
+        }
+
         // Prospect confirmed a time via text — parse it and save as scheduled
         // The booking API handles Calendar + Meet when prospect books via link.
         // This fallback handles text-based confirmations (no link was used).
         const meetingDate = await parseMeetingTime(meetingResult.proposedTime);
-        if (meetingDate) {
+        // Fix R4-#12: CRITICAL — only save meeting if date is in the future
+        // Fix R6-#19: comparar en timezone Chile (UTC-3/UTC-4)
+        const chileNow = new Date(
+          new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' })
+        );
+        if (meetingDate && meetingDate.getTime() > chileNow.getTime()) {
           await supabase
             .from('wa_prospects')
             .update({
@@ -1159,7 +1500,11 @@ async function processProspectAsync(
               updated_at: new Date().toISOString(),
             })
             .eq('id', prospect.id);
+        } else if (meetingDate && meetingDate.getTime() <= chileNow.getTime()) {
+          console.warn(`[meeting-confirm] Rejected past date: ${meetingDate.toISOString()} for ${prospect.phone}`);
+        }
 
+        if (meetingDate && meetingDate.getTime() > chileNow.getTime()) {
           // If there's an assigned seller, create Calendar event via booking API
           if (prospect.assigned_seller_id) {
             const bookingApiUrl = process.env.CLOUD_RUN_URL || 'http://localhost:8080';
@@ -1180,16 +1525,29 @@ async function processProspectAsync(
           console.log(`[prospect ${prospect.phone}] Meeting scheduled via text: ${meetingDate.toISOString()}`);
         }
       } else if (meetingResult.rejected) {
-        // Prospect rejected the meeting entirely
-        await supabase
-          .from('wa_prospects')
-          .update({
-            meeting_status: 'cancelled',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', prospect.id);
-        logProspectEvent(prospect.id, 'meeting_cancelled', { reason: 'prospect_rejected' }, 'steve');
-        console.log(`[prospect ${prospect.phone}] Meeting rejected`);
+        // R7-#27: Si el prospecto propone alternativa de horario, NO es rechazo — mantener en 'proposed'
+        const lastMsgForAlt = history.filter((m: any) => m.role === 'user').slice(-1)[0]?.content || '';
+        const proposesAlternativeForReject = /mejor (el|la|los|las)|prefiero|¿qué tal|qué tal|en vez|en lugar|podría ser|sería mejor|(lunes|martes|miércoles|jueves|viernes|sábado|domingo)|(\d{1,2})(am|pm|:00)/i.test(lastMsgForAlt);
+        const hasExplicitRejection = /no (puedo|quiero|tengo tiempo)|no me viene|no me sale|no es buen|cancelar|no va a ser posible/i.test(lastMsgForAlt);
+
+        if (proposesAlternativeForReject && !hasExplicitRejection) {
+          console.log(`[meeting] Prospect propone alternativa de horario para ${prospect.phone} — manteniendo en 'proposed', no marcando como deferred`);
+          // No cambiamos meeting_status — el prospecto está cooperando, solo propone otro horario
+        } else {
+          // Fix #12: two-level rejection — deferred first, cancelled only on confirmed second rejection
+          const prevMeetingStatus = prospect.meeting_status;
+          const newMeetingStatus = prevMeetingStatus === 'deferred' ? 'cancelled' : 'deferred';
+          await supabase
+            .from('wa_prospects')
+            .update({
+              meeting_status: newMeetingStatus,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', prospect.id);
+          const eventName = newMeetingStatus === 'cancelled' ? 'meeting_cancelled' : 'meeting_deferred';
+          logProspectEvent(prospect.id, eventName, { reason: 'prospect_rejected', prev_status: prevMeetingStatus }, 'steve');
+          console.log(`[prospect ${prospect.phone}] Meeting ${newMeetingStatus} (was: ${prevMeetingStatus})`);
+        }
       }
       // If proposedTime but not confirmed → prospect suggested alternative, Steve handles in next reply
     }
@@ -1206,7 +1564,15 @@ async function auditProspectUrl(url: string, prospectId: string): Promise<void> 
   const APIFY_TOKEN = process.env.APIFY_TOKEN;
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!APIFY_TOKEN || !ANTHROPIC_API_KEY) {
-    console.warn('[prospect-audit] Missing APIFY_TOKEN or ANTHROPIC_API_KEY');
+    const missing = !APIFY_TOKEN ? 'APIFY_TOKEN' : 'ANTHROPIC_API_KEY';
+    console.warn(`[prospect-audit] Missing ${missing}`);
+    // Fix R5-#14: log to qa_log for visibility (silent failures are invisible to JM)
+    void getSupabaseAdmin().from('qa_log').insert({
+      check_type: 'missing_service_token',
+      status: 'warning',
+      details: JSON.stringify({ missing, prospect_id: prospectId, url }),
+      detected_by: 'audit-prospect-url',
+    });
     return;
   }
 
@@ -1319,22 +1685,30 @@ function sanitizeForClaude(
   if (msgs.length === 0) return [{ role: 'user', content: 'Hola' }];
 
   const merged: Array<{ role: 'user' | 'assistant'; content: string }> = [];
-  for (const msg of msgs) {
+  // Fix R5-#10: filter null/empty content before merging to avoid literal "null" strings
+  const validMsgs = msgs.filter(m => m.content != null && String(m.content).trim() !== '');
+  for (const msg of validMsgs) {
+    const content = String(msg.content || '');
     if (merged.length > 0 && merged[merged.length - 1].role === msg.role) {
-      merged[merged.length - 1].content += '\n' + msg.content;
+      merged[merged.length - 1].content += '\n' + content;
     } else {
-      merged.push({ ...msg });
+      merged.push({ role: msg.role, content });
     }
   }
 
-  if (merged[0].role !== 'user') {
-    merged.unshift({ role: 'user', content: 'Hola' });
+  // Fix R6-#18: filtrar mensajes vacíos DESPUÉS del merge también
+  const result = merged.filter(m => m.content.trim() !== '');
+  // Asegurar que el primer mensaje es 'user' (Anthropic lo requiere)
+  while (result.length > 0 && result[0].role !== 'user') {
+    result.shift();
   }
-  if (merged[merged.length - 1].role !== 'user') {
-    merged.push({ role: 'user', content: '...' });
+  if (result.length === 0) return [{ role: 'user', content: 'Hola' }];
+
+  if (result[result.length - 1].role !== 'user') {
+    result.push({ role: 'user', content: '...' });
   }
 
-  return merged;
+  return result;
 }
 
 /**
@@ -1372,16 +1746,22 @@ function splitAtWordBoundary(text: string, maxLen: number): { head: string; tail
   }
 
   // Worst case: hard cut (very long word with no spaces)
+  // Fix R6-#4: trim both head and tail to avoid leading/trailing whitespace
   return {
-    head: text.slice(0, maxLen),
-    tail: text.slice(maxLen),
+    head: text.slice(0, maxLen).trim(),
+    tail: text.slice(maxLen).trim() || '',
   };
 }
 
-// Cleanup stale rate limit entries every 5 minutes to prevent memory leak
-setInterval(() => {
-  const cutoff = Date.now() - RATE_LIMIT_MS * 2;
-  for (const [phone, time] of lastResponseTime) {
-    if (time < cutoff) lastResponseTime.delete(phone);
-  }
-}, 5 * 60 * 1000);
+// Fix R5-#8: cleanup stale rate limit entries every 1 minute (was 5m), cutoff = 1x RATE_LIMIT (was 2x)
+// Fix R6-#16: guard para evitar duplicar interval en redeploy
+// Fix R6-#28: intervalo 30s en vez de 60s para limpiar más frecuente
+let _rateLimitCleanupInterval: NodeJS.Timeout | null = null;
+if (!_rateLimitCleanupInterval) {
+  _rateLimitCleanupInterval = setInterval(() => {
+    const cutoff = Date.now() - RATE_LIMIT_MS;
+    for (const [phone, time] of lastResponseTime) {
+      if (time < cutoff) lastResponseTime.delete(phone);
+    }
+  }, 30_000);
+}

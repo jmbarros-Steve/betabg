@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { logProspectEvent } from '../../lib/prospect-event-logger.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { getUserClientIds, verifyProspectOwnership } from '../../lib/user-scoping.js';
 
 /** CRUD for sales tasks: list, create, update, complete */
 export async function salesTasksCrud(c: Context) {
@@ -10,15 +11,31 @@ export async function salesTasksCrud(c: Context) {
     const { action } = body;
     const supabase = getSupabaseAdmin();
     const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Multi-tenant scoping
+    const { isSuperAdmin, clientIds } = await getUserClientIds(supabase, user.id);
 
     switch (action) {
       case 'list': {
         const { prospect_id, status, assigned_to } = body;
+
+        // If filtering by prospect, verify ownership
+        if (prospect_id && !isSuperAdmin) {
+          const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
+          if (!allowed) return c.json({ error: 'Forbidden' }, 403);
+        }
+
         let query = supabase.from('sales_tasks').select('*, wa_prospects(id, phone, name, profile_name, company, stage)');
 
         if (prospect_id) query = query.eq('prospect_id', prospect_id);
         if (status) query = query.eq('status', status);
         if (assigned_to) query = query.eq('assigned_to', assigned_to);
+
+        // Non-admin: only see tasks assigned to them or linked to their prospects
+        if (!isSuperAdmin && !prospect_id) {
+          query = query.eq('assigned_to', user.id);
+        }
 
         const { data, error } = await query.order('created_at', { ascending: false });
         if (error) return c.json({ error: error.message }, 500);
@@ -29,11 +46,17 @@ export async function salesTasksCrud(c: Context) {
         const { prospect_id, title, description, task_type, due_at } = body;
         if (!title) return c.json({ error: 'title required' }, 400);
 
+        // Verify ownership of the prospect if one is specified
+        if (prospect_id && !isSuperAdmin) {
+          const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
+          if (!allowed) return c.json({ error: 'Forbidden' }, 403);
+        }
+
         const { data, error } = await supabase
           .from('sales_tasks')
           .insert({
             prospect_id: prospect_id || null,
-            assigned_to: user?.id || null,
+            assigned_to: user.id,
             title,
             description: description || null,
             task_type: task_type || 'manual',
@@ -45,7 +68,7 @@ export async function salesTasksCrud(c: Context) {
         if (error) return c.json({ error: error.message }, 500);
 
         if (prospect_id) {
-          logProspectEvent(prospect_id, 'task_created', { task_id: data.id, title }, `admin:${user?.id || 'unknown'}`);
+          logProspectEvent(prospect_id, 'task_created', { task_id: data.id, title }, `admin:${user.id}`);
         }
 
         return c.json({ task: data });
@@ -54,6 +77,16 @@ export async function salesTasksCrud(c: Context) {
       case 'update': {
         const { task_id, title, description, status, due_at } = body;
         if (!task_id) return c.json({ error: 'task_id required' }, 400);
+
+        // Verify the user owns this task (or is super admin)
+        if (!isSuperAdmin) {
+          const { data: task } = await supabase
+            .from('sales_tasks')
+            .select('assigned_to')
+            .eq('id', task_id)
+            .maybeSingle();
+          if (!task || task.assigned_to !== user.id) return c.json({ error: 'Forbidden' }, 403);
+        }
 
         const updatePayload: Record<string, any> = {};
         if (title !== undefined) updatePayload.title = title;
@@ -80,6 +113,16 @@ export async function salesTasksCrud(c: Context) {
         const { task_id } = body;
         if (!task_id) return c.json({ error: 'task_id required' }, 400);
 
+        // Verify the user owns this task (or is super admin)
+        if (!isSuperAdmin) {
+          const { data: task } = await supabase
+            .from('sales_tasks')
+            .select('assigned_to')
+            .eq('id', task_id)
+            .maybeSingle();
+          if (!task || task.assigned_to !== user.id) return c.json({ error: 'Forbidden' }, 403);
+        }
+
         const { data, error } = await supabase
           .from('sales_tasks')
           .update({ status: 'completed', completed_at: new Date().toISOString() })
@@ -105,11 +148,20 @@ export async function salesTasksAutoGenerate(c: Context) {
     const { prospect_id } = await c.req.json();
     const supabase = getSupabaseAdmin();
     const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Multi-tenant scoping
+    const { isSuperAdmin, clientIds } = await getUserClientIds(supabase, user.id);
 
     // If prospect_id given, generate for one; else for all active prospects
     let prospects: any[];
 
     if (prospect_id) {
+      // Verify ownership if not super admin
+      if (!isSuperAdmin) {
+        const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
+        if (!allowed) return c.json({ error: 'Forbidden' }, 403);
+      }
       const data = await safeQuerySingleOrDefault<any>(
         supabase.from('wa_prospects').select('id, stage, lead_score, name, phone, meeting_status').eq('id', prospect_id).single(),
         null,
@@ -117,16 +169,20 @@ export async function salesTasksAutoGenerate(c: Context) {
       );
       prospects = data ? [data] : [];
     } else {
-      const data = await safeQueryOrDefault<any>(
-        supabase
-          .from('wa_prospects')
-          .select('id, stage, lead_score, name, phone, meeting_status')
-          .not('stage', 'in', '(converted,lost)')
-          .order('updated_at', { ascending: false })
-          .limit(50),
-        [],
-        'salesTasks.getActiveProspects',
-      );
+      let query = supabase
+        .from('wa_prospects')
+        .select('id, stage, lead_score, name, phone, meeting_status')
+        .not('stage', 'in', '(converted,lost)')
+        .order('updated_at', { ascending: false })
+        .limit(50);
+
+      // Non-admin: only auto-generate for their own prospects
+      if (!isSuperAdmin) {
+        if (clientIds.length === 0) return c.json({ created: 0, prospects_evaluated: 0 });
+        query = query.in('converted_client_id', clientIds);
+      }
+
+      const data = await safeQueryOrDefault<any>(query, [], 'salesTasks.getActiveProspects');
       prospects = data || [];
     }
 

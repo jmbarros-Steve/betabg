@@ -1,4 +1,5 @@
 import { Context } from 'hono';
+import { randomBytes } from 'crypto';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
@@ -16,7 +17,12 @@ export async function adminCreateClient(c: Context) {
   const body = await c.req.json();
   const { secret, action } = body;
 
-  if (secret !== 'setup-jardin-eva-2026') {
+  const adminSecret = process.env.ADMIN_API_SECRET || process.env.CRON_SECRET;
+  if (!adminSecret) {
+    return c.json({ error: 'Server misconfigured' }, 500);
+  }
+
+  if (secret !== adminSecret) {
     return c.json({ error: 'Invalid secret' }, 403);
   }
 
@@ -269,7 +275,7 @@ export async function adminCreateClient(c: Context) {
 
   if (action === 'reset_password') {
     const userId = '9361e4eb-e94c-4248-adcf-5ac2457c5298';
-    const newPassword = body.password || 'Jardin2026';
+    const newPassword = body.password || `Admin${randomBytes(6).toString('hex')}!`;
 
     const res = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
       method: 'PUT',

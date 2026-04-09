@@ -445,14 +445,20 @@ export async function syncMetaMetrics(c: Context) {
       }
     }
 
-    // Clean up stale metrics from previously connected ad accounts
+    // Clean up stale metrics from the sync window only (last 90 days).
+    // Without a date range guard this would delete ALL historical metrics
+    // outside the current 30-day sync window, wiping months of data.
     const syncedDates = [...new Set(metricsToUpsert.map(m => m.metric_date))];
-    const syncedTypes = [...new Set(metricsToUpsert.map(m => m.metric_type))];
     if (syncedDates.length > 0) {
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      const cleanupSince = formatDate(ninetyDaysAgo);
+
       const { error: cleanupError } = await supabase
         .from('platform_metrics')
         .delete()
         .eq('connection_id', connection_id)
+        .gte('metric_date', cleanupSince)
         .not('metric_date', 'in', `(${syncedDates.join(',')})`);
       if (cleanupError) console.error('Stale metric cleanup error:', cleanupError);
     }

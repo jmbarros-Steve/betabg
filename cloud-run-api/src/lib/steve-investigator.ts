@@ -54,7 +54,8 @@ export async function investigateProspectBackground(
 
       if (storeUrl && APIFY_TOKEN) {
         try {
-          const storeData = await scrapeStoreProducts(storeUrl, APIFY_TOKEN);
+          // Fix R6-#29: normalizar URL antes de scrapear (evita double-protocol)
+          const storeData = await scrapeStoreProducts(normalizeUrl(storeUrl), APIFY_TOKEN);
           if (storeData) {
             updates.store = {
               ...currentInv.store,
@@ -147,6 +148,21 @@ export async function investigateProspectBackground(
   } catch (err) {
     console.error('[steve-investigator] Fatal error:', err);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers — URL normalization
+// ---------------------------------------------------------------------------
+
+/**
+ * Fix R6-#29: eliminar double-protocol si existe y asegurar https:// prefix
+ */
+function normalizeUrl(url: string): string {
+  if (!url) return url;
+  // Fix R6-#29: eliminar double-protocol si existe
+  url = url.replace(/^https?:\/\/https?:\/\//i, 'https://');
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  return url.trim().replace(/\/$/, '');
 }
 
 // ---------------------------------------------------------------------------

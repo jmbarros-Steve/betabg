@@ -91,36 +91,38 @@ function aggregateMetric(
   metric: string
 ): number {
   if (rows.length === 0) return 0;
-  switch (metric) {
-    case 'SPEND':
+  // Normalize to lowercase to match execute-meta-rules.ts convention
+  const m = metric.toLowerCase();
+  switch (m) {
+    case 'spend':
       return rows.reduce((s, r) => s + (Number(r.spend) || 0), 0);
-    case 'IMPRESSIONS':
+    case 'impressions':
       return rows.reduce((s, r) => s + (Number(r.impressions) || 0), 0);
-    case 'CLICKS':
+    case 'clicks':
       return rows.reduce((s, r) => s + (Number(r.clicks) || 0), 0);
-    case 'CONVERSIONS':
+    case 'conversions':
       return rows.reduce((s, r) => s + (Number(r.conversions) || 0), 0);
-    case 'CPA': {
+    case 'cpa': {
       const spend = rows.reduce((s, r) => s + (Number(r.spend) || 0), 0);
       const conv = rows.reduce((s, r) => s + (Number(r.conversions) || 0), 0);
       return conv > 0 ? spend / conv : 0;
     }
-    case 'ROAS': {
+    case 'roas': {
       const sp = rows.reduce((s, r) => s + (Number(r.spend) || 0), 0);
       const rev = rows.reduce((s, r) => s + (Number(r.conversion_value) || 0), 0);
       return sp > 0 ? rev / sp : 0;
     }
-    case 'CTR': {
+    case 'ctr': {
       const imp = rows.reduce((s, r) => s + (Number(r.impressions) || 0), 0);
       const clk = rows.reduce((s, r) => s + (Number(r.clicks) || 0), 0);
       return imp > 0 ? (clk / imp) * 100 : 0;
     }
-    case 'CPM': {
+    case 'cpm': {
       const sp2 = rows.reduce((s, r) => s + (Number(r.spend) || 0), 0);
       const imp2 = rows.reduce((s, r) => s + (Number(r.impressions) || 0), 0);
       return imp2 > 0 ? (sp2 / imp2) * 1000 : 0;
     }
-    case 'FREQUENCY': {
+    case 'frequency': {
       // campaign_metrics does not store reach; approximate frequency from
       // the pre-computed cpm and cpc fields if available, or return 0.
       // Without reach data, frequency rules cannot be accurately evaluated.

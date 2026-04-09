@@ -71,35 +71,49 @@ Responde SOLO el JSON.`,
     return 'No entendí la instrucción. ¿Puedes ser más específico?';
   }
 
-  // Get next check_number
-  const maxCheck = await safeQuerySingleOrDefault<{ check_number: number }>(
-    supabase
-      .from('chino_routine')
-      .select('check_number')
-      .order('check_number', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    null,
-    'chinoInstruction.getMaxCheckNumber',
-  );
+  // Get next check_number with retry logic to handle concurrent inserts
+  let nextNumber = 0;
+  let insertError: any = null;
 
-  const nextNumber = (maxCheck?.check_number || 50) + 1;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const maxCheck = await safeQuerySingleOrDefault<{ check_number: number }>(
+      supabase
+        .from('chino_routine')
+        .select('check_number')
+        .order('check_number', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      null,
+      'chinoInstruction.getMaxCheckNumber',
+    );
 
-  // Insert the new check
-  const { error } = await supabase.from('chino_routine').insert({
-    check_number: nextNumber,
-    description: newCheck.description || message,
-    check_type: newCheck.check_type || 'data_quality',
-    platform: newCheck.platform || 'all',
-    severity: newCheck.severity || 'medium',
-    check_config: newCheck.check_config || {},
-    is_active: true,
-    consecutive_fails: 0,
-  });
+    nextNumber = (maxCheck?.check_number || 50) + 1;
 
-  if (error) {
-    console.error('[chino/instruction] Insert failed:', error.message);
-    return `Error al crear check: ${error.message}`;
+    const { error } = await supabase.from('chino_routine').insert({
+      check_number: nextNumber,
+      description: newCheck.description || message,
+      check_type: newCheck.check_type || 'data_quality',
+      platform: newCheck.platform || 'all',
+      severity: newCheck.severity || 'medium',
+      check_config: newCheck.check_config || {},
+      is_active: true,
+      consecutive_fails: 0,
+    });
+
+    if (!error) {
+      insertError = null;
+      break; // success
+    }
+
+    console.warn(`[chino/instruction] Insert attempt ${attempt + 1} failed (check_number=${nextNumber}): ${error.message}`);
+    insertError = error;
+
+    if (attempt === 2) break; // give up after 3 tries
+  }
+
+  if (insertError) {
+    console.error('[chino/instruction] Insert failed after 3 attempts:', insertError.message);
+    return `Error al crear check: ${insertError.message}`;
   }
 
   console.log(`[chino/instruction] Created check #${nextNumber}: ${newCheck.description}`);

@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { checkRateLimit } from '../../lib/rate-limiter.js';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -69,6 +70,35 @@ export async function steveStrategy(c: Context) {
   }
 
   const supabase = getSupabaseAdmin();
+
+  // Bug 1 fix: Verify client ownership
+  const user = c.get('user');
+  if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+  const [{ data: clientCheck }, { data: roleCheck }] = await Promise.all([
+    supabase
+      .from('clients')
+      .select('id')
+      .eq('id', client_id)
+      .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+      .maybeSingle(),
+    supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'super_admin')
+      .maybeSingle(),
+  ]);
+
+  if (!clientCheck && !roleCheck) {
+    return c.json({ error: 'Access denied' }, 403);
+  }
+
+  // Bug 2 fix: Rate limiting
+  const rl = checkRateLimit(client_id, 'steve-strategy');
+  if (!rl.allowed) {
+    return c.json({ error: `Rate limited. Retry in ${rl.retryAfter} seconds.` }, 429);
+  }
 
   // Detect relevant categories from last user message
   const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
@@ -173,7 +203,11 @@ ${clientContext}${knowledgeBlock}`;
       model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       system: systemPrompt,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      // Bug 3 fix: Sanitize messages — truncate to last 20 and cap content length
+      messages: messages.slice(-20).map(m => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: typeof m.content === 'string' ? m.content.slice(0, 10000) : '',
+      })),
     }),
   });
 

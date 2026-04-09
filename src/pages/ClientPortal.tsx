@@ -289,7 +289,17 @@ export default function ClientPortal() {
   }
 
   if (!user || (!displayClient && !isAdminView)) {
-    return null;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">No se encontro tu cuenta</h2>
+          <p className="text-muted-foreground mb-4">
+            Contacta a soporte para configurar tu acceso.
+          </p>
+          <Button onClick={() => navigate('/auth')}>Volver al login</Button>
+        </div>
+      </div>
+    );
   }
 
     // Onboarding removed

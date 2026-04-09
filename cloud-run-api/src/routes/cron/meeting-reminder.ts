@@ -15,8 +15,9 @@ import { safeQuery } from '../../lib/safe-supabase.js';
  * Cron: 0,30 * * * * (every 30 min)
  */
 export async function meetingReminder(c: Context) {
-  const cronSecret = c.req.header('X-Cron-Secret');
-  if (cronSecret !== process.env.CRON_SECRET) {
+  const cronSecret = c.req.header('X-Cron-Secret')?.trim();
+  const expected = process.env.CRON_SECRET;
+  if (!expected || cronSecret !== expected) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

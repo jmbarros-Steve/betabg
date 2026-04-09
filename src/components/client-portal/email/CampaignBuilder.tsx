@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { callApi } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
@@ -31,6 +32,7 @@ import type { Campaign, CampaignBuilderProps } from './campaign-builder/types';
 import { CAMPAIGN_TYPES, GMAIL_CLIP_LIMIT } from './campaign-builder/constants';
 
 export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
+  const { user } = useAuth();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -302,8 +304,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     return { html, design };
   };
 
-  const handleSaveCampaign = async () => {
-    if (!editingCampaign?.name) { toast.error('Nombre es requerido'); return; }
+  const handleSaveCampaign = async (): Promise<string | null> => {
+    if (!editingCampaign?.name) { toast.error('Nombre es requerido'); return null; }
 
     let htmlContent = editingCampaign.html_content || '';
     let savedDesign = designJson;
@@ -319,7 +321,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     const strippedHtml = htmlContent.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim();
     if (!strippedHtml && !savedDesign) {
       toast.error('El email está vacío. Diseña el contenido antes de guardar.');
-      return;
+      return null;
     }
 
     const action = editingCampaign.id ? 'update' : 'create';
@@ -344,17 +346,17 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       });
       data = res.data;
       const { error } = res;
-      if (error) { toast.error(error); return; }
+      if (error) { toast.error(error); return null; }
     } catch (err: any) {
       console.error('[SteveMail] handleSaveCampaign callApi failed:', err);
       toast.error('Error al guardar la campaña. Inténtalo de nuevo.');
-      return;
+      return null;
     }
 
     // Handle concurrency conflict
     if (data?.conflict) {
       toast.error('Otro usuario modificó esta campaña. Recarga para ver los cambios.');
-      return;
+      return null;
     }
 
     toast.success(action === 'create' ? 'Campaña creada' : 'Campaña guardada');
@@ -365,12 +367,15 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       lastKnownUpdatedAt.current = data.campaign.updated_at;
     }
 
+    const campaignId = data?.campaign?.id || editingCampaign.id || null;
+
     // If new, update the editing campaign ID
     if (!editingCampaign.id && data?.campaign?.id) {
       setEditingCampaign(prev => ({ ...prev, id: data.campaign.id }));
     }
 
     loadCampaigns();
+    return campaignId;
   };
 
   const confirmSend = async () => {
@@ -418,10 +423,11 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     // CRITERIO passed — proceed with send/schedule
     if (sendMode === 'schedule') {
       if (!scheduleDate) { toast.error('Selecciona una fecha'); return; }
-      await handleSaveCampaign();
-      if (!editingCampaign?.id) { toast.error('Guarda la campaña primero'); return; }
+      const savedId = await handleSaveCampaign();
+      const campaignId = savedId || editingCampaign?.id;
+      if (!campaignId) { toast.error('Guarda la campaña primero'); return; }
       const { error } = await callApi('manage-email-campaigns', {
-        body: { action: 'schedule', client_id: clientId, campaign_id: editingCampaign.id, scheduled_at: scheduleDate },
+        body: { action: 'schedule', client_id: clientId, campaign_id: campaignId, scheduled_at: scheduleDate },
       });
       if (error) { toast.error(error); return; }
       toast.success('Campaña programada');
@@ -432,8 +438,9 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }
 
     // Send now
-    await handleSaveCampaign();
-    if (!editingCampaign?.id) { toast.error('Guarda la campaña primero'); return; }
+    const savedId = await handleSaveCampaign();
+    const campaignId = savedId || editingCampaign?.id;
+    if (!campaignId) { toast.error('Guarda la campaña primero'); return; }
     setShowSendDialog(false);
 
     setSending(true);
@@ -446,7 +453,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       } : undefined;
 
       const { data, error } = await callApi<any>('manage-email-campaigns', {
-        body: { action: 'send', client_id: clientId, campaign_id: editingCampaign.id, ab_test: abConfig },
+        body: { action: 'send', client_id: clientId, campaign_id: campaignId, ab_test: abConfig },
       });
       if (error) { toast.error(error); return; }
       const msg = data?.ab_test
@@ -468,10 +475,12 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       const htmlToSend = freshHtml || editingCampaign?.html_content || '';
       if (!htmlToSend) { toast.error('Diseña el email primero'); setSendingTest(false); return; }
       await handleSaveCampaign();
+      const testRecipient = user?.email || '';
+      if (!testRecipient) { toast.error('No se pudo obtener tu email. Inicia sesión de nuevo.'); setSendingTest(false); return; }
       const { error } = await callApi<any>('send-email', {
         body: {
           action: 'send-test',
-          to: editingCampaign?.from_email || 'noreply@steve.cl',
+          to: testRecipient,
           subject: `[TEST] ${editingCampaign?.subject || 'Sin asunto'}`,
           html_content: htmlToSend,
           from_email: editingCampaign?.from_email || 'noreply@steve.cl',
@@ -480,7 +489,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         },
       });
       if (error) { toast.error(error); return; }
-      toast.success('Email de prueba enviado a ' + (editingCampaign?.from_email || 'noreply@steve.cl'));
+      toast.success('Email de prueba enviado a ' + testRecipient);
     } catch {
       toast.error('Error enviando test');
     } finally {
@@ -1506,8 +1515,9 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                     size="lg"
                     className="px-8"
                     onClick={async () => {
-                      await handleSaveCampaign();
-                      if (editingCampaign?.id) {
+                      const savedId = await handleSaveCampaign();
+                      const cId = savedId || editingCampaign?.id;
+                      if (cId) {
                         setSendMode('now');
                         setShowSendDialog(true);
                       } else {

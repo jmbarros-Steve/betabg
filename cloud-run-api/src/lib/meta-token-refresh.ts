@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from './supabase.js';
 import { safeQuerySingleOrDefault } from './safe-supabase.js';
+import { getTokenForConnection } from './resolve-meta-token.js';
 
 const META_API_VERSION = 'v21.0';
 const REFRESH_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
@@ -60,17 +61,16 @@ export async function getValidMetaToken(connectionId: string): Promise<string | 
 
   const { data: conn, error } = await supabase
     .from('platform_connections')
-    .select('id, access_token_encrypted, token_expires_at')
+    .select('id, access_token_encrypted, token_expires_at, connection_type')
     .eq('id', connectionId)
     .eq('platform', 'meta')
     .single();
 
-  if (error || !conn?.access_token_encrypted) return null;
+  if (error || !conn) return null;
 
-  const { data: decryptedToken, error: decryptError } = await supabase
-    .rpc('decrypt_platform_token', { encrypted_token: conn.access_token_encrypted });
-
-  if (decryptError || !decryptedToken) return null;
+  // Use getTokenForConnection to handle both SUAT (bm_partner/leadsie) and OAuth tokens
+  const decryptedToken = await getTokenForConnection(supabase, conn);
+  if (!decryptedToken) return null;
 
   const needsRefresh = conn.token_expires_at &&
     new Date(conn.token_expires_at).getTime() - Date.now() < REFRESH_THRESHOLD_MS;

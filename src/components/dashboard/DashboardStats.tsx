@@ -20,7 +20,7 @@ export function DashboardStats({ userId }: Props) {
 
   const fetchStats = async () => {
     const [clientsRes, creditsRes] = await Promise.all([
-      supabase.from('clients').select('id').eq('user_id', userId),
+      supabase.from('clients').select('id').eq('client_user_id', userId),
       supabase.from('client_credits').select('creditos_disponibles, creditos_usados'),
     ]);
 

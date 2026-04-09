@@ -43,7 +43,8 @@ export async function storeShopifyToken(c: Context) {
     const supabaseAdmin = getSupabaseAdmin();
 
     // Validate that the authenticated user owns this client or is super admin
-    const userId = (c as any).userId;
+    const user = c.get('user');
+    const userId = user?.id;
     if (userId) {
       const client = await safeQuerySingleOrDefault<{ id: string }>(
         supabaseAdmin

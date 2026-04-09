@@ -1077,6 +1077,7 @@ async function getFallbackMerchant(supabase: SupabaseClient): Promise<MerchantCo
     client_name: 'Security Test',
     platform: data.platform,
     connection_id: data.id,
+    connection_type: null,
     access_token_encrypted: null,
     api_key_encrypted: null,
     store_url: data.store_url || null,

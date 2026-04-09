@@ -143,10 +143,32 @@ export async function trackClick(c: Context) {
  * Handle SES webhook notifications (bounces, complaints, deliveries).
  * POST /api/email-ses-webhooks
  * SES sends SNS notifications to this endpoint.
+ *
+ * TODO: Implement full SNS signature verification using the AWS SDK
+ * (@aws-sdk/client-sns or manual certificate-based verification).
+ * This would validate the SigningCertURL, Signature, and SignatureVersion
+ * fields in the SNS message to prevent spoofed notifications.
+ * See: https://docs.aws.amazon.com/sns/latest/dg/sns-verify-signature-of-message.html
  */
 export async function sesWebhooks(c: Context) {
   const body = await c.req.json();
   const supabase = getSupabaseAdmin();
+
+  // Basic SNS message structure validation
+  if (!body.Type || typeof body.Type !== 'string') {
+    return c.json({ error: 'Invalid SNS message: missing Type field' }, 400);
+  }
+  const validTypes = ['SubscriptionConfirmation', 'Notification', 'UnsubscribeConfirmation'];
+  if (!validTypes.includes(body.Type)) {
+    return c.json({ error: `Invalid SNS message Type: ${body.Type}` }, 400);
+  }
+  // Validate required SNS fields are present
+  if (body.Type === 'Notification' && (!body.Message || typeof body.Message !== 'string')) {
+    return c.json({ error: 'Invalid SNS Notification: missing Message field' }, 400);
+  }
+  if (body.Type === 'SubscriptionConfirmation' && !body.SubscribeURL) {
+    return c.json({ error: 'Invalid SNS SubscriptionConfirmation: missing SubscribeURL' }, 400);
+  }
 
   // Handle SNS subscription confirmation
   if (body.Type === 'SubscriptionConfirmation') {

@@ -11,11 +11,9 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
  */
 export async function restartService(c: Context) {
   // Auth: X-Cron-Secret
-  const cronSecret = c.req.header('X-Cron-Secret');
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const authHeader = c.req.header('Authorization')?.replace('Bearer ', '');
-
-  if (cronSecret !== serviceKey && authHeader !== serviceKey) {
+  const cronSecret = c.req.header('X-Cron-Secret')?.trim();
+  const expected = process.env.CRON_SECRET;
+  if (!expected || cronSecret !== expected) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

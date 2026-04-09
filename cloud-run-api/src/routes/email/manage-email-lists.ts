@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 /**
  * Manage email lists and segments.
  * POST /api/manage-email-lists
+ * Auth: protected by authMiddleware at the router level (routes/index.ts).
  */
 export async function manageEmailLists(c: Context) {
   const body = await c.req.json();

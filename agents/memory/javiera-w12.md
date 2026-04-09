@@ -1,5 +1,79 @@
 # Javiera W12 — Journal de QA (El Chino)
 
+## 2026-04-08 — Deuda técnica Supabase silent failures RESUELTA (457 → 27, -94%)
+
+### Contexto
+Oleada 4 (final) del programa iniciado el 2026-04-07. 4 oleadas totales, 9 commits, 433 casos migrados. Objetivo: eliminar el antipatrón `const { data } = await supabase.from(...)` donde se destructura sin capturar `error`, convirtiendo fallos SQL en `undefined` silencioso.
+
+### Estrategia de graceful degradation (LOW severity)
+- **CRITICAL (crons)** → fail-fast con throw
+- **HIGH (libs/chino/ai)** → mix según contexto
+- **MEDIUM/LOW (rutas user-facing)** → `safeQueryOrDefault`/`safeQuerySingleOrDefault` con default vacío o null, log a Sentry via `context` string
+- **Nunca romper la UI** por un fallo SQL en rutas de lectura — devolver data neutral y que la pantalla muestre estado vacío
+
+### Descubrimientos clave
+
+**1. TypeScript `never` inference trap**
+Sin `<any>` explícito, `safeQueryOrDefault(promise, [], 'ctx')` inferia `T = never` → cada `.foo` posterior rompía con `TS2339 Property 'foo' does not exist on type 'never'`. Patrón obligatorio:
+```typescript
+const conns = await safeQueryOrDefault<any>(
+  supabase.from('platform_connections').select('...').eq('...'),
+  [],
+  'context.descriptor',
+);
+```
+
+**2. Audit script sensible a CWD**
+`python3 scripts/audit-supabase-error-capture.py` usa `--dir cloud-run-api/src` default relativo al CWD. Corrido desde `cloud-run-api/` recorre `cloud-run-api/cloud-run-api/src` (no existe) → 0 casos. Corrido desde `/betabg` raíz → conteo real. Mi verificación de "27 casos" fue confiable solo tras correrlo explícitamente desde `/betabg`. Bug del script, no del fix.
+
+**3. Cross-session collision sin conflicto**
+Lancé 3 Task agents paralelos para bucket A (email grandes). Simultáneamente, Rodrigo W0 + Valentina W1 commiteaban `0614d65` — "8 mejoras Steve Mail + migración safe-supabase" — que MIGRABA los mismos 13 archivos. Sin merge conflict, porque ambas migraciones convergen en el mismo patrón final (`safeQueryOrDefault<any>(...)`). Mi agente 4A reportó éxito pero su diff quedó vacío respecto al commit en paralelo. Acepté y cerré sin duplicar. **Lección**: en equipos con múltiples agentes paralelos, el trabajo idempotente (como migraciones mecánicas a un helper canónico) es resiliente a colisiones.
+
+**4. `.insert()/.update()/.upsert().select().single()` fuera de scope**
+Los 4 helpers actuales (`safeQuery*`) solo envuelven reads. Los mutations con `.select().single()` devuelven `{ data, error }` pero necesitan un wrapper distinto que expose `rowsAffected` y permita retry. 3 casos quedaron fuera:
+- `self-signup.ts:62` `.insert()`
+- `prospect-trial.ts:55` `.insert()`
+- `manage-campaigns.ts:256` `.upsert()`
+
+Decisión: NO crear `safeInsert`/`safeUpsert` ahora. Costo de abstracción > beneficio para 3 casos. Se quedan como deuda documentada.
+
+### Granular git add como política permanente
+En esta sesión NUNCA usé `git add -A` ni `git add .`. Cada commit fue `git add <archivo1> <archivo2> ...` explícito. Razón: Felipe W2 tenía trabajo sin commitear en `meta/`, `webhooks/leadsie-*`, `facebook/`, `instagram/` (BM Partner). Cualquier `-A` habría arrastrado sus cambios parciales. Patrón que adopto permanentemente: **en sesiones con múltiples agentes paralelos, siempre granular, nunca bulk**.
+
+### Aceptación consciente de los 24 casos de Felipe
+Felipe está en una rama activa de BM Partner — toca los mismos archivos por otras razones (migración de `connection_type: 'bm_partner'` y resolución de tokens SUAT). Intentar migrar yo esos archivos habría:
+- Creado merge conflicts en su rama
+- Duplicado su trabajo o pisado su progreso
+- Roto su focus en el problema crítico (Meta OAuth bloqueado)
+
+Decisión: dejar los 24 casos sin tocar. Él los cierra al terminar BM Partner como parte natural de su refactor. Esto es **respeto a la ownership temporal** de un squad member.
+
+### Métricas finales del programa
+- **Oleada 1 (CRITICAL, crons)**: 89 casos, commit `739eee1`
+- **Oleada 2 (HIGH, libs/chino/ai)**: 131 casos, commit `0baed25`
+- **Oleada 3 (MEDIUM, client routes)**: 76 casos, commit `8dfb8c0`
+- **Oleada 4 (LOW, resto)**: 137 casos, commits `c62b761` + `0614d65` (cross-session)
+- **Total**: 433 casos migrados / 460 originales = **94%**
+- **9 commits** deployados en Cloud Run
+- **0 TS errors** mantenidos durante todas las oleadas
+- **Baseline final**: 27 casos (24 Felipe excluidos + 3 mutations fuera de scope)
+
+### Lecciones consolidadas
+
+1. **Silent failures son deuda técnica de severidad CRÍTICA** — un `const { data } = ...` sin `error` capture convierte errores SQL (permission denied, connection lost, RLS policy fail) en `undefined`, y el código los usa como si fueran "no hay datos". Diagnóstico imposible sin logs. El programa de 4 oleadas resolvió 433 de estos en una semana.
+
+2. **El patrón canónico vence al diseño elegante**: los 4 helpers `safeQuery*` son primitivas simples, no un framework. Precisamente por eso escalaron a 4 oleadas sin fricción. Cualquier ingeniero nuevo entiende `safeQueryOrDefault(promise, default, 'ctx')` en 10 segundos.
+
+3. **Graceful degradation != fail-silent**: cada helper loggea via `context` string a Sentry. El usuario ve estado vacío pero Sentry recibe el error real. Es lo mejor de ambos mundos.
+
+4. **Taskas paralelas + granular commits = zero-fricción**: lancé 3 agents simultáneos para 140 casos. Con granular commits no hubo ni un conflict. Patrón validado a escala.
+
+5. **Dejar de tocar lo que otro agente toca** — la exclusión de Felipe no fue pereza, fue respeto. Los 24 casos viven en su rama y se cierran como efecto lateral de su refactor. Esta es la mejor forma de paralelizar en un equipo multi-agente.
+
+6. **Los baselines son oro** — `docs/audits/baseline-supabase-error-capture.json` + script lint sin ESLint. Cada PR verifica que no se agreguen NUEVOS casos. Sin esto, las 4 oleadas hubieran degradado en días.
+
+---
+
 ## 2026-04-07 — Pipeline Auto-Fix RESUCITADO + OJOS Ampliado
 
 ### Contexto

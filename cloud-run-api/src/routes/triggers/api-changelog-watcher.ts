@@ -133,9 +133,9 @@ function analyzeChangelog(
 
 export async function apiChangelogWatcher(c: Context) {
   // Auth: cron secret
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-  if (cronSecret && providedSecret !== cronSecret) {
+  const cronSecret = c.req.header('X-Cron-Secret')?.trim();
+  const expected = process.env.CRON_SECRET;
+  if (!expected || cronSecret !== expected) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

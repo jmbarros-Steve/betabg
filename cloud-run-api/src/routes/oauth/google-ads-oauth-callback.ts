@@ -26,8 +26,13 @@ export async function googleAdsOauthCallback(c: Context) {
       return c.json({ error: 'Missing required parameters' }, 400);
     }
 
-    // CSRF protection: validate state parameter
-    if (state) {
+    // CSRF protection: state parameter is mandatory
+    if (!state) {
+      return c.json({ error: 'Missing state parameter' }, 400);
+    }
+
+    // Validate state parameter
+    {
       try {
         const decoded = Buffer.from(state, 'base64').toString();
         const [stateClientId, stateUserId] = decoded.split(':');

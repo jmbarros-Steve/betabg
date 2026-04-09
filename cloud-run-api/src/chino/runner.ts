@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { getSupabaseAdmin } from '../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../lib/safe-supabase.js';
 import { decryptPlatformToken } from '../lib/decrypt-token.js';
+import { getTokenForConnection } from '../lib/resolve-meta-token.js';
 import { executeApiCompare } from './checks/api-compare.js';
 import { executeTokenHealth } from './checks/token-health.js';
 import { executePerformance } from './checks/performance.js';
@@ -44,6 +45,7 @@ async function getMerchantConnections(
       id,
       client_id,
       platform,
+      connection_type,
       access_token_encrypted,
       api_key_encrypted,
       store_url,
@@ -62,6 +64,7 @@ async function getMerchantConnections(
     client_id: row.client_id,
     client_name: (row.clients as any)?.name || 'Unknown',
     platform: row.platform,
+    connection_type: row.connection_type || null,
     access_token_encrypted: row.access_token_encrypted,
     api_key_encrypted: row.api_key_encrypted,
     store_url: row.store_url,
@@ -247,11 +250,16 @@ async function getDecryptedToken(
   merchant: MerchantConn
 ): Promise<string | null> {
   try {
-    const encrypted = merchant.platform === 'klaviyo'
-      ? merchant.api_key_encrypted
-      : merchant.access_token_encrypted;
-
-    return await decryptPlatformToken(supabase, encrypted);
+    if (merchant.platform === 'klaviyo') {
+      // Klaviyo still uses api_key_encrypted
+      return await decryptPlatformToken(supabase, merchant.api_key_encrypted);
+    }
+    // For Meta and others, use the universal resolver (handles SUAT + OAuth)
+    return await getTokenForConnection(supabase, {
+      id: merchant.connection_id,
+      connection_type: merchant.connection_type || undefined,
+      access_token_encrypted: merchant.access_token_encrypted,
+    });
   } catch (err: any) {
     console.error(`[chino] Token decrypt failed for merchant ${merchant.client_id} (${merchant.platform}):`, err.message);
     return null;
@@ -440,8 +448,8 @@ export async function runChinoPatrol(): Promise<PatrolResult> {
       return localDetails;
     }
 
-    // Execute for each target merchant
-    let lastResult: CheckResult | null = null;
+    // Execute for each target merchant, collect ALL results
+    const allResults: Array<{ merchant: string; result: CheckResult }> = [];
     for (const merchant of targetMerchants) {
       let token: string | null = null;
 
@@ -462,7 +470,7 @@ export async function runChinoPatrol(): Promise<PatrolResult> {
             result: skipResult,
           });
           await saveReport(supabase, runId, check, skipResult, merchant.client_id, merchant.client_name);
-          lastResult = skipResult;
+          allResults.push({ merchant: merchant.client_id, result: skipResult });
           continue;
         }
       }
@@ -478,12 +486,19 @@ export async function runChinoPatrol(): Promise<PatrolResult> {
       });
 
       await saveReport(supabase, runId, check, result, merchant.client_id, merchant.client_name);
-      lastResult = result;
+      allResults.push({ merchant: merchant.client_id, result });
     }
 
-    if (lastResult) {
-      await updateCheckStatus(supabase, check, lastResult);
-      await enqueueFixIfNeeded(supabase, check, lastResult);
+    // Use the WORST result for check status (fail > error > skip > pass)
+    if (allResults.length > 0) {
+      const worstResult =
+        allResults.find(r => r.result.result === 'fail')
+        || allResults.find(r => r.result.result === 'error')
+        || allResults.find(r => r.result.result === 'skip')
+        || allResults[allResults.length - 1];
+
+      await updateCheckStatus(supabase, check, worstResult.result);
+      await enqueueFixIfNeeded(supabase, check, worstResult.result);
     }
     return localDetails;
   }

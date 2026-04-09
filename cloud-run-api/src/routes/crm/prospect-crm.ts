@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { logProspectEvent } from '../../lib/prospect-event-logger.js';
 import { sendMetaCAPIEvent } from '../../lib/meta-capi.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { getUserClientIds, verifyProspectOwnership } from '../../lib/user-scoping.js';
 
 /** Update deal value, win probability, expected close date */
 export async function prospectUpdateDeal(c: Context) {
@@ -12,6 +13,11 @@ export async function prospectUpdateDeal(c: Context) {
 
     const supabase = getSupabaseAdmin();
     const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Multi-tenant: verify ownership
+    const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
+    if (!allowed) return c.json({ error: 'Forbidden' }, 403);
 
     const update: Record<string, any> = { updated_at: new Date().toISOString(), last_activity_at: new Date().toISOString() };
     if (deal_value != null) update.deal_value = Number(deal_value) || 0;
@@ -48,6 +54,12 @@ export async function prospectDetail(c: Context) {
     if (!prospect_id) return c.json({ error: 'prospect_id required' }, 400);
 
     const supabase = getSupabaseAdmin();
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Multi-tenant: verify ownership
+    const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
+    if (!allowed) return c.json({ error: 'Forbidden' }, 403);
 
     const [prospectRes, eventsRes, tasksRes, proposalsRes, messagesRes] = await Promise.all([
       supabase.from('wa_prospects').select('*').eq('id', prospect_id).single(),
@@ -93,6 +105,11 @@ export async function prospectAddNote(c: Context) {
 
     const supabase = getSupabaseAdmin();
     const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Multi-tenant: verify ownership
+    const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
+    if (!allowed) return c.json({ error: 'Forbidden' }, 403);
 
     const { error } = await supabase
       .from('wa_prospects')
@@ -120,6 +137,11 @@ export async function prospectChangeStage(c: Context) {
 
     const supabase = getSupabaseAdmin();
     const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Multi-tenant: verify ownership
+    const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
+    if (!allowed) return c.json({ error: 'Forbidden' }, 403);
 
     // Get current stage for event log
     const prospect = await safeQuerySingleOrDefault<any>(
@@ -154,6 +176,13 @@ export async function prospectChangePriority(c: Context) {
     if (!validPriorities.includes(priority)) return c.json({ error: 'Invalid priority' }, 400);
 
     const supabase = getSupabaseAdmin();
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Multi-tenant: verify ownership
+    const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
+    if (!allowed) return c.json({ error: 'Forbidden' }, 403);
+
     const { error } = await supabase
       .from('wa_prospects')
       .update({ priority, updated_at: new Date().toISOString() })
@@ -174,6 +203,13 @@ export async function prospectUpdateTags(c: Context) {
     if (!prospect_id || !Array.isArray(tags)) return c.json({ error: 'prospect_id and tags[] required' }, 400);
 
     const supabase = getSupabaseAdmin();
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Multi-tenant: verify ownership
+    const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
+    if (!allowed) return c.json({ error: 'Forbidden' }, 403);
+
     const { error } = await supabase
       .from('wa_prospects')
       .update({ tags, updated_at: new Date().toISOString() })
@@ -191,11 +227,26 @@ export async function prospectUpdateTags(c: Context) {
 export async function prospectsKanban(c: Context) {
   try {
     const supabase = getSupabaseAdmin();
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const { data, error } = await supabase
+    // Multi-tenant scoping
+    const { isSuperAdmin, clientIds } = await getUserClientIds(supabase, user.id);
+
+    let query = supabase
       .from('wa_prospects')
       .select('id, phone, profile_name, name, company, what_they_sell, stage, lead_score, message_count, updated_at, priority, tags, meeting_status, meeting_at, apellido, deal_value, win_probability, is_rotting')
       .order('updated_at', { ascending: false });
+
+    if (!isSuperAdmin) {
+      // Non-admin users only see prospects linked to their clients
+      if (clientIds.length === 0) {
+        return c.json({ kanban: {}, total: 0, stageTotals: {}, pipelineTotal: 0, pipelineWeighted: 0 });
+      }
+      query = query.in('converted_client_id', clientIds);
+    }
+
+    const { data, error } = await query;
 
     if (error) return c.json({ error: error.message }, 500);
 
@@ -239,6 +290,11 @@ export async function prospectMoveStage(c: Context) {
 
     const supabase = getSupabaseAdmin();
     const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Multi-tenant: verify ownership
+    const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
+    if (!allowed) return c.json({ error: 'Forbidden' }, 403);
 
     const prospect = await safeQuerySingleOrDefault<any>(
       supabase.from('wa_prospects').select('stage, phone, name, profile_name, deal_value').eq('id', prospect_id).single(),

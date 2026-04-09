@@ -1489,6 +1489,7 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
                 orden: 80,
                 approval_status: 'pending',
                 industria: 'general',
+                client_id,
               });
               toolResult = `Regla "${titulo}" guardada exitosamente (pendiente de aprobación).`;
             } catch (e) {

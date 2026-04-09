@@ -165,7 +165,10 @@ export async function performanceTrackerMeta(c: Context) {
       );
       const conversions = purchaseAction ? parseInt(purchaseAction.value) : 0;
       const cpa = conversions > 0 ? spend / conversions : null;
-      const roas = spend > 0 && conversions > 0 ? (conversions * 50000) / spend : null; // avg order ~$50k CLP
+      // TODO: ROAS uses hardcoded $50,000 CLP avg order value. To fix this properly,
+      // we need actual revenue data from Meta (action_values purchase) which requires
+      // adding 'action_values' to the insights fields request — a bigger refactor.
+      const roas = spend > 0 && conversions > 0 ? (conversions * 50000) / spend : null;
 
       // Calculate performance score
       const { score, verdict } = calculatePerformanceScore(ctr, roas, cpa);

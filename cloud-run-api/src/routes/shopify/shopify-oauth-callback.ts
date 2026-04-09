@@ -208,14 +208,25 @@ export async function shopifyOauthCallback(c: Context) {
     let shopifyClientId: string;
     let shopifyClientSecret: string;
 
-    // Try state validation first (for flows that went through our shopify-install endpoint)
+    // CSRF protection: validate the state parameter (nonce) from our shopify-install endpoint
     if (stateParam) {
       const stateResult = await validateState(supabaseAdmin, stateParam, normalizedShopDomain);
       if (stateResult.valid) {
         perClientId = stateResult.clientId;
       } else {
-        console.warn('State validation failed:', stateResult.error, '— will try shop_domain lookup');
+        console.error('[shopify-oauth] State validation failed — possible CSRF:', stateResult.error);
+        if (isDirectRedirect) {
+          return c.redirect(`${frontendUrl}/oauth/shopify/callback?error=csrf_validation_failed`, 302);
+        }
+        return c.json({ error: 'Invalid state parameter' }, 403);
       }
+    } else {
+      // No state param at all — this is suspicious for a callback
+      console.error('[shopify-oauth] No state parameter in callback — possible CSRF');
+      if (isDirectRedirect) {
+        return c.redirect(`${frontendUrl}/oauth/shopify/callback?error=missing_state`, 302);
+      }
+      return c.json({ error: 'Missing state parameter' }, 403);
     }
 
     // If no client_id from state, look up by shop_domain (for install-link flow)
@@ -595,10 +606,11 @@ export async function shopifyOauthCallback(c: Context) {
       redirectUrl.searchParams.set('store', storeName);
       redirectUrl.searchParams.set('shop', normalizedShopDomain);
 
-      if (isNewUser && tempPassword) {
+      if (isNewUser) {
         redirectUrl.searchParams.set('email', shopEmail);
         redirectUrl.searchParams.set('new_user', 'true');
-        redirectUrl.searchParams.set('temp_pass', tempPassword);
+        // SECURITY: Do NOT pass temp_pass in URL (visible in browser history, server logs, referrer headers).
+        // The user will use "forgot password" / password reset flow to set their own password.
       }
 
       console.log('Standalone redirect to:', redirectUrl.toString());
@@ -610,7 +622,7 @@ export async function shopifyOauthCallback(c: Context) {
       store_name: storeName,
       is_new_user: isNewUser,
       user_email: shopEmail,
-      temp_password: isNewUser ? tempPassword : null,
+      // SECURITY: temp_password removed from response — user should use password reset flow
     });
 
   } catch (error: any) {

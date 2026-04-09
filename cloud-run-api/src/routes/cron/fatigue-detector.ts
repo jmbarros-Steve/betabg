@@ -1,6 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-import { decryptPlatformToken } from '../../lib/decrypt-token.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { metaApiJson } from '../../lib/meta-fetch.js';
 import { sendAlertEmail } from '../../lib/send-alert-email.js';
 import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
@@ -23,7 +23,7 @@ import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 interface MetaConnection {
   id: string;
   client_id: string;
-  access_token_encrypted: string | null;
+  connection_type: string | null;
   account_id: string | null;
   clients: { id: string; name: string }[] | { id: string; name: string } | null;
 }
@@ -61,7 +61,7 @@ export async function fatigueDetector(c: Context) {
   // Get all active Meta connections
   const { data: connections, error: connError } = await supabase
     .from('platform_connections')
-    .select('id, client_id, access_token_encrypted, account_id, clients(id, name)')
+    .select('id, client_id, connection_type, account_id, clients(id, name)')
     .eq('platform', 'meta')
     .eq('is_active', true);
 
@@ -71,7 +71,10 @@ export async function fatigueDetector(c: Context) {
   }
 
   for (const conn of connections as MetaConnection[]) {
-    const token = await decryptPlatformToken(supabase, conn.access_token_encrypted);
+    const token = await getTokenForConnection(supabase, {
+      id: conn.id,
+      connection_type: conn.connection_type ?? undefined,
+    });
     if (!token) continue;
 
     const adAccountId = conn.account_id;
@@ -150,7 +153,7 @@ export async function fatigueDetector(c: Context) {
             supabase
               .from('creative_history')
               .select('angle, performance_score, measured_at')
-              .eq('shop_id', shopId)
+              .eq('client_id', conn.client_id)
               .eq('channel', 'meta')
               .eq('performance_verdict', 'bueno')
               .not('angle', 'is', null),

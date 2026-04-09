@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 /**
  * Smart Send Time — analyzes open history per subscriber to find optimal send hour.
  * POST /api/email-smart-send-time
+ * Auth: protected by authMiddleware at the router level (routes/index.ts).
  *
  * Actions:
  *   - analyze: Compute optimal send time for all subscribers of a client

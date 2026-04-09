@@ -11,6 +11,7 @@ function truncateContext(text: string, max = 4000): string {
  * Steve Mail AI — Generate email content using Claude.
  * Works directly with client_id (no Klaviyo dependency).
  * POST /api/generate-steve-mail-content
+ * Auth: protected by authMiddleware at the router level (routes/index.ts).
  */
 export async function generateSteveMailContent(c: Context) {
   try {

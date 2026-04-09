@@ -21,7 +21,7 @@ export async function getTokenForConnection(
   supabase: any,
   connection: {
     id: string;
-    connection_type?: string;
+    connection_type?: string | null;
     access_token_encrypted?: string | null;
   },
 ): Promise<string | null> {

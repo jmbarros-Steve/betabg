@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { decryptPlatformToken } from '../../lib/decrypt-token.js';
 import { metaApiFetch } from '../../lib/meta-fetch.js';
 import { createTask } from '../../lib/task-creator.js';
@@ -107,9 +108,9 @@ async function checkMetaPhantomCampaigns(
     // Get all Meta connections
     const { data: conns, error } = await supabase
       .from('platform_connections')
-      .select('id, client_id, account_id, access_token_encrypted')
+      .select('id, client_id, account_id, connection_type')
       .eq('platform', 'meta')
-      .not('access_token_encrypted', 'is', null)
+      .eq('is_active', true)
       .not('account_id', 'is', null);
 
     if (error || !conns?.length) {
@@ -120,7 +121,7 @@ async function checkMetaPhantomCampaigns(
 
     for (const conn of conns) {
       try {
-        const token = await decryptPlatformToken(supabase, conn.access_token_encrypted);
+        const token = await getTokenForConnection(supabase, conn);
         if (!token) continue;
 
         // Get campaigns we track in DB (last 30 days metrics)

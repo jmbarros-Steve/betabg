@@ -86,15 +86,29 @@ export async function emailUnsubscribe(c: Context) {
 }
 
 /**
+ * Escape HTML special characters to prevent XSS.
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * Render a simple branded HTML page.
  */
 function renderPage(title: string, message: string): string {
+  const safeTitle = escapeHtml(title);
+  const safeMessage = escapeHtml(message);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} - Steve Mail</title>
+  <title>${safeTitle} - Steve Mail</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -138,9 +152,9 @@ function renderPage(title: string, message: string): string {
 </head>
 <body>
   <div class="card">
-    <div class="icon">${title === 'Error' ? '⚠️' : '✉️'}</div>
-    <h1>${title}</h1>
-    <p>${message}</p>
+    <div class="icon">${title === 'Error' ? '&#9888;&#65039;' : '&#9993;&#65039;'}</div>
+    <h1>${safeTitle}</h1>
+    <p>${safeMessage}</p>
     <p class="footer">Powered by Steve Mail</p>
   </div>
 </body>

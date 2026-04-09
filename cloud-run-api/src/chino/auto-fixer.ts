@@ -88,7 +88,10 @@ export async function executeAutoFix(
     // Trigger sync-all-metrics for stale data
     if (check.check_type === 'api_compare' || check.check_type === 'data_quality') {
       const baseUrl = process.env.CLOUD_RUN_URL || 'https://steve-api-850416724643.us-central1.run.app';
-      const cronSecret = process.env.CRON_SECRET || 'steve-cron-secret-2024';
+      const cronSecret = process.env.CRON_SECRET;
+      if (!cronSecret) {
+        return { success: false, action: 'CRON_SECRET not configured — cannot call sync-all-metrics' };
+      }
 
       const res = await fetch(`${baseUrl}/api/cron/sync-all-metrics`, {
         method: 'POST',

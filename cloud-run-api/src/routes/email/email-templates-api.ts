@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 /**
  * Email templates: CRUD for system + custom templates.
  * POST /api/email-templates
+ * Auth: protected by authMiddleware at the router level (routes/index.ts).
  */
 export async function emailTemplatesApi(c: Context) {
   const body = await c.req.json();
@@ -123,6 +124,7 @@ export async function emailTemplatesApi(c: Context) {
 /**
  * Universal blocks: reusable design blocks for email builder.
  * POST /api/universal-blocks
+ * Auth: protected by authMiddleware at the router level (routes/index.ts).
  */
 export async function universalBlocksApi(c: Context) {
   const body = await c.req.json();

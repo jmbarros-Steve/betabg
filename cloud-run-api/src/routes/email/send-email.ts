@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 // Lazy-init Resend client
@@ -43,7 +43,12 @@ export function verifyUnsubscribeToken(token: string): { subscriberId: string; c
     const expectedHmac = createHmac('sha256', UNSUBSCRIBE_SECRET())
       .update(`${subscriberId}:${clientId}`)
       .digest('hex');
-    if (providedHmac !== expectedHmac) return null;
+    // Use timingSafeEqual to prevent timing attacks on HMAC comparison
+    const providedBuffer = Buffer.from(providedHmac);
+    const expectedBuffer = Buffer.from(expectedHmac);
+    const isValid = providedBuffer.length === expectedBuffer.length &&
+      timingSafeEqual(providedBuffer, expectedBuffer);
+    if (!isValid) return null;
     return { subscriberId, clientId };
   } catch (err) {
     console.error('[send-email] verifyUnsubscribeToken failed:', err);
@@ -222,6 +227,7 @@ export async function sendSingleEmail(params: {
 
 /**
  * Route handler for ad-hoc email sending (test emails, single sends).
+ * Auth: protected by authMiddleware at the router level (routes/index.ts).
  */
 export async function sendEmailHandler(c: Context) {
   const body = await c.req.json();

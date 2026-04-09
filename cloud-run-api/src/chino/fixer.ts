@@ -5,6 +5,7 @@
 import { getSupabaseAdmin } from '../lib/supabase.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../lib/safe-supabase.js';
 import { decryptPlatformToken } from '../lib/decrypt-token.js';
+import { getTokenForConnection } from '../lib/resolve-meta-token.js';
 import { generateFixPrompt } from './fix-generator.js';
 import { sendEscalationWhatsApp } from './whatsapp.js';
 import { executeApiCompare } from './checks/api-compare.js';
@@ -70,7 +71,7 @@ async function getMerchantForCheck(
   // Get first active connection for this platform
   let query = supabase
     .from('platform_connections')
-    .select('id, client_id, platform, access_token_encrypted, api_key_encrypted, store_url, account_id, clients!inner(name)')
+    .select('id, client_id, platform, connection_type, access_token_encrypted, api_key_encrypted, store_url, account_id, clients!inner(name)')
     .eq('is_active', true)
     .limit(1);
 
@@ -86,16 +87,25 @@ async function getMerchantForCheck(
     client_id: data.client_id,
     client_name: (data.clients as any)?.name || 'Unknown',
     platform: data.platform,
+    connection_type: data.connection_type || null,
     access_token_encrypted: data.access_token_encrypted,
     api_key_encrypted: data.api_key_encrypted,
     store_url: data.store_url,
     account_id: data.account_id,
   };
 
-  const encrypted = merchant.platform === 'klaviyo'
-    ? merchant.api_key_encrypted
-    : merchant.access_token_encrypted;
-  const token = await decryptPlatformToken(supabase, encrypted).catch(() => null);
+  let token: string | null = null;
+  if (merchant.platform === 'klaviyo') {
+    // Klaviyo still uses api_key_encrypted
+    token = await decryptPlatformToken(supabase, merchant.api_key_encrypted).catch(() => null);
+  } else {
+    // For Meta and others, use the universal resolver (handles SUAT + OAuth)
+    token = await getTokenForConnection(supabase, {
+      id: merchant.connection_id,
+      connection_type: merchant.connection_type || undefined,
+      access_token_encrypted: merchant.access_token_encrypted,
+    }).catch(() => null);
+  }
 
   return { merchant, token };
 }

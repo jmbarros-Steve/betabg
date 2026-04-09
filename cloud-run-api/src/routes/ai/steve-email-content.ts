@@ -354,8 +354,9 @@ Responde SOLO con JSON puro (sin markdown, sin backticks):
 // ═══════════════════════════════════════════════════════════════
 async function handleGenerateABVariants(body: any, ctx: KlaviyoContext): Promise<any> {
   const { subject, count = 3 } = body;
+  const safeCount = Math.min(Math.max(1, Number(count) || 3), 10); // cap at 10
 
-  const userMessage = `Genera ${count} variantes A/B del siguiente subject line para testing:
+  const userMessage = `Genera ${safeCount} variantes A/B del siguiente subject line para testing:
 
 Subject original: "${subject}"
 

@@ -19,6 +19,7 @@ export interface MerchantConn {
   client_name: string;
   platform: string;
   connection_id: string;
+  connection_type: string | null;
   access_token_encrypted: string | null;
   api_key_encrypted: string | null;
   store_url: string | null;

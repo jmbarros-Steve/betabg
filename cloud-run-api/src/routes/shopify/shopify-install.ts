@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /**
  * Verify Shopify HMAC signature following Shopify's exact specification.
@@ -48,7 +48,12 @@ function verifyHmacFromRawUrl(url: URL, secret: string): boolean {
   console.log('HMAC verification - computed hash:', computed);
   console.log('HMAC verification - received hmac:', receivedHmac);
 
-  return computed === receivedHmac;
+  // Timing-safe comparison to prevent timing attacks
+  const encoder = new TextEncoder();
+  const computedBuffer = encoder.encode(computed);
+  const receivedBuffer = encoder.encode(receivedHmac);
+  if (computedBuffer.length !== receivedBuffer.length) return false;
+  return timingSafeEqual(computedBuffer, receivedBuffer);
 }
 
 /**
@@ -193,12 +198,12 @@ export async function shopifyInstall(c: Context) {
 
     // Verify HMAC if present (for requests from Shopify)
     if (hmac) {
-      const isValid = verifyHmacFromRawUrl(url, shopifyClientSecret);
-      if (!isValid) {
-        console.warn('HMAC verification FAILED on install endpoint; continuing to OAuth redirect (non-destructive)');
-      } else {
-        console.log('HMAC verification PASSED');
+      const hmacValid = verifyHmacFromRawUrl(url, shopifyClientSecret);
+      if (!hmacValid) {
+        console.error('[shopify-install] HMAC verification failed');
+        return c.json({ error: 'Invalid HMAC signature' }, 403);
       }
+      console.log('HMAC verification PASSED');
     }
 
     // CRITICAL: Generate nonce and persist it in DB for CSRF validation on callback

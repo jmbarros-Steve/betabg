@@ -1,39 +1,9 @@
 import { Context } from 'hono';
-import { resolveShopifyCredentials } from '../../lib/shopify-credentials.js';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
-import { createHmac, timingSafeEqual } from 'node:crypto';
 
-/**
- * Verify Shopify webhook HMAC signature using timing-safe comparison.
- * Critical for GDPR compliance — prevents timing attacks.
- */
-function verifyWebhookHmac(body: string, hmacHeader: string, secret: string): boolean {
-  try {
-    if (!hmacHeader || !secret) {
-      console.error('Missing HMAC header or secret');
-      return false;
-    }
-
-    const generatedHmac = createHmac('sha256', secret)
-      .update(body, 'utf8')
-      .digest('base64');
-
-    // Use timing-safe comparison to prevent timing attacks
-    const encoder = new TextEncoder();
-    const generatedBuffer = encoder.encode(generatedHmac);
-    const headerBuffer = encoder.encode(hmacHeader);
-
-    if (generatedBuffer.length !== headerBuffer.length) {
-      return false;
-    }
-
-    return timingSafeEqual(generatedBuffer, headerBuffer);
-  } catch (error) {
-    console.error('HMAC verification error:', error);
-    return false;
-  }
-}
+// NOTE: HMAC verification is now handled by shopifyHmacMiddleware in index.ts.
+// The middleware stores the parsed body in c.set('parsedBody', ...) and raw body in c.set('rawBody', ...).
 
 /**
  * Delete all data associated with a shop domain.
@@ -166,48 +136,17 @@ export async function shopifyGdprWebhooks(c: Context) {
   console.log(`[GDPR Webhook ${webhookId}] Processing request...`);
 
   try {
-    // Get raw body for HMAC verification
-    const rawBody = await c.req.text();
-    const hmacHeader = c.req.header('x-shopify-hmac-sha256') || '';
     const topic = c.req.header('x-shopify-topic') || '';
     const shopDomain = c.req.header('x-shopify-shop-domain') || '';
 
     console.log(`[GDPR ${webhookId}] topic=${topic}, shop=${shopDomain}`);
 
-    // Dual-mode webhook secret resolution:
-    //   custom_app → client_secret per-connection (desde DB via shopDomain)
-    //   app_store  → SHOPIFY_WEBHOOK_SECRET global (env var)
-    // Fallback a env vars por si la conexion ya fue borrada (p.ej. shop/redact tardio).
-    let shopifySecret: string | null = null;
-    try {
-      const creds = await resolveShopifyCredentials(shopDomain);
-      if (creds?.webhookSecret) shopifySecret = creds.webhookSecret;
-    } catch (err) {
-      console.error('[GDPR] resolveShopifyCredentials threw:', err);
-    }
-    if (!shopifySecret) {
-      shopifySecret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET || null;
-    }
-    if (!shopifySecret) {
-      console.error(`[GDPR] No webhook secret resolvable for shop=${shopDomain}`);
-      return c.json({ error: 'Server configuration error' }, 500);
-    }
+    // HMAC verification is handled by shopifyHmacMiddleware (applied in index.ts).
+    // The middleware stores the parsed body via c.set('parsedBody', ...).
+    console.log(`[GDPR ${webhookId}] HMAC verified by middleware`);
 
-    // SECURITY: Verify HMAC signature using timing-safe comparison
-    if (!verifyWebhookHmac(rawBody, hmacHeader, shopifySecret)) {
-      console.error(`[GDPR ${webhookId}] HMAC verification failed`);
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
-    console.log(`[GDPR ${webhookId}] HMAC verified successfully`);
-
-    // Parse body after verification
-    let payload: any;
-    try {
-      payload = JSON.parse(rawBody);
-    } catch {
-      payload = {};
-    }
+    // Get pre-parsed payload from middleware
+    const payload: any = c.get('parsedBody') || {};
 
     // Handle different webhook types (GDPR + app lifecycle)
     switch (topic) {

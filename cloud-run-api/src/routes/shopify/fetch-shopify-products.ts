@@ -1,7 +1,66 @@
 import { Context } from 'hono';
+import { createHmac } from 'node:crypto';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { checkRateLimit } from '../../lib/rate-limiter.js';
+
+/**
+ * Verify Shopify session token JWT signature using HMAC-SHA256.
+ * Returns the decoded payload if valid, null if invalid.
+ */
+function verifyShopifySessionToken(token: string): { payload: any; shopDomain: string } | null {
+  const apiSecret = process.env.SHOPIFY_CLIENT_SECRET;
+  const apiKey = process.env.SHOPIFY_CLIENT_ID;
+
+  if (!apiSecret) return null;
+
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+
+  const [header, payloadB64, signature] = parts;
+
+  // Verify HMAC-SHA256 signature
+  const signatureInput = `${header}.${payloadB64}`;
+  const expectedSignature = createHmac('sha256', apiSecret)
+    .update(signatureInput)
+    .digest('base64url');
+
+  // Constant-time comparison
+  if (signature.length !== expectedSignature.length) return null;
+  let result = 0;
+  for (let i = 0; i < signature.length; i++) {
+    result |= signature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
+  }
+  if (result !== 0) return null;
+
+  // Decode payload
+  try {
+    let base64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) base64 += '=';
+    const payload = JSON.parse(atob(base64));
+
+    // Validate expiration
+    const now = Math.floor(Date.now() / 1000);
+    const clockSkew = 60;
+    if (payload.exp && payload.exp < (now - clockSkew)) {
+      console.error('[fetch-shopify-products] Shopify session token expired');
+      return null;
+    }
+
+    // Validate audience if API key is configured
+    if (apiKey && payload.aud && payload.aud !== apiKey) {
+      console.error('[fetch-shopify-products] Shopify session token audience mismatch');
+      return null;
+    }
+
+    const shopDomain = payload.dest?.replace('https://', '').replace('http://', '');
+    if (!shopDomain) return null;
+
+    return { payload, shopDomain };
+  } catch {
+    return null;
+  }
+}
 
 export async function fetchShopifyProducts(c: Context) {
   console.log('[fetch-shopify-products] Request received:', c.req.method);
@@ -9,27 +68,37 @@ export async function fetchShopifyProducts(c: Context) {
   try {
     const supabaseService = getSupabaseAdmin();
 
-    // Auth: Shopify Session Token or Supabase JWT
+    // Auth: Shopify Session Token (verified) or Supabase JWT
     const shopifySessionToken = c.req.header('X-Shopify-Session-Token');
     const authHeader = c.req.header('Authorization');
     let userId: string | null = null;
 
     if (shopifySessionToken) {
-      const [, payloadB64] = shopifySessionToken.split('.');
-      if (!payloadB64) {
-        return c.json({ error: 'Invalid token' }, 401);
+      // Attempt to verify the Shopify JWT signature
+      const verified = verifyShopifySessionToken(shopifySessionToken);
+
+      if (!verified) {
+        // If we can't verify the JWT (no SHOPIFY_CLIENT_SECRET or bad signature),
+        // require normal auth middleware authentication
+        const user = c.get('user');
+        if (!user) {
+          console.error('[fetch-shopify-products] Shopify JWT verification failed and no authenticated user');
+          return c.json({ error: 'Authentication required — Shopify session token could not be verified' }, 401);
+        }
+        userId = user.id;
+        console.log('[fetch-shopify-products] Falling back to authenticated user:', userId);
+      } else {
+        const client = await safeQuerySingleOrDefault<{ client_user_id: string | null; user_id: string | null }>(
+          supabaseService.from('clients').select('client_user_id, user_id').eq('shop_domain', verified.shopDomain).single(),
+          null,
+          'fetchShopifyProducts.getClientByShop',
+        );
+        if (!client) {
+          return c.json({ error: 'Shop not found' }, 401);
+        }
+        userId = client.client_user_id || client.user_id;
+        console.log('[fetch-shopify-products] Verified Shopify session for shop:', verified.shopDomain);
       }
-      const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
-      const shopDomain = payload.dest?.replace('https://', '').replace('http://', '');
-      const client = await safeQuerySingleOrDefault<{ client_user_id: string | null; user_id: string | null }>(
-        supabaseService.from('clients').select('client_user_id, user_id').eq('shop_domain', shopDomain).single(),
-        null,
-        'fetchShopifyProducts.getClientByShop',
-      );
-      if (!client) {
-        return c.json({ error: 'Shop not found' }, 401);
-      }
-      userId = client.client_user_id || client.user_id;
     } else if (authHeader?.startsWith('Bearer ')) {
       // Use service role to validate the user token
       const token = authHeader.replace('Bearer ', '');

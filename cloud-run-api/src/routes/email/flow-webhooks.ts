@@ -490,9 +490,43 @@ async function upsertSubscriber(
     shopify_customer_id?: string;
   }
 ) {
+  // GDPR fix: check if subscriber exists first so we never overwrite their opt-out status
+  const { data: existing } = await supabase
+    .from('email_subscribers')
+    .select('id, email, status')
+    .eq('client_id', clientId)
+    .eq('email', data.email)
+    .maybeSingle();
+
+  if (existing) {
+    // Update other fields but NEVER overwrite status — respect opt-out/bounce
+    const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+    if (data.first_name) updates.first_name = data.first_name;
+    if (data.last_name) updates.last_name = data.last_name;
+    if (data.shopify_customer_id) updates.shopify_customer_id = data.shopify_customer_id;
+
+    const { error } = await supabase
+      .from('email_subscribers')
+      .update(updates)
+      .eq('id', existing.id);
+
+    if (error) {
+      console.error('Failed to update subscriber:', error);
+      return null;
+    }
+
+    // Don't enroll unsubscribed/bounced/complained subscribers
+    if (existing.status !== 'subscribed') {
+      return null;
+    }
+
+    return existing;
+  }
+
+  // New subscriber — safe to set as subscribed
   const { data: subscriber, error } = await supabase
     .from('email_subscribers')
-    .upsert({
+    .insert({
       client_id: clientId,
       email: data.email,
       first_name: data.first_name || null,
@@ -501,17 +535,12 @@ async function upsertSubscriber(
       shopify_customer_id: data.shopify_customer_id || null,
       status: 'subscribed',
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'client_id,email' })
+    })
     .select('id, email, status')
     .single();
 
   if (error) {
-    console.error('Failed to upsert subscriber:', error);
-    return null;
-  }
-
-  // Don't enroll unsubscribed/bounced subscribers
-  if (subscriber.status !== 'subscribed') {
+    console.error('Failed to insert subscriber:', error);
     return null;
   }
 
@@ -691,8 +720,16 @@ async function enrollInFlows(
 /**
  * Cron: Winback trigger — finds customers who haven't ordered in N days and enrolls them.
  * POST /api/email-flow-cron-winback (called by Cloud Scheduler)
+ * Auth: authMiddleware at router level + cron secret validation below.
  */
 export async function emailFlowCronWinback(c: Context) {
+  // Defense-in-depth: validate cron secret in addition to authMiddleware
+  const cronSecret = c.req.header('X-Cron-Secret');
+  const expected = process.env.CRON_SECRET;
+  if (!expected || cronSecret !== expected) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
   const supabase = getSupabaseAdmin();
 
   // Get all active winback flows
@@ -777,8 +814,16 @@ export async function emailFlowCronWinback(c: Context) {
 /**
  * Cron: Birthday trigger — finds subscribers with birthday today (or N days ahead).
  * POST /api/email-flow-cron-birthday (called by Cloud Scheduler)
+ * Auth: authMiddleware at router level + cron secret validation below.
  */
 export async function emailFlowCronBirthday(c: Context) {
+  // Defense-in-depth: validate cron secret in addition to authMiddleware
+  const cronSecret = c.req.header('X-Cron-Secret');
+  const expected = process.env.CRON_SECRET;
+  if (!expected || cronSecret !== expected) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
   const supabase = getSupabaseAdmin();
 
   const flows = await safeQueryOrDefault<any>(
@@ -885,6 +930,7 @@ export async function emailFlowCronBirthday(c: Context) {
  * Track browse events — called from storefront tracking pixel.
  * POST /api/email-flow-track-browse
  * Body: { client_id, email, product_id, product_title, product_url, product_image }
+ * Auth: public endpoint (storefront pixel), validated via client_id existence check.
  */
 export async function emailFlowTrackBrowse(c: Context) {
   const body = await c.req.json();
@@ -895,6 +941,17 @@ export async function emailFlowTrackBrowse(c: Context) {
   }
 
   const supabase = getSupabaseAdmin();
+
+  // Basic auth: verify that the client_id exists to prevent abuse
+  const { data: clientExists } = await supabase
+    .from('clients')
+    .select('id')
+    .eq('id', client_id)
+    .maybeSingle();
+
+  if (!clientExists) {
+    return c.json({ error: 'Invalid client_id' }, 403);
+  }
 
   // Find or create subscriber
   const subscriber = await safeQuerySingleOrDefault<any>(

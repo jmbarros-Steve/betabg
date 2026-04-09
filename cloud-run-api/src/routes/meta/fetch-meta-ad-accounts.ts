@@ -94,7 +94,7 @@ export async function fetchMetaAdAccounts(c: Context) {
     // Step 1: Get connection
     const { data: connection, error: connError } = await supabase
       .from('platform_connections')
-      .select('id, platform, access_token_encrypted, client_id, connection_type')
+      .select('id, platform, access_token_encrypted, client_id, connection_type, account_id')
       .eq('id', connection_id)
       .eq('platform', 'meta')
       .maybeSingle();
@@ -184,96 +184,116 @@ export async function fetchMetaAdAccounts(c: Context) {
       }, 403);
     }
 
-    // Fetch ad accounts from Meta Graph API with business info
-    // Include business field to group by Business Manager
-    const accountsUrl = new URL('https://graph.facebook.com/v21.0/me/adaccounts');
-    
-    accountsUrl.searchParams.set('fields', 'id,name,account_id,account_status,currency,timezone_name,business{id,name}');
-    accountsUrl.searchParams.set('limit', '200');
+    // SUAT detection: bm_partner/leadsie connections use a System User token
+    // that has access to ALL merchants' assets. We must NOT call /me/adaccounts
+    // or /me/businesses — instead, fetch only the specific account_id stored
+    // in the connection row (set by the Leadsie webhook).
+    const isSuat = connection.connection_type === 'bm_partner' || connection.connection_type === 'leadsie';
 
-    console.log('Fetching Meta ad accounts from Graph API (including Business Manager info)');
+    let allAccounts: MetaAdAccount[];
 
-    const metaResponse = await fetch(accountsUrl.toString(), { headers: authHeaders });
+    if (isSuat) {
+      // SUAT path: fetch only the scoped ad account directly
+      const scopedAccountId = connection.account_id;
+      if (!scopedAccountId) {
+        return c.json({ error: 'SUAT connection missing account_id' }, 400);
+      }
+      const actId = scopedAccountId.startsWith('act_') ? scopedAccountId : `act_${scopedAccountId}`;
+      const directUrl = new URL(`https://graph.facebook.com/v21.0/${actId}`);
+      directUrl.searchParams.set('fields', 'id,name,account_id,account_status,currency,timezone_name');
 
-    if (!metaResponse.ok) {
-      const errorData: any = await metaResponse.json();
-      console.error('Meta API error:', errorData);
-      const metaErrCode = errorData?.error?.code;
+      console.log(`[ad-accounts] SUAT connection — fetching scoped account ${actId} directly`);
+      const directResp = await fetch(directUrl.toString(), { headers: authHeaders });
+      if (!directResp.ok) {
+        const errBody: any = await directResp.json().catch(() => ({}));
+        console.error('[ad-accounts] Direct account fetch failed:', errBody);
+        return c.json({ error: 'Failed to fetch ad account', details: errBody?.error?.message }, 502);
+      }
+      const directData: any = await directResp.json();
+      allAccounts = directData.id ? [{ ...directData, business: { id: 'shared', name: 'Cuentas compartidas' } }] : [];
+      console.log(`[ad-accounts] SUAT: found ${allAccounts.length} scoped account(s)`);
+    } else {
+      // OAuth path: fetch from /me/adaccounts + /me/businesses
+      const accountsUrl = new URL('https://graph.facebook.com/v21.0/me/adaccounts');
+      accountsUrl.searchParams.set('fields', 'id,name,account_id,account_status,currency,timezone_name,business{id,name}');
+      accountsUrl.searchParams.set('limit', '200');
 
-      if (metaErrCode === 4) {
-        const rateLimitResult = {
-          error: 'Rate limit de Meta alcanzado',
-          details: 'Demasiadas solicitudes a Meta. Espera unos minutos e intenta de nuevo.',
-          rate_limited: true,
-        };
-        setCache(connection_id, rateLimitResult);
-        return c.json(rateLimitResult, 429);
+      console.log('Fetching Meta ad accounts from Graph API (including Business Manager info)');
+
+      const metaResponse = await fetch(accountsUrl.toString(), { headers: authHeaders });
+
+      if (!metaResponse.ok) {
+        const errorData: any = await metaResponse.json();
+        console.error('Meta API error:', errorData);
+        const metaErrCode = errorData?.error?.code;
+
+        if (metaErrCode === 4) {
+          const rateLimitResult = {
+            error: 'Rate limit de Meta alcanzado',
+            details: 'Demasiadas solicitudes a Meta. Espera unos minutos e intenta de nuevo.',
+            rate_limited: true,
+          };
+          setCache(connection_id, rateLimitResult);
+          return c.json(rateLimitResult, 429);
+        }
+
+        return c.json({
+          error: 'Meta API error',
+          details: errorData.error?.message || 'Unknown error'
+        }, 502);
       }
 
-      return c.json({
-        error: 'Meta API error',
-        details: errorData.error?.message || 'Unknown error'
-      }, 502);
-    }
+      const accountsData: MetaResponse = await metaResponse.json() as any;
+      console.log(`Found ${accountsData.data?.length || 0} ad accounts from /me/adaccounts`);
 
-    const accountsData: MetaResponse = await metaResponse.json() as any;
-    console.log(`Found ${accountsData.data?.length || 0} ad accounts from /me/adaccounts`);
+      // Also fetch accounts from Business Managers directly
+      const businessesUrl = new URL('https://graph.facebook.com/v21.0/me/businesses');
+      businessesUrl.searchParams.set('fields', 'id,name');
+      businessesUrl.searchParams.set('limit', '50');
 
-    // Also fetch accounts from Business Managers directly
-    // First get user's businesses
-    const businessesUrl = new URL('https://graph.facebook.com/v21.0/me/businesses');
-    
-    businessesUrl.searchParams.set('fields', 'id,name');
-    businessesUrl.searchParams.set('limit', '50');
+      const businessesResponse = await fetch(businessesUrl.toString(), { headers: authHeaders });
+      let businessAccounts: MetaAdAccount[] = [];
 
-    const businessesResponse = await fetch(businessesUrl.toString(), { headers: authHeaders });
-    let businessAccounts: MetaAdAccount[] = [];
+      if (businessesResponse.ok) {
+        const businessesData: any = await businessesResponse.json();
+        console.log(`Found ${businessesData.data?.length || 0} businesses`);
 
-    if (businessesResponse.ok) {
-      const businessesData: any = await businessesResponse.json();
-      console.log(`Found ${businessesData.data?.length || 0} businesses`);
+        for (const business of businessesData.data || []) {
+          const businessAdAccountsUrl = new URL(`https://graph.facebook.com/v21.0/${business.id}/owned_ad_accounts`);
+          businessAdAccountsUrl.searchParams.set('fields', 'id,name,account_id,account_status,currency,timezone_name');
+          businessAdAccountsUrl.searchParams.set('limit', '100');
 
-      // Fetch ad accounts for each business
-      for (const business of businessesData.data || []) {
-        const businessAdAccountsUrl = new URL(`https://graph.facebook.com/v21.0/${business.id}/owned_ad_accounts`);
-        
-        businessAdAccountsUrl.searchParams.set('fields', 'id,name,account_id,account_status,currency,timezone_name');
-        businessAdAccountsUrl.searchParams.set('limit', '100');
+          const businessAdAccountsResponse = await fetch(businessAdAccountsUrl.toString(), { headers: authHeaders });
+          if (businessAdAccountsResponse.ok) {
+            const businessAdAccountsData: any = await businessAdAccountsResponse.json();
+            console.log(`Found ${businessAdAccountsData.data?.length || 0} accounts in business: ${business.name}`);
 
-        const businessAdAccountsResponse = await fetch(businessAdAccountsUrl.toString(), { headers: authHeaders });
-        if (businessAdAccountsResponse.ok) {
-          const businessAdAccountsData: any = await businessAdAccountsResponse.json();
-          console.log(`Found ${businessAdAccountsData.data?.length || 0} accounts in business: ${business.name}`);
-
-          // Add business info to each account
-          for (const acc of businessAdAccountsData.data || []) {
-            businessAccounts.push({
-              ...acc,
-              business: { id: business.id, name: business.name }
-            });
+            for (const acc of businessAdAccountsData.data || []) {
+              businessAccounts.push({
+                ...acc,
+                business: { id: business.id, name: business.name }
+              });
+            }
           }
         }
       }
-    }
 
-    // Merge accounts from /me/adaccounts and business owned accounts
-    // Use a Map to deduplicate by account_id
-    const allAccountsMap = new Map<string, MetaAdAccount>();
+      // Merge accounts from /me/adaccounts and business owned accounts
+      const allAccountsMap = new Map<string, MetaAdAccount>();
 
-    // Add accounts from /me/adaccounts
-    for (const acc of accountsData.data || []) {
-      allAccountsMap.set(acc.account_id, acc);
-    }
-
-    // Add/update with business accounts (these have more complete business info)
-    for (const acc of businessAccounts) {
-      const existing = allAccountsMap.get(acc.account_id);
-      if (!existing || (acc.business && !existing.business)) {
+      for (const acc of accountsData.data || []) {
         allAccountsMap.set(acc.account_id, acc);
       }
-    }
 
-    const allAccounts = Array.from(allAccountsMap.values());
+      for (const acc of businessAccounts) {
+        const existing = allAccountsMap.get(acc.account_id);
+        if (!existing || (acc.business && !existing.business)) {
+          allAccountsMap.set(acc.account_id, acc);
+        }
+      }
+
+      allAccounts = Array.from(allAccountsMap.values());
+    }
     console.log(`Total unique accounts: ${allAccounts.length}`);
 
     // Filter only active accounts and format response
