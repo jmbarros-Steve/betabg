@@ -140,37 +140,31 @@ export function WAInbox({ clientId }: Props) {
     setSending(true);
 
     try {
-      const session = await supabase.auth.getSession();
-      const token = session.data.session?.access_token || '';
-
-      const response = await fetch(
-        `${((import.meta.env.VITE_API_URL as string) || '').trim()}/api/whatsapp/send-message`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            client_id: clientId,
-            to_phone: selectedConv.contact_phone,
-            body: reply,
-            channel: 'merchant_wa',
-          }),
-        }
-      );
-
-      if (response.ok) {
-        setMessages(prev => [...prev, {
-          id: `temp-${Date.now()}`,
-          direction: 'outbound',
+      const { error } = await callApi('whatsapp/send-message', {
+        body: {
+          client_id: clientId,
+          to_phone: selectedConv.contact_phone,
           body: reply,
-          status: 'sent',
-          created_at: new Date().toISOString(),
-          contact_name: null,
-        }]);
-        setReply('');
+          channel: 'merchant_wa',
+        },
+      });
+
+      if (error) {
+        toast.error(error || 'No se pudo enviar el mensaje');
+        return;
       }
+
+      setMessages(prev => [...prev, {
+        id: `temp-${Date.now()}`,
+        direction: 'outbound',
+        body: reply,
+        status: 'sent',
+        created_at: new Date().toISOString(),
+        contact_name: null,
+      }]);
+      setReply('');
+    } catch (err: any) {
+      toast.error(err.message || 'No se pudo enviar el mensaje');
     } finally {
       setSending(false);
     }

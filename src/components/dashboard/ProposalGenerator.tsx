@@ -61,6 +61,7 @@ export function ProposalGenerator({ prospectId, prospectName, onProposalSaved }:
           content: generatedContent,
           plan_type: planType,
           monthly_price: monthlyPrice ? parseInt(monthlyPrice) : undefined,
+          status: sendStatus,
         },
       });
 

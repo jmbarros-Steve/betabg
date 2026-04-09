@@ -232,6 +232,8 @@ export default function GoogleAnalyticsDashboard({
   const [goalCpa, setGoalCpa] = useState('');
 
   useEffect(() => {
+    setGoalRoas('');
+    setGoalCpa('');
     try {
       const stored = localStorage.getItem(goalsKey);
       if (stored) {

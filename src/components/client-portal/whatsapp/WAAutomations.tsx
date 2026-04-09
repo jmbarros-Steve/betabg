@@ -129,7 +129,8 @@ export function WAAutomations({ clientId }: Props) {
     const { error } = await supabase
       .from('wa_automations' as any)
       .update({ is_active: isActive })
-      .eq('id', auto.id);
+      .eq('id', auto.id)
+      .eq('client_id', clientId);
 
     if (error) {
       toast.error('Error al actualizar');
