@@ -26,7 +26,7 @@ export async function syncAllMetrics(c: Context) {
     .from('platform_connections')
     .select('id, platform, account_id, access_token_encrypted, api_key_encrypted, store_url, client_id, connection_type')
     .eq('is_active', true)
-    .or('access_token_encrypted.not.is.null,api_key_encrypted.not.is.null,connection_type.eq.bm_partner');
+    .or('access_token_encrypted.not.is.null,api_key_encrypted.not.is.null,connection_type.eq.bm_partner,connection_type.eq.leadsie');
 
   if (fetchErr || !connections) {
     console.error('[cron] Failed to fetch connections:', fetchErr);
@@ -65,7 +65,7 @@ export async function syncAllMetrics(c: Context) {
           endpoint = '/api/sync-shopify-metrics';
           body = { connectionId: conn.id };
           break;
-        case 'google_ads':
+        case 'google':
           endpoint = '/api/sync-google-ads-metrics';
           body = { connection_id: conn.id };
           break;

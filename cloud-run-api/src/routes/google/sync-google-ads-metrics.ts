@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { convertToCLP, fetchGoogleAccountCurrency } from '../../lib/currency.js';
+import { getGoogleTokenForConnection } from '../../lib/resolve-google-token.js';
 
 interface GoogleAdsRow {
   metrics: {
@@ -75,6 +76,7 @@ export async function syncGoogleAdsMetrics(c: Context) {
         access_token_encrypted,
         refresh_token_encrypted,
         client_id,
+        connection_type,
         clients!inner(user_id, client_user_id)
       `)
       .eq('id', connection_id)
@@ -92,61 +94,22 @@ export async function syncGoogleAdsMetrics(c: Context) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
 
-    if (!connection.access_token_encrypted || !connection.account_id) {
-      return c.json({ error: 'Missing Google Ads credentials' }, 400);
+    if (!connection.account_id) {
+      return c.json({ error: 'Missing Google Ads account_id' }, 400);
     }
 
-    // Decrypt access token
-    const { data: decryptedAccessToken, error: decryptError } = await supabase
-      .rpc('decrypt_platform_token', { encrypted_token: connection.access_token_encrypted });
+    // Resolve token via the unified resolver (handles both Leadsie/MCC and OAuth)
+    let accessToken: string;
+    let loginCustomerId: string;
 
-    if (decryptError || !decryptedAccessToken) {
-      console.error('Token decryption error:', decryptError);
-      return c.json({ error: 'Failed to decrypt token' }, 500);
-    }
-
-    let accessToken = decryptedAccessToken;
-
-    // Try to refresh the token if we have a refresh token
-    if (connection.refresh_token_encrypted) {
-      const { data: decryptedRefreshToken } = await supabase
-        .rpc('decrypt_platform_token', { encrypted_token: connection.refresh_token_encrypted });
-
-      if (decryptedRefreshToken) {
-        console.log('Attempting to refresh access token...');
-        try {
-          const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-              client_id: googleClientId,
-              client_secret: googleClientSecret,
-              refresh_token: decryptedRefreshToken,
-              grant_type: 'refresh_token',
-            }),
-          });
-
-          const refreshData: any = await refreshResponse.json();
-
-          if (refreshData.access_token) {
-            accessToken = refreshData.access_token;
-            console.log('Access token refreshed successfully');
-
-            // Update encrypted token in database
-            const { data: newEncryptedToken } = await supabase
-              .rpc('encrypt_platform_token', { raw_token: accessToken });
-
-            if (newEncryptedToken) {
-              await supabase
-                .from('platform_connections')
-                .update({ access_token_encrypted: newEncryptedToken })
-                .eq('id', connection_id);
-            }
-          }
-        } catch (refreshErr) {
-          console.log('Token refresh failed, using existing token:', refreshErr);
-        }
-      }
+    try {
+      const tokenResult = await getGoogleTokenForConnection(supabase, connection);
+      accessToken = tokenResult.accessToken;
+      // For MCC: login-customer-id = MCC ID; for OAuth: login-customer-id = merchant customer_id
+      loginCustomerId = tokenResult.mccCustomerId || connection.account_id;
+    } catch (tokenErr: any) {
+      console.error('Token resolution error:', tokenErr.message);
+      return c.json({ error: 'Failed to resolve Google Ads token' }, 500);
     }
 
     // Calculate date range (last 30 days)
@@ -157,7 +120,7 @@ export async function syncGoogleAdsMetrics(c: Context) {
     const customerId = connection.account_id;
 
     // Detect account currency for proper CLP conversion
-    const accountCurrency = await fetchGoogleAccountCurrency(customerId, accessToken, developerToken);
+    const accountCurrency = await fetchGoogleAccountCurrency(customerId, accessToken, developerToken, loginCustomerId);
     console.log(`Google Ads account currency: ${accountCurrency}`);
 
     // Build GAQL query for account-level metrics
@@ -186,7 +149,7 @@ export async function syncGoogleAdsMetrics(c: Context) {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'developer-token': developerToken,
-          'login-customer-id': customerId,
+          'login-customer-id': loginCustomerId,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ query }),

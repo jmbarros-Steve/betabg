@@ -111,6 +111,7 @@ import { discoverClientAssets } from './meta/discover-client-assets.js';
 
 // Webhooks
 import { leadsieWebhook } from './webhooks/leadsie-webhook.js';
+import { leadsieGoogleWebhook } from './webhooks/leadsie-google-webhook.js';
 
 // Instagram
 import { fetchInstagramInsights } from './instagram/fetch-instagram-insights.js';
@@ -222,6 +223,7 @@ import { shopifyGdprWebhooks } from './shopify/shopify-gdpr-webhooks.js';
 import { storeShopifyCredentials } from './shopify/store-shopify-credentials.js';
 import { shopifyConfig } from './shopify/shopify-config.js';
 import { storeShopifyToken } from './shopify/store-shopify-token.js';
+import { shopifyHmacMiddleware } from '../middleware/shopify-hmac.js';
 
 // Phase 5: Steve Mail (Email Marketing)
 import { sendEmailHandler } from './email/send-email.js';
@@ -346,8 +348,9 @@ export function registerRoutes(app: Hono) {
   app.post('/api/meta-adset-action', authMiddleware, metaAdsetAction);
   app.post('/api/discover-client-assets', authMiddleware, discoverClientAssets);
 
-  // Leadsie webhook (public — validated via X-Leadsie-Secret header)
+  // Leadsie webhooks (public — validated via shared secret)
   app.post('/api/webhooks/leadsie', leadsieWebhook);
+  app.post('/api/webhooks/leadsie-google', leadsieGoogleWebhook);
 
   // ============================================================
   // Phase 3: Platform Integrations (Instagram)
@@ -404,8 +407,8 @@ export function registerRoutes(app: Hono) {
   app.post('/api/google-ads-oauth-callback', authMiddleware, googleAdsOauthCallback);
   app.get('/api/shopify-install', shopifyInstall); // GET - browser redirect, no JWT
   app.all('/api/shopify-oauth-callback', shopifyOauthCallback); // GET + POST, no JWT
-  app.post('/api/shopify-fulfillment-webhooks', shopifyFulfillmentWebhooks); // No JWT - HMAC verified
-  app.post('/api/shopify-gdpr-webhooks', shopifyGdprWebhooks); // No JWT - HMAC verified
+  app.post('/api/shopify-fulfillment-webhooks', shopifyHmacMiddleware, shopifyFulfillmentWebhooks); // No JWT - HMAC verified by middleware
+  app.post('/api/shopify-gdpr-webhooks', shopifyHmacMiddleware, shopifyGdprWebhooks); // No JWT - HMAC verified by middleware
 
   // ============================================================
   // Phase 5: Steve Mail (Email Marketing)

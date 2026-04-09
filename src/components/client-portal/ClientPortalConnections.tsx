@@ -10,6 +10,7 @@ import { Link2, CheckCircle, XCircle, RefreshCw, ExternalLink, ShoppingBag, Key,
 import { QRCodeSVG } from 'qrcode.react';
 import { MetaAdAccountSelector } from './MetaAdAccountSelector';
 import { MetaPartnerSetup } from './meta-ads/MetaPartnerSetup';
+import { GooglePartnerSetup } from './google-ads/GooglePartnerSetup';
 import logoShopify from '@/assets/logo-shopify-clean.png';
 import logoMeta from '@/assets/logo-meta-clean.png';
 import logoGoogle from '@/assets/logo-google-ads.png';
@@ -30,7 +31,6 @@ import { Label } from '@/components/ui/label';
 import { ShopifyCustomAppWizard } from './ShopifyCustomAppWizard';
 import { useRetrySync } from './useRetrySync';
 
-const GOOGLE_CLIENT_ID = '850416724643-52bpu0tvsd9juc2v5b636ajfk4sogt24.apps.googleusercontent.com';
 const META_APP_ID = '1994525824461583';
 
 interface ClientPortalConnectionsProps {
@@ -78,7 +78,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   const [connectingMeta, setConnectingMeta] = useState(false);
   const [showMetaPartnerSetup, setShowMetaPartnerSetup] = useState(false);
   const [showShopifyWizard, setShowShopifyWizard] = useState(false);
-  const [connectingGoogle, setConnectingGoogle] = useState(false);
+  const [showGooglePartnerSetup, setShowGooglePartnerSetup] = useState(false);
   const [showKlaviyoDialog, setShowKlaviyoDialog] = useState(false);
   const [klaviyoApiKey, setKlaviyoApiKey] = useState('');
   const [connectingKlaviyo, setConnectingKlaviyo] = useState(false);
@@ -163,20 +163,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   };
 
   const handleConnectGoogle = () => {
-    setConnectingGoogle(true);
-
-    // Store client_id in sessionStorage for callback
-    sessionStorage.setItem('google_ads_oauth_client_id', clientId);
-
-    // Build Google OAuth URL
-    const redirectUri = `${window.location.origin}/oauth/google-ads/callback`;
-    const scopes = [
-      'https://www.googleapis.com/auth/adwords',
-    ].join(' ');
-
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&access_type=offline&prompt=consent&state=${clientId}`;
-
-    window.location.href = authUrl;
+    setShowGooglePartnerSetup(true);
   };
 
   const handleSyncConnection = async (connection: Connection) => {
@@ -351,8 +338,11 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                           <><XCircle className="w-3.5 h-3.5 mr-1" /> Inactivo</>
                         )}
                       </Badge>
-                      {isMeta && connection.connection_type === 'bm_partner' && (
+                      {isMeta && (connection.connection_type === 'bm_partner' || connection.connection_type === 'leadsie') && (
                         <Badge variant="outline" className="text-xs">BM Partner</Badge>
+                      )}
+                      {connection.platform === 'google' && connection.connection_type === 'leadsie' && (
+                        <Badge variant="outline" className="text-xs">MCC</Badge>
                       )}
                       {!isKlaviyo && (
                         <Button
@@ -471,14 +461,9 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
               <Button
                 data-testid="connect-google-btn"
                 onClick={handleConnectGoogle}
-                disabled={connectingGoogle}
                 className="bg-primary text-white rounded-lg hover:bg-primary/90"
               >
-                {connectingGoogle ? (
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                )}
+                <ExternalLink className="w-4 h-4 mr-2" />
                 Conectar Google
               </Button>
             </div>
@@ -696,6 +681,28 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
             onConnected={() => {
               fetchConnections();
               setShowMetaPartnerSetup(false);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Google Ads MCC Setup (Leadsie) */}
+      <Dialog open={showGooglePartnerSetup} onOpenChange={setShowGooglePartnerSetup}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <img src={logoGoogle} alt="Google Ads" className="h-5 w-5 object-contain" />
+              Conectar Google Ads
+            </DialogTitle>
+            <DialogDescription>
+              Conecta tu cuenta de Google Ads para ver metricas y gestionar campanas con Steve.
+            </DialogDescription>
+          </DialogHeader>
+          <GooglePartnerSetup
+            clientId={clientId}
+            onConnected={() => {
+              fetchConnections();
+              setShowGooglePartnerSetup(false);
             }}
           />
         </DialogContent>

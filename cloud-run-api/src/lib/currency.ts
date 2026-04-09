@@ -79,7 +79,8 @@ export async function convertToCLP(amount: number, fromCurrency: string): Promis
 export async function fetchGoogleAccountCurrency(
   customerId: string,
   accessToken: string,
-  developerToken: string
+  developerToken: string,
+  loginCustomerId?: string
 ): Promise<string> {
   try {
     const query = `SELECT customer.currency_code FROM customer LIMIT 1`;
@@ -90,7 +91,7 @@ export async function fetchGoogleAccountCurrency(
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'developer-token': developerToken,
-          'login-customer-id': customerId,
+          'login-customer-id': loginCustomerId || customerId,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ query }),
