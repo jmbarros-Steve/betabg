@@ -16,7 +16,7 @@ import {
   ChevronDown, ChevronRight, RefreshCw, Loader2,
   Sparkles, FileDown, Settings2, AlertTriangle, BarChart3,
 } from 'lucide-react';
-import { jsPDF } from 'jspdf';
+// jsPDF importado dinámicamente en handleExportPdf (#24 fix: -280KB del bundle)
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -117,26 +117,28 @@ function daysAgo(n: number): string {
   return localDateStr(d);
 }
 
-// #5 fix: currency-aware formatter con fallback CLP
+// #3 fix: Intl.NumberFormat creado una sola vez por formatter (no por cada llamada)
 function buildCurrencyFormatter(currency: string) {
-  return (value: number): string =>
-    new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: currency === 'CLP' ? 0 : 2,
-      maximumFractionDigits: currency === 'CLP' ? 0 : 2,
-    }).format(value);
+  const fmt = new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: currency === 'CLP' ? 0 : 2,
+    maximumFractionDigits: currency === 'CLP' ? 0 : 2,
+  });
+  return (value: number): string => isFinite(value) ? fmt.format(value) : '--';
 }
 
+// #2 fix: NaN/Infinity guards en todos los formatters
 const formatNumber = (value: number): string =>
-  new Intl.NumberFormat('es-CL').format(Math.round(value));
+  isFinite(value) ? new Intl.NumberFormat('es-CL').format(Math.round(value)) : '--';
 
-const formatPercent = (value: number): string => `${value.toFixed(2)}%`;
+const formatPercent = (value: number): string => isFinite(value) ? `${value.toFixed(2)}%` : '--';
 
-const formatRoas = (value: number): string => `${value.toFixed(2)}x`;
+const formatRoas = (value: number): string => isFinite(value) ? `${value.toFixed(2)}x` : '--';
 
+// #1 fix: retorna Infinity cuando prev=0 y curr>0, no null
 const pctChange = (current: number, previous: number): number | null => {
-  if (previous === 0) return current === 0 ? null : null;
+  if (previous === 0) return current === 0 ? null : (current > 0 ? Infinity : -Infinity);
   return ((current - previous) / previous) * 100;
 };
 
@@ -146,8 +148,9 @@ const sumField = (rows: CampaignMetricRow[], field: 'impressions' | 'clicks' | '
 // #17 fix: DAY_NAMES en plural para "Los Domingos", "Los Lunes", etc.
 const DAY_NAMES_PLURAL = ['Domingos', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábados'];
 
+// #38 fix: reemplazar hex hardcodeados con Tailwind semántico para dark mode
 const ACCENT_MAP: Record<string, string> = {
-  blue: 'from-[#2A4F9E]/10 to-[#2A4F9E]/5 border-[#2A4F9E]/20',
+  blue: 'from-blue-500/10 to-blue-500/5 border-blue-500/20',
   green: 'from-green-500/10 to-green-500/5 border-green-500/20',
   purple: 'from-purple-500/10 to-purple-500/5 border-purple-500/20',
   red: 'from-red-500/10 to-red-500/5 border-red-500/20',
@@ -155,27 +158,30 @@ const ACCENT_MAP: Record<string, string> = {
   cyan: 'from-cyan-500/10 to-cyan-500/5 border-cyan-500/20',
 };
 const ICON_COLOR_MAP: Record<string, string> = {
-  blue: 'text-[#2A4F9E] bg-[#1E3A7B]/10',
-  green: 'text-green-500 bg-green-500/10',
-  purple: 'text-purple-500 bg-purple-500/10',
-  red: 'text-red-500 bg-red-500/10',
-  amber: 'text-amber-500 bg-amber-500/10',
-  cyan: 'text-cyan-500 bg-cyan-500/10',
+  blue: 'text-blue-600 dark:text-blue-400 bg-blue-500/10',
+  green: 'text-green-600 dark:text-green-400 bg-green-500/10',
+  purple: 'text-purple-600 dark:text-purple-400 bg-purple-500/10',
+  red: 'text-red-600 dark:text-red-400 bg-red-500/10',
+  amber: 'text-amber-600 dark:text-amber-400 bg-amber-500/10',
+  cyan: 'text-cyan-600 dark:text-cyan-400 bg-cyan-500/10',
 };
 
 // #14 fix: sanitizeForPdf fuera del componente (pura, sin state)
 const sanitizeForPdf = (text: string): string =>
   text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
+// #34 fix: dark mode variants
 const roasColor = (roas: number): string =>
-  roas >= 3 ? 'text-green-600' : roas >= 2 ? 'text-yellow-600' : 'text-red-500';
+  roas >= 3 ? 'text-green-600 dark:text-green-400' : roas >= 2 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-500 dark:text-red-400';
 
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
-// #13 fix: 0% change muestra gris neutro, no verde/rojo
-function ChangeIndicator({ value, invertColors = false }: { value: number | null; invertColors?: boolean }) {
+// #1 fix: maneja Infinity (prev=0→curr>0) con "Nuevo"
+// #15 fix: absoluteLabel para mostrar cambio absoluto (pp) en ratios
+// #34 fix: dark mode variants
+function ChangeIndicator({ value, invertColors = false, absoluteLabel }: { value: number | null; invertColors?: boolean; absoluteLabel?: string }) {
   if (value === null) return <span className="text-xs text-muted-foreground">Sin datos previos</span>;
   if (value === 0) {
     return (
@@ -187,10 +193,12 @@ function ChangeIndicator({ value, invertColors = false }: { value: number | null
   }
   const isPositive = value > 0;
   const isGood = invertColors ? !isPositive : isPositive;
+  const isInf = !isFinite(value);
   return (
-    <span className={`inline-flex items-center gap-1 text-sm font-semibold ${isGood ? 'text-green-600' : 'text-red-500'}`}>
+    <span className={`inline-flex items-center gap-1 text-sm font-semibold ${isGood ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
       {isPositive ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-      {Math.abs(value).toFixed(1)}% vs periodo anterior
+      {isInf ? 'Nuevo' : `${Math.abs(value).toFixed(1)}%`} vs periodo anterior
+      {absoluteLabel && <span className="text-xs text-muted-foreground ml-1">({absoluteLabel})</span>}
     </span>
   );
 }
@@ -203,6 +211,7 @@ function KpiCard({
   prefix,
   accent = 'blue',
   invertColors = false,
+  absoluteLabel,
   children,
 }: {
   title: React.ReactNode;
@@ -212,6 +221,7 @@ function KpiCard({
   prefix?: string;
   accent?: string;
   invertColors?: boolean;
+  absoluteLabel?: string;
   children?: React.ReactNode;
 }) {
   return (
@@ -226,17 +236,18 @@ function KpiCard({
         <p className="text-2xl font-bold tracking-tight leading-none mb-2">
           {prefix}{value}
         </p>
-        <ChangeIndicator value={change} invertColors={invertColors} />
+        <ChangeIndicator value={change} invertColors={invertColors} absoluteLabel={absoluteLabel} />
         {children}
       </CardContent>
     </Card>
   );
 }
 
+// #36 fix: dark mode variants
 function StatusBadge({ status }: { status: string }) {
   const s = (status || 'UNKNOWN').toUpperCase();
-  if (s === 'ENABLED') return <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-xs">Activa</Badge>;
-  if (s === 'PAUSED') return <Badge className="bg-yellow-500/15 text-yellow-600 border-yellow-500/30 text-xs">Pausada</Badge>;
+  if (s === 'ENABLED') return <Badge className="bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30 text-xs">Activa</Badge>;
+  if (s === 'PAUSED') return <Badge className="bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-yellow-500/30 text-xs">Pausada</Badge>;
   return <Badge variant="outline" className="text-xs">{status}</Badge>;
 }
 
@@ -265,16 +276,20 @@ export default function GoogleAnalyticsDashboard({
   const [sortAsc, setSortAsc] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  // #21 fix: error persistente después de fallo de fetch
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // #3 fix: AbortController para cancelar fetches en vuelo
   const abortRef = useRef<AbortController | null>(null);
 
-  // #5 fix: detectar moneda desde los datos
-  const detectedCurrency = useMemo(() => {
+  // #4 fix: detectar moneda y alertar si hay mezcla
+  const { detectedCurrency, hasMultipleCurrencies } = useMemo(() => {
+    const currencies = new Set<string>();
     for (const m of metrics) {
-      if (m.currency) return m.currency.toUpperCase();
+      if (m.currency) currencies.add(m.currency.toUpperCase());
     }
-    return 'CLP';
+    const arr = Array.from(currencies);
+    return { detectedCurrency: arr[0] || 'CLP', hasMultipleCurrencies: arr.length > 1 };
   }, [metrics]);
 
   const formatMoney = useMemo(() => buildCurrencyFormatter(detectedCurrency), [detectedCurrency]);
@@ -284,6 +299,7 @@ export default function GoogleAnalyticsDashboard({
   const [goalsOpen, setGoalsOpen] = useState(false);
   const [goalRoas, setGoalRoas] = useState('');
   const [goalCpa, setGoalCpa] = useState('');
+  const [goalsVersion, setGoalsVersion] = useState(0);
 
   useEffect(() => {
     setGoalRoas('');
@@ -298,22 +314,35 @@ export default function GoogleAnalyticsDashboard({
     } catch { /* ignore */ }
   }, [goalsKey]);
 
-  const savedGoals = useMemo(() => {
-    const roas = parseFloat(goalRoas);
-    const cpa = parseFloat(goalCpa);
-    return {
-      roas: isNaN(roas) || roas <= 0 ? 0 : roas,
-      cpa: isNaN(cpa) || cpa <= 0 ? 0 : cpa,
-    };
-  }, [goalRoas, goalCpa]);
+  // #12 fix: committedGoals se lee de localStorage, no del input en vivo
+  const committedGoals = useMemo(() => {
+    try {
+      const stored = localStorage.getItem(goalsKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const r = parseFloat(parsed.roas);
+        const c = parseFloat(parsed.cpa);
+        return { roas: r > 0 ? r : 0, cpa: c > 0 ? c : 0 };
+      }
+    } catch { /* ignore */ }
+    return { roas: 0, cpa: 0 };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goalsKey, goalsVersion]);
 
+  // #23 fix: try/catch en localStorage.setItem por QuotaExceededError
   function handleSaveGoals() {
     const roas = parseFloat(goalRoas);
     const cpa = parseFloat(goalCpa);
     const data: Record<string, number> = {};
     if (!isNaN(roas) && roas > 0) data.roas = roas;
     if (!isNaN(cpa) && cpa > 0) data.cpa = cpa;
-    localStorage.setItem(goalsKey, JSON.stringify(data));
+    try {
+      localStorage.setItem(goalsKey, JSON.stringify(data));
+    } catch {
+      toast.error('No se pudieron guardar las metas');
+      return;
+    }
+    setGoalsVersion((v) => v + 1);
     setGoalsOpen(false);
     toast.success('Metas guardadas');
   }
@@ -342,7 +371,8 @@ export default function GoogleAnalyticsDashboard({
 
     fetchData(controller.signal);
 
-    return () => { controller.abort(); };
+    // #18 fix: aborta el controller actual (incluye el de handleRefresh)
+    return () => { abortRef.current?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionId, from, to, prevFrom, prevTo, lastSyncAt]);
 
@@ -367,6 +397,7 @@ export default function GoogleAnalyticsDashboard({
   async function fetchData(signal?: AbortSignal) {
     if (!connectionId) { setMetrics([]); setPrevMetrics([]); setLoading(false); return; }
     setLoading(true);
+    setFetchError(null);
     try {
       // Paginated fetch — builds fresh query per page to avoid builder mutation
       const fetchAll = async (
@@ -419,18 +450,24 @@ export default function GoogleAnalyticsDashboard({
     } catch (err) {
       if (signal?.aborted) return;
       console.error('Google Ads fetch error:', err);
+      // #21 fix: error persistente en estado
+      setFetchError(err instanceof Error ? err.message : 'Error al cargar datos de Google Ads');
       toast.error('Error al cargar datos de Google Ads');
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
   }
 
+  // #20 fix: guard contra doble invocación
   async function handleRefresh() {
+    if (refreshing) return;
     setRefreshing(true);
     try {
-      await callApi('sync-campaign-metrics', {
+      // #22 fix: chequear error de callApi
+      const { error } = await callApi('sync-campaign-metrics', {
         body: { connection_id: connectionId, platform: 'google' },
       });
+      if (error) { toast.error(error); return; }
       toast.success('Datos Google Ads sincronizados');
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -564,10 +601,11 @@ export default function GoogleAnalyticsDashboard({
   const funnelData = useMemo(() => {
     const impressions = totals.impressions;
     const clicks = totals.clicks;
-    const landingPageViews = Math.round(clicks * 0.85);
-    const rawInteractions = Math.round(landingPageViews * 0.30);
     const purchases = totals.conversions;
+    // #7 fix: garantizar monotonía descendente en el funnel
+    const rawInteractions = Math.round(clicks * 0.85 * 0.30);
     const interactions = Math.max(rawInteractions, purchases);
+    const landingPageViews = Math.max(Math.round(clicks * 0.85), interactions);
 
     const steps = [
       { name: 'Impresiones', value: impressions, estimated: false },
@@ -608,10 +646,15 @@ export default function GoogleAnalyticsDashboard({
     const activeCampaignsAll = campaigns.filter((c) => c.status === 'ENABLED');
     const highRoasCampaigns = activeCampaignsAll.filter((c) => c.roas >= 3 && c.spend > 0);
     const lowRoasCampaigns = activeCampaignsAll.filter((c) => c.roas < 2 && c.spend > 0);
-    let budgetRec: string | null = null;
+    // #14 fix: datos raw para evitar dep en formatMoney — se formatea en JSX
+    let budgetRec: { shiftAmount: number; lowCount: number; highName: string; highRoas: number } | null = null;
     if (highRoasCampaigns.length > 0 && lowRoasCampaigns.length > 0) {
-      const shiftAmount = lowRoasCampaigns.reduce((s, c) => s + c.spend * 0.3, 0);
-      budgetRec = `Redirigir ${formatMoney(shiftAmount)} desde ${lowRoasCampaigns.length} campaña(s) de bajo ROAS hacia "${highRoasCampaigns[0].campaign_name}" (ROAS ${formatRoas(highRoasCampaigns[0].roas)})`;
+      budgetRec = {
+        shiftAmount: lowRoasCampaigns.reduce((s, c) => s + c.spend * 0.3, 0),
+        lowCount: lowRoasCampaigns.length,
+        highName: highRoasCampaigns[0].campaign_name,
+        highRoas: highRoasCampaigns[0].roas,
+      };
     }
 
     // #8 fix: sort by spend desc so we detect fatigue on highest-spend campaign first
@@ -640,7 +683,7 @@ export default function GoogleAnalyticsDashboard({
     }
 
     return { bestCampaign, worstCampaign, budgetRec, creativeFatigue };
-  }, [campaigns, formatMoney]);
+  }, [campaigns]);
 
   // Proactive Alerts
   // #10 fix: require minimum absolute ROAS to trigger alert (ignore trivial values)
@@ -683,12 +726,13 @@ export default function GoogleAnalyticsDashboard({
   }, [totals, prevTotals, insights, formatMoney]);
 
   // Best day of week
+  // #11 fix: solo mostrar si el mejor día es >20% mejor que el promedio
   const bestDayOfWeek = useMemo(() => {
     if (dailyChartData.length < 7) return null;
     const byDay: Record<number, { spend: number; revenue: number; count: number }> = {};
     for (const d of dailyChartData) {
       const dow = new Date(d.date + 'T12:00:00').getDay();
-      if (isNaN(dow)) continue; // #10b: skip malformed dates
+      if (isNaN(dow)) continue;
       const entry = byDay[dow] || { spend: 0, revenue: 0, count: 0 };
       entry.spend += d.spend;
       entry.revenue += d.revenue;
@@ -705,37 +749,43 @@ export default function GoogleAnalyticsDashboard({
       }
     }
     if (bestDay < 0 || bestRoas === 0) return null;
+    // #11: solo mostrar si es significativamente mejor que el ROAS global
+    const overallRoas = totals.spend > 0 ? totals.revenue / totals.spend : 0;
+    if (overallRoas > 0 && bestRoas < overallRoas * 1.2) return null;
     return { day: DAY_NAMES_PLURAL[bestDay], roas: bestRoas };
-  }, [dailyChartData]);
+  }, [dailyChartData, totals.spend, totals.revenue]);
 
-  // #12 fix: projection uses actual days remaining in current month
+  // #8/#9 fix: usa 'days' del rango como denominador (evita inflación por gaps)
+  // y clarifica que la proyección se basa en el periodo seleccionado
   const projection = useMemo(() => {
-    const actualDays = dailyChartData.length;
-    if (actualDays <= 0 || totals.revenue <= 0) return null;
+    if (days <= 0 || totals.revenue <= 0) return null;
     const now = new Date();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const dailyRevenue = totals.revenue / actualDays;
-    const dailySpend = totals.spend / actualDays;
+    const dailyRevenue = totals.revenue / days;
+    const dailySpend = totals.spend / days;
     const projectedRevenue = dailyRevenue * daysInMonth;
     const projectedSpend = dailySpend * daysInMonth;
     const projectedRoas = projectedSpend > 0 ? projectedRevenue / projectedSpend : 0;
-    return { revenue: projectedRevenue, roas: projectedRoas, daysInMonth };
-  }, [totals, dailyChartData]);
+    return { revenue: projectedRevenue, roas: projectedRoas, daysInMonth, basedOnDays: days };
+  }, [totals, days]);
 
-  // #15 fix: PDF includes actual date range, not just "30d"
-  const handleExportPdf = useCallback(() => {
+  // #24 fix: dynamic import de jsPDF (evita 280KB en bundle)
+  // #25 fix: async permite que React pinte el spinner antes del trabajo síncrono
+  // #10 fix: top 5 filtra campañas con gasto mínimo significativo
+  const handleExportPdf = useCallback(async () => {
     setGeneratingPdf(true);
     try {
+      const { jsPDF } = await import('jspdf');
+      // Permite que React pinte el loading spinner
+      await new Promise((r) => requestAnimationFrame(r));
+
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const w = doc.internal.pageSize.getWidth();
       const pageH = doc.internal.pageSize.getHeight();
       let y = 20;
 
       const checkPage = (needed: number) => {
-        if (y + needed > pageH - 15) {
-          doc.addPage();
-          y = 20;
-        }
+        if (y + needed > pageH - 15) { doc.addPage(); y = 20; }
       };
 
       const safeText = (text: string, x: number, yPos: number, maxW?: number) => {
@@ -782,7 +832,7 @@ export default function GoogleAnalyticsDashboard({
 
       for (const [label, value] of kpis) {
         checkPage(6);
-        safeText(`${label}: ${value}`, 14, y);
+        safeText(`${label}: ${value}`, 14, y, w - 28);
         y += 6;
       }
       y += 6;
@@ -795,7 +845,9 @@ export default function GoogleAnalyticsDashboard({
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
 
-      const topCamps = [...campaigns].sort((a, b) => b.roas - a.roas).slice(0, 5);
+      // #10 fix: filtrar campañas con gasto < 1% del total antes de ranking
+      const minSpend = totals.spend * 0.01;
+      const topCamps = [...campaigns].filter((c) => c.spend >= minSpend).sort((a, b) => b.roas - a.roas).slice(0, 5);
       for (const c of topCamps) {
         checkPage(10);
         const line = `${c.campaign_name.slice(0, 40)} - ROAS: ${c.roas.toFixed(2)}x | Gasto: ${formatMoney(c.spend)} | Conv: ${Math.round(c.conversions)}`;
@@ -819,7 +871,9 @@ export default function GoogleAnalyticsDashboard({
           y += 5;
         }
         if (insights.budgetRec) {
-          const sanitized = sanitizeForPdf(`Recomendacion: ${insights.budgetRec}`);
+          const { shiftAmount, lowCount, highName, highRoas } = insights.budgetRec;
+          const budgetText = `Recomendacion: Redirigir ${formatMoney(shiftAmount)} desde ${lowCount} campana(s) de bajo ROAS hacia "${highName}" (ROAS ${formatRoas(highRoas)})`;
+          const sanitized = sanitizeForPdf(budgetText);
           const lines = doc.splitTextToSize(sanitized, w - 28);
           checkPage(lines.length * 5);
           doc.text(lines, 14, y);
@@ -845,17 +899,15 @@ export default function GoogleAnalyticsDashboard({
     }
   }, [from, to, days, totals, campaigns, insights, formatMoney]);
 
-  // Sort handler
+  // #17 fix: setSortAsc fuera del updater de setSortField
   const handleSort = useCallback((field: SortField) => {
-    setSortField((prev) => {
-      if (prev === field) {
-        setSortAsc((a) => !a);
-        return prev;
-      }
+    if (field === sortField) {
+      setSortAsc((a) => !a);
+    } else {
+      setSortField(field);
       setSortAsc(false);
-      return field;
-    });
-  }, []);
+    }
+  }, [sortField]);
 
   // #30 fix: stable toggleRow via useCallback
   const toggleRow = useCallback((id: string) => {
@@ -870,13 +922,13 @@ export default function GoogleAnalyticsDashboard({
     });
   }, []);
 
-  // Loading skeleton
+  // Loading skeleton — #27 fix: 8 items (llena grid 2-col y 4-col sin huérfano)
   if (loading && metrics.length === 0) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-24 w-full" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-32" />)}
+          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-32" />)}
         </div>
         <Skeleton className="h-64 w-full" />
       </div>
@@ -884,7 +936,6 @@ export default function GoogleAnalyticsDashboard({
   }
 
   const hasData = metrics.length > 0;
-  // #16 fix: connectionActive derived from data instead of hardcoded true
   const connectionActive = hasData || lastSyncAt !== null;
 
   return (
@@ -895,6 +946,24 @@ export default function GoogleAnalyticsDashboard({
           <Loader2 className="w-4 h-4 animate-spin" />
           Actualizando datos...
         </div>
+      )}
+
+      {/* #21 fix: error persistente después de fallo de fetch */}
+      {fetchError && !loading && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error al cargar datos</AlertTitle>
+          <AlertDescription>{fetchError}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* #4 fix: alerta de monedas mixtas */}
+      {hasMultipleCurrencies && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Monedas mixtas detectadas</AlertTitle>
+          <AlertDescription>Esta cuenta tiene campañas en múltiples monedas. Los totales se muestran en {detectedCurrency}.</AlertDescription>
+        </Alert>
       )}
 
       {/* 1. Proactive Alerts */}
@@ -911,23 +980,27 @@ export default function GoogleAnalyticsDashboard({
       )}
 
       {/* 2. Health Banner */}
+      {/* #5 fix: pasar currency para evitar formatCLP hardcodeado */}
       <GoogleHealthBanner
         totals={{ spend: totals.spend, conversions: totals.conversions, revenue: totals.revenue, roas: totals.roas }}
         activeCampaignCount={activeCampaignCount}
         lastSyncAt={lastSyncAt}
         connectionActive={connectionActive}
+        currency={detectedCurrency}
       />
 
       {/* 3. Date range + Sync + PDF + Settings */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex gap-1.5">
+        {/* #33 fix: flex-wrap para no overflow en mobile; #40: aria-pressed + role=group */}
+        <div className="flex gap-1.5 flex-wrap" role="group" aria-label="Periodo de tiempo">
           {DATE_RANGE_OPTIONS.map((opt) => (
             <Button
               key={opt.key}
               variant={dateRange === opt.key ? 'default' : 'outline'}
               size="sm"
               onClick={() => setDateRange(opt.key)}
-              className="text-xs"
+              aria-pressed={dateRange === opt.key}
+              className="text-xs min-h-[44px]"
             >
               {opt.label}
             </Button>
@@ -949,7 +1022,7 @@ export default function GoogleAnalyticsDashboard({
             variant="outline"
             size="sm"
             onClick={handleExportPdf}
-            disabled={generatingPdf || !hasData}
+            disabled={generatingPdf || refreshing || !hasData}
           >
             {generatingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileDown className="w-4 h-4 mr-2" />}
             Exportar PDF
@@ -989,12 +1062,14 @@ export default function GoogleAnalyticsDashboard({
           icon={MousePointerClick}
           accent="cyan"
         />
+        {/* #15 fix: CTR muestra cambio absoluto en pp además del relativo */}
         <KpiCard
           title={<JargonTooltip term="CTR" />}
           value={formatPercent(totals.ctr)}
           change={pctChange(totals.ctr, prevTotals.ctr)}
           icon={Target}
           accent="purple"
+          absoluteLabel={prevTotals.impressions > 0 ? `${(totals.ctr - prevTotals.ctr) >= 0 ? '+' : ''}${(totals.ctr - prevTotals.ctr).toFixed(1)}pp` : undefined}
         />
         <KpiCard
           title={<JargonTooltip term="CPC" />}
@@ -1011,16 +1086,17 @@ export default function GoogleAnalyticsDashboard({
           icon={ShoppingCart}
           accent="green"
         >
-          {savedGoals.cpa > 0 && totals.conversions > 0 && (
+          {/* #13 fix: CPA progress — 100% cuando CPA <= target, decrece cuando excede */}
+          {committedGoals.cpa > 0 && totals.conversions > 0 && (
             <div className="mt-3">
               <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                <span>CPA máx: {formatMoney(savedGoals.cpa)}</span>
+                <span>CPA máx: {formatMoney(committedGoals.cpa)}</span>
                 <span>{formatMoney(currentCpa)}</span>
               </div>
               <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${getTargetBgColor(getTargetStatus(currentCpa, savedGoals.cpa, false))}`}
-                  style={{ width: `${Math.min(100, getProgressPercent(currentCpa, savedGoals.cpa, false))}%` }}
+                  className={`h-full rounded-full transition-all ${getTargetBgColor(getTargetStatus(currentCpa, committedGoals.cpa, false))}`}
+                  style={{ width: `${Math.min(100, currentCpa > 0 ? (committedGoals.cpa / currentCpa) * 100 : 100)}%` }}
                 />
               </div>
             </div>
@@ -1033,16 +1109,16 @@ export default function GoogleAnalyticsDashboard({
           icon={TrendingUp}
           accent="green"
         >
-          {savedGoals.roas > 0 && (
+          {committedGoals.roas > 0 && (
             <div className="mt-3">
               <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                <span>Meta: {savedGoals.roas.toFixed(1)}x</span>
-                <span>{Math.min(100, Math.round(getProgressPercent(totals.roas, savedGoals.roas, true)))}%</span>
+                <span>Meta: {committedGoals.roas.toFixed(1)}x</span>
+                <span>{Math.min(100, Math.round(getProgressPercent(totals.roas, committedGoals.roas, true)))}%</span>
               </div>
               <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${getTargetBgColor(getTargetStatus(totals.roas, savedGoals.roas, true))}`}
-                  style={{ width: `${Math.min(100, getProgressPercent(totals.roas, savedGoals.roas, true))}%` }}
+                  className={`h-full rounded-full transition-all ${getTargetBgColor(getTargetStatus(totals.roas, committedGoals.roas, true))}`}
+                  style={{ width: `${Math.min(100, getProgressPercent(totals.roas, committedGoals.roas, true))}%` }}
                 />
               </div>
             </div>
@@ -1053,25 +1129,27 @@ export default function GoogleAnalyticsDashboard({
       {/* 5. Best Day + Projection */}
       {(bestDayOfWeek || projection) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* #35 fix: dark mode variants */}
           {bestDayOfWeek && (
             <Card className="border-indigo-500/20 bg-indigo-500/[0.03]">
               <CardContent className="py-4 px-5">
                 <p className="text-xs font-medium text-muted-foreground mb-1">Tu mejor día</p>
                 <p className="text-lg font-bold">
-                  Los <span className="text-indigo-600">{bestDayOfWeek.day}</span> tienes ROAS {bestDayOfWeek.roas.toFixed(1)}x
+                  Los <span className="text-indigo-600 dark:text-indigo-400">{bestDayOfWeek.day}</span> tienes ROAS {bestDayOfWeek.roas.toFixed(1)}x
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">Considera aumentar presupuesto ese día</p>
               </CardContent>
             </Card>
           )}
+          {/* #8 fix: label clarifica que proyección se basa en el periodo seleccionado */}
           {projection && (
             <Card className="border-cyan-500/20 bg-cyan-500/[0.03]">
               <CardContent className="py-4 px-5">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Si mantienes este ritmo...</p>
+                <p className="text-xs font-medium text-muted-foreground mb-1">Al ritmo del periodo seleccionado...</p>
                 <p className="text-lg font-bold">
-                  Cerrarás el mes con <span className="text-cyan-600">{formatMoney(projection.revenue)}</span> y ROAS {projection.roas.toFixed(1)}x
+                  Cerrarás el mes con <span className="text-cyan-600 dark:text-cyan-400">{formatMoney(projection.revenue)}</span> y ROAS {projection.roas.toFixed(1)}x
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">Proyección a {projection.daysInMonth} días basada en {dailyChartData.length} días con datos</p>
+                <p className="text-xs text-muted-foreground mt-1">Proyección a {projection.daysInMonth} días basada en promedio de {projection.basedOnDays} días</p>
               </CardContent>
             </Card>
           )}
@@ -1088,28 +1166,31 @@ export default function GoogleAnalyticsDashboard({
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={dailyChartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                {/* #31 fix: minTickGap evita overlap en 60d/90d */}
                 <XAxis
                   dataKey="date"
                   tick={{ fontSize: 11 }}
+                  minTickGap={30}
                   tickFormatter={(d: string) => {
                     const dt = new Date(d + 'T12:00:00');
                     return dt.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
                   }}
                 />
-                {/* #25 fix: smart Y-axis formatter */}
+                {/* #6 fix: Y-axis usa formatMoney en vez de $ hardcodeado */}
                 <YAxis
                   tick={{ fontSize: 11 }}
                   tickFormatter={(v: number) => {
-                    if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-                    if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}k`;
-                    return `$${v}`;
+                    if (v >= 1_000_000) return formatMoney(Math.round(v / 1_000_000) * 1_000_000);
+                    if (v >= 1_000) return formatMoney(Math.round(v / 1_000) * 1_000);
+                    return formatMoney(v);
                   }}
                 />
                 {/* #22 fix: tooltip with dark mode compatible styles */}
+                {/* #63 fix: tooltip usa nombre ya en español (no depende de dataKey) */}
                 <Tooltip
                   formatter={(value: number, name: string) => [
-                    formatMoney(value),
-                    name === 'spend' ? 'Gasto' : 'Ingresos',
+                    typeof value === 'number' ? formatMoney(value) : '--',
+                    name,
                   ]}
                   labelFormatter={(label: string) => {
                     const dt = new Date(label + 'T12:00:00');
@@ -1122,10 +1203,10 @@ export default function GoogleAnalyticsDashboard({
                     fontSize: '12px',
                   }}
                 />
-                <Legend formatter={(v: string) => (v === 'spend' ? 'Gasto' : 'Ingresos')} />
-                {/* #23 fix: activeDot for hover feedback */}
-                <Line type="monotone" dataKey="spend" stroke="#ef4444" strokeWidth={2} dot={false} activeDot={{ r: 4 }} name="spend" />
-                <Line type="monotone" dataKey="revenue" stroke="#22c55e" strokeWidth={2} dot={false} activeDot={{ r: 4 }} name="revenue" />
+                {/* #62 fix: name en español directo, sin formatter que flashea */}
+                <Legend />
+                <Line type="monotone" dataKey="spend" stroke="#ef4444" strokeWidth={2} dot={false} activeDot={{ r: 4 }} name="Gasto" />
+                <Line type="monotone" dataKey="revenue" stroke="#22c55e" strokeWidth={2} dot={false} activeDot={{ r: 4 }} name="Ingresos" />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -1162,11 +1243,12 @@ export default function GoogleAnalyticsDashboard({
                           {formatNumber(step.value)}
                         </span>
                       </div>
+                      {/* #30 fix: min 3% para visibilidad en mobile */}
                       <div className="w-full bg-muted rounded-full h-6 overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all duration-700 ease-out"
                           style={{
-                            width: `${Math.max(step.pct, 1)}%`,
+                            width: `${Math.max(step.pct, 3)}%`,
                             background: `linear-gradient(90deg, hsl(${220 - i * 30}, 80%, 55%), hsl(${220 - i * 30}, 70%, 45%))`,
                           }}
                         />
@@ -1197,7 +1279,7 @@ export default function GoogleAnalyticsDashboard({
                   <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <TrendingUp className="w-4 h-4 text-green-500" />
-                      <span className="text-sm font-medium text-green-600">Mejor campaña</span>
+                      <span className="text-sm font-medium text-green-600 dark:text-green-400">Mejor campaña</span>
                     </div>
                     <p className="text-sm font-medium">{insights.bestCampaign.campaign_name}</p>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -1212,7 +1294,7 @@ export default function GoogleAnalyticsDashboard({
                     <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <TrendingDown className="w-4 h-4 text-red-500" />
-                        <span className="text-sm font-medium text-red-600">Campaña a optimizar</span>
+                        <span className="text-sm font-medium text-red-600 dark:text-red-400">Campaña a optimizar</span>
                       </div>
                       <p className="text-sm font-medium">{insights.worstCampaign.campaign_name}</p>
                       <p className="text-xs text-muted-foreground mt-1">
@@ -1220,9 +1302,10 @@ export default function GoogleAnalyticsDashboard({
                         {' | '}Gasto: {formatMoney(insights.worstCampaign.spend)}
                         {insights.worstCampaign.conversions > 0 && <>{' | '}<JargonTooltip term="CPA" />: {formatMoney(insights.worstCampaign.cpa)}</>}
                       </p>
-                      <p className="text-xs mt-2 text-red-600/80">
+                      {/* #37 fix: texto opaco, no translúcido */}
+                      <p className="text-xs mt-2 text-red-600 dark:text-red-400">
                         {insights.worstCampaign.roas < 1
-                          ? `Esta campaña gasta más de lo que genera (ROAS ${formatRoas(insights.worstCampaign.roas)}). Considera pausarla y reasignar presupuesto a "${insights.bestCampaign.campaign_name}".`
+                          ? `Esta campaña gasta más de lo que genera (ROAS ${formatRoas(insights.worstCampaign.roas)}). Considera pausarla y reasignar presupuesto a "${insights.bestCampaign?.campaign_name}".`
                           : insights.worstCampaign.roas < 2
                             ? `ROAS bajo (${formatRoas(insights.worstCampaign.roas)}). Prueba nuevos creativos o audiencias antes de aumentar inversión.`
                             : `Es la de menor rendimiento activa. Revisa segmentación y prueba nuevas imágenes/videos.`
@@ -1231,14 +1314,14 @@ export default function GoogleAnalyticsDashboard({
                     </div>
                   )}
 
-                  {/* Budget recommendation */}
+                  {/* #14/#35 fix: budget rec con datos formateados en JSX + dark mode */}
                   {insights.budgetRec && (
-                    <div className="rounded-lg border border-[#2A4F9E]/20 bg-[#1E3A7B]/5 p-4">
+                    <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
                       <div className="flex items-center gap-2 mb-2">
-                        <DollarSign className="w-4 h-4 text-[#2A4F9E]" />
-                        <span className="text-sm font-medium text-[#1E3A7B]">Recomendación de presupuesto</span>
+                        <DollarSign className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Recomendación de presupuesto</span>
                       </div>
-                      <p className="text-sm">{insights.budgetRec}</p>
+                      <p className="text-sm">{`Redirigir ${formatMoney(insights.budgetRec.shiftAmount)} desde ${insights.budgetRec.lowCount} campaña(s) de bajo ROAS hacia "${insights.budgetRec.highName}" (ROAS ${formatRoas(insights.budgetRec.highRoas)})`}</p>
                     </div>
                   )}
 
@@ -1247,7 +1330,7 @@ export default function GoogleAnalyticsDashboard({
                     <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <Eye className="w-4 h-4 text-orange-500" />
-                        <span className="text-sm font-medium text-orange-600">Fatiga creativa detectada</span>
+                        <span className="text-sm font-medium text-orange-600 dark:text-orange-400">Fatiga creativa detectada</span>
                       </div>
                       <p className="text-sm">{insights.creativeFatigue}</p>
                     </div>
@@ -1281,7 +1364,8 @@ export default function GoogleAnalyticsDashboard({
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm" role="grid">
+              {/* #39 fix: removido role="grid" (promesa ARIA falsa sin keyboard grid nav) */}
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/30">
                     <th scope="col" className="text-left px-4 py-2.5 font-medium">Campaña</th>
@@ -1443,7 +1527,8 @@ const CampaignRowMemo = memo(function CampaignRow({
         <td className="px-4 py-2.5">
           <div className="flex items-center gap-1.5">
             {expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" aria-hidden="true" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" aria-hidden="true" />}
-            <span className="font-medium truncate max-w-[200px]" title={c.campaign_name}>{c.campaign_name}</span>
+            {/* #29 fix: truncation responsive */}
+            <span className="font-medium truncate max-w-[140px] sm:max-w-[200px] md:max-w-[300px] lg:max-w-[400px]" title={c.campaign_name}>{c.campaign_name}</span>
           </div>
         </td>
         <td className="px-3 py-2.5"><StatusBadge status={c.status} /></td>
@@ -1454,8 +1539,9 @@ const CampaignRowMemo = memo(function CampaignRow({
         <td className="px-3 py-2.5 text-right font-mono tabular-nums">{formatPercent(c.ctr)}</td>
         <td className="px-3 py-2.5 text-right font-mono tabular-nums">{c.conversions > 0 ? formatMoney(c.cpa) : '--'}</td>
       </tr>
-      {expanded && c.dailyBreakdown.map((d) => (
-        <tr key={d.date} className="border-b bg-muted/10 text-xs text-muted-foreground">
+      {/* #26 fix: sort ascending (match chart direction); #28: left border for grouping */}
+      {expanded && [...c.dailyBreakdown].sort((a, b) => a.date.localeCompare(b.date)).map((d) => (
+        <tr key={d.date} className="border-b border-l-2 border-l-primary/30 bg-muted/15 text-xs text-muted-foreground">
           <td className="px-4 py-1.5 pl-10 tabular-nums">
             {new Date(d.date + 'T12:00:00').toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })}
           </td>

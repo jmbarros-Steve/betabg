@@ -16,6 +16,7 @@ interface GoogleHealthBannerProps {
   activeCampaignCount: number;
   lastSyncAt: string | null;
   connectionActive: boolean;
+  currency?: string;
 }
 
 type HealthLevel = 'good' | 'warning' | 'danger';
@@ -36,13 +37,16 @@ function formatTimeAgo(isoDate: string): string {
   return `Hace ${days} dia${days !== 1 ? 's' : ''}`;
 }
 
-const formatCLP = (value: number): string =>
-  new Intl.NumberFormat('es-CL', {
+// #5 fix: usa la moneda detectada, no CLP hardcodeado
+function buildFormatter(currency: string) {
+  const fmt = new Intl.NumberFormat('es-CL', {
     style: 'currency',
-    currency: 'CLP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
+    currency,
+    minimumFractionDigits: currency === 'CLP' ? 0 : 2,
+    maximumFractionDigits: currency === 'CLP' ? 0 : 2,
+  });
+  return (value: number): string => fmt.format(value);
+}
 
 function getHealthLevel(roas: number, spend: number, activeCampaigns: number): HealthLevel {
   if (spend === 0 || activeCampaigns === 0 || roas < 1) return 'danger';
@@ -93,11 +97,14 @@ export default function GoogleHealthBanner({
   activeCampaignCount,
   lastSyncAt,
   connectionActive,
+  currency = 'CLP',
 }: GoogleHealthBannerProps) {
   const health = useMemo(
     () => getHealthLevel(totals.roas, totals.spend, activeCampaignCount),
     [totals.roas, totals.spend, activeCampaignCount],
   );
+
+  const formatMoney = useMemo(() => buildFormatter(currency), [currency]);
 
   const summary = useMemo(() => {
     if (!connectionActive) return 'Conexion Google Ads inactiva.';
@@ -106,8 +113,8 @@ export default function GoogleHealthBanner({
     }
     const cpa = totals.conversions > 0 ? totals.spend / totals.conversions : 0;
     const verdict = totals.roas >= 2 ? 'Vas bien.' : totals.roas >= 1 ? 'Ajusta para mejorar.' : 'Revisa tus campanas.';
-    return `Gastaste ${formatCLP(totals.spend)}, hiciste ${Math.round(totals.conversions)} conversion${totals.conversions !== 1 ? 'es' : ''}${cpa > 0 ? ` a ${formatCLP(cpa)} cada una` : ''}. Tu retorno fue ${totals.roas.toFixed(1)}x. ${verdict}`;
-  }, [totals, connectionActive]);
+    return `Gastaste ${formatMoney(totals.spend)}, hiciste ${Math.round(totals.conversions)} conversion${totals.conversions !== 1 ? 'es' : ''}${cpa > 0 ? ` a ${formatMoney(cpa)} cada una` : ''}. Tu retorno fue ${totals.roas.toFixed(1)}x. ${verdict}`;
+  }, [totals, connectionActive, formatMoney]);
 
   const cfg = HEALTH_CONFIG[health];
   const Icon = cfg.icon;
