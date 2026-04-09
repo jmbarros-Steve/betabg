@@ -33,6 +33,8 @@ CREATE INDEX IF NOT EXISTS idx_steve_alerts_severity
   WHERE acknowledged = false;
 
 -- RLS: admin ve todo, cliente ve solo lo suyo.
+-- Nota: usamos user_roles.is_super_admin (boolean) porque el enum app_role
+-- no tiene 'super_admin'. El patrón es consistente con 20260325_academy_tables.sql.
 ALTER TABLE steve_alerts ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "alerts_client_access" ON steve_alerts;
@@ -42,7 +44,9 @@ CREATE POLICY "alerts_client_access" ON steve_alerts
       SELECT id FROM clients WHERE user_id = auth.uid() OR client_user_id = auth.uid()
     )
     OR EXISTS (
-      SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin')
+      SELECT 1 FROM user_roles
+      WHERE user_id = auth.uid()
+        AND (role = 'admin' OR is_super_admin = true)
     )
   );
 
@@ -50,7 +54,9 @@ DROP POLICY IF EXISTS "alerts_admin_ack" ON steve_alerts;
 CREATE POLICY "alerts_admin_ack" ON steve_alerts
   FOR UPDATE USING (
     EXISTS (
-      SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin')
+      SELECT 1 FROM user_roles
+      WHERE user_id = auth.uid()
+        AND (role = 'admin' OR is_super_admin = true)
     )
   );
 
