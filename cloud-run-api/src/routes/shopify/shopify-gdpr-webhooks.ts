@@ -1,4 +1,5 @@
 import { Context } from 'hono';
+import { resolveShopifyCredentials } from '../../lib/shopify-credentials.js';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
@@ -165,14 +166,6 @@ export async function shopifyGdprWebhooks(c: Context) {
   console.log(`[GDPR Webhook ${webhookId}] Processing request...`);
 
   try {
-    // SHOPIFY_WEBHOOK_SECRET is the "Webhook signing secret" from the Partner Dashboard.
-    // Falls back to SHOPIFY_CLIENT_SECRET for backwards compatibility.
-    const shopifySecret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
-    if (!shopifySecret) {
-      console.error('[GDPR] Neither SHOPIFY_WEBHOOK_SECRET nor SHOPIFY_CLIENT_SECRET configured');
-      return c.json({ error: 'Server configuration error' }, 500);
-    }
-
     // Get raw body for HMAC verification
     const rawBody = await c.req.text();
     const hmacHeader = c.req.header('x-shopify-hmac-sha256') || '';
@@ -180,6 +173,25 @@ export async function shopifyGdprWebhooks(c: Context) {
     const shopDomain = c.req.header('x-shopify-shop-domain') || '';
 
     console.log(`[GDPR ${webhookId}] topic=${topic}, shop=${shopDomain}`);
+
+    // Dual-mode webhook secret resolution:
+    //   custom_app → client_secret per-connection (desde DB via shopDomain)
+    //   app_store  → SHOPIFY_WEBHOOK_SECRET global (env var)
+    // Fallback a env vars por si la conexion ya fue borrada (p.ej. shop/redact tardio).
+    let shopifySecret: string | null = null;
+    try {
+      const creds = await resolveShopifyCredentials(shopDomain);
+      if (creds?.webhookSecret) shopifySecret = creds.webhookSecret;
+    } catch (err) {
+      console.error('[GDPR] resolveShopifyCredentials threw:', err);
+    }
+    if (!shopifySecret) {
+      shopifySecret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET || null;
+    }
+    if (!shopifySecret) {
+      console.error(`[GDPR] No webhook secret resolvable for shop=${shopDomain}`);
+      return c.json({ error: 'Server configuration error' }, 500);
+    }
 
     // SECURITY: Verify HMAC signature using timing-safe comparison
     if (!verifyWebhookHmac(rawBody, hmacHeader, shopifySecret)) {

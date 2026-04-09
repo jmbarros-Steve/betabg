@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { resolveShopifyCredentials } from '../../lib/shopify-credentials.js';
 
 // ---------------------------------------------------------------------------
 // TypeScript interfaces for webhook payloads
@@ -190,13 +191,25 @@ export async function shopifyFulfillmentWebhooks(c: Context) {
   // Read raw body BEFORE any parsing (required for HMAC)
   const rawBody = await c.req.text();
 
-  // HMAC verification
-  // SHOPIFY_WEBHOOK_SECRET is the "Webhook signing secret" from the Partner Dashboard.
-  // Falls back to SHOPIFY_CLIENT_SECRET for backwards compatibility.
-  const shopifySecret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
+  // Dual-mode HMAC verification:
+  //   custom_app → client_secret per-connection (resuelto desde DB via shopDomain)
+  //   app_store  → SHOPIFY_WEBHOOK_SECRET global (env var)
+  // El resolver devuelve el webhookSecret correcto segun connection_mode.
+  let shopifySecret: string | null = null;
+  try {
+    const creds = await resolveShopifyCredentials(shopDomain);
+    if (creds?.webhookSecret) shopifySecret = creds.webhookSecret;
+  } catch (err) {
+    console.error('[Fulfillment] resolveShopifyCredentials threw:', err);
+  }
+  // Fallback: env vars (util si SHOPIFY_MODE=appstore/both o si el webhook llega
+  // antes de que la conexion este registrada — p.ej. en el primer install).
   if (!shopifySecret) {
-    console.error('[Fulfillment] Neither SHOPIFY_WEBHOOK_SECRET nor SHOPIFY_CLIENT_SECRET configured');
-    return c.json({ error: 'Server misconfiguration' }, 500);
+    shopifySecret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET || null;
+  }
+  if (!shopifySecret) {
+    console.error(`[Fulfillment] No webhook secret resolvable for shop=${shopDomain}`);
+    return c.json({ error: 'Server misconfiguration — no webhook secret' }, 500);
   }
 
   if (!verifyWebhookHmac(rawBody, hmacHeader, shopifySecret)) {

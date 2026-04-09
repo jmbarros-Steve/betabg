@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { getWebhookSecretForShop } from "../_shared/shopify-credentials.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -178,17 +179,6 @@ Deno.serve(async (req) => {
   console.log(`[GDPR Webhook ${webhookId}] Processing request...`);
 
   try {
-    // SHOPIFY_WEBHOOK_SECRET is the "Webhook signing secret" from the Partner Dashboard.
-    // Falls back to SHOPIFY_CLIENT_SECRET for backwards compatibility.
-    const shopifySecret = Deno.env.get('SHOPIFY_WEBHOOK_SECRET') || Deno.env.get('SHOPIFY_CLIENT_SECRET');
-    if (!shopifySecret) {
-      console.error('[GDPR] Neither SHOPIFY_WEBHOOK_SECRET nor SHOPIFY_CLIENT_SECRET configured');
-      return new Response(JSON.stringify({ error: 'Server configuration error' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     // Get raw body for HMAC verification
     const rawBody = await req.text();
     const hmacHeader = req.headers.get('x-shopify-hmac-sha256') || '';
@@ -196,6 +186,19 @@ Deno.serve(async (req) => {
     const shopDomain = req.headers.get('x-shopify-shop-domain') || '';
 
     console.log(`[GDPR ${webhookId}] topic=${topic}, shop=${shopDomain}`);
+
+    // Dual-mode webhook secret resolution:
+    //   custom_app → client_secret per-connection (en DB)
+    //   app_store  → SHOPIFY_WEBHOOK_SECRET global (env var)
+    // Fallback a env vars si la conexion ya no existe (p.ej. app/uninstalled despues de borrado).
+    const shopifySecret = await getWebhookSecretForShop(shopDomain);
+    if (!shopifySecret) {
+      console.error(`[GDPR] No webhook secret resolvable for shop=${shopDomain}`);
+      return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // SECURITY: Verify HMAC signature using timing-safe comparison
     if (!verifyWebhookHmac(rawBody, hmacHeader, shopifySecret)) {

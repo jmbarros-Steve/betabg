@@ -340,6 +340,7 @@ export async function shopifyOauthCallback(c: Context) {
           shop_domain: normalizedShopDomain,
           access_token_encrypted: encryptedToken,
           is_active: true,
+          connection_mode: 'custom_app',
           updated_at: new Date().toISOString(),
         }).eq('id', existingConn.id);
       } else {
@@ -351,6 +352,7 @@ export async function shopifyOauthCallback(c: Context) {
           shop_domain: normalizedShopDomain,
           access_token_encrypted: encryptedToken,
           is_active: true,
+          connection_mode: 'custom_app',
         });
       }
 
@@ -634,7 +636,12 @@ async function registerWebhooks(c: Context, shopDomain: string, accessToken: str
   const emailFlowWebhookUrl = `${requestOrigin}/api/email-flow-webhooks`;
 
   const webhooksToRegister = [
+    // GDPR + app lifecycle (mandatory for Shopify App Store compliance)
     { topic: 'app/uninstalled', address: gdprWebhookUrl },
+    { topic: 'customers/data_request', address: gdprWebhookUrl },
+    { topic: 'customers/redact', address: gdprWebhookUrl },
+    { topic: 'shop/redact', address: gdprWebhookUrl },
+    // Fulfillment
     { topic: 'orders/fulfilled', address: fulfillmentWebhookUrl },
     { topic: 'orders/partially_fulfilled', address: fulfillmentWebhookUrl },
     { topic: 'orders/cancelled', address: fulfillmentWebhookUrl },

@@ -23,7 +23,14 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'https://steve-api-850416724643.us-central1.run.app').trim();
+const API_BASE = (import.meta.env.VITE_API_URL || '').trim();
+if (!API_BASE && typeof window !== 'undefined') {
+  console.error('[ShopifyCustomAppWizard] VITE_API_URL no esta configurada. Las URLs del wizard no funcionaran.');
+}
+
+// Timeout maximo esperando que el usuario instale la app (10 minutos)
+const POLL_TIMEOUT_MS = 10 * 60 * 1000;
+const POLL_INTERVAL_MS = 3000;
 
 const REQUIRED_SCOPES = [
   'read_products',
@@ -60,18 +67,31 @@ export function ShopifyCustomAppWizard({
   const [shopifyClientSecret, setShopifyClientSecret] = useState('');
   const [savingCredentials, setSavingCredentials] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [pollTimedOut, setPollTimedOut] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollStartRef = useRef<number>(0);
 
   // Cleanup polling on unmount
   useEffect(() => {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  // Start polling when step 5 is shown (install step)
+  // Start polling when step 5 is shown (install step). Con timeout de 10 min.
   useEffect(() => {
     if (step === 5 && open) {
       setPolling(true);
+      setPollTimedOut(false);
+      pollStartRef.current = Date.now();
+
       pollRef.current = setInterval(async () => {
+        // Timeout: si el usuario no termina en 10 min, parar el polling
+        if (Date.now() - pollStartRef.current > POLL_TIMEOUT_MS) {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setPolling(false);
+          setPollTimedOut(true);
+          return;
+        }
+
         const { data } = await supabase
           .from('platform_connections')
           .select('id, access_token_encrypted')
@@ -85,13 +105,19 @@ export function ShopifyCustomAppWizard({
           setStep(6);
           onConnected();
         }
-      }, 3000);
+      }, POLL_INTERVAL_MS);
     } else {
       if (pollRef.current) clearInterval(pollRef.current);
       setPolling(false);
     }
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [step, open, clientId, onConnected]);
+
+  // Reintentar polling si timeout
+  const handleRetryPolling = () => {
+    setPollTimedOut(false);
+    setStep(5); // re-trigger el useEffect
+  };
 
   const handleClose = () => {
     setStep(1);
@@ -101,8 +127,20 @@ export function ShopifyCustomAppWizard({
     setShopifyClientId('');
     setShopifyClientSecret('');
     setPolling(false);
+    setPollTimedOut(false);
     if (pollRef.current) clearInterval(pollRef.current);
     onClose();
+  };
+
+  // Validacion client-side del formato de credenciales antes de enviar al backend
+  const validateCredentialsFormat = (cid: string, cs: string): string | null => {
+    if (!/^[a-f0-9]{32}$/i.test(cid.trim())) {
+      return 'Client ID invalido. Debe ser 32 caracteres hexadecimales.';
+    }
+    if (!/^(shpss_[a-f0-9]{32,}|[a-f0-9]{32,})$/i.test(cs.trim())) {
+      return 'Client Secret invalido. Debe empezar con "shpss_" o ser 32+ caracteres hex.';
+    }
+    return null;
   };
 
   const normalizeDomain = (raw: string): string => {
@@ -135,6 +173,12 @@ export function ShopifyCustomAppWizard({
   const handleSaveCredentials = async () => {
     if (!shopifyClientId.trim() || !shopifyClientSecret.trim()) {
       setError('Pega ambos: Client ID y Client Secret');
+      return;
+    }
+    // Validacion de formato ANTES de enviar (evita roundtrip al backend)
+    const formatError = validateCredentialsFormat(shopifyClientId, shopifyClientSecret);
+    if (formatError) {
+      setError(formatError);
       return;
     }
     setSavingCredentials(true);
@@ -407,6 +451,19 @@ export function ShopifyCustomAppWizard({
           <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded text-green-800 text-xs">
             <Loader2 className="w-4 h-4 animate-spin shrink-0" />
             <span>Esperando que instales la app... esta ventana se actualiza sola</span>
+          </div>
+        )}
+
+        {pollTimedOut && (
+          <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded text-amber-900 text-xs">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="flex-1 space-y-2">
+              <p className="font-medium">La espera expiro (10 minutos sin detectar instalacion)</p>
+              <p>Si ya instalaste la app, haz clic en "Reintentar deteccion". Si no, sigue los pasos y haz clic cuando termines.</p>
+              <Button size="sm" onClick={handleRetryPolling} className="mt-1 bg-amber-600 hover:bg-amber-700 text-white h-7">
+                Reintentar deteccion
+              </Button>
+            </div>
           </div>
         )}
 

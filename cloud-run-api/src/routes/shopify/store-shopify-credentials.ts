@@ -1,13 +1,17 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { validateShopifyCredentialsFormat } from '../../lib/shopify-credentials.js';
 
 /**
  * Store Shopify Custom App Client ID + Client Secret (OAuth credentials).
- * 
+ *
  * These credentials are needed before the OAuth install link can work.
  * The merchant creates a Custom App in Shopify Admin, and provides
  * the Client ID and Client Secret from the API credentials tab.
+ *
+ * Marks the connection as connection_mode='custom_app' so the Credential
+ * Resolver knows where to find the credentials on subsequent requests.
  *
  * POST /api/store-shopify-credentials (authMiddleware)
  * Body: { clientId, shopDomain, shopifyClientId, shopifyClientSecret }
@@ -19,6 +23,12 @@ export async function storeShopifyCredentials(c: Context) {
 
     if (!clientId || !shopDomain || !shopifyClientId || !shopifyClientSecret) {
       return c.json({ error: 'Faltan campos requeridos: clientId, shopDomain, shopifyClientId, shopifyClientSecret' }, 400);
+    }
+
+    // Validate credential format BEFORE saving (prevents garbage in DB)
+    const formatCheck = validateShopifyCredentialsFormat(shopifyClientId, shopifyClientSecret);
+    if (!formatCheck.valid) {
+      return c.json({ error: formatCheck.error }, 400);
     }
 
     // Normalize domain
@@ -88,6 +98,9 @@ export async function storeShopifyCredentials(c: Context) {
       shop_domain: normalizedDomain,
       store_url: `https://${normalizedDomain}`,
       is_active: true,
+      // CRITICAL: marca la conexion como Custom App para que el Credential
+      // Resolver lea credenciales desde DB (no desde env vars globales).
+      connection_mode: 'custom_app',
       updated_at: new Date().toISOString(),
     };
 

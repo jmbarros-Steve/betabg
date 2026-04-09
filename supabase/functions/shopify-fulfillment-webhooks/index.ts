@@ -59,6 +59,7 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { getWebhookSecretForShop } from "../_shared/shopify-credentials.ts";
 
 // ---------------------------------------------------------------------------
 // CORS headers (needed for Supabase Edge Functions)
@@ -285,13 +286,18 @@ Deno.serve(async (req) => {
   const rawBody = await req.text();
 
   // ── HMAC verification ──
-  // SHOPIFY_WEBHOOK_SECRET is the "Webhook signing secret" from the Partner Dashboard.
-  // Falls back to SHOPIFY_CLIENT_SECRET for backwards compatibility.
-  const shopifySecret = Deno.env.get('SHOPIFY_WEBHOOK_SECRET') || Deno.env.get('SHOPIFY_CLIENT_SECRET');
+  // Dual-mode: el secret se obtiene del Credential Resolver segun el modo de la conexion:
+  //   - custom_app → client_secret per-connection (en DB)
+  //   - app_store  → SHOPIFY_WEBHOOK_SECRET global (env var)
+  // Fallback a env vars si la conexion no existe aun (p.ej. primer webhook durante registro).
+  const shopifySecret = await getWebhookSecretForShop(shopDomain);
   if (!shopifySecret) {
-    console.error('[Fulfillment] Neither SHOPIFY_WEBHOOK_SECRET nor SHOPIFY_CLIENT_SECRET configured');
+    console.error(
+      `[Fulfillment] No webhook secret resolvable for shop=${shopDomain}. ` +
+      `Check platform_connections.connection_mode or SHOPIFY_WEBHOOK_SECRET env var.`
+    );
     return new Response(
-      JSON.stringify({ error: 'Server misconfiguration' }),
+      JSON.stringify({ error: 'Server misconfiguration — no webhook secret' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
