@@ -18,7 +18,7 @@ import { SteveChat } from '@/components/client-portal/SteveChat';
 import { SteveEstrategia } from '@/components/client-portal/SteveEstrategia';
 import { BrandBriefView } from '@/components/client-portal/BrandBriefView';
 import { CopyGenerator } from '@/components/client-portal/CopyGenerator';
-import { GoogleAdsGenerator } from '@/components/client-portal/GoogleAdsGenerator';
+import GoogleAdsTab from '@/components/client-portal/google-ads/GoogleAdsTab';
 import { CampaignStudio } from '@/components/client-portal/campaign-studio/CampaignStudio';
 import { FinancialConfigPanel } from '@/components/client-portal/FinancialConfigPanel';
 import { ChongaSupport } from '@/components/client-portal/ChongaSupport';
@@ -556,9 +556,7 @@ export default function ClientPortal() {
           {visitedTabs.has('google') && effectiveClientId && (
             <div className={activeTab !== 'google' || !userCanAccessTab('google') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Google Ads">
-                <div className="max-w-4xl mx-auto">
-                  <GoogleAdsGenerator clientId={effectiveClientId} />
-                </div>
+                <GoogleAdsTab clientId={effectiveClientId} />
               </TabErrorBoundary>
             </div>
           )}

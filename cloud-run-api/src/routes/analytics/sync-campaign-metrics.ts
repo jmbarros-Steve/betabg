@@ -1,57 +1,11 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
+import { getGoogleTokenForConnection } from '../../lib/resolve-google-token.js';
 import { metaApiFetch, metaApiJson } from '../../lib/meta-fetch.js';
+import { convertToCLP, fetchGoogleAccountCurrency } from '../../lib/currency.js';
 
-// Currency conversion utilities
-const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
-const FALLBACK_RATES: Record<string, number> = {
-  CLP: 950,
-  MXN: 17.5,
-  EUR: 0.92,
-  GBP: 0.79,
-};
-
-let cachedRates: Record<string, number> = {};
-let cacheTime = 0;
-const RATE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-
-async function getExchangeRates(): Promise<Record<string, number>> {
-  if (Object.keys(cachedRates).length > 0 && Date.now() - cacheTime < RATE_CACHE_TTL_MS) {
-    return cachedRates;
-  }
-
-  try {
-    const response = await fetch(EXCHANGE_RATE_API_URL);
-    if (!response.ok) throw new Error(`API returned ${response.status}`);
-    const data: any = await response.json();
-    console.log(`Exchange rates fetched: 1 USD = ${data.rates?.CLP} CLP`);
-    cachedRates = data.rates || FALLBACK_RATES;
-    cacheTime = Date.now();
-    return cachedRates;
-  } catch (error) {
-    console.error('Failed to fetch exchange rates, using fallback:', error);
-    return FALLBACK_RATES;
-  }
-}
-
-async function convertToCLP(amount: number, fromCurrency: string): Promise<number> {
-  const currency = fromCurrency.toUpperCase();
-  if (currency === 'CLP') return amount;
-
-  const rates = await getExchangeRates();
-
-  if (currency === 'USD') {
-    return amount * (rates['CLP'] || FALLBACK_RATES['CLP']);
-  } else {
-    // Convert FROM -> USD -> CLP
-    const fromRate = rates[currency] || 1;
-    const clpRate = rates['CLP'] || FALLBACK_RATES['CLP'];
-    return (amount / fromRate) * clpRate;
-  }
-}
-
-// Cache account currency by accountId (TTL: 1 hour)
+// Cache Meta account currency by accountId (TTL: 1 hour)
 const currencyCache = new Map<string, { currency: string; fetchedAt: number }>();
 const CURRENCY_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -162,12 +116,6 @@ export async function syncCampaignMetrics(c: Context) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
 
-    const decryptedToken = await getTokenForConnection(supabase, connection);
-    if (!decryptedToken) {
-      console.error('[sync-campaign-metrics] Token resolution failed for connection:', connection.id);
-      return c.json({ error: 'Failed to resolve token' }, 500);
-    }
-
     // Date range: last 30 days
     const endDate = new Date();
     const startDate = new Date();
@@ -195,61 +143,40 @@ export async function syncCampaignMetrics(c: Context) {
     }> = [];
 
     const shopDomain = clientData.shop_domain;
+    let metaAccessToken: string | null = null;
 
     if (platform === 'meta') {
+      metaAccessToken = await getTokenForConnection(supabase, connection);
+      if (!metaAccessToken) {
+        console.error('[sync-campaign-metrics] Meta token resolution failed for connection:', connection.id);
+        return c.json({ error: 'Failed to resolve Meta token' }, 500);
+      }
+
       campaignMetrics = await syncMetaCampaigns(
         connection.account_id!,
-        decryptedToken,
+        metaAccessToken,
         connection_id,
         startDate,
         endDate,
         shopDomain
       );
     } else if (platform === 'google') {
-      const googleClientId = process.env.GOOGLE_CLIENT_ID;
-      const googleClientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
       const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-
-      if (!developerToken || !googleClientId || !googleClientSecret) {
-        return c.json({ error: 'Google Ads configuration missing' }, 500);
+      if (!developerToken) {
+        return c.json({ error: 'GOOGLE_ADS_DEVELOPER_TOKEN not configured' }, 500);
       }
 
-      // Refresh token if needed
-      let accessToken = decryptedToken;
-      if (connection.refresh_token_encrypted) {
-        const { data: refreshToken } = await supabase
-          .rpc('decrypt_platform_token', { encrypted_token: connection.refresh_token_encrypted });
-
-        if (refreshToken) {
-          try {
-            const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: new URLSearchParams({
-                client_id: googleClientId,
-                client_secret: googleClientSecret,
-                refresh_token: refreshToken,
-                grant_type: 'refresh_token',
-              }),
-            });
-            const refreshData: any = await refreshResponse.json();
-            if (refreshData.access_token) {
-              accessToken = refreshData.access_token;
-            }
-          } catch (e) {
-            console.log('Token refresh failed:', e);
-          }
-        }
-      }
+      const googleToken = await getGoogleTokenForConnection(supabase, connection);
 
       campaignMetrics = await syncGoogleCampaigns(
         connection.account_id!,
-        accessToken,
+        googleToken.accessToken,
         developerToken,
         connection_id,
         startDate,
         endDate,
-        shopDomain
+        shopDomain,
+        googleToken.mccCustomerId || undefined
       );
     }
 
@@ -278,7 +205,7 @@ export async function syncCampaignMetrics(c: Context) {
       console.log('[sync-campaign-metrics] Syncing adset-level metrics...');
       const adsetMetrics = await syncMetaAdsetMetrics(
         connection.account_id!,
-        decryptedToken,
+        metaAccessToken!,
         connection_id,
         startDate,
         endDate,
@@ -452,13 +379,16 @@ async function syncGoogleCampaigns(
   connectionId: string,
   startDate: Date,
   endDate: Date,
-  shopDomain: string | null
+  shopDomain: string | null,
+  loginCustomerId?: string
 ): Promise<Array<any>> {
   const metrics: Array<any> = [];
   const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
-  // Google Ads uses USD by default, we convert to CLP
-  const sourceCurrency = 'USD';
+  // Detect real account currency (cached in currency.ts)
+  const effectiveLoginId = loginCustomerId || customerId;
+  const sourceCurrency = await fetchGoogleAccountCurrency(customerId, accessToken, developerToken, effectiveLoginId);
+  console.log(`[syncGoogleCampaigns] Account ${customerId} currency: ${sourceCurrency}`);
 
   const query = `
     SELECT
@@ -475,6 +405,7 @@ async function syncGoogleCampaigns(
       metrics.average_cpc
     FROM campaign
     WHERE segments.date BETWEEN '${formatDate(startDate)}' AND '${formatDate(endDate)}'
+      AND campaign.status != 'REMOVED'
     ORDER BY segments.date DESC
   `;
 
@@ -486,7 +417,7 @@ async function syncGoogleCampaigns(
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'developer-token': developerToken,
-          'login-customer-id': customerId,
+          'login-customer-id': effectiveLoginId,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ query }),
@@ -519,19 +450,19 @@ async function syncGoogleCampaigns(
     console.log(`Found ${allResults.length} Google campaign day records`);
 
     for (const row of allResults) {
-      const spendUSD = row.metrics?.costMicros ? parseInt(row.metrics.costMicros, 10) / 1000000 : 0;
+      const spendRaw = row.metrics?.costMicros ? parseInt(row.metrics.costMicros, 10) / 1000000 : 0;
       const impressions = row.metrics?.impressions ? parseInt(row.metrics.impressions, 10) : 0;
       const clicks = row.metrics?.clicks ? parseInt(row.metrics.clicks, 10) : 0;
-      const cpmUSD = impressions > 0 ? (spendUSD / impressions) * 1000 : 0;
-      const cpcUSD = row.metrics?.averageCpc ? parseInt(row.metrics.averageCpc, 10) / 1000000 : 0;
-      const conversionValueUSD = row.metrics?.conversionsValue || 0;
-      const roas = spendUSD > 0 ? conversionValueUSD / spendUSD : 0;
+      const cpmRaw = impressions > 0 ? (spendRaw / impressions) * 1000 : 0;
+      const cpcRaw = row.metrics?.averageCpc ? parseInt(row.metrics.averageCpc, 10) / 1000000 : 0;
+      const conversionValueRaw = row.metrics?.conversionsValue || 0;
+      const roas = spendRaw > 0 ? conversionValueRaw / spendRaw : 0;
 
       // Convert all monetary values to CLP
-      const spendCLP = await convertToCLP(spendUSD, sourceCurrency);
-      const cpcCLP = await convertToCLP(cpcUSD, sourceCurrency);
-      const cpmCLP = await convertToCLP(cpmUSD, sourceCurrency);
-      const conversionValueCLP = await convertToCLP(conversionValueUSD, sourceCurrency);
+      const spendCLP = await convertToCLP(spendRaw, sourceCurrency);
+      const cpcCLP = await convertToCLP(cpcRaw, sourceCurrency);
+      const cpmCLP = await convertToCLP(cpmRaw, sourceCurrency);
+      const conversionValueCLP = await convertToCLP(conversionValueRaw, sourceCurrency);
 
       metrics.push({
         connection_id: connectionId,
