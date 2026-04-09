@@ -93,12 +93,13 @@ export async function syncSubscribers(c: Context) {
       let synced = 0;
       let skipped = 0;
       const errors: string[] = [];
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
       // Process in batches of 50
       for (let i = 0; i < customers.length; i += 50) {
         const batch = customers.slice(i, i + 50);
         const records = batch
-          .filter((c: any) => c.email) // Skip customers without email
+          .filter((c: any) => c.email && emailRegex.test(c.email.trim())) // Skip customers without valid email
           .map((cust: any) => ({
             client_id,
             email: cust.email.toLowerCase().trim(),
@@ -111,7 +112,7 @@ export async function syncSubscribers(c: Context) {
             tags: cust.tags ? cust.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
             total_orders: cust.orders_count || 0,
             total_spent: parseFloat(cust.total_spent || '0'),
-            last_order_at: cust.last_order_name ? new Date().toISOString() : null,
+            last_order_at: cust.orders_count > 0 ? (cust.last_order_date || new Date().toISOString()) : null,
             subscribed_at: cust.created_at || new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }));

@@ -189,6 +189,9 @@ export async function steveEmailContent(c: Context) {
     if (!connectionId) {
       return c.json({ error: 'connectionId required' }, 400);
     }
+    if (body.clientId === '') {
+      return c.json({ error: 'Missing clientId' }, 400);
+    }
 
     // Verify connection ownership
     const { data: connection, error: connError } = await serviceClient

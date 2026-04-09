@@ -87,7 +87,10 @@ export async function executeAutoFix(
 
     // Trigger sync-all-metrics for stale data
     if (check.check_type === 'api_compare' || check.check_type === 'data_quality') {
-      const baseUrl = process.env.CLOUD_RUN_URL || 'https://steve-api-850416724643.us-central1.run.app';
+      const baseUrl = process.env.CLOUD_RUN_URL || process.env.SELF_URL || 'https://steve-api-850416724643.us-central1.run.app';
+      if (!process.env.CLOUD_RUN_URL && !process.env.SELF_URL) {
+        console.warn('[auto-fixer] Using hardcoded CLOUD_RUN_URL — set CLOUD_RUN_URL or SELF_URL env var');
+      }
       const cronSecret = process.env.CRON_SECRET;
       if (!cronSecret) {
         return { success: false, action: 'CRON_SECRET not configured — cannot call sync-all-metrics' };

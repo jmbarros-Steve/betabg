@@ -20,18 +20,21 @@ export async function syncAllMetrics(c: Context) {
   const supabase = getSupabaseAdmin();
   const results: Array<{ connection_id: string; platform: string; status: string; error?: string }> = [];
 
-  // Fetch all active connections with valid tokens
-  // Note: Meta/Shopify/Google use access_token_encrypted, Klaviyo uses api_key_encrypted
-  const { data: connections, error: fetchErr } = await supabase
+  // Fetch all active connections, then filter in JS to avoid fragile .or() with RLS
+  const { data: allConnections, error: fetchErr } = await supabase
     .from('platform_connections')
     .select('id, platform, account_id, access_token_encrypted, api_key_encrypted, store_url, client_id, connection_type')
-    .eq('is_active', true)
-    .or('access_token_encrypted.not.is.null,api_key_encrypted.not.is.null,connection_type.eq.bm_partner,connection_type.eq.leadsie');
+    .eq('is_active', true);
 
-  if (fetchErr || !connections) {
+  if (fetchErr || !allConnections) {
     console.error('[cron] Failed to fetch connections:', fetchErr);
     return c.json({ error: 'Failed to fetch connections' }, 500);
   }
+
+  const connections = allConnections.filter(c =>
+    c.access_token_encrypted || c.api_key_encrypted ||
+    c.connection_type === 'bm_partner' || c.connection_type === 'leadsie'
+  );
 
   console.log(`[cron] Found ${connections.length} active connections to sync`);
 

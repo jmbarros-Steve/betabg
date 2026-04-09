@@ -114,16 +114,22 @@ async function metaGetAll(endpoint: string, token: string, params: Record<string
   }
   url = firstUrl.toString();
 
+  let hadError = false;
   while (url) {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) {
       const err: any = await res.json().catch(() => ({}));
       console.error(`Meta API error on ${endpoint}:`, err);
+      hadError = true;
       break;
     }
     const data: any = await res.json();
     if (data.data) results.push(...data.data);
     url = data.paging?.next || null;
+  }
+
+  if (hadError && results.length > 0) {
+    console.warn(`[hierarchy] Partial results returned for ${endpoint} due to API error (${results.length} items fetched before failure)`);
   }
 
   return results;

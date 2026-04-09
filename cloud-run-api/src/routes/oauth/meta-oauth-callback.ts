@@ -32,7 +32,7 @@ export async function metaOauthCallback(c: Context) {
         .maybeSingle();
       if (!stateCheck) {
         console.warn('[meta-oauth] Invalid state parameter — possible CSRF');
-        // Don't block for now (backwards compat) but log it
+        return c.json({ error: 'Invalid state parameter — possible CSRF attack' }, 403);
       }
     }
 
@@ -127,7 +127,9 @@ export async function metaOauthCallback(c: Context) {
       return c.json({ error: 'No ad accounts or businesses found for this user' }, 400);
     }
 
-    const accountId: string | null = null;
+    const accountId: string | null = adAccounts.length > 0
+      ? (adAccounts[0].account_id || adAccounts[0].id?.replace('act_', '') || null)
+      : null;
     const accountName: string | null = businesses.length > 0 ? businesses[0].name : null;
 
     const { data: encryptedToken, error: encryptError } = await supabase
@@ -136,6 +138,11 @@ export async function metaOauthCallback(c: Context) {
     if (encryptError) {
       console.error('Encryption error:', encryptError);
       return c.json({ error: 'Failed to secure token' }, 500);
+    }
+
+    if (!encryptedToken) {
+      console.error('[meta-oauth] encrypt_platform_token returned null');
+      return c.json({ error: 'Failed to encrypt token' }, 500);
     }
 
     const { data: existingConnection } = await supabase
@@ -188,6 +195,9 @@ export async function metaOauthCallback(c: Context) {
     const cronSecret = process.env.CRON_SECRET;
     if (selfUrl && cronSecret && connectionResult.data?.id) {
       const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+      if (!serviceKey) {
+        console.warn('[meta-oauth] Missing SUPABASE_SERVICE_ROLE_KEY — auto-sync skipped');
+      }
       fetch(`${selfUrl}/api/sync-meta-metrics`, {
         method: 'POST',
         headers: {
@@ -198,7 +208,11 @@ export async function metaOauthCallback(c: Context) {
         },
         body: JSON.stringify({ connection_id: connectionResult.data.id }),
       }).then(res => {
-        console.log(`[meta-oauth] Auto-sync triggered: ${res.status}`);
+        if (!res.ok) {
+          console.warn(`[meta-oauth] Auto-sync returned non-OK status: ${res.status}`);
+        } else {
+          console.log(`[meta-oauth] Auto-sync triggered: ${res.status}`);
+        }
       }).catch(err => {
         console.warn('[meta-oauth] Auto-sync failed (non-blocking):', err.message);
       });

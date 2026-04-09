@@ -142,7 +142,8 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
 
   useEffect(() => {
     supabase.from('buyer_personas').select('id, is_complete').eq('client_id', clientId).eq('is_complete', true).maybeSingle()
-      .then(({ data }) => setHasBrief(!!data));
+      .then(({ data }) => setHasBrief(!!data))
+      .catch((err) => console.error('[CopyGenerator] Query failed:', err));
     fetchCredits();
   }, [clientId]);
 

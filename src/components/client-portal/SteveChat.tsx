@@ -220,7 +220,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
   }, [clientId]);
 
   useEffect(() => {
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       const viewport = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]');
       if (viewport) {
         viewport.scrollTop = viewport.scrollHeight;
@@ -228,6 +228,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }
     }, 100);
+    return () => clearTimeout(timer);
   }, [messages, currentFields, showAssetUpload, showInteraction]);
 
   // Show asset upload when we're on Q15

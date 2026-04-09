@@ -1,4 +1,5 @@
 import { Context } from 'hono';
+import { timingSafeEqual } from 'crypto';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 /**
@@ -52,9 +53,15 @@ export async function leadsieWebhook(c: Context) {
     // should always have the secret set.
     const expectedSecret = process.env.LEADSIE_WEBHOOK_SECRET;
     if (expectedSecret) {
+      if (c.req.query('secret')) {
+        console.warn('[leadsie-webhook] Secret in URL query param — should use header instead');
+      }
       const providedSecret =
         c.req.header('x-webhook-secret') || c.req.query('secret') || '';
-      if (providedSecret !== expectedSecret) {
+      const isValid = providedSecret &&
+        expectedSecret.length === providedSecret.length &&
+        timingSafeEqual(Buffer.from(providedSecret), Buffer.from(expectedSecret));
+      if (!isValid) {
         console.warn('[leadsie-webhook] Rejected: invalid secret');
         return c.json({ error: 'Unauthorized' }, 401);
       }

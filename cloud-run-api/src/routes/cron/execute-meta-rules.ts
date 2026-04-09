@@ -21,10 +21,11 @@ export async function executeMetaRulesCron(c: Context) {
   const supabase = getSupabaseAdmin();
 
   try {
-    // Fetch all active rules grouped by connection
+    // Fetch all active rules with left join on platform_connections (no !inner)
+    // so orphaned rules (deleted connection) are still returned and logged
     const { data: activeRules, error } = await supabase
       .from('meta_automated_rules')
-      .select('*, platform_connections!inner(id, account_id, access_token_encrypted, client_id, connection_type)')
+      .select('*, platform_connections(id, account_id, access_token_encrypted, client_id, connection_type)')
       .eq('is_active', true);
 
     if (error) {
@@ -38,9 +39,13 @@ export async function executeMetaRulesCron(c: Context) {
 
     console.log(`[execute-meta-rules] Found ${activeRules.length} active rules`);
 
-    // Group rules by connection_id
+    // Group rules by connection_id, skipping orphans
     const byConnection = new Map<string, typeof activeRules>();
     for (const rule of activeRules) {
+      if (!rule.platform_connections) {
+        console.warn(`[execute-meta-rules] Rule ${rule.id}: connection deleted, skipping`);
+        continue;
+      }
       const connId = rule.connection_id;
       if (!byConnection.has(connId)) byConnection.set(connId, []);
       byConnection.get(connId)!.push(rule);

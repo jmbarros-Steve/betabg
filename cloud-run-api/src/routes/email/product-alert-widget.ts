@@ -244,8 +244,9 @@ function injectWidget(product) {
   var overlay = document.createElement("div");
   overlay.className = "steve-overlay";
 
-  var productImgHtml = product.image ?
-    '<div class="steve-product-info"><img src="' + product.image + '" alt=""><span>' + escapeHtml(product.title) + '</span></div>' :
+  var safeImage = sanitizeUrl(product.image);
+  var productImgHtml = safeImage ?
+    '<div class="steve-product-info"><img src="' + safeImage + '" alt=""><span>' + escapeHtml(product.title) + '</span></div>' :
     '<div class="steve-product-info"><span>' + escapeHtml(product.title) + '</span></div>';
 
   overlay.innerHTML =
@@ -367,6 +368,12 @@ function injectWidget(product) {
     var main = document.querySelector("main") || document.querySelector(".product") || document.body;
     main.appendChild(host);
   }
+}
+
+function sanitizeUrl(url) {
+  if (!url) return '';
+  if (!/^https?:\\/\\//i.test(url)) return '';
+  return url.replace(/['"<>]/g, '');
 }
 
 function escapeHtml(str) {

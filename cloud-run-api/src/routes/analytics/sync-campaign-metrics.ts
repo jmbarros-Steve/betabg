@@ -13,9 +13,13 @@ const FALLBACK_RATES: Record<string, number> = {
 };
 
 let cachedRates: Record<string, number> = {};
+let cacheTime = 0;
+const RATE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 async function getExchangeRates(): Promise<Record<string, number>> {
-  if (Object.keys(cachedRates).length > 0) return cachedRates;
+  if (Object.keys(cachedRates).length > 0 && Date.now() - cacheTime < RATE_CACHE_TTL_MS) {
+    return cachedRates;
+  }
 
   try {
     const response = await fetch(EXCHANGE_RATE_API_URL);
@@ -23,6 +27,7 @@ async function getExchangeRates(): Promise<Record<string, number>> {
     const data: any = await response.json();
     console.log(`Exchange rates fetched: 1 USD = ${data.rates?.CLP} CLP`);
     cachedRates = data.rates || FALLBACK_RATES;
+    cacheTime = Date.now();
     return cachedRates;
   } catch (error) {
     console.error('Failed to fetch exchange rates, using fallback:', error);

@@ -222,6 +222,7 @@ async function handleCheckoutCreated(supabase: any, clientId: string, payload: a
       console.log(`Enrolled subscriber ${subscriber.id} in abandoned cart flow ${flow.id}`);
     } catch (err) {
       console.error('Failed to schedule flow step:', err);
+      await supabase.from('email_flow_enrollments').update({ status: 'error', error_message: 'Failed to schedule Cloud Task' }).eq('id', enrollment!.id);
     }
   }
 }
@@ -289,6 +290,7 @@ async function handleCustomerCreated(supabase: any, clientId: string, payload: a
       console.log(`Enrolled subscriber ${subscriber.id} in welcome flow ${flow.id}`);
     } catch (err) {
       console.error('Failed to schedule welcome step:', err);
+      await supabase.from('email_flow_enrollments').update({ status: 'error', error_message: 'Failed to schedule Cloud Task' }).eq('id', enrollment.id);
     }
   }
 }
@@ -471,6 +473,7 @@ async function handleOrderCreated(supabase: any, clientId: string, payload: any)
         console.log(`Enrolled subscriber ${subscriber.id} in post-purchase flow ${flow.id}`);
       } catch (err) {
         console.error('Failed to schedule post-purchase step:', err);
+        await supabase.from('email_flow_enrollments').update({ status: 'error', error_message: 'Failed to schedule Cloud Task' }).eq('id', enrollment.id);
       }
     }
   }
@@ -712,6 +715,7 @@ async function enrollInFlows(
         console.log(`Enrolled subscriber ${subscriberId} in ${triggerType} flow ${flow.id}`);
       } catch (err) {
         console.error(`Failed to schedule ${triggerType} flow step:`, err);
+        await supabase.from('email_flow_enrollments').update({ status: 'error', error_message: 'Failed to schedule Cloud Task' }).eq('id', enrollment.id);
       }
     }
   }
@@ -803,6 +807,7 @@ export async function emailFlowCronWinback(c: Context) {
         totalEnrolled++;
       } catch (err) {
         console.error('Failed to schedule winback step:', err);
+        await supabase.from('email_flow_enrollments').update({ status: 'error', error_message: 'Failed to schedule Cloud Task' }).eq('id', enrollment.id);
       }
     }
   }
@@ -918,6 +923,7 @@ export async function emailFlowCronBirthday(c: Context) {
         totalEnrolled++;
       } catch (err) {
         console.error('Failed to schedule birthday step:', err);
+        await supabase.from('email_flow_enrollments').update({ status: 'error', error_message: 'Failed to schedule Cloud Task' }).eq('id', enrollment.id);
       }
     }
   }
@@ -1057,6 +1063,7 @@ export async function emailFlowTrackBrowse(c: Context) {
         console.log(`Enrolled ${subscriber.email} in browse abandonment flow ${flow.id}`);
       } catch (err) {
         console.error('Failed to schedule browse abandonment step:', err);
+        await supabase.from('email_flow_enrollments').update({ status: 'error', error_message: 'Failed to schedule Cloud Task' }).eq('id', enrollment.id);
       }
     }
   }

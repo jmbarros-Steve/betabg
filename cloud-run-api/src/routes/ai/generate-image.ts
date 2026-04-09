@@ -30,8 +30,9 @@ export async function generateImage(c: Context) {
 
   // Verify the authenticated user owns this client
   const user = c.get('user');
-  if (!user || !clientId) {
-    return c.json({ error: 'Missing authentication or clientId' }, 401);
+  if (!user?.id) return c.json({ error: 'Unauthorized' }, 401);
+  if (!clientId) {
+    return c.json({ error: 'Missing clientId' }, 400);
   }
   const ownerCheck = await safeQuerySingleOrDefault<{ id: string }>(
     supabase
@@ -153,20 +154,27 @@ export async function generateImage(c: Context) {
     if (effectiveFotoBase) {
       try {
         console.log('[generate-image] Downloading reference photo for Gemini:', effectiveFotoBase);
-        const refResponse = await fetch(effectiveFotoBase);
-        if (refResponse.ok) {
-          const refBuffer = await refResponse.arrayBuffer();
-          const refBase64 = Buffer.from(refBuffer).toString('base64');
-          const mimeType = refResponse.headers.get('content-type') || 'image/jpeg';
-          parts.push({
-            inlineData: { mimeType, data: refBase64 },
-          });
-          parts.push({
-            text: `CRITICAL: This is the REAL product photo. The product in the generated image MUST look EXACTLY like this — same shape, same colors, same packaging, same labels, same textures. Do not alter, stylize, or reimagine the product. Place this exact real product into the advertising scene described below. The final image must look like a real photograph taken with a professional camera, NOT an AI illustration.\n\n${promptFinal}`,
-          });
-        } else {
+        const refResponse = await fetch(effectiveFotoBase, { signal: AbortSignal.timeout(15000) });
+        if (!refResponse.ok) {
           console.warn('[generate-image] Could not download reference photo:', refResponse.status);
           parts.push({ text: promptFinal });
+        } else {
+          const contentLength = parseInt(refResponse.headers.get('content-length') || '0', 10);
+          if (contentLength > 10 * 1024 * 1024) {
+            // 10MB limit — skip reference image, proceed without it
+            console.warn('[generate-image] Reference image too large:', contentLength);
+            parts.push({ text: promptFinal });
+          } else {
+            const refBuffer = await refResponse.arrayBuffer();
+            const refBase64 = Buffer.from(refBuffer).toString('base64');
+            const mimeType = refResponse.headers.get('content-type') || 'image/jpeg';
+            parts.push({
+              inlineData: { mimeType, data: refBase64 },
+            });
+            parts.push({
+              text: `CRITICAL: This is the REAL product photo. The product in the generated image MUST look EXACTLY like this — same shape, same colors, same packaging, same labels, same textures. Do not alter, stylize, or reimagine the product. Place this exact real product into the advertising scene described below. The final image must look like a real photograph taken with a professional camera, NOT an AI illustration.\n\n${promptFinal}`,
+            });
+          }
         }
       } catch (refErr) {
         console.warn('[generate-image] Reference photo download error:', refErr);
@@ -176,6 +184,7 @@ export async function generateImage(c: Context) {
       parts.push({ text: promptFinal });
     }
 
+    // Note: Gemini API requires key in URL per their docs
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_API_KEY}`,
       {

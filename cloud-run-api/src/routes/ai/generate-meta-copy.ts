@@ -729,6 +729,7 @@ export async function generateMetaCopy(c: Context) {
   // Verify the authenticated user owns this client
   const user = c.get('user');
   if (user) {
+    if (!user.id) return c.json({ error: 'Unauthorized' }, 401);
     const ownerCheck = await safeQuerySingleOrDefault<{ id: string }>(
       supabase
         .from('clients')

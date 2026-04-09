@@ -180,15 +180,17 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
         // Fetch current and previous metrics in parallel
         // IMPORTANT: Only fetch revenue/orders from Shopify connections to avoid double attribution
         // Ad spend comes from platform_metrics (Meta sync writes ad_spend there)
-        const shopifyQueryIds = shopifyConnIds.length > 0 ? shopifyConnIds : ['00000000-0000-0000-0000-000000000000'];
-        const adQueryIds = adConnIds.length > 0 ? adConnIds : ['00000000-0000-0000-0000-000000000000'];
+        const shopifyQueryIds = shopifyConnIds;
+        const adQueryIds = adConnIds;
         // Map connection_id → platform for ad spend breakdown
         const connPlatformMap = new Map(connections.map(c => [c.id, c.platform]));
 
         const endDateStr = endDate.toISOString().split('T')[0];
+        // Skip queries when no connection IDs exist instead of using sentinel UUIDs
+        const emptyResult = { data: [] as any[], error: null };
         const [currentRes, prevRes, configRes, adSpendCurrentRes, adSpendPrevRes] = await Promise.all([
           // Only Shopify metrics for revenue/orders (no Meta purchase_value!)
-          (() => {
+          shopifyQueryIds.length === 0 ? emptyResult : (() => {
             let q = supabase
               .from('platform_metrics')
               .select('metric_type, metric_value, metric_date')
@@ -197,7 +199,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
               .lte('metric_date', endDateStr);
             return q.order('metric_date', { ascending: true });
           })(),
-          supabase
+          shopifyQueryIds.length === 0 ? emptyResult : supabase
             .from('platform_metrics')
             .select('metric_type, metric_value, metric_date')
             .in('connection_id', shopifyQueryIds)
@@ -209,7 +211,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             .eq('client_id', clientId)
             .maybeSingle(),
           // Get ad spend from platform_metrics (where sync-meta-metrics writes)
-          (() => {
+          adQueryIds.length === 0 ? emptyResult : (() => {
             let q = supabase
               .from('platform_metrics')
               .select('metric_type, metric_value, metric_date, connection_id')
@@ -219,7 +221,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
               .lte('metric_date', endDateStr);
             return q;
           })(),
-          supabase
+          adQueryIds.length === 0 ? emptyResult : supabase
             .from('platform_metrics')
             .select('metric_type, metric_value, metric_date, connection_id')
             .in('connection_id', adQueryIds)

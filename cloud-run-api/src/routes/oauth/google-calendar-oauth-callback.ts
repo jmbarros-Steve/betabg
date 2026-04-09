@@ -29,10 +29,16 @@ export async function googleCalendarOauthCallback(c: Context) {
     }
 
     const googleClientId = process.env.GOOGLE_CLIENT_ID;
-    const googleClientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET || process.env.GOOGLE_ADS_CLIENT_SECRET;
+    const clientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET || process.env.GOOGLE_ADS_CLIENT_SECRET;
+    if (!clientSecret) {
+      console.error('[gcal-oauth] No GOOGLE_CALENDAR_CLIENT_SECRET configured');
+      return c.json({ error: 'OAuth not configured' }, 500);
+    }
+    const googleClientSecret = clientSecret;
 
-    if (!googleClientId || !googleClientSecret) {
-      return c.json({ error: 'Google Calendar credentials not configured' }, 500);
+    if (!googleClientId) {
+      console.error('[gcal-oauth] No GOOGLE_CLIENT_ID configured');
+      return c.json({ error: 'OAuth not configured' }, 500);
     }
 
     // Exchange code for tokens

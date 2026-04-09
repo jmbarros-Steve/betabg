@@ -54,6 +54,7 @@ export default function Dashboard() {
     // Only super admins or real admins can access dashboard
     if (!isSuperAdmin && !isAdmin) {
       navigate('/portal');
+      return;
     }
   }, [user, authLoading, roleLoading, isSuperAdmin, isAdmin, isShopifyUser, navigate]);
 

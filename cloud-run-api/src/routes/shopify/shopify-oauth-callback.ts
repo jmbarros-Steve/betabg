@@ -3,6 +3,8 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
+const SHOPIFY_API_VERSION = '2025-01';
+
 function generatePassword(length = 16): string {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
   let password = '';
@@ -301,7 +303,7 @@ export async function shopifyOauthCallback(c: Context) {
     console.log('Successfully obtained access token');
 
     // Get shop info
-    const shopInfoResponse = await fetch(`https://${shopDomain}/admin/api/2024-01/shop.json`, {
+    const shopInfoResponse = await fetch(`https://${shopDomain}/admin/api/${SHOPIFY_API_VERSION}/shop.json`, {
       headers: { 'X-Shopify-Access-Token': accessToken },
     });
 
@@ -668,7 +670,7 @@ async function registerWebhooks(c: Context, shopDomain: string, accessToken: str
   let existingWebhooks: Array<{ topic: string; address: string }> = [];
   try {
     const listRes = await fetch(
-      `https://${shopDomain}/admin/api/2024-10/webhooks.json`,
+      `https://${shopDomain}/admin/api/${SHOPIFY_API_VERSION}/webhooks.json`,
       { headers: { 'X-Shopify-Access-Token': accessToken } },
     );
     if (listRes.ok) {
@@ -693,7 +695,7 @@ async function registerWebhooks(c: Context, shopDomain: string, accessToken: str
 
     try {
       const webhookRes = await fetch(
-        `https://${shopDomain}/admin/api/2024-10/webhooks.json`,
+        `https://${shopDomain}/admin/api/${SHOPIFY_API_VERSION}/webhooks.json`,
         {
           method: 'POST',
           headers: {

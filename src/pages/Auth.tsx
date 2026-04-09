@@ -459,8 +459,13 @@ export default function Auth() {
                       setOauthError(`OAuth Error: ${error.message}`);
                       toast.error('Error al iniciar sesión con Google');
                     }
-                  } catch (err: any) {
-                    setOauthError(`Exception: ${err.message}`);
+                  } catch (err: unknown) {
+                    try {
+                      const message = err instanceof Error ? err.message : String(err);
+                      setOauthError(`Exception: ${message}`);
+                    } catch {
+                      setOauthError('Error desconocido al iniciar sesión con Google');
+                    }
                   }
                 }}
               >

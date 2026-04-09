@@ -250,7 +250,11 @@ export async function steveWAChat(c: Context) {
 
     // Fix #1: Twilio HMAC signature validation — reject forged webhooks
     const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
-    if (twilioAuthToken) {
+    if (!twilioAuthToken) {
+      console.error('[steve-wa] TWILIO_AUTH_TOKEN not configured — rejecting webhook');
+      return c.text('Forbidden', 403);
+    }
+    {
       const sig = c.req.header('X-Twilio-Signature') || '';
       const proto = c.req.header('x-forwarded-proto') || 'https';
       const host = c.req.header('host') || '';
@@ -327,10 +331,10 @@ export async function steveWAChat(c: Context) {
     if (hadPII) {
       console.log(`[steve-wa-chat] PII detected and scrubbed from ${from}`);
     }
-    // Use scrubbed version for storage, original for detecting PII warning
+    // Use scrubbed version for ALL processing and storage — PII must never reach AI or DB
     const storageBody = scrubbedBody;
-    // Keep original for AI processing (AI should see context to warn user)
-    // but messageBody for DB storage is always scrubbed
+    // Override messageBody with scrubbed version so AI calls also use scrubbed data
+    messageBody = scrubbedBody;
 
     // Extract clean phone number
     const phone = from.replace('whatsapp:', '').replace('+', '').trim();
@@ -380,7 +384,7 @@ export async function steveWAChat(c: Context) {
       contact_name: profileName || client.name,
       status: 'open',
       last_message_at: new Date().toISOString(),
-      last_message_preview: messageBody.substring(0, 100),
+      last_message_preview: storageBody.substring(0, 100),
     }, { onConflict: 'client_id,channel,contact_phone' });
 
     // Build Steve's context with real business data + relevant knowledge
@@ -1508,17 +1512,23 @@ async function processProspectAsync(
           // If there's an assigned seller, create Calendar event via booking API
           if (prospect.assigned_seller_id) {
             const bookingApiUrl = process.env.CLOUD_RUN_URL || 'http://localhost:8080';
-            fetch(`${bookingApiUrl}/api/booking/confirm`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                seller_id: prospect.assigned_seller_id,
-                slot_start: meetingDate.toISOString(),
-                prospect_name: prospect.name || prospect.profile_name || 'Prospecto',
-                prospect_phone: prospect.phone,
-                prospect_id: prospect.id,
-              }),
-            }).catch(err => console.error('[meeting-confirm] Booking API error:', err));
+            if (bookingApiUrl && !bookingApiUrl.startsWith('https://') && !bookingApiUrl.startsWith('http://localhost')) {
+              console.warn('[steve-wa] Invalid booking URL (not HTTPS):', bookingApiUrl);
+              // Skip booking confirmation — SSRF protection
+            } else {
+              fetch(`${bookingApiUrl}/api/booking/confirm`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                signal: AbortSignal.timeout(10000),
+                body: JSON.stringify({
+                  seller_id: prospect.assigned_seller_id,
+                  slot_start: meetingDate.toISOString(),
+                  prospect_name: prospect.name || prospect.profile_name || 'Prospecto',
+                  prospect_phone: prospect.phone,
+                  prospect_id: prospect.id,
+                }),
+              }).catch(err => console.error('[meeting-confirm] Booking API error:', err));
+            }
           }
 
           logProspectEvent(prospect.id, 'meeting_booked', { meeting_at: meetingDate.toISOString(), method: 'text_confirmation' }, 'steve');
@@ -1586,6 +1596,7 @@ async function auditProspectUrl(url: string, prospectId: string): Promise<void> 
         'Authorization': `Bearer ${APIFY_TOKEN}`,
         'Content-Type': 'application/json',
       },
+      signal: AbortSignal.timeout(30000),
       body: JSON.stringify({
         startUrls: [{ url }],
         maxCrawlPages: 3,
@@ -1608,7 +1619,10 @@ async function auditProspectUrl(url: string, prospectId: string): Promise<void> 
     let status = 'RUNNING';
     while (status === 'RUNNING' && attempts < 12) {
       await new Promise(r => setTimeout(r, 5000));
-      const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`);
+      // Apify actor-runs GET requires token in URL (not supported in Authorization header for this endpoint)
+      const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`, {
+        signal: AbortSignal.timeout(30000),
+      });
       const statusData: any = await statusRes.json();
       status = statusData.data?.status || 'FAILED';
       attempts++;
@@ -1621,8 +1635,18 @@ async function auditProspectUrl(url: string, prospectId: string): Promise<void> 
 
     // Get results
     const datasetId = runData.data?.defaultDatasetId;
-    const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_TOKEN}&limit=3`);
-    const items = (await itemsRes.json()) as any[];
+    // Apify dataset items GET requires token in URL (not supported in Authorization header for this endpoint)
+    const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_TOKEN}&limit=3`, {
+      signal: AbortSignal.timeout(30000),
+    });
+
+    // Size check before parsing — reject oversized responses
+    const itemsText = await itemsRes.text();
+    if (itemsText.length > 1024 * 1024) {
+      console.warn('[steve-wa] Apify response too large:', itemsText.length, 'bytes');
+      return;
+    }
+    const items = JSON.parse(itemsText) as any[];
 
     if (!items || items.length === 0) return;
 

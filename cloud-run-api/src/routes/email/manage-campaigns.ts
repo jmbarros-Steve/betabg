@@ -58,6 +58,12 @@ export async function manageEmailCampaigns(c: Context) {
 
   const supabase = getSupabaseAdmin();
 
+  // Ownership validation: ensure the authenticated user has access to this client_id
+  const user = c.get('user');
+  if (!user?.id) return c.json({ error: 'Unauthorized' }, 401);
+  const { data: ownerCheck } = await supabase.from('clients').select('id').eq('id', client_id).or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`).maybeSingle();
+  if (!ownerCheck) return c.json({ error: 'No tienes acceso' }, 403);
+
   switch (action) {
     case 'list': {
       const { status, limit = 50, offset = 0 } = body;

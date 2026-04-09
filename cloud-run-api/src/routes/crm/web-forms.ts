@@ -14,6 +14,11 @@ export async function webFormsCrud(c: Context) {
     const supabase = getSupabaseAdmin();
     const user = c.get('user');
 
+    // Auth check: all actions except public_submit require authentication
+    if (action !== 'public_submit') {
+      if (!user?.id) return c.json({ error: 'Unauthorized' }, 401);
+    }
+
     if (action === 'list') {
       const { data, error } = await supabase
         .from('web_forms')
@@ -128,6 +133,11 @@ export async function webFormSubmit(c: Context) {
       const email = data.email || null;
       const company = data.empresa || data.company || null;
 
+      // Require at least email or phone
+      if (!email && !phone) {
+        return c.json({ error: 'Email or phone required' }, 400);
+      }
+
       // Check for existing prospect by phone or email
       let existing: any = null;
       if (phone) {
@@ -166,7 +176,7 @@ export async function webFormSubmit(c: Context) {
         const { data: newProspect, error: insertErr } = await supabase
           .from('wa_prospects')
           .insert({
-            phone: phone || `web-${Date.now()}`,
+            phone: phone || null,
             name,
             email,
             company,

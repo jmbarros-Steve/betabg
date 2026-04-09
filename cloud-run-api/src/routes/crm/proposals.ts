@@ -84,8 +84,13 @@ export async function proposalsCrud(c: Context) {
 
         if (error) return c.json({ error: error.message }, 500);
 
+        // Super admin can see all proposals
+        if (isSuperAdmin) {
+          return c.json({ proposal: data });
+        }
+
         // Verify ownership: check if user created this proposal or owns the prospect
-        if (!isSuperAdmin && data.created_by !== user.id) {
+        if (data.created_by !== user.id) {
           if (data.prospect_id) {
             const { allowed } = await verifyProspectOwnership(supabase, data.prospect_id, user.id);
             if (!allowed) return c.json({ error: 'Forbidden' }, 403);

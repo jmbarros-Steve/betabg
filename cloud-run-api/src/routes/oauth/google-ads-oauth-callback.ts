@@ -94,6 +94,9 @@ export async function googleAdsOauthCallback(c: Context) {
 
     const accessToken = tokenData.access_token;
     const refreshToken = tokenData.refresh_token;
+    if (!tokenData.refresh_token) {
+      console.warn('[google-ads-oauth] No refresh_token received — user may have already authorized this app. Re-authorization with prompt=consent may be needed.');
+    }
     console.log('Access token obtained');
 
     // Get list of accessible Google Ads customers

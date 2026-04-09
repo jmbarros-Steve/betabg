@@ -64,6 +64,10 @@ async function metaApiRequest(
     return { ok: false, error: errorMessage };
   }
 
+  if (responseData === undefined || responseData === null) {
+    return { ok: false, error: 'Empty response from Meta API' };
+  }
+
   return { ok: true, data: responseData };
 }
 
@@ -95,7 +99,12 @@ async function uploadImageFromUrl(
 
     // Fallback: download image and upload as base64 bytes
     console.log(`[manage-meta-campaign] URL upload failed, trying base64 fallback for ${imageUrl}`);
-    const imgResponse = await fetch(imageUrl);
+    let imgResponse: Response;
+    try {
+      imgResponse = await fetch(imageUrl);
+    } catch (fetchErr: any) {
+      return { ok: false, error: `Failed to download image (network error): ${fetchErr?.message || 'unknown'}` };
+    }
     if (!imgResponse.ok) {
       return { ok: false, error: `Failed to download image: ${imgResponse.status}` };
     }

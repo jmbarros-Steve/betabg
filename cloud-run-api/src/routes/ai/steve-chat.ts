@@ -710,7 +710,7 @@ function sanitizeMessagesForAnthropic(
 function truncateMessages(msgs: Array<{ role: 'user' | 'assistant'; content: string }>) {
   let recent = msgs.slice(-20);
   while (JSON.stringify(recent).length > 180000 && recent.length > 4) {
-    recent = [recent[0], ...recent.slice(2)];
+    recent = recent.slice(1);
   }
   return recent;
 }
@@ -1438,7 +1438,9 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
                               .slice(0, 5000);
                           }
                         }
-                      } catch {}
+                      } catch (e: any) {
+                        console.warn('[steve-chat] Caption parse error:', e?.message || e);
+                      }
                     }
                   }
                 }
@@ -2038,6 +2040,7 @@ REGLAS ABSOLUTAS:
   }
 
   const aiData: any = await aiResponse.json();
+  if (!aiData.content?.[0]?.text) console.error('[steve-chat] Invalid AI response:', JSON.stringify(aiData).slice(0, 500));
   let assistantMessage = aiData.content?.[0]?.text || 'Lo siento, hubo un error. ¿Podrías repetir tu respuesta?';
 
   // Track rule usage (Mejora #5): update ultima_vez_usada for rules referenced in the response

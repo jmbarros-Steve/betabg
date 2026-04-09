@@ -42,7 +42,7 @@ export async function detectAudienceOverlap(c: Context) {
 
   // Auth
   const user = c.get('user');
-  if (!user) return c.json({ error: 'Unauthorized' }, 401);
+  if (!user?.id) return c.json({ error: 'Unauthorized' }, 401);
   const ownerCheck = await safeQuerySingleOrDefault<any>(
     supabase
       .from('clients')

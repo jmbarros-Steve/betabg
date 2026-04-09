@@ -64,7 +64,15 @@ async function getMetaToken(supabase: any, clientId: string): Promise<{ token: s
   }
 
   // 2. Fallback: discover from first page with IG
+  //    SUAT check: /me/accounts with a System User token returns ALL merchants'
+  //    pages → cross-contamination. Block this path for bm_partner/leadsie.
   if (!igUserId) {
+    const isSuat = conn.connection_type === 'bm_partner' || conn.connection_type === 'leadsie';
+    if (isSuat) {
+      console.warn('[publish-instagram] SUAT connection has no ig_account_id and no page_id — cannot discover IG account without /me/accounts');
+      return null;
+    }
+
     const pagesRes = await metaApiJson<{ data: any[] }>('/me/accounts', token, {
       params: { fields: 'id,instagram_business_account', limit: '10' },
     });

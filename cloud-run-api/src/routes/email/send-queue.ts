@@ -244,12 +244,12 @@ export async function emailSendQueue(c: Context) {
               .update({
                 status: 'sent',
                 processed_at: new Date().toISOString(),
-                attempts: item.attempts + 1,
+                attempts: (item.attempts ?? 0) + 1,
               })
               .eq('id', item.id);
             sent++;
           } else {
-            const newAttempts = item.attempts + 1;
+            const newAttempts = (item.attempts ?? 0) + 1;
             const newStatus = newAttempts >= item.max_attempts ? 'failed' : 'queued';
             await supabase
               .from('email_send_queue')
@@ -263,7 +263,7 @@ export async function emailSendQueue(c: Context) {
             failed++;
           }
         } catch (err: any) {
-          const newAttempts = item.attempts + 1;
+          const newAttempts = (item.attempts ?? 0) + 1;
           await supabase
             .from('email_send_queue')
             .update({

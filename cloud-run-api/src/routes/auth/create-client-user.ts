@@ -55,8 +55,14 @@ export async function createClientUser(c: Context) {
     return c.json({ error: 'Client not found' }, 404);
   }
 
-  if (client.user_id !== adminUser.id) {
-    return c.json({ error: 'Access denied' }, 403);
+  // Check if user is super admin
+  const { data: profile } = await supabase.from('profiles').select('is_super_admin').eq('id', adminUser.id).maybeSingle();
+  if (profile?.is_super_admin) {
+    // Super admin can create users for any client
+  } else if (client.user_id !== adminUser.id) {
+    // Check user_roles as fallback
+    const { data: roleCheck } = await supabase.from('user_roles').select('id').eq('user_id', adminUser.id).eq('client_id', client_id).maybeSingle();
+    if (!roleCheck) return c.json({ error: 'No permission' }, 403);
   }
 
   if (client.client_user_id) {

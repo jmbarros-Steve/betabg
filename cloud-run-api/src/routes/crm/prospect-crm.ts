@@ -61,12 +61,11 @@ export async function prospectDetail(c: Context) {
     const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
     if (!allowed) return c.json({ error: 'Forbidden' }, 403);
 
-    const [prospectRes, eventsRes, tasksRes, proposalsRes, messagesRes] = await Promise.all([
+    const [prospectRes, eventsRes, tasksRes, proposalsRes] = await Promise.all([
       supabase.from('wa_prospects').select('*').eq('id', prospect_id).single(),
       supabase.from('wa_prospect_events').select('*').eq('prospect_id', prospect_id).order('created_at', { ascending: false }).limit(100),
       supabase.from('sales_tasks').select('*').eq('prospect_id', prospect_id).order('created_at', { ascending: false }),
       supabase.from('proposals').select('*').eq('prospect_id', prospect_id).order('created_at', { ascending: false }),
-      supabase.from('wa_messages').select('id, direction, body, created_at, contact_name, metadata').eq('contact_phone', '').limit(0), // placeholder, filled below
     ]);
 
     if (prospectRes.error || !prospectRes.data) {

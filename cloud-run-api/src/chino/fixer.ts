@@ -64,11 +64,26 @@ async function getMerchantForCheck(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   check: ChinoCheck
 ): Promise<{ merchant: MerchantConn | null; token: string | null }> {
-  if (['performance'].includes(check.check_type) || check.platform === 'infra') {
+  if (['performance', 'api_exists'].includes(check.check_type) || check.platform === 'infra') {
     return { merchant: null, token: null };
   }
 
-  // Get first active connection for this platform
+  // Try to find the specific merchant that last failed this check
+  // by looking at the most recent failing chino_report for this check_id
+  const lastFailReport = await safeQuerySingleOrDefault<{ merchant_id: string | null }>(
+    supabase
+      .from('chino_reports')
+      .select('merchant_id')
+      .eq('check_id', check.id)
+      .in('result', ['fail', 'error'])
+      .not('merchant_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    null,
+    'chinoFixer.getMerchantForCheck.lastFailReport',
+  );
+
   let query = supabase
     .from('platform_connections')
     .select('id, client_id, platform, connection_type, access_token_encrypted, api_key_encrypted, store_url, account_id, clients!inner(name)')
@@ -77,6 +92,11 @@ async function getMerchantForCheck(
 
   if (check.platform !== 'all') {
     query = query.eq('platform', check.platform);
+  }
+
+  // If we know which merchant failed, target that specific connection
+  if (lastFailReport?.merchant_id) {
+    query = query.eq('client_id', lastFailReport.merchant_id);
   }
 
   const { data } = await query.maybeSingle();

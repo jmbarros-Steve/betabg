@@ -221,6 +221,10 @@ export async function metaApiJson<T = any>(
       return { ok: false, error: data.error || data, status: res.status };
     }
 
+    if (data === null || data === undefined) {
+      return { ok: false, error: { message: 'Empty response body' }, status: res.status };
+    }
+
     return { ok: true, data: data as T };
   } catch (err: any) {
     if (err.name === 'AbortError') {

@@ -186,6 +186,11 @@ export async function salesTasksAutoGenerate(c: Context) {
       prospects = data || [];
     }
 
+    // Guard against too many prospects to prevent Cartesian product DoS
+    if (prospects.length > 100) {
+      return c.json({ error: 'Too many prospects for auto-generate (max 100)' }, 400);
+    }
+
     // Get existing pending tasks to avoid duplicates
     const prospectIds = prospects.map(p => p.id);
     const existingTasks = await safeQueryOrDefault<any>(

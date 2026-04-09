@@ -8,7 +8,11 @@ import { isChinoInstruction, handleChinoInstruction } from './instruction-handle
 
 // JM's phone — env var or hardcoded fallback
 function getJMPhone(): string {
-  return process.env.JOSE_WHATSAPP_NUMBER || process.env.JM_PHONE || '';
+  const phone = process.env.JOSE_WHATSAPP_NUMBER || process.env.JM_PHONE;
+  if (!phone) {
+    console.error('[chino/wa] JOSE_WHATSAPP_NUMBER not configured — WhatsApp alerts DISABLED');
+  }
+  return phone || '';
 }
 
 // ─── Send text to JM ────────────────────────────────────────────

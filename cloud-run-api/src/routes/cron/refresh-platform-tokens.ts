@@ -44,9 +44,14 @@ export async function refreshPlatformTokens(c: Context) {
   for (const conn of connections) {
     const label = conn.store_name || conn.id;
     try {
+      if (!conn.access_token_encrypted) {
+        // Token missing entirely — skip
+        results.push({ id: conn.id, store: label, status: 'no_token' });
+        continue;
+      }
       const decrypted = await decryptPlatformToken(supabase, conn.access_token_encrypted);
       if (!decrypted) {
-        console.error(`[refresh-platform-tokens] Could not decrypt token for ${label}`);
+        console.error(`[refresh-platform-tokens] ${label}: decrypt failed (possible key rotation)`);
         results.push({ id: conn.id, store: label, status: 'decrypt_failed' });
         failed++;
         continue;

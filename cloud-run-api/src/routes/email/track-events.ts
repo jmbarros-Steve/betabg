@@ -206,12 +206,16 @@ export async function sesWebhooks(c: Context) {
         const email = recipient.emailAddress?.toLowerCase();
         if (!email) continue;
 
+        // NOTE: Cross-tenant lookup is unavoidable here because SES bounce
+        // notifications don't include client context. We limit results to
+        // prevent unbounded queries and process all matching subscribers.
         const subscribers = await safeQueryOrDefault<any>(
           supabase
             .from('email_subscribers')
             .select('id, client_id, bounce_count')
             .eq('email', email)
-            .in('status', ['subscribed', 'bounced']),
+            .in('status', ['subscribed', 'bounced'])
+            .limit(10),
           [],
           'sesWebhooks.getBounceSubscribers',
         );
@@ -264,11 +268,15 @@ export async function sesWebhooks(c: Context) {
         const email = recipient.emailAddress?.toLowerCase();
         if (!email) continue;
 
+        // NOTE: Cross-tenant lookup is unavoidable here because SES complaint
+        // notifications don't include client context. Limit results to prevent
+        // unbounded queries.
         const subscribers = await safeQueryOrDefault<any>(
           supabase
             .from('email_subscribers')
             .select('id, client_id')
-            .eq('email', email),
+            .eq('email', email)
+            .limit(10),
           [],
           'sesWebhooks.getComplaintSubscribers',
         );

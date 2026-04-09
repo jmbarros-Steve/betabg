@@ -28,6 +28,13 @@ export async function storeKlaviyoConnection(c: Context) {
       return c.json({ error: 'client_id and api_key are required' }, 400);
     }
 
+    // Ownership validation: ensure the authenticated user has access to this client_id
+    const { data: ownerCheck } = await supabase.from('clients').select('id').eq('id', client_id).or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`).maybeSingle();
+    if (!ownerCheck) {
+      const { data: profile } = await supabase.from('profiles').select('is_super_admin').eq('id', user.id).maybeSingle();
+      if (!profile?.is_super_admin) return c.json({ error: 'No tienes acceso' }, 403);
+    }
+
     // Validate the API key by making a test request to Klaviyo
     const testResponse = await fetch('https://a.klaviyo.com/api/accounts/', {
       method: 'GET',

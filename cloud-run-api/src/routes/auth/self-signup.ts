@@ -63,7 +63,7 @@ export async function selfSignup(c: Context) {
     supabase.from('clients').insert({
       user_id: userId,
       client_user_id: userId,
-      name: email.split('@')[0],
+      name: (email.split('@')[0] || 'User').trim(),
       email,
     }).select('id').single(),
     'selfSignup.createClient',

@@ -64,7 +64,7 @@ export function useUserRole(): UseUserRoleReturn {
         let effectiveIsAdmin = isAdmin ?? false;
 
         if (clientErr || adminErr) {
-          console.warn('[useUserRole] RPC failed, using clients table fallback');
+          console.warn('[useUserRole] RPC failed, using clients table fallback:', clientErr?.message || adminErr?.message);
           const { data: fallbackClients, error: fallbackErr } = await supabase
             .from('clients')
             .select('id')

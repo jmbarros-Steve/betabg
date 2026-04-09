@@ -17,6 +17,9 @@ export async function adminCreateClient(c: Context) {
   const body = await c.req.json();
   const { secret, action } = body;
 
+  if (!process.env.ADMIN_API_SECRET) {
+    console.warn('[admin-create-client] ADMIN_API_SECRET not set, falling back to CRON_SECRET');
+  }
   const adminSecret = process.env.ADMIN_API_SECRET || process.env.CRON_SECRET;
   if (!adminSecret) {
     return c.json({ error: 'Server misconfigured' }, 500);

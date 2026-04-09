@@ -283,8 +283,17 @@ async function executeCheck(
         if (!merchant) return { result: 'skip', error_message: 'No merchant for api_compare', duration_ms: 0 };
         return await executeApiCompare(supabase, check, merchant, decryptedToken);
 
-      case 'api_exists':
-        return await executePerformance(check, runId);
+      case 'api_exists': {
+        // Simple API existence check — verify endpoint responds
+        const url = check.check_config?.url || check.check_config?.target_url;
+        if (!url) return { result: 'skip', error_message: 'No target URL configured in check_config', duration_ms: 0 };
+        try {
+          const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(10000) });
+          return { result: res.ok ? 'pass' : 'fail', error_message: `HTTP ${res.status}`, duration_ms: Date.now() - start };
+        } catch (e: any) {
+          return { result: 'fail', error_message: e.message, duration_ms: Date.now() - start };
+        }
+      }
 
       case 'token_health':
         return await executeTokenHealth(supabase, check, merchant, decryptedToken);
