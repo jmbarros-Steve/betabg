@@ -9,17 +9,9 @@ export async function metaCatalogs(c: Context) {
   try {
     const supabase = getSupabaseAdmin();
 
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader) {
-      return c.json({ error: 'Missing authorization header' }, 401);
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      return c.json({ error: 'Invalid token' }, 401);
-    }
+    // User already validated by authMiddleware
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const body = await c.req.json();
     const { connection_id } = body;

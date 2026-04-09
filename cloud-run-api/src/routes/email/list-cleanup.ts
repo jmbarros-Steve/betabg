@@ -107,21 +107,22 @@ export async function emailListCleanup(c: Context) {
           .update(updateData)
           .eq('id', sub.id);
 
-        if (!error) updated++;
-      }
+        if (!error) {
+          updated++;
 
-      // Record cleanup event
-      await supabase.from('email_events').insert({
-        client_id,
-        subscriber_id: toSunset[0].id, // Use first subscriber as reference
-        event_type: 'unsubscribed',
-        metadata: {
-          action: 'sunset_cleanup',
-          affected_count: updated,
-          unsubscribed: unsubscribe,
-          days_inactive: days,
-        },
-      });
+          // Record cleanup event per subscriber
+          await supabase.from('email_events').insert({
+            client_id,
+            subscriber_id: sub.id,
+            event_type: 'unsubscribed',
+            metadata: {
+              action: 'sunset_cleanup',
+              unsubscribed: unsubscribe,
+              days_inactive: days,
+            },
+          });
+        }
+      }
 
       return c.json({
         success: true,

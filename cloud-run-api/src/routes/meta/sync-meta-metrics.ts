@@ -4,58 +4,7 @@ import { checkRateLimit } from '../../lib/rate-limiter.js';
 import { metaApiFetch, metaApiJson } from '../../lib/meta-fetch.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
-
-// Currency conversion utilities
-const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
-const FALLBACK_RATES: Record<string, number> = {
-  CLP: 920,
-  MXN: 17.0,
-  EUR: 0.91,
-  GBP: 0.78,
-};
-
-// Cache exchange rates for the duration of a sync run (avoid ~180 API calls)
-let cachedRates: Record<string, number> | null = null;
-let cachedRatesAt = 0;
-const RATE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-async function getExchangeRates(): Promise<Record<string, number>> {
-  // Return cached rates if still fresh
-  if (cachedRates && Date.now() - cachedRatesAt < RATE_CACHE_TTL_MS) {
-    return cachedRates;
-  }
-
-  try {
-    const response = await fetch(EXCHANGE_RATE_API_URL);
-    if (!response.ok) throw new Error(`API returned ${response.status}`);
-    const data: any = await response.json();
-    console.log(`Exchange rates fetched: 1 USD = ${data.rates?.CLP} CLP`);
-    cachedRates = data.rates;
-    cachedRatesAt = Date.now();
-    return data.rates;
-  } catch (error) {
-    console.error('Failed to fetch exchange rates, using fallback:', error);
-    cachedRates = FALLBACK_RATES;
-    cachedRatesAt = Date.now();
-    return FALLBACK_RATES;
-  }
-}
-
-async function convertToCLP(amount: number, fromCurrency: string): Promise<number> {
-  const currency = fromCurrency.toUpperCase();
-  if (currency === 'CLP') return amount;
-
-  const rates = await getExchangeRates();
-
-  if (currency === 'USD') {
-    return amount * (rates['CLP'] || FALLBACK_RATES['CLP']);
-  } else {
-    // Convert FROM -> USD -> CLP
-    const fromRate = rates[currency] || 1;
-    const clpRate = rates['CLP'] || FALLBACK_RATES['CLP'];
-    return (amount / fromRate) * clpRate;
-  }
-}
+import { convertToCLP } from '../../lib/currency.js';
 
 // Helper to validate Shopify Session Token
 async function validateShopifySessionToken(

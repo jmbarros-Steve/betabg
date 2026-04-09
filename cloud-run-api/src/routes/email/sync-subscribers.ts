@@ -1,7 +1,5 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
-
 /**
  * Decrypt Shopify access token from the platform_connections table.
  * Follows the same pattern used in fetch-shopify-analytics.ts.
@@ -214,48 +212,6 @@ export async function syncSubscribers(c: Context) {
 
     case 'stats': {
       // Get subscriber counts by status
-      const { data, error } = await supabase
-        .from('email_subscribers')
-        .select('status', { count: 'exact' })
-        .eq('client_id', client_id);
-
-      if (error) return c.json({ error: error.message }, 500);
-
-      // Count by status (using parameterized query builder instead of raw SQL)
-      const subscribedCount = await safeQueryOrDefault<any>(
-        supabase
-          .from('email_subscribers')
-          .select('*', { count: 'exact', head: true })
-          .eq('client_id', client_id)
-          .eq('status', 'subscribed'),
-        [],
-        'syncSubscribers.countSubscribed',
-      );
-      const unsubscribedRows = await safeQueryOrDefault<any>(
-        supabase
-          .from('email_subscribers')
-          .select('*', { count: 'exact', head: true })
-          .eq('client_id', client_id)
-          .eq('status', 'unsubscribed'),
-        [],
-        'syncSubscribers.countUnsubscribed',
-      );
-      const bouncedRows = await safeQueryOrDefault<any>(
-        supabase
-          .from('email_subscribers')
-          .select('*', { count: 'exact', head: true })
-          .eq('client_id', client_id)
-          .eq('status', 'bounced'),
-        [],
-        'syncSubscribers.countBounced',
-      );
-      const counts = [
-        { status: 'subscribed', count: (subscribedCount as any)?.length || 0 },
-        { status: 'unsubscribed', count: (unsubscribedRows as any)?.length || 0 },
-        { status: 'bounced', count: (bouncedRows as any)?.length || 0 },
-      ];
-
-      // Simple count approach
       const { count: total } = await supabase
         .from('email_subscribers')
         .select('*', { count: 'exact', head: true })

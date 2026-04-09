@@ -4,12 +4,9 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 export async function uploadEmailImage(c: Context) {
   const supabase = getSupabaseAdmin();
 
-  // Verify JWT
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader) return c.json({ error: 'Missing authorization header' }, 401);
-  const token = authHeader.replace('Bearer ', '');
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-  if (authError || !user) return c.json({ error: 'Invalid token' }, 401);
+  // User already validated by authMiddleware
+  const user = c.get('user');
+  if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
   const body = await c.req.parseBody();
   const file = body['file'];

@@ -13,9 +13,6 @@ interface ShopifyOrder {
 
 export async function syncShopifyMetrics(c: Context) {
   try {
-    const supabaseUrl = process.env.SUPABASE_URL!;
-    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
-
     // Use service role for all DB operations
     const supabaseService = getSupabaseAdmin();
 
@@ -222,6 +219,7 @@ export async function syncShopifyMetrics(c: Context) {
 
       if (insertError) {
         console.error('Error inserting metrics:', insertError);
+        return c.json({ error: `Failed to save metrics: ${insertError.message}` }, 500);
       }
     }
 

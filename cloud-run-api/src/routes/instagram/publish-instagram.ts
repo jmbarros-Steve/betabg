@@ -183,17 +183,11 @@ async function publishContainer(token: string, igUserId: string, creationId: str
 
 export async function publishInstagram(c: Context) {
   try {
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    // User already validated by authMiddleware
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const supabase = getSupabaseAdmin();
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
 
     const body = await c.req.json();
     const { action, client_id } = body;

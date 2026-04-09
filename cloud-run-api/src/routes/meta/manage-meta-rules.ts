@@ -221,16 +221,9 @@ export async function manageMetaRules(c: Context) {
   try {
     const supabase = getSupabaseAdmin();
 
-    // Verify JWT
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader) {
-      return c.json({ error: 'Missing authorization header' }, 401);
-    }
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return c.json({ error: 'Invalid token' }, 401);
-    }
+    // User already validated by authMiddleware
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const body: RequestBody = await c.req.json();
     const { action, client_id, connection_id, rule_id, data } = body;

@@ -104,19 +104,20 @@ export async function ruleCalibrator(c: Context) {
 
   for (const p of problematic) {
     if (p.issue === 'too_strict') {
-      // Check if this rule was already flagged last week (persistent problem)
+      // Check if this specific rule was already flagged in previous calibration runs (persistent problem)
       const prevLog = await safeQueryOrDefault<{ id: string }>(
         supabase
           .from('qa_log')
           .select('id')
           .eq('check_type', 'rule_calibration')
           .gte('checked_at', new Date(Date.now() - 14 * 86400000).toISOString())
+          .ilike('details', `%${p.rule_id}%`)
           .limit(5),
         [],
         'ruleCalibrator.fetchPrevCalibrationLogs',
       );
 
-      // If rule has been too_strict for 2+ weeks (found in previous logs), auto-disable
+      // If this specific rule has been too_strict for 2+ weeks (found in previous logs), auto-disable
       const persistentProblem = prevLog.length >= 2;
 
       if (persistentProblem) {

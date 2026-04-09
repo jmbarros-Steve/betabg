@@ -180,7 +180,13 @@ export async function waSendCampaign(c: Context) {
               .replace(/\{\{nombre\}\}/g, recipient.name || 'Hola')
               .replace(/\{\{customer_name\}\}/g, recipient.name || 'Hola');
 
-            const toNorm = `whatsapp:+${recipient.phone.replace('+', '')}`;
+            const rawPhone = recipient.phone || '';
+            if (!rawPhone) {
+              console.warn(`[wa-campaign] Skipping recipient with no phone`);
+              failedCount++;
+              continue;
+            }
+            const toNorm = `whatsapp:+${rawPhone.replace('+', '')}`;
 
             const msg = await subClient.messages.create({
               from: fromNorm,

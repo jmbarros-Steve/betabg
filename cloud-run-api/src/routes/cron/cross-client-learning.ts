@@ -100,7 +100,13 @@ Solo incluye patrones claros respaldados por los datos. Sin markdown.`,
 
     const data: any = await res.json();
     const text = data.content?.[0]?.text || '[]';
-    const rules = JSON.parse(text.replace(/```json|```/g, '').trim());
+    let rules: any[];
+    try {
+      rules = JSON.parse(text.replace(/```json|```/g, '').trim());
+    } catch (parseErr) {
+      console.error('[cross-client-learning] Failed to parse AI response as JSON:', text.slice(0, 200));
+      return c.json({ success: true, clientsAnalyzed: clients.length, rulesGenerated: 0, parseError: true });
+    }
 
     let saved = 0;
     for (const rule of (Array.isArray(rules) ? rules : [])) {

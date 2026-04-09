@@ -189,18 +189,11 @@ export async function syncKlaviyoMetrics(c: Context) {
     const serviceClient = getSupabaseAdmin();
     const isInternal = c.get('isInternal') === true;
 
-    // Auth: allow internal calls (cron) or verify user JWT
+    // Auth: allow internal calls (cron) or use middleware-validated user
     let userId: string | null = null;
     if (!isInternal) {
-      const authHeader = c.req.header('Authorization');
-      if (!authHeader?.startsWith('Bearer ')) {
-        return c.json({ error: 'Unauthorized' }, 401);
-      }
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user }, error: authError } = await serviceClient.auth.getUser(token);
-      if (authError || !user) {
-        return c.json({ error: 'Unauthorized' }, 401);
-      }
+      const user = c.get('user');
+      if (!user) return c.json({ error: 'Unauthorized' }, 401);
       userId = user.id;
     }
 

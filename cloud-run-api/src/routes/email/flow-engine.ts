@@ -97,8 +97,13 @@ export async function emailFlowExecute(c: Context) {
       console.warn(`[flow-engine] Invalid timezone "${subscriberTz}" for subscriber ${subscriber.id}, using UTC.`);
       hour = now.getUTCHours();
     }
-    const quietStart = parseInt(settings.quiet_hours_start);
-    const quietEnd = parseInt(settings.quiet_hours_end);
+    const quietStart = parseInt(settings.quiet_hours_start, 10);
+    const quietEnd = parseInt(settings.quiet_hours_end, 10);
+
+    // Validate quiet hours — NaN from garbage input would bypass the check
+    if (isNaN(quietStart) || isNaN(quietEnd) || quietStart < 0 || quietStart > 23 || quietEnd < 0 || quietEnd > 23) {
+      console.warn(`[flow-engine] Invalid quiet_hours (start=${settings.quiet_hours_start}, end=${settings.quiet_hours_end}), ignoring.`);
+    } else {
 
     const inQuiet = quietStart <= quietEnd
       ? (hour >= quietStart && hour < quietEnd)
@@ -116,6 +121,7 @@ export async function emailFlowExecute(c: Context) {
       await scheduleFlowStep(enrollment_id, effectivePath, nextRun, enrollment.client_id);
       return c.json({ postponed: true, reason: 'Quiet hours', next_run: nextRun.toISOString() });
     }
+    } // end else (valid quiet hours)
   }
 
   // 6. Check exit conditions
@@ -580,8 +586,8 @@ async function evaluateBranchCondition(
 
 function compareValues(fieldValue: any, operator: string, compareValue: any): boolean {
   switch (operator) {
-    case 'eq': return fieldValue == compareValue;
-    case 'neq': return fieldValue != compareValue;
+    case 'eq': return String(fieldValue) === String(compareValue);
+    case 'neq': return String(fieldValue) !== String(compareValue);
     case 'gt': return Number(fieldValue) > Number(compareValue);
     case 'gte': return Number(fieldValue) >= Number(compareValue);
     case 'lt': return Number(fieldValue) < Number(compareValue);

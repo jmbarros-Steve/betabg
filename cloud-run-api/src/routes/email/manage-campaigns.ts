@@ -1047,11 +1047,25 @@ export async function executeScheduledCampaign(c: Context) {
 
   // Reuse the send logic by calling the manage function internally
   // This is a simplified version - in practice, you'd extract the send logic
+
+  // Fetch the campaign's user_id so the ownership check in manageEmailCampaigns passes
+  const { data: campaignOwner } = await supabase
+    .from('clients')
+    .select('user_id')
+    .eq('id', client_id)
+    .maybeSingle();
+
+  const fakeStore: Record<string, any> = {
+    user: { id: campaignOwner?.user_id || 'scheduled-system', email: 'scheduled@steve.cl' },
+  };
+
   const fakeContext = {
     req: {
       json: async () => ({ action: 'send', client_id, campaign_id }),
     },
     json: (data: any, status?: number) => c.json(data, status as any),
+    get: (key: string) => fakeStore[key],
+    set: (key: string, value: any) => { fakeStore[key] = value; },
   } as any;
 
   return manageEmailCampaigns(fakeContext);

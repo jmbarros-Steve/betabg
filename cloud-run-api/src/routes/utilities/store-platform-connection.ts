@@ -12,24 +12,11 @@ interface ConnectionPayload {
 
 export async function storePlatformConnection(c: Context) {
   try {
-    // Verify authentication
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      console.error('Missing or invalid authorization header');
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    // User already validated by authMiddleware
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const token = authHeader.replace('Bearer ', '');
     const supabase = getSupabaseAdmin();
-
-    // Validate the JWT and get user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      console.error('Invalid JWT:', authError);
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
     const userId = user.id;
     console.log('Authenticated user:', userId);
 

@@ -175,12 +175,16 @@ export async function fetchShopifyProducts(c: Context) {
 
     console.log('[fetch-shopify-products] Fetching from:', cleanStoreUrl);
 
+    const fetchController = new AbortController();
+    const fetchTimeout = setTimeout(() => fetchController.abort(), 30_000);
     const shopifyResponse = await fetch(shopifyUrl, {
       headers: {
         'X-Shopify-Access-Token': decryptedToken,
         'Content-Type': 'application/json',
       },
+      signal: fetchController.signal,
     });
+    clearTimeout(fetchTimeout);
 
     if (!shopifyResponse.ok) {
       const errorText = await shopifyResponse.text();
@@ -206,12 +210,16 @@ export async function fetchShopifyProducts(c: Context) {
         const batchIds = inventoryItemIds.slice(i, i + batchSize).join(',');
         const invUrl = `https://${cleanStoreUrl}/admin/api/2024-01/inventory_items.json?ids=${batchIds}`;
 
+        const invController = new AbortController();
+        const invTimeout = setTimeout(() => invController.abort(), 30_000);
         const invResponse = await fetch(invUrl, {
           headers: {
             'X-Shopify-Access-Token': decryptedToken,
             'Content-Type': 'application/json',
           },
+          signal: invController.signal,
         });
+        clearTimeout(invTimeout);
 
         if (invResponse.ok) {
           const { inventory_items }: any = await invResponse.json();

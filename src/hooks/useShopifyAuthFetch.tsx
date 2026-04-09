@@ -8,19 +8,37 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
  * Standalone mode: always uses Supabase auth session.
  */
 export function useShopifyAuthFetch() {
+  /**
+   * Get a fresh access token, refreshing the session if it's expired or about to expire.
+   */
+  const getFreshToken = async (): Promise<string | null> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return null;
+
+    // If the token expires within 60 seconds, proactively refresh
+    const expiresAt = session.expires_at ?? 0;
+    const nowSecs = Math.floor(Date.now() / 1000);
+    if (expiresAt - nowSecs < 60) {
+      const { data: { session: refreshed } } = await supabase.auth.refreshSession();
+      return refreshed?.access_token ?? session.access_token;
+    }
+
+    return session.access_token;
+  };
+
   const authFetch = useCallback(async (
     url: string,
     options: RequestInit = {}
   ): Promise<Response> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    
+    const token = await getFreshToken();
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string> || {}),
     };
 
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     return fetch(url, { ...options, headers });
@@ -33,13 +51,13 @@ export function useShopifyAuthFetch() {
     const { method = 'POST', body } = options;
     
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const token = await getFreshToken();
+
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
 
       const response = await fetch(

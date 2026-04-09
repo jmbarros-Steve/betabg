@@ -20,10 +20,9 @@ export async function analyzeBrandResearch(c: Context) {
 
   let userId: string | null = null;
   if (!isInternalCall) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    // User already validated by authMiddleware
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
     userId = user.id;
   }
 

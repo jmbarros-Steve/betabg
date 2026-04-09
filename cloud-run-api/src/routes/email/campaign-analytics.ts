@@ -22,11 +22,9 @@ export async function emailCampaignAnalytics(c: Context) {
     }
     userId = validation.userId;
   } else if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    // User already validated by authMiddleware
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
     userId = user.id;
   } else {
     return c.json({ error: 'Unauthorized' }, 401);

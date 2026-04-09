@@ -106,7 +106,10 @@ export async function fetchShopifyAnalytics(c: Context) {
       const results: T[] = [];
       let url: string | null = initialUrl;
       while (url) {
-        const res = await fetch(url, { headers: shopifyHeaders });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30_000);
+        const res = await fetch(url, { headers: shopifyHeaders, signal: controller.signal });
+        clearTimeout(timeout);
         if (!res.ok) {
           const errText = await res.text();
           console.warn(`[fetch-shopify-analytics] Paginated fetch failed: ${res.status}`, errText);

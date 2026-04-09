@@ -48,19 +48,20 @@ export async function waSendMessage(c: Context) {
       return c.json({ error: 'WhatsApp no configurado para este merchant' }, 404);
     }
 
-    // Check credits (read-only check before sending)
-    const creditCheck = await safeQuerySingleOrDefault<any>(
-      supabase
-        .from('wa_credits')
-        .select('balance')
-        .eq('client_id', client_id)
-        .single(),
-      null,
-      'sendMessage.getCreditCheck',
-    );
+    // Race-condition fix: Deduct credit ATOMICALLY before sending.
+    // deduct_wa_credit uses UPDATE ... WHERE balance >= p_amount, so two concurrent
+    // requests cannot both succeed — the second one will get insufficient_credits.
+    const cleanPhone = to_phone.replace('whatsapp:', '').replace('+', '');
 
-    if (!creditCheck || creditCheck.balance < 1) {
-      return c.json({ error: 'Creditos insuficientes', balance: creditCheck?.balance || 0 }, 402);
+    const { data: deductResult } = await supabase.rpc('deduct_wa_credit', {
+      p_client_id: client_id,
+      p_amount: 1,
+      p_description: `Mensaje manual a ${cleanPhone}`,
+    });
+
+    const result = deductResult as any;
+    if (!result?.success) {
+      return c.json({ error: 'Créditos insuficientes', balance: 0 }, 402);
     }
 
     // Send via Twilio sub-account
@@ -75,15 +76,33 @@ export async function waSendMessage(c: Context) {
 
     const fromNorm = `whatsapp:${waAccount.phone_number.startsWith('+') ? waAccount.phone_number : '+' + waAccount.phone_number}`;
 
-    const twilioMsg = await subClient.messages.create({
-      from: fromNorm,
-      to: toNorm,
-      body: messageBody,
-    });
+    let twilioMsg;
+    try {
+      twilioMsg = await subClient.messages.create({
+        from: fromNorm,
+        to: toNorm,
+        body: messageBody,
+      });
+    } catch (twilioErr) {
+      // Twilio failed — refund the credit we already deducted
+      console.error('[wa-send-message] Twilio send failed, refunding credit:', twilioErr);
+      const { error: refundError } = await supabase.rpc('deduct_wa_credit', {
+        p_client_id: client_id,
+        p_amount: -1,
+        p_description: `Refund: fallo envío a ${cleanPhone}`,
+      });
+      if (refundError) {
+        // If the RPC doesn't support negative amounts, fall back to direct update
+        console.warn('[wa-send-message] deduct_wa_credit refund failed, using direct update:', refundError);
+        await supabase
+          .from('wa_credits')
+          .update({ balance: (result?.new_balance ?? 0) + 1 })
+          .eq('client_id', client_id);
+      }
+      throw twilioErr;
+    }
 
     // Save message
-    const cleanPhone = to_phone.replace('whatsapp:', '').replace('+', '');
-
     await supabase.from('wa_messages').insert({
       client_id,
       channel: 'merchant_wa',
@@ -107,23 +126,10 @@ export async function waSendMessage(c: Context) {
       .eq('channel', 'merchant_wa')
       .eq('contact_phone', cleanPhone);
 
-    // Deduct credit atomically (Issue 1: prevents race condition)
-    const { data: deductResult } = await supabase.rpc('deduct_wa_credit', {
-      p_client_id: client_id,
-      p_amount: 1,
-      p_description: `Mensaje manual a ${cleanPhone}`,
-    });
-
-    const result = deductResult as any;
-    if (!result?.success) {
-      // Message already sent but credits failed — log but don't fail
-      console.warn('[wa-send-message] Credit deduction failed after message sent');
-    }
-
     return c.json({
       success: true,
       message_sid: twilioMsg.sid,
-      credits_remaining: result?.new_balance ?? (creditCheck.balance - 1),
+      credits_remaining: result?.new_balance ?? 0,
     });
 
   } catch (err: any) {

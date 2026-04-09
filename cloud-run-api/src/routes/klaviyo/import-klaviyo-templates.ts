@@ -6,17 +6,9 @@ export async function importKlaviyoTemplates(c: Context) {
   try {
     const supabase = getSupabaseAdmin();
 
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-    if (authError || !user) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    // User already validated by authMiddleware
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const body = await c.req.json();
     const { connectionId } = body;

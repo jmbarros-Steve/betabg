@@ -255,7 +255,9 @@ function evaluateCondition(value: number, operator: string, threshold: number, v
   switch (operator) {
     case 'GREATER_THAN': return value > threshold;
     case 'LESS_THAN': return value < threshold;
-    case 'EQUAL_TO': return Math.abs(value - threshold) < 0.01;
+    case 'EQUAL_TO':
+    case 'EQUALS':  // alias — manage-meta-rules creates rules with EQUALS
+      return Math.abs(value - threshold) < 0.01;
     case 'BETWEEN': return valueTo !== undefined && value >= threshold && value <= valueTo;
     default: return false;
   }

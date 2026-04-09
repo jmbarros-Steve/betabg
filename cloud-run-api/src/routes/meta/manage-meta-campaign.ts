@@ -375,6 +375,8 @@ async function handleCreate(
   }
 
   // Helper: create ad creative with retry (drops instagram_actor_id on failure)
+  // Uses a local copy of igActorId to avoid mutating the outer scope variable,
+  // which would break subsequent creative creation calls in the same request.
   async function createCreativeWithRetry(
     creativePayload: Record<string, any>,
     storySpecKey: string = 'object_story_spec'
@@ -382,8 +384,7 @@ async function handleCreate(
     const result = await metaApiRequest(`act_${accountId}/adcreatives`, accessToken, 'POST', creativePayload);
     if (!result.ok && result.error?.includes('instagram_actor_id') && igActorId) {
       console.warn(`[manage-meta-campaign] Creative failed with instagram_actor_id, retrying without it`);
-      igActorId = null;
-      // Remove instagram_actor_id from story spec and retry
+      // Remove instagram_actor_id from story spec and retry (local copy only, do NOT mutate outer igActorId)
       const specStr = creativePayload[storySpecKey];
       if (specStr) {
         const spec = JSON.parse(specStr);

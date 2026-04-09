@@ -21,19 +21,11 @@ export async function stevePromptEvolver(c: Context) {
     // errores en las 3 queries. Mismo patrón sistémico de bug silencioso
     // que ya causó 6 bugs. Ahora: capturamos result objects y logueamos
     // cada error explícitamente antes de continuar con data || [].
-    const [fbRes, qaRes, rulesRes] = await Promise.all([
+    const [fbRes, rulesRes] = await Promise.all([
       supabase.from('steve_training_feedback')
         .select('feedback_rating, original_recommendation, improved_recommendation, feedback_notes')
         .gte('created_at', thirtyDaysAgo)
         .limit(20),
-      // Fix Tomás W7 (2026-04-07): qa_log usa `checked_at`, no `created_at`.
-      // Antes esta query siempre devolvía vacío → los prompts de Steve nunca
-      // evolucionaban con feedback real del juez nocturno.
-      supabase.from('qa_log')
-        .select('check_type, status, details')
-        .eq('check_type', 'juez_nocturno')
-        .gte('checked_at', thirtyDaysAgo)
-        .limit(10),
       supabase.from('steve_knowledge')
         .select('titulo, contenido, veces_usada, quality_score')
         .eq('activo', true)
@@ -44,7 +36,6 @@ export async function stevePromptEvolver(c: Context) {
     ]);
 
     if (fbRes.error) console.error('[steve-prompt-evolver] feedback fetch error:', fbRes.error.message);
-    if (qaRes.error) console.error('[steve-prompt-evolver] qa_log fetch error:', qaRes.error.message);
     if (rulesRes.error) console.error('[steve-prompt-evolver] knowledge fetch error:', rulesRes.error.message);
 
     const feedback = fbRes.data || [];

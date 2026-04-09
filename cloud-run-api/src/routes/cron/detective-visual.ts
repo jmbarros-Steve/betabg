@@ -1,6 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-import { decryptPlatformToken } from '../../lib/decrypt-token.js';
+import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { safeQuery } from '../../lib/safe-supabase.js';
 
 /**
@@ -46,10 +46,10 @@ function withinTolerance(steveVal: number, realVal: number, tolerance: number): 
 async function checkMetaCampaigns(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<ComparisonResult[]> {
   const results: ComparisonResult[] = [];
 
-  const connections = await safeQuery<{ id: string; client_id: string; account_id: string; access_token_encrypted: string }>(
+  const connections = await safeQuery<{ id: string; client_id: string; account_id: string; access_token_encrypted: string; connection_type: string | null }>(
     supabase
       .from('platform_connections')
-      .select('id, client_id, account_id, access_token_encrypted')
+      .select('id, client_id, account_id, access_token_encrypted, connection_type')
       .eq('platform', 'meta')
       .eq('is_active', true),
     'detectiveVisual.fetchMetaConnections',
@@ -71,7 +71,7 @@ async function checkMetaCampaigns(supabase: ReturnType<typeof getSupabaseAdmin>)
 
     if (!steveCampaigns.length) continue;
 
-    const accessToken = await decryptPlatformToken(supabase, conn.access_token_encrypted);
+    const accessToken = await getTokenForConnection(supabase, conn);
     const adAccountId = conn.account_id;
     if (!accessToken || !adAccountId) continue;
 
@@ -125,10 +125,10 @@ async function checkMetaCampaigns(supabase: ReturnType<typeof getSupabaseAdmin>)
 async function checkShopifyProducts(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<ComparisonResult[]> {
   const results: ComparisonResult[] = [];
 
-  const connections = await safeQuery<{ id: string; client_id: string; shop_domain: string | null; access_token_encrypted: string }>(
+  const connections = await safeQuery<{ id: string; client_id: string; shop_domain: string | null; access_token_encrypted: string; connection_type: string | null }>(
     supabase
       .from('platform_connections')
-      .select('id, client_id, shop_domain, access_token_encrypted')
+      .select('id, client_id, shop_domain, access_token_encrypted, connection_type')
       .eq('platform', 'shopify')
       .eq('is_active', true),
     'detectiveVisual.fetchShopifyConnections',
@@ -139,7 +139,7 @@ async function checkShopifyProducts(supabase: ReturnType<typeof getSupabaseAdmin
   for (const conn of connections.slice(0, 5)) {
     const clientId = conn.client_id;
     const shopDomain = conn.shop_domain;
-    const accessToken = await decryptPlatformToken(supabase, conn.access_token_encrypted);
+    const accessToken = await getTokenForConnection(supabase, conn);
     if (!shopDomain || !accessToken) continue;
 
     const steveProducts = await safeQuery<{ id: string; title: string | null; price: number | null; shopify_product_id: string }>(

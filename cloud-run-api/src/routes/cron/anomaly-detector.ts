@@ -84,7 +84,8 @@ export async function anomalyDetector(c: Context) {
 
       const deviation = (todayData.revenue - avgHistorical) / avgHistorical;
 
-      if (Math.abs(deviation) < 0.40) continue; // Only flag >40% deviation
+      const deviationThreshold = parseFloat(process.env.ANOMALY_DEVIATION_THRESHOLD || '0.40');
+      if (Math.abs(deviation) < deviationThreshold) continue;
 
       const conn = connMap.get(connId);
       const direction = deviation > 0 ? 'subió' : 'bajó';

@@ -35,18 +35,11 @@ async function klaviyoFlowPost(url: string, apiKey: string, body: any): Promise<
 
 export async function klaviyoManageFlows(c: Context) {
   try {
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    // User already validated by authMiddleware
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const serviceClient = getSupabaseAdmin();
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await serviceClient.auth.getUser(token);
-    if (authError || !user) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
 
     const body = await c.req.json();
     const { connectionId, action } = body;

@@ -48,14 +48,9 @@ export async function discoverClientAssets(c: Context) {
   try {
     const supabase = getSupabaseAdmin();
 
-    // Auth — admin only
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader) return c.json({ error: 'Missing authorization' }, 401);
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', ''),
-    );
-    if (authError || !user) return c.json({ error: 'Invalid token' }, 401);
+    // User already validated by authMiddleware
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const adminRole = await safeQuerySingleOrDefault<any>(
       supabase

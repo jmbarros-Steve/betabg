@@ -254,6 +254,36 @@ export async function merchantWAWebhook(c: Context) {
       return c.text(`<Response><Message>${escaped}</Message></Response>`, 200, { 'Content-Type': 'text/xml' });
     }
 
+    // Race-condition fix: Deduct credit ATOMICALLY before AI call.
+    // deduct_wa_credit uses UPDATE ... WHERE balance >= p_amount, so two concurrent
+    // webhook calls cannot both succeed — the second one gets insufficient_credits.
+    const { data: deductResult } = await supabase.rpc('deduct_wa_credit', {
+      p_client_id: clientId,
+      p_amount: 1,
+      p_description: `Respuesta a ${profileName || phone}`,
+    });
+
+    const deductData = deductResult as any;
+    if (!deductData?.success) {
+      // Atomic deduction failed (concurrent request consumed the last credit)
+      const fallback = 'Gracias por tu mensaje, te responderemos pronto.';
+      await supabase.from('wa_messages').insert({
+        client_id: clientId,
+        channel: 'merchant_wa',
+        direction: 'outbound',
+        from_number: waAccount.phone_number,
+        to_number: phone,
+        body: fallback,
+        contact_name: profileName,
+        contact_phone: phone,
+        credits_used: 0,
+      });
+      const escaped = fallback.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return c.text(`<Response><Message>${escaped}</Message></Response>`, 200, { 'Content-Type': 'text/xml' });
+    }
+
+    // Credit deducted — proceed with AI call. If anything fails critically, we still
+    // send a fallback reply (credit was legitimately used for the response attempt).
     // Build context and generate response
     const [context, history] = await Promise.all([
       buildMerchantContext(clientId),
@@ -280,9 +310,24 @@ export async function merchantWAWebhook(c: Context) {
       messages.unshift({ role: 'user', content: messageBody });
     }
 
+    let replyText: string;
+
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     if (!ANTHROPIC_API_KEY) {
       console.error('[merchant-wa] ANTHROPIC_API_KEY not set');
+      // Refund credit — config error means we can't provide AI service
+      const { error: refundErr } = await supabase.rpc('deduct_wa_credit', {
+        p_client_id: clientId,
+        p_amount: -1,
+        p_description: `Refund: config error para ${profileName || phone}`,
+      });
+      if (refundErr) {
+        console.warn('[merchant-wa] deduct_wa_credit refund failed, using direct update:', refundErr);
+        await supabase
+          .from('wa_credits')
+          .update({ balance: (deductData.new_balance ?? 0) + 1 })
+          .eq('client_id', clientId);
+      }
       return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
     }
 
@@ -302,8 +347,6 @@ export async function merchantWAWebhook(c: Context) {
         messages,
       }),
     });
-
-    let replyText: string;
 
     if (!aiRes.ok) {
       console.error('[merchant-wa] Claude API error:', aiRes.status);
@@ -377,18 +420,15 @@ export async function merchantWAWebhook(c: Context) {
       .eq('channel', 'merchant_wa')
       .eq('contact_phone', phone);
 
-    // Deduct 1 credit atomically (Issue 1: prevents race condition)
-    await supabase.rpc('deduct_wa_credit', {
-      p_client_id: clientId,
-      p_amount: 1,
-      p_description: `Respuesta a ${profileName || phone}`,
-    });
-
     const escaped = replyText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return c.text(`<Response><Message>${escaped}</Message></Response>`, 200, { 'Content-Type': 'text/xml' });
 
   } catch (error: any) {
-    console.error('[merchant-wa] Error:', error);
-    return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
+    console.error('[merchant-wa] Error:', error?.message, error?.stack);
+    // Return a fallback TwiML response so the customer gets a reply even on error.
+    // Empty <Response></Response> silently drops the customer's message with no reply.
+    const fallback = 'Gracias por tu mensaje, te responderemos pronto.';
+    const escaped = fallback.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return c.text(`<Response><Message>${escaped}</Message></Response>`, 200, { 'Content-Type': 'text/xml' });
   }
 }

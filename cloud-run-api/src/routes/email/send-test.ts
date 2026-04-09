@@ -14,13 +14,8 @@ export async function sendTestEmail(c: Context) {
     const isInternal = c.get('isInternal') === true;
 
     if (!isInternal) {
-      const authHeader = c.req.header('Authorization');
-      if (!authHeader?.startsWith('Bearer ')) {
-        return c.json({ error: 'Unauthorized' }, 401);
-      }
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-      if (authError || !user) return c.json({ error: 'Unauthorized' }, 401);
+      const user = c.get('user');
+      if (!user) return c.json({ error: 'Unauthorized' }, 401);
     }
 
     const { to, subject, html, from_name, from_email } = await c.req.json();

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 
@@ -143,7 +143,7 @@ export function useMetaScopes(clientId: string) {
   }, [checkScopes]);
 
   // Compute feature availability — only meaningful when scopeDataLoaded is true
-  const features: FeatureStatus[] = FEATURE_SCOPE_MAP.map((f) => {
+  const features: FeatureStatus[] = useMemo(() => FEATURE_SCOPE_MAP.map((f) => {
     const missingScopes = f.requiredScopes.filter((s) => !granted.includes(s));
     return {
       key: f.key,
@@ -152,7 +152,7 @@ export function useMetaScopes(clientId: string) {
       requiredScopes: f.requiredScopes,
       missingScopes,
     };
-  });
+  }), [granted]);
 
   const allScopesMissing = ALL_REQUIRED_SCOPES.filter((s) => !granted.includes(s));
   const needsReconnect = scopeDataLoaded ? (allScopesMissing.length > 0 || tokenExpired) : false;

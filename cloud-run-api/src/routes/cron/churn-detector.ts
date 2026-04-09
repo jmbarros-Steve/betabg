@@ -72,11 +72,17 @@ export async function churnDetector(c: Context) {
           continue;
         }
 
+        // Only send WA for medium/high if risk just escalated.
+        // Re-read churn_risk from DB to minimize stale data (another cron or admin may have changed it).
+        const { data: freshClient } = await supabase
+          .from('clients')
+          .select('churn_risk')
+          .eq('id', client.id)
+          .single();
+        const previousRisk = freshClient?.churn_risk || client.churn_risk || 'none';
+
         // Update risk level
         await supabase.from('clients').update({ churn_risk: newRisk }).eq('id', client.id);
-
-        // Only send WA for medium/high if risk just escalated
-        const previousRisk = client.churn_risk || 'none';
         const riskOrder: Record<string, number> = { none: 0, low: 1, medium: 2, high: 3 };
         // Bug #59 fix: default to 0 if previousRisk has an unexpected value
         const previousRiskLevel = riskOrder[previousRisk] ?? 0;

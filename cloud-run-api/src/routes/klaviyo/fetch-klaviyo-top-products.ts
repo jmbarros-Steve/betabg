@@ -48,18 +48,11 @@ async function decryptApiKey(serviceSupabase: any, connectionId: string, platfor
 
 export async function fetchKlaviyoTopProducts(c: Context) {
   try {
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    // User already validated by authMiddleware
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const serviceSupabase = getSupabaseAdmin();
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await serviceSupabase.auth.getUser(token);
-    if (authError || !user) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
 
     const { connectionId, metric, timeframe, limit: productLimit } = await c.req.json();
     if (!connectionId || !metric) {

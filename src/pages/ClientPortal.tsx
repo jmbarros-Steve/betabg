@@ -111,6 +111,7 @@ export default function ClientPortal() {
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      if ((e.target as HTMLElement).isContentEditable) return;
       const tab = tabMap[e.key];
       if (tab) handleUserNavigate(tab);
     };
@@ -127,8 +128,6 @@ export default function ClientPortal() {
   const effectiveClientId = isAdminView ? urlClientId : clientData?.id;
 
   // Onboarding disabled — will rebuild properly later
-  useEffect(() => {
-  }, [user, isClient, isAdminView]);
 
   // Claridad de sesión: mostrar una vez al entrar al portal que la sesión está activa
   useEffect(() => {

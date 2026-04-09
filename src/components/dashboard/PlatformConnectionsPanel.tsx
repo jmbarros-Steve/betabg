@@ -188,7 +188,7 @@ export function PlatformConnectionsPanel() {
       
       const bodyKey = connection.platform === 'meta' ? 'connection_id' : 'connectionId';
       
-      const { data, error } = await supabase.functions.invoke(functionName, {
+      const { data, error } = await callApi(functionName, {
         body: { [bodyKey]: connection.id }
       });
 

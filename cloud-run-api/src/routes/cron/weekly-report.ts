@@ -191,26 +191,45 @@ export async function weeklyReport(c: Context) {
         continue;
       }
 
-      // This week's campaign metrics
-      const thisWeekMetrics = await safeQuery<any>(
+      // Get connection IDs for this client to query campaign_metrics
+      // (campaign_metrics uses connection_id, not client_id)
+      const clientConnections = await safeQuery<{ id: string }>(
         supabase
-          .from('campaign_metrics')
-          .select('campaign_name, spend, results, cpa, date')
+          .from('platform_connections')
+          .select('id')
           .eq('client_id', client.id)
-          .gte('date', weekAgo.split('T')[0]),
-        'weeklyReport.fetchThisWeekMetrics',
+          .eq('platform', 'meta')
+          .eq('is_active', true),
+        'weeklyReport.fetchClientConnections',
       );
+      const connectionIds = clientConnections.map(c => c.id);
+
+      // This week's campaign metrics
+      let thisWeekMetrics: any[] = [];
+      if (connectionIds.length > 0) {
+        thisWeekMetrics = await safeQuery<any>(
+          supabase
+            .from('campaign_metrics')
+            .select('campaign_name, spend, conversions, metric_date')
+            .in('connection_id', connectionIds)
+            .gte('metric_date', weekAgo.split('T')[0]),
+          'weeklyReport.fetchThisWeekMetrics',
+        );
+      }
 
       // Last week's campaign metrics
-      const lastWeekMetrics = await safeQuery<any>(
-        supabase
-          .from('campaign_metrics')
-          .select('spend, results, cpa')
-          .eq('client_id', client.id)
-          .gte('date', twoWeeksAgo.split('T')[0])
-          .lt('date', weekAgo.split('T')[0]),
-        'weeklyReport.fetchLastWeekMetrics',
-      );
+      let lastWeekMetrics: any[] = [];
+      if (connectionIds.length > 0) {
+        lastWeekMetrics = await safeQuery<any>(
+          supabase
+            .from('campaign_metrics')
+            .select('spend, conversions')
+            .in('connection_id', connectionIds)
+            .gte('metric_date', twoWeeksAgo.split('T')[0])
+            .lt('metric_date', weekAgo.split('T')[0]),
+          'weeklyReport.fetchLastWeekMetrics',
+        );
+      }
 
       // Shopify revenue this week
       const shopifyThisWeek = await safeQuery<{ total_sales: number | null }>(
@@ -235,27 +254,28 @@ export async function weeklyReport(c: Context) {
       const totalSales = shopifyThisWeek.reduce((s: number, r: any) => s + (r.total_sales || 0), 0);
       const lastWeekSales = shopifyLastWeek.reduce((s: number, r: any) => s + (r.total_sales || 0), 0);
 
-      // Top campaign by results
-      const campaignTotals: Record<string, { spend: number; results: number; cpa: number[] }> = {};
+      // Top campaign by conversions
+      const campaignTotals: Record<string, { spend: number; conversions: number }> = {};
       for (const m of thisWeekMetrics) {
         const key = (m as any).campaign_name || 'Unknown';
-        if (!campaignTotals[key]) campaignTotals[key] = { spend: 0, results: 0, cpa: [] };
+        if (!campaignTotals[key]) campaignTotals[key] = { spend: 0, conversions: 0 };
         campaignTotals[key].spend += (m as any).spend || 0;
-        campaignTotals[key].results += (m as any).results || 0;
-        if ((m as any).cpa) campaignTotals[key].cpa.push((m as any).cpa);
+        campaignTotals[key].conversions += (m as any).conversions || 0;
       }
 
-      const topCampaign = Object.entries(campaignTotals).sort((a, b) => b[1].results - a[1].results)[0];
+      const topCampaign = Object.entries(campaignTotals).sort((a, b) => b[1].conversions - a[1].conversions)[0];
       const topCampaignName = topCampaign?.[0] || null;
       const topCampaignSpend = topCampaign?.[1]?.spend || 0;
-      const topCampaignResults = topCampaign?.[1]?.results || 0;
+      const topCampaignResults = topCampaign?.[1]?.conversions || 0;
 
-      // Average CPA
-      const allCpas = thisWeekMetrics.filter((m: any) => m.cpa > 0).map((m: any) => m.cpa);
-      const cpaThisWeek = allCpas.length > 0 ? allCpas.reduce((a: number, b: number) => a + b, 0) / allCpas.length : null;
+      // Compute CPA from spend / conversions
+      const totalSpendThisWeek = thisWeekMetrics.reduce((s: number, m: any) => s + ((m as any).spend || 0), 0);
+      const totalConversionsThisWeek = thisWeekMetrics.reduce((s: number, m: any) => s + ((m as any).conversions || 0), 0);
+      const cpaThisWeek = totalConversionsThisWeek > 0 ? totalSpendThisWeek / totalConversionsThisWeek : null;
 
-      const lastCpas = lastWeekMetrics.filter((m: any) => m.cpa > 0).map((m: any) => m.cpa);
-      const cpaLastWeek = lastCpas.length > 0 ? lastCpas.reduce((a: number, b: number) => a + b, 0) / lastCpas.length : null;
+      const totalSpendLastWeek = lastWeekMetrics.reduce((s: number, m: any) => s + ((m as any).spend || 0), 0);
+      const totalConversionsLastWeek = lastWeekMetrics.reduce((s: number, m: any) => s + ((m as any).conversions || 0), 0);
+      const cpaLastWeek = totalConversionsLastWeek > 0 ? totalSpendLastWeek / totalConversionsLastWeek : null;
 
       // Creative score
       const creativeData = await safeQuery<{ performance_score: number }>(
@@ -368,7 +388,9 @@ export async function weeklyReport(c: Context) {
   const errorTrend = thisWeekCount < lastWeekCount ? 'bajando' : thisWeekCount > lastWeekCount ? 'subiendo' : 'estable';
 
   const autoFixed = thisWeekErrors.filter((e: any) => e.status === 'auto_fixed').length;
-  const autofixRate = thisWeekCount > 0 ? Math.round((autoFixed / thisWeekCount) * 100) : 0;
+  const autofixRate = (autoFixed + thisWeekCount) > 0
+    ? Math.round((autoFixed / (autoFixed + thisWeekCount)) * 100)
+    : 0;
 
   const selfHealed = thisWeekErrors.filter((e: any) => e.check_type === 'test_self_healed').length;
 

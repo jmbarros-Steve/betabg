@@ -7,19 +7,11 @@ import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 export async function uploadKlaviyoDrafts(c: Context) {
   try {
-    // Auth: verify JWT
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    // User already validated by authMiddleware
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const supabase = getSupabaseAdmin();
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
 
     const { connectionId, campaign, send_strategy, scheduled_at } = await c.req.json();
     console.log('upload-klaviyo-drafts received:', JSON.stringify({

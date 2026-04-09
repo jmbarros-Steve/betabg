@@ -786,12 +786,16 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
   useEffect(() => {
     if (analysisStatus !== 'pending' || elapsedSeconds < 25) return;
+    // Only check every 5 seconds, not every second
+    if (elapsedSeconds % 5 !== 0) return;
+    let cancelled = false;
     (async () => {
       const { data: rows } = await supabase
         .from('brand_research')
         .select('research_type, research_data')
         .eq('client_id', clientId)
         .in('research_type', ['executive_summary', 'seo_audit', 'competitive_analysis', 'competitor_analysis', 'keywords']);
+      if (cancelled) return;
       const dataInDb: Record<string, boolean> = {};
       for (const r of rows ?? []) {
         const d = (r as any).research_data;
@@ -801,6 +805,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       }
       setDiagnostic(prev => ({ ...prev, dataInDb }));
     })();
+    return () => { cancelled = true; };
   }, [analysisStatus, elapsedSeconds, clientId]);
 
   // A los 300s aplicar automáticamente solo si ya hay datos de research (SEO, keywords, competencia). Si no, seguir comprobando cada 8s.
@@ -1589,7 +1594,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
   const q2Response = getResponse('numbers');
   const financials = parseFinancials(q2Response);
   const margin = financials ? financials.price - financials.cost - financials.shipping : null;
-  const marginPct = financials && margin !== null ? ((margin / financials.price) * 100).toFixed(1) : null;
+  const marginPct = financials && margin !== null && financials.price > 0 ? ((margin / financials.price) * 100).toFixed(1) : null;
   const cpaMax = margin !== null ? (margin * 0.3).toFixed(0) : null;
 
   async function loadImageAsBase64(src: string): Promise<string> {

@@ -4,19 +4,7 @@ import { getCreativeContext } from '../../lib/creative-context.js';
 import { detectAngle } from '../../lib/angle-detector.js';
 import { checkRateLimit } from '../../lib/rate-limiter.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
-
-/**
- * Sanitize user-controlled text before injecting into AI prompts.
- * Strips common prompt-injection patterns and limits length.
- */
-function sanitizeForPrompt(text: string, maxLength = 500): string {
-  if (!text) return '';
-  return text
-    .replace(/\b(ignore|forget|disregard)\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?)/gi, '[filtered]')
-    .replace(/\b(you are now|act as|pretend to be|new instructions?:|system prompt:?)/gi, '[filtered]')
-    .replace(/```[\s\S]*?```/g, '[code-block-removed]')
-    .substring(0, maxLength);
-}
+import { sanitizeForPrompt } from '../../lib/prompt-utils.js';
 
 /**
  * Sanitize an object's string values recursively for prompt injection.

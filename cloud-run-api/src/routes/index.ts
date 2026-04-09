@@ -38,6 +38,7 @@ import { editImageGemini } from './ai/edit-image-gemini.js';
 import { criterioMetaHandler } from './ai/criterio-meta.js';
 import { criterioEmail } from './ai/criterio-email.js';
 
+import { suggestInboxReply } from './ai/suggest-inbox-reply.js';
 import { creativePreview } from './ai/creative-preview.js';
 import { espejoHandler } from './ai/espejo.js';
 
@@ -103,6 +104,7 @@ import { manageMetaPixel } from './meta/manage-meta-pixel.js';
 import { metaSocialInbox } from './meta/meta-social-inbox.js';
 import { metaDataDeletion } from './meta/meta-data-deletion.js';
 import { syncMetaMetrics } from './meta/sync-meta-metrics.js';
+import { manageReportSchedule } from './meta/manage-report-schedule.js';
 import { manageMetaRules } from './meta/manage-meta-rules.js';
 import { metaTargetingSearch } from './meta/meta-targeting-search.js';
 import { detectAudienceOverlap } from './meta/detect-audience-overlap.js';
@@ -178,6 +180,7 @@ import { steveWAChat } from './whatsapp/steve-wa-chat.js';
 import { merchantWAWebhook } from './whatsapp/merchant-wa.js';
 import { waSendMessage } from './whatsapp/send-message.js';
 import { waSendCampaign } from './whatsapp/send-campaign.js';
+import { waCampaignsCrud } from './whatsapp/wa-campaigns-crud.js';
 import { waMarkRead } from './whatsapp/wa-mark-read.js';
 import { shopifyCheckoutWebhook } from './whatsapp/shopify-checkout-webhook.js';
 import { abandonedCartWA } from './whatsapp/abandoned-cart-wa.js';
@@ -310,6 +313,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/criterio-email', authMiddleware, criterioEmail);
 
   app.post('/api/creative-preview', authMiddleware, creativePreview);
+  app.post('/api/ai/suggest-inbox-reply', authMiddleware, suggestInboxReply);
   app.post('/api/espejo', authMiddleware, espejoHandler);
   app.post('/api/sync-competitor-ads', authMiddleware, syncCompetitorAds);
   app.post('/api/analyze-competitor-ads', authMiddleware, analyzeCompetitorAds);
@@ -351,6 +355,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/meta-catalogs', authMiddleware, metaCatalogs);
   app.post('/api/meta-adset-action', authMiddleware, metaAdsetAction);
   app.post('/api/discover-client-assets', authMiddleware, discoverClientAssets);
+  app.post('/api/manage-report-schedule', authMiddleware, manageReportSchedule);
 
   // Leadsie webhooks (public — validated via shared secret)
   app.post('/api/webhooks/leadsie', leadsieWebhook);
@@ -505,6 +510,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/whatsapp/steve-wa-chat', steveWAChat); // Twilio webhook: merchant → Steve
   app.post('/api/whatsapp/merchant-wa/:clientId', merchantWAWebhook); // Twilio webhook: customer → merchant store
   app.post('/api/whatsapp/send-message', authMiddleware, waSendMessage); // Portal: merchant sends manual reply
+  app.post('/api/whatsapp/campaigns', authMiddleware, waCampaignsCrud); // Portal: CRUD WA campaign drafts
   app.post('/api/whatsapp/send-campaign', authMiddleware, waSendCampaign); // Portal: send bulk WA campaign
   app.post('/api/whatsapp/mark-read', authMiddleware, waMarkRead); // Bug #98: mark conversation read via backend (bypasses RLS)
   app.post('/api/whatsapp/shopify-checkout-webhook', shopifyCheckoutWebhook); // No JWT — Shopify HMAC
