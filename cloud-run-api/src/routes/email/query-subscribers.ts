@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Query subscribers with filters and segmentation.
@@ -90,12 +91,16 @@ export async function queryEmailSubscribers(c: Context) {
       if (error) return c.json({ error: error.message }, 500);
 
       // Get recent events for this subscriber
-      const { data: events } = await supabase
-        .from('email_events')
-        .select('event_type, campaign_id, flow_id, metadata, created_at')
-        .eq('subscriber_id', subscriber_id)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const events = await safeQueryOrDefault<any>(
+        supabase
+          .from('email_events')
+          .select('event_type, campaign_id, flow_id, metadata, created_at')
+          .eq('subscriber_id', subscriber_id)
+          .order('created_at', { ascending: false })
+          .limit(50),
+        [],
+        'queryEmailSubscribers.getSubscriberEvents',
+      );
 
       return c.json({ subscriber, events: events || [] });
     }

@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendSingleEmail } from './send-email.js';
 import { renderEmailTemplate, buildTemplateContext } from '../../lib/template-engine.js';
 import { processEmailHtml } from '../../lib/email-html-processor.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Flow engine: executes flow steps when triggered by Cloud Tasks.
@@ -73,20 +74,45 @@ export async function emailFlowExecute(c: Context) {
     return c.json({ completed: true });
   }
 
-  // 5. Check quiet hours
+  // 5. Check quiet hours — usa el timezone del subscriber, NO UTC.
+  // Contexto: antes esto comparaba contra UTC y para un subscriber chileno
+  // con quiet hours 22-08 el resultado era enviar emails a las 7pm local.
+  // Ahora convertimos "la hora ahora mismo" al timezone del subscriber y
+  // comparamos contra ese valor. Si no hay timezone en el subscriber, el
+  // default en DB es America/Santiago.
   const settings = flow.settings as any || {};
   if (settings.quiet_hours_start && settings.quiet_hours_end) {
     const now = new Date();
-    const hour = now.getUTCHours();
+    const subscriberTz = subscriber.timezone || 'America/Santiago';
+    let hour: number;
+    try {
+      const formatted = new Intl.DateTimeFormat('en-US', {
+        hour: '2-digit',
+        hour12: false,
+        timeZone: subscriberTz,
+      }).format(now);
+      hour = parseInt(formatted, 10);
+    } catch (tzErr) {
+      // Timezone inválida en el subscriber — fallback a UTC y log warning.
+      console.warn(`[flow-engine] Invalid timezone "${subscriberTz}" for subscriber ${subscriber.id}, using UTC.`);
+      hour = now.getUTCHours();
+    }
     const quietStart = parseInt(settings.quiet_hours_start);
     const quietEnd = parseInt(settings.quiet_hours_end);
 
-    if (quietStart <= quietEnd ? (hour >= quietStart && hour < quietEnd) : (hour >= quietStart || hour < quietEnd)) {
-      const nextRun = new Date();
-      nextRun.setUTCHours(quietEnd, 0, 0, 0);
-      if (nextRun <= now) nextRun.setDate(nextRun.getDate() + 1);
+    const inQuiet = quietStart <= quietEnd
+      ? (hour >= quietStart && hour < quietEnd)
+      : (hour >= quietStart || hour < quietEnd);
 
-      console.log(`Quiet hours active. Rescheduling to ${nextRun.toISOString()}`);
+    if (inQuiet) {
+      // Para la próxima corrida: apuntar a quietEnd en HORA LOCAL del subscriber.
+      // Calculamos cuántas horas faltan hasta quietEnd local y le sumamos a "now".
+      const hoursUntilEnd = (quietEnd - hour + 24) % 24 || 24;
+      const nextRun = new Date(now.getTime() + hoursUntilEnd * 60 * 60 * 1000);
+      // Redondear al minuto 0 de esa hora.
+      nextRun.setUTCSeconds(0, 0);
+
+      console.log(`Quiet hours active (subscriber local hour ${hour}, tz ${subscriberTz}). Rescheduling to ${nextRun.toISOString()}`);
       await scheduleFlowStep(enrollment_id, effectivePath, nextRun, enrollment.client_id);
       return c.json({ postponed: true, reason: 'Quiet hours', next_run: nextRun.toISOString() });
     }
@@ -220,18 +246,26 @@ export async function emailFlowExecute(c: Context) {
   // 8. Send the email
   console.log(`Sending flow email step ${effectivePath} to ${subscriber.email}`);
 
-  const { data: domain } = await supabase
-    .from('email_domains')
-    .select('domain')
-    .eq('client_id', enrollment.client_id)
-    .eq('status', 'verified')
-    .limit(1)
-    .maybeSingle();
+  const domain = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('email_domains')
+      .select('domain')
+      .eq('client_id', enrollment.client_id)
+      .eq('status', 'verified')
+      .limit(1)
+      .maybeSingle(),
+    null,
+    'emailFlowExecute.getDomain',
+  );
 
   const fromDomain = domain?.domain || process.env.DEFAULT_FROM_DOMAIN || 'steve.cl';
   const fromEmail = currentStep.from_email || `noreply@${fromDomain}`;
   // Use merchant's business name as sender, not generic "Steve"
-  const { data: flowClient } = await supabase.from('clients').select('name, company, logo_url, brand_color, brand_secondary_color, brand_font, website_url, shop_domain').eq('id', enrollment.client_id).maybeSingle();
+  const flowClient = await safeQuerySingleOrDefault<any>(
+    supabase.from('clients').select('name, company, logo_url, brand_color, brand_secondary_color, brand_font, website_url, shop_domain').eq('id', enrollment.client_id).maybeSingle(),
+    null,
+    'emailFlowExecute.getFlowClient',
+  );
   const fromName = currentStep.from_name || flowClient?.company || flowClient?.name || 'Steve';
 
   // Build brand info from client record (enrollment.metadata.brand is rarely populated)
@@ -303,7 +337,11 @@ export async function emailFlowExecute(c: Context) {
 
   // Tag the sent event with step_path for idempotency checks on Cloud Tasks retries
   if (result.eventId) {
-    const { data: evt } = await supabase.from('email_events').select('metadata').eq('id', result.eventId).single();
+    const evt = await safeQuerySingleOrDefault<any>(
+      supabase.from('email_events').select('metadata').eq('id', result.eventId).single(),
+      null,
+      'emailFlowExecute.getEventMetadata',
+    );
     if (evt) {
       await supabase.from('email_events').update({ metadata: { ...evt.metadata, step_path: effectivePath } }).eq('id', result.eventId);
     }
@@ -721,11 +759,15 @@ export async function manageEmailFlows(c: Context) {
       if (error) return c.json({ error: error.message }, 500);
 
       // Cancel all pending Cloud Tasks for active enrollments and pause them
-      const { data: activeEnrollments } = await supabase
-        .from('email_flow_enrollments')
-        .select('id, cloud_task_name')
-        .eq('flow_id', flow_id)
-        .eq('status', 'active');
+      const activeEnrollments = await safeQueryOrDefault<any>(
+        supabase
+          .from('email_flow_enrollments')
+          .select('id, cloud_task_name')
+          .eq('flow_id', flow_id)
+          .eq('status', 'active'),
+        [],
+        'manageEmailFlows.getActiveEnrollmentsForPause',
+      );
 
       if (activeEnrollments && activeEnrollments.length > 0) {
         // Try to cancel Cloud Tasks in parallel

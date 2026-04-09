@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { validateShopifySessionToken } from '../../lib/shopify-session.js';
 
 /**
@@ -50,11 +51,15 @@ export async function emailCampaignAnalytics(c: Context) {
   const isOwner = client.user_id === userId || client.client_user_id === userId;
 
   // Also check super admin
-  const { data: roleRow } = await supabase
-    .from('user_roles')
-    .select('is_super_admin')
-    .eq('user_id', userId!)
-    .maybeSingle();
+  const roleRow = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('user_roles')
+      .select('is_super_admin')
+      .eq('user_id', userId!)
+      .maybeSingle(),
+    null,
+    'campaignAnalytics.getRoleRow',
+  );
 
   if (!isOwner && !roleRow?.is_super_admin) {
     return c.json({ error: 'Forbidden' }, 403);
@@ -90,17 +95,25 @@ export async function emailCampaignAnalytics(c: Context) {
       }
 
       // Count unique opens and clicks (by subscriber)
-      const { data: uniqueOpens } = await supabase
-        .from('email_events')
-        .select('subscriber_id')
-        .eq('campaign_id', campaign_id)
-        .eq('event_type', 'opened');
+      const uniqueOpens = await safeQueryOrDefault<any>(
+        supabase
+          .from('email_events')
+          .select('subscriber_id')
+          .eq('campaign_id', campaign_id)
+          .eq('event_type', 'opened'),
+        [],
+        'campaignAnalytics.campaignStats.getUniqueOpens',
+      );
 
-      const { data: uniqueClicks } = await supabase
-        .from('email_events')
-        .select('subscriber_id')
-        .eq('campaign_id', campaign_id)
-        .eq('event_type', 'clicked');
+      const uniqueClicks = await safeQueryOrDefault<any>(
+        supabase
+          .from('email_events')
+          .select('subscriber_id')
+          .eq('campaign_id', campaign_id)
+          .eq('event_type', 'clicked'),
+        [],
+        'campaignAnalytics.campaignStats.getUniqueClicks',
+      );
 
       const uniqueOpenCount = new Set((uniqueOpens || []).map(e => e.subscriber_id)).size;
       const uniqueClickCount = new Set((uniqueClicks || []).map(e => e.subscriber_id)).size;
@@ -118,11 +131,15 @@ export async function emailCampaignAnalytics(c: Context) {
       };
 
       // Get top clicked links
-      const { data: clickEvents } = await supabase
-        .from('email_events')
-        .select('metadata')
-        .eq('campaign_id', campaign_id)
-        .eq('event_type', 'clicked');
+      const clickEvents = await safeQueryOrDefault<any>(
+        supabase
+          .from('email_events')
+          .select('metadata')
+          .eq('campaign_id', campaign_id)
+          .eq('event_type', 'clicked'),
+        [],
+        'campaignAnalytics.campaignStats.getClickEvents',
+      );
 
       const linkCounts: Record<string, number> = {};
       for (const event of clickEvents || []) {
@@ -135,11 +152,15 @@ export async function emailCampaignAnalytics(c: Context) {
         .map(([url, clicks]) => ({ url, clicks }));
 
       // Revenue from conversions
-      const { data: conversions } = await supabase
-        .from('email_events')
-        .select('metadata')
-        .eq('campaign_id', campaign_id)
-        .eq('event_type', 'converted');
+      const conversions = await safeQueryOrDefault<any>(
+        supabase
+          .from('email_events')
+          .select('metadata')
+          .eq('campaign_id', campaign_id)
+          .eq('event_type', 'converted'),
+        [],
+        'campaignAnalytics.campaignStats.getConversions',
+      );
 
       const totalRevenue = (conversions || []).reduce(
         (sum, e) => sum + (parseFloat(e.metadata?.revenue) || 0), 0
@@ -160,12 +181,16 @@ export async function emailCampaignAnalytics(c: Context) {
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
       // Get recent campaigns
-      const { data: campaigns } = await supabase
-        .from('email_campaigns')
-        .select('id, name, status, sent_count, total_recipients, sent_at, created_at')
-        .eq('client_id', client_id)
-        .gte('created_at', since)
-        .order('created_at', { ascending: false });
+      const campaigns = await safeQueryOrDefault<any>(
+        supabase
+          .from('email_campaigns')
+          .select('id, name, status, sent_count, total_recipients, sent_at, created_at')
+          .eq('client_id', client_id)
+          .gte('created_at', since)
+          .order('created_at', { ascending: false }),
+        [],
+        'campaignAnalytics.overview.getCampaigns',
+      );
 
       // Get aggregate event counts for the period
       const { count: totalSent } = await supabase
@@ -354,10 +379,14 @@ export async function emailCampaignAnalytics(c: Context) {
       else spamScore = 'critical';
 
       // Domain health
-      const { data: domains } = await supabase
-        .from('email_domains')
-        .select('domain, status, spf_verified, dkim_verified, dmarc_verified, created_at')
-        .eq('client_id', client_id);
+      const domains = await safeQueryOrDefault<any>(
+        supabase
+          .from('email_domains')
+          .select('domain, status, spf_verified, dkim_verified, dmarc_verified, created_at')
+          .eq('client_id', client_id),
+        [],
+        'campaignAnalytics.deliverabilityDashboard.getDomains',
+      );
 
       const domainHealth = (domains || []).map((d: any) => ({
         domain: d.domain,
@@ -368,12 +397,16 @@ export async function emailCampaignAnalytics(c: Context) {
       }));
 
       // Bounce breakdown (hard vs soft)
-      const { data: bounceEvents } = await supabase
-        .from('email_events')
-        .select('metadata')
-        .eq('client_id', client_id)
-        .eq('event_type', 'bounced')
-        .gte('created_at', since);
+      const bounceEvents = await safeQueryOrDefault<any>(
+        supabase
+          .from('email_events')
+          .select('metadata')
+          .eq('client_id', client_id)
+          .eq('event_type', 'bounced')
+          .gte('created_at', since),
+        [],
+        'campaignAnalytics.deliverabilityDashboard.getBounceEvents',
+      );
 
       let hardBounces = 0;
       let softBounces = 0;
@@ -384,13 +417,17 @@ export async function emailCampaignAnalytics(c: Context) {
       }
 
       // Trend data: daily stats for last 30 days
-      const { data: trendEvents } = await supabase
-        .from('email_events')
-        .select('event_type, created_at')
-        .eq('client_id', client_id)
-        .in('event_type', ['sent', 'bounced', 'complained', 'opened'])
-        .gte('created_at', since)
-        .order('created_at', { ascending: true });
+      const trendEvents = await safeQueryOrDefault<any>(
+        supabase
+          .from('email_events')
+          .select('event_type, created_at')
+          .eq('client_id', client_id)
+          .in('event_type', ['sent', 'bounced', 'complained', 'opened'])
+          .gte('created_at', since)
+          .order('created_at', { ascending: true }),
+        [],
+        'campaignAnalytics.deliverabilityDashboard.getTrendEvents',
+      );
 
       const dailyBuckets: Record<string, { sent: number; bounced: number; complained: number; opened: number }> = {};
       // Pre-fill all 30 days

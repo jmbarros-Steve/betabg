@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const API_BASE_URL = () =>
   process.env.API_BASE_URL || 'https://steve-api-850416724643.us-central1.run.app';
@@ -218,12 +219,16 @@ export async function signupForms(c: Context) {
       if (!form_id) return c.json({ error: 'form_id is required' }, 400);
 
       // Check for existing script tag to remove first
-      const { data: existing } = await supabase
-        .from('email_forms')
-        .select('script_tag_id')
-        .eq('id', form_id)
-        .eq('client_id', client_id)
-        .single();
+      const existing = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('email_forms')
+          .select('script_tag_id')
+          .eq('id', form_id)
+          .eq('client_id', client_id)
+          .single(),
+        null,
+        'manageSignupForms.getExistingForDelete',
+      );
 
       if (existing?.script_tag_id) {
         await removeScriptTag(supabase, client_id, existing.script_tag_id);
@@ -273,12 +278,16 @@ export async function signupForms(c: Context) {
       if (!form_id) return c.json({ error: 'form_id is required' }, 400);
 
       // Get existing script_tag_id
-      const { data: existing } = await supabase
-        .from('email_forms')
-        .select('script_tag_id')
-        .eq('id', form_id)
-        .eq('client_id', client_id)
-        .single();
+      const existing = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('email_forms')
+          .select('script_tag_id')
+          .eq('id', form_id)
+          .eq('client_id', client_id)
+          .single(),
+        null,
+        'manageSignupForms.getExistingForPause',
+      );
 
       if (existing?.script_tag_id) {
         await removeScriptTag(supabase, client_id, existing.script_tag_id);

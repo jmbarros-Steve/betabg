@@ -1,4 +1,5 @@
 import { getProductCatalog } from './product-recommendations.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -352,12 +353,16 @@ async function getProductPopularity(
   supabase: any,
   clientId: string
 ): Promise<Map<string, number>> {
-  const { data: events } = await supabase
-    .from('email_events')
-    .select('metadata')
-    .eq('client_id', clientId)
-    .eq('event_type', 'converted')
-    .limit(500);
+  const events = await safeQueryOrDefault<any>(
+    supabase
+      .from('email_events')
+      .select('metadata')
+      .eq('client_id', clientId)
+      .eq('event_type', 'converted')
+      .limit(500),
+    [],
+    'getProductPopularity.getConvertedEvents',
+  );
 
   const counts = new Map<string, number>();
   for (const event of events || []) {

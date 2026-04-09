@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { createHmac } from 'node:crypto';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 // Lazy-init Resend client
 let resendClient: Resend | null = null;
@@ -111,8 +112,12 @@ function addUnsubscribeFooter(html: string, subscriberId: string, clientId: stri
 }
 
 /**
- * Core function to send a single email via SES.
+ * Core function to send a single email via Resend.
  * Used by campaigns and flows.
+ *
+ * Nota histórica: el proyecto originalmente usaba AWS SES. Se migró a Resend pero
+ * quedan algunos archivos/endpoints con "ses" en el nombre por retrocompatibilidad
+ * con health checks de El Chino (ver track-events.ts sesWebhooks).
  */
 export async function sendSingleEmail(params: {
   to: string;
@@ -233,12 +238,16 @@ export async function sendEmailHandler(c: Context) {
       const supabase = getSupabaseAdmin();
 
       // Get or create a test subscriber
-      const { data: subscriber } = await supabase
-        .from('email_subscribers')
-        .select('id')
-        .eq('client_id', client_id)
-        .eq('email', to)
-        .single();
+      const subscriber = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('email_subscribers')
+          .select('id')
+          .eq('client_id', client_id)
+          .eq('email', to)
+          .single(),
+        null,
+        'sendEmailHandler.getTestSubscriber',
+      );
 
       const subscriberId = subscriber?.id || 'test-' + Date.now();
 

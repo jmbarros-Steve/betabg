@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { convertToCLP } from '../../lib/currency.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const SHOPIFY_API_VERSION = '2025-01';
 const ATTRIBUTION_WINDOW_DAYS = 7;
@@ -42,11 +43,15 @@ export async function emailRevenueAttribution(c: Context) {
 
   const isOwner = client.user_id === user.id || client.client_user_id === user.id;
 
-  const { data: roleRow } = await supabase
-    .from('user_roles')
-    .select('is_super_admin')
-    .eq('user_id', user.id)
-    .maybeSingle();
+  const roleRow = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('user_roles')
+      .select('is_super_admin')
+      .eq('user_id', user.id)
+      .maybeSingle(),
+    null,
+    'emailRevenueAttribution.getRoleRow',
+  );
 
   if (!isOwner && !roleRow?.is_super_admin) {
     return c.json({ error: 'Forbidden' }, 403);
@@ -108,12 +113,16 @@ export async function emailRevenueAttribution(c: Context) {
       const emailSet = new Set(subscriberEmails);
 
       // 4. Get Shopify connection for this client
-      const { data: shopifyConn } = await supabase
-        .from('platform_connections')
-        .select('id, store_url, access_token_encrypted')
-        .eq('client_id', client_id)
-        .eq('platform', 'shopify')
-        .maybeSingle();
+      const shopifyConn = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('platform_connections')
+          .select('id, store_url, access_token_encrypted')
+          .eq('client_id', client_id)
+          .eq('platform', 'shopify')
+          .maybeSingle(),
+        null,
+        'emailRevenueAttribution.getShopifyConnCampaign',
+      );
 
       if (!shopifyConn?.store_url || !shopifyConn?.access_token_encrypted) {
         return c.json({ error: 'No Shopify connection found for this client' }, 404);
@@ -272,12 +281,16 @@ export async function emailRevenueAttribution(c: Context) {
       }
 
       // Get Shopify connection
-      const { data: shopifyConn } = await supabase
-        .from('platform_connections')
-        .select('id, store_url, access_token_encrypted')
-        .eq('client_id', client_id)
-        .eq('platform', 'shopify')
-        .maybeSingle();
+      const shopifyConn = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('platform_connections')
+          .select('id, store_url, access_token_encrypted')
+          .eq('client_id', client_id)
+          .eq('platform', 'shopify')
+          .maybeSingle(),
+        null,
+        'emailRevenueAttribution.getShopifyConnSummary',
+      );
 
       if (!shopifyConn?.store_url || !shopifyConn?.access_token_encrypted) {
         return c.json({ error: 'No Shopify connection found' }, 404);
@@ -332,11 +345,15 @@ export async function emailRevenueAttribution(c: Context) {
         const windowEnd = new Date(sentDate.getTime() + ATTRIBUTION_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
         // Get subscribers sent this campaign
-        const { data: sentEvents } = await supabase
-          .from('email_events')
-          .select('subscriber_id')
-          .eq('campaign_id', campaign.id)
-          .eq('event_type', 'sent');
+        const sentEvents = await safeQueryOrDefault<any>(
+          supabase
+            .from('email_events')
+            .select('subscriber_id')
+            .eq('campaign_id', campaign.id)
+            .eq('event_type', 'sent'),
+          [],
+          'emailRevenueAttribution.getSentEventsSummary',
+        );
 
         const subIds = [...new Set((sentEvents || []).map(e => e.subscriber_id).filter(Boolean))];
         const totalSent = subIds.length;
@@ -356,10 +373,14 @@ export async function emailRevenueAttribution(c: Context) {
         }
 
         // Get subscriber emails
-        const { data: subs } = await supabase
-          .from('email_subscribers')
-          .select('id, email')
-          .in('id', subIds);
+        const subs = await safeQueryOrDefault<any>(
+          supabase
+            .from('email_subscribers')
+            .select('id, email')
+            .in('id', subIds),
+          [],
+          'emailRevenueAttribution.getSubscribersSummary',
+        );
 
         const emailSet = new Set((subs || []).map(s => s.email?.toLowerCase()).filter(Boolean));
 

@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Mail — Mejoras priorizadas</title>
+<style>
+  :root {
+    --bg: #0b0f17;
+    --panel: #131a26;
+    --panel-2: #1a2334;
+    --border: #243049;
+    --text: #e6edf7;
+    --muted: #8b97ad;
+    --red: #ff5470;
+    --green: #3ddc97;
+    --yellow: #ffd166;
+    --blue: #5fa8ff;
+    --purple: #b088ff;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 48px 24px 96px; }
+  header { margin-bottom: 40px; }
+  header .eyebrow {
+    display: inline-block;
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 999px;
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-size: 38px;
+    margin: 0 0 12px;
+    letter-spacing: -0.02em;
+  }
+  header p {
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 720px;
+    margin: 0;
+  }
+
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin: 32px 0 48px;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .stat .num {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .stat .label {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .stat.red    .num { color: var(--red); }
+  .stat.yellow .num { color: var(--yellow); }
+  .stat.blue   .num { color: var(--blue); }
+  .stat.green  .num { color: var(--green); }
+
+  .seccion-titulo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 56px 0 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .seccion-titulo h2 {
+    margin: 0;
+    font-size: 22px;
+    letter-spacing: -0.01em;
+  }
+  .seccion-titulo .chip {
+    font-size: 11px;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  .chip.p0 { background: rgba(255,84,112,0.15);  color: var(--red);    border: 1px solid rgba(255,84,112,0.3); }
+  .chip.p1 { background: rgba(255,209,102,0.15); color: var(--yellow); border: 1px solid rgba(255,209,102,0.3); }
+  .chip.p2 { background: rgba(95,168,255,0.15);  color: var(--blue);   border: 1px solid rgba(95,168,255,0.3); }
+
+  .mejora {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--blue);
+    border-radius: 14px;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+  .mejora.p0 { border-left-color: var(--red); }
+  .mejora.p1 { border-left-color: var(--yellow); }
+  .mejora.p2 { border-left-color: var(--blue); }
+
+  .mejora-head {
+    padding: 22px 28px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .badge {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    color: #0b0f17;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 16px;
+    font-family: var(--mono);
+  }
+  .mejora.p0 .badge { background: var(--red); }
+  .mejora.p1 .badge { background: var(--yellow); }
+  .mejora.p2 .badge { background: var(--blue); }
+
+  .mejora-head h3 {
+    margin: 0;
+    font-size: 22px;
+    letter-spacing: -0.01em;
+  }
+  .mejora-head .sub {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  .effort {
+    margin-left: auto;
+    flex-shrink: 0;
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .effort .val {
+    display: block;
+    font-size: 18px;
+    color: var(--text);
+    margin-top: 2px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .mejora-body {
+    padding: 24px 28px 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  .col {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .col h4 {
+    margin: 0 0 10px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+  }
+  .col.bad  h4 { color: var(--red); }
+  .col.good h4 { color: var(--green); }
+  .col p { margin: 0; font-size: 14px; }
+  .col strong { color: var(--text); }
+
+  .ejemplo {
+    grid-column: 1 / -1;
+    background: #06090f;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0;
+    overflow: hidden;
+  }
+  .ejemplo .label {
+    background: var(--panel-2);
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .ejemplo .label .file {
+    color: var(--blue);
+    font-family: var(--mono);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  pre {
+    margin: 0;
+    padding: 18px 20px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    color: #d4dbe8;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .tok-key { color: var(--purple); }
+  .tok-str { color: var(--green); }
+  .tok-num { color: var(--yellow); }
+  .tok-com { color: #5e6a85; font-style: italic; }
+  .tok-fn  { color: var(--blue); }
+  .tok-err { color: var(--red); font-weight: 600; }
+  .tok-ok  { color: var(--green); font-weight: 600; }
+  .tok-add { background: rgba(61,220,151,0.08); display: block; }
+  .tok-del { background: rgba(255,84,112,0.08); display: block; }
+
+  .impacto {
+    grid-column: 1 / -1;
+    background: var(--panel-2);
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13px;
+    color: var(--muted);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+  .impacto > div strong {
+    display: block;
+    color: var(--yellow);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 4px;
+  }
+  .impacto code {
+    font-family: var(--mono);
+    color: #d4dbe8;
+  }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 13px;
+    text-align: center;
+  }
+  footer code { font-family: var(--mono); color: var(--blue); }
+
+  @media (max-width: 760px) {
+    .summary { grid-template-columns: repeat(2, 1fr); }
+    .mejora-body { grid-template-columns: 1fr; }
+    .impacto { grid-template-columns: 1fr; }
+    h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Steve Mail · Roadmap · 2026-04-07</span>
+    <h1>Las 8 mejoras que hay que hacer</h1>
+    <p>Después de auditar el módulo, estas son las mejoras concretas. Cada una con: el problema actual, la solución exacta, snippet de cómo cambiar el código, y cómo se mide el impacto. Ordenadas por prioridad real, no por gusto.</p>
+  </header>
+
+  <section class="summary">
+    <div class="stat red">    <div class="num">3</div><div class="label">P0 — Críticas (esta semana)</div></div>
+    <div class="stat yellow"> <div class="num">3</div><div class="label">P1 — Altas (este sprint)</div></div>
+    <div class="stat blue">   <div class="num">2</div><div class="label">P2 — Nice to have (backlog)</div></div>
+    <div class="stat green">  <div class="num">8</div><div class="label">Total mejoras</div></div>
+  </section>
+
+  <!-- ============================================== -->
+  <!-- ===================== P0 ===================== -->
+  <!-- ============================================== -->
+
+  <div class="seccion-titulo">
+    <span class="chip p0">P0 · Críticas</span>
+    <h2>Bloquean valor real ahora mismo</h2>
+  </div>
+
+  <!-- MEJORA 1 -->
+  <article class="mejora p0">
+    <div class="mejora-head">
+      <div class="badge">1</div>
+      <div>
+        <h3>Activar la cola para todos los clientes</h3>
+        <div class="sub">La feature está deployada hace 1 día y no la usa nadie. Toda la inteligencia (rate limit, retry, smart send time) está muerta.</div>
+      </div>
+      <div class="effort">Esfuerzo<span class="val">2 horas</span></div>
+    </div>
+    <div class="mejora-body">
+      <div class="col bad">
+        <h4>❌ Problema actual</h4>
+        <p><code>email_send_settings</code> está vacía. <strong>Ningún cliente</strong> tiene <code>use_send_queue=true</code>. 100% del envío cae por la ruta directa de <code>manage-campaigns.ts:188-610</code>, que <strong>no respeta smart send time, no reintenta, no se recupera de crashes</strong>.</p>
+      </div>
+      <div class="col good">
+        <h4>✅ Solución</h4>
+        <p>Crear una migration que inserte settings con <code>use_send_queue=true</code> para todos los clientes existentes. Seedear el default en el código. La cola ya funciona — solo nadie la enchufó.</p>
+      </div>
+
+      <div class="ejemplo">
+        <div class="label">
+          <span>EJEMPLO — Migration mínima</span>
+          <span class="file">supabase/migrations/20260408120000_enable_send_queue_default.sql</span>
+        </div>
+<pre><span class="tok-com">-- 1. Backfill: activar cola para todos los clientes existentes</span>
+<span class="tok-key">INSERT INTO</span> email_send_settings (client_id, use_send_queue, rate_limit_per_minute)
+<span class="tok-key">SELECT</span> id, <span class="tok-key">true</span>, <span class="tok-num">60</span>
+<span class="tok-key">FROM</span> clients
+<span class="tok-key">WHERE NOT EXISTS</span> (
+  <span class="tok-key">SELECT</span> <span class="tok-num">1</span> <span class="tok-key">FROM</span> email_send_settings <span class="tok-key">WHERE</span> client_id = clients.id
+);
+
+<span class="tok-com">-- 2. Default a true para clientes nuevos</span>
+<span class="tok-key">ALTER TABLE</span> email_send_settings
+  <span class="tok-key">ALTER COLUMN</span> use_send_queue <span class="tok-key">SET DEFAULT</span> <span class="tok-key">true</span>;
+
+<span class="tok-com">-- 3. Trigger para auto-crear settings al crear cliente</span>
+<span class="tok-key">CREATE OR REPLACE FUNCTION</span> create_default_email_settings()
+<span class="tok-key">RETURNS</span> TRIGGER <span class="tok-key">AS</span> $$
+<span class="tok-key">BEGIN</span>
+  <span class="tok-key">INSERT INTO</span> email_send_settings (client_id, use_send_queue)
+  <span class="tok-key">VALUES</span> (NEW.id, <span class="tok-key">true</span>);
+  <span class="tok-key">RETURN</span> NEW;
+<span class="tok-key">END</span>;
+$$ <span class="tok-key">LANGUAGE</span> plpgsql;</pre>
+      </div>
+
+      <div class="impacto">
+        <div><strong>Antes</strong><code>0 clientes con cola activa</code></div>
+        <div><strong>Después</strong><code>100% con retry + smart send time</code></div>
+        <div><strong>Riesgo</strong><code>Bajo — feature ya probada en deploy</code></div>
+      </div>
+    </div>
+  </article>
+
+  <!-- MEJORA 2 -->
+  <article class="mejora p0">
+    <div class="mejora-head">
+      <div class="badge">2</div>
+      <div>
+        <h3>Smart send time también en la ruta directa</h3>
+        <div class="sub">Los clientes que envían sin cola pierden el feature de "enviar a cada subscriber a su mejor hora". Es injusto.</div>
+      </div>
+      <div class="effort">Esfuerzo<span class="val">4 horas</span></div>
+    </div>
+    <div class="mejora-body">
+      <div class="col bad">
+        <h4>❌ Problema actual</h4>
+        <p><code>send-queue.ts</code> respeta <code>subscriber.send_time_hour</code> al procesar la cola. Pero <code>manage-campaigns.ts</code> en la ruta directa <strong>envía todos los emails al mismo tiempo</strong>, ignorando completamente la mejor hora por subscriber.</p>
+      </div>
+      <div class="col good">
+        <h4>✅ Solución</h4>
+        <p>Aunque la cola se active (mejora #1), mientras tanto: agrupar subscribers por <code>send_time_hour</code> en la ruta directa y usar Cloud Tasks para programar batches por hora.</p>
+      </div>
+
+      <div class="ejemplo">
+        <div class="label">
+          <span>EJEMPLO — Agrupar antes de enviar</span>
+          <span class="file">cloud-run-api/src/routes/email/manage-campaigns.ts (rama send directa)</span>
+        </div>
+<pre><span class="tok-com">// ANTES: loop secuencial sin importar la hora</span>
+<span class="tok-del"><span class="tok-key">for</span> (<span class="tok-key">const</span> sub <span class="tok-key">of</span> subscribers) {
+  <span class="tok-key">await</span> <span class="tok-fn">sendSingleEmail</span>({ to: sub.email, ... });
+}</span>
+
+<span class="tok-com">// DESPUÉS: agrupar por hora y programar batches</span>
+<span class="tok-add"><span class="tok-key">const</span> byHour = subscribers.<span class="tok-fn">reduce</span>((acc, sub) =&gt; {
+  <span class="tok-key">const</span> hour = sub.send_time_hour ?? <span class="tok-num">10</span>; <span class="tok-com">// default 10am</span>
+  (acc[hour] ||= []).<span class="tok-fn">push</span>(sub);
+  <span class="tok-key">return</span> acc;
+}, {} <span class="tok-key">as</span> Record&lt;<span class="tok-key">number</span>, Subscriber[]&gt;);</span>
+
+<span class="tok-add"><span class="tok-key">for</span> (<span class="tok-key">const</span> [hour, batch] <span class="tok-key">of</span> Object.<span class="tok-fn">entries</span>(byHour)) {
+  <span class="tok-key">const</span> scheduledFor = <span class="tok-fn">nextOccurrenceOf</span>(<span class="tok-key">parseInt</span>(hour));
+  <span class="tok-key">await</span> <span class="tok-fn">scheduleCloudTask</span>({
+    payload: { campaignId, subscriberIds: batch.<span class="tok-fn">map</span>(s =&gt; s.id) },
+    scheduledFor,
+  });
+}</span></pre>
+      </div>
+
+      <div class="impacto">
+        <div><strong>Antes</strong><code>Open rate ~22%</code></div>
+        <div><strong>Después esperado</strong><code>Open rate ~28-32% (+30%)</code></div>
+        <div><strong>Riesgo</strong><code>Medio — testear en 1 cliente primero</code></div>
+      </div>
+    </div>
+  </article>
+
+  <!-- MEJORA 3 -->
+  <article class="mejora p0">
+    <div class="mejora-head">
+      <div class="badge">3</div>
+      <div>
+        <h3>Quiet hours por timezone del subscriber, no UTC</h3>
+        <div class="sub">Hoy <code>flow-engine.ts</code> usa quiet hours en UTC. Un subscriber chileno con quiet hours 22-08 recibe emails a las 6pm hora local.</div>
+      </div>
+      <div class="effort">Esfuerzo<span class="val">3 horas</span></div>
+    </div>
+    <div class="mejora-body">
+      <div class="col bad">
+        <h4>❌ Problema actual</h4>
+        <p>La función <code>isInQuietHours()</code> de <code>flow-engine.ts</code> compara contra UTC. Para Chile (UTC-3), las quiet hours configuradas como <strong>22-08</strong> realmente significan <strong>19-05</strong> local. Resultado: spam nocturno legal pero molesto.</p>
+      </div>
+      <div class="col good">
+        <h4>✅ Solución</h4>
+        <p>Agregar columna <code>timezone</code> a <code>email_subscribers</code> (default <code>America/Santiago</code>). Convertir quiet hours antes de comparar usando <code>Intl.DateTimeFormat</code>.</p>
+      </div>
+
+      <div class="ejemplo">
+        <div class="label">
+          <span>EJEMPLO — Conversión correcta</span>
+          <span class="file">cloud-run-api/src/routes/email/flow-engine.ts</span>
+        </div>
+<pre><span class="tok-com">// ANTES: usa UTC ciegamente</span>
+<span class="tok-del"><span class="tok-key">function</span> <span class="tok-fn">isInQuietHours</span>(quietStart: <span class="tok-key">number</span>, quietEnd: <span class="tok-key">number</span>): <span class="tok-key">boolean</span> {
+  <span class="tok-key">const</span> nowUtc = <span class="tok-key">new</span> <span class="tok-fn">Date</span>().<span class="tok-fn">getUTCHours</span>();
+  <span class="tok-key">return</span> nowUtc &gt;= quietStart || nowUtc &lt; quietEnd;
+}</span>
+
+<span class="tok-com">// DESPUÉS: respeta timezone del subscriber</span>
+<span class="tok-add"><span class="tok-key">function</span> <span class="tok-fn">isInQuietHours</span>(
+  quietStart: <span class="tok-key">number</span>,
+  quietEnd: <span class="tok-key">number</span>,
+  timezone = <span class="tok-str">'America/Santiago'</span>
+): <span class="tok-key">boolean</span> {
+  <span class="tok-key">const</span> hourLocal = <span class="tok-key">parseInt</span>(
+    <span class="tok-key">new</span> <span class="tok-fn">Intl</span>.DateTimeFormat(<span class="tok-str">'en-US'</span>, {
+      hour: <span class="tok-str">'2-digit'</span>,
+      hour12: <span class="tok-key">false</span>,
+      timeZone: timezone,
+    }).<span class="tok-fn">format</span>(<span class="tok-key">new</span> <span class="tok-fn">Date</span>())
+  );
+  <span class="tok-key">return</span> hourLocal &gt;= quietStart || hourLocal &lt; quietEnd;
+}</span>
+
+<span class="tok-com">// Migration acompañante:</span>
+<span class="tok-add"><span class="tok-key">ALTER TABLE</span> email_subscribers
+  <span class="tok-key">ADD COLUMN</span> timezone TEXT <span class="tok-key">DEFAULT</span> <span class="tok-str">'America/Santiago'</span>;</span></pre>
+      </div>
+
+      <div class="impacto">
+        <div><strong>Antes</strong><code>Quiet hours rotos para todo no-UTC</code></div>
+        <div><strong>Después</strong><code>Cero envíos en horario nocturno local</code></div>
+        <div><strong>Riesgo</strong><code>Bajo — solo afecta crons de flow</code></div>
+      </div>
+    </div>
+  </article>
+
+  <!-- ============================================== -->
+  <!-- ===================== P1 ===================== -->
+  <!-- ============================================== -->
+
+  <div class="seccion-titulo">
+    <span class="chip p1">P1 · Altas</span>
+    <h2>Deuda técnica que duele</h2>
+  </div>
+
+  <!-- MEJORA 4 -->
+  <article class="mejora p1">
+    <div class="mejora-head">
+      <div class="badge">4</div>
+      <div>
+        <h3>Limpiar código legacy de SES</h3>
+        <div class="sub">El sistema migró a Resend pero <code>track-events.ts:138-281</code> tiene 143 líneas de webhook SNS de SES sin uso, más comentarios mentirosos.</div>
+      </div>
+      <div class="effort">Esfuerzo<span class="val">2 horas</span></div>
+    </div>
+    <div class="mejora-body">
+      <div class="col bad">
+        <h4>❌ Problema actual</h4>
+        <p><code>send-email.ts:114</code> dice "Send via SES" pero llama a Resend. <code>track-events.ts</code> exporta <code>sesWebhooks()</code> que parsea SNS bounces — Resend usa otro webhook (<code>/api/email/webhooks/resend</code>), y nadie ya invoca <code>sesWebhooks</code>. Confunde a cualquiera que abra el archivo.</p>
+      </div>
+      <div class="col good">
+        <h4>✅ Solución</h4>
+        <p>Eliminar <code>sesWebhooks()</code> entero, eliminar la ruta de <code>routes.ts</code>, arreglar comentarios. Documentar el webhook de Resend como único. Si en algún momento se necesita SES como fallback, está en git.</p>
+      </div>
+
+      <div class="ejemplo">
+        <div class="label">
+          <span>EJEMPLO — Lo que se borra</span>
+          <span class="file">cloud-run-api/src/routes/email/track-events.ts</span>
+        </div>
+<pre><span class="tok-del"><span class="tok-com">// L138-281 — borrar el archivo entero de esta función</span>
+<span class="tok-key">export async function</span> <span class="tok-fn">sesWebhooks</span>(c: Context) {
+  <span class="tok-key">const</span> body = <span class="tok-key">await</span> c.req.<span class="tok-fn">json</span>();
+
+  <span class="tok-com">// SNS subscription confirmation handshake</span>
+  <span class="tok-key">if</span> (body.Type === <span class="tok-str">'SubscriptionConfirmation'</span>) {
+    <span class="tok-key">await</span> <span class="tok-fn">fetch</span>(body.SubscribeURL);
+    <span class="tok-key">return</span> c.<span class="tok-fn">json</span>({ ok: <span class="tok-key">true</span> });
+  }
+
+  <span class="tok-com">// Parse SES bounce/complaint/delivery (... ~140 líneas más)</span>
+}</span>
+
+<span class="tok-com">// L114 de send-email.ts — arreglar comentario:</span>
+<span class="tok-del"><span class="tok-com">// Send via SES</span></span>
+<span class="tok-add"><span class="tok-com">// Send via Resend (migrado de SES en commit abc123)</span></span>
+<span class="tok-key">const</span> res = <span class="tok-key">await</span> <span class="tok-fn">resend</span>.emails.<span class="tok-fn">send</span>({ ... });</pre>
+      </div>
+
+      <div class="impacto">
+        <div><strong>Antes</strong><code>~200 líneas zombi</code></div>
+        <div><strong>Después</strong><code>0 código muerto, comentarios honestos</code></div>
+        <div><strong>Riesgo</strong><code>Cero — código no se invoca</code></div>
+      </div>
+    </div>
+  </article>
+
+  <!-- MEJORA 5 -->
+  <article class="mejora p1">
+    <div class="mejora-head">
+      <div class="badge">5</div>
+      <div>
+        <h3>Health score y benchmarks no hardcoded</h3>
+        <div class="sub"><code>EmailAnalytics.tsx:91-96</code> tiene los benchmarks de la industria <strong>en el código</strong>. Cuando hay que ajustarlos hay que rebuildear el frontend.</div>
+      </div>
+      <div class="effort">Esfuerzo<span class="val">5 horas</span></div>
+    </div>
+    <div class="mejora-body">
+      <div class="col bad">
+        <h4>❌ Problema actual</h4>
+        <p>Los benchmarks (open=20%, click=2.5%, bounce=0.4%, unsub=0.2%) están <strong>en una constante de React</strong>. Y los pesos del health score (40+30+30) también. Si Steve Mail crece a otras industrias, hay que tocar código.</p>
+      </div>
+      <div class="col good">
+        <h4>✅ Solución</h4>
+        <p>Tabla nueva <code>email_industry_benchmarks</code> con benchmarks por <code>industry</code>. Tabla <code>email_health_score_config</code> con los pesos. <code>EmailAnalytics</code> los lee al montar.</p>
+      </div>
+
+      <div class="ejemplo">
+        <div class="label">
+          <span>EJEMPLO — De constante a query</span>
+          <span class="file">src/components/client-portal/email/EmailAnalytics.tsx</span>
+        </div>
+<pre><span class="tok-com">// ANTES: hardcoded</span>
+<span class="tok-del"><span class="tok-key">const</span> BENCHMARKS = {
+  openRate: <span class="tok-num">20</span>,
+  clickRate: <span class="tok-num">2.5</span>,
+  bounceRate: <span class="tok-num">0.4</span>,
+  unsubscribeRate: <span class="tok-num">0.2</span>,
+};</span>
+
+<span class="tok-com">// DESPUÉS: lee de DB con cache 1h</span>
+<span class="tok-add"><span class="tok-key">const</span> { data: benchmarks } = useQuery({
+  queryKey: [<span class="tok-str">'email-benchmarks'</span>, client.industry],
+  queryFn: () =&gt; supabase
+    .<span class="tok-fn">from</span>(<span class="tok-str">'email_industry_benchmarks'</span>)
+    .<span class="tok-fn">select</span>(<span class="tok-str">'*'</span>)
+    .<span class="tok-fn">eq</span>(<span class="tok-str">'industry'</span>, client.industry)
+    .<span class="tok-fn">single</span>(),
+  staleTime: <span class="tok-num">3600_000</span>,
+});</span>
+
+<span class="tok-com">// Migration acompañante:</span>
+<span class="tok-add"><span class="tok-key">CREATE TABLE</span> email_industry_benchmarks (
+  industry TEXT <span class="tok-key">PRIMARY KEY</span>,
+  open_rate NUMERIC,
+  click_rate NUMERIC,
+  bounce_rate NUMERIC,
+  unsubscribe_rate NUMERIC
+);
+<span class="tok-key">INSERT INTO</span> email_industry_benchmarks <span class="tok-key">VALUES</span>
+  (<span class="tok-str">'ecommerce'</span>, <span class="tok-num">18.5</span>, <span class="tok-num">2.1</span>, <span class="tok-num">0.4</span>, <span class="tok-num">0.2</span>),
+  (<span class="tok-str">'saas'</span>,      <span class="tok-num">21.3</span>, <span class="tok-num">2.8</span>, <span class="tok-num">0.3</span>, <span class="tok-num">0.15</span>),
+  (<span class="tok-str">'b2b'</span>,       <span class="tok-num">15.1</span>, <span class="tok-num">3.2</span>, <span class="tok-num">0.5</span>, <span class="tok-num">0.18</span>);</span></pre>
+      </div>
+
+      <div class="impacto">
+        <div><strong>Antes</strong><code>Cambio = redeploy</code></div>
+        <div><strong>Después</strong><code>Cambio = UPDATE en DB</code></div>
+        <div><strong>Riesgo</strong><code>Bajo — fallback al constante si no hay row</code></div>
+      </div>
+    </div>
+  </article>
+
+  <!-- MEJORA 6 -->
+  <article class="mejora p1">
+    <div class="mejora-head">
+      <div class="badge">6</div>
+      <div>
+        <h3>Romper <code>CampaignBuilder.tsx</code> (1865 líneas)</h3>
+        <div class="sub">Es un solo componente con 4-step wizard, A/B testing, recommendations, dirty tracking, optimistic locking. Imposible de mantener.</div>
+      </div>
+      <div class="effort">Esfuerzo<span class="val">8 horas</span></div>
+    </div>
+    <div class="mejora-body">
+      <div class="col bad">
+        <h4>❌ Problema actual</h4>
+        <p>1865 líneas en un solo archivo. Cualquier cambio implica scrollear 30 veces. Tocar el step "audience" puede romper el step "design" sin querer. No hay tests porque es imposible montar el componente aislado.</p>
+      </div>
+      <div class="col good">
+        <h4>✅ Solución</h4>
+        <p>Romper en 1 router + 4 sub-componentes (uno por step) + hooks compartidos. Cada step recibe un store de Zustand con el estado del wizard.</p>
+      </div>
+
+      <div class="ejemplo">
+        <div class="label">
+          <span>EJEMPLO — Estructura propuesta</span>
+          <span class="file">src/components/client-portal/email/campaign-builder/</span>
+        </div>
+<pre>campaign-builder/
+├── CampaignBuilder.tsx           <span class="tok-com">// 200 líneas — solo router de steps</span>
+├── store.ts                      <span class="tok-com">// Zustand con estado del wizard</span>
+├── hooks/
+│   ├── useDirtyTracking.ts      <span class="tok-com">// extraído</span>
+│   ├── useOptimisticLock.ts     <span class="tok-com">// extraído</span>
+│   └── useAbTestVariants.ts     <span class="tok-com">// extraído</span>
+└── steps/
+    ├── SetupStep.tsx             <span class="tok-com">// ~300 líneas</span>
+    ├── DesignStep.tsx            <span class="tok-com">// ~500 líneas (visual editor)</span>
+    ├── AudienceStep.tsx          <span class="tok-com">// ~400 líneas</span>
+    └── ReviewStep.tsx            <span class="tok-com">// ~250 líneas</span>
+
+<span class="tok-com">// CampaignBuilder.tsx queda así:</span>
+<span class="tok-key">export default function</span> <span class="tok-fn">CampaignBuilder</span>() {
+  <span class="tok-key">const</span> step = <span class="tok-fn">useCampaignStore</span>(s =&gt; s.currentStep);
+  <span class="tok-key">return</span> (
+    &lt;WizardShell&gt;
+      {step === <span class="tok-str">'setup'</span>    &amp;&amp; &lt;SetupStep /&gt;}
+      {step === <span class="tok-str">'design'</span>   &amp;&amp; &lt;DesignStep /&gt;}
+      {step === <span class="tok-str">'audience'</span> &amp;&amp; &lt;AudienceStep /&gt;}
+      {step === <span class="tok-str">'review'</span>   &amp;&amp; &lt;ReviewStep /&gt;}
+    &lt;/WizardShell&gt;
+  );
+}</pre>
+      </div>
+
+      <div class="impacto">
+        <div><strong>Antes</strong><code>1 archivo · 1865 líneas</code></div>
+        <div><strong>Después</strong><code>~10 archivos · max 500 líneas c/u</code></div>
+        <div><strong>Riesgo</strong><code>Alto — refactor grande, hacer en rama aparte</code></div>
+      </div>
+    </div>
+  </article>
+
+  <!-- ============================================== -->
+  <!-- ===================== P2 ===================== -->
+  <!-- ============================================== -->
+
+  <div class="seccion-titulo">
+    <span class="chip p2">P2 · Nice to have</span>
+    <h2>Cuando ya no haya P0/P1</h2>
+  </div>
+
+  <!-- MEJORA 7 -->
+  <article class="mejora p2">
+    <div class="mejora-head">
+      <div class="badge">7</div>
+      <div>
+        <h3>Dashboard de salud de la cola</h3>
+        <div class="sub">Una vez activada (mejora #1), hay que ver: items stuck, error rate, throughput por minuto, items por cliente.</div>
+      </div>
+      <div class="effort">Esfuerzo<span class="val">6 horas</span></div>
+    </div>
+    <div class="mejora-body">
+      <div class="col bad">
+        <h4>❌ Problema actual</h4>
+        <p>El cron <code>email-queue-tick-1m</code> imprime logs en Cloud Run pero no hay UI. Si la cola se atasca, el primer aviso es un cliente quejándose. <code>STUCK_PROCESSING_MINUTES = 30</code> esconde problemas durante media hora.</p>
+      </div>
+      <div class="col good">
+        <h4>✅ Solución</h4>
+        <p>Tab nuevo en <code>EmailMarketing.tsx</code> "Cola" (admin only) con: items por status, items stuck, throughput last 1h/24h, top clientes por volumen, último error.</p>
+      </div>
+
+      <div class="ejemplo">
+        <div class="label">
+          <span>EJEMPLO — Query base del dashboard</span>
+          <span class="file">cloud-run-api/src/routes/email/queue-health.ts (nuevo)</span>
+        </div>
+<pre><span class="tok-key">export async function</span> <span class="tok-fn">queueHealth</span>(c: Context) {
+  <span class="tok-key">const</span> [
+    statusCounts,
+    stuckItems,
+    throughputLastHour,
+    topClients,
+    recentErrors,
+  ] = <span class="tok-key">await</span> Promise.<span class="tok-fn">all</span>([
+    supabase.<span class="tok-fn">rpc</span>(<span class="tok-str">'email_queue_status_counts'</span>),
+    supabase.<span class="tok-fn">from</span>(<span class="tok-str">'email_send_queue'</span>)
+      .<span class="tok-fn">select</span>(<span class="tok-str">'id, processed_at, last_error'</span>)
+      .<span class="tok-fn">eq</span>(<span class="tok-str">'status'</span>, <span class="tok-str">'processing'</span>)
+      .<span class="tok-fn">lt</span>(<span class="tok-str">'processed_at'</span>, <span class="tok-fn">tenMinutesAgo</span>()),
+    supabase.<span class="tok-fn">rpc</span>(<span class="tok-str">'email_queue_throughput'</span>, { window_minutes: <span class="tok-num">60</span> }),
+    supabase.<span class="tok-fn">rpc</span>(<span class="tok-str">'email_queue_top_clients'</span>, { limit_n: <span class="tok-num">10</span> }),
+    supabase.<span class="tok-fn">from</span>(<span class="tok-str">'email_send_queue'</span>)
+      .<span class="tok-fn">select</span>(<span class="tok-str">'id, client_id, last_error, processed_at'</span>)
+      .<span class="tok-fn">not</span>(<span class="tok-str">'last_error'</span>, <span class="tok-str">'is'</span>, <span class="tok-key">null</span>)
+      .<span class="tok-fn">order</span>(<span class="tok-str">'processed_at'</span>, { ascending: <span class="tok-key">false</span> })
+      .<span class="tok-fn">limit</span>(<span class="tok-num">20</span>),
+  ]);
+  <span class="tok-key">return</span> c.<span class="tok-fn">json</span>({ statusCounts, stuckItems, throughputLastHour, topClients, recentErrors });
+}</pre>
+      </div>
+
+      <div class="impacto">
+        <div><strong>Antes</strong><code>Detección reactiva (cliente avisa)</code></div>
+        <div><strong>Después</strong><code>Detección proactiva en &lt;5min</code></div>
+        <div><strong>Riesgo</strong><code>Cero — solo lectura</code></div>
+      </div>
+    </div>
+  </article>
+
+  <!-- MEJORA 8 -->
+  <article class="mejora p2">
+    <div class="mejora-head">
+      <div class="badge">8</div>
+      <div>
+        <h3>Alertas automáticas en bounces/complaints masivos</h3>
+        <div class="sub">Resend procesa los webhooks pero no avisa cuando hay 50 bounces seguidos. Eso es señal de lista contaminada o dominio quemado.</div>
+      </div>
+      <div class="effort">Esfuerzo<span class="val">3 horas</span></div>
+    </div>
+    <div class="mejora-body">
+      <div class="col bad">
+        <h4>❌ Problema actual</h4>
+        <p>El handler de Resend webhook actualiza <code>email_subscribers.status</code> a 'bounced' o 'complained' silenciosamente. Si una campaña tiene <strong>10% de bounce</strong> (5x el benchmark), nadie se entera hasta que abren analytics.</p>
+      </div>
+      <div class="col good">
+        <h4>✅ Solución</h4>
+        <p>Agregar trigger en Postgres que cuente bounces/complaints en ventana de 1h por <code>client_id</code>, y si supera umbral, inserta en <code>steve_alerts</code> y dispara mensaje a Slack/WhatsApp del admin.</p>
+      </div>
+
+      <div class="ejemplo">
+        <div class="label">
+          <span>EJEMPLO — Trigger en DB</span>
+          <span class="file">supabase/migrations/20260408130000_email_bounce_alerts.sql</span>
+        </div>
+<pre><span class="tok-key">CREATE OR REPLACE FUNCTION</span> alert_on_bounce_spike()
+<span class="tok-key">RETURNS</span> TRIGGER <span class="tok-key">AS</span> $$
+<span class="tok-key">DECLARE</span>
+  recent_bounces <span class="tok-key">INT</span>;
+  recent_total   <span class="tok-key">INT</span>;
+  bounce_rate    NUMERIC;
+<span class="tok-key">BEGIN</span>
+  <span class="tok-key">IF</span> NEW.event_type <span class="tok-key">NOT IN</span> (<span class="tok-str">'bounced'</span>, <span class="tok-str">'complained'</span>) <span class="tok-key">THEN</span>
+    <span class="tok-key">RETURN</span> NEW;
+  <span class="tok-key">END IF</span>;
+
+  <span class="tok-key">SELECT COUNT</span>(*) <span class="tok-key">INTO</span> recent_bounces
+  <span class="tok-key">FROM</span> email_events
+  <span class="tok-key">WHERE</span> client_id = NEW.client_id
+    <span class="tok-key">AND</span> event_type <span class="tok-key">IN</span> (<span class="tok-str">'bounced'</span>, <span class="tok-str">'complained'</span>)
+    <span class="tok-key">AND</span> created_at &gt; NOW() - <span class="tok-key">INTERVAL</span> <span class="tok-str">'1 hour'</span>;
+
+  <span class="tok-key">SELECT COUNT</span>(*) <span class="tok-key">INTO</span> recent_total
+  <span class="tok-key">FROM</span> email_events
+  <span class="tok-key">WHERE</span> client_id = NEW.client_id
+    <span class="tok-key">AND</span> created_at &gt; NOW() - <span class="tok-key">INTERVAL</span> <span class="tok-str">'1 hour'</span>;
+
+  bounce_rate := (recent_bounces::NUMERIC / NULLIF(recent_total, <span class="tok-num">0</span>)) * <span class="tok-num">100</span>;
+
+  <span class="tok-key">IF</span> bounce_rate &gt; <span class="tok-num">5</span> <span class="tok-key">AND</span> recent_total &gt;= <span class="tok-num">20</span> <span class="tok-key">THEN</span>
+    <span class="tok-key">INSERT INTO</span> steve_alerts (client_id, severity, message, payload)
+    <span class="tok-key">VALUES</span> (
+      NEW.client_id,
+      <span class="tok-str">'high'</span>,
+      <span class="tok-fn">format</span>(<span class="tok-str">'Bounce rate %.1f%% en última hora (%s/%s)'</span>,
+        bounce_rate, recent_bounces, recent_total),
+      jsonb_build_object(<span class="tok-str">'bounces'</span>, recent_bounces, <span class="tok-str">'total'</span>, recent_total)
+    );
+  <span class="tok-key">END IF</span>;
+
+  <span class="tok-key">RETURN</span> NEW;
+<span class="tok-key">END</span>;
+$$ <span class="tok-key">LANGUAGE</span> plpgsql;
+
+<span class="tok-key">CREATE TRIGGER</span> trg_email_bounce_alert
+  <span class="tok-key">AFTER INSERT ON</span> email_events
+  <span class="tok-key">FOR EACH ROW</span> <span class="tok-key">EXECUTE FUNCTION</span> alert_on_bounce_spike();</pre>
+      </div>
+
+      <div class="impacto">
+        <div><strong>Antes</strong><code>Detección post-mortem</code></div>
+        <div><strong>Después</strong><code>Alerta &lt;1h con bounce rate &gt;5%</code></div>
+        <div><strong>Riesgo</strong><code>Bajo — trigger condicional</code></div>
+      </div>
+    </div>
+  </article>
+
+  <footer>
+    Roadmap generado el 2026-04-07 · Para abrir este archivo correctamente:<br>
+    <code>cd ~/betabg/public &amp;&amp; python3 -m http.server 8765</code> → <code>http://localhost:8765/steve-mail-mejoras.html</code>
+  </footer>
+</div>
+</body>
+</html>

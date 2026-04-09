@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Decrypt Shopify access token from the platform_connections table.
@@ -220,25 +221,37 @@ export async function syncSubscribers(c: Context) {
       if (error) return c.json({ error: error.message }, 500);
 
       // Count by status (using parameterized query builder instead of raw SQL)
-      const { data: subscribedCount } = await supabase
-        .from('email_subscribers')
-        .select('*', { count: 'exact', head: true })
-        .eq('client_id', client_id)
-        .eq('status', 'subscribed');
-      const { data: _uC, count: unsubscribedCount } = await supabase
-        .from('email_subscribers')
-        .select('*', { count: 'exact', head: true })
-        .eq('client_id', client_id)
-        .eq('status', 'unsubscribed');
-      const { data: _bC, count: bouncedCount } = await supabase
-        .from('email_subscribers')
-        .select('*', { count: 'exact', head: true })
-        .eq('client_id', client_id)
-        .eq('status', 'bounced');
+      const subscribedCount = await safeQueryOrDefault<any>(
+        supabase
+          .from('email_subscribers')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', client_id)
+          .eq('status', 'subscribed'),
+        [],
+        'syncSubscribers.countSubscribed',
+      );
+      const unsubscribedRows = await safeQueryOrDefault<any>(
+        supabase
+          .from('email_subscribers')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', client_id)
+          .eq('status', 'unsubscribed'),
+        [],
+        'syncSubscribers.countUnsubscribed',
+      );
+      const bouncedRows = await safeQueryOrDefault<any>(
+        supabase
+          .from('email_subscribers')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', client_id)
+          .eq('status', 'bounced'),
+        [],
+        'syncSubscribers.countBounced',
+      );
       const counts = [
-        { status: 'subscribed', count: subscribedCount || 0 },
-        { status: 'unsubscribed', count: unsubscribedCount || 0 },
-        { status: 'bounced', count: bouncedCount || 0 },
+        { status: 'subscribed', count: (subscribedCount as any)?.length || 0 },
+        { status: 'unsubscribed', count: (unsubscribedRows as any)?.length || 0 },
+        { status: 'bounced', count: (bouncedRows as any)?.length || 0 },
       ];
 
       // Simple count approach

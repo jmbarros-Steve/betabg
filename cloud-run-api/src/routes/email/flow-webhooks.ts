@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /**
@@ -61,13 +62,17 @@ export async function emailFlowWebhooks(c: Context) {
   const supabase = getSupabaseAdmin();
 
   // Find client by shop domain
-  const { data: connection } = await supabase
-    .from('platform_connections')
-    .select('client_id')
-    .eq('platform', 'shopify')
-    .eq('is_active', true)
-    .or(`connection_data->>shop_domain.eq.${shopDomain},connection_data->>shop.eq.${shopDomain}`)
-    .single();
+  const connection = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('platform_connections')
+      .select('client_id')
+      .eq('platform', 'shopify')
+      .eq('is_active', true)
+      .or(`connection_data->>shop_domain.eq.${shopDomain},connection_data->>shop.eq.${shopDomain}`)
+      .single(),
+    null,
+    'flowWebhooks.findClientByShop',
+  );
 
   if (!connection) {
     console.log(`No client found for shop ${shopDomain}`);
@@ -154,12 +159,16 @@ async function handleCheckoutCreated(supabase: any, clientId: string, payload: a
   if (!subscriber) return;
 
   // Find active abandoned_cart flows for this client
-  const { data: flows } = await supabase
-    .from('email_flows')
-    .select('*')
-    .eq('client_id', clientId)
-    .eq('trigger_type', 'abandoned_cart')
-    .eq('status', 'active');
+  const flows = await safeQueryOrDefault<any>(
+    supabase
+      .from('email_flows')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('trigger_type', 'abandoned_cart')
+      .eq('status', 'active'),
+    [],
+    'flowWebhooks.getAbandonedCartFlows',
+  );
 
   if (!flows || flows.length === 0) return;
 
@@ -236,12 +245,16 @@ async function handleCustomerCreated(supabase: any, clientId: string, payload: a
   if (!subscriber) return;
 
   // Find active welcome flows
-  const { data: flows } = await supabase
-    .from('email_flows')
-    .select('*')
-    .eq('client_id', clientId)
-    .eq('trigger_type', 'welcome')
-    .eq('status', 'active');
+  const flows = await safeQueryOrDefault<any>(
+    supabase
+      .from('email_flows')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('trigger_type', 'welcome')
+      .eq('status', 'active'),
+    [],
+    'flowWebhooks.getWelcomeFlows',
+  );
 
   if (!flows || flows.length === 0) return;
 
@@ -301,12 +314,16 @@ async function handleOrderCreated(supabase: any, clientId: string, payload: any)
   if (!email) return;
 
   // Update subscriber with order data
-  const { data: subscriber } = await supabase
-    .from('email_subscribers')
-    .select('id, total_orders, total_spent')
-    .eq('client_id', clientId)
-    .eq('email', email)
-    .single();
+  const subscriber = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('email_subscribers')
+      .select('id, total_orders, total_spent')
+      .eq('client_id', clientId)
+      .eq('email', email)
+      .single(),
+    null,
+    'flowWebhooks.getSubscriberForOrder',
+  );
 
   if (subscriber) {
     const orderTotal = parseFloat(payload.total_price || '0');
@@ -321,20 +338,28 @@ async function handleOrderCreated(supabase: any, clientId: string, payload: any)
       .eq('id', subscriber.id);
 
     // Cancel any active abandoned_cart enrollments for this subscriber
-    const { data: activeEnrollments } = await supabase
-      .from('email_flow_enrollments')
-      .select('id, flow_id, cloud_task_name')
-      .eq('subscriber_id', subscriber.id)
-      .eq('client_id', clientId)
-      .eq('status', 'active');
+    const activeEnrollments = await safeQueryOrDefault<any>(
+      supabase
+        .from('email_flow_enrollments')
+        .select('id, flow_id, cloud_task_name')
+        .eq('subscriber_id', subscriber.id)
+        .eq('client_id', clientId)
+        .eq('status', 'active'),
+      [],
+      'flowWebhooks.getActiveEnrollments',
+    );
 
     for (const enrollment of activeEnrollments || []) {
       // Check if this enrollment belongs to an abandoned_cart flow
-      const { data: flow } = await supabase
-        .from('email_flows')
-        .select('trigger_type')
-        .eq('id', enrollment.flow_id)
-        .single();
+      const flow = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('email_flows')
+          .select('trigger_type')
+          .eq('id', enrollment.flow_id)
+          .single(),
+        null,
+        'flowWebhooks.getEnrollmentFlow',
+      );
 
       if (flow?.trigger_type === 'abandoned_cart') {
         await supabase
@@ -359,14 +384,18 @@ async function handleOrderCreated(supabase: any, clientId: string, payload: any)
     }
 
     // Record conversion event — attribute to most recent campaign/flow email
-    const { data: recentEvent } = await supabase
-      .from('email_events')
-      .select('campaign_id, flow_id')
-      .eq('subscriber_id', subscriber.id)
-      .eq('event_type', 'clicked')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+    const recentEvent = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('email_events')
+        .select('campaign_id, flow_id')
+        .eq('subscriber_id', subscriber.id)
+        .eq('event_type', 'clicked')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single(),
+      null,
+      'flowWebhooks.getRecentClickEvent',
+    );
 
     // Also check UTM attribution
     const landingSite = payload.landing_site || '';
@@ -388,12 +417,16 @@ async function handleOrderCreated(supabase: any, clientId: string, payload: any)
     });
 
     // Trigger post-purchase flows
-    const { data: postPurchaseFlows } = await supabase
-      .from('email_flows')
-      .select('*')
-      .eq('client_id', clientId)
-      .eq('trigger_type', 'post_purchase')
-      .eq('status', 'active');
+    const postPurchaseFlows = await safeQueryOrDefault<any>(
+      supabase
+        .from('email_flows')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('trigger_type', 'post_purchase')
+        .eq('status', 'active'),
+      [],
+      'flowWebhooks.getPostPurchaseFlows',
+    );
 
     for (const flow of postPurchaseFlows || []) {
       const { count } = await supabase
@@ -499,14 +532,18 @@ async function handleProductUpdate(supabase: any, clientId: string, payload: any
 
   if (hasInventory) {
     // Check active back-in-stock alerts — only proceed if someone is actually waiting
-    const { data: bisAlerts } = await supabase
-      .from('product_alerts')
-      .select('id')
-      .eq('client_id', clientId)
-      .eq('product_id', productId)
-      .eq('alert_type', 'back_in_stock')
-      .eq('status', 'active')
-      .limit(1);
+    const bisAlerts = await safeQueryOrDefault<any>(
+      supabase
+        .from('product_alerts')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('product_id', productId)
+        .eq('alert_type', 'back_in_stock')
+        .eq('status', 'active')
+        .limit(1),
+      [],
+      'flowWebhooks.getBackInStockAlerts',
+    );
 
     if (bisAlerts && bisAlerts.length > 0) {
       console.log(`Product ${productId} back in stock — triggering alerts for client ${clientId}`);
@@ -533,13 +570,17 @@ async function handleProductUpdate(supabase: any, clientId: string, payload: any
     const currentPrice = parseFloat(variant.price || '0');
     if (currentPrice <= 0) continue;
 
-    const { data: priceAlerts } = await supabase
-      .from('product_alerts')
-      .select('id, original_price')
-      .eq('client_id', clientId)
-      .eq('product_id', productId)
-      .eq('alert_type', 'price_drop')
-      .eq('status', 'active');
+    const priceAlerts = await safeQueryOrDefault<any>(
+      supabase
+        .from('product_alerts')
+        .select('id, original_price')
+        .eq('client_id', clientId)
+        .eq('product_id', productId)
+        .eq('alert_type', 'price_drop')
+        .eq('status', 'active'),
+      [],
+      'flowWebhooks.getPriceDropAlerts',
+    );
 
     const triggeredAlerts = (priceAlerts || []).filter(
       (a: any) => a.original_price && currentPrice < parseFloat(a.original_price)
@@ -577,23 +618,31 @@ async function enrollInFlows(
   productId: string,
   payload: any,
 ) {
-  const { data: flows } = await supabase
-    .from('email_flows')
-    .select('*')
-    .eq('client_id', clientId)
-    .eq('trigger_type', triggerType)
-    .eq('status', 'active');
+  const flows = await safeQueryOrDefault<any>(
+    supabase
+      .from('email_flows')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('trigger_type', triggerType)
+      .eq('status', 'active'),
+    [],
+    'flowWebhooks.enrollInFlows.getFlows',
+  );
 
   if (!flows || flows.length === 0) return;
 
   // Get subscribers who had alerts for this product
-  const { data: alerts } = await supabase
-    .from('product_alerts')
-    .select('subscriber_id')
-    .eq('client_id', clientId)
-    .eq('product_id', productId)
-    .eq('status', 'active')
-    .not('subscriber_id', 'is', null);
+  const alerts = await safeQueryOrDefault<any>(
+    supabase
+      .from('product_alerts')
+      .select('subscriber_id')
+      .eq('client_id', clientId)
+      .eq('product_id', productId)
+      .eq('status', 'active')
+      .not('subscriber_id', 'is', null),
+    [],
+    'flowWebhooks.enrollInFlows.getAlerts',
+  );
 
   const subscriberIds = [...new Set((alerts || []).map((a: any) => a.subscriber_id).filter(Boolean))];
   if (subscriberIds.length === 0) return;
@@ -647,11 +696,15 @@ export async function emailFlowCronWinback(c: Context) {
   const supabase = getSupabaseAdmin();
 
   // Get all active winback flows
-  const { data: flows } = await supabase
-    .from('email_flows')
-    .select('*')
-    .eq('trigger_type', 'winback')
-    .eq('status', 'active');
+  const flows = await safeQueryOrDefault<any>(
+    supabase
+      .from('email_flows')
+      .select('*')
+      .eq('trigger_type', 'winback')
+      .eq('status', 'active'),
+    [],
+    'flowWebhooks.cronWinback.getFlows',
+  );
 
   if (!flows || flows.length === 0) {
     return c.json({ processed: 0, message: 'No active winback flows' });
@@ -665,15 +718,19 @@ export async function emailFlowCronWinback(c: Context) {
 
     // Find subscribers with Shopify customer IDs who ordered before the cutoff
     // and haven't ordered since
-    const { data: candidates } = await supabase
-      .from('email_subscribers')
-      .select('id, email, shopify_customer_id')
-      .eq('client_id', flow.client_id)
-      .eq('status', 'subscribed')
-      .not('shopify_customer_id', 'is', null)
-      .not('last_order_at', 'is', null)
-      .lt('last_order_at', cutoffDate)
-      .limit(100);
+    const candidates = await safeQueryOrDefault<any>(
+      supabase
+        .from('email_subscribers')
+        .select('id, email, shopify_customer_id')
+        .eq('client_id', flow.client_id)
+        .eq('status', 'subscribed')
+        .not('shopify_customer_id', 'is', null)
+        .not('last_order_at', 'is', null)
+        .lt('last_order_at', cutoffDate)
+        .limit(100),
+      [],
+      'flowWebhooks.cronWinback.getCandidates',
+    );
 
     if (!candidates || candidates.length === 0) continue;
 
@@ -724,11 +781,15 @@ export async function emailFlowCronWinback(c: Context) {
 export async function emailFlowCronBirthday(c: Context) {
   const supabase = getSupabaseAdmin();
 
-  const { data: flows } = await supabase
-    .from('email_flows')
-    .select('*')
-    .eq('trigger_type', 'birthday')
-    .eq('status', 'active');
+  const flows = await safeQueryOrDefault<any>(
+    supabase
+      .from('email_flows')
+      .select('*')
+      .eq('trigger_type', 'birthday')
+      .eq('status', 'active'),
+    [],
+    'flowWebhooks.cronBirthday.getFlows',
+  );
 
   if (!flows || flows.length === 0) {
     return c.json({ processed: 0, message: 'No active birthday flows' });
@@ -744,12 +805,16 @@ export async function emailFlowCronBirthday(c: Context) {
 
     // Find subscribers whose birthday matches target date
     // birthday stored as metadata field (month-day) or custom_fields.birthday
-    const { data: subscribers } = await supabase
-      .from('email_subscribers')
-      .select('id, email, custom_fields')
-      .eq('client_id', flow.client_id)
-      .eq('status', 'subscribed')
-      .limit(500);
+    const subscribers = await safeQueryOrDefault<any>(
+      supabase
+        .from('email_subscribers')
+        .select('id, email, custom_fields')
+        .eq('client_id', flow.client_id)
+        .eq('status', 'subscribed')
+        .limit(500),
+      [],
+      'flowWebhooks.cronBirthday.getSubscribers',
+    );
 
     if (!subscribers) continue;
 
@@ -832,23 +897,31 @@ export async function emailFlowTrackBrowse(c: Context) {
   const supabase = getSupabaseAdmin();
 
   // Find or create subscriber
-  const { data: subscriber } = await supabase
-    .from('email_subscribers')
-    .select('id, email, status')
-    .eq('client_id', client_id)
-    .eq('email', email.toLowerCase())
-    .single();
+  const subscriber = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('email_subscribers')
+      .select('id, email, status')
+      .eq('client_id', client_id)
+      .eq('email', email.toLowerCase())
+      .single(),
+    null,
+    'flowWebhooks.trackBrowse.getSubscriber',
+  );
 
   if (!subscriber || subscriber.status !== 'subscribed') {
     return c.json({ tracked: false, reason: 'not_subscribed' });
   }
 
   // Store browse event in subscriber's metadata
-  const { data: existing } = await supabase
-    .from('email_subscribers')
-    .select('custom_fields')
-    .eq('id', subscriber.id)
-    .single();
+  const existing = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('email_subscribers')
+      .select('custom_fields')
+      .eq('id', subscriber.id)
+      .single(),
+    null,
+    'flowWebhooks.trackBrowse.getSubscriberCustomFields',
+  );
 
   const customFields = existing?.custom_fields || {};
   const browseHistory = customFields.browse_history || [];
@@ -876,12 +949,16 @@ export async function emailFlowTrackBrowse(c: Context) {
     return Date.now() - viewedAt < 3600 * 1000; // last hour
   });
 
-  const { data: flows } = await supabase
-    .from('email_flows')
-    .select('*')
-    .eq('client_id', client_id)
-    .eq('trigger_type', 'browse_abandonment')
-    .eq('status', 'active');
+  const flows = await safeQueryOrDefault<any>(
+    supabase
+      .from('email_flows')
+      .select('*')
+      .eq('client_id', client_id)
+      .eq('trigger_type', 'browse_abandonment')
+      .eq('status', 'active'),
+    [],
+    'flowWebhooks.trackBrowse.getBrowseAbandonmentFlows',
+  );
 
   if (flows && flows.length > 0) {
     for (const flow of flows) {

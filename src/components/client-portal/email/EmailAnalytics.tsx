@@ -4,9 +4,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { callApi } from '@/lib/api';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Mail, MousePointerClick, AlertTriangle, Loader2, DollarSign, Eye, ArrowLeft, Users, TrendingUp, Link2, BarChart3, ShieldCheck, Target } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+
+// Fallback si la tabla email_industry_benchmarks no responde o no tiene 'default'.
+// Debe quedar en sync con el row 'default' de la migration 20260408140200.
+const FALLBACK_BENCHMARKS = {
+  open_rate: 20.0,
+  click_rate: 2.5,
+  bounce_rate: 0.4,
+  unsubscribe_rate: 0.2,
+};
 
 interface EmailAnalyticsProps {
   clientId: string;
@@ -20,6 +30,33 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
   const [loading, setLoading] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [days, setDays] = useState('30');
+  const [BENCHMARKS, setBENCHMARKS] = useState(FALLBACK_BENCHMARKS);
+
+  // Load benchmarks from DB once on mount, fallback to constants if not available.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('email_industry_benchmarks')
+          .select('open_rate, click_rate, bounce_rate, unsubscribe_rate')
+          .eq('industry', 'default')
+          .maybeSingle();
+        if (!cancelled && !error && data) {
+          setBENCHMARKS({
+            open_rate: Number(data.open_rate),
+            click_rate: Number(data.click_rate),
+            bounce_rate: Number(data.bounce_rate),
+            unsubscribe_rate: Number(data.unsubscribe_rate),
+          });
+        }
+      } catch (err) {
+        // Silent fallback — los FALLBACK_BENCHMARKS ya son razonables.
+        console.warn('[EmailAnalytics] benchmarks fallback:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const loadOverview = useCallback(async () => {
     setLoading(true);
@@ -87,14 +124,6 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
       }));
   }, [overview]);
 
-  // Industry benchmarks (ecommerce averages from industry reports 2025)
-  const BENCHMARKS = {
-    open_rate: 20.0,
-    click_rate: 2.5,
-    bounce_rate: 0.4,
-    unsubscribe_rate: 0.2,
-  };
-
   const benchmarkComparison = useMemo(() => {
     if (!overview?.aggregate) return null;
     const agg = overview.aggregate;
@@ -108,7 +137,7 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
       { label: 'Tasa de baja', client: parseFloat(unsubRate.toFixed(2)), benchmark: BENCHMARKS.unsubscribe_rate, unit: '%', higherBetter: false },
     ];
     return metrics;
-  }, [overview]);
+  }, [overview, BENCHMARKS]);
 
   if (loading) {
     return (

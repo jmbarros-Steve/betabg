@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { TRACKING_PIXEL_GIF } from './send-email.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Handle email open tracking via 1x1 transparent GIF.
@@ -16,12 +17,16 @@ export async function trackOpen(c: Context) {
     // Get the original event to find subscriber/campaign info
     (async () => {
       try {
-        const { data } = await supabase
-          .from('email_events')
-          .select('subscriber_id, client_id, campaign_id, flow_id')
-          .eq('id', eventId)
-          .eq('event_type', 'sent')
-          .single();
+        const data = await safeQuerySingleOrDefault<any>(
+          supabase
+            .from('email_events')
+            .select('subscriber_id, client_id, campaign_id, flow_id')
+            .eq('id', eventId)
+            .eq('event_type', 'sent')
+            .single(),
+          null,
+          'trackOpen.getSentEvent',
+        );
         if (data) {
           const { error } = await supabase.from('email_events').insert({
             client_id: data.client_id,
@@ -92,12 +97,16 @@ export async function trackClick(c: Context) {
 
     (async () => {
       try {
-        const { data } = await supabase
-          .from('email_events')
-          .select('subscriber_id, client_id, campaign_id, flow_id')
-          .eq('id', eventId)
-          .eq('event_type', 'sent')
-          .single();
+        const data = await safeQuerySingleOrDefault<any>(
+          supabase
+            .from('email_events')
+            .select('subscriber_id, client_id, campaign_id, flow_id')
+            .eq('id', eventId)
+            .eq('event_type', 'sent')
+            .single(),
+          null,
+          'trackClick.getSentEvent',
+        );
         if (data) {
           const { error } = await supabase.from('email_events').insert({
             client_id: data.client_id,
@@ -175,11 +184,15 @@ export async function sesWebhooks(c: Context) {
         const email = recipient.emailAddress?.toLowerCase();
         if (!email) continue;
 
-        const { data: subscribers } = await supabase
-          .from('email_subscribers')
-          .select('id, client_id, bounce_count')
-          .eq('email', email)
-          .in('status', ['subscribed', 'bounced']);
+        const subscribers = await safeQueryOrDefault<any>(
+          supabase
+            .from('email_subscribers')
+            .select('id, client_id, bounce_count')
+            .eq('email', email)
+            .in('status', ['subscribed', 'bounced']),
+          [],
+          'sesWebhooks.getBounceSubscribers',
+        );
 
         for (const sub of subscribers || []) {
           const currentBounceCount = (sub.bounce_count ?? 0) + 1;
@@ -229,10 +242,14 @@ export async function sesWebhooks(c: Context) {
         const email = recipient.emailAddress?.toLowerCase();
         if (!email) continue;
 
-        const { data: subscribers } = await supabase
-          .from('email_subscribers')
-          .select('id, client_id')
-          .eq('email', email);
+        const subscribers = await safeQueryOrDefault<any>(
+          supabase
+            .from('email_subscribers')
+            .select('id, client_id')
+            .eq('email', email),
+          [],
+          'sesWebhooks.getComplaintSubscribers',
+        );
 
         for (const sub of subscribers || []) {
           await supabase
@@ -255,14 +272,18 @@ export async function sesWebhooks(c: Context) {
       const delivery = message.delivery;
       for (const email of delivery.recipients || []) {
         // Find the most recent 'sent' event for this email
-        const { data: event } = await supabase
-          .from('email_events')
-          .select('id, client_id, subscriber_id, campaign_id, flow_id')
-          .eq('event_type', 'sent')
-          .eq('metadata->>to', email.toLowerCase())
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+        const event = await safeQuerySingleOrDefault<any>(
+          supabase
+            .from('email_events')
+            .select('id, client_id, subscriber_id, campaign_id, flow_id')
+            .eq('event_type', 'sent')
+            .eq('metadata->>to', email.toLowerCase())
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single(),
+          null,
+          'sesWebhooks.getDeliveredSentEvent',
+        );
 
         if (event) {
           await supabase.from('email_events').insert({

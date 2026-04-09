@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Auto-cleanup: detect inactive subscribers and manage sunset segment.
@@ -144,13 +145,17 @@ export async function emailListCleanup(c: Context) {
 
       // Filter to those who engaged in the last 30 days
       const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
-      const { data: recentlyActive } = await supabase
-        .from('email_subscribers')
-        .select('id, tags')
-        .eq('client_id', client_id)
-        .eq('status', 'subscribed')
-        .contains('tags', ['sunset'])
-        .gte('last_engaged_at', thirtyDaysAgo);
+      const recentlyActive = await safeQueryOrDefault<any>(
+        supabase
+          .from('email_subscribers')
+          .select('id, tags')
+          .eq('client_id', client_id)
+          .eq('status', 'subscribed')
+          .contains('tags', ['sunset'])
+          .gte('last_engaged_at', thirtyDaysAgo),
+        [],
+        'listCleanup.getRecentlyActive',
+      );
 
       let reactivated = 0;
       for (const sub of recentlyActive || []) {

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { getPersonalizedRecommendations } from './product-recommendation-engine.js';
 
 // In-memory product cache per client (TTL: 1 hour)
@@ -91,13 +92,17 @@ export async function getProductCatalog(supabase: any, clientId: string): Promis
   }
 
   // Get Shopify credentials
-  const { data: connection } = await supabase
-    .from('platform_connections')
-    .select('store_url, access_token_encrypted')
-    .eq('client_id', clientId)
-    .eq('platform', 'shopify')
-    .eq('is_active', true)
-    .maybeSingle();
+  const connection = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('platform_connections')
+      .select('store_url, access_token_encrypted')
+      .eq('client_id', clientId)
+      .eq('platform', 'shopify')
+      .eq('is_active', true)
+      .maybeSingle(),
+    null,
+    'productRecommendations.getProductCatalog.getConnection',
+  );
 
   if (!connection?.store_url) {
     return [];
@@ -181,12 +186,16 @@ export async function generateRecommendationBlock(
 
       // Fallback to conversion events
       if (recommended.length < config.count) {
-        const { data: events } = await supabase
-          .from('email_events')
-          .select('metadata')
-          .eq('client_id', clientId)
-          .eq('event_type', 'converted')
-          .limit(100);
+        const events = await safeQueryOrDefault<any>(
+          supabase
+            .from('email_events')
+            .select('metadata')
+            .eq('client_id', clientId)
+            .eq('event_type', 'converted')
+            .limit(100),
+          [],
+          'productRecommendations.bestSellers.getConvertedEvents',
+        );
 
         const productCounts = new Map<string, number>();
         for (const event of events || []) {
@@ -221,14 +230,18 @@ export async function generateRecommendationBlock(
     case 'complementary': {
       if (subscriber) {
         // Get subscriber's last purchased product type
-        const { data: lastEvent } = await supabase
-          .from('email_events')
-          .select('metadata')
-          .eq('subscriber_id', subscriber.id)
-          .eq('event_type', 'converted')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+        const lastEvent = await safeQuerySingleOrDefault<any>(
+          supabase
+            .from('email_events')
+            .select('metadata')
+            .eq('subscriber_id', subscriber.id)
+            .eq('event_type', 'converted')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single(),
+          null,
+          'productRecommendations.complementary.getLastEvent',
+        );
 
         const lastProductType = lastEvent?.metadata?.product_type;
         if (lastProductType) {
@@ -255,14 +268,18 @@ export async function generateRecommendationBlock(
     case 'recently_viewed': {
       // Get products the subscriber clicked on recently via email links
       if (subscriber) {
-        const { data: clickEvents } = await supabase
-          .from('email_events')
-          .select('metadata')
-          .eq('client_id', clientId)
-          .eq('subscriber_id', subscriber.id)
-          .eq('event_type', 'clicked')
-          .order('created_at', { ascending: false })
-          .limit(50);
+        const clickEvents = await safeQueryOrDefault<any>(
+          supabase
+            .from('email_events')
+            .select('metadata')
+            .eq('client_id', clientId)
+            .eq('subscriber_id', subscriber.id)
+            .eq('event_type', 'clicked')
+            .order('created_at', { ascending: false })
+            .limit(50),
+          [],
+          'productRecommendations.recentlyViewed.getClickEvents',
+        );
 
         const viewedHandles: string[] = [];
         for (const event of clickEvents || []) {
@@ -290,13 +307,17 @@ export async function generateRecommendationBlock(
     case 'abandoned_cart': {
       // Get products from subscriber's abandoned cart via flow enrollments
       if (subscriber) {
-        const { data: enrollments } = await supabase
-          .from('email_flow_enrollments')
-          .select('metadata')
-          .eq('client_id', clientId)
-          .eq('subscriber_id', subscriber.id)
-          .order('enrolled_at', { ascending: false })
-          .limit(5);
+        const enrollments = await safeQueryOrDefault<any>(
+          supabase
+            .from('email_flow_enrollments')
+            .select('metadata')
+            .eq('client_id', clientId)
+            .eq('subscriber_id', subscriber.id)
+            .order('enrolled_at', { ascending: false })
+            .limit(5),
+          [],
+          'productRecommendations.abandonedCart.getEnrollments',
+        );
 
         const cartProductIds: string[] = [];
         for (const enrollment of enrollments || []) {
@@ -353,13 +374,17 @@ async function getBestSellerProductIds(supabase: any, clientId: string): Promise
   }
 
   // Get Shopify credentials
-  const { data: connection } = await supabase
-    .from('platform_connections')
-    .select('store_url, access_token_encrypted')
-    .eq('client_id', clientId)
-    .eq('platform', 'shopify')
-    .eq('is_active', true)
-    .maybeSingle();
+  const connection = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('platform_connections')
+      .select('store_url, access_token_encrypted')
+      .eq('client_id', clientId)
+      .eq('platform', 'shopify')
+      .eq('is_active', true)
+      .maybeSingle(),
+    null,
+    'productRecommendations.bestSellers.getConnection',
+  );
 
   if (!connection?.store_url) return [];
 

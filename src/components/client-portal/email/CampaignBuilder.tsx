@@ -25,39 +25,10 @@ import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { ConditionalBlockPanel, serializeConditionsToAttr, type BlockCondition } from './ConditionalBlockPanel';
 import { ABTestResultsPanel } from './ABTestResultsPanel';
 import { ProductBlockPanel } from './ProductBlockPanel';
-
-interface CampaignBuilderProps {
-  clientId: string;
-}
-
-interface Campaign {
-  id: string;
-  name: string;
-  subject: string;
-  preview_text: string;
-  from_name: string;
-  from_email: string;
-  html_content: string;
-  design_json?: any;
-  status: string;
-  total_recipients: number;
-  sent_count: number;
-  scheduled_at: string | null;
-  sent_at: string | null;
-  created_at: string;
-  audience_filter: any;
-}
-
-const CAMPAIGN_TYPES = [
-  { value: 'promotional', label: 'Promocional' },
-  { value: 'newsletter', label: 'Newsletter' },
-  { value: 'product_launch', label: 'Lanzamiento de producto' },
-  { value: 'seasonal', label: 'Temporada / Holiday' },
-  { value: 'announcement', label: 'Anuncio' },
-  { value: 'restock', label: 'Restock / Back in stock' },
-];
-
-const GMAIL_CLIP_LIMIT = 102 * 1024;
+// Tipos y constantes extraídos a ./campaign-builder/ — ver README.md en esa carpeta
+// para el plan de refactor gradual del componente.
+import type { Campaign, CampaignBuilderProps } from './campaign-builder/types';
+import { CAMPAIGN_TYPES, GMAIL_CLIP_LIMIT } from './campaign-builder/constants';
 
 export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);

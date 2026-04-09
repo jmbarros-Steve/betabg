@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendSingleEmail } from './send-email.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Product alert management for Steve Mail.
@@ -61,15 +62,19 @@ export async function productAlerts(c: Context) {
       }
 
       // Check for existing active alert for same product + email + type
-      const { data: existing } = await supabase
-        .from('product_alerts')
-        .select('id')
-        .eq('client_id', client_id)
-        .eq('subscriber_id', subscriber.id)
-        .eq('product_id', product_id)
-        .eq('alert_type', alert_type)
-        .eq('status', 'active')
-        .maybeSingle();
+      const existing = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('product_alerts')
+          .select('id')
+          .eq('client_id', client_id)
+          .eq('subscriber_id', subscriber.id)
+          .eq('product_id', product_id)
+          .eq('alert_type', alert_type)
+          .eq('status', 'active')
+          .maybeSingle(),
+        null,
+        'productAlerts.getExistingAlert',
+      );
 
       if (existing) {
         return c.json({ success: true, alert_id: existing.id, message: 'Alert already active' });
@@ -223,19 +228,27 @@ export async function productAlerts(c: Context) {
       }
 
       // Get client's email settings for from address
-      const { data: clientData } = await supabase
-        .from('clients')
-        .select('company_name')
-        .eq('id', client_id)
-        .single();
+      const clientData = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('clients')
+          .select('company_name')
+          .eq('id', client_id)
+          .single(),
+        null,
+        'productAlerts.getClientData',
+      );
 
-      const { data: domainData } = await supabase
-        .from('email_domains')
-        .select('domain, from_name')
-        .eq('client_id', client_id)
-        .eq('status', 'verified')
-        .limit(1)
-        .maybeSingle();
+      const domainData = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('email_domains')
+          .select('domain, from_name')
+          .eq('client_id', client_id)
+          .eq('status', 'verified')
+          .limit(1)
+          .maybeSingle(),
+        null,
+        'productAlerts.getDomainData',
+      );
 
       const fromDomain = domainData?.domain || process.env.DEFAULT_FROM_DOMAIN || 'steve.cl';
       const fromName = (domainData as any)?.from_name || clientData?.company_name || 'Store';

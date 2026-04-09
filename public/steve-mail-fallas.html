@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Mail — Fallas del análisis (a prueba de idiotas)</title>
+<style>
+  :root {
+    --bg: #0b0f17;
+    --panel: #131a26;
+    --panel-2: #1a2334;
+    --border: #243049;
+    --text: #e6edf7;
+    --muted: #8b97ad;
+    --red: #ff5470;
+    --green: #3ddc97;
+    --yellow: #ffd166;
+    --blue: #5fa8ff;
+    --purple: #b088ff;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 48px 24px 96px; }
+  header { margin-bottom: 40px; }
+  header .eyebrow {
+    display: inline-block;
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 999px;
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-size: 38px;
+    margin: 0 0 12px;
+    letter-spacing: -0.02em;
+  }
+  header p {
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 720px;
+    margin: 0;
+  }
+
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin: 32px 0 48px;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .stat .num {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--red);
+    line-height: 1;
+  }
+  .stat .label {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .stat.green .num { color: var(--green); }
+  .stat.yellow .num { color: var(--yellow); }
+  .stat.blue .num { color: var(--blue); }
+
+  .falla {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--red);
+    border-radius: 14px;
+    margin-bottom: 28px;
+    overflow: hidden;
+  }
+  .falla-head {
+    padding: 22px 28px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .badge {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--red);
+    color: #0b0f17;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 16px;
+    font-family: var(--mono);
+  }
+  .falla-head h2 {
+    margin: 0;
+    font-size: 22px;
+    letter-spacing: -0.01em;
+  }
+  .falla-head .sub {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  .falla-body {
+    padding: 24px 28px 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  .col {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .col h3 {
+    margin: 0 0 10px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .col.bad h3 { color: var(--red); }
+  .col.good h3 { color: var(--green); }
+  .col p { margin: 0; font-size: 14px; }
+  .col strong { color: var(--text); }
+
+  .ejemplo {
+    grid-column: 1 / -1;
+    background: #06090f;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0;
+    overflow: hidden;
+  }
+  .ejemplo .label {
+    background: var(--panel-2);
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .ejemplo .label .file {
+    color: var(--blue);
+    font-family: var(--mono);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  pre {
+    margin: 0;
+    padding: 18px 20px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    color: #d4dbe8;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .tok-key { color: var(--purple); }
+  .tok-str { color: var(--green); }
+  .tok-num { color: var(--yellow); }
+  .tok-com { color: #5e6a85; font-style: italic; }
+  .tok-fn  { color: var(--blue); }
+  .tok-err { color: var(--red); font-weight: 600; }
+  .tok-ok  { color: var(--green); font-weight: 600; }
+
+  .verifica {
+    grid-column: 1 / -1;
+    background: var(--panel-2);
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .verifica strong { color: var(--yellow); display: block; margin-bottom: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; }
+  .verifica code {
+    font-family: var(--mono);
+    background: #06090f;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #d4dbe8;
+    font-size: 12px;
+  }
+
+  table.tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  table.tbl th, table.tbl td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  table.tbl th {
+    color: var(--muted);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    font-weight: 500;
+  }
+  table.tbl td.mono { font-family: var(--mono); font-size: 12px; }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-family: var(--mono);
+  }
+  .pill.no  { background: rgba(255,84,112,0.15); color: var(--red); border: 1px solid rgba(255,84,112,0.3); }
+  .pill.yes { background: rgba(61,220,151,0.15); color: var(--green); border: 1px solid rgba(61,220,151,0.3); }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 13px;
+    text-align: center;
+  }
+  footer code { font-family: var(--mono); color: var(--blue); }
+
+  @media (max-width: 760px) {
+    .summary { grid-template-columns: repeat(2, 1fr); }
+    .falla-body { grid-template-columns: 1fr; }
+    h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Auditoría · Steve Mail · 2026-04-07</span>
+    <h1>Las 4 fallas del análisis original</h1>
+    <p>El primer análisis del módulo de Steve Mail tenía cosas que no cuadraban. Esto las muestra una por una con el código real y cómo se verifican. Si alguna de estas vuelve a colarse, es por flojera, no por falta de evidencia.</p>
+  </header>
+
+  <section class="summary">
+    <div class="stat"><div class="num">4</div><div class="label">Fallas detectadas</div></div>
+    <div class="stat yellow"><div class="num">1</div><div class="label">Cron olvidado (el más importante)</div></div>
+    <div class="stat blue"><div class="num">2</div><div class="label">Crons mal atribuidos</div></div>
+    <div class="stat green"><div class="num">1</div><div class="label">Tabla declarada "rota" sin estarlo</div></div>
+  </section>
+
+  <!-- ===================== FALLA 1 ===================== -->
+  <article class="falla">
+    <div class="falla-head">
+      <div class="badge">1</div>
+      <div>
+        <h2>Olvidé el cron principal: <code>email-queue-tick-1m</code></h2>
+        <div class="sub">Es el que mueve la cola entera. Se ejecuta cada minuto. Es de Valentina W1, autorizado el 2026-04-08.</div>
+      </div>
+    </div>
+    <div class="falla-body">
+      <div class="col bad">
+        <h3>❌ Lo que dije</h3>
+        <p>"Steve Mail tiene <strong>2 crons</strong>: <code>wolf-morning-send-9am</code> y <code>wolf-night-mode-3am</code>."</p>
+      </div>
+      <div class="col good">
+        <h3>✅ La realidad</h3>
+        <p>El cron real que procesa <code>email_send_queue</code> es <strong><code>email-queue-tick-1m</code></strong>, programado por Cloud Scheduler con expresión <code>* * * * *</code> (cada minuto).</p>
+      </div>
+
+      <div class="ejemplo">
+        <div class="label">
+          <span>EJEMPLO — el archivo que ignoré</span>
+          <span class="file">cloud-run-api/src/routes/cron/email-queue-tick.ts</span>
+        </div>
+<pre><span class="tok-com">// L20-21: parámetros del tick</span>
+<span class="tok-key">const</span> CONCURRENCY = <span class="tok-num">5</span>;
+<span class="tok-key">const</span> STUCK_PROCESSING_MINUTES = <span class="tok-num">30</span>;
+
+<span class="tok-key">export async function</span> <span class="tok-fn">emailQueueTick</span>(c: Context) {
+  <span class="tok-com">// L24-29: auth con X-Cron-Secret</span>
+  <span class="tok-key">if</span> (providedSecret !== cronSecret) <span class="tok-key">return</span> c.<span class="tok-fn">json</span>({ error: <span class="tok-str">'Unauthorized'</span> }, <span class="tok-num">401</span>);
+
+  <span class="tok-com">// L39-58: PRE-SWEEP — recupera items atascados en 'processing' &gt; 30 min</span>
+  <span class="tok-key">await</span> supabase.<span class="tok-fn">from</span>(<span class="tok-str">'email_send_queue'</span>)
+    .<span class="tok-fn">update</span>({ status: <span class="tok-str">'queued'</span>, last_error: <span class="tok-str">'recovered from stuck processing state'</span> })
+    .<span class="tok-fn">eq</span>(<span class="tok-str">'status'</span>, <span class="tok-str">'processing'</span>)
+    .<span class="tok-fn">lt</span>(<span class="tok-str">'processed_at'</span>, stuckCutoff);
+
+  <span class="tok-com">// L61-66: encuentra clientes con items 'queued' listos</span>
+  <span class="tok-key">const</span> { data: queueRows } = <span class="tok-key">await</span> supabase
+    .<span class="tok-fn">from</span>(<span class="tok-str">'email_send_queue'</span>)
+    .<span class="tok-fn">select</span>(<span class="tok-str">'client_id'</span>)
+    .<span class="tok-fn">eq</span>(<span class="tok-str">'status'</span>, <span class="tok-str">'queued'</span>)
+    .<span class="tok-fn">lte</span>(<span class="tok-str">'scheduled_for'</span>, <span class="tok-key">new</span> <span class="tok-fn">Date</span>().<span class="tok-fn">toISOString</span>());
+
+  <span class="tok-com">// L115-128: procesa hasta 5 clientes en PARALELO con Promise.allSettled</span>
+  <span class="tok-key">for</span> (<span class="tok-key">let</span> i = <span class="tok-num">0</span>; i &lt; clientIds.length; i += CONCURRENCY) {
+    <span class="tok-key">const</span> chunk = clientIds.<span class="tok-fn">slice</span>(i, i + CONCURRENCY);
+    <span class="tok-key">const</span> settled = <span class="tok-key">await</span> Promise.<span class="tok-fn">allSettled</span>(chunk.<span class="tok-fn">map</span>(processClient));
+  }
+}</pre>
+      </div>
+
+      <div class="verifica">
+        <strong>Cómo se verifica</strong>
+        <code>gcloud scheduler jobs list --location=us-central1 | grep email</code><br>
+        Devuelve <code>email-queue-tick-1m</code> con schedule <code>* * * * *</code> apuntando a <code>/api/cron/email-queue-tick</code>.
+      </div>
+    </div>
+  </article>
+
+  <!-- ===================== FALLA 2 ===================== -->
+  <article class="falla">
+    <div class="falla-head">
+      <div class="badge">2</div>
+      <div>
+        <h2>Los crons <code>wolf-*</code> NO son de Steve Mail</h2>
+        <div class="sub">Son del pipeline de Steve Vendedor WhatsApp. Cero contacto con tablas <code>email_*</code>.</div>
+      </div>
+    </div>
+    <div class="falla-body">
+      <div class="col bad">
+        <h3>❌ Lo que dije</h3>
+        <p>"Los wolf-* son <strong>legacy del proyecto Wolf</strong>, parte de Steve Mail aunque el nombre confunda."</p>
+      </div>
+      <div class="col good">
+        <h3>✅ La realidad</h3>
+        <p>Operan sobre <code>wa_prospects</code>, <code>wa_messages</code> y <code>competitor_ads</code>. Envían <strong>WhatsApp por Twilio</strong>, no email. Pertenecen al pipeline de prospects de Steve Vendedor.</p>
+      </div>
+
+      <div class="ejemplo">
+        <div class="label">
+          <span>EJEMPLO 1 — wolf-morning-send.ts NO toca email</span>
+          <span class="file">cloud-run-api/src/routes/cron/wolf-morning-send.ts</span>
+        </div>
+<pre><span class="tok-com">// L18: importa el cliente de WhatsApp, no de email</span>
+<span class="tok-key">import</span> { sendWhatsApp } <span class="tok-key">from</span> <span class="tok-str">'../../lib/twilio-client.js'</span>;
+
+<span class="tok-com">// L51-57: lee de wa_prospects (tabla de WhatsApp), no email_subscribers</span>
+<span class="tok-key">const</span> prospects = <span class="tok-key">await</span> <span class="tok-fn">safeQuery</span>(
+  supabase.<span class="tok-fn">from</span>(<span class="tok-err">'wa_prospects'</span>)
+    .<span class="tok-fn">select</span>(<span class="tok-str">'id, phone, profile_name, name, what_they_sell, wolf_findings, stage'</span>)
+    .<span class="tok-fn">not</span>(<span class="tok-str">'wolf_findings'</span>, <span class="tok-str">'is'</span>, <span class="tok-key">null</span>),
+);
+
+<span class="tok-com">// L113: envía por WhatsApp Twilio, NO por Resend</span>
+<span class="tok-key">await</span> <span class="tok-fn">sendWhatsApp</span>(<span class="tok-str">`+${prospect.phone}`</span>, msg);
+
+<span class="tok-com">// L116-125: inserta en wa_messages, NO en email_events</span>
+<span class="tok-key">await</span> supabase.<span class="tok-fn">from</span>(<span class="tok-err">'wa_messages'</span>).<span class="tok-fn">insert</span>({
+  channel: <span class="tok-str">'prospect'</span>,
+  direction: <span class="tok-str">'outbound'</span>,
+  body: msg,
+});</pre>
+      </div>
+
+      <div class="ejemplo">
+        <div class="label">
+          <span>EJEMPLO 2 — wolf-night-mode.ts hace web scraping</span>
+          <span class="file">cloud-run-api/src/routes/cron/wolf-night-mode.ts</span>
+        </div>
+<pre><span class="tok-com">// L40-47: lee wa_prospects (NO email_subscribers)</span>
+<span class="tok-key">const</span> prospects = <span class="tok-key">await</span> <span class="tok-fn">safeQuery</span>(
+  supabase.<span class="tok-fn">from</span>(<span class="tok-err">'wa_prospects'</span>)
+    .<span class="tok-fn">select</span>(<span class="tok-str">'id, phone, what_they_sell, audit_data, investigation_data'</span>),
+);
+
+<span class="tok-com">// L63-75: llama a Apify para re-scrapear la tienda del prospect</span>
+<span class="tok-key">const</span> runRes = <span class="tok-key">await</span> <span class="tok-fn">fetch</span>(<span class="tok-str">'https://api.apify.com/v2/acts/apify~website-content-crawler/runs'</span>, {
+  method: <span class="tok-str">'POST'</span>,
+  body: JSON.<span class="tok-fn">stringify</span>({ startUrls: [{ url: storeUrl }], maxCrawlPages: <span class="tok-num">3</span> }),
+});
+
+<span class="tok-com">// L107-108: detecta productos nuevos por imágenes</span>
+<span class="tok-key">if</span> (newProductImages.length &gt; <span class="tok-num">0</span>) {
+  findings.<span class="tok-fn">push</span>(<span class="tok-str">`Subió ${newProductImages.length} producto(s) nuevo(s) a su tienda`</span>);
+}</pre>
+      </div>
+
+      <div class="verifica">
+        <strong>Cómo se verifica</strong>
+        Buscar en los archivos <code>wolf-*.ts</code> cualquier referencia a <code>email_</code>:<br>
+        <code>grep -r "email_" cloud-run-api/src/routes/cron/wolf-*.ts</code> → <strong>0 resultados</strong>.
+      </div>
+    </div>
+  </article>
+
+  <!-- ===================== FALLA 3 ===================== -->
+  <article class="falla">
+    <div class="falla-head">
+      <div class="badge">3</div>
+      <div>
+        <h2><code>email_send_queue</code> NO está rota — está sin usar</h2>
+        <div class="sub">La marqué como "ROTA" porque tiene 0 filas. Pero es una feature nueva detrás de un flag, y nadie lo activó todavía.</div>
+      </div>
+    </div>
+    <div class="falla-body">
+      <div class="col bad">
+        <h3>❌ Lo que dije</h3>
+        <p>"<code>email_send_queue</code> está <strong>ROTA</strong>: 0 filas, el cron no encuentra nada que procesar, hay un bug en algún lado."</p>
+      </div>
+      <div class="col good">
+        <h3>✅ La realidad</h3>
+        <p>La cola es <strong>una feature nueva</strong> (deployada el 2026-04-08) detrás del flag <code>email_send_settings.use_send_queue</code>. La tabla <code>email_send_settings</code> está vacía: <strong>ningún cliente lo tiene en true</strong>. Por eso 100% del envío sigue cayendo por la ruta directa de <code>manage-campaigns.ts</code>.</p>
+      </div>
+
+      <div class="ejemplo">
+        <div class="label">
+          <span>EJEMPLO — Estado real de las tablas</span>
+          <span class="file">Verificado vía Supabase REST API</span>
+        </div>
+        <table class="tbl">
+          <thead>
+            <tr><th>Tabla</th><th>Filas</th><th>¿Está rota?</th><th>Explicación</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mono">email_campaigns</td><td class="mono">8</td><td><span class="pill yes">NO</span></td><td>Funcional, hay campañas reales.</td></tr>
+            <tr><td class="mono">email_subscribers</td><td class="mono">604</td><td><span class="pill yes">NO</span></td><td>Lista de contactos sana.</td></tr>
+            <tr><td class="mono">email_events</td><td class="mono">90</td><td><span class="pill yes">NO</span></td><td>Tracking funcionando.</td></tr>
+            <tr><td class="mono">email_send_queue</td><td class="mono">0</td><td><span class="pill yes">NO</span></td><td><strong>Sin uso</strong>, no rota. Esperando que algún cliente active el flag.</td></tr>
+            <tr><td class="mono">email_send_settings</td><td class="mono">0</td><td><span class="pill yes">NO</span></td><td>Vacía. Por eso <code>use_send_queue</code> es false en todos los clientes.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="ejemplo">
+        <div class="label">
+          <span>POR QUÉ no entra nada a la cola</span>
+          <span class="file">cloud-run-api/src/routes/email/manage-campaigns.ts (rama send)</span>
+        </div>
+<pre><span class="tok-com">// El send action lee el flag y elige la ruta</span>
+<span class="tok-key">const</span> { data: settings } = <span class="tok-key">await</span> supabase
+  .<span class="tok-fn">from</span>(<span class="tok-str">'email_send_settings'</span>)
+  .<span class="tok-fn">select</span>(<span class="tok-str">'use_send_queue'</span>)
+  .<span class="tok-fn">eq</span>(<span class="tok-str">'client_id'</span>, clientId)
+  .<span class="tok-fn">maybeSingle</span>();
+
+<span class="tok-key">const</span> useSendQueue = settings?.use_send_queue === <span class="tok-key">true</span>; <span class="tok-com">// ← siempre false hoy</span>
+
+<span class="tok-key">if</span> (useSendQueue) {
+  <span class="tok-com">// RAMA NUEVA — INSERT en email_send_queue (no se ejecuta)</span>
+} <span class="tok-key">else</span> {
+  <span class="tok-com">// RAMA DIRECTA — loop sendSingleEmail() en batches a Resend (esta es la que corre)</span>
+}</pre>
+      </div>
+
+      <div class="verifica">
+        <strong>Cómo se verifica</strong>
+        <code>curl 'https://[supabase]/rest/v1/email_send_settings?select=*'</code> → devuelve <code>[]</code>.<br>
+        Para activar la cola: insertar una fila con <code>{ client_id, use_send_queue: true }</code>.
+      </div>
+    </div>
+  </article>
+
+  <!-- ===================== FALLA 4 ===================== -->
+  <article class="falla">
+    <div class="falla-head">
+      <div class="badge">4</div>
+      <div>
+        <h2>Confundí Cloud <strong>Tasks</strong> con Cloud <strong>Scheduler</strong></h2>
+        <div class="sub">Son dos servicios distintos de GCP. Cada uno cumple un rol diferente en Steve Mail.</div>
+      </div>
+    </div>
+    <div class="falla-body">
+      <div class="col bad">
+        <h3>❌ Lo que dije</h3>
+        <p>"<strong>Cloud Tasks</strong> programa el procesamiento de la cola."</p>
+      </div>
+      <div class="col good">
+        <h3>✅ La realidad</h3>
+        <p><strong>Cloud Scheduler</strong> (cron) llama al endpoint <code>/api/cron/email-queue-tick</code> cada minuto. <strong>Cloud Tasks</strong> sí se usa, pero solo para campañas programadas a futuro y para la selección del ganador A/B.</p>
+      </div>
+
+      <div class="ejemplo">
+        <div class="label">
+          <span>QUIÉN hace QUÉ</span>
+          <span class="file">Servicios GCP en Steve Mail</span>
+        </div>
+        <table class="tbl">
+          <thead>
+            <tr><th>Servicio</th><th>Función</th><th>Dónde se usa</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Cloud Scheduler</strong></td>
+              <td>Cron recurrente (cada minuto)</td>
+              <td><code>email-queue-tick-1m</code> → procesa <code>email_send_queue</code></td>
+            </tr>
+            <tr>
+              <td><strong>Cloud Tasks</strong></td>
+              <td>Tarea programada one-shot a futuro</td>
+              <td><code>scheduleCloudTask()</code> en <code>manage-campaigns.ts:834-865</code> para campañas con <code>scheduled_for</code></td>
+            </tr>
+            <tr>
+              <td><strong>Cloud Tasks</strong></td>
+              <td>Selección de ganador A/B test</td>
+              <td><code>scheduleAbTestWinner()</code> en <code>manage-campaigns.ts:870-910</code> con margen de 10min si <code>useSendQueue</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="ejemplo">
+        <div class="label">
+          <span>EJEMPLO — Cloud Scheduler, no Tasks</span>
+          <span class="file">gcloud scheduler jobs describe email-queue-tick-1m</span>
+        </div>
+<pre><span class="tok-key">name</span>: projects/steveapp-agency/locations/us-central1/jobs/<span class="tok-ok">email-queue-tick-1m</span>
+<span class="tok-key">schedule</span>: <span class="tok-str">'* * * * *'</span>
+<span class="tok-key">timeZone</span>: <span class="tok-str">'America/Santiago'</span>
+<span class="tok-key">httpTarget</span>:
+  uri: <span class="tok-str">'https://steve-api-xxx.run.app/api/cron/email-queue-tick'</span>
+  httpMethod: POST
+  headers:
+    X-Cron-Secret: <span class="tok-str">'***'</span></pre>
+      </div>
+
+      <div class="verifica">
+        <strong>Cómo se verifica</strong>
+        <code>gcloud scheduler jobs list --location=us-central1</code> lista los crons.<br>
+        <code>gcloud tasks queues list --location=us-central1</code> lista las colas de Tasks (otras, no email-queue-tick).
+      </div>
+    </div>
+  </article>
+
+  <footer>
+    Auditoría generada el 2026-04-07 · Para abrir este archivo correctamente:<br>
+    <code>cd ~/betabg/public && python3 -m http.server 8765</code> → <code>http://localhost:8765/steve-mail-fallas.html</code>
+  </footer>
+</div>
+</body>
+</html>

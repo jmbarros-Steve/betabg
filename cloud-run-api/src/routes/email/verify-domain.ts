@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 let resendClient: Resend | null = null;
 function getResendClient(): Resend {
@@ -89,12 +90,16 @@ export async function verifyEmailDomain(c: Context) {
       const resend = getResendClient();
 
       // Get resend_domain_id + existing dns_records (to preserve DMARC)
-      const { data: domainRecord } = await supabase
-        .from('email_domains')
-        .select('resend_domain_id, dns_records')
-        .eq('client_id', client_id)
-        .eq('domain', cleanDomain)
-        .single();
+      const domainRecord = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('email_domains')
+          .select('resend_domain_id, dns_records')
+          .eq('client_id', client_id)
+          .eq('domain', cleanDomain)
+          .single(),
+        null,
+        'verifyEmailDomain.getDomainRecord',
+      );
 
       if (!domainRecord?.resend_domain_id) {
         return c.json({ error: 'Domain not found. Please initiate verification first.' }, 404);

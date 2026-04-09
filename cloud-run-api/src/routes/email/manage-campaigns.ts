@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { sendSingleEmail } from './send-email.js';
 import { renderEmailTemplate, buildTemplateContext } from '../../lib/template-engine.js';
 import { processEmailHtml } from '../../lib/email-html-processor.js';
@@ -141,12 +142,16 @@ export async function manageEmailCampaigns(c: Context) {
       if (!campaign_id) return c.json({ error: 'campaign_id is required' }, 400);
 
       // Only allow updates on draft/scheduled campaigns
-      const { data: existing } = await supabase
-        .from('email_campaigns')
-        .select('status')
-        .eq('id', campaign_id)
-        .eq('client_id', client_id)
-        .single();
+      const existing = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('email_campaigns')
+          .select('status')
+          .eq('id', campaign_id)
+          .eq('client_id', client_id)
+          .single(),
+        null,
+        'manageCampaigns.update.getExisting',
+      );
 
       if (!existing || !['draft', 'scheduled'].includes(existing.status)) {
         return c.json({ error: 'Can only update draft or scheduled campaigns' }, 400);
@@ -208,11 +213,15 @@ export async function manageEmailCampaigns(c: Context) {
       // ── ESPEJO visual check for email HTML ──
       if (campaign.html_content) {
         try {
-          const { data: brandInfo } = await supabase
-            .from('brand_research')
-            .select('brand_name, colors')
-            .eq('shop_id', client_id)
-            .maybeSingle();
+          const brandInfo = await safeQuerySingleOrDefault<any>(
+            supabase
+              .from('brand_research')
+              .select('brand_name, colors')
+              .eq('shop_id', client_id)
+              .maybeSingle(),
+            null,
+            'manageCampaigns.send.getBrandInfo',
+          );
 
           const espejoResult = await espejoEmail(
             campaign.html_content,
@@ -260,22 +269,30 @@ export async function manageEmailCampaigns(c: Context) {
         abTest = newTest;
       } else {
         // Check for existing A/B test
-        const { data: existingTest } = await supabase
-          .from('email_ab_tests')
-          .select('*')
-          .eq('campaign_id', campaign_id)
-          .eq('client_id', client_id)
-          .eq('status', 'pending')
-          .maybeSingle();
+        const existingTest = await safeQuerySingleOrDefault<any>(
+          supabase
+            .from('email_ab_tests')
+            .select('*')
+            .eq('campaign_id', campaign_id)
+            .eq('client_id', client_id)
+            .eq('status', 'pending')
+            .maybeSingle(),
+          null,
+          'manageCampaigns.send.getExistingAbTest',
+        );
         abTest = existingTest;
       }
 
       // Read feature flag: use queue vs direct send
-      const { data: sendSettings } = await supabase
-        .from('email_send_settings')
-        .select('use_send_queue')
-        .eq('client_id', client_id)
-        .maybeSingle();
+      const sendSettings = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('email_send_settings')
+          .select('use_send_queue')
+          .eq('client_id', client_id)
+          .maybeSingle(),
+        null,
+        'manageCampaigns.send.getSendSettings',
+      );
       const useSendQueue = sendSettings?.use_send_queue === true;
 
       // Mark as sending
@@ -296,7 +313,11 @@ export async function manageEmailCampaigns(c: Context) {
       // Determine from email — use merchant's business name, not generic "Steve"
       const fromEmail = campaign.from_email || `noreply@${process.env.DEFAULT_FROM_DOMAIN || 'steve.cl'}`;
       // brandClient is loaded below, but we need fromName before that, so load merchant name here
-      const { data: senderClient } = await supabase.from('clients').select('name, company').eq('id', client_id).maybeSingle();
+      const senderClient = await safeQuerySingleOrDefault<any>(
+        supabase.from('clients').select('name, company').eq('id', client_id).maybeSingle(),
+        null,
+        'manageCampaigns.send.getSenderClient',
+      );
       const fromName = campaign.from_name || senderClient?.company || senderClient?.name || 'Steve';
 
       // Product recommendations are now processed per-subscriber in processEmailHtml
@@ -304,11 +325,15 @@ export async function manageEmailCampaigns(c: Context) {
       let baseHtml = campaign.html_content;
 
       // Load brand info for nunjucks template rendering
-      const { data: brandClient } = await supabase
-        .from('clients')
-        .select('name, logo_url, brand_color, brand_secondary_color, brand_font, website_url')
-        .eq('id', client_id)
-        .single();
+      const brandClient = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('clients')
+          .select('name, logo_url, brand_color, brand_secondary_color, brand_font, website_url')
+          .eq('id', client_id)
+          .single(),
+        null,
+        'manageCampaigns.send.getBrandClient',
+      );
       const brandInfo = {
         name: brandClient?.name || '',
         logo_url: brandClient?.logo_url || '',
@@ -524,8 +549,62 @@ export async function manageEmailCampaigns(c: Context) {
       }
 
       // === Normal send (no A/B test) — DIRECT PATH ===
-      for (let i = 0; i < subscribers.length; i += batchSize) {
-        const batch = subscribers.slice(i, i + batchSize);
+      // Smart send time: si el subscriber tiene send_time_hour y NO coincide
+      // con la hora UTC actual, lo encolamos con scheduled_for = próxima
+      // ocurrencia de esa hora. El cron email-queue-tick-1m lo tomará cuando
+      // llegue el momento. Así respetamos smart send time incluso en ruta directa.
+      const nowUtcHour = new Date().getUTCHours();
+      const nowSubscribers: typeof subscribers = [];
+      const deferredSubscribers: typeof subscribers = [];
+      for (const sub of subscribers) {
+        if (sub.send_time_hour == null || sub.send_time_hour === nowUtcHour) {
+          nowSubscribers.push(sub);
+        } else {
+          deferredSubscribers.push(sub);
+        }
+      }
+
+      // Encolar los deferred con scheduled_for = próxima ocurrencia de su hora óptima.
+      let deferredCount = 0;
+      if (deferredSubscribers.length > 0) {
+        const deferredItems: Array<any> = [];
+        for (const sub of deferredSubscribers) {
+          try {
+            const ctx = buildTemplateContext(
+              { first_name: sub.first_name ?? undefined, last_name: sub.last_name ?? undefined, email: sub.email, tags: sub.tags, total_orders: sub.total_orders, total_spent: sub.total_spent, last_order_at: sub.last_order_at ?? undefined, custom_fields: sub.custom_fields ?? undefined },
+              { discount_code: campaign.recommendation_config?.discount_code },
+              brandInfo,
+              []
+            );
+            let personalizedHtml = usesNunjucks ? renderEmailTemplate(baseHtml, ctx) : baseHtml;
+            const personalizedSubject = usesNunjucks ? renderEmailTemplate(campaign.subject, ctx) : campaign.subject;
+            const hasCustomBlocks = personalizedHtml.includes('data-steve-') || personalizedHtml.includes('product_recommendations');
+            if (hasCustomBlocks) {
+              personalizedHtml = await processEmailHtml(personalizedHtml, {
+                clientId: client_id, subscriberId: sub.id, templateContext: ctx, recommendationConfig: recConfig,
+              });
+            }
+            // Calcular próxima ocurrencia UTC de la hora objetivo del subscriber.
+            const target = new Date();
+            target.setUTCHours(sub.send_time_hour!, 0, 0, 0);
+            if (target.getTime() <= Date.now()) target.setUTCDate(target.getUTCDate() + 1);
+            deferredItems.push({
+              client_id, campaign_id, flow_id: null, subscriber_id: sub.id,
+              subject: personalizedSubject, html_content: personalizedHtml,
+              from_email: fromEmail, from_name: fromName, reply_to: campaign.reply_to || null,
+              ab_variant: null, priority: 5,
+              scheduled_for: target.toISOString(),
+            });
+          } catch (err) {
+            console.error(`[manage-campaigns] deferred queue build error for sub ${sub.id}:`, err);
+          }
+        }
+        deferredCount = await enqueueCampaignItems(supabase, deferredItems);
+        console.log(`[manage-campaigns] smart send: ${deferredCount} emails diferidos a su hora óptima`);
+      }
+
+      for (let i = 0; i < nowSubscribers.length; i += batchSize) {
+        const batch = nowSubscribers.slice(i, i + batchSize);
 
         const promises = batch.map(async (sub) => {
           try {
@@ -583,11 +662,13 @@ export async function manageEmailCampaigns(c: Context) {
         }
       }
 
-      // Mark as sent
+      // Si hay deferred items en la cola, la campaña no está "sent" todavía —
+      // sigue en 'sending' hasta que el cron drene la cola y la marque como sent.
+      const campaignFinalStatus = deferredCount > 0 ? 'sending' : 'sent';
       await supabase
         .from('email_campaigns')
         .update({
-          status: 'sent',
+          status: campaignFinalStatus,
           sent_count: sentCount,
           updated_at: new Date().toISOString(),
         })
@@ -606,6 +687,8 @@ export async function manageEmailCampaigns(c: Context) {
         success: true,
         total_recipients: subscribers.length,
         sent_count: sentCount,
+        deferred_count: deferredCount,
+        smart_send_active: deferredCount > 0,
       });
     }
 
@@ -667,22 +750,30 @@ export async function manageEmailCampaigns(c: Context) {
     }
 
     case 'get_client_brand': {
-      const { data: client } = await supabase
-        .from('clients')
-        .select('name, logo_url, brand_color, brand_secondary_color, brand_font, website_url')
-        .eq('id', client_id)
-        .single();
+      const client = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('clients')
+          .select('name, logo_url, brand_color, brand_secondary_color, brand_font, website_url')
+          .eq('id', client_id)
+          .single(),
+        null,
+        'manageCampaigns.getClientBrand.getClient',
+      );
 
       if (!client) return c.json({ error: 'Client not found' }, 404);
 
       // Fetch store_name from platform_connections for sender defaults
-      const { data: conn } = await supabase
-        .from('platform_connections')
-        .select('store_name')
-        .eq('client_id', client_id)
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
+      const conn = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('platform_connections')
+          .select('store_name')
+          .eq('client_id', client_id)
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle(),
+        null,
+        'manageCampaigns.getClientBrand.getConnection',
+      );
 
       return c.json({
         brand_name: client.name || '',
@@ -722,7 +813,11 @@ async function getFilteredSubscribers(
   supabase: any,
   clientId: string,
   filter: any
-): Promise<Array<{ id: string; email: string; first_name: string | null; last_name: string | null; tags: string[]; total_orders: number; total_spent: number; last_order_at: string | null; custom_fields: Record<string, any> | null }>> {
+): Promise<Array<{ id: string; email: string; first_name: string | null; last_name: string | null; tags: string[]; total_orders: number; total_spent: number; last_order_at: string | null; custom_fields: Record<string, any> | null; send_time_hour: number | null; timezone: string | null }>> {
+
+  // Campos que siempre viajamos. send_time_hour y timezone se incluyen para que
+  // el motor de envío pueda aplicar smart send time y quiet hours correctamente.
+  const SUBSCRIBER_COLS = 'id, email, first_name, last_name, tags, total_orders, total_spent, last_order_at, custom_fields, send_time_hour, timezone';
 
   // --- Type: list → join email_list_members ---
   if (filter?.type === 'list' && filter.list_id) {
@@ -739,7 +834,7 @@ async function getFilteredSubscribers(
     const subscriberIds = members.map((m: any) => m.subscriber_id);
     const { data, error } = await supabase
       .from('email_subscribers')
-      .select('id, email, first_name, last_name, tags, total_orders, total_spent, last_order_at, custom_fields')
+      .select(SUBSCRIBER_COLS)
       .eq('client_id', clientId)
       .eq('status', 'subscribed')
       .in('id', subscriberIds);
@@ -768,7 +863,7 @@ async function getFilteredSubscribers(
     // Build query from segment filters
     let query = supabase
       .from('email_subscribers')
-      .select('id, email, first_name, last_name, tags, total_orders, total_spent, last_order_at, custom_fields')
+      .select(SUBSCRIBER_COLS)
       .eq('client_id', clientId)
       .eq('status', 'subscribed');
 
@@ -805,7 +900,7 @@ async function getFilteredSubscribers(
   // --- Type: all or legacy flat filters ---
   let query = supabase
     .from('email_subscribers')
-    .select('id, email, first_name, last_name, tags, total_orders, total_spent, last_order_at, custom_fields')
+    .select(SUBSCRIBER_COLS)
     .eq('client_id', clientId)
     .eq('status', 'subscribed');
 
@@ -924,12 +1019,16 @@ export async function executeScheduledCampaign(c: Context) {
   const supabase = getSupabaseAdmin();
 
   // Verify campaign is still scheduled
-  const { data: campaign } = await supabase
-    .from('email_campaigns')
-    .select('status')
-    .eq('id', campaign_id)
-    .eq('client_id', client_id)
-    .single();
+  const campaign = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('email_campaigns')
+      .select('status')
+      .eq('id', campaign_id)
+      .eq('client_id', client_id)
+      .single(),
+    null,
+    'executeScheduledCampaign.getCampaign',
+  );
 
   if (!campaign || campaign.status !== 'scheduled') {
     console.log(`Campaign ${campaign_id} is no longer scheduled (status: ${campaign?.status}). Skipping.`);

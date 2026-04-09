@@ -220,6 +220,7 @@ import { shopifyOauthCallback } from './shopify/shopify-oauth-callback.js';
 import { shopifyFulfillmentWebhooks } from './shopify/shopify-fulfillment-webhooks.js';
 import { shopifyGdprWebhooks } from './shopify/shopify-gdpr-webhooks.js';
 import { storeShopifyCredentials } from './shopify/store-shopify-credentials.js';
+import { shopifyConfig } from './shopify/shopify-config.js';
 import { storeShopifyToken } from './shopify/store-shopify-token.js';
 
 // Phase 5: Steve Mail (Email Marketing)
@@ -246,6 +247,7 @@ import { seedSystemEmailTemplates } from '../seed/email-system-templates.js';
 import { seedChinoChecks } from '../seed/chino-checks-seed.js';
 import { smartSendTime } from './email/smart-send-time.js';
 import { emailSendQueue } from './email/send-queue.js';
+import { queueHealthHandler } from './email/queue-health.js';
 import { emailListCleanup } from './email/list-cleanup.js';
 import { uploadEmailImage } from './email/upload-email-image.js';
 import { manageEmailLists } from './email/manage-email-lists.js';
@@ -372,6 +374,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/sync-shopify-metrics', authMiddleware, syncShopifyMetrics);
   app.post('/api/fetch-shopify-discounts', authMiddleware, fetchShopifyDiscounts);
   app.post('/api/store-shopify-credentials', authMiddleware, storeShopifyCredentials);
+  app.get('/api/shopify/config', shopifyConfig); // Public - returns current SHOPIFY_MODE
   app.post('/api/store-shopify-token', authMiddleware, storeShopifyToken);
   app.post('/api/fetch-shopify-customers', authMiddleware, fetchShopifyCustomers);
   app.post('/api/update-shopify-product', authMiddleware, updateShopifyProduct);
@@ -479,6 +482,7 @@ export function registerRoutes(app: Hono) {
   // Smart Send Time, Throttled Queue, List Cleanup
   app.post('/api/email-smart-send-time', authMiddleware, smartSendTime);
   app.post('/api/email-send-queue', authMiddleware, emailSendQueue);
+  app.get('/api/email-queue-health', authMiddleware, queueHealthHandler); // P2-7: dashboard de salud
   app.post('/api/email-list-cleanup', authMiddleware, emailListCleanup);
 
   // ============================================================

@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendSingleEmail } from './send-email.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Email Send Queue — throttled sending with priority and rate limiting.
@@ -43,11 +44,15 @@ export async function emailSendQueue(c: Context) {
       }
 
       // Get smart send settings for this client
-      const { data: settings } = await supabase
-        .from('email_send_settings')
-        .select('smart_send_enabled')
-        .eq('client_id', client_id)
-        .maybeSingle();
+      const settings = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('email_send_settings')
+          .select('smart_send_enabled')
+          .eq('client_id', client_id)
+          .maybeSingle(),
+        null,
+        'emailSendQueue.getSmartSendSettings',
+      );
 
       const smartSendEnabled = settings?.smart_send_enabled ?? true;
 
@@ -58,10 +63,14 @@ export async function emailSendQueue(c: Context) {
         // Batch fetch in chunks of 100
         for (let i = 0; i < subIds.length; i += 100) {
           const batch = subIds.slice(i, i + 100);
-          const { data } = await supabase
-            .from('email_subscribers')
-            .select('id, send_time_hour')
-            .in('id', batch);
+          const data = await safeQueryOrDefault<any>(
+            supabase
+              .from('email_subscribers')
+              .select('id, send_time_hour')
+              .in('id', batch),
+            [],
+            'emailSendQueue.getSubscriberSendTimes',
+          );
 
           for (const sub of data || []) {
             subscriberSendTimes[sub.id] = sub.send_time_hour;
@@ -123,11 +132,15 @@ export async function emailSendQueue(c: Context) {
       // This should be called by a cron job or Cloud Task every minute
 
       // Get rate limit setting
-      const { data: settings } = await supabase
-        .from('email_send_settings')
-        .select('rate_limit_per_hour')
-        .eq('client_id', client_id)
-        .maybeSingle();
+      const settings = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('email_send_settings')
+          .select('rate_limit_per_hour')
+          .eq('client_id', client_id)
+          .maybeSingle(),
+        null,
+        'emailSendQueue.getRateLimitSettings',
+      );
 
       const rateLimit = settings?.rate_limit_per_hour ?? 500;
       const batchLimit = Math.max(1, Math.floor(rateLimit / 60)); // Per-minute batch
@@ -185,10 +198,14 @@ export async function emailSendQueue(c: Context) {
 
       // Pre-fetch subscriber emails
       const subIds = [...new Set(queueItems.map(q => q.subscriber_id))];
-      const { data: subs } = await supabase
-        .from('email_subscribers')
-        .select('id, email')
-        .in('id', subIds);
+      const subs = await safeQueryOrDefault<any>(
+        supabase
+          .from('email_subscribers')
+          .select('id, email')
+          .in('id', subIds),
+        [],
+        'emailSendQueue.getQueueSubscribers',
+      );
       const emailMap: Record<string, string> = {};
       for (const s of subs || []) emailMap[s.id] = s.email;
 

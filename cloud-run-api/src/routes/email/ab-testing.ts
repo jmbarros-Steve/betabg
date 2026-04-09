@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendSingleEmail } from './send-email.js';
 import { renderEmailTemplate, buildTemplateContext } from '../../lib/template-engine.js';
 import { processEmailHtml } from '../../lib/email-html-processor.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Calculate stats for a specific A/B variant.
@@ -41,12 +42,16 @@ async function calculateVariantStats(
     .eq('event_type', 'clicked')
     .eq('ab_variant', variant);
 
-  const { data: conversionEvents } = await supabase
-    .from('email_events')
-    .select('metadata')
-    .eq('campaign_id', campaignId)
-    .eq('event_type', 'converted')
-    .eq('ab_variant', variant);
+  const conversionEvents = await safeQueryOrDefault<any>(
+    supabase
+      .from('email_events')
+      .select('metadata')
+      .eq('campaign_id', campaignId)
+      .eq('event_type', 'converted')
+      .eq('ab_variant', variant),
+    [],
+    'calculateVariantStats.getConversionEvents',
+  );
 
   const conversions = conversionEvents?.length || 0;
   const revenue = (conversionEvents || []).reduce(
@@ -263,11 +268,15 @@ export async function executeAbTestWinner(c: Context) {
     : campaign.html_content;
 
   // Get subscriber IDs already in email_events for this campaign (already received test emails)
-  const { data: alreadySentEvents } = await supabase
-    .from('email_events')
-    .select('subscriber_id')
-    .eq('campaign_id', test.campaign_id)
-    .eq('event_type', 'sent');
+  const alreadySentEvents = await safeQueryOrDefault<any>(
+    supabase
+      .from('email_events')
+      .select('subscriber_id')
+      .eq('campaign_id', test.campaign_id)
+      .eq('event_type', 'sent'),
+    [],
+    'executeAbTestWinner.getAlreadySentEvents',
+  );
 
   const alreadySentIds = new Set((alreadySentEvents || []).map((e: any) => e.subscriber_id));
 
@@ -298,11 +307,15 @@ export async function executeAbTestWinner(c: Context) {
   );
 
   // Fetch brand info for template rendering
-  const { data: brandInfo } = await supabase
-    .from('clients')
-    .select('brand_name, website_url, logo_url')
-    .eq('id', client_id)
-    .single();
+  const brandInfo = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('clients')
+      .select('brand_name, website_url, logo_url')
+      .eq('id', client_id)
+      .single(),
+    null,
+    'executeAbTestWinner.getBrandInfo',
+  );
 
   // Send winning variant with full per-subscriber processing pipeline
   const fromEmail = campaign.from_email || `noreply@${process.env.DEFAULT_FROM_DOMAIN || 'steve.cl'}`;

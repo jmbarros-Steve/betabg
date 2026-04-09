@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Users, Send, GitBranch, BarChart3, FileText, Globe } from 'lucide-react';
+import { Users, Send, GitBranch, BarChart3, FileText, Globe, Activity } from 'lucide-react';
 import { SubscribersList } from './SubscribersList';
 import { CampaignBuilder } from './CampaignBuilder';
 import { FlowBuilder } from './FlowBuilder';
 import { EmailAnalytics } from './EmailAnalytics';
 import { DomainSetup } from './DomainSetup';
 import { FormBuilder } from './FormBuilder';
+import { QueueHealthDashboard } from './QueueHealthDashboard';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface EmailMarketingProps {
   clientId: string;
@@ -16,6 +18,7 @@ interface EmailMarketingProps {
 
 export function EmailMarketing({ clientId }: EmailMarketingProps) {
   const [activeTab, setActiveTab] = useState('campaigns');
+  const { isSuperAdmin } = useUserRole();
 
   return (
     <div className="space-y-4">
@@ -77,6 +80,15 @@ export function EmailMarketing({ clientId }: EmailMarketingProps) {
               <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Metricas y resultados</span>
             </div>
           </TabsTrigger>
+          {isSuperAdmin && (
+            <TabsTrigger value="queue" className="flex items-center gap-1.5 text-xs flex-1">
+              <Activity className="w-3.5 h-3.5" />
+              <div className="flex flex-col items-start">
+                <span>Cola</span>
+                <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Salud del envío (admin)</span>
+              </div>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="campaigns">
@@ -98,6 +110,12 @@ export function EmailMarketing({ clientId }: EmailMarketingProps) {
         <TabsContent value="analytics">
           <EmailAnalytics clientId={clientId} />
         </TabsContent>
+
+        {isSuperAdmin && (
+          <TabsContent value="queue">
+            <QueueHealthDashboard />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
