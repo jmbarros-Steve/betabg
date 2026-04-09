@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
 import { safeQuery, safeQuerySingle } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Onboarding WA Cron — Steve Post-Venta
@@ -15,9 +16,7 @@ import { safeQuery, safeQuerySingle } from '../../lib/safe-supabase.js';
  * Auth: X-Cron-Secret header
  */
 export async function onboardingWA(c: Context) {
-  const cronSecret = c.req.header('X-Cron-Secret')?.trim();
-  const expected = process.env.CRON_SECRET;
-  if (!expected || cronSecret !== expected) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -130,12 +129,13 @@ export async function onboardingWA(c: Context) {
         });
 
         // Update onboarding step
+        // Bug #87 fix: Don't update updated_at — it resets the 24h cooldown timer
+        // used on line 60 (hoursSinceUpdate). Only update wa_message_sent and reminder_count.
         await supabase
           .from('merchant_onboarding')
           .update({
             wa_message_sent: true,
             reminder_count: (step.reminder_count || 0) + 1,
-            updated_at: now.toISOString(),
           })
           .eq('id', step.id);
 

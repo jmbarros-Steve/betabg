@@ -165,11 +165,14 @@ export async function proposalsGenerate(c: Context) {
     if (pErr || !prospect) return c.json({ error: 'Prospect not found' }, 404);
 
     // Fetch recent messages for context
+    // Fix #73: scope messages to prospect channel to prevent cross-merchant leak
     const messages = await safeQueryOrDefault<any>(
       supabase
         .from('wa_messages')
         .select('direction, body, created_at')
         .eq('contact_phone', prospect.phone)
+        .eq('channel', 'prospect')
+        .is('client_id', null)
         .order('created_at', { ascending: false })
         .limit(20),
       [],

@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { getTwilioSubClient } from '../../lib/twilio-client.js';
 import { decryptToken } from './setup-merchant.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Abandoned Cart WA — Cron that sends WhatsApp reminders for abandoned carts.
@@ -18,10 +19,7 @@ import { decryptToken } from './setup-merchant.js';
  * Auth: X-Cron-Secret
  */
 export async function abandonedCartWA(c: Context) {
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -52,6 +50,8 @@ export async function abandonedCartWA(c: Context) {
 
   let sent = 0;
   let skipped = 0;
+  // Bug #88 fix: Track per-client sent counts to batch-update total_sent after the loop
+  const sentByClient: Record<string, number> = {};
 
   for (const cart of carts) {
     try {
@@ -151,11 +151,23 @@ export async function abandonedCartWA(c: Context) {
         continue;
       }
 
-      const twilioMsg = await subClient.messages.create({
-        from: `whatsapp:${waAccount.phone_number}`,
-        to: `whatsapp:${toNumber}`,
-        body: message,
-      });
+      // Bug #76 fix: Wrap Twilio send in try/catch to refund credit on failure
+      let twilioMsg: any;
+      try {
+        twilioMsg = await subClient.messages.create({
+          from: `whatsapp:${waAccount.phone_number}`,
+          to: `whatsapp:${toNumber}`,
+          body: message,
+        });
+      } catch (sendErr) {
+        // Refund the credit since send failed
+        await supabase.rpc('deduct_wa_credit', {
+          p_client_id: cart.client_id,
+          p_amount: -1,
+          p_description: 'Refund: cart reminder send failed',
+        });
+        throw sendErr; // re-throw to be caught by outer handler
+      }
 
       // Save message
       await supabase.from('wa_messages').insert({
@@ -178,18 +190,33 @@ export async function abandonedCartWA(c: Context) {
         .update({ wa_reminder_sent: true })
         .eq('id', cart.id);
 
-      // Update automation stats
-      await supabase.from('wa_automations')
-        .update({ total_sent: (automation as any).total_sent ? (automation as any).total_sent + 1 : 1 })
-        .eq('client_id', cart.client_id)
-        .eq('trigger_type', 'abandoned_cart');
-
       sent++;
+      sentByClient[cart.client_id] = (sentByClient[cart.client_id] || 0) + 1;
       console.log(`[abandoned-cart-wa] Sent to ${toNumber} for client ${cart.client_id}`);
 
     } catch (err: any) {
       console.error(`[abandoned-cart-wa] Error processing cart ${cart.id}:`, err?.message);
       skipped++;
+    }
+  }
+
+  // Bug #88 fix: Update total_sent once per client after loop to avoid read-then-write race.
+  for (const [clientId, count] of Object.entries(sentByClient)) {
+    try {
+      // Fetch current total_sent, then set to current + count in one update
+      const { data: automationRow } = await supabase
+        .from('wa_automations')
+        .select('total_sent')
+        .eq('client_id', clientId)
+        .eq('trigger_type', 'abandoned_cart')
+        .maybeSingle();
+
+      await supabase.from('wa_automations')
+        .update({ total_sent: ((automationRow as any)?.total_sent || 0) + count })
+        .eq('client_id', clientId)
+        .eq('trigger_type', 'abandoned_cart');
+    } catch (updateErr) {
+      console.warn(`[abandoned-cart-wa] Failed to update total_sent for client ${clientId}:`, updateErr);
     }
   }
 

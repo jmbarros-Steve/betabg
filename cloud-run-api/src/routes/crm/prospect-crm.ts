@@ -113,9 +113,20 @@ export async function prospectAddNote(c: Context) {
     const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
     if (!allowed) return c.json({ error: 'Forbidden' }, 403);
 
+    // Fix #81: append to existing admin_notes instead of overwriting
+    const { data: current } = await supabase
+      .from('wa_prospects')
+      .select('admin_notes')
+      .eq('id', prospect_id)
+      .single();
+    const existingNotes = current?.admin_notes || '';
+    const updatedNotes = existingNotes
+      ? `${existingNotes}\n\n---\n[${new Date().toISOString()}]\n${note}`
+      : note;
+
     const { error } = await supabase
       .from('wa_prospects')
-      .update({ admin_notes: note, updated_at: new Date().toISOString() })
+      .update({ admin_notes: updatedNotes, updated_at: new Date().toISOString() })
       .eq('id', prospect_id);
 
     if (error) return c.json({ error: error.message }, 500);
@@ -280,6 +291,42 @@ export async function prospectsKanban(c: Context) {
     const pipelineWeighted = activePipelineStages.reduce((s, stage) => s + (stageTotals[stage]?.weighted || 0), 0);
 
     return c.json({ kanban, total: (data || []).length, stageTotals, pipelineTotal, pipelineWeighted });
+  } catch (error: any) {
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+}
+
+/** Delete a prospect (Bug #80 fix: server-side ownership check) */
+export async function prospectDelete(c: Context) {
+  try {
+    const { prospect_id } = await c.req.json();
+    if (!prospect_id) return c.json({ error: 'prospect_id required' }, 400);
+
+    const supabase = getSupabaseAdmin();
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Multi-tenant: verify ownership before deleting
+    const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
+    if (!allowed) return c.json({ error: 'Forbidden' }, 403);
+
+    // Delete related records first (events, tasks, proposals)
+    await Promise.all([
+      supabase.from('wa_prospect_events').delete().eq('prospect_id', prospect_id),
+      supabase.from('sales_tasks').delete().eq('prospect_id', prospect_id),
+      supabase.from('proposals').delete().eq('prospect_id', prospect_id),
+    ]);
+
+    const { error } = await supabase
+      .from('wa_prospects')
+      .delete()
+      .eq('id', prospect_id);
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    logProspectEvent(prospect_id, 'deleted', {}, `admin:${user?.id || 'unknown'}`);
+
+    return c.json({ success: true });
   } catch (error: any) {
     return c.json({ error: error.message || 'Internal server error' }, 500);
   }

@@ -30,7 +30,11 @@ export async function salesTasksCrud(c: Context) {
 
         if (prospect_id) query = query.eq('prospect_id', prospect_id);
         if (status) query = query.eq('status', status);
-        if (assigned_to) query = query.eq('assigned_to', assigned_to);
+
+        // Fix #79: non-admin cannot use assigned_to to see other users' tasks
+        if (isSuperAdmin && assigned_to) {
+          query = query.eq('assigned_to', assigned_to);
+        }
 
         // Non-admin: only see tasks assigned to them or linked to their prospects
         if (!isSuperAdmin && !prospect_id) {

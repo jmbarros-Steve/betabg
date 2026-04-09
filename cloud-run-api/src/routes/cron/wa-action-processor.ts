@@ -16,14 +16,13 @@ import { loadIndustryCaseStudy } from '../../lib/steve-wa-brain.js';
 import { generateProspectMockup } from '../../lib/steve-mockup-generator.js';
 import { generateAndSendSalesDeck } from '../../lib/steve-sales-deck.js';
 import type { ProspectRecord } from '../../lib/steve-wa-brain.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 const MEETING_LINK = 'https://meetings.hubspot.com/jose-manuel15';
 
 export async function waActionProcessor(c: Context) {
-  const cronSecret = c.req.header('X-Cron-Secret')?.trim();
-  const expected = process.env.CRON_SECRET;
-  if (!expected || cronSecret !== expected) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -32,15 +31,32 @@ export async function waActionProcessor(c: Context) {
   // Bug #39 fix: generate a unique batch ID so this instance only processes its own claims
   const batchId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  // Bug #39 fix: UPDATE first with WHERE status='pending' to atomically claim actions,
-  // preventing two cron instances from picking the same pending actions.
-  const { error: claimError } = await supabase
+  // Bug #64 fix: PostgREST ignores .order().limit() on UPDATE, so we use a two-step approach:
+  // 1) SELECT the IDs of pending actions (with limit), then 2) UPDATE only those IDs.
+  const { data: pendingActions, error: selectError } = await supabase
     .from('wa_pending_actions')
-    .update({ status: 'processing', started_at: now, error_message: `batch:${batchId}` })
+    .select('id')
     .eq('status', 'pending')
     .lte('scheduled_at', now)
     .order('scheduled_at', { ascending: true })
     .limit(10);
+
+  if (selectError) {
+    console.error('[wa-action-processor] Select pending error:', selectError.message);
+    return c.json({ error: selectError.message }, 500);
+  }
+
+  if (!pendingActions || pendingActions.length === 0) {
+    return c.json({ processed: 0 });
+  }
+
+  const pendingIds = pendingActions.map((a: any) => a.id);
+
+  const { error: claimError } = await supabase
+    .from('wa_pending_actions')
+    .update({ status: 'processing', started_at: now, error_message: `batch:${batchId}` })
+    .in('id', pendingIds)
+    .eq('status', 'pending');
 
   if (claimError) {
     console.error('[wa-action-processor] Claim error:', claimError.message);
@@ -71,9 +87,10 @@ export async function waActionProcessor(c: Context) {
   for (const action of actions) {
     // Bug #55 fix: update attempts counter and clear the batch marker.
     // The action is already in 'processing' status from the claim step above.
+    // Bug #65 fix: add { count: 'exact' } so .update() returns an actual count instead of null.
     const { count: updatedRows } = await supabase
       .from('wa_pending_actions')
-      .update({ attempts: action.attempts + 1, error_message: null })
+      .update({ attempts: action.attempts + 1, error_message: null }, { count: 'exact' })
       .eq('id', action.id)
       .eq('status', 'processing');
 
@@ -306,7 +323,8 @@ async function saveOutboundMessage(
   profileName: string | null | undefined,
   body: string,
 ): Promise<void> {
-  await supabase.from('wa_messages').insert({
+  // Bug #96 fix: Check insert result and log errors instead of swallowing them
+  const { error: insertErr } = await supabase.from('wa_messages').insert({
     client_id: null,
     channel: 'prospect',
     direction: 'outbound',
@@ -316,4 +334,7 @@ async function saveOutboundMessage(
     contact_name: profileName || phone,
     contact_phone: phone,
   });
+  if (insertErr) {
+    console.error(`[wa-action-processor] wa_messages insert failed after send:`, insertErr.message);
+  }
 }

@@ -5,7 +5,7 @@ import {
   MessageSquare, ChevronDown, ChevronUp, Shield, BarChart3, Zap,
   Database, Cloud, Monitor, Mail, ShoppingBag, Image, Phone, Search,
   AlertTriangle, CheckCircle2, FileText, Cog, ArrowRight, Layers,
-  Timer, GitBranch
+  Timer, GitBranch, Globe
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -114,6 +114,14 @@ const AGENTS: AgentInfo[] = [
     whatSimple: 'Mantiene generación de imágenes AI, fatiga creativa y biblioteca de assets',
     ifNotExist: 'Los clientes tendrían que crear todos sus creativos fuera de Steve',
     challenge: 'El fatigue detector corre diario. ¿Cuántas alertas generó este mes?',
+  },
+  {
+    code: 'w20', name: 'Martín', squad: 'producto', module: 'Landing & Conversión',
+    icon: Globe, tables: 0, crons: 0,
+    contextFile: 'agents/contexts/martin-w20.md',
+    whatSimple: 'Mantiene las landing pages públicas, CTAs, audit-store y el flujo de conversión de visitante a lead',
+    ifNotExist: 'La primera impresión de Steve moriría — visitantes llegarían y se irían sin entender qué es',
+    challenge: 'audit-store funciona perfecto pero no tiene UI. Es un Ferrari en el garage.',
   },
   {
     code: 'w8', name: 'Diego', squad: 'infra', module: 'Base de Datos',

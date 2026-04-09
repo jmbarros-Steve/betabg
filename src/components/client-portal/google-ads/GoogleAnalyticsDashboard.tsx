@@ -587,7 +587,15 @@ export default function GoogleAnalyticsDashboard({
     try {
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const w = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
       let y = 20;
+
+      const checkPage = (needed: number) => {
+        if (y + needed > pageH - 15) {
+          doc.addPage();
+          y = 20;
+        }
+      };
 
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
@@ -599,6 +607,7 @@ export default function GoogleAnalyticsDashboard({
       doc.text(`Generado: ${new Date().toLocaleDateString('es-CL')}`, w - 60, y);
       y += 12;
 
+      checkPage(60);
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('KPIs', 14, y);
@@ -617,11 +626,13 @@ export default function GoogleAnalyticsDashboard({
       ];
 
       for (const [label, value] of kpis) {
+        checkPage(6);
         doc.text(`${label}: ${value}`, 14, y);
         y += 6;
       }
       y += 6;
 
+      checkPage(40);
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('Top 5 Campañas', 14, y);
@@ -631,6 +642,7 @@ export default function GoogleAnalyticsDashboard({
 
       const topCamps = [...campaigns].sort((a, b) => b.roas - a.roas).slice(0, 5);
       for (const c of topCamps) {
+        checkPage(5);
         const line = `${c.campaign_name.slice(0, 40)} — ROAS: ${c.roas.toFixed(2)}x | Gasto: ${formatCLP(c.spend)} | Conv: ${Math.round(c.conversions)}`;
         doc.text(line, 14, y);
         y += 5;
@@ -638,6 +650,7 @@ export default function GoogleAnalyticsDashboard({
       y += 8;
 
       if (insights) {
+        checkPage(30);
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
         doc.text('AI Insights', 14, y);
@@ -646,16 +659,19 @@ export default function GoogleAnalyticsDashboard({
         doc.setFont('helvetica', 'normal');
 
         if (insights.bestCampaign) {
+          checkPage(5);
           doc.text(`Mejor campaña: ${insights.bestCampaign.campaign_name} (ROAS ${insights.bestCampaign.roas.toFixed(2)}x)`, 14, y);
           y += 5;
         }
         if (insights.budgetRec) {
           const lines = doc.splitTextToSize(`Recomendación: ${insights.budgetRec}`, w - 28);
+          checkPage(lines.length * 5);
           doc.text(lines, 14, y);
           y += lines.length * 5;
         }
         if (insights.creativeFatigue) {
           const lines = doc.splitTextToSize(`Alerta: ${insights.creativeFatigue}`, w - 28);
+          checkPage(lines.length * 5);
           doc.text(lines, 14, y);
           y += lines.length * 5;
         }
@@ -820,7 +836,22 @@ export default function GoogleAnalyticsDashboard({
           change={pctChange(totals.conversions, prevTotals.conversions)}
           icon={ShoppingCart}
           accent="green"
-        />
+        >
+          {savedGoals.cpa > 0 && totals.conversions > 0 && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                <span>CPA máx: {formatCLP(savedGoals.cpa)}</span>
+                <span>{formatCLP(totals.spend / totals.conversions)}</span>
+              </div>
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${getTargetBgColor(getTargetStatus(totals.spend / totals.conversions, savedGoals.cpa, false))}`}
+                  style={{ width: `${Math.min(100, getProgressPercent(totals.spend / totals.conversions, savedGoals.cpa, false))}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </KpiCard>
         <KpiCard
           title="ROAS"
           value={formatRoas(totals.roas)}

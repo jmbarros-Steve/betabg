@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
 import { safeQuery, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Prospect Follow-up — Steve Perro Lobo Paso 14-15
@@ -24,9 +25,7 @@ import { safeQuery, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js'
  * Auth: X-Cron-Secret header
  */
 export async function prospectFollowup(c: Context) {
-  const cronSecret = c.req.header('X-Cron-Secret')?.trim();
-  const expected = process.env.CRON_SECRET;
-  if (!expected || cronSecret !== expected) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -162,7 +161,8 @@ export async function prospectFollowup(c: Context) {
           await sendWhatsApp(`+${prospect.phone}`, followupMsg);
 
           // Save message in wa_messages
-          await supabase.from('wa_messages').insert({
+          // Bug #96 fix: Check insert result and log errors instead of swallowing them
+          const { error: insertErr } = await supabase.from('wa_messages').insert({
             client_id: null,
             channel: 'prospect',
             direction: 'outbound',
@@ -172,6 +172,9 @@ export async function prospectFollowup(c: Context) {
             contact_name: prospectName || prospect.phone,
             contact_phone: prospect.phone,
           });
+          if (insertErr) {
+            console.error(`[prospect-followup] wa_messages insert failed after send:`, insertErr.message);
+          }
 
           // Update prospect
           const newFollowupCount = (prospect.followup_count || 0) + 1;

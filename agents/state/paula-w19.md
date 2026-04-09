@@ -1,34 +1,41 @@
 # Paula W19 — Estado Actual
-_Última sesión: 2026-04-07_
+_Última sesión: 2026-04-09_
 
 ## Tareas en Progreso
-- (ninguna — primera activación)
+- (ninguna)
 
 ## Tareas Pendientes
-- [ ] Verificar que `wa-action-processor` esté procesando acciones reales (no en vacío)
-- [ ] Revisar cuántos prospectos en Pipeline llevan +7 días sin actividad
-- [ ] Verificar `prospect-followup-4h` — ¿está disparando correctamente?
-- [ ] Auditar `wa_conversations` — ¿hay conversaciones activas?
+- [ ] Verificar wa-action-processor batch processing en producción (no duplicados)
+- [ ] Crear RPC `increment_message_count` para atomicidad (Bug #49)
+- [ ] Migrar WACampaigns.tsx CRUD completo a backend endpoint
+- [ ] Verificar email nurture ahora incluye prospects con NULL step
+- [ ] Monitorear Sentry por errores nuevos post-deploy
+- [ ] 20 bugs medium restantes de Ronda 1 (backlog)
+
+## Completado (sesión 2026-04-09 — Bug Hunt Masivo)
+- [x] Ronda 1: 30 bugs encontrados, 10 critical arreglados
+- [x] Ronda 2: 30 bugs encontrados, 30 arreglados (1 critical + 15 high + 14 medium)
+- [x] SSRF protection en quickScrapeUrl (IPs privadas/metadata GCP)
+- [x] Prompt injection guard [SISTEMA:] ampliado
+- [x] IDOR ownership checks en send-message, send-campaign
+- [x] Multi-tenant scoping en web-forms, sales-tasks, prospect-crm
+- [x] Optimistic lock sync en steve-wa-chat
+- [x] TOCTOU credit race condition arreglado (deducción atómica pre-send)
+- [x] Atomic batch processing en wa-action-processor (batchId)
+- [x] Idempotency guards en status-callback
+- [x] Frontend migrado a callApi (WAInbox, WACampaigns)
+- [x] Deploy: Cloud Run steve-api-00439-pkm + Vercel auto
+- [x] Commits: 315607e + ebfcdad
 
 ## Completado (sesión 2026-04-07)
-- [x] Pipeline CRM funcional con columna `meeting_status` (migración aplicada)
-- [x] Botón de eliminar prospecto desde Kanban (ProspectKanban.tsx)
-- [x] Meta CAPI Purchase event al mover prospecto a "converted" en `prospect-crm.ts`
-- [x] Meta CAPI Lead event al crear nuevo prospecto en `steve-wa-chat.ts`
-- [x] Meta CAPI Schedule event al confirmar reunión en `booking-api.ts`
-- [x] Link de reuniones cambiado: HubSpot → www.steve.cl/agendar/steve
-- [x] Seller "Consultor" con horario 09:00–13:00 Chile, Lunes–Viernes, slots 30min
-- [x] Timezone fix crítico en booking-api (slots mostraban 5AM en vez de 9AM Chile)
+- [x] Pipeline CRM funcional con columna `meeting_status`
+- [x] Meta CAPI Purchase/Lead/Schedule events
+- [x] Timezone fix crítico en booking-api
+- [x] Seller "Consultor" con horario Chile
 
 ## Blockers
 - Shopify desconectado → `abandoned-cart-wa` no puede recuperar carritos (depende de Matías W13)
 
-## Métricas de Pipeline (a revisar)
-- Prospectos totales: desconocido
-- En stage "new": desconocido
-- Último lead creado: desconocido
-- Reuniones agendadas: desconocido
-
 ## Desafíos Pendientes para JM
-- "¿Cuántos leads recibimos ayer y cuántos contestaron antes de 5 minutos?"
-- "El CAPI ya trackea Lead+Schedule+Purchase. ¿Qué hacemos con los eventos de remarketing?"
+- "60 bugs en producción. ¿Cuándo metemos tests automatizados para que no se acumulen?"
+- "WACampaigns.tsx todavía hace INSERT directo a Supabase para algunas operaciones. Hay que migrar TODO a backend."

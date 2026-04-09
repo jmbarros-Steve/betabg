@@ -178,6 +178,7 @@ import { steveWAChat } from './whatsapp/steve-wa-chat.js';
 import { merchantWAWebhook } from './whatsapp/merchant-wa.js';
 import { waSendMessage } from './whatsapp/send-message.js';
 import { waSendCampaign } from './whatsapp/send-campaign.js';
+import { waMarkRead } from './whatsapp/wa-mark-read.js';
 import { shopifyCheckoutWebhook } from './whatsapp/shopify-checkout-webhook.js';
 import { abandonedCartWA } from './whatsapp/abandoned-cart-wa.js';
 import { prospectTrial } from './whatsapp/prospect-trial.js';
@@ -191,7 +192,7 @@ import { apiChangelogWatcher } from './triggers/api-changelog-watcher.js';
 import { competitorSpy } from './triggers/competitor-spy.js';
 
 // CRM
-import { prospectDetail, prospectAddNote, prospectChangeStage, prospectChangePriority, prospectUpdateTags, prospectsKanban, prospectMoveStage, prospectUpdateDeal } from './crm/prospect-crm.js';
+import { prospectDetail, prospectAddNote, prospectChangeStage, prospectChangePriority, prospectUpdateTags, prospectsKanban, prospectMoveStage, prospectUpdateDeal, prospectDelete } from './crm/prospect-crm.js';
 import { salesTasksCrud, salesTasksAutoGenerate } from './crm/sales-tasks.js';
 import { proposalsCrud, proposalsGenerate } from './crm/proposals.js';
 import { sellersList } from './crm/sellers.js';
@@ -505,6 +506,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/whatsapp/merchant-wa/:clientId', merchantWAWebhook); // Twilio webhook: customer → merchant store
   app.post('/api/whatsapp/send-message', authMiddleware, waSendMessage); // Portal: merchant sends manual reply
   app.post('/api/whatsapp/send-campaign', authMiddleware, waSendCampaign); // Portal: send bulk WA campaign
+  app.post('/api/whatsapp/mark-read', authMiddleware, waMarkRead); // Bug #98: mark conversation read via backend (bypasses RLS)
   app.post('/api/whatsapp/shopify-checkout-webhook', shopifyCheckoutWebhook); // No JWT — Shopify HMAC
   app.post('/api/task-completed', taskCompleted); // No JWT — uses X-Cron-Secret, called by Leonardo when task is done
 
@@ -591,6 +593,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/crm/prospect/tags', authMiddleware, prospectUpdateTags);
   app.post('/api/crm/prospect/move-stage', authMiddleware, prospectMoveStage);
   app.post('/api/crm/prospect/deal', authMiddleware, prospectUpdateDeal);
+  app.post('/api/crm/prospect/delete', authMiddleware, prospectDelete);
   app.post('/api/crm/prospects/kanban', authMiddleware, prospectsKanban);
   app.post('/api/crm/web-forms', authMiddleware, webFormsCrud);
   app.post('/api/web-forms/submit', webFormSubmit); // PUBLIC — no auth, form submissions

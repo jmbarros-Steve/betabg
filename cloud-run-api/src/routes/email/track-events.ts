@@ -11,50 +11,48 @@ export async function trackOpen(c: Context) {
   const eventId = c.req.query('eid');
 
   if (eventId) {
-    // Fire-and-forget: don't block the pixel response
+    // Await tracking inline — DB write is ~50ms, acceptable for pixel response.
+    // Previous fire-and-forget IIFE could lose events if Cloud Run recycles the instance.
     const supabase = getSupabaseAdmin();
 
-    // Get the original event to find subscriber/campaign info
-    (async () => {
-      try {
-        const data = await safeQuerySingleOrDefault<any>(
-          supabase
-            .from('email_events')
-            .select('subscriber_id, client_id, campaign_id, flow_id')
-            .eq('id', eventId)
-            .eq('event_type', 'sent')
-            .single(),
-          null,
-          'trackOpen.getSentEvent',
-        );
-        if (data) {
-          const { error } = await supabase.from('email_events').insert({
-            client_id: data.client_id,
-            campaign_id: data.campaign_id,
-            flow_id: data.flow_id,
-            subscriber_id: data.subscriber_id,
-            event_type: 'opened',
-            metadata: {
-              original_event_id: eventId,
-              user_agent: c.req.header('user-agent') || null,
-              ip: c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || null,
-            },
-          });
-          if (error) console.error('Failed to record open event:', error);
+    try {
+      const data = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('email_events')
+          .select('subscriber_id, client_id, campaign_id, flow_id')
+          .eq('id', eventId)
+          .eq('event_type', 'sent')
+          .single(),
+        null,
+        'trackOpen.getSentEvent',
+      );
+      if (data) {
+        const { error } = await supabase.from('email_events').insert({
+          client_id: data.client_id,
+          campaign_id: data.campaign_id,
+          flow_id: data.flow_id,
+          subscriber_id: data.subscriber_id,
+          event_type: 'opened',
+          metadata: {
+            original_event_id: eventId,
+            user_agent: c.req.header('user-agent') || null,
+            ip: c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || null,
+          },
+        });
+        if (error) console.error('Failed to record open event:', error);
 
-          // Update last_engaged_at for smart send time & sunset detection
-          await supabase
-            .from('email_subscribers')
-            .update({ last_engaged_at: new Date().toISOString() })
-            .eq('id', data.subscriber_id);
-        }
-      } catch (err) {
-        console.error('Open tracking error:', err);
+        // Update last_engaged_at for smart send time & sunset detection
+        await supabase
+          .from('email_subscribers')
+          .update({ last_engaged_at: new Date().toISOString() })
+          .eq('id', data.subscriber_id);
       }
-    })();
+    } catch (err) {
+      console.error('Open tracking error:', err);
+    }
   }
 
-  // Return 1x1 transparent GIF immediately
+  // Return 1x1 transparent GIF
   return new Response(TRACKING_PIXEL_GIF, {
     status: 200,
     headers: {
@@ -92,50 +90,48 @@ export async function trackClick(c: Context) {
   }
 
   if (eventId) {
-    // Fire-and-forget: record click then redirect
+    // Await tracking inline — prevents event loss on instance recycle.
     const supabase = getSupabaseAdmin();
 
-    (async () => {
-      try {
-        const data = await safeQuerySingleOrDefault<any>(
-          supabase
-            .from('email_events')
-            .select('subscriber_id, client_id, campaign_id, flow_id')
-            .eq('id', eventId)
-            .eq('event_type', 'sent')
-            .single(),
-          null,
-          'trackClick.getSentEvent',
-        );
-        if (data) {
-          const { error } = await supabase.from('email_events').insert({
-            client_id: data.client_id,
-            campaign_id: data.campaign_id,
-            flow_id: data.flow_id,
-            subscriber_id: data.subscriber_id,
-            event_type: 'clicked',
-            metadata: {
-              original_event_id: eventId,
-              url: decodedUrl,
-              user_agent: c.req.header('user-agent') || null,
-              ip: c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || null,
-            },
-          });
-          if (error) console.error('Failed to record click event:', error);
+    try {
+      const data = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('email_events')
+          .select('subscriber_id, client_id, campaign_id, flow_id')
+          .eq('id', eventId)
+          .eq('event_type', 'sent')
+          .single(),
+        null,
+        'trackClick.getSentEvent',
+      );
+      if (data) {
+        const { error } = await supabase.from('email_events').insert({
+          client_id: data.client_id,
+          campaign_id: data.campaign_id,
+          flow_id: data.flow_id,
+          subscriber_id: data.subscriber_id,
+          event_type: 'clicked',
+          metadata: {
+            original_event_id: eventId,
+            url: decodedUrl,
+            user_agent: c.req.header('user-agent') || null,
+            ip: c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || null,
+          },
+        });
+        if (error) console.error('Failed to record click event:', error);
 
-          // Update last_engaged_at for smart send time & sunset detection
-          await supabase
-            .from('email_subscribers')
-            .update({ last_engaged_at: new Date().toISOString() })
-            .eq('id', data.subscriber_id);
-        }
-      } catch (err) {
-        console.error('Click tracking error:', err);
+        // Update last_engaged_at for smart send time & sunset detection
+        await supabase
+          .from('email_subscribers')
+          .update({ last_engaged_at: new Date().toISOString() })
+          .eq('id', data.subscriber_id);
       }
-    })();
+    } catch (err) {
+      console.error('Click tracking error:', err);
+    }
   }
 
-  // Redirect to target URL immediately
+  // Redirect to target URL
   return c.redirect(decodedUrl, 302);
 }
 

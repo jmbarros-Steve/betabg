@@ -126,12 +126,33 @@ export function WAInbox({ clientId }: Props) {
 
     setMessages((data as any[]) || []);
 
-    // Mark as read
+    // Bug #98 fix: Mark as read via backend API to bypass missing UPDATE RLS.
+    // Only clear the badge in UI if the update actually succeeds.
     if (conv.unread_count > 0) {
-      await supabase
-        .from('wa_conversations' as any)
-        .update({ unread_count: 0 })
-        .eq('id', conv.id);
+      try {
+        const { error: markError } = await callApi('whatsapp/mark-read', {
+          body: { conversation_id: conv.id, client_id: clientId },
+        });
+        if (markError) {
+          // Fallback: try direct Supabase update (may fail due to RLS)
+          const { error: directError } = await supabase
+            .from('wa_conversations' as any)
+            .update({ unread_count: 0 })
+            .eq('id', conv.id);
+          if (directError) {
+            console.warn('[WAInbox] mark-as-read failed (RLS?):', directError.message);
+            // Don't update the badge — the unread count is still non-zero server-side
+            return;
+          }
+        }
+        // Only clear badge after confirmed server-side update
+        setConversations(prev =>
+          prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c)
+        );
+      } catch (err) {
+        console.warn('[WAInbox] mark-as-read error:', err);
+        // Don't optimistically remove the badge if update fails
+      }
     }
   }
 

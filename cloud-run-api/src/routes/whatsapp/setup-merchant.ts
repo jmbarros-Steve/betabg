@@ -3,17 +3,38 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { getTwilioMasterClient, getTwilioSubClient } from '../../lib/twilio-client.js';
 import { createHmac } from 'node:crypto';
+import { getUserClientIds } from '../../lib/user-scoping.js';
 
 const API_BASE_URL = () =>
   process.env.API_BASE_URL || 'https://steve-api-850416724643.us-central1.run.app';
 
 /**
- * Simple reversible encryption for storing sub-account auth tokens.
- * Uses HMAC-derived key with AES-like XOR (lightweight for non-critical secrets
- * since the real security boundary is Supabase RLS + service role).
+ * WARNING: SECURITY VULNERABILITY — XOR-based encryption is WEAK.
+ *
+ * This uses a repeating-key XOR cipher, which is:
+ * 1. Vulnerable to known-plaintext attacks (knowing any plaintext reveals the key stream)
+ * 2. Deterministic (same plaintext + key = same ciphertext, no IV/nonce)
+ * 3. Has no authentication (ciphertext can be flipped bit-by-bit without detection)
+ *
+ * TODO: Migrate to AES-256-GCM with random IV and authentication tag.
+ * See: https://nodejs.org/api/crypto.html#cryptocreatedecipherivmethod-key-iv-options
+ *
+ * The real security boundary is Supabase RLS + service role, but this should
+ * still be upgraded to provide defense-in-depth for stored Twilio auth tokens.
  */
+function getEncryptionSecret(): string {
+  const secret = process.env.TWILIO_ENCRYPTION_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secret) {
+    throw new Error(
+      'FATAL: Neither TWILIO_ENCRYPTION_KEY nor SUPABASE_SERVICE_ROLE_KEY is set. ' +
+      'Cannot encrypt/decrypt tokens without a proper secret key.',
+    );
+  }
+  return secret;
+}
+
 function encryptToken(plaintext: string): string {
-  const secret = process.env.TWILIO_ENCRYPTION_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'fallback';
+  const secret = getEncryptionSecret();
   const key = createHmac('sha256', secret).update('twilio-token-key').digest();
   const buf = Buffer.from(plaintext, 'utf-8');
   const encrypted = Buffer.alloc(buf.length);
@@ -24,7 +45,7 @@ function encryptToken(plaintext: string): string {
 }
 
 export function decryptToken(ciphertext: string): string {
-  const secret = process.env.TWILIO_ENCRYPTION_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'fallback';
+  const secret = getEncryptionSecret();
   const key = createHmac('sha256', secret).update('twilio-token-key').digest();
   const buf = Buffer.from(ciphertext, 'base64url');
   const decrypted = Buffer.alloc(buf.length);
@@ -212,6 +233,19 @@ export async function setupMerchantHandler(c: Context) {
     const body = await c.req.json();
     const { action } = body;
     const supabase = getSupabaseAdmin();
+
+    // Bug #69 fix: Verify authenticated user owns the client_id (IDOR prevention).
+    // authMiddleware already sets c.get('user'), but we must check ownership.
+    const clientIdFromBody = body.client_id;
+    if (clientIdFromBody) {
+      const user = c.get('user');
+      if (user?.id) {
+        const { isSuperAdmin, clientIds } = await getUserClientIds(supabase, user.id);
+        if (!isSuperAdmin && !clientIds.includes(clientIdFromBody)) {
+          return c.json({ error: 'Forbidden: you do not own this client' }, 403);
+        }
+      }
+    }
 
     switch (action) {
       case 'provision': {

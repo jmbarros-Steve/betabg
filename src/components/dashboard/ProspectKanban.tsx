@@ -8,7 +8,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { ProspectDetail } from './ProspectDetail';
 import { CalendarConnect } from './CalendarConnect';
 
@@ -156,9 +155,12 @@ export function ProspectKanban() {
     e.stopPropagation();
     if (!window.confirm(`¿Borrar a "${prospectName}"? Esta acción no se puede deshacer.`)) return;
 
-    const { error } = await supabase.from('wa_prospects').delete().eq('id', prospectId);
+    // Bug #80 fix: Route through backend API for server-side ownership check
+    const { error } = await callApi('crm/prospect/delete', {
+      body: { prospect_id: prospectId },
+    });
     if (error) {
-      toast.error('Error al borrar prospecto');
+      toast.error(error || 'Error al borrar prospecto');
       return;
     }
     setKanban(prev => {

@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
 import { safeQuery } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Churn Detector — Steve Post-Venta
@@ -15,9 +16,7 @@ import { safeQuery } from '../../lib/safe-supabase.js';
  * Auth: X-Cron-Secret header
  */
 export async function churnDetector(c: Context) {
-  const cronSecret = c.req.header('X-Cron-Secret')?.trim();
-  const expected = process.env.CRON_SECRET;
-  if (!expected || cronSecret !== expected) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -98,12 +97,14 @@ export async function churnDetector(c: Context) {
           );
 
           let metricContext = '';
-          if (connections.length > 0) {
+          // Bug #84 fix: Guard against empty array passed to .in() which can error or return all rows
+          const connectionIds = connections.map((c: any) => c.id).filter(Boolean);
+          if (connectionIds.length > 0) {
             const recentMetrics = await safeQuery<{ metric_type: string; metric_value: number | string }>(
               supabase
                 .from('platform_metrics')
                 .select('metric_type, metric_value')
-                .in('connection_id', connections.map((c: any) => c.id))
+                .in('connection_id', connectionIds)
                 .order('metric_date', { ascending: false })
                 .limit(5),
               'churnDetector.fetchRecentMetrics',
@@ -157,16 +158,28 @@ export async function churnDetector(c: Context) {
           }
 
           // High risk → create admin task
+          // Bug #94 fix: Check for existing pending CHURN task before creating a duplicate
           if (newRisk === 'high') {
-            const taskResult = await supabase.from('tasks').insert({
-              title: `[CHURN] ${clientName} lleva ${Math.round(daysSinceActive)} días inactivo`,
-              description: `Cliente ${clientName} (${client.email}) no ha entrado a Steve en ${Math.round(daysSinceActive)} días. Riesgo alto de churn. Requiere atención personal.`,
-              priority: 'high',
-              status: 'pending',
-              assigned_to: '3d195082-aa83-48c0-b514-a8052264a1e7',
-              created_at: now.toISOString(),
-            });
-            if (!taskResult.error) results.tasks_created++;
+            const { data: existingTask } = await supabase
+              .from('tasks')
+              .select('id')
+              .eq('related_id', client.id)
+              .eq('status', 'pending')
+              .ilike('title', '%CHURN%')
+              .maybeSingle();
+
+            if (!existingTask) {
+              const taskResult = await supabase.from('tasks').insert({
+                title: `[CHURN] ${clientName} lleva ${Math.round(daysSinceActive)} días inactivo`,
+                description: `Cliente ${clientName} (${client.email}) no ha entrado a Steve en ${Math.round(daysSinceActive)} días. Riesgo alto de churn. Requiere atención personal.`,
+                priority: 'high',
+                status: 'pending',
+                related_id: client.id,
+                assigned_to: '3d195082-aa83-48c0-b514-a8052264a1e7',
+                created_at: now.toISOString(),
+              });
+              if (!taskResult.error) results.tasks_created++;
+            }
           }
         }
 

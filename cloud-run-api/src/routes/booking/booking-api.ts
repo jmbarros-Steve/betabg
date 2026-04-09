@@ -13,6 +13,31 @@ import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
  * No JWT required — these are accessed by prospects from WhatsApp links.
  */
 
+// Bug #66 fix: simple in-memory rate limiter for public booking endpoint
+const bookingRateLimit = new Map<string, number[]>();
+const BOOKING_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const BOOKING_RATE_LIMIT_MAX = 3; // max 3 bookings per IP per hour
+
+function isBookingRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const timestamps = bookingRateLimit.get(ip) || [];
+  const recent = timestamps.filter(t => now - t < BOOKING_RATE_LIMIT_WINDOW_MS);
+  bookingRateLimit.set(ip, recent);
+  if (recent.length >= BOOKING_RATE_LIMIT_MAX) return true;
+  recent.push(now);
+  bookingRateLimit.set(ip, recent);
+  return false;
+}
+
+// Bug #78 fix: sanitize user-supplied strings
+function sanitizeInput(value: string | undefined, maxLength: number): string {
+  if (!value) return '';
+  return value.replace(/<[^>]*>/g, '').trim().slice(0, maxLength);
+}
+
+// Bug #89 fix: in-memory mutex per seller_id to prevent concurrent token refreshes
+const tokenRefreshMutex = new Map<string, Promise<string | null>>();
+
 // ============================================================
 // Helper: Refresh Google access token if expired
 // ============================================================
@@ -39,6 +64,29 @@ async function getValidAccessToken(
   }
 
   // Token expired — refresh it
+  // Bug #89 fix: use mutex to prevent concurrent refresh for the same seller
+  const existing = tokenRefreshMutex.get(seller.id);
+  if (existing) {
+    return existing;
+  }
+
+  const refreshPromise = doTokenRefresh(seller, supabase);
+  tokenRefreshMutex.set(seller.id, refreshPromise);
+
+  try {
+    return await refreshPromise;
+  } finally {
+    tokenRefreshMutex.delete(seller.id);
+  }
+}
+
+async function doTokenRefresh(
+  seller: {
+    id: string;
+    google_refresh_token_encrypted: string | null;
+  },
+  supabase: any,
+): Promise<string | null> {
   if (!seller.google_refresh_token_encrypted) return null;
 
   const { data: refreshToken } = await supabase
@@ -115,19 +163,44 @@ export async function bookingSlots(c: Context) {
   }
 
   // Generate candidate slots for next 5 business days
-  const slotDuration = seller.slot_duration_minutes || 15;
-  const buffer = seller.buffer_minutes || 5;
+  // Bug #90 fix: clamp slotDuration and buffer to safe defaults to prevent infinite loop
+  let slotDuration = seller.slot_duration_minutes || 15;
+  let buffer = seller.buffer_minutes ?? 5;
+  if (slotDuration <= 0) slotDuration = 30;
+  if (buffer < 0) buffer = 0;
   const workStart = seller.working_hours_start || 9;
   const workEnd = seller.working_hours_end || 18;
   const workDays = seller.working_days || [1, 2, 3, 4, 5];
 
+  // Bug #92 fix: robust Chile timezone conversion using explicit DST rules.
+  // Chile uses CLT (UTC-4) in winter and CLST (UTC-3) in summer.
+  // DST transitions: first Saturday of April (CLST→CLT) and first Saturday of September (CLT→CLST).
+  // NOTE: Chile has changed DST rules before — update these if official rules change.
+  const getChileOffsetHours = (date: Date): number => {
+    // Use Intl.DateTimeFormat to get the actual offset for a given UTC date
+    // This leverages the ICU timezone database which tracks DST correctly
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Santiago',
+      year: 'numeric', month: 'numeric', day: 'numeric',
+      hour: 'numeric', minute: 'numeric', second: 'numeric',
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(date);
+    const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0', 10);
+    const chileDate = new Date(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
+    const diffMs = chileDate.getTime() - date.getTime();
+    return Math.round(diffMs / (60 * 60 * 1000));
+  };
+
   // Helper: convert a Chile local datetime to proper UTC
   // (server runs in UTC — setHours would set UTC hours, not Chile hours)
   const chileLocalToUTC = (y: number, mo: number, d: number, h: number, min: number): Date => {
-    const approx = new Date(Date.UTC(y, mo - 1, d, h, min, 0));
-    const chileDisp = new Date(approx.toLocaleString('en-US', { timeZone: 'America/Santiago' }));
-    const offsetMs = approx.getTime() - chileDisp.getTime();
-    return new Date(approx.getTime() + offsetMs);
+    // Start with an approximation using UTC-4 (CLT standard)
+    const approxUTC = new Date(Date.UTC(y, mo - 1, d, h + 4, min, 0));
+    // Get the actual Chile offset for this approximate time
+    const actualOffset = getChileOffsetHours(approxUTC);
+    // Rebuild with the correct offset: UTC = local - offset
+    return new Date(Date.UTC(y, mo - 1, d, h - actualOffset, min, 0));
   };
 
   // Get today in Chile time
@@ -239,7 +312,13 @@ export async function bookingSlots(c: Context) {
 // POST /api/booking/confirm
 // ============================================================
 export async function bookingConfirm(c: Context) {
-  const { seller_id, slot_start, prospect_name, prospect_phone, prospect_id, website, monthly_budget } = await c.req.json() as {
+  // Bug #66 fix: rate limit by IP — max 3 bookings per hour
+  const clientIp = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('x-real-ip') || 'unknown';
+  if (isBookingRateLimited(clientIp)) {
+    return c.json({ error: 'Too many booking attempts. Please wait before trying again.' }, 429);
+  }
+
+  const { seller_id, slot_start, prospect_name: rawName, prospect_phone: rawPhone, prospect_id, website: rawWebsite, monthly_budget: rawBudget } = await c.req.json() as {
     seller_id: string;
     slot_start: string;
     prospect_name: string;
@@ -249,8 +328,18 @@ export async function bookingConfirm(c: Context) {
     monthly_budget?: string;
   };
 
+  // Bug #78 fix: sanitize all user-supplied fields (truncate + strip HTML)
+  const prospect_name = sanitizeInput(rawName, 100);
+  const prospect_phone = rawPhone ? sanitizeInput(rawPhone, 30) : undefined;
+  const website = rawWebsite ? sanitizeInput(rawWebsite, 200) : undefined;
+  const monthly_budget = rawBudget ? sanitizeInput(rawBudget, 50) : undefined;
+
+  // Bug #66 fix: require non-empty prospect_name and prospect_phone
   if (!seller_id || !slot_start || !prospect_name) {
     return c.json({ error: 'Missing required fields' }, 400);
+  }
+  if (!prospect_phone) {
+    return c.json({ error: 'prospect_phone is required' }, 400);
   }
 
   // Bug #42 fix: validate slot_start is a valid date and in the future
@@ -277,6 +366,30 @@ export async function bookingConfirm(c: Context) {
   );
 
   if (!seller) return c.json({ error: 'Seller not found' }, 404);
+
+  // Bug #91 fix: verify the slot falls within the seller's working hours and days
+  const sellerWorkDays = seller.working_days || [1, 2, 3, 4, 5];
+  const sellerWorkStart = seller.working_hours_start || 9;
+  const sellerWorkEnd = seller.working_hours_end || 18;
+
+  // Get the slot time in Chile timezone
+  const slotChileStr = startDate.toLocaleString('en-US', {
+    timeZone: 'America/Santiago',
+    hour12: false,
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: 'numeric',
+  });
+  const slotChile = new Date(slotChileStr);
+  const slotHour = slotChile.getHours();
+  const rawDay = slotChile.getDay();
+  const slotDay = rawDay === 0 ? 7 : rawDay; // 1=Mon, 7=Sun to match workDays format
+
+  if (!sellerWorkDays.includes(slotDay)) {
+    return c.json({ error: 'El horario seleccionado no está en un día laboral del vendedor.' }, 400);
+  }
+  if (slotHour < sellerWorkStart || slotHour >= sellerWorkEnd) {
+    return c.json({ error: 'El horario seleccionado está fuera del horario laboral del vendedor.' }, 400);
+  }
 
   const accessToken = await getValidAccessToken(seller);
   if (!accessToken) return c.json({ error: 'Calendar token expired' }, 503);
@@ -307,7 +420,11 @@ export async function bookingConfirm(c: Context) {
     if (busy.length > 0) {
       return c.json({ error: 'Este horario ya no está disponible. Por favor elige otro.' }, 409);
     }
-  } catch {}
+  } catch (freeBusyErr: any) {
+    // Bug #77 fix: log the error and return 503 instead of silently swallowing
+    console.error('[booking-api] FreeBusy check failed:', freeBusyErr?.message || freeBusyErr);
+    return c.json({ error: 'Unable to verify slot availability, please try again' }, 503);
+  }
 
   // Create Google Calendar event with Google Meet
   const calendarId = seller.google_calendar_id || 'primary';

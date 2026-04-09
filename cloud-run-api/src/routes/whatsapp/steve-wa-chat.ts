@@ -1,3 +1,4 @@
+import dns from 'node:dns';
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { handleChinoWhatsApp } from '../../chino/whatsapp.js';
@@ -147,10 +148,22 @@ async function quickScrapeUrl(rawUrl: string): Promise<string | null> {
     if (!url.match(/^https?:\/\//i)) url = 'https://' + url;
 
     // Fix #31: SSRF protection — block private/internal IPs before fetching
+    // Fix #70: DNS rebinding protection — resolve hostname and check resolved IP too
     try {
       const parsed = new URL(url);
       if (isPrivateOrReservedHost(parsed.hostname)) {
         console.warn(`[quick-scrape] Blocked SSRF attempt to private/reserved host: ${parsed.hostname}`);
+        return null;
+      }
+      // Resolve DNS and check the actual IP to prevent DNS rebinding attacks
+      try {
+        const { address } = await dns.promises.lookup(parsed.hostname);
+        if (isPrivateOrReservedHost(address)) {
+          console.warn(`[quick-scrape] Blocked DNS rebinding SSRF: ${parsed.hostname} resolves to private IP ${address}`);
+          return null;
+        }
+      } catch (dnsErr: any) {
+        console.warn(`[quick-scrape] DNS resolution failed for ${parsed.hostname}: ${dnsErr.message}`);
         return null;
       }
     } catch {
@@ -398,11 +411,14 @@ export async function steveWAChat(c: Context) {
       // Not a Chino command — JM falls through to normal merchant flow
     }
 
+    // Fix #85: sanitize phone before using in .or() to prevent PostgREST filter injection
+    const safePhone = phone.replace(/[^\d+]/g, '');
+
     // Identify merchant by whatsapp_phone (with and without + prefix)
     const { data: client } = await supabase
       .from('clients')
       .select('id, name, company, whatsapp_phone')
-      .or(`whatsapp_phone.eq.${phone},whatsapp_phone.eq.+${phone},whatsapp_phone.eq.+56${phone.replace(/^56/, '')}`)
+      .or(`whatsapp_phone.eq.${safePhone},whatsapp_phone.eq.+${safePhone},whatsapp_phone.eq.+56${safePhone.replace(/^56/, '')}`)
       .limit(1)
       .maybeSingle();
 
@@ -742,10 +758,12 @@ async function handleProspect(
     // Inject quick scrape data so Claude has real page info
     if (quickScrapeData) {
       // Fix R6-#14: decodificar HTML entities antes de inyectar al prompt
-      const cleanScrapeData = quickScrapeData
+      let cleanScrapeData = quickScrapeData
         .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
         .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
         .replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+      // Fix #72: strip injection patterns from scraped content to prevent indirect prompt injection
+      cleanScrapeData = cleanScrapeData.replace(/\[\s*(?:SYSTEM|SISTEMA|INSTRUCCION|INSTRUCCIÓN|DIRECTIVA)\s*[:\]]/gi, '[INFO:]');
       aiMessageBody += `\n\n[SISTEMA: Steve revisó la página ${validatedUrl} y encontró esta información REAL. USA SOLO ESTOS DATOS para hablar de la tienda, NO inventes nada que no esté aquí:\n${cleanScrapeData}]`;
     }
     // If PII was detected, inject warning hint
@@ -927,6 +945,8 @@ async function handleProspect(
       prospect.what_they_sell &&
       (replyText.toLowerCase().includes('¿qué vendes') || replyText.toLowerCase().includes('qué vendes'))
     ) {
+      // Fix #71: sanitize what_they_sell to prevent stored prompt injection
+      const safeWhatTheySell = (prospect.what_they_sell || '').replace(/\[[\w\s:]+\]/g, '').substring(0, 200);
       // One retry: ask Claude to fix the response
       try {
         const fixResponse = await fetch('https://api.anthropic.com/v1/messages', {
@@ -941,7 +961,7 @@ async function handleProspect(
             max_tokens: 800,
             messages: [{
               role: 'user',
-              content: `Tu respuesta anterior contiene una pregunta REDUNDANTE. Ya sabemos que el prospecto vende "${prospect.what_they_sell}".
+              content: `Tu respuesta anterior contiene una pregunta REDUNDANTE. Ya sabemos que el prospecto vende "${safeWhatTheySell}".
 
 Tu respuesta original: "${replyText}"
 
@@ -1686,8 +1706,10 @@ async function auditProspectUrl(url: string, prospectId: string): Promise<void> 
     let status = 'RUNNING';
     while (status === 'RUNNING' && attempts < 12) {
       await new Promise(r => setTimeout(r, 5000));
-      // Apify actor-runs GET requires token in URL (not supported in Authorization header for this endpoint)
-      const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`, {
+      // Bug #100 fix: Move APIFY_TOKEN from URL query params to Authorization header
+      // to prevent token leakage in logs (same pattern as Bug #58 GEMINI fix).
+      const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}`, {
+        headers: { 'Authorization': `Bearer ${APIFY_TOKEN}` },
         signal: AbortSignal.timeout(30000),
       });
       const statusData: any = await statusRes.json();
@@ -1702,8 +1724,9 @@ async function auditProspectUrl(url: string, prospectId: string): Promise<void> 
 
     // Get results
     const datasetId = runData.data?.defaultDatasetId;
-    // Apify dataset items GET requires token in URL (not supported in Authorization header for this endpoint)
-    const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_TOKEN}&limit=3`, {
+    // Bug #100 fix: Move APIFY_TOKEN from URL query params to Authorization header
+    const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?limit=3`, {
+      headers: { 'Authorization': `Bearer ${APIFY_TOKEN}` },
       signal: AbortSignal.timeout(30000),
     });
 

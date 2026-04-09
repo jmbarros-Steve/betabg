@@ -106,14 +106,18 @@ export async function prospectTrial(c: Context) {
       await sendWhatsApp(`+${phone}`, welcomeMsg);
       waSent = true;
 
-      // Save welcome message
+      // Bug #63 fix: Redact the plaintext password before storing in wa_messages.
+      // The user already received the real password via WA above.
+      const redactedMsg = welcomeMsg.replace(tempPassword, '[REDACTED]');
+
+      // Save welcome message (with password redacted)
       await supabase.from('wa_messages').insert({
         client_id: newClient.id,
         channel: 'steve_chat',
         direction: 'outbound',
         from_number: process.env.STEVE_WA_NUMBER || process.env.TWILIO_PHONE_NUMBER || '',
         to_number: phone,
-        body: welcomeMsg,
+        body: redactedMsg,
         contact_name: name || email,
         contact_phone: phone,
       });

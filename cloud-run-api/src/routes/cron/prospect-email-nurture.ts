@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuery, safeQueryOrDefault } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Prospect Email Nurture — Steve Perro Lobo Paso 16
@@ -16,10 +17,12 @@ import { safeQuery, safeQueryOrDefault } from '../../lib/safe-supabase.js';
  * Auth: X-Cron-Secret header
  */
 
+// Bug #86 fix: Use incremental delays from the last email, not cumulative from step 0.
+// Step 0: immediate, Step 1: 3 days after step 0, Step 2: 4 days after step 1 (7 total from start).
 const STEP_DELAYS: Record<number, number> = {
   0: 0, // Immediate
-  1: 3, // 3 days after step 1
-  2: 7, // 7 days after step 1 (4 more days)
+  1: 3, // 3 days after step 0
+  2: 4, // 4 days after step 1 (7 total from start)
 };
 
 const MEETING_LINK = 'https://meetings.hubspot.com/jose-manuel15';
@@ -91,9 +94,7 @@ Responde SOLO con JSON válido sin markdown fences: {"subject":"asunto max 50 ch
 `;
 
 export async function prospectEmailNurture(c: Context) {
-  const cronSecret = c.req.header('X-Cron-Secret')?.trim();
-  const expected = process.env.CRON_SECRET;
-  if (!expected || cronSecret !== expected) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -152,11 +153,13 @@ export async function prospectEmailNurture(c: Context) {
           'prospectEmailNurture.fetchConversationHistory',
         );
 
+        // Bug #93 fix: Sanitize conversation before injecting into AI prompt to prevent prompt injection
         const conversationSummary = messages
           .reverse()
           .map((m: any) => `${m.direction === 'inbound' ? 'Prospecto' : 'Steve'}: ${m.body}`)
           .join('\n')
-          .slice(0, 3000);
+          .replace(/\[\s*(?:SYSTEM|SISTEMA|INSTRUCCION|DIRECTIVA|IGNORE|OVERRIDE|PROMPT)\s*[:\]]/gi, '[msg]')
+          .substring(0, 2000);
 
         const prospectName = prospect.name || prospect.profile_name || 'ahí';
         const industry = prospect.what_they_sell || 'e-commerce';

@@ -154,6 +154,13 @@ export async function waSendCampaign(c: Context) {
 
     // Issue 2: Return HTTP response immediately, process sends in background
     // Bug #36 fix: use finally block to guarantee status update even on partial failure
+    // TODO Bug #99: This detached Promise is lost if the Cloud Run instance recycles mid-send,
+    // leaving the campaign stuck in 'sending' forever (zombie campaign). Proper fix requires:
+    //   1. A persistent job queue (Cloud Tasks, Pub/Sub, or pg_boss) that survives instance recycling
+    //   2. A cron job that finds campaigns stuck in 'sending' for >1 hour and marks them as 'failed'
+    //   3. Idempotent message sending so retries don't double-send
+    // For now, we add progress tracking (sent_count updated every 10 messages) so the dashboard
+    // can show partial progress and detect stalled campaigns.
     Promise.resolve().then(async () => {
       let sentCount = 0;
       let failedCount = 0;
@@ -199,6 +206,14 @@ export async function waSendCampaign(c: Context) {
 
             sentCount++;
 
+            // Bug #99 fix: Update sent_count every 10 messages for progress tracking.
+            // This lets the dashboard show partial progress and detect stalled campaigns.
+            if (sentCount % 10 === 0) {
+              await supabase.from('wa_campaigns')
+                .update({ sent_count: sentCount })
+                .eq('id', campaign_id);
+            }
+
             // Rate limit: ~10 messages/second
             if (sentCount % 10 === 0) {
               await new Promise(r => setTimeout(r, 1000));
@@ -228,15 +243,27 @@ export async function waSendCampaign(c: Context) {
         }
 
         // Bug #35 fix: credits were reserved upfront for recipients.length.
-        // Credit back the difference if some messages failed or loop errored out.
+        // Bug #83 fix: Don't call deduct_wa_credit with negative amounts — it corrupts total_used.
+        // Instead, log unused credits as a warning. A proper refund requires a dedicated
+        // SQL function that adds to balance WITHOUT decrementing total_used.
         try {
           const unusedCredits = recipients.length - sentCount;
           if (unusedCredits > 0) {
-            await supabase.rpc('deduct_wa_credit', {
-              p_client_id: client_id,
-              p_amount: -unusedCredits,
-              p_description: `Campaña "${campaign.name}": devolución ${unusedCredits} créditos (${failedCount} fallidos)`,
-            });
+            console.warn(`[wa-campaign] Campaign ${campaign_id}: ${unusedCredits} unused credits (${failedCount} failed). ` +
+              `Pre-deducted ${recipients.length}, sent ${sentCount}. Manual credit adjustment may be needed.`);
+            // Use a direct balance update that won't corrupt total_used
+            const { data: currentCredits } = await supabase
+              .from('wa_credits')
+              .select('balance')
+              .eq('client_id', client_id)
+              .single();
+            if (currentCredits) {
+              await supabase
+                .from('wa_credits')
+                .update({ balance: currentCredits.balance + unusedCredits })
+                .eq('client_id', client_id);
+              console.log(`[wa-campaign] Refunded ${unusedCredits} credits to client ${client_id} balance (total_used unchanged)`);
+            }
           }
         } catch (creditErr) {
           console.error(`[wa-campaign] CRITICAL: Failed to credit back unused credits for campaign ${campaign_id}:`, creditErr);

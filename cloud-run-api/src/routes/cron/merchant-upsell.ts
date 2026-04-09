@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
 import { safeQuery } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Merchant Upsell — Steve Post-Venta
@@ -17,9 +18,7 @@ import { safeQuery } from '../../lib/safe-supabase.js';
  * Auth: X-Cron-Secret header
  */
 export async function merchantUpsell(c: Context) {
-  const cronSecret = c.req.header('X-Cron-Secret')?.trim();
-  const expected = process.env.CRON_SECRET;
-  if (!expected || cronSecret !== expected) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -68,18 +67,23 @@ export async function merchantUpsell(c: Context) {
         const hasMeta = activePlatforms.includes('meta');
         const hasShopify = activePlatforms.includes('shopify');
 
-        // Check recent metrics (revenue growth)
-        const metrics = await safeQuery<{ metric_type: string; metric_value: number | string }>(
-          supabase
-            .from('platform_metrics')
-            .select('metric_type, metric_value')
-            .in('connection_id', connections.map((c: any) => c.id).filter(Boolean))
-            .eq('metric_type', 'revenue')
-            .gte('metric_date', thirtyDaysAgo),
-          'merchantUpsell.fetchMetrics',
-        );
+        // Bug #84 fix: Guard against empty array passed to .in() which can error or return all rows
+        const connectionIds = connections.map((c: any) => c.id).filter(Boolean);
+        let totalRevenue = 0;
+        if (connectionIds.length > 0) {
+          // Check recent metrics (revenue growth)
+          const metrics = await safeQuery<{ metric_type: string; metric_value: number | string }>(
+            supabase
+              .from('platform_metrics')
+              .select('metric_type, metric_value')
+              .in('connection_id', connectionIds)
+              .eq('metric_type', 'revenue')
+              .gte('metric_date', thirtyDaysAgo),
+            'merchantUpsell.fetchMetrics',
+          );
 
-        const totalRevenue = metrics.reduce((sum: number, m: any) => sum + (Number(m.metric_value) || 0), 0);
+          totalRevenue = metrics.reduce((sum: number, m: any) => sum + (Number(m.metric_value) || 0), 0);
+        }
 
         // Determine upsell opportunity
         let opportunity: { type: string; reason: string; metric_data: any } | null = null;
@@ -107,12 +111,14 @@ export async function merchantUpsell(c: Context) {
         if (!opportunity) continue;
 
         // Check if we already suggested this type recently (avoid spam)
+        // Bug #95: Exclude 'draft' records from dedup — drafts are cleaned up on failure
         const recentUpsell = await safeQuery<{ id: string }>(
           supabase
             .from('merchant_upsell_opportunities')
             .select('id')
             .eq('client_id', client.id)
             .eq('type', opportunity.type)
+            .neq('outcome', 'draft')
             .gte('created_at', new Date(now.getTime() - 30 * 86400000).toISOString())
             .limit(1),
           'merchantUpsell.fetchRecentUpsell',
@@ -120,16 +126,15 @@ export async function merchantUpsell(c: Context) {
 
         if (recentUpsell.length > 0) continue;
 
-        // Insert opportunity
-        await supabase.from('merchant_upsell_opportunities').insert({
+        // Bug #95 fix: Insert opportunity as 'draft' before WA send. If send fails,
+        // delete the draft so the dedup check allows retry on the next run.
+        const { data: insertedOpp } = await supabase.from('merchant_upsell_opportunities').insert({
           client_id: client.id,
           type: opportunity.type,
           reason: opportunity.reason,
           metric_data: opportunity.metric_data,
-          outcome: 'pending',
-        });
-
-        results.opportunities_found++;
+          outcome: 'draft',
+        }).select('id').single();
 
         // Generate and send WA message
         const clientName = client.name || client.email?.split('@')[0] || '';
@@ -150,24 +155,41 @@ export async function merchantUpsell(c: Context) {
         });
 
         if (!aiRes.ok) {
+          // Delete draft so dedup allows retry
+          if (insertedOpp?.id) {
+            await supabase.from('merchant_upsell_opportunities').delete().eq('id', insertedOpp.id);
+          }
           results.errors++;
           continue;
         }
 
         const aiData: any = await aiRes.json();
         let msg = (aiData.content?.[0]?.text || '').trim();
-        if (!msg) continue;
+        if (!msg) {
+          // Delete draft so dedup allows retry
+          if (insertedOpp?.id) {
+            await supabase.from('merchant_upsell_opportunities').delete().eq('id', insertedOpp.id);
+          }
+          continue;
+        }
         if (msg.length > 400) msg = msg.slice(0, 397) + '...';
 
-        await sendWhatsApp(`+${phone}`, msg);
+        try {
+          await sendWhatsApp(`+${phone}`, msg);
+        } catch (sendErr) {
+          // WA send failed — delete draft so dedup allows retry
+          if (insertedOpp?.id) {
+            await supabase.from('merchant_upsell_opportunities').delete().eq('id', insertedOpp.id);
+          }
+          throw sendErr;
+        }
 
-        // Mark as sent
+        // Send succeeded — promote draft to pending and mark as sent
+        results.opportunities_found++;
         await supabase
           .from('merchant_upsell_opportunities')
-          .update({ wa_sent: true, wa_sent_at: now.toISOString() })
-          .eq('client_id', client.id)
-          .eq('type', opportunity.type)
-          .eq('outcome', 'pending');
+          .update({ outcome: 'pending', wa_sent: true, wa_sent_at: now.toISOString() })
+          .eq('id', insertedOpp?.id);
 
         // Save message
         await supabase.from('wa_messages').insert({
