@@ -93,13 +93,21 @@ async function metaGet(endpoint: string, token: string, params: Record<string, s
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
   }
-  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(15_000),
+  });
   if (!res.ok) {
     const err: any = await res.json().catch(() => ({}));
     console.error(`Meta API error on ${endpoint}:`, err);
     return null;
   }
-  return res.json();
+  try {
+    return await res.json();
+  } catch {
+    console.error(`Meta API non-JSON response on ${endpoint}: HTTP ${res.status}`);
+    return null;
+  }
 }
 
 /** Paginate through all results for a list endpoint */
@@ -116,14 +124,24 @@ async function metaGetAll(endpoint: string, token: string, params: Record<string
 
   let hadError = false;
   while (url) {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(15_000),
+    });
     if (!res.ok) {
       const err: any = await res.json().catch(() => ({}));
       console.error(`Meta API error on ${endpoint}:`, err);
       hadError = true;
       break;
     }
-    const data: any = await res.json();
+    let data: any;
+    try {
+      data = await res.json();
+    } catch {
+      console.error(`Meta API non-JSON response on ${endpoint}: HTTP ${res.status}`);
+      hadError = true;
+      break;
+    }
     if (data.data) results.push(...data.data);
     url = data.paging?.next || null;
   }

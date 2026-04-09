@@ -75,9 +75,15 @@ export async function metaAdsetAction(c: Context) {
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      console.error(`[meta-adset-action] Meta API error:`, response.status, errText.slice(0, 300));
-      return c.json({ error: 'Failed to update ad set status', details: errText.slice(0, 200) }, 502);
+      let errDetail = '';
+      try {
+        const errJson: any = await response.json();
+        errDetail = errJson?.error?.message || JSON.stringify(errJson).slice(0, 200);
+      } catch {
+        errDetail = `HTTP ${response.status}`;
+      }
+      console.error(`[meta-adset-action] Meta API error:`, response.status, errDetail);
+      return c.json({ error: 'Failed to update ad set status', details: errDetail }, 502);
     }
 
     return c.json({ success: true, adset_id, status: newStatus });

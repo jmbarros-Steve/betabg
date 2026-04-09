@@ -50,8 +50,9 @@ async function getFBPageToken(supabase: any, clientId: string): Promise<FBTokenR
 
   let pageId = conn.page_id;
 
-  // If no page_id stored, discover from /me/accounts
-  if (!pageId) {
+  // If no page_id stored, discover from /me/accounts (only for OAuth — SUAT cross-contaminates)
+  const isSuat = conn.connection_type === 'bm_partner' || conn.connection_type === 'leadsie';
+  if (!pageId && !isSuat) {
     const pagesRes = await metaApiJson<{ data: any[] }>('/me/accounts', userToken, {
       params: { fields: 'id,name,access_token', limit: '10' },
     });

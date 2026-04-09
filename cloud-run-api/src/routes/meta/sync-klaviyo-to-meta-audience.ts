@@ -99,6 +99,7 @@ export async function syncKlaviyoToMetaAudience(c: Context) {
           'accept': 'application/json',
           'revision': KLAVIYO_REVISION,
         },
+        signal: AbortSignal.timeout(15_000),
       });
 
       if (!res.ok) {

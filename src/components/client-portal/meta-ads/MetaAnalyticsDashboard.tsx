@@ -241,7 +241,8 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
   const { from, to, prevFrom, prevTo, days } = useMemo(() => {
     const opt = DATE_RANGE_OPTIONS.find((o) => o.key === dateRange);
     const numDays = opt?.days ?? 30;
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     if (dateRange === 'custom' && customFrom && customTo) {
       const diffMs = new Date(customTo).getTime() - new Date(customFrom).getTime();

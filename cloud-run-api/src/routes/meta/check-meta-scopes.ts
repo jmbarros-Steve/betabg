@@ -49,7 +49,8 @@ export async function checkMetaScopes(c: Context) {
     }
 
     // BM Partner: SUAT has fixed permissions, skip API check
-    if ((connection as any).connection_type === 'bm_partner' || (connection as any).connection_type === 'leadsie') {
+    const connType = (connection as { connection_type?: string | null }).connection_type;
+    if (connType === 'bm_partner' || connType === 'leadsie') {
       const bmPartnerScopes = [
         'ads_management', 'ads_read', 'business_management',
         'pages_read_engagement', 'pages_manage_ads', 'pages_manage_posts',

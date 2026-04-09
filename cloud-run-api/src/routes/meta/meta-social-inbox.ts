@@ -35,7 +35,13 @@ async function metaGet(endpoint: string, token: string, params?: Record<string, 
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   }
   const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
-  const data: any = await res.json();
+  let data: any;
+  try {
+    data = await res.json();
+  } catch {
+    console.error(`Meta GET /${endpoint} non-JSON response: HTTP ${res.status}`);
+    return { ok: false as const, error: `Non-JSON response (HTTP ${res.status})`, data: null };
+  }
   if (!res.ok) {
     console.error(`Meta GET /${endpoint} error:`, data);
     return { ok: false as const, error: data?.error?.message || 'Meta API error', data: null };

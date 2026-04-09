@@ -142,7 +142,7 @@ export async function syncMetaMetrics(c: Context) {
       `)
       .eq('id', connection_id)
       .eq('platform', 'meta')
-      .single();
+      .maybeSingle();
 
     if (connError || !connection) {
       console.error('Connection fetch error:', connError);

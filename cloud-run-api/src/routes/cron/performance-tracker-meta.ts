@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { safeQuerySingleOrDefault, safeQueryOrDefault } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * D.1 — Performance Tracker Meta
@@ -59,9 +60,7 @@ function calculatePerformanceScore(
 }
 
 export async function performanceTrackerMeta(c: Context) {
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -148,7 +147,14 @@ export async function performanceTrackerMeta(c: Context) {
         continue;
       }
 
-      const metricsJson = await response.json() as { data?: MetricInsight[] };
+      let metricsJson: { data?: MetricInsight[] };
+      try {
+        metricsJson = await response.json() as { data?: MetricInsight[] };
+      } catch {
+        console.error(`[perf-tracker-meta] Non-JSON response for campaign ${creative.meta_campaign_id}`);
+        errors++;
+        continue;
+      }
       if (!metricsJson.data || metricsJson.data.length === 0) {
         console.log(`[perf-tracker-meta] No insight data for campaign ${creative.meta_campaign_id}`);
         continue;

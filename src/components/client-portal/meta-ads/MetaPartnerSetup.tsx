@@ -61,26 +61,26 @@ export function MetaPartnerSetup({ clientId, onConnected }: MetaPartnerSetupProp
     let stopped = false;
     const startTime = Date.now();
 
-    const interval = setInterval(async () => {
+    // Use setTimeout chain to prevent async overlap (setInterval can fire while previous poll is still running)
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
       if (stopped) return;
 
       const elapsed = Date.now() - startTime;
       setPollElapsed(elapsed);
 
-      if (elapsed > POLL_TIMEOUT_MS) {
-        clearInterval(interval);
-        return;
-      }
+      if (elapsed > POLL_TIMEOUT_MS) return;
 
       const found = await pollForConnection();
-      if (found) {
-        clearInterval(interval);
+      if (!found && !stopped) {
+        timer = setTimeout(poll, POLL_INTERVAL_MS);
       }
-    }, POLL_INTERVAL_MS);
+    };
+    timer = setTimeout(poll, POLL_INTERVAL_MS);
 
     return () => {
       stopped = true;
-      clearInterval(interval);
+      clearTimeout(timer);
     };
   }, [state, pollForConnection]);
 

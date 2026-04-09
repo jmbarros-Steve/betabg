@@ -46,9 +46,10 @@ export async function fetchFacebookInsights(c: Context) {
   const userToken = await getTokenForConnection(supabase, conn);
   if (!userToken) return c.json({ error: 'Error resolviendo token Meta' }, 500);
 
-  // Find page_id
+  // Find page_id (only for OAuth — SUAT /me/accounts cross-contaminates)
   let pageId = conn.page_id;
-  if (!pageId) {
+  const isSuat = conn.connection_type === 'bm_partner' || conn.connection_type === 'leadsie';
+  if (!pageId && !isSuat) {
     const pagesRes = await metaApiJson<{ data: any[] }>('/me/accounts', userToken, {
       params: { fields: 'id,name', limit: '10' },
     });

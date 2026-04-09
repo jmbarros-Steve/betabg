@@ -97,6 +97,11 @@ export function MetaAdAccountSelector({
   }
 
   async function handleSelectAccount(accountId: string) {
+    // Validate accountId format (numeric only, max 20 digits)
+    if (!/^\d{1,20}$/.test(accountId)) {
+      toast.error('ID de cuenta inválido');
+      return;
+    }
     setSelectedAccount(accountId);
     setSaving(true);
 

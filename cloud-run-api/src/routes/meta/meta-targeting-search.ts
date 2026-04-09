@@ -42,6 +42,10 @@ export async function metaTargetingSearch(c: Context) {
       return c.json({ success: true, results: [] });
     }
 
+    if (query.length > 200) {
+      return c.json({ error: 'Query too long (max 200 characters)' }, 400);
+    }
+
     // Fetch connection details
     const { data: connection, error: connError } = await supabase
       .from('platform_connections')

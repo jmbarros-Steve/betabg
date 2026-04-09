@@ -25,14 +25,23 @@ async function metaGet(endpoint: string, token: string, params: Record<string, s
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
   }
-  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(15_000),
+  });
   if (!res.ok) {
     const err: any = await res.json().catch(() => ({}));
     const msg = err?.error?.message || `HTTP ${res.status}`;
     console.error(`[discover-assets] Meta API error on ${endpoint}:`, msg);
     return { data: null, error: msg };
   }
-  const json: any = await res.json();
+  let json: any;
+  try {
+    json = await res.json();
+  } catch {
+    console.error(`[discover-assets] Non-JSON response on ${endpoint}: HTTP ${res.status}`);
+    return { data: null, error: 'Non-JSON response' };
+  }
   return { data: json.data || [] };
 }
 

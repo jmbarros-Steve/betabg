@@ -28,8 +28,14 @@ async function metaApiRequest(
 
   const response = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(15_000),
   });
-  const responseData: any = await response.json();
+  let responseData: any;
+  try {
+    responseData = await response.json();
+  } catch {
+    return { ok: false, error: `Non-JSON response (HTTP ${response.status})` };
+  }
 
   if (!response.ok) {
     const errorMessage =

@@ -140,7 +140,19 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
   const [videoProgress, setVideoProgress] = useState('');
 
   useEffect(() => {
-    loadBriefData();
+    let cancelled = false;
+    const load = async () => {
+      const { data: clientData } = await supabase
+        .from('clients')
+        .select('fase_negocio, presupuesto_ads')
+        .eq('id', clientId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (clientData?.fase_negocio) setFaseNegocio(clientData.fase_negocio);
+      if (clientData?.presupuesto_ads) setPresupuestoAds(String(clientData.presupuesto_ads));
+    };
+    load();
+    return () => { cancelled = true; };
   }, [clientId]);
 
   const loadBriefData = async () => {

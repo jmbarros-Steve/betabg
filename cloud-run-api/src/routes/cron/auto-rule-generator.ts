@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuery } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * C.5 — Auto-generación de reglas
@@ -14,9 +15,7 @@ import { safeQuery } from '../../lib/safe-supabase.js';
  */
 
 export async function autoRuleGenerator(c: Context) {
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -92,6 +91,11 @@ Si ya hay regla que cubre, responde: {"existing_covers": true, "rule_id": "R-XXX
       ],
     }),
   });
+
+  if (!response.ok) {
+    console.error(`[auto-rule-gen] Anthropic API error: ${response.status}`);
+    return c.json({ error: `AI API error: ${response.status}` }, 502);
+  }
 
   let aiResponse: any;
   try {
