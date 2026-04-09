@@ -97,28 +97,37 @@ export async function prospectTrial(c: Context) {
     await supabase.from('merchant_onboarding').insert(onboardingSteps);
 
     // 6. Send welcome WA message
+    // Fix Bug#6: wrap WA send in separate try/catch — DB steps (1-5) already succeeded,
+    // don't return 500 just because Twilio is down (causes 409 on retry)
     const welcomeMsg = `🎉 ¡Bienvenido a Steve!\n\nTu cuenta está lista. Entra a steve.cl con tu email (${email}) y esta clave temporal:\n\n🔑 ${tempPassword}\n\nCámbiala apenas entres.\n\nPróximo paso: conectar tu Shopify para que empiece la magia 🚀\n\n¿Necesitas ayuda? Solo escríbeme aquí.`;
 
-    await sendWhatsApp(`+${phone}`, welcomeMsg);
+    let waSent = false;
+    try {
+      await sendWhatsApp(`+${phone}`, welcomeMsg);
+      waSent = true;
 
-    // Save welcome message
-    await supabase.from('wa_messages').insert({
-      client_id: newClient.id,
-      channel: 'steve_chat',
-      direction: 'outbound',
-      from_number: process.env.STEVE_WA_NUMBER || process.env.TWILIO_PHONE_NUMBER || '',
-      to_number: phone,
-      body: welcomeMsg,
-      contact_name: name || email,
-      contact_phone: phone,
-    });
+      // Save welcome message
+      await supabase.from('wa_messages').insert({
+        client_id: newClient.id,
+        channel: 'steve_chat',
+        direction: 'outbound',
+        from_number: process.env.STEVE_WA_NUMBER || process.env.TWILIO_PHONE_NUMBER || '',
+        to_number: phone,
+        body: welcomeMsg,
+        contact_name: name || email,
+        contact_phone: phone,
+      });
+    } catch (waErr: any) {
+      console.error(`[prospect-trial] WA send failed (user+client already created): ${waErr.message}`);
+    }
 
-    console.log(`[prospect-trial] Trial activated: ${email} → client ${newClient.id}`);
+    console.log(`[prospect-trial] Trial activated: ${email} → client ${newClient.id} (WA: ${waSent ? 'sent' : 'FAILED'})`);
 
     return c.json({
       success: true,
       client_id: newClient.id,
       user_id: userId,
+      wa_sent: waSent,
     });
 
   } catch (err: any) {

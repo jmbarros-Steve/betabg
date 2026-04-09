@@ -253,6 +253,15 @@ export async function bookingConfirm(c: Context) {
     return c.json({ error: 'Missing required fields' }, 400);
   }
 
+  // Bug #42 fix: validate slot_start is a valid date and in the future
+  const startDate = new Date(slot_start);
+  if (isNaN(startDate.getTime())) {
+    return c.json({ error: 'Invalid slot_start date' }, 400);
+  }
+  if (startDate.getTime() <= Date.now()) {
+    return c.json({ error: 'slot_start must be in the future' }, 400);
+  }
+
   const supabase = getSupabaseAdmin();
 
   // Load seller

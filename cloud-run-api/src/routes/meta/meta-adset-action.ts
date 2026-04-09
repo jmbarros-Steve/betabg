@@ -46,7 +46,7 @@ export async function metaAdsetAction(c: Context) {
     const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
     // Check ownership — allow both client owner and admin
     const profile = await safeQuerySingleOrDefault<any>(
-      supabase.from('profiles').select('is_super_admin').eq('id', user.id).maybeSingle(),
+      supabase.from('user_roles').select('is_super_admin').eq('user_id', user.id).maybeSingle(),
       null,
       'metaAdsetAction.getProfile',
     );

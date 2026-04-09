@@ -57,7 +57,8 @@ export function ProductAlerts({ clientId }: ProductAlertsProps) {
   const [checking, setChecking] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const widgetUrl = `https://steve-api-850416724643.us-central1.run.app/api/email-product-alert-widget?client_id=${clientId}`;
+  const apiBase = ((import.meta.env.VITE_API_URL as string) || '').trim();
+  const widgetUrl = `${apiBase}/api/email-product-alert-widget?client_id=${clientId}`;
   const scriptTag = `<script src="${widgetUrl}" async defer></script>`;
 
   const loadAlerts = useCallback(async () => {

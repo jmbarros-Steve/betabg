@@ -138,13 +138,7 @@ export async function abandonedCartWA(c: Context) {
         ? cart.customer_phone
         : `+${cart.customer_phone}`;
 
-      const twilioMsg = await subClient.messages.create({
-        from: `whatsapp:${waAccount.phone_number}`,
-        to: `whatsapp:${toNumber}`,
-        body: message,
-      });
-
-      // Deduct credit atomically (Issue 1: prevents race condition)
+      // Fix Bug#8: Deduct credit BEFORE sending message (irreversible)
       const { data: deductResult } = await supabase.rpc('deduct_wa_credit', {
         p_client_id: cart.client_id,
         p_amount: 1,
@@ -156,6 +150,12 @@ export async function abandonedCartWA(c: Context) {
         skipped++;
         continue;
       }
+
+      const twilioMsg = await subClient.messages.create({
+        from: `whatsapp:${waAccount.phone_number}`,
+        to: `whatsapp:${toNumber}`,
+        body: message,
+      });
 
       // Save message
       await supabase.from('wa_messages').insert({

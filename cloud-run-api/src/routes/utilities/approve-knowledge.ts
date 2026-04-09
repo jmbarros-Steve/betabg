@@ -4,6 +4,9 @@ import { propagateKnowledge } from '../../lib/knowledge-propagator.js';
 import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 export async function approveKnowledge(c: Context) {
+  const user = c.get('user');
+  if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
   const supabase = getSupabaseAdmin();
   const { action, ids } = await c.req.json();
 

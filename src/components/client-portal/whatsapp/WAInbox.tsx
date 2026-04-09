@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
+import { toast } from 'sonner';
 
 interface Conversation {
   id: string;
@@ -142,7 +144,7 @@ export function WAInbox({ clientId }: Props) {
       const token = session.data.session?.access_token || '';
 
       const response = await fetch(
-        `${import.meta.env.VITE_CLOUD_RUN_URL || 'https://steve-api-850416724643.us-central1.run.app'}/api/whatsapp/send-message`,
+        `${((import.meta.env.VITE_API_URL as string) || '').trim()}/api/whatsapp/send-message`,
         {
           method: 'POST',
           headers: {

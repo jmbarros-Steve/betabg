@@ -20,26 +20,37 @@ export async function waStatusCallback(c: Context) {
 
     const supabase = getSupabaseAdmin();
 
-    // Update message status
+    // Bug #37 fix: only include metadata in update when actually defined,
+    // otherwise passing undefined can nullify existing metadata (e.g. campaign_id)
+    const updatePayload: Record<string, any> = { status };
+    if (errorCode) {
+      updatePayload.metadata = { error_code: errorCode };
+    }
+
     await supabase
       .from('wa_messages')
-      .update({
-        status,
-        metadata: errorCode ? { error_code: errorCode } : undefined,
-      })
+      .update(updatePayload)
       .eq('message_sid', messageSid);
 
-    // Issue 5: Update campaign metrics if this message belongs to a campaign
+    // Bug #51 fix: check current message status to prevent duplicate increments on Twilio retries
+    // Only increment campaign counters if the status is actually changing
     if (status === 'delivered' || status === 'read') {
       const msg = await safeQuerySingleOrDefault<any>(
         supabase
           .from('wa_messages')
-          .select('metadata')
+          .select('metadata, status')
           .eq('message_sid', messageSid)
           .single(),
         null,
         'statusCallback.getMsg',
       );
+
+      // Only increment if the status actually changed (idempotency guard)
+      const previousStatus = msg?.status;
+      if (previousStatus === status) {
+        // Duplicate callback — skip counter increment
+        return c.text('OK');
+      }
 
       const campaignId = (msg?.metadata as any)?.campaign_id;
       if (campaignId) {

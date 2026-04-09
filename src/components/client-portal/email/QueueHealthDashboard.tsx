@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
  * Visible solo para admins. Pega a /api/email-queue-health.
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://steve-api-850416724643.us-central1.run.app';
+const API_BASE = ((import.meta.env.VITE_API_URL as string) || '').trim();
 
 interface QueueHealth {
   verdict: 'ok' | 'warning' | 'critical';

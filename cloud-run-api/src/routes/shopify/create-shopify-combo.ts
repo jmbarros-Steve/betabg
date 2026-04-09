@@ -33,6 +33,18 @@ export async function createShopifyCombo(c: Context) {
       return c.json({ error: 'connectionId and at least 2 products required' }, 400);
     }
 
+    // Validate discount percentage is within bounds
+    if (typeof discountPercent !== 'number' || discountPercent < 0 || discountPercent > 100) {
+      return c.json({ error: 'discountPercent must be a number between 0 and 100' }, 400);
+    }
+
+    // Validate product prices are non-negative numbers
+    for (const p of products) {
+      if (typeof p.price !== 'number' || p.price < 0) {
+        return c.json({ error: `Invalid price for product "${p.title || 'unknown'}": price must be a non-negative number` }, 400);
+      }
+    }
+
     // Ownership check
     const { data: connection, error: connError } = await supabase
       .from('platform_connections')

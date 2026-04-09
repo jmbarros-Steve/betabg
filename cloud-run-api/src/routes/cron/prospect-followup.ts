@@ -38,6 +38,8 @@ export async function prospectFollowup(c: Context) {
   const supabase = getSupabaseAdmin();
   const now = new Date();
   const results = { followups_sent: 0, marked_lost: 0, resurrections_sent: 0, errors: 0 };
+  // Bug #40 fix: Track IDs that received goodbye in this run to exclude from mark-ghosted
+  const goodbyeSentIds = new Set<string>();
 
   try {
     // ============================================================
@@ -57,25 +59,44 @@ export async function prospectFollowup(c: Context) {
     if (prospects.length > 0) {
       for (const prospect of prospects) {
         try {
-          // Find last message for this prospect
-          const lastMsg = await safeQuerySingleOrDefault<any>(
+          // Bug #57 fix: Only count INBOUND messages from the prospect for last activity,
+          // not outbound system messages (cron-sent mockups, follow-ups) which would reset the timer
+          const lastInboundMsg = await safeQuerySingleOrDefault<any>(
             supabase
               .from('wa_messages')
               .select('direction, created_at')
               .eq('contact_phone', prospect.phone)
               .eq('channel', 'prospect')
+              .eq('direction', 'inbound')
               .is('client_id', null)
               .order('created_at', { ascending: false })
               .limit(1)
               .maybeSingle(),
             null,
-            'prospectFollowup.fetchLastMsg',
+            'prospectFollowup.fetchLastInboundMsg',
           );
 
-          // Skip if last message is inbound (prospect responded)
-          if (!lastMsg || lastMsg.direction === 'inbound') continue;
+          const lastOutboundMsg = await safeQuerySingleOrDefault<any>(
+            supabase
+              .from('wa_messages')
+              .select('direction, created_at')
+              .eq('contact_phone', prospect.phone)
+              .eq('channel', 'prospect')
+              .eq('direction', 'outbound')
+              .is('client_id', null)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+            null,
+            'prospectFollowup.fetchLastOutboundMsg',
+          );
 
-          const lastMsgTime = new Date(lastMsg.created_at);
+          // Skip if last message is inbound (prospect responded recently)
+          if (lastInboundMsg && lastOutboundMsg && new Date(lastInboundMsg.created_at) > new Date(lastOutboundMsg.created_at)) continue;
+          // Skip if no outbound message at all
+          if (!lastOutboundMsg) continue;
+
+          const lastMsgTime = new Date(lastOutboundMsg.created_at);
           const hoursSinceLastMsg = (now.getTime() - lastMsgTime.getTime()) / (1000 * 60 * 60);
 
           // Determine which follow-up to send based on time and count
@@ -166,7 +187,10 @@ export async function prospectFollowup(c: Context) {
           results.followups_sent++;
           console.log(`[prospect-followup] Sent ${followupType} to ${prospect.phone} (count: ${newFollowupCount})`);
 
-          // If this was the goodbye, mark as lost on next cycle (after 3 follow-ups)
+          // Bug #40 fix: track goodbye recipients to avoid marking lost in same run
+          if (followupType === 'goodbye') {
+            goodbyeSentIds.add(prospect.id);
+          }
 
         } catch (err) {
           console.error(`[prospect-followup] Error for ${prospect.phone}:`, err);
@@ -186,6 +210,8 @@ export async function prospectFollowup(c: Context) {
 
       if (ghosted.length > 0) {
         for (const g of ghosted) {
+          // Bug #40 fix: skip prospects that just received goodbye in this run
+          if (goodbyeSentIds.has(g.id)) continue;
           // Verify they haven't responded since last follow-up
           const lastInbound = await safeQuerySingleOrDefault<any>(
             supabase

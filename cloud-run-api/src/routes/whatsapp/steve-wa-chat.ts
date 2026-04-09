@@ -105,6 +105,39 @@ async function downloadImageForVision(
 const URL_REGEX = /(?:https?:\/\/)?(?:www\.)?[a-z0-9][-a-z0-9]*\.[a-z]{2,}(?:\.[a-z]{2,})?(?:\/[^\s]*)?/i;
 
 /**
+ * Fix #31: SSRF protection — block requests to private/internal IPs and metadata endpoints.
+ * Must be called BEFORE any fetch to user-supplied URLs (quickScrapeUrl, etc.).
+ */
+function isPrivateOrReservedHost(hostname: string): boolean {
+  const lower = hostname.toLowerCase();
+
+  // Block localhost and common metadata endpoints
+  if (lower === 'localhost' || lower === '127.0.0.1' || lower === '::1') return true;
+  if (lower === '0.0.0.0' || lower === '[::1]') return true;
+  // AWS/GCP metadata endpoint
+  if (lower === '169.254.169.254' || lower === 'metadata.google.internal') return true;
+
+  // Block private IPv4 ranges
+  const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4Match) {
+    const [, a, b] = ipv4Match.map(Number);
+    if (a === 10) return true;                          // 10.0.0.0/8
+    if (a === 127) return true;                         // 127.0.0.0/8
+    if (a === 172 && b >= 16 && b <= 31) return true;   // 172.16.0.0/12
+    if (a === 192 && b === 168) return true;             // 192.168.0.0/16
+    if (a === 169 && b === 254) return true;             // 169.254.0.0/16 (link-local)
+    if (a === 0) return true;                            // 0.0.0.0/8
+  }
+
+  // Block private IPv6 (fd00::/8, fe80::/10, ::1)
+  if (lower.startsWith('fd') || lower.startsWith('fe80') || lower.startsWith('fc')) return true;
+  if (lower.startsWith('[fd') || lower.startsWith('[fe80') || lower.startsWith('[fc')) return true;
+  if (lower === '[::1]' || lower === '::1') return true;
+
+  return false;
+}
+
+/**
  * Quick scrape — fetch homepage HTML and extract basic info for Claude context.
  * Timeout: 3s. Returns null on failure. NOT a deep audit, just basic page data.
  */
@@ -112,6 +145,18 @@ async function quickScrapeUrl(rawUrl: string): Promise<string | null> {
   try {
     let url = rawUrl.trim();
     if (!url.match(/^https?:\/\//i)) url = 'https://' + url;
+
+    // Fix #31: SSRF protection — block private/internal IPs before fetching
+    try {
+      const parsed = new URL(url);
+      if (isPrivateOrReservedHost(parsed.hostname)) {
+        console.warn(`[quick-scrape] Blocked SSRF attempt to private/reserved host: ${parsed.hostname}`);
+        return null;
+      }
+    } catch {
+      console.warn(`[quick-scrape] Invalid URL, skipping: ${url}`);
+      return null;
+    }
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
@@ -309,6 +354,8 @@ export async function steveWAChat(c: Context) {
           messageBody = '[El usuario envió un audio que no pude transcribir]';
         }
         }
+        // Fix #48: messageBody now contains transcription; storageBody is derived from
+        // scrubPII(messageBody) below, which correctly includes the transcription.
       } else if (mediaUrl && mediaType && SUPPORTED_IMAGE_TYPES.some(t => mediaType.startsWith(t))) {
         // Image: download for Claude vision
         imageData = await downloadImageForVision(mediaUrl, mediaType);
@@ -332,7 +379,8 @@ export async function steveWAChat(c: Context) {
       console.log(`[steve-wa-chat] PII detected and scrubbed from ${from}`);
     }
     // Use scrubbed version for ALL processing and storage — PII must never reach AI or DB
-    const storageBody = scrubbedBody;
+    // Fix #48: use let so storageBody can be updated after audio transcription
+    let storageBody = scrubbedBody;
     // Override messageBody with scrubbed version so AI calls also use scrubbed data
     messageBody = scrubbedBody;
 
@@ -516,6 +564,7 @@ async function handleProspect(
         contact_name: profileName || phone, contact_phone: phone,
       });
       // Update message count silently
+      // TODO Fix #49: same non-atomic increment issue — see main upsert block for details
       const { data: p } = await supabase.from('wa_prospects').select('message_count').eq('phone', phone).maybeSingle();
       if (p) {
         await supabase.from('wa_prospects').update({
@@ -542,11 +591,19 @@ async function handleProspect(
       if (isReactivation) {
         console.log(`[handleProspect] Lost prospect ${phone} wrote again → re-activating (was: ${existingProspect.lost_reason || 'unknown'})`);
       }
+      // Fix Bug#1: use same timestamp for DB update and in-memory prospect
+      // so processProspectAsync's optimistic lock (.eq('updated_at', prospect.updated_at)) matches
+      const updatedAtNow = new Date().toISOString();
+      // TODO Fix #49: message_count increment is NOT atomic (read+increment race condition).
+      // Supabase PostgREST doesn't support atomic increment natively.
+      // To fix properly: create an RPC like `increment_message_count(prospect_id uuid)`
+      // that does `UPDATE wa_prospects SET message_count = message_count + 1 WHERE id = $1`.
+      // For now this is acceptable since concurrent messages from the same phone are rate-limited (30s).
       await supabase
         .from('wa_prospects')
         .update({
           message_count: (existingProspect.message_count || 0) + 1,
-          updated_at: new Date().toISOString(),
+          updated_at: updatedAtNow,
           profile_name: profileName || existingProspect.profile_name,
           ...(isReactivation && {
             stage: 'discovery',
@@ -558,14 +615,14 @@ async function handleProspect(
             meeting_status: 'none',    // Fix R6-#30: limpiar reunión anterior
             meeting_at: null,
             // Fix R5-#18: store reactivation context for future reference
-            reactivated_at: new Date().toISOString(),
+            reactivated_at: updatedAtNow,
           }),
         })
         .eq('id', existingProspect.id);
-
       prospect = {
         ...existingProspect,
         message_count: (existingProspect.message_count || 0) + 1,
+        updated_at: updatedAtNow,
         ...(isReactivation && { stage: 'discovery', lead_score: 0 }),
       };
     } else {
@@ -664,12 +721,15 @@ async function handleProspect(
     }
 
     // Fix #21 + R4-#16: stricter injection guard — avoid false positives like "ignora mis dudas"
+    // Fix #32: add [SISTEMA: and Spanish accent variants to prevent injection bypass
     const INJECTION_PATTERNS = [
-      /^\s*(?:system|instrucción|directiva)[\s:]/i,  // Starts with "system:" command
-      /\[\s*(?:SYSTEM|INSTRUCCIÓN|DIRECTIVA)\s*:/i,  // [SYSTEM: ...] tags
+      /^\s*(?:system|instrucción|instruccion|sistema|directiva)[\s:]/i,  // Starts with "system:" command
+      /\[\s*(?:SYSTEM|INSTRUCCIÓN|INSTRUCCION|SISTEMA|DIRECTIVA)\s*[\s:]/i,  // [SYSTEM: ...] / [SISTEMA: ...] tags
       /jailbreak|DAN\s+mode|developer\s+mode/i,
       /forget\s+everything|ignore\s+(?:all|previous|everything)/i,
       /\[INSTRUCCIÓN:/i,
+      /\[SISTEMA\s*[:\]]/i,       // Fix #32: [SISTEMA:] and [SISTEMA ] variants
+      /\[INSTRUCCION\s*[:\]]/i,   // Fix #32: [INSTRUCCION:] without accent
     ];
     const sanitizedMessageBody = INJECTION_PATTERNS.some(p => p.test(messageBody))
       ? 'Hola'  // neutralize injection — treat as blank greeting
@@ -1079,7 +1139,7 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
     // Paso 17: Detect URL in prospect message (reuse earlier detection)
     const urlMatch = detectedUrl ? [detectedUrl] : null;
 
-    processProspectAsync(prospect, fullHistory, meetingLinkSent, disqResult.disqualified ? disqResult.reason : undefined, urlMatch?.[0], meetingProposed).catch(err => {
+    processProspectAsync(prospect, fullHistory, meetingLinkSent, disqResult.disqualified ? disqResult.reason : undefined, urlMatch?.[0], meetingProposed, true /* isInbound */).catch(err => {
       console.error('[steve-wa-chat] processProspectAsync error:', err);
     });
 
@@ -1114,6 +1174,7 @@ async function processProspectAsync(
   disqualifiedReason?: string,
   detectedUrl?: string,
   meetingProposed?: boolean,
+  isInbound: boolean = true, // Fix #47: explicit direction flag — only reset is_rotting for inbound
 ): Promise<void> {
   const supabase = getSupabaseAdmin();
 
@@ -1342,7 +1403,10 @@ async function processProspectAsync(
       last_extracted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       last_activity_at: new Date().toISOString(),
-      is_rotting: isGhosting ? true : false,
+      // Fix #47: only set is_rotting=false when the message is INBOUND from the prospect.
+      // isGhosting=true always sets is_rotting=true. Otherwise, only reset on inbound messages
+      // (processProspectAsync is currently only called from inbound handler).
+      ...(isGhosting ? { is_rotting: true } : (isInbound ? { is_rotting: false } : {})),
       // Fix #9: reset cancelled meeting status after 5 days (prospect may be ready again)
       ...(shouldResetMeeting && { meeting_status: 'none' }),
     };
@@ -1459,11 +1523,13 @@ async function processProspectAsync(
       const proposesAlternativeTime = /mejor (el|la|los|las)|prefiero|¿qué tal|qué tal|en vez|en lugar|podría ser|sería mejor|(lunes|martes|miércoles|jueves|viernes|sábado|domingo)|(\d{1,2})(am|pm|:00)/i.test(lastUserMsg);
       const hasRejection = /no (puedo|quiero|tengo tiempo)|no me viene|no me sale|no es buen|cancelar|no va a ser posible/i.test(lastUserMsg);
 
+      // Fix #34: if prospect proposes an alternative time, skip detectMeetingConfirmation entirely
+      // to prevent the alternative from being treated as a confirmation
       if (proposesAlternativeTime && !hasRejection) {
-        console.log(`[meeting] Prospect propone alternativa de horario para ${prospect.phone} — manteniendo en 'proposed'`);
+        console.log(`[meeting] Prospect propone alternativa de horario para ${prospect.phone} — manteniendo en 'proposed', skipping confirmation detection`);
         // NO transicionar a 'deferred' — mantener 'proposed' para que Steve coordine
-        // (skip the meetingResult.rejected branch by not calling detectMeetingConfirmation with rejection)
-      }
+        // Early return from this meeting detection block — do NOT call detectMeetingConfirmation
+      } else {
 
       const meetingResult = await detectMeetingConfirmation(lastUserMsg, history);
       // Fix R6-#20: loguear resultado de detectMeetingConfirmation para debugging
@@ -1560,6 +1626,7 @@ async function processProspectAsync(
         }
       }
       // If proposedTime but not confirmed → prospect suggested alternative, Steve handles in next reply
+      } // Fix #34: close the else block for non-alternative-time path
     }
   } catch (err) {
     console.error('[steve-wa-chat] processProspectAsync error:', err);
@@ -1682,6 +1749,8 @@ async function auditProspectUrl(url: string, prospectId: string): Promise<void> 
     const parsed = JSON.parse(jsonStr);
 
     // Save audit data
+    // Fix #33: do NOT update updated_at here — this is background enrichment,
+    // and updating updated_at breaks the optimistic lock in processProspectAsync
     await supabase
       .from('wa_prospects')
       .update({
@@ -1692,7 +1761,6 @@ async function auditProspectUrl(url: string, prospectId: string): Promise<void> 
           findings: parsed.findings || [],
           audited_at: new Date().toISOString(),
         },
-        updated_at: new Date().toISOString(),
       })
       .eq('id', prospectId);
 

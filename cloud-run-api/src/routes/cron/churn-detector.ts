@@ -78,8 +78,10 @@ export async function churnDetector(c: Context) {
 
         // Only send WA for medium/high if risk just escalated
         const previousRisk = client.churn_risk || 'none';
-        const riskOrder = { none: 0, low: 1, medium: 2, high: 3 };
-        const justEscalated = riskOrder[newRisk] > riskOrder[previousRisk as keyof typeof riskOrder];
+        const riskOrder: Record<string, number> = { none: 0, low: 1, medium: 2, high: 3 };
+        // Bug #59 fix: default to 0 if previousRisk has an unexpected value
+        const previousRiskLevel = riskOrder[previousRisk] ?? 0;
+        const justEscalated = riskOrder[newRisk] > previousRiskLevel;
 
         if (!justEscalated) continue;
 

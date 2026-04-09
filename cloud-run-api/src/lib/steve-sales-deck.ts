@@ -163,17 +163,29 @@ Style: Professional SaaS pitch deck. Each slide tile should have a subtle icon o
 Typography: Clean sans-serif, high contrast. The text must be READABLE.
 This should look like a screenshot of a real pitch deck overview.`;
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: imagePrompt }] }],
-          generationConfig: { responseModalities: ['IMAGE'] },
-        }),
-      },
-    );
+    // Bug #58 fix: Use x-goog-api-key header instead of URL query param to prevent key leakage in logs
+    let geminiRes: Response;
+    try {
+      geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': GEMINI_API_KEY,
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: imagePrompt }] }],
+            generationConfig: { responseModalities: ['IMAGE'] },
+          }),
+        },
+      );
+    } catch (fetchErr: any) {
+      // Sanitize any potential key leakage in error messages
+      const safeMsg = (fetchErr.message || '').replace(GEMINI_API_KEY, '[REDACTED]');
+      console.error('[steve-sales-deck] Gemini fetch error:', safeMsg);
+      return await sendTextDeck(phone, slides, companyName, industry, profileName);
+    }
 
     if (!geminiRes.ok) {
       console.error('[steve-sales-deck] Gemini error:', geminiRes.status);

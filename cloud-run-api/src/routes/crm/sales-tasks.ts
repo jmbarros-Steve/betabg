@@ -177,9 +177,11 @@ export async function salesTasksAutoGenerate(c: Context) {
         .limit(50);
 
       // Non-admin: only auto-generate for their own prospects
+      // Bug #38 fix: .in() excludes NULL converted_client_id (active pipeline prospects)
       if (!isSuperAdmin) {
         if (clientIds.length === 0) return c.json({ created: 0, prospects_evaluated: 0 });
-        query = query.in('converted_client_id', clientIds);
+        const clientList = clientIds.map((id: string) => `converted_client_id.eq.${id}`).join(',');
+        query = query.or(`${clientList},converted_client_id.is.null`);
       }
 
       const data = await safeQueryOrDefault<any>(query, [], 'salesTasks.getActiveProspects');

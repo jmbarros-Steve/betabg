@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { logProspectEvent } from '../../lib/prospect-event-logger.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { getUserClientIds } from '../../lib/user-scoping.js';
 
 /**
  * Web Forms CRUD — authenticated (admin dashboard)
@@ -19,11 +20,20 @@ export async function webFormsCrud(c: Context) {
       if (!user?.id) return c.json({ error: 'Unauthorized' }, 401);
     }
 
+    // Fix Bug#7: multi-tenant scoping — non-admins only see their own forms
+    const { isSuperAdmin } = await getUserClientIds(supabase, user?.id);
+
     if (action === 'list') {
-      const { data, error } = await supabase
+      let query = supabase
         .from('web_forms')
         .select('*, web_form_submissions(count)')
         .order('created_at', { ascending: false });
+
+      if (!isSuperAdmin) {
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) return c.json({ error: error.message }, 500);
       return c.json({ forms: data || [] });
@@ -52,8 +62,11 @@ export async function webFormsCrud(c: Context) {
       const { form_id } = body;
       if (!form_id) return c.json({ error: 'form_id required' }, 400);
 
+      let formQuery = supabase.from('web_forms').select('*').eq('id', form_id);
+      if (!isSuperAdmin) formQuery = formQuery.eq('user_id', user.id);
+
       const [formRes, subsRes] = await Promise.all([
-        supabase.from('web_forms').select('*').eq('id', form_id).single(),
+        formQuery.single(),
         supabase.from('web_form_submissions').select('*').eq('form_id', form_id).order('created_at', { ascending: false }).limit(50),
       ]);
 
@@ -73,7 +86,9 @@ export async function webFormsCrud(c: Context) {
       if (updates.auto_create_prospect !== undefined) allowed.auto_create_prospect = updates.auto_create_prospect;
       if (updates.is_active !== undefined) allowed.is_active = updates.is_active;
 
-      const { error } = await supabase.from('web_forms').update(allowed).eq('id', form_id);
+      let updateQuery = supabase.from('web_forms').update(allowed).eq('id', form_id);
+      if (!isSuperAdmin) updateQuery = updateQuery.eq('user_id', user.id);
+      const { error } = await updateQuery;
       if (error) return c.json({ error: error.message }, 500);
       return c.json({ success: true });
     }
@@ -81,7 +96,9 @@ export async function webFormsCrud(c: Context) {
     if (action === 'delete') {
       const { form_id } = body;
       if (!form_id) return c.json({ error: 'form_id required' }, 400);
-      const { error } = await supabase.from('web_forms').delete().eq('id', form_id);
+      let deleteQuery = supabase.from('web_forms').delete().eq('id', form_id);
+      if (!isSuperAdmin) deleteQuery = deleteQuery.eq('user_id', user.id);
+      const { error } = await deleteQuery;
       if (error) return c.json({ error: error.message }, 500);
       return c.json({ success: true });
     }
@@ -92,12 +109,43 @@ export async function webFormsCrud(c: Context) {
   }
 }
 
+// Fix Bug#5: simple in-memory rate limiter for public form submit
+const formSubmitRateLimit = new Map<string, number[]>();
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+const RATE_LIMIT_MAX = 5; // max 5 submissions per IP per minute
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const timestamps = formSubmitRateLimit.get(ip) || [];
+  const recent = timestamps.filter(t => now - t < RATE_LIMIT_WINDOW_MS);
+  if (recent.length >= RATE_LIMIT_MAX) return true;
+  recent.push(now);
+  formSubmitRateLimit.set(ip, recent);
+  return false;
+}
+
+// Cleanup stale entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, timestamps] of formSubmitRateLimit) {
+    const recent = timestamps.filter(t => now - t < RATE_LIMIT_WINDOW_MS);
+    if (recent.length === 0) formSubmitRateLimit.delete(ip);
+    else formSubmitRateLimit.set(ip, recent);
+  }
+}, 300_000);
+
 /**
  * Web Form Submit — PUBLIC (no auth)
  * Receives form submission, creates prospect, optionally notifies via WA
  */
 export async function webFormSubmit(c: Context) {
   try {
+    // Fix Bug#5: rate limit by IP
+    const clientIp = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('x-real-ip') || 'unknown';
+    if (isRateLimited(clientIp)) {
+      return c.json({ error: 'Too many submissions. Please wait a moment.' }, 429);
+    }
+
     const body = await c.req.json();
     const { form_id, data } = body;
     if (!form_id || !data) return c.json({ error: 'form_id and data required' }, 400);

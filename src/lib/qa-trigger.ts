@@ -3,7 +3,7 @@ import { exec } from 'child_process';
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const STEVE_API_URL = process.env.STEVE_API_URL || 'https://steve-api-850416724643.us-central1.run.app';
+const STEVE_API_URL = process.env.STEVE_API_URL || '';
 const CRON_SECRET = process.env.CRON_SECRET!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);

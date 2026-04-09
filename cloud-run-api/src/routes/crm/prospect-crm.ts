@@ -22,8 +22,9 @@ export async function prospectUpdateDeal(c: Context) {
     const update: Record<string, any> = { updated_at: new Date().toISOString(), last_activity_at: new Date().toISOString() };
     if (deal_value != null) update.deal_value = Number(deal_value) || 0;
     if (win_probability != null) {
+      // Bug #54 fix: Number("alta") = NaN passes < 0 and > 100 checks (both false)
       const wp = Number(win_probability);
-      if (wp < 0 || wp > 100) return c.json({ error: 'win_probability must be 0-100' }, 400);
+      if (isNaN(wp) || wp < 0 || wp > 100) return c.json({ error: 'win_probability must be a number 0-100' }, 400);
       update.win_probability = wp;
     }
     if (expected_close_date !== undefined) update.expected_close_date = expected_close_date || null;
@@ -72,12 +73,14 @@ export async function prospectDetail(c: Context) {
       return c.json({ error: 'Prospect not found' }, 404);
     }
 
-    // Fetch messages using the prospect's phone
+    // Bug #52 fix: scope messages to prospect channel to prevent cross-merchant leak
     const messages = await safeQueryOrDefault<any>(
       supabase
         .from('wa_messages')
         .select('id, direction, body, created_at, contact_name, metadata')
         .eq('contact_phone', prospectRes.data.phone)
+        .eq('channel', 'prospect')
+        .is('client_id', null)
         .order('created_at', { ascending: false })
         .limit(50),
       [],
@@ -238,11 +241,14 @@ export async function prospectsKanban(c: Context) {
       .order('updated_at', { ascending: false });
 
     if (!isSuperAdmin) {
-      // Non-admin users only see prospects linked to their clients
+      // Non-admin users see prospects linked to their clients OR unassigned (active pipeline)
       if (clientIds.length === 0) {
         return c.json({ kanban: {}, total: 0, stageTotals: {}, pipelineTotal: 0, pipelineWeighted: 0 });
       }
-      query = query.in('converted_client_id', clientIds);
+      // Fix Bug#4: converted_client_id is NULL for active pipeline prospects
+      // Use OR to include both converted prospects AND unassigned active ones
+      const clientList = clientIds.map((id: string) => `converted_client_id.eq.${id}`).join(',');
+      query = query.or(`${clientList},converted_client_id.is.null`);
     }
 
     const { data, error } = await query;
@@ -268,9 +274,10 @@ export async function prospectsKanban(c: Context) {
       stageTotals[s] = { total, weighted, count: stageProspects.length };
     }
 
-    // Pipeline-wide totals
-    const pipelineTotal = Object.values(stageTotals).reduce((s, v) => s + v.total, 0);
-    const pipelineWeighted = Object.values(stageTotals).reduce((s, v) => s + v.weighted, 0);
+    // Bug #53 fix: Pipeline totals should exclude converted and lost stages
+    const activePipelineStages = ['new', 'discovery', 'qualifying', 'pitching', 'closing'];
+    const pipelineTotal = activePipelineStages.reduce((s, stage) => s + (stageTotals[stage]?.total || 0), 0);
+    const pipelineWeighted = activePipelineStages.reduce((s, stage) => s + (stageTotals[stage]?.weighted || 0), 0);
 
     return c.json({ kanban, total: (data || []).length, stageTotals, pipelineTotal, pipelineWeighted });
   } catch (error: any) {

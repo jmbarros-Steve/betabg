@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface Campaign {
@@ -82,18 +83,25 @@ export function WACampaigns({ clientId }: Props) {
       return;
     }
 
+    if (templateBody.length > 1024) {
+      toast.error('El mensaje no puede superar los 1024 caracteres');
+      return;
+    }
+
     setCreating(true);
     try {
-      const { error } = await supabase.from('wa_campaigns' as any).insert({
-        client_id: clientId,
-        name,
-        template_name: name.toLowerCase().replace(/\s+/g, '_'),
-        template_body: templateBody,
-        segment_query: { segment },
-        status: 'draft',
+      const { error } = await callApi('whatsapp/campaigns', {
+        body: {
+          action: 'create',
+          client_id: clientId,
+          name,
+          template_name: name.toLowerCase().replace(/\s+/g, '_'),
+          template_body: templateBody,
+          segment_query: { segment },
+        },
       });
 
-      if (error) throw error;
+      if (error) throw new Error(error);
 
       toast.success('Campana creada como borrador');
       setShowCreate(false);
@@ -101,8 +109,8 @@ export function WACampaigns({ clientId }: Props) {
       setSegment('all');
       setTemplateBody('');
       fetchCampaigns();
-    } catch (err) {
-      toast.error('Error al crear campana');
+    } catch (err: any) {
+      toast.error(err.message || 'Error al crear campana');
     } finally {
       setCreating(false);
     }
@@ -112,27 +120,16 @@ export function WACampaigns({ clientId }: Props) {
     if (campaign.status !== 'draft') return;
 
     try {
-      const session = await supabase.auth.getSession();
-      const token = session.data.session?.access_token || '';
+      const { error } = await callApi('whatsapp/send-campaign', {
+        body: { campaign_id: campaign.id, client_id: clientId },
+      });
 
-      const response = await fetch(
-        `${import.meta.env.VITE_CLOUD_RUN_URL || 'https://steve-api-850416724643.us-central1.run.app'}/api/whatsapp/send-campaign`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ campaign_id: campaign.id, client_id: clientId }),
-        }
-      );
-
-      if (!response.ok) throw new Error('Error al enviar');
+      if (error) throw new Error(error);
 
       toast.success('Campana en envio');
       fetchCampaigns();
-    } catch {
-      toast.error('Error al enviar campana');
+    } catch (err: any) {
+      toast.error(err.message || 'Error al enviar campana');
     }
   }
 

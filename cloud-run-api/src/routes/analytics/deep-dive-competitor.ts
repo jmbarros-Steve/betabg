@@ -268,16 +268,94 @@ function extractPageMeta(html: string, markdown: string): DeepDiveResult['page_m
   return { title, description, og_image: ogImage, language };
 }
 
+/**
+ * Sanitize fetched web content before injecting into AI prompts.
+ * Strips common prompt-injection patterns and limits length.
+ */
+function sanitizeWebContentForPrompt(text: string, maxLength = 3000): string {
+  if (!text) return '';
+  return text
+    .replace(/\b(ignore|forget|disregard)\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?)/gi, '[filtered]')
+    .replace(/\b(you are now|act as|pretend to be|new instructions?:|system prompt:?)/gi, '[filtered]')
+    .replace(/```[\s\S]*?```/g, '[code-block-removed]')
+    .replace(/<script[\s\S]*?<\/script>/gi, '[script-removed]')
+    .replace(/<style[\s\S]*?<\/style>/gi, '[style-removed]')
+    .substring(0, maxLength);
+}
+
 const USER_AGENTS = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
 ];
 
+// Maximum response size: 5 MB
+const MAX_RESPONSE_SIZE = 5 * 1024 * 1024;
+
+/**
+ * SSRF protection: validate that a URL is safe to fetch.
+ * Rejects private/internal IPs, non-HTTP(S) protocols, and known metadata endpoints.
+ */
+function validateUrlForSSRF(urlString: string): { safe: boolean; reason?: string } {
+  let parsed: URL;
+  try {
+    parsed = new URL(urlString);
+  } catch {
+    return { safe: false, reason: 'Invalid URL' };
+  }
+
+  // Only allow HTTP and HTTPS
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { safe: false, reason: `Protocol not allowed: ${parsed.protocol}` };
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  // Block cloud metadata endpoints
+  if (hostname === '169.254.169.254' || hostname === 'metadata.google.internal') {
+    return { safe: false, reason: 'Cloud metadata endpoint blocked' };
+  }
+
+  // Block localhost variants
+  if (hostname === 'localhost' || hostname === '0.0.0.0' || hostname === '[::1]') {
+    return { safe: false, reason: 'Localhost not allowed' };
+  }
+
+  // Check if hostname is an IP address and block private/internal ranges
+  // IPv4 pattern
+  const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4Match) {
+    const octets = [parseInt(ipv4Match[1]), parseInt(ipv4Match[2]), parseInt(ipv4Match[3]), parseInt(ipv4Match[4])];
+    const [a, b] = octets;
+
+    // 127.0.0.0/8 — loopback
+    if (a === 127) return { safe: false, reason: 'Loopback address blocked' };
+    // 10.0.0.0/8 — private
+    if (a === 10) return { safe: false, reason: 'Private IP (10.x) blocked' };
+    // 172.16.0.0/12 — private
+    if (a === 172 && b >= 16 && b <= 31) return { safe: false, reason: 'Private IP (172.16-31.x) blocked' };
+    // 192.168.0.0/16 — private
+    if (a === 192 && b === 168) return { safe: false, reason: 'Private IP (192.168.x) blocked' };
+    // 169.254.0.0/16 — link-local
+    if (a === 169 && b === 254) return { safe: false, reason: 'Link-local address blocked' };
+    // 0.0.0.0/8
+    if (a === 0) return { safe: false, reason: 'Zero network blocked' };
+  }
+
+  return { safe: true };
+}
+
 async function fetchDirectHtml(url: string): Promise<string> {
+  // SSRF protection: validate URL before fetching
+  const validation = validateUrlForSSRF(url);
+  if (!validation.safe) {
+    console.warn(`[deep-dive] SSRF blocked: ${validation.reason} for URL: ${url}`);
+    return '';
+  }
+
   for (let attempt = 0; attempt < 2; attempt++) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeout = setTimeout(() => controller.abort(), 10000);
 
     try {
       const resp = await fetch(url, {
@@ -305,7 +383,38 @@ async function fetchDirectHtml(url: string): Promise<string> {
         return '';
       }
 
-      const text = await resp.text();
+      // Check Content-Length header before reading body
+      const contentLength = resp.headers.get('content-length');
+      if (contentLength && parseInt(contentLength, 10) > MAX_RESPONSE_SIZE) {
+        console.warn(`[deep-dive] Response too large (${contentLength} bytes), skipping`);
+        clearTimeout(timeout);
+        return '';
+      }
+
+      // Read body with size limit
+      const reader = resp.body?.getReader();
+      if (!reader) {
+        clearTimeout(timeout);
+        return '';
+      }
+
+      const chunks: Uint8Array[] = [];
+      let totalSize = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        totalSize += value.byteLength;
+        if (totalSize > MAX_RESPONSE_SIZE) {
+          console.warn(`[deep-dive] Response exceeded ${MAX_RESPONSE_SIZE} bytes, truncating`);
+          reader.cancel();
+          break;
+        }
+        chunks.push(value);
+      }
+
+      const decoder = new TextDecoder();
+      const text = chunks.map(chunk => decoder.decode(chunk, { stream: true })).join('') + decoder.decode();
       return text;
     } catch (err: any) {
       console.log(`[deep-dive] Direct fetch attempt ${attempt + 1} error: ${err.message}`);
@@ -339,14 +448,14 @@ Plataforma: ${result.tech_stack.platform || 'No detectada'} (${result.tech_stack
 Tracking Scripts: Meta Pixel=${result.tracking_scripts.meta_pixel}, GTM=${result.tracking_scripts.google_tag_manager}, GA=${result.tracking_scripts.google_analytics}, TikTok=${result.tracking_scripts.tiktok_pixel}, Klaviyo=${result.tracking_scripts.klaviyo}, Hotjar=${result.tracking_scripts.hotjar}
 Otros scripts: ${result.tracking_scripts.other.join(', ') || 'Ninguno'}
 Nivel marketing: ${result.tracking_scripts.marketing_sophistication}
-Título: ${result.page_meta.title || 'No detectado'}
-Descripción: ${result.page_meta.description || 'No detectada'}
-H1: ${result.irresistible_offer.h1 || 'No detectado'}
-Descuento: ${result.irresistible_offer.discount_messaging || 'No detectado'}
+Título: ${sanitizeWebContentForPrompt(result.page_meta.title || 'No detectado', 200)}
+Descripción: ${sanitizeWebContentForPrompt(result.page_meta.description || 'No detectada', 500)}
+H1: ${sanitizeWebContentForPrompt(result.irresistible_offer.h1 || 'No detectado', 200)}
+Descuento: ${sanitizeWebContentForPrompt(result.irresistible_offer.discount_messaging || 'No detectado', 200)}
 Productos: ${result.irresistible_offer.featured_products.length}
 
 Contenido de la página (primeros 3000 chars):
-${markdown.slice(0, 3000)}
+${sanitizeWebContentForPrompt(markdown, 3000)}
 `.trim();
 
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -444,6 +553,12 @@ export async function deepDiveCompetitor(c: Context) {
     let url = store_url.trim();
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = `https://${url}`;
+    }
+
+    // SSRF protection: validate URL before any fetching
+    const urlValidation = validateUrlForSSRF(url);
+    if (!urlValidation.safe) {
+      return c.json({ error: `Invalid URL: ${urlValidation.reason}` }, 400);
     }
 
     console.log(`[deep-dive] Starting analysis for: ${url}`);

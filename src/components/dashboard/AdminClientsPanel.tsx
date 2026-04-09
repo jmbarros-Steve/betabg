@@ -264,7 +264,8 @@ function ClientDetail({ client, onClose, onRefresh, onDelete }: {
       domain = domain.replace(/\.myshopify\.com$/, '') + '.myshopify.com';
       setEditForm(f => ({ ...f, shopDomain: domain }));
     }
-    const installUrl = `https://steve-api-850416724643.us-central1.run.app/api/shopify-install?shop=${encodeURIComponent(domain)}`;
+    const apiBase = ((import.meta.env.VITE_API_URL as string) || '').trim();
+    const installUrl = `${apiBase}/api/shopify-install?shop=${encodeURIComponent(domain)}`;
     await navigator.clipboard.writeText(installUrl);
     setLinkCopied(true);
     toast.success('Link copiado al clipboard');

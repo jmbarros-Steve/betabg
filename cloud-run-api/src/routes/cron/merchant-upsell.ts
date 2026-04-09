@@ -58,7 +58,7 @@ export async function merchantUpsell(c: Context) {
         const connections = await safeQuery<{ id?: string; platform: string; is_active: boolean }>(
           supabase
             .from('platform_connections')
-            .select('platform, is_active')
+            .select('id, platform, is_active')
             .eq('client_id', client.id),
           'merchantUpsell.fetchConnections',
         );

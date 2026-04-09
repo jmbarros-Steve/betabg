@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Loader2, Calendar, Clock, CheckCircle, XCircle, Video, Globe, DollarSign } from 'lucide-react';
 import logo from '@/assets/logo.jpg';
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'https://steve-api-850416724643.us-central1.run.app').trim();
+const API_BASE = ((import.meta.env.VITE_API_URL as string) || '').trim();
 
 interface Slot {
   start: string;

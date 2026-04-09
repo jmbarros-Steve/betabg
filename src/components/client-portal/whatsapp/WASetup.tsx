@@ -34,7 +34,7 @@ export function WASetup({ clientId, onSetupComplete }: Props) {
       const token = session.data.session?.access_token || '';
 
       const response = await fetch(
-        `${import.meta.env.VITE_CLOUD_RUN_URL || 'https://steve-api-850416724643.us-central1.run.app'}/api/whatsapp/setup-merchant`,
+        `${((import.meta.env.VITE_API_URL as string) || '').trim()}/api/whatsapp/setup-merchant`,
         {
           method: 'POST',
           headers: {

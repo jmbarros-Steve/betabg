@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { getTwilioSubClient } from '../../lib/twilio-client.js';
 import { decryptToken } from './setup-merchant.js';
+import { getUserClientIds } from '../../lib/user-scoping.js';
 
 /**
  * POST /api/whatsapp/send-message
@@ -21,6 +22,15 @@ export async function waSendMessage(c: Context) {
     }
 
     const supabase = getSupabaseAdmin();
+
+    // Fix Bug#3: verify authenticated user owns client_id (IDOR prevention)
+    const user = c.get('user');
+    if (user?.id) {
+      const { isSuperAdmin, clientIds } = await getUserClientIds(supabase, user.id);
+      if (!isSuperAdmin && !clientIds.includes(client_id)) {
+        return c.json({ error: 'Forbidden: you do not own this client' }, 403);
+      }
+    }
 
     // Get merchant's Twilio sub-account
     const waAccount = await safeQuerySingleOrDefault<any>(

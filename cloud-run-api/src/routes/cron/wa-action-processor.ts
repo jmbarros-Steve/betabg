@@ -29,13 +29,30 @@ export async function waActionProcessor(c: Context) {
 
   const supabase = getSupabaseAdmin();
   const now = new Date().toISOString();
+  // Bug #39 fix: generate a unique batch ID so this instance only processes its own claims
+  const batchId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  // Pick up to 10 pending actions whose scheduled_at has passed
+  // Bug #39 fix: UPDATE first with WHERE status='pending' to atomically claim actions,
+  // preventing two cron instances from picking the same pending actions.
+  const { error: claimError } = await supabase
+    .from('wa_pending_actions')
+    .update({ status: 'processing', started_at: now, error_message: `batch:${batchId}` })
+    .eq('status', 'pending')
+    .lte('scheduled_at', now)
+    .order('scheduled_at', { ascending: true })
+    .limit(10);
+
+  if (claimError) {
+    console.error('[wa-action-processor] Claim error:', claimError.message);
+    return c.json({ error: claimError.message }, 500);
+  }
+
+  // Now SELECT only the actions claimed by this batch
   const { data: actions, error } = await supabase
     .from('wa_pending_actions')
     .select('*')
-    .eq('status', 'pending')
-    .lte('scheduled_at', now)
+    .eq('status', 'processing')
+    .eq('error_message', `batch:${batchId}`)
     .order('scheduled_at', { ascending: true })
     .limit(10);
 
@@ -52,11 +69,19 @@ export async function waActionProcessor(c: Context) {
   let failed = 0;
 
   for (const action of actions) {
-    // Mark as processing
-    await supabase
+    // Bug #55 fix: update attempts counter and clear the batch marker.
+    // The action is already in 'processing' status from the claim step above.
+    const { count: updatedRows } = await supabase
       .from('wa_pending_actions')
-      .update({ status: 'processing', started_at: now, attempts: action.attempts + 1 })
-      .eq('id', action.id);
+      .update({ attempts: action.attempts + 1, error_message: null })
+      .eq('id', action.id)
+      .eq('status', 'processing');
+
+    // Bug #55 fix: if no rows were updated, another instance already handled it — skip
+    if (updatedRows === 0) {
+      console.warn(`[wa-action-processor] Action ${action.id} already claimed by another instance, skipping`);
+      continue;
+    }
 
     try {
       await executeAction(action, supabase);
@@ -206,7 +231,10 @@ async function handleGenerateCopy(phone: string, payload: any, supabase: any): P
 
 async function handleSendCaseStudy(phone: string, payload: any, supabase: any): Promise<void> {
   const caseStudy = await loadIndustryCaseStudy(payload.whatTheySell);
-  if (!caseStudy) return;
+  // Bug #56 fix: throw error instead of silently returning so action gets marked as 'failed'
+  if (!caseStudy) {
+    throw new Error(`No case study found for industry: ${payload.whatTheySell || 'unknown'}`);
+  }
 
   const msg = `${caseStudy.title}\n\n${caseStudy.summary}`;
   if (caseStudy.mediaUrl) {

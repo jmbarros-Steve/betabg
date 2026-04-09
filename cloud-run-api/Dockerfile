@@ -34,6 +34,13 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY package*.json ./
 
+# Remove source maps from production image
+RUN find dist -name '*.map' -delete
+
+# Run as non-root user
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nodeuser
+USER nodeuser
+
 ENV PORT=8080
 EXPOSE 8080
 

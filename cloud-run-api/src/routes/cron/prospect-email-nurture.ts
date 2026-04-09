@@ -116,7 +116,8 @@ export async function prospectEmailNurture(c: Context) {
         .not('email', 'is', null)
         .gte('lead_score', 30)
         .not('stage', 'in', '("lost","converted")')
-        .lt('email_sequence_step', 3)
+        // Bug #41 fix: .lt() excludes NULLs (NULL < 3 = NULL in PostgreSQL)
+        .or('email_sequence_step.lt.3,email_sequence_step.is.null')
         .order('email_sequence_step', { ascending: true })
         .limit(30),
       'prospectEmailNurture.fetchEligibleProspects',

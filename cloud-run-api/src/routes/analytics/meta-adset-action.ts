@@ -63,11 +63,13 @@ export async function metaAdsetAction(c: Context) {
     if (action === 'pause') {
       // Pause the ad set
       const url = new URL(`https://graph.facebook.com/v21.0/${adset_id}`);
-      
 
       const res = await fetch(url.toString(), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${decryptedToken}`,
+        },
         body: JSON.stringify({ status: 'PAUSED' }),
       });
 
@@ -92,10 +94,11 @@ export async function metaAdsetAction(c: Context) {
 
       // First, fetch current budget
       const getUrl = new URL(`https://graph.facebook.com/v21.0/${adset_id}`);
-      
       getUrl.searchParams.set('fields', 'daily_budget,lifetime_budget,name,status');
 
-      const getRes = await fetch(getUrl.toString());
+      const getRes = await fetch(getUrl.toString(), {
+        headers: { 'Authorization': `Bearer ${decryptedToken}` },
+      });
       if (!getRes.ok) {
         const errorText = await getRes.text();
         console.error('Meta get adset error:', errorText);
@@ -120,11 +123,13 @@ export async function metaAdsetAction(c: Context) {
 
       // Update the budget
       const updateUrl = new URL(`https://graph.facebook.com/v21.0/${adset_id}`);
-      
 
       const updateRes = await fetch(updateUrl.toString(), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${decryptedToken}`,
+        },
         body: JSON.stringify({ [budgetField]: newBudget.toString() }),
       });
 

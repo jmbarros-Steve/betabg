@@ -4,6 +4,19 @@ import { getCreativeContext } from '../../lib/creative-context.js';
 import { checkRateLimit } from '../../lib/rate-limiter.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
+/**
+ * Sanitize user-controlled text before injecting into AI prompts.
+ * Strips common prompt-injection patterns and limits length.
+ */
+function sanitizeForPrompt(text: string, maxLength = 500): string {
+  if (!text) return '';
+  return text
+    .replace(/\b(ignore|forget|disregard)\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?)/gi, '[filtered]')
+    .replace(/\b(you are now|act as|pretend to be|new instructions?:|system prompt:?)/gi, '[filtered]')
+    .replace(/```[\s\S]*?```/g, '[code-block-removed]')
+    .substring(0, maxLength);
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -1052,7 +1065,7 @@ export async function steveChat(c: Context) {
           clicks += Number(m.clicks) || 0;
           conversions += Number(m.conversions) || 0;
           revenue += Number(m.conversion_value) || 0;
-          const name = m.campaign_name || 'Sin nombre';
+          const name = sanitizeForPrompt(m.campaign_name || 'Sin nombre', 200);
           if (!byCampaign[name]) byCampaign[name] = { spend: 0, impressions: 0, clicks: 0, conversions: 0, revenue: 0, status: m.campaign_status || 'UNKNOWN' };
           byCampaign[name].spend += Number(m.spend) || 0;
           byCampaign[name].impressions += Number(m.impressions) || 0;

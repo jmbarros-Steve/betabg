@@ -6,6 +6,39 @@ import { checkRateLimit } from '../../lib/rate-limiter.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
+ * Sanitize user-controlled text before injecting into AI prompts.
+ * Strips common prompt-injection patterns and limits length.
+ */
+function sanitizeForPrompt(text: string, maxLength = 500): string {
+  if (!text) return '';
+  return text
+    .replace(/\b(ignore|forget|disregard)\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?)/gi, '[filtered]')
+    .replace(/\b(you are now|act as|pretend to be|new instructions?:|system prompt:?)/gi, '[filtered]')
+    .replace(/```[\s\S]*?```/g, '[code-block-removed]')
+    .substring(0, maxLength);
+}
+
+/**
+ * Sanitize an object's string values recursively for prompt injection.
+ * Used for brief data and variacion objects.
+ */
+function sanitizeObjectForPrompt(obj: any, maxDepth = 3): any {
+  if (maxDepth <= 0) return '[truncated]';
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === 'string') return sanitizeForPrompt(obj, 1000);
+  if (typeof obj === 'number' || typeof obj === 'boolean') return obj;
+  if (Array.isArray(obj)) return obj.map(item => sanitizeObjectForPrompt(item, maxDepth - 1));
+  if (typeof obj === 'object') {
+    const sanitized: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      sanitized[key] = sanitizeObjectForPrompt(value, maxDepth - 1);
+    }
+    return sanitized;
+  }
+  return obj;
+}
+
+/**
  * Fetches active CRITERIO rules for meta/creative/copy categories
  * and builds an injection block for the system prompt.
  */
@@ -541,7 +574,7 @@ ${funnel.copyRules}
 
 TIPO DE ANUNCIO: ${adType === 'static' ? 'Estático (imagen)' : 'Video'}
 
-${customPrompt ? `INSTRUCCIONES ADICIONALES DEL CLIENTE: ${customPrompt}` : ''}
+${customPrompt ? `INSTRUCCIONES ADICIONALES DEL CLIENTE: ${sanitizeForPrompt(customPrompt, 1000)}` : ''}
 
 ═══════════════════════════════════════════════════════════════════════════════
 FRAMEWORK OBLIGATORIO: HOOK → HISTORIA → OFERTA
@@ -828,7 +861,7 @@ export async function generateMetaCopy(c: Context) {
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
         system: 'Eres un copywriter experto en Meta Ads. REGLA ABSOLUTA: TODO el copy que generes DEBE ser 100% específico para la marca y productos REALES del cliente. NUNCA inventes productos, industrias, o temas que no estén en los datos del cliente. Si no hay suficiente contexto, usa SOLO los datos que sí tienes. VARIEDAD: Usa un ángulo creativo DIFERENTE para cada headline (urgencia, social proof, transformación, curiosidad, oferta, behind-the-scenes, problema-solución, aspiracional, datos, storytelling, controversia, comparación).' + criterioBlock,
-        messages: [{ role: 'user', content: `${clientSection}${brandSection}${briefSection}${shopifySection}${bugSection}${knowledgeSection}${antiRepetition}${creativeCtx}\nREGLA ANTI-ALUCINACIÓN: SOLO escribe sobre los productos y marca listados arriba. NO inventes productos ni temas que no aparezcan en los datos del cliente.\n\n${body.instruction}` }],
+        messages: [{ role: 'user', content: `${clientSection}${brandSection}${briefSection}${shopifySection}${bugSection}${knowledgeSection}${antiRepetition}${creativeCtx}\nREGLA ANTI-ALUCINACIÓN: SOLO escribe sobre los productos y marca listados arriba. NO inventes productos ni temas que no aparezcan en los datos del cliente.\n\n${sanitizeForPrompt(body.instruction, 2000)}` }],
       }),
     });
     const aiData: any = await resp.json();
@@ -925,8 +958,8 @@ DATOS DEL CLIENTE:
 - Brief: ${JSON.stringify(rawData, null, 2)}
 - Fotos del producto disponibles: ${(assetUrls || []).join(', ')}
 
-Genera exactamente 3 variaciones usando el ángulo "${angulo}" para un anuncio ${funnelStage?.toUpperCase()} ${adType === 'video' ? 'video' : 'imagen'}.
-${customPrompt ? `Instrucciones adicionales: ${customPrompt}` : ''}
+Genera exactamente 3 variaciones usando el ángulo "${sanitizeForPrompt(angulo || '', 200)}" para un anuncio ${funnelStage?.toUpperCase()} ${adType === 'video' ? 'video' : 'imagen'}.
+${customPrompt ? `Instrucciones adicionales: ${sanitizeForPrompt(customPrompt, 1000)}` : ''}
 
 Usa las fotos para hacer el copy más específico — menciona colores, diseños o detalles reales que veas.
 
@@ -1030,9 +1063,9 @@ Responde SOLO en JSON válido sin markdown ni backticks:
     const prompt = `${bugSectionBV}${knowledgeSectionBV}${creativeCtxBV}Basándote en el copy aprobado y las fotos reales del producto, genera el brief visual para producción.
 Cliente: ${clientNameBV}
 ${brandContextBV}${shopifyContextBV}
-Copy aprobado: ${JSON.stringify(variacionElegida)}
+Copy aprobado: ${JSON.stringify(sanitizeObjectForPrompt(variacionElegida))}
 Formato: ${adType}
-Ángulo: ${angulo}
+Ángulo: ${sanitizeForPrompt(angulo || '', 200)}
 Brief del cliente: ${JSON.stringify(rawData, null, 2)}
 Fotos disponibles: ${(assetUrls || []).join(', ')}
 

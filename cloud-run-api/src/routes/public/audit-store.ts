@@ -21,6 +21,10 @@ function checkRateLimit(ip: string): boolean {
 export async function auditStore(c: Context) {
   try {
     // Rate limit by IP
+    // WARNING: IP detection via X-Forwarded-For and CF-Connecting-IP headers is spoofable.
+    // An attacker can bypass this rate limit by setting arbitrary X-Forwarded-For values.
+    // For production hardening, rely on the first IP set by a trusted reverse proxy
+    // (e.g., Cloud Run's own X-Forwarded-For entry) or use a WAF/CDN-level rate limiter.
     const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
       || c.req.header('cf-connecting-ip')
       || 'unknown';

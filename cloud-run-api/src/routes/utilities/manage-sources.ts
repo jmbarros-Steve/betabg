@@ -3,6 +3,9 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 export async function manageSources(c: Context) {
+  const user = c.get('user');
+  if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
   const supabase = getSupabaseAdmin();
   const { action, ...data } = await c.req.json();
 

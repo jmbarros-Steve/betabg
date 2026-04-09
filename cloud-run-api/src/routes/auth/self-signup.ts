@@ -7,6 +7,10 @@ import { safeQuerySingleOrDefault, safeMutateSingle } from '../../lib/safe-supab
  * Takes {email, password, action} from body.
  * action === 'confirm' → confirms existing user email
  * Default action → creates new user with admin API, assigns client role, creates client record
+ *
+ * TODO: Add rate limiting to this endpoint. Without it, an attacker can brute-force
+ * user creation or email confirmation. Consider IP-based rate limiting (e.g., 5 req/min)
+ * or email-based rate limiting to prevent abuse.
  */
 export async function selfSignup(c: Context) {
   const { email, password, action } = await c.req.json();

@@ -14,55 +14,37 @@ async function deleteShopData(shopDomain: string): Promise<{ deleted: boolean; d
   const details: string[] = [];
 
   try {
-    // 1. Delete campaign recommendations
-    const { error: recError, count: recCount } = await supabase
-      .from('campaign_recommendations')
-      .delete()
-      .eq('shop_domain', shopDomain);
+    // Helper: execute a delete and fail immediately if there's an error.
+    // This ensures partial deletion never goes unnoticed — the webhook returns 500
+    // and Shopify retries, which is the correct GDPR-compliant behavior.
+    const deleteOrFail = async (table: string, filter: { column: string; value: string }) => {
+      const { error, count } = await supabase
+        .from(table)
+        .delete()
+        .eq(filter.column, filter.value);
 
-    if (recError) {
-      console.error('Error deleting campaign_recommendations:', recError);
-    } else {
-      details.push(`campaign_recommendations: ${recCount ?? 0} deleted`);
-    }
+      if (error) {
+        const msg = `Failed to delete from ${table} where ${filter.column}=${filter.value}: ${error.message} (code: ${error.code})`;
+        console.error(`[GDPR deleteShopData] ${msg}`, { table, filter, error });
+        throw new Error(msg);
+      }
+
+      details.push(`${table}: ${count ?? 0} deleted`);
+    };
+
+    // 1. Delete campaign recommendations
+    await deleteOrFail('campaign_recommendations', { column: 'shop_domain', value: shopDomain });
 
     // 2. Delete campaign metrics
-    const { error: cmError, count: cmCount } = await supabase
-      .from('campaign_metrics')
-      .delete()
-      .eq('shop_domain', shopDomain);
-
-    if (cmError) {
-      console.error('Error deleting campaign_metrics:', cmError);
-    } else {
-      details.push(`campaign_metrics: ${cmCount ?? 0} deleted`);
-    }
+    await deleteOrFail('campaign_metrics', { column: 'shop_domain', value: shopDomain });
 
     // 3. Delete platform metrics
-    const { error: pmError, count: pmCount } = await supabase
-      .from('platform_metrics')
-      .delete()
-      .eq('shop_domain', shopDomain);
-
-    if (pmError) {
-      console.error('Error deleting platform_metrics:', pmError);
-    } else {
-      details.push(`platform_metrics: ${pmCount ?? 0} deleted`);
-    }
+    await deleteOrFail('platform_metrics', { column: 'shop_domain', value: shopDomain });
 
     // 4. Delete platform connections
-    const { error: pcError, count: pcCount } = await supabase
-      .from('platform_connections')
-      .delete()
-      .eq('shop_domain', shopDomain);
+    await deleteOrFail('platform_connections', { column: 'shop_domain', value: shopDomain });
 
-    if (pcError) {
-      console.error('Error deleting platform_connections:', pcError);
-    } else {
-      details.push(`platform_connections: ${pcCount ?? 0} deleted`);
-    }
-
-    // 5. Find and delete client record
+    // 5. Find and delete client records and their dependents
     const clients = await safeQueryOrDefault<{ id: string }>(
       supabase
         .from('clients')
@@ -75,12 +57,12 @@ async function deleteShopData(shopDomain: string): Promise<{ deleted: boolean; d
     if (clients && clients.length > 0) {
       for (const client of clients) {
         // Delete related records first (foreign key constraints)
-        await supabase.from('buyer_personas').delete().eq('client_id', client.id);
-        await supabase.from('client_financial_config').delete().eq('client_id', client.id);
-        await supabase.from('saved_meta_copies').delete().eq('client_id', client.id);
-        await supabase.from('saved_google_copies').delete().eq('client_id', client.id);
-        await supabase.from('klaviyo_email_plans').delete().eq('client_id', client.id);
-        await supabase.from('steve_feedback').delete().eq('client_id', client.id);
+        await deleteOrFail('buyer_personas', { column: 'client_id', value: client.id });
+        await deleteOrFail('client_financial_config', { column: 'client_id', value: client.id });
+        await deleteOrFail('saved_meta_copies', { column: 'client_id', value: client.id });
+        await deleteOrFail('saved_google_copies', { column: 'client_id', value: client.id });
+        await deleteOrFail('klaviyo_email_plans', { column: 'client_id', value: client.id });
+        await deleteOrFail('steve_feedback', { column: 'client_id', value: client.id });
 
         // Delete steve conversations and messages
         const convs = await safeQueryOrDefault<{ id: string }>(
@@ -94,32 +76,27 @@ async function deleteShopData(shopDomain: string): Promise<{ deleted: boolean; d
 
         if (convs) {
           for (const conv of convs) {
-            await supabase.from('steve_messages').delete().eq('conversation_id', conv.id);
+            await deleteOrFail('steve_messages', { column: 'conversation_id', value: conv.id });
           }
-          await supabase.from('steve_conversations').delete().eq('client_id', client.id);
+          await deleteOrFail('steve_conversations', { column: 'client_id', value: client.id });
         }
       }
 
       // Now delete client records
-      const { error: clientError, count: clientCount } = await supabase
-        .from('clients')
-        .delete()
-        .eq('shop_domain', shopDomain);
-
-      if (clientError) {
-        console.error('Error deleting clients:', clientError);
-      } else {
-        details.push(`clients: ${clientCount ?? 0} deleted`);
-      }
+      await deleteOrFail('clients', { column: 'shop_domain', value: shopDomain });
     }
 
-    console.log(`Shop data deletion completed for ${shopDomain}:`, details);
+    console.log(`[GDPR deleteShopData] Shop data deletion completed for ${shopDomain}:`, details);
     return { deleted: true, details };
 
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    console.error('Error in deleteShopData:', err);
-    return { deleted: false, details: [`Error: ${errorMessage}`] };
+    console.error('[GDPR deleteShopData] FAILED — partial deletion may have occurred. Shopify should retry.', {
+      shopDomain,
+      completedSteps: details,
+      error: errorMessage,
+    });
+    return { deleted: false, details: [...details, `FAILED: ${errorMessage}`] };
   }
 }
 
@@ -240,6 +217,20 @@ export async function shopifyGdprWebhooks(c: Context) {
         const deleteResult = await deleteShopData(payloadShopDomain);
 
         console.log(`[GDPR ${webhookId}] Shop data deletion result:`, deleteResult);
+
+        if (!deleteResult.deleted) {
+          // Return 500 so Shopify retries the webhook — partial deletion is not acceptable for GDPR
+          console.error(`[GDPR ${webhookId}] Shop data deletion FAILED for ${payloadShopDomain}. Returning 500 for retry.`);
+          return c.json({
+            success: false,
+            webhook_id: webhookId,
+            topic: 'shop/redact',
+            message: 'Shop redact failed — will be retried by Shopify.',
+            deletion_details: deleteResult.details,
+            deleted: false,
+            processed_at: new Date().toISOString(),
+          }, 500);
+        }
 
         return c.json({
           success: true,

@@ -56,7 +56,7 @@ export async function createClientUser(c: Context) {
   }
 
   // Check if user is super admin
-  const { data: profile } = await supabase.from('profiles').select('is_super_admin').eq('id', adminUser.id).maybeSingle();
+  const { data: profile } = await supabase.from('user_roles').select('is_super_admin').eq('user_id', adminUser.id).maybeSingle();
   if (profile?.is_super_admin) {
     // Super admin can create users for any client
   } else if (client.user_id !== adminUser.id) {

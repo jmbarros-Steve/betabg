@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { getTwilioSubClient } from '../../lib/twilio-client.js';
 import { decryptToken } from './setup-merchant.js';
+import { getUserClientIds } from '../../lib/user-scoping.js';
 
 /**
  * POST /api/whatsapp/send-campaign
@@ -22,6 +23,15 @@ export async function waSendCampaign(c: Context) {
     }
 
     const supabase = getSupabaseAdmin();
+
+    // Fix Bug#3: verify authenticated user owns client_id (IDOR prevention)
+    const user = c.get('user');
+    if (user?.id) {
+      const { isSuperAdmin, clientIds } = await getUserClientIds(supabase, user.id);
+      if (!isSuperAdmin && !clientIds.includes(client_id)) {
+        return c.json({ error: 'Forbidden: you do not own this client' }, 403);
+      }
+    }
 
     // Get campaign
     const { data: campaign, error: campError } = await supabase
@@ -72,10 +82,18 @@ export async function waSendCampaign(c: Context) {
     );
 
     if (contacts.length > 0) {
-      recipients = contacts.map((c: any) => ({
-        phone: c.contact_phone,
-        name: c.contact_name || '',
-      }));
+      // Bug #50 fix: deduplicate recipients by phone number
+      const seen = new Set<string>();
+      recipients = contacts
+        .map((c: any) => ({
+          phone: c.contact_phone,
+          name: c.contact_name || '',
+        }))
+        .filter((r: { phone: string; name: string }) => {
+          if (seen.has(r.phone)) return false;
+          seen.add(r.phone);
+          return true;
+        });
     }
 
     // Filter by segment (basic implementation)
@@ -89,7 +107,8 @@ export async function waSendCampaign(c: Context) {
       return c.json({ error: 'No hay destinatarios para esta campaña' }, 400);
     }
 
-    // Check credits (read-only pre-check)
+    // Bug #35 fix: reserve credits atomically BEFORE sending
+    // Pre-check balance to give a clear error message
     const creditCheck = await safeQuerySingleOrDefault<any>(
       supabase
         .from('wa_credits')
@@ -117,8 +136,29 @@ export async function waSendCampaign(c: Context) {
       })
       .eq('id', campaign_id);
 
+    // Bug #35 fix: deduct credits upfront (atomic RPC) to prevent race conditions
+    const { error: deductError } = await supabase.rpc('deduct_wa_credit', {
+      p_client_id: client_id,
+      p_amount: recipients.length,
+      p_description: `Campaña "${campaign.name}": ${recipients.length} mensajes (reserva)`,
+    });
+
+    if (deductError) {
+      console.error(`[wa-campaign] Credit deduction failed for campaign ${campaign_id}:`, deductError);
+      // Roll back campaign status to draft
+      await supabase.from('wa_campaigns')
+        .update({ status: 'draft', sent_at: null })
+        .eq('id', campaign_id);
+      return c.json({ error: 'Error al reservar créditos', details: deductError.message }, 500);
+    }
+
     // Issue 2: Return HTTP response immediately, process sends in background
+    // Bug #36 fix: use finally block to guarantee status update even on partial failure
     Promise.resolve().then(async () => {
+      let sentCount = 0;
+      let failedCount = 0;
+      let finalStatus: 'sent' | 'failed' = 'sent';
+
       try {
         const subClient = getTwilioSubClient(
           waAccount.twilio_account_sid,
@@ -126,9 +166,6 @@ export async function waSendCampaign(c: Context) {
         );
 
         const fromNorm = `whatsapp:${waAccount.phone_number.startsWith('+') ? waAccount.phone_number : '+' + waAccount.phone_number}`;
-
-        let sentCount = 0;
-        let failedCount = 0;
 
         for (const recipient of recipients) {
           try {
@@ -172,31 +209,38 @@ export async function waSendCampaign(c: Context) {
           }
         }
 
-        // Update campaign final status
-        await supabase.from('wa_campaigns')
-          .update({
-            status: 'sent',
-            sent_count: sentCount,
-            credits_used: sentCount,
-          })
-          .eq('id', campaign_id);
-
-        // Issue 1: Deduct credits atomically in one RPC call
-        if (sentCount > 0) {
-          await supabase.rpc('deduct_wa_credit', {
-            p_client_id: client_id,
-            p_amount: sentCount,
-            p_description: `Campaña "${campaign.name}": ${sentCount} mensajes`,
-          });
-        }
-
         console.log(`[wa-campaign] Campaign ${campaign_id}: ${sentCount} sent, ${failedCount} failed`);
       } catch (bgErr: any) {
         console.error(`[wa-campaign] Background error for campaign ${campaign_id}:`, bgErr);
-        // Mark campaign as failed on unrecoverable error
-        await supabase.from('wa_campaigns')
-          .update({ status: 'failed' })
-          .eq('id', campaign_id);
+        finalStatus = 'failed';
+      } finally {
+        // Bug #36 fix: always update campaign status, even on unrecoverable errors
+        try {
+          await supabase.from('wa_campaigns')
+            .update({
+              status: finalStatus,
+              sent_count: sentCount,
+              credits_used: sentCount,
+            })
+            .eq('id', campaign_id);
+        } catch (statusErr) {
+          console.error(`[wa-campaign] CRITICAL: Failed to update campaign ${campaign_id} status to '${finalStatus}':`, statusErr);
+        }
+
+        // Bug #35 fix: credits were reserved upfront for recipients.length.
+        // Credit back the difference if some messages failed or loop errored out.
+        try {
+          const unusedCredits = recipients.length - sentCount;
+          if (unusedCredits > 0) {
+            await supabase.rpc('deduct_wa_credit', {
+              p_client_id: client_id,
+              p_amount: -unusedCredits,
+              p_description: `Campaña "${campaign.name}": devolución ${unusedCredits} créditos (${failedCount} fallidos)`,
+            });
+          }
+        } catch (creditErr) {
+          console.error(`[wa-campaign] CRITICAL: Failed to credit back unused credits for campaign ${campaign_id}:`, creditErr);
+        }
       }
     });
 

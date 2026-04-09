@@ -185,6 +185,19 @@ async function handleCreate(
     product_set_id,
   } = data;
 
+  // --- Early validations (before any Meta API calls) ---
+
+  // Budget validation: reject negative, zero, or non-numeric values
+  if (daily_budget && (isNaN(Number(daily_budget)) || Number(daily_budget) <= 0)) {
+    return { body: { error: 'Invalid daily_budget: must be a positive number' }, status: 400 };
+  }
+
+  // destination_url is required for non-DPA campaigns (DPA uses product URLs)
+  const isDpa = !!(product_catalog_id && product_set_id);
+  if (!isDpa && !destination_url) {
+    return { body: { error: 'Missing required field: destination_url. A destination URL is required for conversion campaigns.' }, status: 400 };
+  }
+
   // Step 1: Use existing campaign or create new one
   let campaignId = existingCampaignId || null;
 
@@ -225,6 +238,9 @@ async function handleCreate(
 
   const isFlexible = ad_set_format === 'flexible';
   const isCarousel = ad_set_format === 'carousel';
+
+  // Track warnings to include in the response
+  const warnings: string[] = [];
 
   // Check if existing campaign uses CBO (Campaign Budget Optimization)
   let isCboCampaign = false;
@@ -271,7 +287,10 @@ async function handleCreate(
       }
       // With Advantage+ audience, age_max cannot be below 65
       if (targetingObj.targeting_automation?.advantage_audience === 1 && targetingObj.age_max && targetingObj.age_max < 65) {
+        const originalAgeMax = targetingObj.age_max;
         targetingObj.age_max = 65;
+        warnings.push(`Advantage+ audience requires age_max >= 65. Your value (${originalAgeMax}) was adjusted to 65.`);
+        console.log(`[manage-meta-campaign] Advantage+ forced age_max from ${originalAgeMax} to 65`);
       }
       adsetPayload.targeting = JSON.stringify(targetingObj);
     }
@@ -467,14 +486,19 @@ async function handleCreate(
     adId = adResult.data.id;
     console.log(`[manage-meta-campaign] DPA ad created: ${adId}`);
 
+    const dpaResponseBody: Record<string, any> = {
+      success: true,
+      campaign_id: campaignId,
+      adset_id: adSetId,
+      creative_id: creativeId,
+      ad_id: adId,
+    };
+    if (warnings.length > 0) {
+      dpaResponseBody.warnings = warnings;
+    }
+
     return {
-      body: {
-        success: true,
-        campaign_id: campaignId,
-        adset_id: adSetId,
-        creative_id: creativeId,
-        ad_id: adId,
-      },
+      body: dpaResponseBody,
       status: 200,
     };
   }
@@ -484,9 +508,6 @@ async function handleCreate(
   const allTexts: string[] = (texts && texts.length > 0) ? texts : (primary_text ? [primary_text] : []);
   const allHeadlines: string[] = (headlines && headlines.length > 0) ? headlines : (headline ? [headline] : []);
   const allDescriptions: string[] = (descriptions && descriptions.length > 0) ? descriptions : (description ? [description] : []);
-  if (!destination_url) {
-    return { body: { error: 'Missing required field: destination_url. A destination URL is required for conversion campaigns.' }, status: 400 };
-  }
   const destUrl = destination_url;
 
   const hasCreativeData = allImages.length > 0 || allTexts.length > 0;
@@ -786,14 +807,20 @@ async function handleCreate(
     }
   }
 
+  const responseBody: Record<string, any> = {
+    success: true,
+    campaign_id: campaignId,
+    adset_id: adSetId,
+    creative_id: creativeId,
+    ad_id: adId,
+  };
+
+  if (warnings.length > 0) {
+    responseBody.warnings = warnings;
+  }
+
   return {
-    body: {
-      success: true,
-      campaign_id: campaignId,
-      adset_id: adSetId,
-      creative_id: creativeId,
-      ad_id: adId,
-    },
+    body: responseBody,
     status: 200
   };
 }
