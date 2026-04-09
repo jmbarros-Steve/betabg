@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /**
@@ -91,10 +92,14 @@ async function deleteShopData(shopDomain: string): Promise<{ deleted: boolean; d
     }
 
     // 5. Find and delete client record
-    const { data: clients } = await supabase
-      .from('clients')
-      .select('id')
-      .eq('shop_domain', shopDomain);
+    const clients = await safeQueryOrDefault<{ id: string }>(
+      supabase
+        .from('clients')
+        .select('id')
+        .eq('shop_domain', shopDomain),
+      [],
+      'shopifyGdprWebhooks.getClientsByShop',
+    );
 
     if (clients && clients.length > 0) {
       for (const client of clients) {
@@ -107,10 +112,14 @@ async function deleteShopData(shopDomain: string): Promise<{ deleted: boolean; d
         await supabase.from('steve_feedback').delete().eq('client_id', client.id);
 
         // Delete steve conversations and messages
-        const { data: convs } = await supabase
-          .from('steve_conversations')
-          .select('id')
-          .eq('client_id', client.id);
+        const convs = await safeQueryOrDefault<{ id: string }>(
+          supabase
+            .from('steve_conversations')
+            .select('id')
+            .eq('client_id', client.id),
+          [],
+          'shopifyGdprWebhooks.getSteveConversations',
+        );
 
         if (convs) {
           for (const conv of convs) {

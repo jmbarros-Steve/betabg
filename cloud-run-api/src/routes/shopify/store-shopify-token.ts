@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Store a Shopify Admin API Access Token directly (Custom App flow).
@@ -44,19 +45,27 @@ export async function storeShopifyToken(c: Context) {
     // Validate that the authenticated user owns this client or is super admin
     const userId = (c as any).userId;
     if (userId) {
-      const { data: client } = await supabaseAdmin
-        .from('clients')
-        .select('id')
-        .eq('id', clientId)
-        .or(`user_id.eq.${userId},client_user_id.eq.${userId}`)
-        .single();
+      const client = await safeQuerySingleOrDefault<{ id: string }>(
+        supabaseAdmin
+          .from('clients')
+          .select('id')
+          .eq('id', clientId)
+          .or(`user_id.eq.${userId},client_user_id.eq.${userId}`)
+          .single(),
+        null,
+        'storeShopifyToken.getClient',
+      );
 
       if (!client) {
-        const { data: role } = await supabaseAdmin
-          .from('user_roles')
-          .select('role, is_super_admin')
-          .eq('user_id', userId)
-          .single();
+        const role = await safeQuerySingleOrDefault<{ role: string; is_super_admin: boolean }>(
+          supabaseAdmin
+            .from('user_roles')
+            .select('role, is_super_admin')
+            .eq('user_id', userId)
+            .single(),
+          null,
+          'storeShopifyToken.getRole',
+        );
 
         if (!role?.is_super_admin && role?.role !== 'admin') {
           return c.json({ error: 'No autorizado: no eres dueño de este cliente' }, 403);
@@ -109,12 +118,16 @@ export async function storeShopifyToken(c: Context) {
     }
 
     // Upsert platform_connections with is_active=true
-    const { data: existing } = await supabaseAdmin
-      .from('platform_connections')
-      .select('id')
-      .eq('client_id', clientId)
-      .eq('platform', 'shopify')
-      .maybeSingle();
+    const existing = await safeQuerySingleOrDefault<{ id: string }>(
+      supabaseAdmin
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('platform', 'shopify')
+        .maybeSingle(),
+      null,
+      'storeShopifyToken.getExistingConnection',
+    );
 
     const connectionData = {
       access_token_encrypted: encryptedToken,

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const KLAVIYO_REVISION = '2024-10-15';
 const KLAVIYO_BASE = 'https://a.klaviyo.com/api';
@@ -77,11 +78,15 @@ export async function fetchKlaviyoTopProducts(c: Context) {
     const apiKey = await decryptApiKey(serviceSupabase, connectionId, 'klaviyo');
 
     // Get the Klaviyo connection to find client_id for Shopify lookup
-    const { data: klaviyoConn } = await serviceSupabase
-      .from('platform_connections')
-      .select('client_id')
-      .eq('id', connectionId)
-      .single();
+    const klaviyoConn = await safeQuerySingleOrDefault<any>(
+      serviceSupabase
+        .from('platform_connections')
+        .select('client_id')
+        .eq('id', connectionId)
+        .single(),
+      null,
+      'fetchKlaviyoTopProducts.getKlaviyoConn',
+    );
 
     // Calculate date range
     const sinceDate = new Date();
@@ -125,14 +130,18 @@ export async function fetchKlaviyoTopProducts(c: Context) {
     let shopifyDomain: string | null = null;
 
     if (klaviyoConn?.client_id) {
-      const { data: shopifyConn } = await serviceSupabase
-        .from('platform_connections')
-        .select('id, store_url, access_token_encrypted')
-        .eq('client_id', klaviyoConn.client_id)
-        .eq('platform', 'shopify')
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
+      const shopifyConn = await safeQuerySingleOrDefault<any>(
+        serviceSupabase
+          .from('platform_connections')
+          .select('id, store_url, access_token_encrypted')
+          .eq('client_id', klaviyoConn.client_id)
+          .eq('platform', 'shopify')
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle(),
+        null,
+        'fetchKlaviyoTopProducts.getShopifyConn',
+      );
 
       if (shopifyConn?.access_token_encrypted && shopifyConn?.store_url) {
         const { data: decrypted } = await serviceSupabase

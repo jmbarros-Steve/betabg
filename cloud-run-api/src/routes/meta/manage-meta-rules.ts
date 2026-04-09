@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
@@ -256,9 +257,13 @@ export async function manageMetaRules(c: Context) {
     const ownerData = connCheck.clients as unknown as { user_id: string; client_user_id: string | null };
     const isRuleOwner = ownerData.user_id === user.id || ownerData.client_user_id === user.id;
     if (!isRuleOwner) {
-      const { data: adminRole } = await supabase
-        .from('user_roles').select('role').eq('user_id', user.id)
-        .in('role', ['admin', 'super_admin']).limit(1).maybeSingle();
+      const adminRole = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('user_roles').select('role').eq('user_id', user.id)
+          .in('role', ['admin', 'super_admin']).limit(1).maybeSingle(),
+        null,
+        'manageMetaRules.getAdminRole',
+      );
       if (!adminRole) {
         return c.json({ error: 'Unauthorized' }, 403);
       }
@@ -365,12 +370,16 @@ export async function manageMetaRules(c: Context) {
       if (!rule_id) return c.json({ error: 'Missing rule_id' }, 400);
 
       // Fetch current state
-      const { data: currentRule } = await supabase
-        .from('meta_automated_rules')
-        .select('is_active')
-        .eq('id', rule_id)
-        .eq('client_id', client_id)
-        .single();
+      const currentRule = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('meta_automated_rules')
+          .select('is_active')
+          .eq('id', rule_id)
+          .eq('client_id', client_id)
+          .single(),
+        null,
+        'manageMetaRules.getCurrentRule',
+      );
 
       if (!currentRule) return c.json({ error: 'Rule not found' }, 404);
 

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 import { randomUUID } from 'crypto';
 
 const FRONTEND_URL = 'https://betabgnuevosupa-git-main-jmbarros-steves-projects.vercel.app';
@@ -86,11 +87,15 @@ export async function metaDataDeletion(c: Context) {
     // which requires looking up platform_connections
     if (userId !== 'unknown') {
       // Find and mark connections for this Meta user
-      const { data: connections } = await supabase
-        .from('platform_connections')
-        .select('id, client_id')
-        .eq('platform', 'meta')
-        .eq('is_active', true);
+      const connections = await safeQueryOrDefault<any>(
+        supabase
+          .from('platform_connections')
+          .select('id, client_id')
+          .eq('platform', 'meta')
+          .eq('is_active', true),
+        [],
+        'metaDataDeletion.listConnections',
+      );
 
       // We can't directly match by Meta user ID since we store account_id (ad account),
       // not the user's personal Facebook ID. Log for manual processing.

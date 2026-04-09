@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 interface StoreKlaviyoRequest {
   client_id: string;
@@ -56,12 +57,16 @@ export async function storeKlaviyoConnection(c: Context) {
     }
 
     // Check if connection already exists
-    const { data: existingConn } = await supabase
-      .from('platform_connections')
-      .select('id')
-      .eq('client_id', client_id)
-      .eq('platform', 'klaviyo')
-      .single();
+    const existingConn = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', client_id)
+        .eq('platform', 'klaviyo')
+        .single(),
+      null,
+      'storeKlaviyoConnection.getExistingConn',
+    );
 
     let result;
     if (existingConn) {

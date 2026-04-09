@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { criterioEmailEvaluate } from '../ai/criterio-email.js';
 import { detectAngle } from '../../lib/angle-detector.js';
 import { deleteKlaviyoTemplate, sendCampaignJob } from './_helpers.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 export async function uploadKlaviyoDrafts(c: Context) {
   try {
@@ -67,11 +68,15 @@ export async function uploadKlaviyoDrafts(c: Context) {
     if (!apiKey) return c.json({ error: 'No API key found for Klaviyo connection' }, 500);
 
     // CRITERIO pre-flight check
-    const { data: connClient } = await supabase
-      .from('platform_connections')
-      .select('client_id, clients!inner(shop_id)')
-      .eq('id', connectionId)
-      .single();
+    const connClient = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('platform_connections')
+        .select('client_id, clients!inner(shop_id)')
+        .eq('id', connectionId)
+        .single(),
+      null,
+      'uploadKlaviyoDrafts.getConnClient',
+    );
     const shopId = (connClient as any)?.clients?.shop_id;
     const clientId = (connClient as any)?.client_id;
     let _criterioScore: number | null = null;

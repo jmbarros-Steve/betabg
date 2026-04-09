@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { getTwilioSubClient } from '../../lib/twilio-client.js';
 import { decryptToken } from './setup-merchant.js';
 
@@ -55,14 +56,18 @@ export async function abandonedCartWA(c: Context) {
   for (const cart of carts) {
     try {
       // Check if merchant has active abandoned_cart automation
-      const { data: automation } = await supabase
-        .from('wa_automations')
-        .select('template_body')
-        .eq('client_id', cart.client_id)
-        .eq('trigger_type', 'abandoned_cart')
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
+      const automation = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('wa_automations')
+          .select('template_body')
+          .eq('client_id', cart.client_id)
+          .eq('trigger_type', 'abandoned_cart')
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle(),
+        null,
+        'abandonedCartWa.getAutomation',
+      );
 
       if (!automation) {
         skipped++;
@@ -70,11 +75,15 @@ export async function abandonedCartWA(c: Context) {
       }
 
       // Check credits
-      const { data: credits } = await supabase
-        .from('wa_credits')
-        .select('id, balance, total_used')
-        .eq('client_id', cart.client_id)
-        .single();
+      const credits = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('wa_credits')
+          .select('id, balance, total_used')
+          .eq('client_id', cart.client_id)
+          .single(),
+        null,
+        'abandonedCartWa.getCredits',
+      );
 
       if (!credits || credits.balance < 1) {
         skipped++;
@@ -82,13 +91,17 @@ export async function abandonedCartWA(c: Context) {
       }
 
       // Get merchant's Twilio sub-account
-      const { data: waAccount } = await supabase
-        .from('wa_twilio_accounts')
-        .select('twilio_account_sid, twilio_auth_token, phone_number, display_name')
-        .eq('client_id', cart.client_id)
-        .eq('status', 'active')
-        .limit(1)
-        .maybeSingle();
+      const waAccount = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('wa_twilio_accounts')
+          .select('twilio_account_sid, twilio_auth_token, phone_number, display_name')
+          .eq('client_id', cart.client_id)
+          .eq('status', 'active')
+          .limit(1)
+          .maybeSingle(),
+        null,
+        'abandonedCartWa.getWaAccount',
+      );
 
       if (!waAccount) {
         skipped++;

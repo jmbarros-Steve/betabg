@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { deleteKlaviyoTemplate } from './_helpers.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const KLAVIYO_REVISION = '2025-01-15';
 const KLAVIYO_BASE = 'https://a.klaviyo.com/api';
@@ -48,12 +49,16 @@ export async function createKlaviyoCampaign(c: Context) {
     }
 
     // Verify connection + ownership
-    const { data: conn } = await supabase
-      .from('platform_connections')
-      .select('api_key_encrypted, clients!inner(user_id, client_user_id)')
-      .eq('id', connection_id)
-      .eq('platform', 'klaviyo')
-      .single();
+    const conn = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('platform_connections')
+        .select('api_key_encrypted, clients!inner(user_id, client_user_id)')
+        .eq('id', connection_id)
+        .eq('platform', 'klaviyo')
+        .single(),
+      null,
+      'createKlaviyoCampaign.getConnection',
+    );
 
     if (!conn?.api_key_encrypted) {
       return c.json({ error: 'Klaviyo connection not found' }, 404);

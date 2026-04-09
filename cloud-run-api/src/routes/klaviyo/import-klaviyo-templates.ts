@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 export async function importKlaviyoTemplates(c: Context) {
   try {
@@ -25,12 +26,16 @@ export async function importKlaviyoTemplates(c: Context) {
     }
 
     // Verify connection ownership
-    const { data: conn } = await supabase
-      .from('platform_connections')
-      .select('api_key_encrypted, clients!inner(user_id, client_user_id)')
-      .eq('id', connectionId)
-      .eq('platform', 'klaviyo')
-      .single();
+    const conn = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('platform_connections')
+        .select('api_key_encrypted, clients!inner(user_id, client_user_id)')
+        .eq('id', connectionId)
+        .eq('platform', 'klaviyo')
+        .single(),
+      null,
+      'importKlaviyoTemplates.getConnection',
+    );
 
     if (!conn?.api_key_encrypted) {
       return c.json({ error: 'No Klaviyo connection found' }, 404);

@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
@@ -45,9 +46,13 @@ export async function metaCatalogs(c: Context) {
     const isOwner = clientData.user_id === user.id || clientData.client_user_id === user.id;
 
     if (!isOwner) {
-      const { data: adminRole } = await supabase
-        .from('user_roles').select('role').eq('user_id', user.id)
-        .in('role', ['admin', 'super_admin']).limit(1).maybeSingle();
+      const adminRole = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('user_roles').select('role').eq('user_id', user.id)
+          .in('role', ['admin', 'super_admin']).limit(1).maybeSingle(),
+        null,
+        'metaCatalogs.getAdminRole',
+      );
       if (!adminRole) {
         return c.json({ error: 'Unauthorized' }, 403);
       }

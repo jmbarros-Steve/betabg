@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Shopify Checkout Webhook — receives checkouts/create events.
@@ -23,12 +24,16 @@ export async function shopifyCheckoutWebhook(c: Context) {
     const supabase = getSupabaseAdmin();
 
     // Find client by shop_domain
-    const { data: client } = await supabase
-      .from('clients')
-      .select('id')
-      .eq('shop_domain', shopDomain)
-      .limit(1)
-      .maybeSingle();
+    const client = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('clients')
+        .select('id')
+        .eq('shop_domain', shopDomain)
+        .limit(1)
+        .maybeSingle(),
+      null,
+      'shopifyCheckoutWebhook.getClient',
+    );
 
     if (!client) {
       // Not a registered merchant — ignore

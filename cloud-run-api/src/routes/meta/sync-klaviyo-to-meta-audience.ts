@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { createHash } from 'crypto';
 
 const META_API_BASE = 'https://graph.facebook.com/v21.0';
@@ -29,12 +30,16 @@ export async function syncKlaviyoToMetaAudience(c: Context) {
 
   try {
     // 1. Get Klaviyo connection + decrypt key
-    const { data: klaviyoConn } = await supabase
-      .from('platform_connections')
-      .select('id, api_key_encrypted, client_id, clients!inner(user_id, client_user_id)')
-      .eq('id', klaviyo_connection_id)
-      .eq('platform', 'klaviyo')
-      .single();
+    const klaviyoConn = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('platform_connections')
+        .select('id, api_key_encrypted, client_id, clients!inner(user_id, client_user_id)')
+        .eq('id', klaviyo_connection_id)
+        .eq('platform', 'klaviyo')
+        .single(),
+      null,
+      'syncKlaviyoToMetaAudience.getKlaviyoConnection',
+    );
 
     if (!klaviyoConn?.api_key_encrypted) {
       return c.json({ error: 'Klaviyo connection not found or missing API key' }, 404);
@@ -43,9 +48,13 @@ export async function syncKlaviyoToMetaAudience(c: Context) {
     // Verify ownership
     const kClient = klaviyoConn.clients as any;
     if (kClient.user_id !== user.id && kClient.client_user_id !== user.id) {
-      const { data: adminRole } = await supabase
-        .from('user_roles').select('role').eq('user_id', user.id)
-        .in('role', ['admin', 'super_admin']).limit(1).maybeSingle();
+      const adminRole = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('user_roles').select('role').eq('user_id', user.id)
+          .in('role', ['admin', 'super_admin']).limit(1).maybeSingle(),
+        null,
+        'syncKlaviyoToMetaAudience.getAdminRole',
+      );
       if (!adminRole) return c.json({ error: 'Unauthorized' }, 403);
     }
 
@@ -54,12 +63,16 @@ export async function syncKlaviyoToMetaAudience(c: Context) {
     if (!klaviyoApiKey) return c.json({ error: 'Failed to decrypt Klaviyo key' }, 500);
 
     // 2. Get Meta connection + decrypt token
-    const { data: metaConn } = await supabase
-      .from('platform_connections')
-      .select('id, account_id, access_token_encrypted, connection_type, client_id')
-      .eq('id', meta_connection_id)
-      .eq('platform', 'meta')
-      .single();
+    const metaConn = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('platform_connections')
+        .select('id, account_id, access_token_encrypted, connection_type, client_id')
+        .eq('id', meta_connection_id)
+        .eq('platform', 'meta')
+        .single(),
+      null,
+      'syncKlaviyoToMetaAudience.getMetaConnection',
+    );
 
     if (!metaConn?.account_id) {
       return c.json({ error: 'Meta connection not found or missing account ID' }, 404);

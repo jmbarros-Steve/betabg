@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { checkRateLimit } from '../../lib/rate-limiter.js';
 
 export async function fetchShopifyProducts(c: Context) {
@@ -20,7 +21,11 @@ export async function fetchShopifyProducts(c: Context) {
       }
       const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
       const shopDomain = payload.dest?.replace('https://', '').replace('http://', '');
-      const { data: client } = await supabaseService.from('clients').select('client_user_id, user_id').eq('shop_domain', shopDomain).single();
+      const client = await safeQuerySingleOrDefault<{ client_user_id: string | null; user_id: string | null }>(
+        supabaseService.from('clients').select('client_user_id, user_id').eq('shop_domain', shopDomain).single(),
+        null,
+        'fetchShopifyProducts.getClientByShop',
+      );
       if (!client) {
         return c.json({ error: 'Shop not found' }, 401);
       }
@@ -65,12 +70,16 @@ export async function fetchShopifyProducts(c: Context) {
     const clientData = connection.clients as { user_id: string; client_user_id: string | null };
 
     // Check super admin access
-    const { data: roleRow } = await supabaseService
-      .from('user_roles')
-      .select('is_super_admin')
-      .eq('user_id', userId!)
-      .eq('role', 'admin')
-      .maybeSingle();
+    const roleRow = await safeQuerySingleOrDefault<{ is_super_admin: boolean }>(
+      supabaseService
+        .from('user_roles')
+        .select('is_super_admin')
+        .eq('user_id', userId!)
+        .eq('role', 'admin')
+        .maybeSingle(),
+      null,
+      'fetchShopifyProducts.getRoleRow',
+    );
     const isSuperAdmin = roleRow?.is_super_admin === true;
 
     if (!isSuperAdmin && clientData.user_id !== userId && clientData.client_user_id !== userId) {

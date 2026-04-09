@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { metaApiJson } from '../../lib/meta-fetch.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 interface TargetingInfo {
   adset_id: string;
@@ -42,21 +43,29 @@ export async function detectAudienceOverlap(c: Context) {
   // Auth
   const user = c.get('user');
   if (!user) return c.json({ error: 'Unauthorized' }, 401);
-  const { data: ownerCheck } = await supabase
-    .from('clients')
-    .select('id')
-    .eq('id', client_id)
-    .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
-    .maybeSingle();
+  const ownerCheck = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('clients')
+      .select('id')
+      .eq('id', client_id)
+      .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+      .maybeSingle(),
+    null,
+    'detectAudienceOverlap.ownerCheck',
+  );
   if (!ownerCheck) return c.json({ error: 'No tienes acceso' }, 403);
 
   // Get Meta token
-  const { data: conn } = await supabase
-    .from('platform_connections')
-    .select('id, access_token_encrypted, connection_type')
-    .eq('client_id', client_id)
-    .eq('platform', 'meta')
-    .maybeSingle();
+  const conn = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('platform_connections')
+      .select('id, access_token_encrypted, connection_type')
+      .eq('client_id', client_id)
+      .eq('platform', 'meta')
+      .maybeSingle(),
+    null,
+    'detectAudienceOverlap.getConnection',
+  );
 
   if (!conn) {
     return c.json({ error: 'No hay conexión a Meta' }, 404);

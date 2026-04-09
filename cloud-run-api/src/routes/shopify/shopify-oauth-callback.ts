@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 function generatePassword(length = 16): string {
@@ -119,12 +120,16 @@ async function resolveShopifyCredentials(
   perClientId: string | undefined
 ): Promise<{ clientId: string; clientSecret: string } | null> {
   if (perClientId) {
-    const { data: conn } = await supabaseAdmin
-      .from('platform_connections')
-      .select('shopify_client_id, shopify_client_secret_encrypted')
-      .eq('client_id', perClientId)
-      .eq('platform', 'shopify')
-      .single();
+    const conn = await safeQuerySingleOrDefault<{ shopify_client_id: string; shopify_client_secret_encrypted: string }>(
+      supabaseAdmin
+        .from('platform_connections')
+        .select('shopify_client_id, shopify_client_secret_encrypted')
+        .eq('client_id', perClientId)
+        .eq('platform', 'shopify')
+        .single(),
+      null,
+      'shopifyOauthCallback.resolveShopifyCredentials',
+    );
 
     if (conn?.shopify_client_id && conn?.shopify_client_secret_encrypted) {
       const { data: decryptedSecret, error: decryptError } = await supabaseAdmin
@@ -215,13 +220,17 @@ export async function shopifyOauthCallback(c: Context) {
 
     // If no client_id from state, look up by shop_domain (for install-link flow)
     if (!perClientId) {
-      const { data: conn } = await supabaseAdmin
-        .from('platform_connections')
-        .select('client_id, shopify_client_id, shopify_client_secret_encrypted')
-        .eq('shop_domain', normalizedShopDomain)
-        .eq('platform', 'shopify')
-        .not('shopify_client_id', 'is', null)
-        .single();
+      const conn = await safeQuerySingleOrDefault<{ client_id: string; shopify_client_id: string; shopify_client_secret_encrypted: string }>(
+        supabaseAdmin
+          .from('platform_connections')
+          .select('client_id, shopify_client_id, shopify_client_secret_encrypted')
+          .eq('shop_domain', normalizedShopDomain)
+          .eq('platform', 'shopify')
+          .not('shopify_client_id', 'is', null)
+          .single(),
+        null,
+        'shopifyOauthCallback.lookupByShopDomain',
+      );
 
       if (conn?.shopify_client_id && conn?.shopify_client_secret_encrypted) {
         perClientId = conn.client_id;
@@ -313,12 +322,16 @@ export async function shopifyOauthCallback(c: Context) {
       }
 
       // Upsert platform_connections — handles both existing and new connections
-      const { data: existingConn } = await supabaseAdmin
-        .from('platform_connections')
-        .select('id')
-        .eq('client_id', perClientId)
-        .eq('platform', 'shopify')
-        .maybeSingle();
+      const existingConn = await safeQuerySingleOrDefault<{ id: string }>(
+        supabaseAdmin
+          .from('platform_connections')
+          .select('id')
+          .eq('client_id', perClientId)
+          .eq('platform', 'shopify')
+          .maybeSingle(),
+        null,
+        'shopifyOauthCallback.perClientExistingConn',
+      );
 
       if (existingConn) {
         await supabaseAdmin.from('platform_connections').update({
@@ -387,10 +400,14 @@ export async function shopifyOauthCallback(c: Context) {
     }
 
     // PRIORITY 1: Check if a client was pre-registered with this shop_domain
-    const { data: preRegisteredClient } = await supabaseAdmin
-      .from('clients').select('id, client_user_id')
-      .eq('shop_domain', normalizedShopDomain)
-      .single();
+    const preRegisteredClient = await safeQuerySingleOrDefault<{ id: string; client_user_id: string }>(
+      supabaseAdmin
+        .from('clients').select('id, client_user_id')
+        .eq('shop_domain', normalizedShopDomain)
+        .single(),
+      null,
+      'shopifyOauthCallback.preRegisteredClient',
+    );
 
     let userId: string;
     let clientId: string;
@@ -414,10 +431,14 @@ export async function shopifyOauthCallback(c: Context) {
 
       if (existingUser) {
         userId = existingUser.id;
-        const { data: existingClient } = await supabaseAdmin
-          .from('clients').select('id')
-          .or(`user_id.eq.${userId},client_user_id.eq.${userId}`)
-          .single();
+        const existingClient = await safeQuerySingleOrDefault<{ id: string }>(
+          supabaseAdmin
+            .from('clients').select('id')
+            .or(`user_id.eq.${userId},client_user_id.eq.${userId}`)
+            .single(),
+          null,
+          'shopifyOauthCallback.existingClientByUser',
+        );
 
         if (existingClient) {
           clientId = existingClient.id;
@@ -484,8 +505,12 @@ export async function shopifyOauthCallback(c: Context) {
 
         clientId = newClient.id;
 
-        const { data: freePlan } = await supabaseAdmin
-          .from('subscription_plans').select('id').eq('slug', 'free').single();
+        const freePlan = await safeQuerySingleOrDefault<{ id: string }>(
+          supabaseAdmin
+            .from('subscription_plans').select('id').eq('slug', 'free').single(),
+          null,
+          'shopifyOauthCallback.freePlan',
+        );
 
         if (freePlan) {
           await supabaseAdmin.from('user_subscriptions').insert({
@@ -508,9 +533,13 @@ export async function shopifyOauthCallback(c: Context) {
     }
 
     // Upsert Shopify connection
-    const { data: existingConnection } = await supabaseAdmin
-      .from('platform_connections').select('id')
-      .eq('client_id', clientId).eq('platform', 'shopify').single();
+    const existingConnection = await safeQuerySingleOrDefault<{ id: string }>(
+      supabaseAdmin
+        .from('platform_connections').select('id')
+        .eq('client_id', clientId).eq('platform', 'shopify').single(),
+      null,
+      'shopifyOauthCallback.existingConnection',
+    );
 
     if (existingConnection) {
       await supabaseAdmin.from('platform_connections').update({

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { getTwilioSubClient } from '../../lib/twilio-client.js';
 import { decryptToken } from './setup-merchant.js';
 
@@ -39,12 +40,16 @@ export async function waSendCampaign(c: Context) {
     }
 
     // Get merchant's Twilio account
-    const { data: waAccount } = await supabase
-      .from('wa_twilio_accounts')
-      .select('twilio_account_sid, twilio_auth_token, phone_number')
-      .eq('client_id', client_id)
-      .eq('status', 'active')
-      .single();
+    const waAccount = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('wa_twilio_accounts')
+        .select('twilio_account_sid, twilio_auth_token, phone_number')
+        .eq('client_id', client_id)
+        .eq('status', 'active')
+        .single(),
+      null,
+      'sendCampaign.getWaAccount',
+    );
 
     if (!waAccount) {
       return c.json({ error: 'WhatsApp no configurado' }, 404);
@@ -55,14 +60,18 @@ export async function waSendCampaign(c: Context) {
     let recipients: Array<{ phone: string; name: string }> = [];
 
     // Query contacts from wa_conversations (people who've written before)
-    const { data: contacts } = await supabase
-      .from('wa_conversations')
-      .select('contact_phone, contact_name')
-      .eq('client_id', client_id)
-      .eq('channel', 'merchant_wa')
-      .limit(500);
+    const contacts = await safeQueryOrDefault<any>(
+      supabase
+        .from('wa_conversations')
+        .select('contact_phone, contact_name')
+        .eq('client_id', client_id)
+        .eq('channel', 'merchant_wa')
+        .limit(500),
+      [],
+      'sendCampaign.getContacts',
+    );
 
-    if (contacts) {
+    if (contacts.length > 0) {
       recipients = contacts.map((c: any) => ({
         phone: c.contact_phone,
         name: c.contact_name || '',
@@ -81,11 +90,15 @@ export async function waSendCampaign(c: Context) {
     }
 
     // Check credits (read-only pre-check)
-    const { data: creditCheck } = await supabase
-      .from('wa_credits')
-      .select('balance')
-      .eq('client_id', client_id)
-      .single();
+    const creditCheck = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('wa_credits')
+        .select('balance')
+        .eq('client_id', client_id)
+        .single(),
+      null,
+      'sendCampaign.getCreditCheck',
+    );
 
     if (!creditCheck || creditCheck.balance < recipients.length) {
       return c.json({

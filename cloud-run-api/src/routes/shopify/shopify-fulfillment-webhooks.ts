@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 // ---------------------------------------------------------------------------
@@ -112,13 +113,17 @@ async function handleOrderFulfilled(
     const today = new Date().toISOString().slice(0, 10);
 
     // Find the Shopify connection for this shop
-    const { data: conn } = await supabase
-      .from('platform_connections')
-      .select('id')
-      .eq('shop_domain', shopDomain)
-      .eq('platform', 'shopify')
-      .eq('is_active', true)
-      .single();
+    const conn = await safeQuerySingleOrDefault<{ id: string }>(
+      supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('shop_domain', shopDomain)
+        .eq('platform', 'shopify')
+        .eq('is_active', true)
+        .single(),
+      null,
+      'shopifyFulfillmentWebhooks.getConnection',
+    );
 
     if (conn) {
       await supabase.from('platform_metrics').upsert(

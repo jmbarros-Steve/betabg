@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { criterioEmailEvaluate } from '../ai/criterio-email.js';
 import { espejoEmail } from '../ai/espejo.js';
 import { escapeHtml, decryptKlaviyoApiKey, sendCampaignJob, deleteKlaviyoTemplate } from './_helpers.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const KLAVIYO_REVISION = '2025-01-15';
 const KLAVIYO_BASE = 'https://a.klaviyo.com/api';
@@ -280,11 +281,15 @@ export async function klaviyoPushEmails(c: Context) {
     }
 
     // Get shop_id from the plan's client connection
-    const { data: connData } = await supabase
-      .from('platform_connections')
-      .select('client_id, clients!inner(shop_id)')
-      .eq('id', connection_id)
-      .single();
+    const connData = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('platform_connections')
+        .select('client_id, clients!inner(shop_id)')
+        .eq('id', connection_id)
+        .single(),
+      null,
+      'klaviyoPushEmails.getConnData',
+    );
     const shopId = (connData as any)?.clients?.shop_id;
     const clientId = (connData as any)?.client_id;
 
@@ -328,11 +333,15 @@ export async function klaviyoPushEmails(c: Context) {
     // Fetch brand info for ESPEJO evaluation
     let brandInfo: { brand_name?: string; colors?: string } | null = null;
     if (clientId) {
-      const { data: bi } = await supabase
-        .from('brand_research')
-        .select('brand_name, colors')
-        .eq('shop_id', shopId)
-        .maybeSingle();
+      const bi = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('brand_research')
+          .select('brand_name, colors')
+          .eq('shop_id', shopId)
+          .maybeSingle(),
+        null,
+        'klaviyoPushEmails.getBrandInfo',
+      );
       brandInfo = bi;
     }
 

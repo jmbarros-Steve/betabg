@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { decryptToken } from './setup-merchant.js';
 
 /**
@@ -36,35 +37,47 @@ Si puedes responder normalmente, responde directo sin tags.`;
 async function buildMerchantContext(clientId: string): Promise<string> {
   const supabase = getSupabaseAdmin();
 
-  const { data: client } = await supabase
-    .from('clients')
-    .select('name, company, shop_domain')
-    .eq('id', clientId)
-    .maybeSingle();
+  const client = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('clients')
+      .select('name, company, shop_domain')
+      .eq('id', clientId)
+      .maybeSingle(),
+    null,
+    'merchantWa.buildContext.getClient',
+  );
 
   // Brand brief
-  const { data: brief } = await supabase
-    .from('brand_research')
-    .select('research_data')
-    .eq('client_id', clientId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const brief = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('brand_research')
+      .select('research_data')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    null,
+    'merchantWa.buildContext.getBrief',
+  );
 
   const brandInfo = brief?.research_data
     ? JSON.stringify(brief.research_data).slice(0, 800)
     : '';
 
   // Products (top 20 by price for quick lookup)
-  const { data: products } = await supabase
-    .from('shopify_products')
-    .select('title, price, status')
-    .eq('shop_id', clientId)
-    .eq('status', 'active')
-    .order('price', { ascending: false })
-    .limit(20);
+  const products = await safeQueryOrDefault<any>(
+    supabase
+      .from('shopify_products')
+      .select('title, price, status')
+      .eq('shop_id', clientId)
+      .eq('status', 'active')
+      .order('price', { ascending: false })
+      .limit(20),
+    [],
+    'merchantWa.buildContext.getProducts',
+  );
 
-  const productList = products?.length
+  const productList = products.length
     ? products.map((p: any) => `- ${p.title}: $${p.price}`).join('\n')
     : 'Sin productos cargados.';
 
@@ -82,16 +95,20 @@ async function getConversationHistory(
 ): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
   const supabase = getSupabaseAdmin();
 
-  const { data: messages } = await supabase
-    .from('wa_messages')
-    .select('direction, body')
-    .eq('client_id', clientId)
-    .eq('channel', 'merchant_wa')
-    .eq('contact_phone', contactPhone)
-    .order('created_at', { ascending: true })
-    .limit(limit);
+  const messages = await safeQueryOrDefault<any>(
+    supabase
+      .from('wa_messages')
+      .select('direction, body')
+      .eq('client_id', clientId)
+      .eq('channel', 'merchant_wa')
+      .eq('contact_phone', contactPhone)
+      .order('created_at', { ascending: true })
+      .limit(limit),
+    [],
+    'merchantWa.getHistory.getMessages',
+  );
 
-  if (!messages?.length) return [];
+  if (!messages.length) return [];
 
   return messages
     .filter((m: any) => m.body)
@@ -119,12 +136,16 @@ export async function merchantWAWebhook(c: Context) {
     const phone = from.replace('whatsapp:', '').replace('+', '').trim();
 
     // Get merchant's WA account
-    const { data: waAccount } = await supabase
-      .from('wa_twilio_accounts')
-      .select('phone_number')
-      .eq('client_id', clientId)
-      .eq('status', 'active')
-      .single();
+    const waAccount = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('wa_twilio_accounts')
+        .select('phone_number')
+        .eq('client_id', clientId)
+        .eq('status', 'active')
+        .single(),
+      null,
+      'merchantWa.webhook.getWaAccount',
+    );
 
     if (!waAccount) {
       return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
@@ -144,13 +165,17 @@ export async function merchantWAWebhook(c: Context) {
     });
 
     // Upsert conversation
-    const { data: existingConv } = await supabase
-      .from('wa_conversations')
-      .select('id, unread_count, assigned_to')
-      .eq('client_id', clientId)
-      .eq('channel', 'merchant_wa')
-      .eq('contact_phone', phone)
-      .single();
+    const existingConv = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('wa_conversations')
+        .select('id, unread_count, assigned_to')
+        .eq('client_id', clientId)
+        .eq('channel', 'merchant_wa')
+        .eq('contact_phone', phone)
+        .single(),
+      null,
+      'merchantWa.webhook.getExistingConv',
+    );
 
     if (existingConv) {
       await supabase
@@ -180,11 +205,15 @@ export async function merchantWAWebhook(c: Context) {
     if (existingConv?.assigned_to === 'human') {
       // Notify merchant via Steve Chat that their customer wrote
       const { sendWhatsApp } = await import('../../lib/twilio-client.js');
-      const { data: merchant } = await supabase
-        .from('clients')
-        .select('phone')
-        .eq('id', clientId)
-        .single();
+      const merchant = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('clients')
+          .select('phone')
+          .eq('id', clientId)
+          .single(),
+        null,
+        'merchantWa.webhook.getMerchantForNotify',
+      );
 
       if (merchant?.phone) {
         await sendWhatsApp(
@@ -197,11 +226,15 @@ export async function merchantWAWebhook(c: Context) {
     }
 
     // Check credits BEFORE calling Claude (Issue 3: don't waste AI credits if no WA credits)
-    const { data: creditCheck } = await supabase
-      .from('wa_credits')
-      .select('balance')
-      .eq('client_id', clientId)
-      .single();
+    const creditCheck = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('wa_credits')
+        .select('balance')
+        .eq('client_id', clientId)
+        .single(),
+      null,
+      'merchantWa.webhook.getCreditCheck',
+    );
 
     if (!creditCheck || creditCheck.balance < 1) {
       // No credits — send fallback without calling AI
@@ -296,11 +329,15 @@ export async function merchantWAWebhook(c: Context) {
 
       // Notify merchant
       const { sendWhatsApp } = await import('../../lib/twilio-client.js');
-      const { data: merchant } = await supabase
-        .from('clients')
-        .select('phone, name')
-        .eq('id', clientId)
-        .single();
+      const merchant = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('clients')
+          .select('phone, name')
+          .eq('id', clientId)
+          .single(),
+        null,
+        'merchantWa.webhook.getMerchantForEscalate',
+      );
 
       if (merchant?.phone) {
         await sendWhatsApp(

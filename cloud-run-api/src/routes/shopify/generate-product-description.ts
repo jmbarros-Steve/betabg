@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 /**
@@ -42,12 +43,16 @@ export async function generateProductDescription(c: Context) {
     }
 
     const clientData = connection.clients as { user_id: string; client_user_id: string | null };
-    const { data: roleRow } = await supabase
-      .from('user_roles')
-      .select('is_super_admin')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .maybeSingle();
+    const roleRow = await safeQuerySingleOrDefault<{ is_super_admin: boolean }>(
+      supabase
+        .from('user_roles')
+        .select('is_super_admin')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle(),
+      null,
+      'generateProductDescription.getRoleRow',
+    );
     const isSuperAdmin = roleRow?.is_super_admin === true;
 
     if (!isSuperAdmin && clientData.user_id !== user.id && clientData.client_user_id !== user.id) {

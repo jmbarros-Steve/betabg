@@ -5,6 +5,7 @@ import {
   makeKlaviyoGetHeaders, makeKlaviyoPostHeaders,
   findConversionMetricId,
 } from './_helpers.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * GET /api/klaviyo/flow-metrics?connection_id=xxx&flow_id=yyy&timeframe=last_90_days
@@ -36,12 +37,16 @@ export async function klaviyoFlowMetrics(c: Context) {
     }
 
     // Verify connection + ownership
-    const { data: conn } = await supabase
-      .from('platform_connections')
-      .select('api_key_encrypted, clients!inner(user_id, client_user_id)')
-      .eq('id', connectionId)
-      .eq('platform', 'klaviyo')
-      .single();
+    const conn = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('platform_connections')
+        .select('api_key_encrypted, clients!inner(user_id, client_user_id)')
+        .eq('id', connectionId)
+        .eq('platform', 'klaviyo')
+        .single(),
+      null,
+      'klaviyoFlowMetrics.getConnection',
+    );
 
     if (!conn?.api_key_encrypted) {
       return c.json({ error: 'Klaviyo connection not found' }, 404);

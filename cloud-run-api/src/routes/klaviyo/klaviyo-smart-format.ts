@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const BASE_SYSTEM_PROMPT = `Eres un experto en email marketing con Klaviyo. Tu trabajo es tomar el contenido de un email en texto plano y convertirlo en HTML optimizado para Klaviyo, detectando automaticamente donde deben ir:
 
@@ -43,12 +44,16 @@ REGLAS:
 - NO inventes contenido nuevo, solo formatea y enriquece lo existente`;
 
 async function loadBrandContext(supabase: any, connectionId: string): Promise<string> {
-  const { data: connection } = await supabase
-    .from('platform_connections')
-    .select('client_id')
-    .eq('id', connectionId)
-    .eq('platform', 'klaviyo')
-    .single();
+  const connection = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('platform_connections')
+      .select('client_id')
+      .eq('id', connectionId)
+      .eq('platform', 'klaviyo')
+      .single(),
+    null,
+    'klaviyoSmartFormat.getConnection',
+  );
 
   if (!connection?.client_id) return '';
 

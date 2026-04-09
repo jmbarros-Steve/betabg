@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v21.0';
 
@@ -44,7 +45,11 @@ export async function metaAdsetAction(c: Context) {
 
     const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
     // Check ownership — allow both client owner and admin
-    const { data: profile } = await supabase.from('profiles').select('is_super_admin').eq('id', user.id).maybeSingle();
+    const profile = await safeQuerySingleOrDefault<any>(
+      supabase.from('profiles').select('is_super_admin').eq('id', user.id).maybeSingle(),
+      null,
+      'metaAdsetAction.getProfile',
+    );
     const isAdmin = profile?.is_super_admin === true;
     if (!isAdmin && clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
       return c.json({ error: 'Forbidden' }, 403);

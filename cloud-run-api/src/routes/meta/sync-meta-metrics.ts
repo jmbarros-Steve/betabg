@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { checkRateLimit } from '../../lib/rate-limiter.js';
 import { metaApiFetch, metaApiJson } from '../../lib/meta-fetch.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 // Currency conversion utilities
 const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
@@ -205,9 +206,13 @@ export async function syncMetaMetrics(c: Context) {
       const isOwner = clientData.user_id === userId || clientData.client_user_id === userId;
 
       if (!isOwner) {
-        const { data: adminRole } = await supabase
-          .from('user_roles').select('role').eq('user_id', userId)
-          .in('role', ['admin', 'super_admin']).limit(1).maybeSingle();
+        const adminRole = await safeQuerySingleOrDefault<any>(
+          supabase
+            .from('user_roles').select('role').eq('user_id', userId)
+            .in('role', ['admin', 'super_admin']).limit(1).maybeSingle(),
+          null,
+          'syncMetaMetrics.getAdminRole',
+        );
         if (!adminRole) {
           console.error('Authorization failed:', { userId, clientUserId: clientData.client_user_id, adminId: clientData.user_id });
           return c.json({ error: 'Unauthorized' }, 403);

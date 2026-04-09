@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { createHmac } from 'node:crypto';
 
 /**
@@ -115,13 +116,17 @@ export async function shopifyInstall(c: Context) {
       let foundByShop = false;
       if (shop) {
         const lookupDomain = (shop.includes('.myshopify.com') ? shop : `${shop}.myshopify.com`).toLowerCase().trim();
-        const { data: conn } = await supabaseAdmin
-          .from('platform_connections')
-          .select('shopify_client_id, shopify_client_secret_encrypted')
-          .eq('shop_domain', lookupDomain)
-          .eq('platform', 'shopify')
-          .not('shopify_client_id', 'is', null)
-          .single();
+        const conn = await safeQuerySingleOrDefault<{ shopify_client_id: string; shopify_client_secret_encrypted: string }>(
+          supabaseAdmin
+            .from('platform_connections')
+            .select('shopify_client_id, shopify_client_secret_encrypted')
+            .eq('shop_domain', lookupDomain)
+            .eq('platform', 'shopify')
+            .not('shopify_client_id', 'is', null)
+            .single(),
+          null,
+          'shopifyInstall.lookupByShopDomain',
+        );
 
         if (conn?.shopify_client_id && conn?.shopify_client_secret_encrypted) {
           const { data: decryptedSecret } = await supabaseAdmin

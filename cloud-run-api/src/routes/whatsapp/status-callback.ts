@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * POST /api/whatsapp/status-callback
@@ -30,11 +31,15 @@ export async function waStatusCallback(c: Context) {
 
     // Issue 5: Update campaign metrics if this message belongs to a campaign
     if (status === 'delivered' || status === 'read') {
-      const { data: msg } = await supabase
-        .from('wa_messages')
-        .select('metadata')
-        .eq('message_sid', messageSid)
-        .single();
+      const msg = await safeQuerySingleOrDefault<any>(
+        supabase
+          .from('wa_messages')
+          .select('metadata')
+          .eq('message_sid', messageSid)
+          .single(),
+        null,
+        'statusCallback.getMsg',
+      );
 
       const campaignId = (msg?.metadata as any)?.campaign_id;
       if (campaignId) {

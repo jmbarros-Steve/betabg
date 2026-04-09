@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { getTwilioMasterClient, getTwilioSubClient } from '../../lib/twilio-client.js';
 import { createHmac } from 'node:crypto';
 
@@ -162,11 +163,15 @@ async function provisionMerchant(clientId: string, businessName: string) {
   });
 
   // 5. Create welcome credits (100 free)
-  const { data: existingCredits } = await supabase
-    .from('wa_credits')
-    .select('id')
-    .eq('client_id', clientId)
-    .single();
+  const existingCredits = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('wa_credits')
+      .select('id')
+      .eq('client_id', clientId)
+      .single(),
+    null,
+    'setupMerchant.provision.getExistingCredits',
+  );
 
   if (!existingCredits) {
     await supabase.from('wa_credits').insert({
@@ -216,12 +221,16 @@ export async function setupMerchantHandler(c: Context) {
         }
 
         // Check if already provisioned
-        const { data: existing } = await supabase
-          .from('wa_twilio_accounts')
-          .select('phone_number, status')
-          .eq('client_id', client_id)
-          .eq('status', 'active')
-          .single();
+        const existing = await safeQuerySingleOrDefault<any>(
+          supabase
+            .from('wa_twilio_accounts')
+            .select('phone_number, status')
+            .eq('client_id', client_id)
+            .eq('status', 'active')
+            .single(),
+          null,
+          'setupMerchant.provision.getExisting',
+        );
 
         if (existing) {
           return c.json({
@@ -243,18 +252,26 @@ export async function setupMerchantHandler(c: Context) {
         const { client_id } = body;
         if (!client_id) return c.json({ error: 'Missing client_id' }, 400);
 
-        const { data: account } = await supabase
-          .from('wa_twilio_accounts')
-          .select('phone_number, whatsapp_approved, display_name, status, created_at')
-          .eq('client_id', client_id)
-          .eq('status', 'active')
-          .single();
+        const account = await safeQuerySingleOrDefault<any>(
+          supabase
+            .from('wa_twilio_accounts')
+            .select('phone_number, whatsapp_approved, display_name, status, created_at')
+            .eq('client_id', client_id)
+            .eq('status', 'active')
+            .single(),
+          null,
+          'setupMerchant.status.getAccount',
+        );
 
-        const { data: credits } = await supabase
-          .from('wa_credits')
-          .select('balance, total_purchased, total_used')
-          .eq('client_id', client_id)
-          .single();
+        const credits = await safeQuerySingleOrDefault<any>(
+          supabase
+            .from('wa_credits')
+            .select('balance, total_purchased, total_used')
+            .eq('client_id', client_id)
+            .single(),
+          null,
+          'setupMerchant.status.getCredits',
+        );
 
         return c.json({
           configured: !!account,

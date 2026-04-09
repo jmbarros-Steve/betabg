@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const META_API_VERSION = 'v21.0';
 const META_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
@@ -54,9 +55,13 @@ export async function discoverClientAssets(c: Context) {
     );
     if (authError || !user) return c.json({ error: 'Invalid token' }, 401);
 
-    const { data: adminRole } = await supabase
-      .from('user_roles').select('role').eq('user_id', user.id)
-      .in('role', ['admin', 'super_admin']).limit(1).maybeSingle();
+    const adminRole = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('user_roles').select('role').eq('user_id', user.id)
+        .in('role', ['admin', 'super_admin']).limit(1).maybeSingle(),
+      null,
+      'discoverClientAssets.getAdminRole',
+    );
     if (!adminRole) return c.json({ error: 'Admin only' }, 403);
 
     const suat = process.env.META_SYSTEM_TOKEN;

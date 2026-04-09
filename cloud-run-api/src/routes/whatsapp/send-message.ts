@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { getTwilioSubClient } from '../../lib/twilio-client.js';
 import { decryptToken } from './setup-merchant.js';
 
@@ -22,23 +23,31 @@ export async function waSendMessage(c: Context) {
     const supabase = getSupabaseAdmin();
 
     // Get merchant's Twilio sub-account
-    const { data: waAccount } = await supabase
-      .from('wa_twilio_accounts')
-      .select('twilio_account_sid, twilio_auth_token, phone_number')
-      .eq('client_id', client_id)
-      .eq('status', 'active')
-      .single();
+    const waAccount = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('wa_twilio_accounts')
+        .select('twilio_account_sid, twilio_auth_token, phone_number')
+        .eq('client_id', client_id)
+        .eq('status', 'active')
+        .single(),
+      null,
+      'sendMessage.getWaAccount',
+    );
 
     if (!waAccount) {
       return c.json({ error: 'WhatsApp no configurado para este merchant' }, 404);
     }
 
     // Check credits (read-only check before sending)
-    const { data: creditCheck } = await supabase
-      .from('wa_credits')
-      .select('balance')
-      .eq('client_id', client_id)
-      .single();
+    const creditCheck = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('wa_credits')
+        .select('balance')
+        .eq('client_id', client_id)
+        .single(),
+      null,
+      'sendMessage.getCreditCheck',
+    );
 
     if (!creditCheck || creditCheck.balance < 1) {
       return c.json({ error: 'Creditos insuficientes', balance: creditCheck?.balance || 0 }, 402);
