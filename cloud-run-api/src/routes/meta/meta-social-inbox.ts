@@ -68,8 +68,43 @@ async function metaPost(endpoint: string, token: string, body: Record<string, an
 // --- Action Handlers ---
 
 /** List all Facebook pages and Instagram accounts the user manages */
-async function handleListPages(token: string): Promise<{ body: any; status: number }> {
-  // Get Facebook pages with Instagram business account
+async function handleListPages(
+  token: string,
+  connection?: { connection_type?: string | null; page_id?: string | null; ig_account_id?: string | null },
+): Promise<{ body: any; status: number }> {
+  const isSuat = connection?.connection_type === 'bm_partner' || connection?.connection_type === 'leadsie';
+
+  // For SUAT connections, /me/accounts doesn't work — use stored page_id directly
+  if (isSuat && connection?.page_id) {
+    const pageResult = await metaGet(connection.page_id, token, {
+      fields: 'id,name,category,picture{url},access_token,instagram_business_account{id,name,username,profile_picture_url}',
+    });
+
+    if (!pageResult.ok) return { body: { success: false, error: pageResult.error }, status: 502 };
+
+    const p = pageResult.data;
+    const pages = [{
+      id: p.id,
+      name: p.name,
+      category: p.category || null,
+      picture_url: p.picture?.data?.url || null,
+      has_page_token: !!p.access_token,
+      instagram: p.instagram_business_account
+        ? {
+            id: p.instagram_business_account.id,
+            name: p.instagram_business_account.name,
+            username: p.instagram_business_account.username,
+            profile_picture_url: p.instagram_business_account.profile_picture_url,
+          }
+        : connection.ig_account_id
+          ? { id: connection.ig_account_id, name: null, username: null, profile_picture_url: null }
+          : null,
+    }];
+
+    return { body: { success: true, pages }, status: 200 };
+  }
+
+  // OAuth connections: use /me/accounts as before
   const result = await metaGet('me/accounts', token, {
     fields: 'id,name,category,picture{url},access_token,instagram_business_account{id,name,username,profile_picture_url}',
     limit: '100',
@@ -649,6 +684,7 @@ export async function metaSocialInbox(c: Context) {
       .from('platform_connections')
       .select(`
         id, platform, access_token_encrypted, client_id, connection_type,
+        page_id, ig_account_id,
         clients!inner(user_id, client_user_id)
       `)
       .eq('id', connection_id)
@@ -682,7 +718,7 @@ export async function metaSocialInbox(c: Context) {
 
     switch (action) {
       case 'list_pages':
-        result = await handleListPages(decryptedToken);
+        result = await handleListPages(decryptedToken, connection);
         break;
       case 'list_conversations':
         result = await handleListConversations(decryptedToken, body);

@@ -116,10 +116,22 @@ async function handleOverview(c: Context, token: string, igId: string, dateFrom?
   });
   const profile = profileRes.ok ? profileRes.data : {};
 
-  // 2. Account insights (daily metrics for the period)
-  const insightsRes = await metaApiJson<any>(`/${igId}/insights`, token, {
+  // 2. Account insights — split into two calls for Graph API v21 compatibility
+  // Call A: daily period metrics (reach)
+  const dailyRes = await metaApiJson<any>(`/${igId}/insights`, token, {
     params: {
-      metric: 'impressions,reach,profile_views,website_clicks',
+      metric: 'reach',
+      period: 'day',
+      since: String(since),
+      until: String(until),
+    },
+  });
+
+  // Call B: total_value metrics (profile_views, website_clicks) — v21 requires metric_type=total_value
+  const totalRes = await metaApiJson<any>(`/${igId}/insights`, token, {
+    params: {
+      metric: 'profile_views,website_clicks',
+      metric_type: 'total_value',
       period: 'day',
       since: String(since),
       until: String(until),
@@ -127,19 +139,29 @@ async function handleOverview(c: Context, token: string, igId: string, dateFrom?
   });
 
   const metrics: Record<string, number> = {
-    impressions: 0,
     reach: 0,
     profile_views: 0,
     website_clicks: 0,
   };
   const followerTrend: Array<{ date: string; value: number }> = [];
 
-  if (insightsRes.ok && insightsRes.data?.data) {
-    for (const metric of insightsRes.data.data) {
+  // Parse daily metrics (summing day values)
+  if (dailyRes.ok && dailyRes.data?.data) {
+    for (const metric of dailyRes.data.data) {
       const name = metric.name;
       const values = metric.values || [];
       if (metrics[name] !== undefined) {
         metrics[name] = values.reduce((sum: number, v: any) => sum + (v.value || 0), 0);
+      }
+    }
+  }
+
+  // Parse total_value metrics (single aggregated value per metric)
+  if (totalRes.ok && totalRes.data?.data) {
+    for (const metric of totalRes.data.data) {
+      const name = metric.name;
+      if (metrics[name] !== undefined) {
+        metrics[name] = metric.total_value?.value || 0;
       }
     }
   }

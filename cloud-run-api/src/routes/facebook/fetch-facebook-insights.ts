@@ -102,10 +102,13 @@ async function handleOverview(
     ? Math.floor(new Date(dateTo).getTime() / 1000)
     : Math.floor(now.getTime() / 1000);
 
-  // Page insights (daily)
+  // Page insights (daily) — Graph API v21 valid metrics
+  // Deprecated in v21: page_impressions, page_engaged_users, page_fans, page_fan_adds
+  // Valid in v21: page_views_total, page_post_engagements, page_actions_post_reactions_total,
+  //              page_follows, page_daily_follows_unique
   const insightsRes = await metaApiJson<any>(`/${pageId}/insights`, pageToken, {
     params: {
-      metric: 'page_impressions,page_engaged_users,page_post_engagements,page_views_total,page_fan_adds',
+      metric: 'page_views_total,page_post_engagements,page_actions_post_reactions_total,page_follows,page_daily_follows_unique',
       period: 'day',
       since: String(since),
       until: String(until),
@@ -113,14 +116,14 @@ async function handleOverview(
   });
 
   const metrics: Record<string, number> = {
-    page_impressions: 0,
-    page_engaged_users: 0,
-    page_post_engagements: 0,
     page_views_total: 0,
-    page_fan_adds: 0,
+    page_post_engagements: 0,
+    page_actions_post_reactions_total: 0,
+    page_follows: 0,
+    page_daily_follows_unique: 0,
   };
 
-  const fanTrend: Array<{ date: string; value: number }> = [];
+  const followTrend: Array<{ date: string; value: number }> = [];
 
   if (insightsRes.ok && insightsRes.data?.data) {
     for (const metric of insightsRes.data.data) {
@@ -129,10 +132,10 @@ async function handleOverview(
       if (metrics[name] !== undefined) {
         metrics[name] = values.reduce((sum: number, v: any) => sum + (v.value || 0), 0);
       }
-      // Capture fan_adds trend for chart
-      if (name === 'page_fan_adds') {
+      // Capture follows trend for chart (replaces fan_adds)
+      if (name === 'page_daily_follows_unique') {
         for (const v of values) {
-          fanTrend.push({
+          followTrend.push({
             date: v.end_time?.split('T')[0] || '',
             value: v.value || 0,
           });
@@ -147,7 +150,7 @@ async function handleOverview(
       fan_count: pageInfo.fan_count || 0,
     },
     metrics,
-    fan_trend: fanTrend,
+    follow_trend: followTrend,
   });
 }
 
