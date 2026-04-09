@@ -90,15 +90,16 @@ interface DailyRow {
 type SortField = keyof Omit<CampaignAggregate, 'campaign_id' | 'campaign_name' | 'status' | 'dailyBreakdown'>;
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers (fuera del componente — #14 fix: no se recrean cada render)
 // ---------------------------------------------------------------------------
 
+// #8 fix: tildes en labels
 const DATE_RANGE_OPTIONS: { key: DateRangeKey; label: string; days: number }[] = [
-  { key: '7d', label: '7 dias', days: 7 },
-  { key: '14d', label: '14 dias', days: 14 },
-  { key: '30d', label: '30 dias', days: 30 },
-  { key: '60d', label: '60 dias', days: 60 },
-  { key: '90d', label: '90 dias', days: 90 },
+  { key: '7d', label: '7 días', days: 7 },
+  { key: '14d', label: '14 días', days: 14 },
+  { key: '30d', label: '30 días', days: 30 },
+  { key: '60d', label: '60 días', days: 60 },
+  { key: '90d', label: '90 días', days: 90 },
 ];
 
 function daysAgo(n: number): string {
@@ -127,7 +128,28 @@ const pctChange = (current: number, previous: number): number | null => {
   return ((current - previous) / previous) * 100;
 };
 
+const sumField = (rows: CampaignMetricRow[], field: 'impressions' | 'clicks' | 'spend' | 'conversions' | 'conversion_value') =>
+  rows.reduce((s, r) => s + (Number(r[field]) || 0), 0);
+
 const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+// #14 fix: mapas de estilo estáticos fuera del componente
+const ACCENT_MAP: Record<string, string> = {
+  blue: 'from-[#2A4F9E]/10 to-[#2A4F9E]/5 border-[#2A4F9E]/20',
+  green: 'from-green-500/10 to-green-500/5 border-green-500/20',
+  purple: 'from-purple-500/10 to-purple-500/5 border-purple-500/20',
+  red: 'from-red-500/10 to-red-500/5 border-red-500/20',
+  amber: 'from-amber-500/10 to-amber-500/5 border-amber-500/20',
+  cyan: 'from-cyan-500/10 to-cyan-500/5 border-cyan-500/20',
+};
+const ICON_COLOR_MAP: Record<string, string> = {
+  blue: 'text-[#2A4F9E] bg-[#1E3A7B]/10',
+  green: 'text-green-500 bg-green-500/10',
+  purple: 'text-purple-500 bg-purple-500/10',
+  red: 'text-red-500 bg-red-500/10',
+  amber: 'text-amber-500 bg-amber-500/10',
+  cyan: 'text-cyan-500 bg-cyan-500/10',
+};
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -164,28 +186,12 @@ function KpiCard({
   invertColors?: boolean;
   children?: React.ReactNode;
 }) {
-  const accentMap: Record<string, string> = {
-    blue: 'from-[#2A4F9E]/10 to-[#2A4F9E]/5 border-[#2A4F9E]/20',
-    green: 'from-green-500/10 to-green-500/5 border-green-500/20',
-    purple: 'from-purple-500/10 to-purple-500/5 border-purple-500/20',
-    red: 'from-red-500/10 to-red-500/5 border-red-500/20',
-    amber: 'from-amber-500/10 to-amber-500/5 border-amber-500/20',
-    cyan: 'from-cyan-500/10 to-cyan-500/5 border-cyan-500/20',
-  };
-  const iconColorMap: Record<string, string> = {
-    blue: 'text-[#2A4F9E] bg-[#1E3A7B]/10',
-    green: 'text-green-500 bg-green-500/10',
-    purple: 'text-purple-500 bg-purple-500/10',
-    red: 'text-red-500 bg-red-500/10',
-    amber: 'text-amber-500 bg-amber-500/10',
-    cyan: 'text-cyan-500 bg-cyan-500/10',
-  };
   return (
-    <Card className={`relative overflow-hidden border bg-gradient-to-br ${accentMap[accent] || accentMap.blue}`}>
+    <Card className={`relative overflow-hidden border bg-gradient-to-br ${ACCENT_MAP[accent] || ACCENT_MAP.blue}`}>
       <CardContent className="pt-5 pb-5 px-5">
         <div className="flex items-start justify-between mb-3">
           <span className="text-sm font-medium text-muted-foreground leading-tight">{title}</span>
-          <div className={`p-2 rounded-lg ${iconColorMap[accent] || iconColorMap.blue}`}>
+          <div className={`p-2 rounded-lg ${ICON_COLOR_MAP[accent] || ICON_COLOR_MAP.blue}`}>
             <Icon className="w-4 h-4" />
           </div>
         </div>
@@ -204,6 +210,12 @@ function StatusBadge({ status }: { status: string }) {
   if (s === 'ENABLED') return <Badge className="bg-green-500/15 text-green-600 border-green-500/30 text-xs">Activa</Badge>;
   if (s === 'PAUSED') return <Badge className="bg-yellow-500/15 text-yellow-600 border-yellow-500/30 text-xs">Pausada</Badge>;
   return <Badge variant="outline" className="text-xs">{status}</Badge>;
+}
+
+// #14 fix: SortIcon como función pura que recibe todo por parámetros (no se redefine cada render)
+function renderSortIcon(field: SortField, sortField: SortField, sortAsc: boolean) {
+  if (sortField !== field) return null;
+  return sortAsc ? <TrendingUp className="w-3 h-3 inline ml-1" /> : <TrendingDown className="w-3 h-3 inline ml-1" />;
 }
 
 // ---------------------------------------------------------------------------
@@ -284,30 +296,47 @@ export default function GoogleAnalyticsDashboard({
     if (!connectionId) { setMetrics([]); setPrevMetrics([]); setLoading(false); return; }
     setLoading(true);
     try {
-      const { data: currentData, error: currentError } = await supabase
-        .from('campaign_metrics')
-        .select('*')
-        .eq('connection_id', connectionId)
-        .eq('platform', 'google')
-        .gte('metric_date', from)
-        .lte('metric_date', to)
-        .order('metric_date', { ascending: true });
+      // #1 fix: paginated fetch para evitar truncamiento silencioso de 1000 rows
+      const fetchAll = async (query: ReturnType<ReturnType<typeof supabase.from>['select']>) => {
+        const PAGE = 1000;
+        let offset = 0;
+        let all: CampaignMetricRow[] = [];
+        let done = false;
+        while (!done) {
+          const { data, error } = await query.range(offset, offset + PAGE - 1);
+          if (error) throw error;
+          const rows = (data as CampaignMetricRow[]) || [];
+          all = all.concat(rows);
+          done = rows.length < PAGE;
+          offset += PAGE;
+        }
+        return all;
+      };
 
-      if (currentError) throw currentError;
+      const currentData = await fetchAll(
+        supabase
+          .from('campaign_metrics')
+          .select('*')
+          .eq('connection_id', connectionId)
+          .eq('platform', 'google')
+          .gte('metric_date', from)
+          .lte('metric_date', to)
+          .order('metric_date', { ascending: true })
+      );
 
-      const { data: prevData, error: prevError } = await supabase
-        .from('campaign_metrics')
-        .select('*')
-        .eq('connection_id', connectionId)
-        .eq('platform', 'google')
-        .gte('metric_date', prevFrom)
-        .lt('metric_date', from)
-        .order('metric_date', { ascending: true });
+      const prevData = await fetchAll(
+        supabase
+          .from('campaign_metrics')
+          .select('*')
+          .eq('connection_id', connectionId)
+          .eq('platform', 'google')
+          .gte('metric_date', prevFrom)
+          .lt('metric_date', from)
+          .order('metric_date', { ascending: true })
+      );
 
-      if (prevError) throw prevError;
-
-      setMetrics((currentData as CampaignMetricRow[]) || []);
-      setPrevMetrics((prevData as CampaignMetricRow[]) || []);
+      setMetrics(currentData);
+      setPrevMetrics(prevData);
     } catch {
       toast.error('Error al cargar datos de Google Ads');
     } finally {
@@ -331,9 +360,6 @@ export default function GoogleAnalyticsDashboard({
   }
 
   // Aggregations
-  const sumField = (rows: CampaignMetricRow[], field: 'impressions' | 'clicks' | 'spend' | 'conversions' | 'conversion_value') =>
-    rows.reduce((s, r) => s + (Number(r[field]) || 0), 0);
-
   const totals = useMemo(() => {
     const spend = sumField(metrics, 'spend');
     const impressions = sumField(metrics, 'impressions');
@@ -376,6 +402,8 @@ export default function GoogleAnalyticsDashboard({
     for (const m of metrics) {
       const entry = map.get(m.campaign_id) || { rows: [], name: m.campaign_name };
       entry.rows.push(m);
+      // #6 fix: siempre actualizar el nombre al más reciente
+      entry.name = m.campaign_name;
       map.set(m.campaign_id, entry);
     }
 
@@ -417,10 +445,12 @@ export default function GoogleAnalyticsDashboard({
         .sort((a, b) => b.date.localeCompare(a.date));
 
       const sortedByDate = [...rows].sort((a, b) => b.metric_date.localeCompare(a.metric_date));
-      const realStatus = sortedByDate[0]?.campaign_status || 'ENABLED';
+      // #5 fix: status null → 'UNKNOWN' en vez de asumir ENABLED
+      const rawStatus = sortedByDate[0]?.campaign_status;
+      const realStatus = rawStatus ? rawStatus.toUpperCase() : 'UNKNOWN';
 
       result.push({
-        campaign_id: id, campaign_name: name, status: realStatus.toUpperCase(),
+        campaign_id: id, campaign_name: name, status: realStatus,
         spend, impressions, clicks, ctr, cpc, cpm,
         conversions, revenue, roas, cpa, dailyBreakdown,
       });
@@ -441,19 +471,29 @@ export default function GoogleAnalyticsDashboard({
     [campaigns],
   );
 
-  // Funnel data
+  // #12 fix: CPA actual calculado una sola vez
+  const currentCpa = useMemo(
+    () => totals.conversions > 0 ? totals.spend / totals.conversions : 0,
+    [totals],
+  );
+
+  // Funnel data — #4 fix: cap estimated steps so funnel never inverts
+  // #15 fix: labels genéricos (no "Agregar al Carro")
   const funnelData = useMemo(() => {
     const impressions = totals.impressions;
     const clicks = totals.clicks;
     const landingPageViews = Math.round(clicks * 0.85);
-    const addToCart = Math.round(landingPageViews * 0.30);
+    // #4 fix: estimated addToCart can't exceed actual conversions
+    const rawAddToCart = Math.round(landingPageViews * 0.30);
     const purchases = totals.conversions;
+    const addToCart = Math.max(rawAddToCart, purchases);
 
     const steps = [
       { name: 'Impresiones', value: impressions },
       { name: 'Clics', value: clicks },
       { name: 'Vistas LP', value: landingPageViews },
-      { name: 'Agregar al Carro', value: addToCart },
+      // #15 fix: label genérico en vez de "Agregar al Carro"
+      { name: 'Interacciones', value: addToCart },
       { name: 'Conversiones', value: purchases },
     ];
 
@@ -473,7 +513,11 @@ export default function GoogleAnalyticsDashboard({
   const insights = useMemo(() => {
     if (campaigns.length === 0) return null;
 
-    const bestCampaign = [...campaigns].sort((a, b) => b.roas - a.roas)[0];
+    // #3 fix: bestCampaign solo entre ENABLED (no pausadas)
+    const enabledCampaigns = campaigns.filter((c) => c.status === 'ENABLED');
+    const bestCampaign = enabledCampaigns.length > 0
+      ? [...enabledCampaigns].sort((a, b) => b.roas - a.roas)[0]
+      : [...campaigns].sort((a, b) => b.roas - a.roas)[0];
 
     const worstCampaign = [...campaigns]
       .filter((c) => c.spend > 0 && c.status === 'ENABLED')
@@ -481,7 +525,8 @@ export default function GoogleAnalyticsDashboard({
 
     const activeCampaignsAll = campaigns.filter((c) => c.status === 'ENABLED');
     const highRoasCampaigns = activeCampaignsAll.filter((c) => c.roas >= 3 && c.spend > 0);
-    const lowRoasCampaigns = activeCampaignsAll.filter((c) => c.roas < 2 && c.roas > 0 && c.spend > 0);
+    // #11 fix: incluir ROAS=0 en low ROAS (son los peores)
+    const lowRoasCampaigns = activeCampaignsAll.filter((c) => c.roas < 2 && c.spend > 0);
     let budgetRec: string | null = null;
     if (highRoasCampaigns.length > 0 && lowRoasCampaigns.length > 0) {
       const shiftAmount = lowRoasCampaigns.reduce((s, c) => s + c.spend * 0.3, 0);
@@ -570,18 +615,22 @@ export default function GoogleAnalyticsDashboard({
     return { day: DAY_NAMES[bestDay], roas: bestRoas };
   }, [dailyChartData]);
 
-  // Monthly projection
+  // Monthly projection — #2 fix: dividir por días reales con data, no por rango seleccionado
   const projection = useMemo(() => {
-    if (days <= 0 || totals.revenue <= 0) return null;
-    const dailyRevenue = totals.revenue / days;
-    const dailySpend = totals.spend / days;
+    const actualDays = dailyChartData.length;
+    if (actualDays <= 0 || totals.revenue <= 0) return null;
+    const dailyRevenue = totals.revenue / actualDays;
+    const dailySpend = totals.spend / actualDays;
     const projectedRevenue = dailyRevenue * 30;
     const projectedSpend = dailySpend * 30;
     const projectedRoas = projectedSpend > 0 ? projectedRevenue / projectedSpend : 0;
     return { revenue: projectedRevenue, roas: projectedRoas };
-  }, [totals, days]);
+  }, [totals, dailyChartData]);
 
-  // PDF Export
+  // PDF Export — #7 fix: sanitizar texto para jsPDF Helvetica
+  const sanitizeForPdf = (text: string): string =>
+    text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ñ/g, 'n').replace(/Ñ/g, 'N');
+
   const handleExportPdf = () => {
     setGeneratingPdf(true);
     try {
@@ -597,20 +646,24 @@ export default function GoogleAnalyticsDashboard({
         }
       };
 
+      const safeText = (text: string, x: number, yPos: number) => {
+        doc.text(sanitizeForPdf(text), x, yPos);
+      };
+
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('Reporte Google Ads', 14, y);
+      safeText('Reporte Google Ads', 14, y);
       y += 8;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Periodo: ${dateRange}`, 14, y);
-      doc.text(`Generado: ${new Date().toLocaleDateString('es-CL')}`, w - 60, y);
+      safeText(`Periodo: ${dateRange}`, 14, y);
+      safeText(`Generado: ${new Date().toLocaleDateString('es-CL')}`, w - 60, y);
       y += 12;
 
       checkPage(60);
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text('KPIs', 14, y);
+      safeText('KPIs', 14, y);
       y += 7;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
@@ -627,7 +680,7 @@ export default function GoogleAnalyticsDashboard({
 
       for (const [label, value] of kpis) {
         checkPage(6);
-        doc.text(`${label}: ${value}`, 14, y);
+        safeText(`${label}: ${value}`, 14, y);
         y += 6;
       }
       y += 6;
@@ -635,7 +688,7 @@ export default function GoogleAnalyticsDashboard({
       checkPage(40);
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text('Top 5 Campañas', 14, y);
+      safeText('Top 5 Campanas', 14, y);
       y += 7;
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
@@ -644,7 +697,7 @@ export default function GoogleAnalyticsDashboard({
       for (const c of topCamps) {
         checkPage(5);
         const line = `${c.campaign_name.slice(0, 40)} — ROAS: ${c.roas.toFixed(2)}x | Gasto: ${formatCLP(c.spend)} | Conv: ${Math.round(c.conversions)}`;
-        doc.text(line, 14, y);
+        safeText(line, 14, y);
         y += 5;
       }
       y += 8;
@@ -653,24 +706,26 @@ export default function GoogleAnalyticsDashboard({
         checkPage(30);
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
-        doc.text('AI Insights', 14, y);
+        safeText('AI Insights', 14, y);
         y += 7;
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
 
         if (insights.bestCampaign) {
           checkPage(5);
-          doc.text(`Mejor campaña: ${insights.bestCampaign.campaign_name} (ROAS ${insights.bestCampaign.roas.toFixed(2)}x)`, 14, y);
+          safeText(`Mejor campana: ${insights.bestCampaign.campaign_name} (ROAS ${insights.bestCampaign.roas.toFixed(2)}x)`, 14, y);
           y += 5;
         }
         if (insights.budgetRec) {
-          const lines = doc.splitTextToSize(`Recomendación: ${insights.budgetRec}`, w - 28);
+          const sanitized = sanitizeForPdf(`Recomendacion: ${insights.budgetRec}`);
+          const lines = doc.splitTextToSize(sanitized, w - 28);
           checkPage(lines.length * 5);
           doc.text(lines, 14, y);
           y += lines.length * 5;
         }
         if (insights.creativeFatigue) {
-          const lines = doc.splitTextToSize(`Alerta: ${insights.creativeFatigue}`, w - 28);
+          const sanitized = sanitizeForPdf(`Alerta: ${insights.creativeFatigue}`);
+          const lines = doc.splitTextToSize(sanitized, w - 28);
           checkPage(lines.length * 5);
           doc.text(lines, 14, y);
           y += lines.length * 5;
@@ -696,20 +751,20 @@ export default function GoogleAnalyticsDashboard({
     }
   }
 
+  // #13 fix: if/else en vez de ternary con side effects
   function toggleRow(id: string) {
     setExpandedRows((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   }
 
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return null;
-    return sortAsc ? <TrendingUp className="w-3 h-3 inline ml-1" /> : <TrendingDown className="w-3 h-3 inline ml-1" />;
-  };
-
-  // Loading skeleton
+  // Loading skeleton — #9 fix: mostrar overlay de loading al cambiar date range
   if (loading && metrics.length === 0) {
     return (
       <div className="space-y-4">
@@ -722,8 +777,18 @@ export default function GoogleAnalyticsDashboard({
     );
   }
 
+  const hasData = metrics.length > 0;
+
   return (
     <div className="space-y-5">
+      {/* #9 fix: loading overlay cuando hay data cacheada */}
+      {loading && hasData && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg px-4 py-2">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Actualizando datos...
+        </div>
+      )}
+
       {/* 1. Proactive Alerts */}
       {proactiveAlerts.length > 0 && (
         <div className="space-y-2">
@@ -775,7 +840,7 @@ export default function GoogleAnalyticsDashboard({
             variant="outline"
             size="sm"
             onClick={handleExportPdf}
-            disabled={generatingPdf || metrics.length === 0}
+            disabled={generatingPdf || !hasData}
           >
             {generatingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileDown className="w-4 h-4 mr-2" />}
             Exportar PDF
@@ -791,7 +856,7 @@ export default function GoogleAnalyticsDashboard({
         </div>
       </div>
 
-      {/* 4. KPI Cards with progress bar on ROAS */}
+      {/* 4. KPI Cards with progress bars */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         <KpiCard
           title="Gasto"
@@ -830,6 +895,7 @@ export default function GoogleAnalyticsDashboard({
           accent="amber"
           invertColors
         />
+        {/* #12 fix: usa currentCpa memoizado */}
         <KpiCard
           title="Conversiones"
           value={formatNumber(totals.conversions)}
@@ -841,12 +907,12 @@ export default function GoogleAnalyticsDashboard({
             <div className="mt-3">
               <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                 <span>CPA máx: {formatCLP(savedGoals.cpa)}</span>
-                <span>{formatCLP(totals.spend / totals.conversions)}</span>
+                <span>{formatCLP(currentCpa)}</span>
               </div>
               <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${getTargetBgColor(getTargetStatus(totals.spend / totals.conversions, savedGoals.cpa, false))}`}
-                  style={{ width: `${Math.min(100, getProgressPercent(totals.spend / totals.conversions, savedGoals.cpa, false))}%` }}
+                  className={`h-full rounded-full transition-all ${getTargetBgColor(getTargetStatus(currentCpa, savedGoals.cpa, false))}`}
+                  style={{ width: `${Math.min(100, getProgressPercent(currentCpa, savedGoals.cpa, false))}%` }}
                 />
               </div>
             </div>
@@ -897,7 +963,7 @@ export default function GoogleAnalyticsDashboard({
                 <p className="text-lg font-bold">
                   Cerrarás el mes con <span className="text-cyan-600">{formatCLP(projection.revenue)}</span> y ROAS {projection.roas.toFixed(1)}x
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">Proyección lineal basada en los últimos {days} días</p>
+                <p className="text-xs text-muted-foreground mt-1">Proyección basada en {dailyChartData.length} días con datos</p>
               </CardContent>
             </Card>
           )}
@@ -945,141 +1011,146 @@ export default function GoogleAnalyticsDashboard({
         </Card>
       )}
 
-      {/* 7. Funnel de Conversión */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Embudo de Conversión</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {totals.impressions === 0 ? (
-            <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
-              Sin datos de embudo para el periodo seleccionado
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {funnelData.map((step, i) => (
-                <div key={step.name} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium w-28">{step.name}</span>
-                      {step.convRate && (
-                        <Badge variant="outline" className="text-[10px] h-5">
-                          {step.convRate}
-                        </Badge>
-                      )}
+      {/* #10 fix: Funnel y Insights solo cuando hay datos */}
+      {hasData && (
+        <>
+          {/* 7. Funnel de Conversión */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Embudo de Conversión</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {totals.impressions === 0 ? (
+                <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
+                  Sin datos de embudo para el periodo seleccionado
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {funnelData.map((step, i) => (
+                    <div key={step.name} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium w-28">{step.name}</span>
+                          {step.convRate && (
+                            <Badge variant="outline" className="text-[10px] h-5">
+                              {step.convRate}
+                            </Badge>
+                          )}
+                        </div>
+                        <span className="font-mono text-xs tabular-nums">
+                          {formatNumber(step.value)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-6 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-700 ease-out"
+                          style={{
+                            width: `${Math.max(step.pct, 1)}%`,
+                            background: `linear-gradient(90deg, hsl(${220 - i * 30}, 80%, 55%), hsl(${220 - i * 30}, 70%, 45%))`,
+                          }}
+                        />
+                      </div>
                     </div>
-                    <span className="font-mono text-xs tabular-nums">
-                      {formatNumber(step.value)}
-                    </span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-6 overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-700 ease-out"
-                      style={{
-                        width: `${Math.max(step.pct, 1)}%`,
-                        background: `linear-gradient(90deg, hsl(${220 - i * 30}, 80%, 55%), hsl(${220 - i * 30}, 70%, 45%))`,
-                      }}
-                    />
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* 8. AI Insights */}
-      <Card className="border-primary/20">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-primary" />
-            Insights de Optimización
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!insights || campaigns.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              No hay suficientes datos para generar insights. Sincroniza tus campañas primero.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Best performing */}
-              <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="w-4 h-4 text-green-500" />
-                  <span className="text-sm font-medium text-green-600">Mejor campaña</span>
-                </div>
-                <p className="text-sm font-medium">{insights.bestCampaign.campaign_name}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  ROAS: <span className="text-green-500 font-semibold">{formatRoas(insights.bestCampaign.roas)}</span>
-                  {' | '}Ingresos: {formatCLP(insights.bestCampaign.revenue)}
-                  {' | '}Gasto: {formatCLP(insights.bestCampaign.spend)}
+          {/* 8. AI Insights */}
+          <Card className="border-primary/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                Insights de Optimización
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!insights || campaigns.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  No hay suficientes datos para generar insights. Sincroniza tus campañas primero.
                 </p>
-              </div>
-
-              {/* Worst performing — only ENABLED */}
-              {insights.worstCampaign && insights.worstCampaign.campaign_id !== insights.bestCampaign.campaign_id && (
-                <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingDown className="w-4 h-4 text-red-500" />
-                    <span className="text-sm font-medium text-red-600">Campaña a optimizar</span>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Best performing */}
+                  <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="w-4 h-4 text-green-500" />
+                      <span className="text-sm font-medium text-green-600">Mejor campaña</span>
+                    </div>
+                    <p className="text-sm font-medium">{insights.bestCampaign.campaign_name}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ROAS: <span className="text-green-500 font-semibold">{formatRoas(insights.bestCampaign.roas)}</span>
+                      {' | '}Ingresos: {formatCLP(insights.bestCampaign.revenue)}
+                      {' | '}Gasto: {formatCLP(insights.bestCampaign.spend)}
+                    </p>
                   </div>
-                  <p className="text-sm font-medium">{insights.worstCampaign.campaign_name}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    ROAS: <span className="text-red-500 font-semibold">{formatRoas(insights.worstCampaign.roas)}</span>
-                    {' | '}Gasto: {formatCLP(insights.worstCampaign.spend)}
-                    {insights.worstCampaign.conversions > 0 && <>{' | '}CPA: {formatCLP(insights.worstCampaign.cpa)}</>}
-                  </p>
-                  <p className="text-xs mt-2 text-red-600/80">
-                    {insights.worstCampaign.roas < 1
-                      ? `Esta campaña gasta más de lo que genera (ROAS ${formatRoas(insights.worstCampaign.roas)}). Considera pausarla y reasignar presupuesto a "${insights.bestCampaign.campaign_name}".`
-                      : insights.worstCampaign.roas < 2
-                        ? `ROAS bajo (${formatRoas(insights.worstCampaign.roas)}). Prueba nuevos creativos o audiencias antes de aumentar inversión.`
-                        : `Es la de menor rendimiento activa. Revisa segmentación y prueba nuevas imágenes/videos.`
-                    }
-                  </p>
+
+                  {/* Worst performing — only ENABLED */}
+                  {insights.worstCampaign && insights.worstCampaign.campaign_id !== insights.bestCampaign.campaign_id && (
+                    <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingDown className="w-4 h-4 text-red-500" />
+                        <span className="text-sm font-medium text-red-600">Campaña a optimizar</span>
+                      </div>
+                      <p className="text-sm font-medium">{insights.worstCampaign.campaign_name}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        ROAS: <span className="text-red-500 font-semibold">{formatRoas(insights.worstCampaign.roas)}</span>
+                        {' | '}Gasto: {formatCLP(insights.worstCampaign.spend)}
+                        {insights.worstCampaign.conversions > 0 && <>{' | '}CPA: {formatCLP(insights.worstCampaign.cpa)}</>}
+                      </p>
+                      <p className="text-xs mt-2 text-red-600/80">
+                        {insights.worstCampaign.roas < 1
+                          ? `Esta campaña gasta más de lo que genera (ROAS ${formatRoas(insights.worstCampaign.roas)}). Considera pausarla y reasignar presupuesto a "${insights.bestCampaign.campaign_name}".`
+                          : insights.worstCampaign.roas < 2
+                            ? `ROAS bajo (${formatRoas(insights.worstCampaign.roas)}). Prueba nuevos creativos o audiencias antes de aumentar inversión.`
+                            : `Es la de menor rendimiento activa. Revisa segmentación y prueba nuevas imágenes/videos.`
+                        }
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Budget recommendation */}
+                  {insights.budgetRec && (
+                    <div className="rounded-lg border border-[#2A4F9E]/20 bg-[#1E3A7B]/5 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <DollarSign className="w-4 h-4 text-[#2A4F9E]" />
+                        <span className="text-sm font-medium text-[#1E3A7B]">Recomendación de presupuesto</span>
+                      </div>
+                      <p className="text-sm">{insights.budgetRec}</p>
+                    </div>
+                  )}
+
+                  {/* Creative fatigue */}
+                  {insights.creativeFatigue && (
+                    <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Eye className="w-4 h-4 text-orange-500" />
+                        <span className="text-sm font-medium text-orange-600">Fatiga creativa detectada</span>
+                      </div>
+                      <p className="text-sm">{insights.creativeFatigue}</p>
+                    </div>
+                  )}
+
+                  {/* Stable state */}
+                  {!insights.budgetRec && !insights.creativeFatigue && (
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-medium text-primary">Estado general</span>
+                      </div>
+                      <p className="text-sm">
+                        Las campañas se ven estables. Sin alertas de fatiga creativa ni desbalances
+                        de presupuesto detectados en este periodo.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
-
-              {/* Budget recommendation */}
-              {insights.budgetRec && (
-                <div className="rounded-lg border border-[#2A4F9E]/20 bg-[#1E3A7B]/5 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="w-4 h-4 text-[#2A4F9E]" />
-                    <span className="text-sm font-medium text-[#1E3A7B]">Recomendación de presupuesto</span>
-                  </div>
-                  <p className="text-sm">{insights.budgetRec}</p>
-                </div>
-              )}
-
-              {/* Creative fatigue */}
-              {insights.creativeFatigue && (
-                <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Eye className="w-4 h-4 text-orange-500" />
-                    <span className="text-sm font-medium text-orange-600">Fatiga creativa detectada</span>
-                  </div>
-                  <p className="text-sm">{insights.creativeFatigue}</p>
-                </div>
-              )}
-
-              {/* Stable state */}
-              {!insights.budgetRec && !insights.creativeFatigue && (
-                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    <span className="text-sm font-medium text-primary">Estado general</span>
-                  </div>
-                  <p className="text-sm">
-                    Las campañas se ven estables. Sin alertas de fatiga creativa ni desbalances
-                    de presupuesto detectados en este periodo.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* 9. Campaign Table */}
       {sortedCampaigns.length > 0 && (
@@ -1095,19 +1166,19 @@ export default function GoogleAnalyticsDashboard({
                     <th className="text-left px-4 py-2.5 font-medium">Campaña</th>
                     <th className="text-left px-3 py-2.5 font-medium">Estado</th>
                     <th className="text-right px-3 py-2.5 font-medium cursor-pointer select-none" onClick={() => handleSort('spend')}>
-                      Gasto<SortIcon field="spend" />
+                      Gasto{renderSortIcon('spend', sortField, sortAsc)}
                     </th>
                     <th className="text-right px-3 py-2.5 font-medium cursor-pointer select-none" onClick={() => handleSort('clicks')}>
-                      Clicks<SortIcon field="clicks" />
+                      Clicks{renderSortIcon('clicks', sortField, sortAsc)}
                     </th>
                     <th className="text-right px-3 py-2.5 font-medium cursor-pointer select-none" onClick={() => handleSort('ctr')}>
-                      CTR<SortIcon field="ctr" />
+                      CTR{renderSortIcon('ctr', sortField, sortAsc)}
                     </th>
                     <th className="text-right px-3 py-2.5 font-medium cursor-pointer select-none" onClick={() => handleSort('conversions')}>
-                      Conv.<SortIcon field="conversions" />
+                      Conv.{renderSortIcon('conversions', sortField, sortAsc)}
                     </th>
                     <th className="text-right px-3 py-2.5 font-medium cursor-pointer select-none" onClick={() => handleSort('roas')}>
-                      ROAS<SortIcon field="roas" />
+                      ROAS{renderSortIcon('roas', sortField, sortAsc)}
                     </th>
                   </tr>
                 </thead>
@@ -1133,7 +1204,7 @@ export default function GoogleAnalyticsDashboard({
       )}
 
       {/* 10. Empty state */}
-      {!loading && metrics.length === 0 && (
+      {!loading && !hasData && (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground mb-3">No hay datos de campañas para este periodo.</p>
