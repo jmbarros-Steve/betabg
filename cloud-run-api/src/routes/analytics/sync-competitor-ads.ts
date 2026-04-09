@@ -1,7 +1,68 @@
 import { Context } from 'hono';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+
+const MIME_TO_EXT: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+};
+
+/**
+ * Download an image from Facebook CDN and persist it to Supabase Storage.
+ * Returns the public Supabase URL, or the original URL as fallback on any error.
+ */
+async function persistImage(
+  supabase: SupabaseClient,
+  imageUrl: string,
+  clientId: string,
+  adLibraryId: string,
+  index: number,
+): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+
+    const resp = await fetch(imageUrl, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!resp.ok) return imageUrl;
+
+    const contentType = resp.headers.get('content-type')?.split(';')[0]?.trim() || '';
+    const ext = MIME_TO_EXT[contentType];
+    if (!ext) return imageUrl; // not a supported image type
+
+    const buffer = await resp.arrayBuffer();
+    if (buffer.byteLength < 100 || buffer.byteLength > 10 * 1024 * 1024) return imageUrl;
+
+    const path = `competitors/${clientId}/${adLibraryId}_${index}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('ad-references')
+      .upload(path, buffer, {
+        contentType,
+        cacheControl: '31536000',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.warn(`[persistImage] Upload failed for ${path}:`, uploadError.message);
+      return imageUrl;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('ad-references')
+      .getPublicUrl(path);
+
+    return urlData.publicUrl;
+  } catch (err: any) {
+    console.warn(`[persistImage] Failed for ${imageUrl}:`, err.message);
+    return imageUrl;
+  }
+}
 
 interface AdLibraryAd {
   id: string;
@@ -360,6 +421,18 @@ function mapApifyAdToRow(
   // Dedupe
   const uniqueImages = [...new Set(imageUrls)];
 
+  // Landing URL — from snapshot or first card
+  const landingUrl = ad.snapshot?.linkUrl || ad.snapshot?.link_url
+    || ad.snapshot?.cards?.[0]?.linkUrl || ad.snapshot?.cards?.[0]?.link_url
+    || null;
+
+  // Video URL — prefer HD, fallback SD
+  let videoUrl: string | null = null;
+  if (ad.snapshot?.videos && ad.snapshot.videos.length > 0) {
+    const vid = ad.snapshot.videos[0];
+    videoUrl = vid.videoHdUrl || vid.videoSdUrl || null;
+  }
+
   return {
     tracking_id: trackingId,
     client_id: clientId,
@@ -382,6 +455,8 @@ function mapApifyAdToRow(
     reach_upper: reachUpper,
     platforms: platforms,
     image_urls: uniqueImages.length > 0 ? uniqueImages : null,
+    landing_url: landingUrl,
+    video_url: videoUrl,
   };
 }
 
@@ -578,6 +653,20 @@ export async function syncCompetitorAds(c: Context) {
           } else if (apifyResult.ads.length > 0) {
             // Success — map and save Apify ads
             const adsToUpsert = apifyResult.ads.map(ad => mapApifyAdToRow(ad, tracking.id, client_id));
+
+            // Persist images to Supabase Storage (max 3 per ad to limit storage)
+            console.log(`[sync-competitor-ads] ${handle}: Persisting images for ${adsToUpsert.length} ads...`);
+            for (const row of adsToUpsert) {
+              if (row.image_urls && Array.isArray(row.image_urls)) {
+                const urls = (row.image_urls as string[]).slice(0, 3);
+                const persisted = await Promise.all(
+                  urls.map((url, idx) => persistImage(supabase, url, client_id, row.ad_library_id, idx))
+                );
+                row.image_urls = persisted;
+                row.image_url = persisted[0] || row.image_url;
+              }
+            }
+
             // Log first mapped ad for debugging
             const firstAd = adsToUpsert[0];
             console.log(`[sync-competitor-ads] ${handle}: First mapped ad: text=${(firstAd?.ad_text || '').substring(0, 50)}, images=${(firstAd?.image_urls || []).length}, impressions=${firstAd?.impressions_lower}, type=${firstAd?.ad_type}`);

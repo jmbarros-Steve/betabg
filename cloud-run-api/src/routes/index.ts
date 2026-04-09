@@ -43,6 +43,7 @@ import { espejoHandler } from './ai/espejo.js';
 
 // Phase 2: Analytics
 import { syncCompetitorAds } from './analytics/sync-competitor-ads.js';
+import { analyzeCompetitorAds } from './analytics/analyze-competitor-ads.js';
 import { deepDiveCompetitor } from './analytics/deep-dive-competitor.js';
 import { fetchCampaignAdsets } from './analytics/fetch-campaign-adsets.js';
 import { syncCampaignMetrics } from './analytics/sync-campaign-metrics.js';
@@ -63,6 +64,7 @@ import { createShopifyCombo } from './shopify/create-shopify-combo.js';
 
 // Phase 3: Google
 import { syncGoogleAdsMetrics } from './google/sync-google-ads-metrics.js';
+import { checkGoogleAdsHealth } from './google/check-google-ads-health.js';
 
 // Phase 3: Other
 import { storePlatformConnection } from './utilities/store-platform-connection.js';
@@ -309,6 +311,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/creative-preview', authMiddleware, creativePreview);
   app.post('/api/espejo', authMiddleware, espejoHandler);
   app.post('/api/sync-competitor-ads', authMiddleware, syncCompetitorAds);
+  app.post('/api/analyze-competitor-ads', authMiddleware, analyzeCompetitorAds);
   app.post('/api/deep-dive-competitor', authMiddleware, deepDiveCompetitor);
   app.post('/api/fetch-campaign-adsets', authMiddleware, fetchCampaignAdsets);
   app.post('/api/sync-campaign-metrics', authMiddleware, syncCampaignMetrics);
@@ -390,6 +393,7 @@ export function registerRoutes(app: Hono) {
   // Phase 3: Platform Integrations (Google + Other)
   // ============================================================
   app.post('/api/sync-google-ads-metrics', authMiddleware, syncGoogleAdsMetrics);
+  app.post('/api/check-google-ads-health', authMiddleware, checkGoogleAdsHealth);
   app.post('/api/store-platform-connection', authMiddleware, storePlatformConnection);
 
   // ============================================================

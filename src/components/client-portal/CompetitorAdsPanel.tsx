@@ -253,96 +253,47 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
     }
   }
 
-  // AI Analysis
+  // AI Analysis via Claude Haiku
   async function handleAnalyze() {
     if (ads.length === 0) return;
     setAnalyzing(true);
     try {
-      const winners = ads.filter(a => (a.days_running || 0) >= 30);
-      const activeAds = ads.filter(a => a.is_active);
+      const response = await callApi('analyze-competitor-ads', {
+        body: {
+          ads: ads.map(a => ({
+            ad_text: a.ad_text,
+            ad_headline: a.ad_headline,
+            ad_type: a.ad_type,
+            cta_type: a.cta_type,
+            days_running: a.days_running,
+            is_active: a.is_active,
+            impressions_lower: a.impressions_lower,
+            impressions_upper: a.impressions_upper,
+            spend_lower: a.spend_lower,
+            spend_upper: a.spend_upper,
+            reach_lower: a.reach_lower,
+            reach_upper: a.reach_upper,
+            platforms: a.platforms,
+            landing_url: a.landing_url,
+          })),
+          competitor_count: tracking.length,
+        },
+        timeoutMs: 30_000,
+      });
 
-      const ctaCounts: Record<string, number> = {};
-      for (const ad of ads) {
-        const cta = ad.cta_type || 'OTHER';
-        ctaCounts[cta] = (ctaCounts[cta] || 0) + 1;
-      }
-      const topCtas = Object.entries(ctaCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([key, count]) => `${CTA_LABELS[key]?.label || key} (${count} ads)`);
+      if (response.error) throw new Error(response.error);
 
-      const typeCounts: Record<string, number> = {};
-      for (const ad of ads) {
-        const t = ad.ad_type || 'unknown';
-        typeCounts[t] = (typeCounts[t] || 0) + 1;
-      }
-      const topFormats = Object.entries(typeCounts)
-        .sort((a, b) => b[1] - a[1])
-        .map(([key, count]) => `${key} (${count})`);
-
-      const winnerTexts = winners.filter(w => w.ad_text).map(w => w.ad_text!);
-      const hasQuestions = winnerTexts.filter(t => t.includes('?')).length;
-      const hasEmojis = winnerTexts.filter(t => /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(t)).length;
-      const hasNumbers = winnerTexts.filter(t => /\d+%|\d+x|\$\d+/i.test(t)).length;
-
-      const patrones: string[] = [];
-      if (hasQuestions > winnerTexts.length * 0.3) patrones.push('Usan preguntas en el copy para generar curiosidad');
-      if (hasEmojis > winnerTexts.length * 0.4) patrones.push('Uso frecuente de emojis para llamar la atencion');
-      if (hasNumbers > winnerTexts.length * 0.2) patrones.push('Incluyen numeros y estadisticas en sus ads ganadores');
-      if (winners.length > 3) patrones.push(`${winners.length} ads llevan mas de 30 dias - estan escalando agresivamente`);
-      if (patrones.length === 0) patrones.push('Patron mixto - necesitan mas data para identificar tendencias claras');
-
-      // Use real spend data if available
-      const adsWithSpend = ads.filter(a => a.spend_lower && a.spend_upper);
-      let estimacion: string;
-      if (adsWithSpend.length > 0) {
-        const totalSpendLower = adsWithSpend.reduce((s, a) => s + (a.spend_lower || 0), 0);
-        const totalSpendUpper = adsWithSpend.reduce((s, a) => s + (a.spend_upper || 0), 0);
-        estimacion = `Gasto real reportado: $${formatNumber(totalSpendLower)}-$${formatNumber(totalSpendUpper)} USD total (${adsWithSpend.length} ads con datos)`;
-      } else {
-        const avgDays = ads.reduce((s, a) => s + (a.days_running || 0), 0) / Math.max(ads.length, 1);
-        const estMinDaily = activeAds.length * 15;
-        const estMaxDaily = activeAds.length * 50;
-        estimacion = `Estimacion: $${estMinDaily}-$${estMaxDaily} USD/dia (${activeAds.length} ads activos, promedio ${Math.round(avgDays)} dias)`;
-      }
-
-      const angulos: string[] = [];
-      for (const w of winnerTexts) {
-        const lower = w.toLowerCase();
-        if (lower.includes('descuento') || lower.includes('%') || lower.includes('off')) angulos.push('Descuentos/Ofertas');
-        else if (lower.includes('antes') || lower.includes('resultado')) angulos.push('Antes y Despues');
-        else if (lower.includes('mejor') || lower.includes('unico') || lower.includes('solo')) angulos.push('Bold Statement');
-        else if (lower.includes('?') || lower.includes('cansad') || lower.includes('busc')) angulos.push('Call Out');
-        else if (lower.includes('testimonio') || lower.includes('opinion') || lower.includes('review')) angulos.push('Reviews');
-        else angulos.push('Beneficios');
-      }
-      const uniqueAngulos = [...new Set(angulos)].slice(0, 4);
-
-      const ganadorInsights: string[] = [];
-      for (const w of winners.slice(0, 3)) {
-        const handle = tracking.find(t => t.id === w.tracking_id)?.ig_handle || '?';
-        const spendInfo = w.spend_lower && w.spend_upper ? ` | Gasto: $${w.spend_lower}-$${w.spend_upper}` : '';
-        const impInfo = w.impressions_lower && w.impressions_upper ? ` | ${formatNumber(w.impressions_lower)}-${formatNumber(w.impressions_upper)} imp.` : '';
-        ganadorInsights.push(
-          `@${handle}: "${(w.ad_headline || w.ad_text || '').slice(0, 60)}..." — ${w.days_running}d activo${spendInfo}${impInfo}. ${w.cta_type ? `CTA: ${CTA_LABELS[w.cta_type]?.label || w.cta_type}` : ''}`
-        );
-      }
-
-      const recomendaciones: string[] = [];
-      if (winners.length > 0) recomendaciones.push(`Hay ${winners.length} ads ganadores (30d+). Analiza sus copies y crea versiones mejoradas.`);
-      if (topCtas[0]) recomendaciones.push(`CTA mas popular: ${topCtas[0]}. Considera usar el mismo para competir.`);
-      if (uniqueAngulos[0]) recomendaciones.push(`Angulo dominante: ${uniqueAngulos[0]}. Prueba un angulo diferente para diferenciarte.`);
-      if (activeAds.length > 10) recomendaciones.push(`Competidores tienen ${activeAds.length} ads activos. Necesitas al menos ${Math.ceil(activeAds.length * 0.5)} para competir.`);
-      recomendaciones.push('Usa la metodologia 3:2:2 para testear variaciones inspiradas en los ganadores.');
+      const ai = response.data?.analysis;
+      if (!ai) throw new Error('No analysis returned');
 
       setAnalysis({
-        patrones,
-        angulos_frecuentes: uniqueAngulos,
-        formatos_usados: topFormats,
-        ctas_populares: topCtas,
-        estimacion_gasto: estimacion,
-        recomendaciones,
-        ganadores_insight: ganadorInsights,
+        patrones: ai.patrones || [],
+        angulos_frecuentes: ai.angulos_frecuentes || [],
+        formatos_usados: ai.formatos_usados || [],
+        ctas_populares: ai.ctas_populares || [],
+        estimacion_gasto: ai.estimacion_gasto || '',
+        recomendaciones: ai.recomendaciones || [],
+        ganadores_insight: ai.ganadores_insight || [],
       });
     } catch {
       toast.error('Error al analizar competidores');
