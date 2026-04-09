@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { logProspectEvent } from '../../lib/prospect-event-logger.js';
 import { sendMetaCAPIEvent } from '../../lib/meta-capi.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /** Update deal value, win probability, expected close date */
 export async function prospectUpdateDeal(c: Context) {
@@ -61,12 +62,16 @@ export async function prospectDetail(c: Context) {
     }
 
     // Fetch messages using the prospect's phone
-    const { data: messages } = await supabase
-      .from('wa_messages')
-      .select('id, direction, body, created_at, contact_name, metadata')
-      .eq('contact_phone', prospectRes.data.phone)
-      .order('created_at', { ascending: false })
-      .limit(50);
+    const messages = await safeQueryOrDefault<any>(
+      supabase
+        .from('wa_messages')
+        .select('id, direction, body, created_at, contact_name, metadata')
+        .eq('contact_phone', prospectRes.data.phone)
+        .order('created_at', { ascending: false })
+        .limit(50),
+      [],
+      'prospectCrm.getMessages',
+    );
 
     return c.json({
       prospect: prospectRes.data,
@@ -117,7 +122,11 @@ export async function prospectChangeStage(c: Context) {
     const user = c.get('user');
 
     // Get current stage for event log
-    const { data: prospect } = await supabase.from('wa_prospects').select('stage').eq('id', prospect_id).single();
+    const prospect = await safeQuerySingleOrDefault<any>(
+      supabase.from('wa_prospects').select('stage').eq('id', prospect_id).single(),
+      null,
+      'prospectCrm.getCurrentStage',
+    );
     const oldStage = prospect?.stage || 'unknown';
 
     const { error } = await supabase
@@ -231,7 +240,11 @@ export async function prospectMoveStage(c: Context) {
     const supabase = getSupabaseAdmin();
     const user = c.get('user');
 
-    const { data: prospect } = await supabase.from('wa_prospects').select('stage, phone, name, profile_name, deal_value').eq('id', prospect_id).single();
+    const prospect = await safeQuerySingleOrDefault<any>(
+      supabase.from('wa_prospects').select('stage, phone, name, profile_name, deal_value').eq('id', prospect_id).single(),
+      null,
+      'prospectCrm.getProspectForMove',
+    );
     const oldStage = prospect?.stage || 'unknown';
 
     if (oldStage === new_stage) return c.json({ success: true, moved: false });

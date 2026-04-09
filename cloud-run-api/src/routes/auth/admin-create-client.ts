@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * TEMPORARY: one-time admin setup utility.
@@ -134,14 +135,18 @@ export async function adminCreateClient(c: Context) {
     const results: Record<string, any> = {};
 
     // 1. Find the active Shopify connection (most recent active one)
-    const { data: shopifyConns } = await supabase
-      .from('platform_connections')
-      .select('id, client_id, is_active, shop_domain')
-      .eq('platform', 'shopify')
-      .eq('shop_domain', 'raicesdelalma.myshopify.com')
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(1);
+    const shopifyConns = await safeQueryOrDefault<any>(
+      supabase
+        .from('platform_connections')
+        .select('id, client_id, is_active, shop_domain')
+        .eq('platform', 'shopify')
+        .eq('shop_domain', 'raicesdelalma.myshopify.com')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1),
+      [],
+      'adminCreateClient.getShopifyConns',
+    );
 
     if (shopifyConns && shopifyConns.length > 0) {
       const conn = shopifyConns[0];
@@ -151,13 +156,17 @@ export async function adminCreateClient(c: Context) {
     }
 
     // 2. Find Klaviyo connections
-    const { data: klaviyoConns } = await supabase
-      .from('platform_connections')
-      .select('id, client_id, is_active')
-      .eq('platform', 'klaviyo')
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(1);
+    const klaviyoConns = await safeQueryOrDefault<any>(
+      supabase
+        .from('platform_connections')
+        .select('id, client_id, is_active')
+        .eq('platform', 'klaviyo')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1),
+      [],
+      'adminCreateClient.getKlaviyoConns',
+    );
 
     if (klaviyoConns && klaviyoConns.length > 0) {
       const conn = klaviyoConns[0];
@@ -166,11 +175,15 @@ export async function adminCreateClient(c: Context) {
     }
 
     // 3. Delete ALL duplicate Shopify connections (inactive or pointing to wrong clients)
-    const { data: dupeConns } = await supabase
-      .from('platform_connections')
-      .select('id')
-      .eq('shop_domain', 'raicesdelalma.myshopify.com')
-      .neq('client_id', correctClientId);
+    const dupeConns = await safeQueryOrDefault<any>(
+      supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('shop_domain', 'raicesdelalma.myshopify.com')
+        .neq('client_id', correctClientId),
+      [],
+      'adminCreateClient.getDupeConns',
+    );
 
     if (dupeConns && dupeConns.length > 0) {
       for (const dc of dupeConns) {
@@ -180,11 +193,15 @@ export async function adminCreateClient(c: Context) {
     }
 
     // 4. Delete duplicate "Patricio Correa" clients (keep only 9432e754)
-    const { data: dupeClients } = await supabase
-      .from('clients')
-      .select('id')
-      .ilike('name', '%Patricio%')
-      .neq('id', correctClientId);
+    const dupeClients = await safeQueryOrDefault<any>(
+      supabase
+        .from('clients')
+        .select('id')
+        .ilike('name', '%Patricio%')
+        .neq('id', correctClientId),
+      [],
+      'adminCreateClient.getDupeClients',
+    );
 
     if (dupeClients && dupeClients.length > 0) {
       // First delete their platform_connections (cascade might handle this)
@@ -196,8 +213,16 @@ export async function adminCreateClient(c: Context) {
     }
 
     // 5. Verify final state
-    const { data: finalClient } = await supabase.from('clients').select('*').eq('id', correctClientId).single();
-    const { data: finalConns } = await supabase.from('platform_connections').select('id, platform, store_name, is_active').eq('client_id', correctClientId);
+    const finalClient = await safeQuerySingleOrDefault<any>(
+      supabase.from('clients').select('*').eq('id', correctClientId).single(),
+      null,
+      'adminCreateClient.getFinalClient',
+    );
+    const finalConns = await safeQueryOrDefault<any>(
+      supabase.from('platform_connections').select('id, platform, store_name, is_active').eq('client_id', correctClientId),
+      [],
+      'adminCreateClient.getFinalConns',
+    );
 
     return c.json({
       success: true,
@@ -208,9 +233,21 @@ export async function adminCreateClient(c: Context) {
   }
 
   if (action === 'diagnostic') {
-    const { data: allClients } = await supabase.from('clients').select('id, name, email, company, shop_domain, client_user_id').order('created_at');
-    const { data: allConns } = await supabase.from('platform_connections').select('id, client_id, platform, store_name, shop_domain, is_active').order('created_at');
-    const { data: allRoles } = await supabase.from('user_roles').select('user_id, role, is_super_admin');
+    const allClients = await safeQueryOrDefault<any>(
+      supabase.from('clients').select('id, name, email, company, shop_domain, client_user_id').order('created_at'),
+      [],
+      'adminCreateClient.getAllClients',
+    );
+    const allConns = await safeQueryOrDefault<any>(
+      supabase.from('platform_connections').select('id, client_id, platform, store_name, shop_domain, is_active').order('created_at'),
+      [],
+      'adminCreateClient.getAllConns',
+    );
+    const allRoles = await safeQueryOrDefault<any>(
+      supabase.from('user_roles').select('user_id, role, is_super_admin'),
+      [],
+      'adminCreateClient.getAllRoles',
+    );
     return c.json({ clients: allClients, connections: allConns, roles: allRoles });
   }
 

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Google Calendar OAuth Callback
@@ -98,11 +99,15 @@ export async function googleCalendarOauthCallback(c: Context) {
     }
 
     // Upsert seller_calendars
-    const { data: existing } = await supabase
-      .from('seller_calendars')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    const existing = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('seller_calendars')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+      null,
+      'googleCalendarOauthCallback.getExistingCalendar',
+    );
 
     const calendarData = {
       user_id: user.id,

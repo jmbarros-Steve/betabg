@@ -18,6 +18,7 @@
 
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 export async function submitCorrection(c: Context) {
   const supabase = getSupabaseAdmin();
@@ -48,11 +49,15 @@ export async function submitCorrection(c: Context) {
     const ruleIds: string[] = message.metadata?.rule_ids || [];
 
     // 2. Fetch prospect info for context
-    const { data: prospect } = await supabase
-      .from('wa_prospects')
-      .select('id, phone, name, profile_name, company, what_they_sell, stage, lead_score')
-      .eq('phone', message.contact_phone)
-      .maybeSingle();
+    const prospect = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('wa_prospects')
+        .select('id, phone, name, profile_name, company, what_they_sell, stage, lead_score')
+        .eq('phone', message.contact_phone)
+        .maybeSingle(),
+      null,
+      'submitCorrection.getProspect',
+    );
 
     // 3. Update message metadata with rating
     const newMeta = {
@@ -83,11 +88,15 @@ export async function submitCorrection(c: Context) {
       // Boost rules: orden += 5 (cap 100)
       if (ruleIds.length > 0) {
         for (const ruleId of ruleIds) {
-          const { data: rule } = await supabase
-            .from('steve_knowledge')
-            .select('orden')
-            .eq('id', ruleId)
-            .maybeSingle();
+          const rule = await safeQuerySingleOrDefault<any>(
+            supabase
+              .from('steve_knowledge')
+              .select('orden')
+              .eq('id', ruleId)
+              .maybeSingle(),
+            null,
+            'submitCorrection.getRuleForBoost',
+          );
           if (rule) {
             await supabase
               .from('steve_knowledge')
@@ -124,11 +133,15 @@ export async function submitCorrection(c: Context) {
       // Degrade rules: orden -= 10
       if (ruleIds.length > 0) {
         for (const ruleId of ruleIds) {
-          const { data: rule } = await supabase
-            .from('steve_knowledge')
-            .select('orden')
-            .eq('id', ruleId)
-            .maybeSingle();
+          const rule = await safeQuerySingleOrDefault<any>(
+            supabase
+              .from('steve_knowledge')
+              .select('orden')
+              .eq('id', ruleId)
+              .maybeSingle(),
+            null,
+            'submitCorrection.getRuleForDegrade',
+          );
           if (rule) {
             await supabase
               .from('steve_knowledge')

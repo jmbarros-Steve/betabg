@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 interface AdLibraryAd {
   id: string;
@@ -427,14 +428,18 @@ export async function syncCompetitorAds(c: Context) {
     console.log(`[sync-competitor-ads] Processing ${handles.length} handles for client ${client_id}`);
 
     // Get Meta access token — needed for fallback (ig_handle only) path
-    const { data: metaConn } = await supabase
-      .from('platform_connections')
-      .select('id, access_token_encrypted, connection_type')
-      .eq('client_id', client_id)
-      .eq('platform', 'meta')
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle();
+    const metaConn = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('platform_connections')
+        .select('id, access_token_encrypted, connection_type')
+        .eq('client_id', client_id)
+        .eq('platform', 'meta')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle(),
+      null,
+      'syncCompetitorAds.getMetaConn',
+    );
 
     let accessToken = '';
     let tokenSource = '';

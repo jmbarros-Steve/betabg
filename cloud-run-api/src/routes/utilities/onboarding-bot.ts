@@ -11,6 +11,7 @@
 
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 export async function onboardingBot(c: Context) {
   try {
@@ -92,11 +93,15 @@ export async function onboardingBot(c: Context) {
           return c.json({ error: 'job_id is required' }, 400);
         }
 
-        const { data: job } = await supabase
-          .from('onboarding_jobs')
-          .select('*')
-          .eq('id', job_id)
-          .single();
+        const job = await safeQuerySingleOrDefault<any>(
+          supabase
+            .from('onboarding_jobs')
+            .select('*')
+            .eq('id', job_id)
+            .single(),
+          null,
+          'onboardingBot.getJob',
+        );
 
         if (!job) {
           return c.json({ error: 'Job not found' }, 404);
@@ -104,13 +109,17 @@ export async function onboardingBot(c: Context) {
 
         // Check if Shopify OAuth completed (token appeared in platform_connections)
         if (job.shopify_status === 'waiting_oauth' && job.client_id) {
-          const { data: conn } = await supabase
-            .from('platform_connections')
-            .select('is_active, store_name')
-            .eq('client_id', job.client_id)
-            .eq('platform', 'shopify')
-            .eq('is_active', true)
-            .single();
+          const conn = await safeQuerySingleOrDefault<any>(
+            supabase
+              .from('platform_connections')
+              .select('is_active, store_name')
+              .eq('client_id', job.client_id)
+              .eq('platform', 'shopify')
+              .eq('is_active', true)
+              .single(),
+            null,
+            'onboardingBot.getShopifyConn',
+          );
 
           if (conn) {
             // OAuth completed! Update job

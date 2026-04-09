@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 export async function generateCopy(c: Context) {
   try {
@@ -16,12 +17,16 @@ export async function generateCopy(c: Context) {
     if (!user || !clientId) {
       return c.json({ error: 'Missing authentication or clientId' }, 401);
     }
-    const { data: ownerCheck } = await supabase
-      .from('clients')
-      .select('id')
-      .eq('id', clientId)
-      .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
-      .maybeSingle();
+    const ownerCheck = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('clients')
+        .select('id')
+        .eq('id', clientId)
+        .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+        .maybeSingle(),
+      null,
+      'generateCopy.getOwnerCheck',
+    );
     if (!ownerCheck) {
       return c.json({ error: 'No tienes acceso a este cliente' }, 403);
     }

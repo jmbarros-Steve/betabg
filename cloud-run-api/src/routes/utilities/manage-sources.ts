@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 export async function manageSources(c: Context) {
   const supabase = getSupabaseAdmin();
@@ -16,7 +17,11 @@ export async function manageSources(c: Context) {
       return c.json({ success: true, source });
     }
     case 'list': {
-      const { data: sources } = await supabase.from('steve_sources').select('*').order('created_at', { ascending: false });
+      const sources = await safeQueryOrDefault<any>(
+        supabase.from('steve_sources').select('*').order('created_at', { ascending: false }),
+        [],
+        'manageSources.listSources',
+      );
       return c.json({ sources });
     }
     case 'toggle': {

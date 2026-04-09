@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { detectKnowledgeConflicts } from '../../lib/knowledge-conflict-detector.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 export async function trainSteve(c: Context) {
   try {
@@ -12,11 +13,15 @@ export async function trainSteve(c: Context) {
     return c.json({ error: 'Unauthorized' }, 403);
   }
 
-  const { data: userRole } = await supabase
-    .from('user_roles')
-    .select('is_super_admin, role')
-    .eq('user_id', user.id)
-    .maybeSingle();
+  const userRole = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('user_roles')
+      .select('is_super_admin, role')
+      .eq('user_id', user.id)
+      .maybeSingle(),
+    null,
+    'trainSteve.getUserRole',
+  );
 
   if (!userRole?.is_super_admin && userRole?.role !== 'admin') {
     return c.json({ error: 'Unauthorized' }, 403);

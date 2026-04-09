@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Changelog Watcher — Fase 5 A.4
@@ -150,13 +151,17 @@ export async function apiChangelogWatcher(c: Context) {
   console.log('[changelog-watcher] Starting daily changelog scan...');
 
   // Check last run to avoid duplicate alerts
-  const { data: lastRun } = await supabase
-    .from('qa_log')
-    .select('checked_at')
-    .eq('check_type', 'changelog_watcher')
-    .order('checked_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const lastRun = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('qa_log')
+      .select('checked_at')
+      .eq('check_type', 'changelog_watcher')
+      .order('checked_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    null,
+    'apiChangelogWatcher.getLastRun',
+  );
 
   const lastRunDate = lastRun?.checked_at
     ? new Date(lastRun.checked_at).toISOString().split('T')[0]
@@ -189,15 +194,19 @@ export async function apiChangelogWatcher(c: Context) {
 
   for (const entry of actionable) {
     // Check if a similar task already exists (avoid duplicates)
-    const { data: existing } = await supabase
-      .from('tasks')
-      .select('id')
-      .eq('type', 'fix')
-      .eq('source', 'ojos')
-      .ilike('title', `%${entry.platform}%changelog%`)
-      .eq('status', 'pending')
-      .limit(1)
-      .maybeSingle();
+    const existing = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('tasks')
+        .select('id')
+        .eq('type', 'fix')
+        .eq('source', 'ojos')
+        .ilike('title', `%${entry.platform}%changelog%`)
+        .eq('status', 'pending')
+        .limit(1)
+        .maybeSingle(),
+      null,
+      'apiChangelogWatcher.getExistingTask',
+    );
 
     if (existing) continue;
 

@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { logProspectEvent } from '../../lib/prospect-event-logger.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /** CRUD for sales tasks: list, create, update, complete */
 export async function salesTasksCrud(c: Context) {
@@ -109,25 +110,37 @@ export async function salesTasksAutoGenerate(c: Context) {
     let prospects: any[];
 
     if (prospect_id) {
-      const { data } = await supabase.from('wa_prospects').select('id, stage, lead_score, name, phone, meeting_status').eq('id', prospect_id).single();
+      const data = await safeQuerySingleOrDefault<any>(
+        supabase.from('wa_prospects').select('id, stage, lead_score, name, phone, meeting_status').eq('id', prospect_id).single(),
+        null,
+        'salesTasks.getProspectById',
+      );
       prospects = data ? [data] : [];
     } else {
-      const { data } = await supabase
-        .from('wa_prospects')
-        .select('id, stage, lead_score, name, phone, meeting_status')
-        .not('stage', 'in', '(converted,lost)')
-        .order('updated_at', { ascending: false })
-        .limit(50);
+      const data = await safeQueryOrDefault<any>(
+        supabase
+          .from('wa_prospects')
+          .select('id, stage, lead_score, name, phone, meeting_status')
+          .not('stage', 'in', '(converted,lost)')
+          .order('updated_at', { ascending: false })
+          .limit(50),
+        [],
+        'salesTasks.getActiveProspects',
+      );
       prospects = data || [];
     }
 
     // Get existing pending tasks to avoid duplicates
     const prospectIds = prospects.map(p => p.id);
-    const { data: existingTasks } = await supabase
-      .from('sales_tasks')
-      .select('prospect_id, task_type, status')
-      .in('prospect_id', prospectIds)
-      .eq('status', 'pending');
+    const existingTasks = await safeQueryOrDefault<any>(
+      supabase
+        .from('sales_tasks')
+        .select('prospect_id, task_type, status')
+        .in('prospect_id', prospectIds)
+        .eq('status', 'pending'),
+      [],
+      'salesTasks.getExistingTasks',
+    );
 
     const existingSet = new Set(
       (existingTasks || []).map(t => `${t.prospect_id}:${t.task_type}`)

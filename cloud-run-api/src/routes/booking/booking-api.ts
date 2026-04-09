@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
 import { sendMetaCAPIEvent } from '../../lib/meta-capi.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Booking API — Public endpoints for meeting scheduling
@@ -95,12 +96,16 @@ export async function bookingSlots(c: Context) {
   const supabase = getSupabaseAdmin();
 
   // Load seller config
-  const { data: seller } = await supabase
-    .from('seller_calendars')
-    .select('*')
-    .eq('id', sellerId)
-    .eq('is_active', true)
-    .maybeSingle();
+  const seller = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('seller_calendars')
+      .select('*')
+      .eq('id', sellerId)
+      .eq('is_active', true)
+      .maybeSingle(),
+    null,
+    'bookingApi.getSellerForSlots',
+  );
 
   if (!seller) return c.json({ error: 'Seller not found or inactive' }, 404);
 
@@ -251,12 +256,16 @@ export async function bookingConfirm(c: Context) {
   const supabase = getSupabaseAdmin();
 
   // Load seller
-  const { data: seller } = await supabase
-    .from('seller_calendars')
-    .select('*')
-    .eq('id', seller_id)
-    .eq('is_active', true)
-    .maybeSingle();
+  const seller = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('seller_calendars')
+      .select('*')
+      .eq('id', seller_id)
+      .eq('is_active', true)
+      .maybeSingle(),
+    null,
+    'bookingApi.getSellerForConfirm',
+  );
 
   if (!seller) return c.json({ error: 'Seller not found' }, 404);
 

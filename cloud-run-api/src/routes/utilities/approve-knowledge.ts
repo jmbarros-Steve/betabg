@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { propagateKnowledge } from '../../lib/knowledge-propagator.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 export async function approveKnowledge(c: Context) {
   const supabase = getSupabaseAdmin();
@@ -14,7 +15,11 @@ export async function approveKnowledge(c: Context) {
     case 'approve': {
       await supabase.from('steve_knowledge').update({ approval_status: 'approved', activo: true, orden: 90 }).in('id', ids);
       // Also approve siblings sharing the same insight_group_id
-      const { data: rows } = await supabase.from('steve_knowledge').select('insight_group_id').in('id', ids);
+      const rows = await safeQueryOrDefault<any>(
+        supabase.from('steve_knowledge').select('insight_group_id').in('id', ids),
+        [],
+        'approveKnowledge.getGroupIds',
+      );
       const groupIds = (rows || []).map((r: any) => r.insight_group_id).filter(Boolean);
       if (groupIds.length > 0) {
         await supabase.from('steve_knowledge')
@@ -24,7 +29,11 @@ export async function approveKnowledge(c: Context) {
       }
       const allIds = [...ids];
       if (groupIds.length > 0) {
-        const { data: siblingRows } = await supabase.from('steve_knowledge').select('id').in('insight_group_id', groupIds);
+        const siblingRows = await safeQueryOrDefault<any>(
+          supabase.from('steve_knowledge').select('id').in('insight_group_id', groupIds),
+          [],
+          'approveKnowledge.getSiblingRows',
+        );
         if (siblingRows) allIds.push(...siblingRows.map((r: any) => r.id));
       }
       propagateKnowledge([...new Set(allIds)]).catch(err => console.error('[approve] Propagation error:', err));
@@ -33,7 +42,11 @@ export async function approveKnowledge(c: Context) {
     case 'reject': {
       await supabase.from('steve_knowledge').update({ approval_status: 'rejected', activo: false }).in('id', ids);
       // Also reject siblings sharing the same insight_group_id
-      const { data: rejRows } = await supabase.from('steve_knowledge').select('insight_group_id').in('id', ids);
+      const rejRows = await safeQueryOrDefault<any>(
+        supabase.from('steve_knowledge').select('insight_group_id').in('id', ids),
+        [],
+        'approveKnowledge.getRejectGroupIds',
+      );
       const rejGroupIds = (rejRows || []).map((r: any) => r.insight_group_id).filter(Boolean);
       if (rejGroupIds.length > 0) {
         await supabase.from('steve_knowledge')
@@ -44,13 +57,17 @@ export async function approveKnowledge(c: Context) {
       return c.json({ success: true, rejected: ids.length });
     }
     case 'list_pending': {
-      const { data: pending } = await supabase
-        .from('steve_knowledge')
-        .select('id, titulo, contenido, categoria, source_url, created_at')
-        .eq('approval_status', 'pending')
-        .eq('activo', true)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const pending = await safeQueryOrDefault<any>(
+        supabase
+          .from('steve_knowledge')
+          .select('id, titulo, contenido, categoria, source_url, created_at')
+          .eq('approval_status', 'pending')
+          .eq('activo', true)
+          .order('created_at', { ascending: false })
+          .limit(50),
+        [],
+        'approveKnowledge.listPending',
+      );
       return c.json({ pending });
     }
     default:

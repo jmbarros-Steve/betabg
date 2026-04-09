@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 export async function learnFromSource(c: Context) {
   try {
@@ -11,11 +12,15 @@ export async function learnFromSource(c: Context) {
     return c.json({ error: 'Unauthorized' }, 403);
   }
 
-  const { data: userRole } = await supabase
-    .from('user_roles')
-    .select('is_super_admin, role')
-    .eq('user_id', user.id)
-    .maybeSingle();
+  const userRole = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('user_roles')
+      .select('is_super_admin, role')
+      .eq('user_id', user.id)
+      .maybeSingle(),
+    null,
+    'learnFromSource.getUserRole',
+  );
 
   if (!userRole?.is_super_admin && userRole?.role !== 'admin') {
     return c.json({ error: 'Unauthorized' }, 403);
@@ -29,11 +34,15 @@ export async function learnFromSource(c: Context) {
 
   // Duplicate check (includes already completed items)
   if (!queueId) {
-    const { data: existing } = await supabase
-      .from('learning_queue')
-      .select('id, status')
-      .eq('source_content', content.trim())
-      .limit(1);
+    const existing = await safeQueryOrDefault<any>(
+      supabase
+        .from('learning_queue')
+        .select('id, status')
+        .eq('source_content', content.trim())
+        .limit(1),
+      [],
+      'learnFromSource.checkExisting',
+    );
 
     if (existing && existing.length > 0) {
       if (existing[0].status === 'completed' || existing[0].status === 'done') {

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 const GOOGLE_ADS_METHODOLOGY = `
 ═══════════════════════════════════════════════════════════════════════════════
@@ -101,20 +102,28 @@ export async function generateGoogleCopy(c: Context) {
   const knowledgeSectionGG = kbKnowledgeGG && kbKnowledgeGG.length > 0 ? `\nCONOCIMIENTO BASE:\n${kbKnowledgeGG.map((k: any) => `## ${k.titulo}\n${k.contenido}`).join('\n\n')}\n` : '';
 
   // Dual-layer learning
-  const { data: globalFeedback } = await supabase
-    .from('steve_feedback')
-    .select('rating, feedback_text, content_type')
-    .eq('content_type', 'google_copy')
-    .order('created_at', { ascending: false })
-    .limit(50);
+  const globalFeedback = await safeQueryOrDefault<any>(
+    supabase
+      .from('steve_feedback')
+      .select('rating, feedback_text, content_type')
+      .eq('content_type', 'google_copy')
+      .order('created_at', { ascending: false })
+      .limit(50),
+    [],
+    'generateGoogleCopy.getGlobalFeedback',
+  );
 
-  const { data: clientFeedback } = await supabase
-    .from('steve_feedback')
-    .select('rating, feedback_text, content_type, improvement_notes')
-    .eq('client_id', clientId)
-    .eq('content_type', 'google_copy')
-    .order('created_at', { ascending: false })
-    .limit(10);
+  const clientFeedback = await safeQueryOrDefault<any>(
+    supabase
+      .from('steve_feedback')
+      .select('rating, feedback_text, content_type, improvement_notes')
+      .eq('client_id', clientId)
+      .eq('content_type', 'google_copy')
+      .order('created_at', { ascending: false })
+      .limit(10),
+    [],
+    'generateGoogleCopy.getClientFeedback',
+  );
 
   let learningContext = '';
 

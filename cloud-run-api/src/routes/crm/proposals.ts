@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { anthropicFetch } from '../../lib/anthropic-fetch.js';
 import { logProspectEvent } from '../../lib/prospect-event-logger.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 /** CRUD for proposals: list, create, get */
 export async function proposalsCrud(c: Context) {
@@ -109,12 +110,16 @@ export async function proposalsGenerate(c: Context) {
     if (pErr || !prospect) return c.json({ error: 'Prospect not found' }, 404);
 
     // Fetch recent messages for context
-    const { data: messages } = await supabase
-      .from('wa_messages')
-      .select('direction, body, created_at')
-      .eq('contact_phone', prospect.phone)
-      .order('created_at', { ascending: false })
-      .limit(20);
+    const messages = await safeQueryOrDefault<any>(
+      supabase
+        .from('wa_messages')
+        .select('direction, body, created_at')
+        .eq('contact_phone', prospect.phone)
+        .order('created_at', { ascending: false })
+        .limit(20),
+      [],
+      'proposals.getRecentMessages',
+    );
 
     const conversationContext = (messages || [])
       .reverse()

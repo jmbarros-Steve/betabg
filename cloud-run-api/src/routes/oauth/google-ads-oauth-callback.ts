@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 interface OAuthPayload {
   code: string;
@@ -163,12 +164,16 @@ export async function googleAdsOauthCallback(c: Context) {
     }
 
     // Check if connection already exists
-    const { data: existingConnection } = await supabase
-      .from('platform_connections')
-      .select('id')
-      .eq('client_id', client_id)
-      .eq('platform', 'google')
-      .maybeSingle();
+    const existingConnection = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', client_id)
+        .eq('platform', 'google')
+        .maybeSingle(),
+      null,
+      'googleAdsOauthCallback.getExistingConnection',
+    );
 
     let connectionResult;
     if (existingConnection) {

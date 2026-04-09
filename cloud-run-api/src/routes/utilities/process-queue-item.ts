@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { detectKnowledgeConflicts } from '../../lib/knowledge-conflict-detector.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 const CHUNK_SIZE = 50000;
 const SYSTEM_PROMPT = `Eres un experto en performance marketing para e-commerce. Analiza el contenido y extrae TODAS las reglas accionables.
@@ -243,9 +244,13 @@ export async function processQueueItem(c: Context) {
     });
 
     // Deduplicate against existing steve_knowledge
-    const { data: existingRules } = await supabase
-      .from('steve_knowledge')
-      .select('titulo');
+    const existingRules = await safeQueryOrDefault<any>(
+      supabase
+        .from('steve_knowledge')
+        .select('titulo'),
+      [],
+      'processQueueItem.getExistingRules',
+    );
 
     const existingTitles = new Set(
       (existingRules || []).map((r: { titulo: string }) => normalize(r.titulo))

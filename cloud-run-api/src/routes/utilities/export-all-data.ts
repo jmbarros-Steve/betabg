@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const TABLES = [
   "clients", "user_roles", "buyer_personas", "platform_connections",
@@ -24,11 +25,15 @@ export async function exportAllData(c: Context) {
     return c.json({ error: 'Unauthorized' }, 403);
   }
 
-  const { data: userRole } = await supabase
-    .from('user_roles')
-    .select('is_super_admin')
-    .eq('user_id', user.id)
-    .maybeSingle();
+  const userRole = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('user_roles')
+      .select('is_super_admin')
+      .eq('user_id', user.id)
+      .maybeSingle(),
+    null,
+    'exportAllData.getUserRole',
+  );
 
   if (!userRole?.is_super_admin) {
     return c.json({ error: 'Unauthorized' }, 403);

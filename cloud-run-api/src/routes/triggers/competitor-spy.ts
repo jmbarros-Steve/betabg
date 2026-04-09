@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Competitor Spy — Fase 5 A.5
@@ -239,13 +240,17 @@ export async function competitorSpy(c: Context) {
   weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
   weekStart.setHours(0, 0, 0, 0);
 
-  const { data: lastRun } = await supabase
-    .from('qa_log')
-    .select('checked_at')
-    .eq('check_type', 'competitor_spy')
-    .gte('checked_at', weekStart.toISOString())
-    .limit(1)
-    .maybeSingle();
+  const lastRun = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('qa_log')
+      .select('checked_at')
+      .eq('check_type', 'competitor_spy')
+      .gte('checked_at', weekStart.toISOString())
+      .limit(1)
+      .maybeSingle(),
+    null,
+    'competitorSpy.getLastRun',
+  );
 
   if (lastRun) {
     console.log('[competitor-spy] Already ran this week, skipping.');

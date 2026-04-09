@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Public endpoint (no JWT required) - handles self-signup.
@@ -83,12 +84,16 @@ export async function selfSignup(c: Context) {
 
   // Check if this email matches a WhatsApp prospect and convert them
   if (newClient) {
-    const { data: prospect } = await supabase
-      .from('wa_prospects')
-      .select('id, phone')
-      .eq('email', email)
-      .neq('stage', 'converted')
-      .maybeSingle();
+    const prospect = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('wa_prospects')
+        .select('id, phone')
+        .eq('email', email)
+        .neq('stage', 'converted')
+        .maybeSingle(),
+      null,
+      'selfSignup.getProspect',
+    );
 
     if (prospect) {
       await supabase

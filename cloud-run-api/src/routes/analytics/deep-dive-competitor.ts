@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 interface DeepDiveResult {
   tech_stack: {
@@ -425,11 +426,15 @@ export async function deepDiveCompetitor(c: Context) {
     }
 
     // Verify ownership
-    const { data: client } = await supabase
-      .from('clients')
-      .select('id, user_id, client_user_id')
-      .eq('id', client_id)
-      .single();
+    const client = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('clients')
+        .select('id, user_id, client_user_id')
+        .eq('id', client_id)
+        .single(),
+      null,
+      'deepDiveCompetitor.getClient',
+    );
 
     if (!client || (client.user_id !== user.id && client.client_user_id !== user.id)) {
       return c.json({ error: 'Unauthorized' }, 403);

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 interface CreateClientUserPayload {
   email: string;
@@ -21,12 +22,16 @@ export async function createClientUser(c: Context) {
   }
 
   // Check if caller is admin
-  const { data: adminRole } = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', adminUser.id)
-    .eq('role', 'admin')
-    .maybeSingle();
+  const adminRole = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', adminUser.id)
+      .eq('role', 'admin')
+      .maybeSingle(),
+    null,
+    'createClientUser.getAdminRole',
+  );
 
   if (!adminRole) {
     return c.json({ error: 'Only admins can create client users' }, 403);

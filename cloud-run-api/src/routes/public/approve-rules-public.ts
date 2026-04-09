@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { propagateKnowledge } from '../../lib/knowledge-propagator.js';
+import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * GET/POST /api/approve-rules-public
@@ -96,7 +97,11 @@ async function handlePost(c: Context, supabase: any) {
     updated = count || ids.length;
 
     // Also approve siblings sharing the same insight_group_id
-    const { data: rows } = await supabase.from('steve_knowledge').select('insight_group_id').in('id', ids);
+    const rows = await safeQueryOrDefault<any>(
+      supabase.from('steve_knowledge').select('insight_group_id').in('id', ids),
+      [],
+      'approveRulesPublic.getGroupIds',
+    );
     const groupIds = (rows || []).map((r: any) => r.insight_group_id).filter(Boolean);
     if (groupIds.length > 0) {
       const { count: sibCount } = await supabase.from('steve_knowledge')
@@ -108,7 +113,11 @@ async function handlePost(c: Context, supabase: any) {
 
     const allIds = [...ids];
     if (groupIds.length > 0) {
-      const { data: siblingRows } = await supabase.from('steve_knowledge').select('id').in('insight_group_id', groupIds);
+      const siblingRows = await safeQueryOrDefault<any>(
+        supabase.from('steve_knowledge').select('id').in('insight_group_id', groupIds),
+        [],
+        'approveRulesPublic.getSiblingRows',
+      );
       if (siblingRows) allIds.push(...siblingRows.map((r: any) => r.id));
     }
     propagateKnowledge([...new Set(allIds)]).catch(err => console.error('[approve-public] Propagation error:', err));
@@ -123,7 +132,11 @@ async function handlePost(c: Context, supabase: any) {
     updated = count || ids.length;
 
     // Also reject siblings sharing the same insight_group_id
-    const { data: rejRows } = await supabase.from('steve_knowledge').select('insight_group_id').in('id', ids);
+    const rejRows = await safeQueryOrDefault<any>(
+      supabase.from('steve_knowledge').select('insight_group_id').in('id', ids),
+      [],
+      'approveRulesPublic.getRejectGroupIds',
+    );
     const rejGroupIds = (rejRows || []).map((r: any) => r.insight_group_id).filter(Boolean);
     if (rejGroupIds.length > 0) {
       const { count: sibCount } = await supabase.from('steve_knowledge')
@@ -135,11 +148,15 @@ async function handlePost(c: Context, supabase: any) {
 
   } else if (action === 'approve_all') {
     // Fetch IDs before updating so we can propagate them
-    const { data: pendingRows } = await supabase
-      .from('steve_knowledge')
-      .select('id')
-      .eq('approval_status', 'pending')
-      .eq('activo', true);
+    const pendingRows = await safeQueryOrDefault<any>(
+      supabase
+        .from('steve_knowledge')
+        .select('id')
+        .eq('approval_status', 'pending')
+        .eq('activo', true),
+      [],
+      'approveRulesPublic.getPendingRows',
+    );
 
     const { count, error } = await supabase
       .from('steve_knowledge')

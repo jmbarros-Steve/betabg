@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { logProspectEvent } from '../../lib/prospect-event-logger.js';
+import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 /**
  * Web Forms CRUD — authenticated (admin dashboard)
@@ -128,21 +129,29 @@ export async function webFormSubmit(c: Context) {
       const company = data.empresa || data.company || null;
 
       // Check for existing prospect by phone or email
-      let existing = null;
+      let existing: any = null;
       if (phone) {
-        const { data: byPhone } = await supabase
-          .from('wa_prospects')
-          .select('id')
-          .eq('phone', phone)
-          .maybeSingle();
+        const byPhone = await safeQuerySingleOrDefault<any>(
+          supabase
+            .from('wa_prospects')
+            .select('id')
+            .eq('phone', phone)
+            .maybeSingle(),
+          null,
+          'webForms.getProspectByPhone',
+        );
         existing = byPhone;
       }
       if (!existing && email) {
-        const { data: byEmail } = await supabase
-          .from('wa_prospects')
-          .select('id')
-          .eq('email', email)
-          .maybeSingle();
+        const byEmail = await safeQuerySingleOrDefault<any>(
+          supabase
+            .from('wa_prospects')
+            .select('id')
+            .eq('email', email)
+            .maybeSingle(),
+          null,
+          'webForms.getProspectByEmail',
+        );
         existing = byEmail;
       }
 

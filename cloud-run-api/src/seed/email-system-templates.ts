@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from '../lib/supabase.js';
+import { safeQuerySingleOrDefault } from '../lib/safe-supabase.js';
 
 /**
  * 5 system templates for Steve Mail (Unlayer design JSON).
@@ -551,12 +552,16 @@ export async function seedSystemEmailTemplates() {
 
   // Get a valid client_id to satisfy the NOT NULL + FK constraint
   // System templates are queried by is_system=true (not by client_id), so any valid client works
-  const { data: anyClient } = await supabase
-    .from('clients')
-    .select('id')
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const anyClient = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('clients')
+      .select('id')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    null,
+    'seedSystemEmailTemplates.getAnyClient',
+  );
 
   const systemClientId = anyClient?.id;
   if (!systemClientId) {
@@ -565,12 +570,16 @@ export async function seedSystemEmailTemplates() {
 
   for (const tpl of SYSTEM_TEMPLATES) {
     // Check if already exists
-    const { data: existing } = await supabase
-      .from('email_templates')
-      .select('id')
-      .eq('name', tpl.name)
-      .eq('is_system', true)
-      .maybeSingle();
+    const existing = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('email_templates')
+        .select('id')
+        .eq('name', tpl.name)
+        .eq('is_system', true)
+        .maybeSingle(),
+      null,
+      'seedSystemEmailTemplates.getExistingTemplate',
+    );
 
     if (existing) {
       // Update existing template

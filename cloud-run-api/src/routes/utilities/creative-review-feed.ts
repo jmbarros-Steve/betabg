@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 export async function creativeReviewFeed(c: Context) {
   try {
@@ -11,11 +12,15 @@ export async function creativeReviewFeed(c: Context) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
 
-    const { data: userRole } = await supabase
-      .from('user_roles')
-      .select('is_super_admin, role')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    const userRole = await safeQuerySingleOrDefault<any>(
+      supabase
+        .from('user_roles')
+        .select('is_super_admin, role')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+      null,
+      'creativeReviewFeed.getUserRole',
+    );
 
     if (!userRole?.is_super_admin && userRole?.role !== 'admin') {
       return c.json({ error: 'Unauthorized' }, 403);
@@ -73,10 +78,14 @@ async function handleList(c: Context, supabase: any, params: any) {
   const clientIds = [...new Set((data || []).map((d: any) => d.client_id).filter(Boolean))];
   let clientMap: Record<string, { name: string | null; company: string | null }> = {};
   if (clientIds.length > 0) {
-    const { data: clients } = await supabase
-      .from('clients')
-      .select('id, name, company')
-      .in('id', clientIds);
+    const clients = await safeQueryOrDefault<any>(
+      supabase
+        .from('clients')
+        .select('id, name, company')
+        .in('id', clientIds),
+      [],
+      'creativeReviewFeed.getClients',
+    );
     for (const cl of clients || []) {
       clientMap[cl.id] = { name: cl.name, company: cl.company };
     }
@@ -88,9 +97,13 @@ async function handleList(c: Context, supabase: any, params: any) {
   }));
 
   // Get stats
-  const { data: statsData } = await supabase
-    .from('creative_history')
-    .select('review_status');
+  const statsData = await safeQueryOrDefault<any>(
+    supabase
+      .from('creative_history')
+      .select('review_status'),
+    [],
+    'creativeReviewFeed.getStats',
+  );
 
   const stats = {
     pending: 0,
@@ -108,11 +121,15 @@ async function handleList(c: Context, supabase: any, params: any) {
   }
 
   // Sum rules generated
-  const { data: rulesData } = await supabase
-    .from('creative_history')
-    .select('feedback_rules_generated')
-    .eq('review_status', 'reviewed')
-    .not('feedback_rules_generated', 'is', null);
+  const rulesData = await safeQueryOrDefault<any>(
+    supabase
+      .from('creative_history')
+      .select('feedback_rules_generated')
+      .eq('review_status', 'reviewed')
+      .not('feedback_rules_generated', 'is', null),
+    [],
+    'creativeReviewFeed.getRulesGenerated',
+  );
 
   if (rulesData) {
     stats.rules_generated = rulesData.reduce(
@@ -145,17 +162,25 @@ async function handleSubmitFeedback(c: Context, supabase: any, params: any) {
   }
 
   // 2. Fetch client context
-  const { data: client } = await supabase
-    .from('clients')
-    .select('name, company')
-    .eq('id', creative.client_id)
-    .single();
+  const client = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('clients')
+      .select('name, company')
+      .eq('id', creative.client_id)
+      .single(),
+    null,
+    'creativeReviewFeed.getClient',
+  );
 
-  const { data: brandRes } = await supabase
-    .from('brand_research')
-    .select('industry')
-    .eq('client_id', creative.client_id)
-    .maybeSingle();
+  const brandRes = await safeQuerySingleOrDefault<any>(
+    supabase
+      .from('brand_research')
+      .select('industry')
+      .eq('client_id', creative.client_id)
+      .maybeSingle(),
+    null,
+    'creativeReviewFeed.getBrandResearch',
+  );
 
   // 3. Build enriched text for learning pipeline
   const clientName = client?.name || client?.company || 'Cliente desconocido';
