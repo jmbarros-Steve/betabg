@@ -102,14 +102,18 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
   }, [clientId]);
 
   async function fetchWhatsappPhone() {
-    const { data } = await supabase
-      .from('clients')
-      .select('whatsapp_phone')
-      .eq('id', clientId)
-      .maybeSingle();
-    if (data?.whatsapp_phone) {
-      setWhatsappPhone(data.whatsapp_phone);
-      setWhatsappSaved(data.whatsapp_phone);
+    try {
+      const { data } = await supabase
+        .from('clients')
+        .select('whatsapp_phone')
+        .eq('id', clientId)
+        .maybeSingle();
+      if (data?.whatsapp_phone) {
+        setWhatsappPhone(data.whatsapp_phone);
+        setWhatsappSaved(data.whatsapp_phone);
+      }
+    } catch {
+      // WhatsApp phone fetch failed silently
     }
   }
 

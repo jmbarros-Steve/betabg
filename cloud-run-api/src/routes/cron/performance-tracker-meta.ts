@@ -140,6 +140,7 @@ export async function performanceTrackerMeta(c: Context) {
 
       const response = await fetch(insightsUrl, {
         headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(30_000),
       });
       if (!response.ok) {
         console.error(`[perf-tracker-meta] Meta API ${response.status} for campaign ${creative.meta_campaign_id}`);
@@ -170,7 +171,7 @@ export async function performanceTrackerMeta(c: Context) {
       const purchaseAction = (d.actions || []).find(
         (a) => a.action_type === 'purchase'
       );
-      const conversions = purchaseAction ? parseInt(purchaseAction.value) : 0;
+      const conversions = purchaseAction ? (parseInt(purchaseAction.value, 10) || 0) : 0;
       const cpa = conversions > 0 ? spend / conversions : null;
 
       // ROAS from real revenue (action_values purchase), fallback to null

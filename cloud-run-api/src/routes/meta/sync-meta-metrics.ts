@@ -120,6 +120,11 @@ export async function syncMetaMetrics(c: Context) {
       return c.json({ error: 'Missing connection_id' }, 400);
     }
 
+    // Validate connection_id format (UUID)
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(connection_id)) {
+      return c.json({ error: 'Invalid connection_id format' }, 400);
+    }
+
     // Rate limit: 10 requests/minute per connection
     const rl = checkRateLimit(connection_id, 'sync-meta-metrics');
     if (!rl.allowed) {

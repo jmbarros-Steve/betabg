@@ -672,13 +672,16 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                       className="w-full h-full object-cover"
                       loading="lazy"
                       onError={(e) => {
-                        // Fallback to Ad Library link on image load error
+                        // Fallback to placeholder on image load error
                         const target = e.currentTarget;
                         target.style.display = 'none';
                         const parent = target.parentElement;
                         if (parent) {
                           parent.classList.add('flex', 'flex-col', 'items-center', 'justify-center');
-                          parent.innerHTML = `<span class="text-xs text-muted-foreground">Imagen no disponible</span>`;
+                          const span = document.createElement('span');
+                          span.className = 'text-xs text-muted-foreground';
+                          span.textContent = 'Imagen no disponible';
+                          parent.appendChild(span);
                         }
                       }}
                     />

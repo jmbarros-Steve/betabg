@@ -36,7 +36,7 @@ async function persistImage(
     if (!ext) return imageUrl; // not a supported image type
 
     const buffer = await resp.arrayBuffer();
-    if (buffer.byteLength < 100 || buffer.byteLength > 10 * 1024 * 1024) return imageUrl;
+    if (buffer.byteLength === 0 || buffer.byteLength < 100 || buffer.byteLength > 10 * 1024 * 1024) return imageUrl;
 
     const path = `competitors/${clientId}/${adLibraryId}_${index}.${ext}`;
 

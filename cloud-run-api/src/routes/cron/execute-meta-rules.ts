@@ -109,6 +109,22 @@ export async function executeMetaRulesCron(c: Context) {
         totalEvaluated++;
         const condition = rule.condition as any;
 
+        // Validate condition values are numbers
+        const conditionValue = Number(condition.value);
+        if (isNaN(conditionValue)) {
+          console.warn(`[execute-meta-rules] Rule ${rule.id}: invalid condition.value "${condition.value}", skipping`);
+          continue;
+        }
+        condition.value = conditionValue;
+        if (condition.valueTo !== undefined) {
+          const conditionValueTo = Number(condition.valueTo);
+          if (isNaN(conditionValueTo)) {
+            console.warn(`[execute-meta-rules] Rule ${rule.id}: invalid condition.valueTo "${condition.valueTo}", skipping`);
+            continue;
+          }
+          condition.valueTo = conditionValueTo;
+        }
+
         // Filter metrics by time window
         const windowDays = getWindowDays(condition.timeWindow);
         const sinceDate = new Date(Date.now() - windowDays * 86400000).toISOString().split('T')[0];
@@ -170,7 +186,9 @@ export async function executeMetaRulesCron(c: Context) {
                   const adsetsData: any = await adsetsResp.json();
                   for (const adset of (adsetsData.data || [])) {
                     if (!adset.daily_budget) continue;
-                    const newBudget = Math.round(parseFloat(adset.daily_budget) * multiplier);
+                    const parsedBudget = parseFloat(adset.daily_budget);
+                    if (isNaN(parsedBudget) || parsedBudget <= 0) continue;
+                    const newBudget = Math.round(parsedBudget * multiplier);
                     // Each adset update goes through circuit breaker + delay
                     await metaApiFetch(`/${adset.id}`, decryptedToken, {
                       method: 'POST',
@@ -211,7 +229,7 @@ export async function executeMetaRulesCron(c: Context) {
             .from('meta_automated_rules')
             .select('trigger_count')
             .eq('id', rule.id)
-            .single();
+            .maybeSingle();
           await supabase.from('meta_automated_rules').update({
             last_triggered_at: new Date().toISOString(),
             trigger_count: ((fresh?.trigger_count as number) || 0) + 1,

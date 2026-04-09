@@ -276,12 +276,22 @@ async function handleCreate(
     if (daily_budget && !isCboCampaign) {
       // CLP has no cents — smallest currency unit is 1 CLP
       // Skip budget for CBO campaigns — budget is managed at campaign level
-      adsetPayload.daily_budget = Math.round(Number(daily_budget));
+      const parsedBudget = Number(daily_budget);
+      if (isNaN(parsedBudget) || parsedBudget <= 0) {
+        return { body: { success: false, error: 'daily_budget must be a positive number' }, status: 400 };
+      }
+      adsetPayload.daily_budget = Math.round(parsedBudget);
     }
 
     if (targeting) {
       // Meta now requires targeting_automation.advantage_audience to be set
-      const targetingObj = typeof targeting === 'string' ? JSON.parse(targeting) : { ...targeting };
+      let targetingObj: any;
+      try {
+        targetingObj = typeof targeting === 'string' ? JSON.parse(targeting) : { ...targeting };
+      } catch {
+        console.error('[manage-meta-campaign] Invalid targeting JSON:', typeof targeting === 'string' ? targeting.slice(0, 100) : targeting);
+        return { body: { success: false, error: 'Invalid targeting format' }, status: 400 };
+      }
       if (!targetingObj.targeting_automation) {
         targetingObj.targeting_automation = { advantage_audience: 1 };
       }
@@ -382,7 +392,7 @@ async function handleCreate(
     storySpecKey: string = 'object_story_spec'
   ): Promise<{ ok: boolean; data?: any; error?: string }> {
     const result = await metaApiRequest(`act_${accountId}/adcreatives`, accessToken, 'POST', creativePayload);
-    if (!result.ok && result.error?.includes('instagram_actor_id') && igActorId) {
+    if (!result.ok && typeof result.error === 'string' && result.error.includes('instagram_actor_id') && igActorId) {
       console.warn(`[manage-meta-campaign] Creative failed with instagram_actor_id, retrying without it`);
       // Remove instagram_actor_id from story spec and retry (local copy only, do NOT mutate outer igActorId)
       const specStr = creativePayload[storySpecKey];

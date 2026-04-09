@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -415,25 +415,33 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
     finally { setGeneratingImage(false); }
   };
 
-  const startVideoPolling = useCallback(async (predictionId: string) => {
+  const videoPollingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startVideoPolling = useCallback((predictionId: string) => {
     const msgs = ['Procesando escenas...', 'Generando movimiento...', 'Aplicando efectos...', 'Finalizando video...'];
     let idx = 0;
-    const interval = setInterval(async () => {
+    let stopped = false;
+    const poll = async () => {
+      if (stopped) return;
       setVideoProgress(msgs[idx % msgs.length]); idx++;
       try {
         const { data } = await callApi('check-video-status', {
           body: { predictionId, creativeId: savedCreativeId, clientId },
         });
         if (data?.status === 'succeeded' && data?.asset_url) {
-          clearInterval(interval);
           setGeneratedAssetUrls(prev => [...prev, data.asset_url]);
           setGeneratingVideo(false);
-          toast.success('🎬 Video generado');
+          toast.success('Video generado');
+          return;
         } else if (data?.status === 'failed') {
-          clearInterval(interval); setGeneratingVideo(false); toast.error('Error en generación de video');
+          setGeneratingVideo(false); toast.error('Error en generación de video');
+          return;
         }
       } catch { /* keep polling */ }
-    }, 5000);
+      if (!stopped) { videoPollingTimer.current = setTimeout(poll, 5000); }
+    };
+    videoPollingTimer.current = setTimeout(poll, 5000);
+    return () => { stopped = true; if (videoPollingTimer.current) clearTimeout(videoPollingTimer.current); };
   }, [savedCreativeId, clientId]);
 
   const handleGenerateVideo = async () => {

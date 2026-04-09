@@ -19,10 +19,21 @@ function getCached(connectionId: string): any | null {
 
 function setCache(connectionId: string, data: any): void {
   adAccountsCache.set(connectionId, { data, ts: Date.now() });
+  // Evict stale entries first, then oldest if still over limit
   if (adAccountsCache.size > 100) {
-    const oldest = adAccountsCache.keys().next().value;
-    if (oldest) adAccountsCache.delete(oldest);
+    const now = Date.now();
+    for (const [key, entry] of adAccountsCache) {
+      if (now - entry.ts >= CACHE_TTL_MS) adAccountsCache.delete(key);
+    }
+    if (adAccountsCache.size > 100) {
+      const oldest = adAccountsCache.keys().next().value;
+      if (oldest) adAccountsCache.delete(oldest);
+    }
   }
+}
+
+function invalidateCache(connectionId: string): void {
+  adAccountsCache.delete(connectionId);
 }
 
 interface MetaBusiness {

@@ -73,8 +73,10 @@ function evaluateMetaRule(
     if (name.includes('Precio coincide')) {
       const priceMatch = (campaign.primary_text || '').match(/\$[\d.,]+/);
       if (!priceMatch) return { passed: true, actual: 'No price mentioned', expected: 'N/A', details: null };
-      const mentioned = parseInt(priceMatch[0].replace(/[$.,]/g, ''));
-      const shopifyPrice = products[0]?.price ? parseInt(products[0].price) : null;
+      const mentioned = parseInt(priceMatch[0].replace(/[$.,]/g, ''), 10);
+      if (isNaN(mentioned)) return { passed: true, actual: priceMatch[0], expected: 'N/A', details: 'Formato de precio no reconocido' };
+      const shopifyPrice = products[0]?.price ? parseInt(products[0].price, 10) : null;
+      if (shopifyPrice !== null && isNaN(shopifyPrice)) return { passed: true, actual: priceMatch[0], expected: 'Precio Shopify inválido', details: null };
       if (!shopifyPrice) return { passed: true, actual: priceMatch[0], expected: 'No product linked', details: null };
       return { passed: Math.abs(mentioned - shopifyPrice) < 100, actual: priceMatch[0], expected: `$${shopifyPrice}`, details: mentioned !== shopifyPrice ? 'Precio no coincide con Shopify' : null };
     }

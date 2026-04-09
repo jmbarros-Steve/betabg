@@ -82,7 +82,7 @@ async function getMetaToken(supabase: any, clientId: string): Promise<{ token: s
           igUserId = page.instagram_business_account.id;
           await supabase
             .from('platform_connections')
-            .update({ ig_account_id: igUserId, page_id: conn.page_id || page.id })
+            .update({ ig_account_id: igUserId, page_id: conn.page_id || page.id || null })
             .eq('id', conn.id);
           break;
         }
