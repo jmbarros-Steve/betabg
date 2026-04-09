@@ -797,7 +797,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                     <button
                       onClick={() => {
                         const t = tracking.find(tr => tr.id === ad.tracking_id);
-                        openAdLibrary(t?.ig_handle || '', t?.meta_page_id);
+                        if (t) openAdLibrary(t.ig_handle, t.meta_page_id);
                       }}
                       className="text-xs text-primary hover:underline flex items-center gap-1"
                     >
@@ -816,7 +816,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                         className="text-xs text-primary hover:underline flex items-center gap-1 truncate"
                       >
                         <Link2 className="h-3 w-3 flex-shrink-0" />
-                        <span className="truncate">{new URL(ad.landing_url).hostname}{new URL(ad.landing_url).pathname}</span>
+                        <span className="truncate">{(() => { try { const u = new URL(ad.landing_url!); return u.hostname + u.pathname; } catch { return ad.landing_url; } })()}</span>
                       </a>
                       {ad.screenshot_url && (
                         <a href={ad.landing_url} target="_blank" rel="noopener noreferrer" className="block">

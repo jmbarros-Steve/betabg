@@ -20,7 +20,7 @@ interface Portfolio {
   pixel_id: string | null;
 }
 
-async function metaGet(endpoint: string, token: string, params: Record<string, string> = {}): Promise<any> {
+async function metaGet(endpoint: string, token: string, params: Record<string, string> = {}): Promise<{ data: any[] | null; error?: string }> {
   const url = new URL(`${META_BASE}${endpoint}`);
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
@@ -28,10 +28,12 @@ async function metaGet(endpoint: string, token: string, params: Record<string, s
   const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) {
     const err: any = await res.json().catch(() => ({}));
-    console.error(`[discover-assets] Meta API error on ${endpoint}:`, err);
-    return null;
+    const msg = err?.error?.message || `HTTP ${res.status}`;
+    console.error(`[discover-assets] Meta API error on ${endpoint}:`, msg);
+    return { data: null, error: msg };
   }
-  return res.json();
+  const json: any = await res.json();
+  return { data: json.data || [] };
 }
 
 /**

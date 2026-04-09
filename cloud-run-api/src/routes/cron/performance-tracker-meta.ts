@@ -23,6 +23,7 @@ interface MetricInsight {
   spend?: string;
   ctr?: string;
   actions?: Array<{ action_type: string; value: string }>;
+  action_values?: Array<{ action_type: string; value: string }>;
   cost_per_action_type?: Array<{ action_type: string; value: string }>;
 }
 
@@ -136,7 +137,7 @@ export async function performanceTrackerMeta(c: Context) {
       // Fetch insights from Meta Graph API (token in header, not URL)
       const insightsUrl =
         `https://graph.facebook.com/${META_API_VERSION}/${creative.meta_campaign_id}/insights?` +
-        `fields=impressions,clicks,spend,actions,cost_per_action_type,ctr`;
+        `fields=impressions,clicks,spend,actions,action_values,cost_per_action_type,ctr`;
 
       const response = await fetch(insightsUrl, {
         headers: { Authorization: `Bearer ${token}` },
@@ -165,10 +166,13 @@ export async function performanceTrackerMeta(c: Context) {
       );
       const conversions = purchaseAction ? parseInt(purchaseAction.value) : 0;
       const cpa = conversions > 0 ? spend / conversions : null;
-      // TODO: ROAS uses hardcoded $50,000 CLP avg order value. To fix this properly,
-      // we need actual revenue data from Meta (action_values purchase) which requires
-      // adding 'action_values' to the insights fields request — a bigger refactor.
-      const roas = spend > 0 && conversions > 0 ? (conversions * 50000) / spend : null;
+
+      // ROAS from real revenue (action_values purchase), fallback to null
+      const purchaseValue = (d.action_values || []).find(
+        (a: any) => a.action_type === 'purchase'
+      );
+      const revenue = purchaseValue ? parseFloat(purchaseValue.value) : 0;
+      const roas = spend > 0 && revenue > 0 ? revenue / spend : null;
 
       // Calculate performance score
       const { score, verdict } = calculatePerformanceScore(ctr, roas, cpa);

@@ -48,7 +48,7 @@ export async function detectAudienceOverlap(c: Context) {
       .from('clients')
       .select('id')
       .eq('id', client_id)
-      .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+      .or(`user_id.eq."${user.id}",client_user_id.eq."${user.id}"`)
       .maybeSingle(),
     null,
     'detectAudienceOverlap.ownerCheck',

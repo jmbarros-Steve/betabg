@@ -369,7 +369,9 @@ async function handleCreate(
         igActorId = igResult.data.instagram_business_account.id;
         console.log(`[manage-meta-campaign] Resolved instagram_actor_id: ${igActorId} (${igResult.data.instagram_business_account.username || 'no username'})`);
       }
-    } catch (_) { /* no IG account linked */ }
+    } catch (err: any) {
+      console.warn(`[manage-meta-campaign] Failed to resolve IG actor for page ${pageId}:`, err.message);
+    }
   }
 
   // Helper: create ad creative with retry (drops instagram_actor_id on failure)
@@ -537,15 +539,16 @@ async function handleCreate(
     if (isFlexible && allImages.length > 0) {
       console.log(`[manage-meta-campaign] Creating Dynamic Creative (flexible) with ${allImages.length} images, ${allTexts.length} texts, ${allHeadlines.length} headlines`);
 
-      // Upload images to get hashes
+      // Upload images in parallel to get hashes
+      const uploadResults = await Promise.all(
+        allImages.filter(Boolean).map(imgUrl => uploadImageFromUrl(accountId, accessToken, imgUrl))
+      );
       const imageHashes: string[] = [];
-      for (const imgUrl of allImages) {
-        if (!imgUrl) continue;
-        const upload = await uploadImageFromUrl(accountId, accessToken, imgUrl);
+      for (const upload of uploadResults) {
         if (upload.ok && upload.hash) {
           imageHashes.push(upload.hash);
         } else {
-          console.warn(`[manage-meta-campaign] Image upload failed for ${imgUrl}: ${upload.error}`);
+          console.warn(`[manage-meta-campaign] Image upload failed: ${upload.error}`);
         }
       }
 
@@ -627,15 +630,16 @@ async function handleCreate(
     } else if (isCarousel && allImages.length > 1) {
       console.log(`[manage-meta-campaign] Creating Carousel creative with ${allImages.length} images`);
 
-      // Upload images to get hashes
+      // Upload images in parallel to get hashes
+      const uploadResults = await Promise.all(
+        allImages.filter(Boolean).map(imgUrl => uploadImageFromUrl(accountId, accessToken, imgUrl))
+      );
       const imageHashes: string[] = [];
-      for (const imgUrl of allImages) {
-        if (!imgUrl) continue;
-        const upload = await uploadImageFromUrl(accountId, accessToken, imgUrl);
+      for (const upload of uploadResults) {
         if (upload.ok && upload.hash) {
           imageHashes.push(upload.hash);
         } else {
-          console.warn(`[manage-meta-campaign] Image upload failed for ${imgUrl}: ${upload.error}`);
+          console.warn(`[manage-meta-campaign] Image upload failed: ${upload.error}`);
         }
       }
 

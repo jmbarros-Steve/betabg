@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -84,13 +84,17 @@ export function MetaPartnerSetup({ clientId, onConnected }: MetaPartnerSetupProp
     };
   }, [state, pollForConnection]);
 
+  // Stable ref to avoid re-render loops if parent passes inline callback
+  const onConnectedRef = useRef(onConnected);
+  onConnectedRef.current = onConnected;
+
   // Notify parent after a short delay once connected
   useEffect(() => {
     if (state === 'connected') {
-      const timer = setTimeout(onConnected, 1500);
+      const timer = setTimeout(() => onConnectedRef.current(), 1500);
       return () => clearTimeout(timer);
     }
-  }, [state, onConnected]);
+  }, [state]);
 
   const handleOpenLeadsie = () => {
     if (!leadsieUrl) return;

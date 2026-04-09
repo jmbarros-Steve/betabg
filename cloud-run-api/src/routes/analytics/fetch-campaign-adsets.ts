@@ -87,12 +87,12 @@ export async function fetchCampaignAdsets(c: Context) {
         const acctRes = await fetch(acctUrl.toString(), { headers: { Authorization: `Bearer ${decryptedToken}` } });
         if (acctRes.ok) {
           const acctData: any = await acctRes.json();
-          accountCurrency = acctData.currency || 'USD';
+          accountCurrency = acctData.currency || 'CLP';
           console.log(`Meta account currency: ${accountCurrency}`);
         }
       }
     } catch (e) {
-      console.warn('Failed to fetch account currency, defaulting to USD');
+      console.warn('Failed to fetch account currency, defaulting to CLP');
     }
 
     // Fetch ad sets for this campaign with insights

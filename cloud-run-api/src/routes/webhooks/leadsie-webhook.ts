@@ -278,7 +278,7 @@ async function triggerMetaSync(clientId: string): Promise<void> {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) return;
 
-  await fetch(`${baseUrl}/api/sync-meta-metrics`, {
+  const res = await fetch(`${baseUrl}/api/sync-meta-metrics`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -287,4 +287,8 @@ async function triggerMetaSync(clientId: string): Promise<void> {
     },
     body: JSON.stringify({ connection_id: conn.id }),
   });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`sync-meta-metrics returned ${res.status}: ${detail.slice(0, 200)}`);
+  }
 }

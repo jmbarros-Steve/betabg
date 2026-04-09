@@ -179,9 +179,15 @@ export async function executeMetaRulesCron(c: Context) {
         }
 
         if (ruleTriggered) {
+          // Re-read current count to minimize race window
+          const { data: fresh } = await supabase
+            .from('meta_automated_rules')
+            .select('trigger_count')
+            .eq('id', rule.id)
+            .single();
           await supabase.from('meta_automated_rules').update({
             last_triggered_at: new Date().toISOString(),
-            trigger_count: (rule.trigger_count || 0) + 1,
+            trigger_count: ((fresh?.trigger_count as number) || 0) + 1,
           }).eq('id', rule.id);
         }
       }

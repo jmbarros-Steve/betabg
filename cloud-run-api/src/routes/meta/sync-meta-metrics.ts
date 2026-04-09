@@ -8,10 +8,10 @@ import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 // Currency conversion utilities
 const EXCHANGE_RATE_API_URL = 'https://api.exchangerate-api.com/v4/latest/USD';
 const FALLBACK_RATES: Record<string, number> = {
-  CLP: 950,
-  MXN: 17.5,
-  EUR: 0.92,
-  GBP: 0.79,
+  CLP: 920,
+  MXN: 17.0,
+  EUR: 0.91,
+  GBP: 0.78,
 };
 
 // Cache exchange rates for the duration of a sync run (avoid ~180 API calls)

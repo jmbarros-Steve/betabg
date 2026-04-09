@@ -812,6 +812,9 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
     if (!metaConnection) return;
     if (portfolio.adAccountId === selectedAssets.adAccountId) return;
 
+    // Capture connection ID before any state updates
+    const connId = metaConnection.id;
+
     setPortfolioSwitching(true);
     try {
       // 1. Persist portfolio selection to DB (page_id, ig_account_id, pixel_id, etc.)
@@ -827,7 +830,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
           ig_account_id: portfolio.igAccountId,
           pixel_id: portfolio.pixelId,
         })
-        .eq('id', metaConnection.id);
+        .eq('id', connId);
 
       if (dbError) {
         console.error('[MetaAdsManager] Failed to persist portfolio switch:', dbError);
@@ -849,7 +852,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
       );
 
       setSelectedAssets({
-        connectionId: metaConnection.id,
+        connectionId: connId,
         businessId: portfolio.businessId,
         businessName: portfolio.businessName,
         adAccountId: portfolio.adAccountId,
