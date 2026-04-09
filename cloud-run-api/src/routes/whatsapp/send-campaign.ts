@@ -6,6 +6,16 @@ import { decryptToken } from './setup-merchant.js';
 import { getUserClientIds } from '../../lib/user-scoping.js';
 
 /**
+ * Bug #160 fix: Escape WhatsApp special formatting characters in template variable VALUES.
+ * WhatsApp uses *bold*, _italic_, ~strikethrough~, ```code``` — if a contact name or value
+ * contains these characters (e.g. "John_Doe" or "Store*Plus"), the message formatting breaks.
+ * We only escape the substituted values, NOT the template itself (so intentional formatting is preserved).
+ */
+function escapeWAFormatting(text: string): string {
+  return text.replace(/([*_~`])/g, '\\$1');
+}
+
+/**
  * POST /api/whatsapp/send-campaign
  * Sends a WhatsApp campaign to a segment of contacts.
  * Returns HTTP response immediately after marking campaign as 'sending'.
@@ -184,17 +194,31 @@ export async function waSendCampaign(c: Context) {
         // Bug #124 fix: Query wa_messages for recipients who already received this campaign.
         // If Cloud Run kills the instance mid-send and it restarts (or the campaign is retried),
         // this prevents double-sending to contacts that were already messaged.
-        const alreadySent = await safeQueryOrDefault<{ contact_phone: string }>(
-          supabase
+        // Bug #140 fix: Use .eq('metadata->>campaign_id', ...) instead of .contains('metadata', ...)
+        // The JSONB .contains() without a GIN index causes full table scans and timeouts,
+        // which were treated as "no duplicates" — leading to double-sends.
+        // Using ->> operator allows Postgres to use a btree index on the extracted text value.
+        // Also: fail-safe — if this query fails, we abort rather than proceed without dedup.
+        let alreadySent: { contact_phone: string }[] = [];
+        try {
+          const { data, error: alreadySentError } = await supabase
             .from('wa_messages')
             .select('contact_phone')
             .eq('client_id', client_id)
             .eq('channel', 'merchant_wa')
             .eq('direction', 'outbound')
-            .contains('metadata', { campaign_id }),
-          [],
-          'sendCampaign.getAlreadySent',
-        );
+            .eq('metadata->>campaign_id', campaign_id)
+            .limit(10000);
+          if (alreadySentError) {
+            throw new Error(`alreadySent query failed: ${alreadySentError.message}`);
+          }
+          alreadySent = (data || []) as { contact_phone: string }[];
+        } catch (dedupErr) {
+          // Bug #140 fail-safe: if dedup query fails, do NOT proceed (fail-closed, not fail-open)
+          console.error(`[wa-campaign] Bug #140: Dedup query failed for campaign ${campaign_id}, aborting to prevent double-send:`, dedupErr);
+          finalStatus = 'failed';
+          return; // exits the Promise.resolve().then() block, falls through to finally
+        }
         const alreadySentPhones = new Set(alreadySent.map((m: { contact_phone: string }) => m.contact_phone));
         if (alreadySentPhones.size > 0) {
           console.log(`[wa-campaign] Bug #124: Skipping ${alreadySentPhones.size} already-sent recipients for campaign ${campaign_id}`);
@@ -202,9 +226,11 @@ export async function waSendCampaign(c: Context) {
 
         for (const recipient of recipients) {
           try {
+            // Bug #160 fix: Escape WA formatting chars in variable VALUES only.
+            const safeName = escapeWAFormatting(recipient.name || 'Hola');
             const personalizedBody = campaign.template_body
-              .replace(/\{\{nombre\}\}/g, recipient.name || 'Hola')
-              .replace(/\{\{customer_name\}\}/g, recipient.name || 'Hola');
+              .replace(/\{\{nombre\}\}/g, safeName)
+              .replace(/\{\{customer_name\}\}/g, safeName);
 
             const rawPhone = recipient.phone || '';
             if (!rawPhone) {
@@ -285,6 +311,8 @@ export async function waSendCampaign(c: Context) {
         // Bug #83 fix: Don't call deduct_wa_credit with negative amounts — it corrupts total_used.
         // Bug #111 fix: use atomic refund_wa_credit RPC (balance = balance + X in SQL)
         // instead of read-then-write which has a TOCTOU race condition.
+        // Bug #152 fix: Add fallback to refund_wa_credit RPC — if the RPC doesn't exist
+        // or fails, use direct balance update so credits are not silently lost.
         try {
           const unusedCredits = recipients.length - sentCount;
           if (unusedCredits > 0) {
@@ -296,14 +324,50 @@ export async function waSendCampaign(c: Context) {
               p_description: `Campaña "${campaign.name}": refund ${unusedCredits} créditos no usados (${failedCount} fallidos)`,
             });
             if (refundError) {
-              console.error(`[wa-campaign] refund_wa_credit failed for campaign ${campaign_id}:`, refundError.message);
-              // NOTE: If the RPC doesn't exist yet, deploy migration 20260409_refund_wa_credit.sql
+              // Bug #152: RPC failed — fallback to direct balance update
+              console.error(`[wa-campaign] refund_wa_credit RPC failed for campaign ${campaign_id}: ${refundError.message}. Using fallback.`);
+              try {
+                const { data: credits } = await supabase
+                  .from('wa_credits')
+                  .select('balance')
+                  .eq('client_id', client_id)
+                  .single();
+                if (credits) {
+                  await supabase
+                    .from('wa_credits')
+                    .update({ balance: (credits as any).balance + unusedCredits })
+                    .eq('client_id', client_id);
+                  console.log(`[wa-campaign] Bug #152: Refunded ${unusedCredits} credits via fallback for campaign ${campaign_id}`);
+                }
+              } catch (fallbackErr) {
+                console.error(`[wa-campaign] CRITICAL Bug #152: Refund fallback also failed for campaign ${campaign_id}:`, fallbackErr);
+              }
             } else {
               console.log(`[wa-campaign] Refunded ${unusedCredits} credits to client ${client_id} via atomic RPC`);
             }
           }
         } catch (creditErr) {
           console.error(`[wa-campaign] CRITICAL: Failed to credit back unused credits for campaign ${campaign_id}:`, creditErr);
+          // Bug #152: Last-resort fallback inside catch
+          try {
+            const unusedCredits = recipients.length - sentCount;
+            if (unusedCredits > 0) {
+              const { data: credits } = await supabase
+                .from('wa_credits')
+                .select('balance')
+                .eq('client_id', client_id)
+                .single();
+              if (credits) {
+                await supabase
+                  .from('wa_credits')
+                  .update({ balance: (credits as any).balance + unusedCredits })
+                  .eq('client_id', client_id);
+                console.log(`[wa-campaign] Bug #152: Refunded ${unusedCredits} credits via last-resort fallback`);
+              }
+            }
+          } catch (lastResortErr) {
+            console.error(`[wa-campaign] CRITICAL Bug #152: Last-resort refund failed for campaign ${campaign_id}:`, lastResortErr);
+          }
         }
       }
     });

@@ -15,13 +15,28 @@ import { isValidCronSecret } from '../../lib/cron-auth.js';
  * Cron: every 4 hours
  * Auth: X-Cron-Secret header
  */
+
+// Bug #145 fix: In-memory lock to prevent overlapping cron invocations on the same instance.
+// For multi-instance, Cloud Scheduler should be configured with a 4h+ interval so overlap is
+// unlikely. If overlap occurs across instances, the 24h cooldown (hoursSinceUpdate < 24) and
+// wa_message_sent flag provide a secondary dedup guard.
+let _onboardingRunning = false;
+
 export async function onboardingWA(c: Context) {
   if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
+  // Bug #145 fix: Prevent overlapping invocations on the same instance
+  if (_onboardingRunning) {
+    console.log('[onboarding-wa] Already running on this instance, skipping');
+    return c.json({ success: true, message: 'Already running, skipped' });
+  }
+  _onboardingRunning = true;
+
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) {
+    _onboardingRunning = false;
     return c.json({ error: 'ANTHROPIC_API_KEY not configured' }, 500);
   }
 
@@ -31,6 +46,9 @@ export async function onboardingWA(c: Context) {
 
   try {
     // Find clients with pending/in_progress onboarding steps
+    // Bug #145: The 24h cooldown (line ~62) + wa_message_sent flag provide natural
+    // dedup across instances. If a reminder was already sent by another instance,
+    // wa_message_sent=true and hoursSinceUpdate<24 will skip it.
     const pendingSteps = await safeQuery<any>(
       supabase
         .from('merchant_onboarding')
@@ -154,5 +172,7 @@ export async function onboardingWA(c: Context) {
   } catch (err: any) {
     console.error('[onboarding-wa] Fatal error:', err);
     return c.json({ error: err.message }, 500);
+  } finally {
+    _onboardingRunning = false;
   }
 }

@@ -85,22 +85,32 @@ export async function waSendMessage(c: Context) {
       });
     } catch (twilioErr) {
       // Twilio failed — refund the credit we already deducted.
-      // Bug #116 fix: Do NOT use deduct_wa_credit with -1 as it corrupts total_used.
-      // Instead, read current balance and increment it directly without touching total_used.
+      // Bug #132 fix: Use atomic refund_wa_credit RPC to prevent TOCTOU race condition.
+      // The previous read-then-write pattern could lose refunds under concurrent requests.
       console.error('[wa-send-message] Twilio send failed, refunding credit:', twilioErr);
       try {
-        const { data: currentCredits } = await supabase
-          .from('wa_credits')
-          .select('balance')
-          .eq('client_id', client_id)
-          .single();
-        const currentBalance = (currentCredits as any)?.balance ?? (result?.new_balance ?? 0);
-        await supabase
-          .from('wa_credits')
-          .update({ balance: currentBalance + 1 })
-          .eq('client_id', client_id);
-      } catch (refundErr) {
-        console.error('[wa-send-message] Refund direct update failed:', refundErr);
+        await supabase.rpc('refund_wa_credit', {
+          p_client_id: client_id,
+          p_amount: 1,
+          p_description: `send_failure_refund: ${cleanPhone}`,
+        });
+      } catch (rpcErr) {
+        // Fallback: direct balance update if RPC doesn't exist
+        console.error('[wa-send-message] refund_wa_credit RPC failed, using fallback:', rpcErr);
+        try {
+          const { data: currentCredits } = await supabase
+            .from('wa_credits')
+            .select('balance')
+            .eq('client_id', client_id)
+            .single();
+          const currentBalance = (currentCredits as any)?.balance ?? (result?.new_balance ?? 0);
+          await supabase
+            .from('wa_credits')
+            .update({ balance: currentBalance + 1 })
+            .eq('client_id', client_id);
+        } catch (fallbackErr) {
+          console.error('[wa-send-message] CRITICAL: Refund fallback also failed:', fallbackErr);
+        }
       }
       throw twilioErr;
     }

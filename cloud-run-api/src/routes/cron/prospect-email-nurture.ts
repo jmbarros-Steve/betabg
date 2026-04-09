@@ -27,6 +27,21 @@ const STEP_DELAYS: Record<number, number> = {
 
 const MEETING_LINK = 'https://meetings.hubspot.com/jose-manuel15';
 
+// Bug #148 fix: Sanitize AI-generated HTML to prevent stored XSS via prompt injection.
+// Prospect conversation (user-controlled) feeds into the AI prompt; a crafted message
+// could trick the model into emitting <script>, event handlers, or javascript: URLs.
+function sanitizeEmailHtml(html: string): string {
+  // Remove script tags and content
+  html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  // Remove event handlers (onclick, onerror, onload, etc.)
+  html = html.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
+  // Remove javascript: URLs
+  html = html.replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"');
+  // Remove iframe, object, embed, form, input tags
+  html = html.replace(/<(iframe|object|embed|form|input)\b[^>]*>/gi, '');
+  return html;
+}
+
 // ---------------------------------------------------------------------------
 // Premium email template — Steve Ads branding
 // ---------------------------------------------------------------------------
@@ -238,6 +253,10 @@ ${DESIGN_INSTRUCTIONS}`,
         }
 
         if (!emailContent.subject || !emailContent.body) continue;
+
+        // Bug #148 fix: Sanitize AI-generated HTML before inserting into email template
+        emailContent.body = sanitizeEmailHtml(emailContent.body);
+        emailContent.subject = emailContent.subject.replace(/<[^>]*>/g, '').slice(0, 100);
 
         // Wrap body in premium template
         const fullHtml = wrapEmail(emailContent.body);

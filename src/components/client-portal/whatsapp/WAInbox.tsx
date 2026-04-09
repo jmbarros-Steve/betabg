@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MessageCircle, Search, Filter, Send, ArrowLeft, User } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -47,6 +47,7 @@ export function WAInbox({ clientId }: Props) {
   const [reply, setReply] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchConversations();
@@ -93,26 +94,29 @@ export function WAInbox({ clientId }: Props) {
     };
   }, [clientId]);
 
-  // Bug #117: Realtime subscription for new wa_messages — append to chat in real time
+  // Bug #117 + Bug #139 fix: Realtime subscription for new wa_messages
+  // Use primitive deps (convId, convPhone) to avoid stale closure and unnecessary re-subscribes.
+  // Channel name includes convId to prevent collision when switching conversations.
+  const convId = selectedConv?.id;
+  const convPhone = selectedConv?.contact_phone;
+
   useEffect(() => {
-    const msgChannel = supabase
-      .channel(`wa-messages-${clientId}`)
+    if (!clientId || !convPhone) return;
+
+    const channelName = `wa-messages-${clientId}-${convId || 'none'}`;
+    const channel = supabase
+      .channel(channelName)
       .on(
         'postgres_changes' as any,
         {
           event: 'INSERT',
           schema: 'public',
           table: 'wa_messages',
-          filter: `client_id=eq.${clientId}`,
+          filter: `contact_phone=eq.${convPhone}`,
         },
         (payload: any) => {
           const newMsg = payload.new as Message & { contact_phone?: string; channel?: string };
-          // Only append if we have a conversation selected and the message matches it
-          if (
-            selectedConv &&
-            newMsg.contact_phone === selectedConv.contact_phone &&
-            (newMsg.channel === 'merchant_wa' || !newMsg.channel)
-          ) {
+          if (newMsg.channel === 'merchant_wa' || !newMsg.channel) {
             setMessages(prev => {
               // Deduplicate: don't add if already present (e.g. optimistic insert from sendReply)
               if (prev.some(m => m.id === newMsg.id)) return prev;
@@ -124,9 +128,14 @@ export function WAInbox({ clientId }: Props) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(msgChannel);
+      supabase.removeChannel(channel);
     };
-  }, [clientId, selectedConv]);
+  }, [clientId, convId, convPhone]);
+
+  // Bug #155 fix: Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   async function fetchConversations() {
     setLoading(true);
@@ -288,6 +297,7 @@ export function WAInbox({ clientId }: Props) {
                 </div>
               ))
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           {/* Reply input */}

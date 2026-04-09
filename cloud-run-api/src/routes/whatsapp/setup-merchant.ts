@@ -5,8 +5,12 @@ import { getTwilioMasterClient, getTwilioSubClient } from '../../lib/twilio-clie
 import { createHmac } from 'node:crypto';
 import { getUserClientIds } from '../../lib/user-scoping.js';
 
+// Bug #158 fix: Webhook URL uses env var with hardcoded fallback.
+// IMPORTANT: If API_BASE_URL or CLOUD_RUN_URL changes (e.g. new Cloud Run revision URL),
+// existing merchants will still have the OLD webhook URL configured in Twilio.
+// Run a migration script to update webhooks for all active wa_twilio_accounts.
 const API_BASE_URL = () =>
-  process.env.API_BASE_URL || 'https://steve-api-850416724643.us-central1.run.app';
+  process.env.API_BASE_URL || process.env.CLOUD_RUN_URL || 'https://steve-api-850416724643.us-central1.run.app';
 
 /**
  * WARNING: SECURITY VULNERABILITY — XOR-based encryption is WEAK.

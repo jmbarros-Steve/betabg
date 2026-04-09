@@ -160,21 +160,31 @@ export async function abandonedCartWA(c: Context) {
           body: message,
         });
       } catch (sendErr) {
-        // Bug #116 fix: Refund credit without corrupting total_used.
-        // Do NOT use deduct_wa_credit with -1 — read current balance and increment directly.
+        // Bug #132 fix: Use atomic refund_wa_credit RPC to prevent TOCTOU race condition.
+        // The previous read-then-write pattern could lose refunds under concurrent cron runs.
         try {
-          const { data: currentCredits } = await supabase
-            .from('wa_credits')
-            .select('balance')
-            .eq('client_id', cart.client_id)
-            .single();
-          const currentBalance = (currentCredits as any)?.balance ?? 0;
-          await supabase
-            .from('wa_credits')
-            .update({ balance: currentBalance + 1 })
-            .eq('client_id', cart.client_id);
-        } catch (refundErr) {
-          console.error(`[abandoned-cart-wa] Refund direct update failed for client ${cart.client_id}:`, refundErr);
+          await supabase.rpc('refund_wa_credit', {
+            p_client_id: cart.client_id,
+            p_amount: 1,
+            p_description: `abandoned_cart_send_failure: ${cart.customer_phone}`,
+          });
+        } catch (rpcErr) {
+          // Fallback: direct balance update if RPC doesn't exist
+          console.error(`[abandoned-cart-wa] refund_wa_credit RPC failed for client ${cart.client_id}, using fallback:`, rpcErr);
+          try {
+            const { data: currentCredits } = await supabase
+              .from('wa_credits')
+              .select('balance')
+              .eq('client_id', cart.client_id)
+              .single();
+            const currentBalance = (currentCredits as any)?.balance ?? 0;
+            await supabase
+              .from('wa_credits')
+              .update({ balance: currentBalance + 1 })
+              .eq('client_id', cart.client_id);
+          } catch (fallbackErr) {
+            console.error(`[abandoned-cart-wa] CRITICAL: Refund fallback also failed for client ${cart.client_id}:`, fallbackErr);
+          }
         }
         throw sendErr; // re-throw to be caught by outer handler
       }
@@ -211,6 +221,12 @@ export async function abandonedCartWA(c: Context) {
   }
 
   // Bug #88 fix: Update total_sent once per client after loop to avoid read-then-write race.
+  // TODO Bug #146: This read-then-write pattern is still non-atomic. If two cron instances
+  // run concurrently (e.g. Cloud Scheduler retries), both read the same total_sent value
+  // and one increment is lost. Proper fix requires an RPC like:
+  //   increment_automation_total_sent(p_client_id, p_trigger_type, p_count)
+  //   that does: UPDATE wa_automations SET total_sent = total_sent + p_count WHERE ...
+  // For now, this is acceptable because the cron runs hourly and concurrent runs are rare.
   for (const [clientId, count] of Object.entries(sentByClient)) {
     try {
       // Fetch current total_sent, then set to current + count in one update
