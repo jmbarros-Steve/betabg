@@ -69,16 +69,16 @@ export async function steveAgentLoop(c: Context) {
     const categories = [...new Set(knowledgeStats.map(k => k.categoria))];
 
     // Get recent feedback
-    const recentFeedback = await safeQuery<{ feedback_type: string; created_at: string }>(
+    const recentFeedback = await safeQuery<{ rating: number | null; created_at: string }>(
       supabase
         .from('steve_feedback')
-        .select('feedback_type, created_at')
+        .select('rating, created_at')
         .gte('created_at', new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()),
       'steveAgentLoop.fetchRecentFeedback',
     );
 
-    const positiveFb = recentFeedback.filter(f => f.feedback_type === 'positive').length;
-    const negativeFb = recentFeedback.filter(f => f.feedback_type === 'negative').length;
+    const positiveFb = recentFeedback.filter(f => (f.rating ?? 0) >= 4).length;
+    const negativeFb = recentFeedback.filter(f => (f.rating ?? 0) <= 2 && f.rating !== null).length;
 
     // Get client metrics summary
     const recentMetrics = await safeQuery<{ connection_id: string; spend: number | string; conversion_value: number | string }>(
