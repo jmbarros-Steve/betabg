@@ -374,7 +374,7 @@ export async function criterioMeta(campaignData: Record<string, any>, shopId: st
       .map((r) => `• [${r.severity}] ${r.rule_id}: ${r.details || 'Failed'}`)
       .join('\n');
 
-    await supabase.from('tasks').insert({
+    const { error: taskError } = await supabase.from('tasks').insert({
       shop_id: shopId,
       title: `CRITERIO rechazó Meta campaign: score ${evalResult.score}%`,
       description: [
@@ -395,9 +395,8 @@ export async function criterioMeta(campaignData: Record<string, any>, shopId: st
         blockers: evalResult.blockers,
         failed_rules: evalResult.failed_rules,
       },
-    }).then(({ error }) => {
-      if (error) console.error('[criterio-meta] Failed to create task:', error.message);
     });
+    if (taskError) console.error('[criterio-meta] Failed to create task:', taskError.message);
   }
 
   console.log(`[criterio-meta] Score: ${evalResult.score}%, can_publish: ${evalResult.can_publish}, failed: ${evalResult.failed}`);
@@ -422,7 +421,7 @@ export async function criterioMetaHandler(c: Context) {
 
     const result = await criterioMeta(campaign_data, shop_id, client_id);
 
-    return c.json(result, result.can_publish ? 200 : 422);
+    return c.json(result, 200);
   } catch (error) {
     console.error('[criterio-meta] Unhandled error:', error);
     const msg = error instanceof Error ? error.message : 'Unknown error';

@@ -46,6 +46,8 @@ export function useUserPlan(overrideUserId?: string): UseUserPlanReturn {
       return;
     }
 
+    let cancelled = false;
+
     async function fetchPlan() {
       try {
         // If overrideUserId is a client row ID (not a user_id), resolve to user_id first
@@ -59,6 +61,7 @@ export function useUserPlan(overrideUserId?: string): UseUserPlanReturn {
             .eq('id', overrideUserId)
             .single();
 
+          if (cancelled) return;
           if (clientData?.client_user_id) {
             userId = clientData.client_user_id;
           }
@@ -73,6 +76,7 @@ export function useUserPlan(overrideUserId?: string): UseUserPlanReturn {
           .limit(1)
           .single();
 
+        if (cancelled) return;
         if (error || !data) {
           setPlanSlug('visual'); // Default
         } else {
@@ -80,13 +84,14 @@ export function useUserPlan(overrideUserId?: string): UseUserPlanReturn {
           setPlanSlug(slug || 'visual');
         }
       } catch {
-        setPlanSlug('visual');
+        if (!cancelled) setPlanSlug('visual');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     fetchPlan();
+    return () => { cancelled = true; };
   }, [user?.id, isSuperAdmin, overrideUserId]);
 
   const canAccess = useCallback(

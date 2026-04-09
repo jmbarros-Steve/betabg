@@ -74,7 +74,8 @@ export async function executeMetaRulesCron(c: Context) {
           .from('campaign_metrics')
           .select('*')
           .eq('connection_id', connectionId)
-          .gte('metric_date', new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]),
+          .gte('metric_date', new Date(Date.now() - 31 * 86400000).toISOString().split('T')[0])
+          .lt('metric_date', new Date().toISOString().split('T')[0]),
         'executeMetaRules.fetchCampaignMetrics',
       );
 

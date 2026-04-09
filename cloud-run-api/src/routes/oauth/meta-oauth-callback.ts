@@ -40,7 +40,7 @@ export async function metaOauthCallback(c: Context) {
 
     const { data: client, error: clientError } = await supabase
       .from('clients')
-      .select('id, client_user_id')
+      .select('id, client_user_id, user_id')
       .eq('id', client_id)
       .single();
 
@@ -50,10 +50,8 @@ export async function metaOauthCallback(c: Context) {
 
     // Allow both client_user_id and admin (user_id) to connect Meta
     if (client.client_user_id !== user.id) {
-      // Check if user is admin/owner of the client
-      const { data: fullClient } = await supabase.from('clients').select('user_id').eq('id', client_id).single();
       const { data: profile } = await supabase.from('user_roles').select('is_super_admin').eq('user_id', user.id).maybeSingle();
-      const isOwner = fullClient?.user_id === user.id;
+      const isOwner = client.user_id === user.id;
       const isAdmin = profile?.is_super_admin === true;
       if (!isOwner && !isAdmin) {
         return c.json({ error: 'Access denied' }, 403);
@@ -200,24 +198,25 @@ export async function metaOauthCallback(c: Context) {
       if (!serviceKey) {
         console.warn('[meta-oauth] Missing SUPABASE_SERVICE_ROLE_KEY — auto-sync skipped');
       }
-      fetch(`${selfUrl}/api/sync-meta-metrics`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${serviceKey}`,
-          'X-Internal-Key': serviceKey,
-          'X-Cron-Secret': cronSecret,
-        },
-        body: JSON.stringify({ connection_id: connectionResult.data.id }),
-      }).then(res => {
-        if (!res.ok) {
-          console.warn(`[meta-oauth] Auto-sync returned non-OK status: ${res.status}`);
+      try {
+        const syncRes = await fetch(`${selfUrl}/api/sync-meta-metrics`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceKey}`,
+            'X-Internal-Key': serviceKey,
+            'X-Cron-Secret': cronSecret,
+          },
+          body: JSON.stringify({ connection_id: connectionResult.data.id }),
+        });
+        if (!syncRes.ok) {
+          console.warn(`[meta-oauth] Auto-sync returned non-OK status: ${syncRes.status}`);
         } else {
-          console.log(`[meta-oauth] Auto-sync triggered: ${res.status}`);
+          console.log(`[meta-oauth] Auto-sync triggered: ${syncRes.status}`);
         }
-      }).catch(err => {
-        console.warn('[meta-oauth] Auto-sync failed (non-blocking):', err.message);
-      });
+      } catch (syncErr: any) {
+        console.warn('[meta-oauth] Auto-sync failed (non-blocking):', syncErr.message);
+      }
     }
 
     // Complete onboarding step (fire & forget)

@@ -20,6 +20,7 @@ import logoMeta from '@/assets/logo-meta-clean.png';
 
 interface MetaAdAccountSelectorProps {
   connectionId: string;
+  clientId: string;
   currentAccountId: string | null;
   onAccountSelected: (accountId: string) => void;
 }
@@ -38,10 +39,11 @@ interface GroupedAccounts {
   [businessName: string]: AdAccount[];
 }
 
-export function MetaAdAccountSelector({ 
-  connectionId, 
+export function MetaAdAccountSelector({
+  connectionId,
+  clientId,
   currentAccountId,
-  onAccountSelected 
+  onAccountSelected
 }: MetaAdAccountSelectorProps) {
   const [accounts, setAccounts] = useState<AdAccount[]>([]);
   const [groupedAccounts, setGroupedAccounts] = useState<GroupedAccounts>({});
@@ -169,7 +171,7 @@ export function MetaAdAccountSelector({
       'email',
     ].join(',');
 
-    sessionStorage.setItem('meta_oauth_client_id', connectionId);
+    sessionStorage.setItem('meta_oauth_client_id', clientId);
     
     const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code&auth_type=rerequest`;
 

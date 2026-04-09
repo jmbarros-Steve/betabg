@@ -93,7 +93,7 @@ export function useMetaScopes(clientId: string) {
       setConnectionId(conns[0].id);
 
       // Call Cloud Run API
-      let data: any = null;
+      let data: { success?: boolean; granted?: string[]; declined?: string[]; token_expired?: boolean; missing_all?: boolean } | null = null;
       try {
         const { data: result, error: apiError } = await callApi('check-meta-scopes', {
           body: { connection_id: conns[0].id },
@@ -101,7 +101,7 @@ export function useMetaScopes(clientId: string) {
         if (apiError || !result) {
           return; // scopeDataLoaded stays false → panel hidden
         }
-        data = result;
+        data = result as typeof data;
       } catch {
         return; // scopeDataLoaded stays false → panel hidden
       }
@@ -122,14 +122,14 @@ export function useMetaScopes(clientId: string) {
       }
 
       // Only trust the response if the edge function explicitly reported success
-      if (data?.success !== true || !Array.isArray(data?.granted)) {
+      if (data?.success !== true || !data?.granted || !Array.isArray(data.granted)) {
         return; // scopeDataLoaded stays false → panel hidden
       }
 
       // Happy path — we have real scope data
       setScopeDataLoaded(true);
       setGranted(data.granted);
-      setDeclined(data.declined || []);
+      setDeclined(Array.isArray(data.declined) ? data.declined : []);
     } catch (err: any) {
       setError(err?.message || 'Error checking scopes');
       // scopeDataLoaded stays false → panel hidden
@@ -161,6 +161,11 @@ export function useMetaScopes(clientId: string) {
   const getReconnectUrl = useCallback(() => {
     const redirectUri = `${window.location.origin}/oauth/meta/callback`;
     const scopes = ALL_REQUIRED_SCOPES.join(',');
+    // Validate clientId is a UUID before using in OAuth flow
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clientId)) {
+      console.error('[useMetaScopes] Invalid clientId format:', clientId);
+      return '';
+    }
     sessionStorage.setItem('meta_oauth_client_id', clientId);
     return `https://www.facebook.com/v21.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code&state=${clientId}&auth_type=rerequest`;
   }, [clientId]);

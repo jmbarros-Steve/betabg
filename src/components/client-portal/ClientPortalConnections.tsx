@@ -383,6 +383,7 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
                 {isMeta && (
                   <MetaAdAccountSelector
                     connectionId={connection.id}
+                    clientId={clientId}
                     currentAccountId={connection.account_id}
                     onAccountSelected={() => fetchConnections()}
                   />
