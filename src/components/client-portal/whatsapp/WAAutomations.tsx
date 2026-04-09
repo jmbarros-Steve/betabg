@@ -105,18 +105,48 @@ export function WAAutomations({ clientId }: Props) {
   }
 
   async function createDefaults() {
+    // Bug #126 fix: Race condition — multiple tabs can call createDefaults() in parallel.
+    // Use upsert with onConflict on (client_id, trigger_type) to deduplicate.
+    // If the table doesn't have a unique constraint on those columns, we fall back to
+    // a re-check after insert to detect and clean up duplicates.
     const inserts = DEFAULT_AUTOMATIONS.map(a => ({
       ...a,
       client_id: clientId,
       is_active: false,
     }));
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('wa_automations' as any)
-      .insert(inserts)
+      .upsert(inserts, { onConflict: 'client_id,trigger_type', ignoreDuplicates: true })
       .select();
 
-    setAutomations((data as any[]) || []);
+    if (error) {
+      // Fallback: upsert failed (maybe no unique constraint exists) — do plain insert + re-fetch
+      console.warn('[WAAutomations] upsert failed, falling back to insert + re-fetch:', error.message);
+      await supabase
+        .from('wa_automations' as any)
+        .insert(inserts)
+        .select();
+
+      // Re-fetch to get deduplicated results (in case another tab already inserted)
+      const { data: refetched } = await supabase
+        .from('wa_automations' as any)
+        .select('*')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: true });
+
+      setAutomations((refetched as any[]) || []);
+      return;
+    }
+
+    // Re-fetch to ensure we have the canonical set (another tab may have inserted first)
+    const { data: canonical } = await supabase
+      .from('wa_automations' as any)
+      .select('*')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: true });
+
+    setAutomations((canonical as any[]) || []);
   }
 
   async function toggleAutomation(auto: Automation, isActive: boolean) {

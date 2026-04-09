@@ -45,6 +45,13 @@ export async function waSendCampaign(c: Context) {
       return c.json({ error: 'Campaña no encontrada' }, 404);
     }
 
+    // Bug #127 fix: explicitly reject completed/sending campaigns with clear error messages
+    if (campaign.status === 'completed' || campaign.status === 'sent') {
+      return c.json({ error: 'Esta campaña ya fue enviada y no puede re-enviarse' }, 400);
+    }
+    if (campaign.status === 'sending') {
+      return c.json({ error: 'Esta campaña ya está en proceso de envío' }, 400);
+    }
     if (campaign.status !== 'draft') {
       return c.json({ error: `Campaña ya está en estado ${campaign.status}` }, 400);
     }
@@ -174,6 +181,25 @@ export async function waSendCampaign(c: Context) {
 
         const fromNorm = `whatsapp:${waAccount.phone_number.startsWith('+') ? waAccount.phone_number : '+' + waAccount.phone_number}`;
 
+        // Bug #124 fix: Query wa_messages for recipients who already received this campaign.
+        // If Cloud Run kills the instance mid-send and it restarts (or the campaign is retried),
+        // this prevents double-sending to contacts that were already messaged.
+        const alreadySent = await safeQueryOrDefault<{ contact_phone: string }>(
+          supabase
+            .from('wa_messages')
+            .select('contact_phone')
+            .eq('client_id', client_id)
+            .eq('channel', 'merchant_wa')
+            .eq('direction', 'outbound')
+            .contains('metadata', { campaign_id }),
+          [],
+          'sendCampaign.getAlreadySent',
+        );
+        const alreadySentPhones = new Set(alreadySent.map((m: { contact_phone: string }) => m.contact_phone));
+        if (alreadySentPhones.size > 0) {
+          console.log(`[wa-campaign] Bug #124: Skipping ${alreadySentPhones.size} already-sent recipients for campaign ${campaign_id}`);
+        }
+
         for (const recipient of recipients) {
           try {
             const personalizedBody = campaign.template_body
@@ -186,6 +212,13 @@ export async function waSendCampaign(c: Context) {
               failedCount++;
               continue;
             }
+
+            // Bug #124 fix: skip if this phone was already sent in a previous run
+            if (alreadySentPhones.has(rawPhone)) {
+              sentCount++; // count as sent (already delivered)
+              continue;
+            }
+
             const toNorm = `whatsapp:+${rawPhone.replace('+', '')}`;
 
             const msg = await subClient.messages.create({
@@ -250,25 +283,23 @@ export async function waSendCampaign(c: Context) {
 
         // Bug #35 fix: credits were reserved upfront for recipients.length.
         // Bug #83 fix: Don't call deduct_wa_credit with negative amounts — it corrupts total_used.
-        // Instead, log unused credits as a warning. A proper refund requires a dedicated
-        // SQL function that adds to balance WITHOUT decrementing total_used.
+        // Bug #111 fix: use atomic refund_wa_credit RPC (balance = balance + X in SQL)
+        // instead of read-then-write which has a TOCTOU race condition.
         try {
           const unusedCredits = recipients.length - sentCount;
           if (unusedCredits > 0) {
             console.warn(`[wa-campaign] Campaign ${campaign_id}: ${unusedCredits} unused credits (${failedCount} failed). ` +
-              `Pre-deducted ${recipients.length}, sent ${sentCount}. Manual credit adjustment may be needed.`);
-            // Use a direct balance update that won't corrupt total_used
-            const { data: currentCredits } = await supabase
-              .from('wa_credits')
-              .select('balance')
-              .eq('client_id', client_id)
-              .single();
-            if (currentCredits) {
-              await supabase
-                .from('wa_credits')
-                .update({ balance: currentCredits.balance + unusedCredits })
-                .eq('client_id', client_id);
-              console.log(`[wa-campaign] Refunded ${unusedCredits} credits to client ${client_id} balance (total_used unchanged)`);
+              `Pre-deducted ${recipients.length}, sent ${sentCount}. Refunding atomically.`);
+            const { error: refundError } = await supabase.rpc('refund_wa_credit', {
+              p_client_id: client_id,
+              p_amount: unusedCredits,
+              p_description: `Campaña "${campaign.name}": refund ${unusedCredits} créditos no usados (${failedCount} fallidos)`,
+            });
+            if (refundError) {
+              console.error(`[wa-campaign] refund_wa_credit failed for campaign ${campaign_id}:`, refundError.message);
+              // NOTE: If the RPC doesn't exist yet, deploy migration 20260409_refund_wa_credit.sql
+            } else {
+              console.log(`[wa-campaign] Refunded ${unusedCredits} credits to client ${client_id} via atomic RPC`);
             }
           }
         } catch (creditErr) {

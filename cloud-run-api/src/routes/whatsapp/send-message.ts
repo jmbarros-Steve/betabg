@@ -84,20 +84,23 @@ export async function waSendMessage(c: Context) {
         body: messageBody,
       });
     } catch (twilioErr) {
-      // Twilio failed — refund the credit we already deducted
+      // Twilio failed — refund the credit we already deducted.
+      // Bug #116 fix: Do NOT use deduct_wa_credit with -1 as it corrupts total_used.
+      // Instead, read current balance and increment it directly without touching total_used.
       console.error('[wa-send-message] Twilio send failed, refunding credit:', twilioErr);
-      const { error: refundError } = await supabase.rpc('deduct_wa_credit', {
-        p_client_id: client_id,
-        p_amount: -1,
-        p_description: `Refund: fallo envío a ${cleanPhone}`,
-      });
-      if (refundError) {
-        // If the RPC doesn't support negative amounts, fall back to direct update
-        console.warn('[wa-send-message] deduct_wa_credit refund failed, using direct update:', refundError);
+      try {
+        const { data: currentCredits } = await supabase
+          .from('wa_credits')
+          .select('balance')
+          .eq('client_id', client_id)
+          .single();
+        const currentBalance = (currentCredits as any)?.balance ?? (result?.new_balance ?? 0);
         await supabase
           .from('wa_credits')
-          .update({ balance: (result?.new_balance ?? 0) + 1 })
+          .update({ balance: currentBalance + 1 })
           .eq('client_id', client_id);
+      } catch (refundErr) {
+        console.error('[wa-send-message] Refund direct update failed:', refundErr);
       }
       throw twilioErr;
     }

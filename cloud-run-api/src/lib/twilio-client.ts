@@ -33,7 +33,7 @@ export function getSteveWANumber(): string {
 /**
  * Send a WhatsApp message from Steve's number.
  * @param to  Destination, e.g. "whatsapp:+56987654321" or raw "+56987654321"
- * @param body  Message text (max 1600 chars)
+ * @param body  Message text (max 4096 chars — WhatsApp limit)
  */
 export async function sendWhatsApp(to: string, body: string) {
   const client = getTwilioMasterClient();
@@ -41,7 +41,13 @@ export async function sendWhatsApp(to: string, body: string) {
   const from = `whatsapp:+${steveNumber}`;
   const toNorm = to.startsWith('whatsapp:') ? to : `whatsapp:${to.startsWith('+') ? to : '+' + to}`;
 
-  return client.messages.create({ from, to: toNorm, body });
+  // Bug #130 fix: enforce WhatsApp 4096 char limit to prevent Twilio API errors
+  const WA_MAX_CHARS = 4096;
+  const safeBody = body.length > WA_MAX_CHARS
+    ? body.slice(0, WA_MAX_CHARS - 6) + '...[+]'
+    : body;
+
+  return client.messages.create({ from, to: toNorm, body: safeBody });
 }
 
 /**

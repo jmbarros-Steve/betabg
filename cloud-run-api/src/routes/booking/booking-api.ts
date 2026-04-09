@@ -29,6 +29,16 @@ function isBookingRateLimited(ip: string): boolean {
   return false;
 }
 
+// Bug #121 fix: cleanup stale entries every 5 minutes (same pattern as web-forms.ts)
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, timestamps] of bookingRateLimit) {
+    const recent = timestamps.filter(t => now - t < BOOKING_RATE_LIMIT_WINDOW_MS);
+    if (recent.length === 0) bookingRateLimit.delete(ip);
+    else bookingRateLimit.set(ip, recent);
+  }
+}, 300_000);
+
 // Bug #78 fix: sanitize user-supplied strings
 function sanitizeInput(value: string | undefined, maxLength: number): string {
   if (!value) return '';
@@ -222,15 +232,19 @@ export async function bookingSlots(c: Context) {
       const tm = targetChile.getMonth() + 1;
       const td = targetChile.getDate();
 
-      for (let hour = workStart; hour < workEnd; hour++) {
-        for (let min = 0; min < 60; min += slotDuration + buffer) {
-          const slotStart = chileLocalToUTC(ty, tm, td, hour, min);
-          const slotEnd = new Date(slotStart.getTime() + slotDuration * 60 * 1000);
-          // Verify end doesn't exceed workEnd in Chile
-          const endChile = new Date(slotEnd.toLocaleString('en-US', { timeZone: 'America/Santiago' }));
-          if (endChile.getHours() > workEnd || (endChile.getHours() === workEnd && endChile.getMinutes() > 0)) break;
-          candidateSlots.push({ start: slotStart, end: slotEnd });
-        }
+      // Bug #122 fix: linear loop instead of nested hour/min — prevents slot overlaps
+      // when slotDuration + buffer > 60 minutes
+      const stepMinutes = slotDuration + buffer;
+      let offsetMin = workStart * 60; // start at workStart in minutes from midnight
+      const endMin = workEnd * 60;    // end at workEnd in minutes from midnight
+
+      while (offsetMin + slotDuration <= endMin) {
+        const hour = Math.floor(offsetMin / 60);
+        const min = offsetMin % 60;
+        const slotStart = chileLocalToUTC(ty, tm, td, hour, min);
+        const slotEnd = new Date(slotStart.getTime() + slotDuration * 60 * 1000);
+        candidateSlots.push({ start: slotStart, end: slotEnd });
+        offsetMin += stepMinutes;
       }
       daysChecked++;
     }
@@ -494,6 +508,8 @@ export async function bookingConfirm(c: Context) {
         meeting_at: startTime.toISOString(),
         meeting_url: meetLink || event.htmlLink,
         meeting_status: 'scheduled',
+        // Bug #112 fix: persist Google Calendar event ID for future updates/cancellations
+        google_calendar_event_id: event.id,
         reminder_24h_sent: false,
         reminder_2h_sent: false,
         assigned_seller_id: seller_id,

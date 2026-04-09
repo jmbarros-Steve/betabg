@@ -54,6 +54,7 @@ export function WACampaigns({ clientId }: Props) {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [sendingCampaignId, setSendingCampaignId] = useState<string | null>(null);
 
   // Form state
   const [name, setName] = useState('');
@@ -117,8 +118,14 @@ export function WACampaigns({ clientId }: Props) {
   }
 
   async function sendCampaign(campaign: Campaign) {
+    // Bug #127 fix: prevent re-sending completed or in-progress campaigns
+    if (campaign.status === 'completed' || campaign.status === 'sending' || campaign.status === 'sent') {
+      toast.error('Esta campana ya fue enviada o esta en proceso de envio');
+      return;
+    }
     if (campaign.status !== 'draft') return;
 
+    setSendingCampaignId(campaign.id);
     try {
       const { error } = await callApi('whatsapp/send-campaign', {
         body: { campaign_id: campaign.id, client_id: clientId },
@@ -130,6 +137,8 @@ export function WACampaigns({ clientId }: Props) {
       fetchCampaigns();
     } catch (err: any) {
       toast.error(err.message || 'Error al enviar campana');
+    } finally {
+      setSendingCampaignId(null);
     }
   }
 
@@ -233,9 +242,11 @@ export function WACampaigns({ clientId }: Props) {
                         size="sm"
                         variant="outline"
                         onClick={() => sendCampaign(campaign)}
+                        disabled={sendingCampaignId === campaign.id}
                         className="text-green-600 border-green-300 hover:bg-green-50"
                       >
-                        <Send className="h-3 w-3 mr-1" /> Enviar
+                        <Send className="h-3 w-3 mr-1" />
+                        {sendingCampaignId === campaign.id ? 'Enviando...' : 'Enviar'}
                       </Button>
                     )}
                   </div>

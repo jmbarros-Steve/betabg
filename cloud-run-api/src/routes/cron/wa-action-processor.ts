@@ -101,7 +101,13 @@ export async function waActionProcessor(c: Context) {
     }
 
     try {
-      await executeAction(action, supabase);
+      // Bug #128 fix: wrap each action in a 30s timeout to prevent stuck processing
+      await Promise.race([
+        executeAction(action, supabase),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Action ${action.action_type} timed out after 30s`)), 30_000)
+        ),
+      ]);
 
       // Mark completed
       await supabase

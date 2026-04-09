@@ -36,9 +36,19 @@ export async function prospectFollowup(c: Context) {
 
   const supabase = getSupabaseAdmin();
   const now = new Date();
-  const results = { followups_sent: 0, marked_lost: 0, resurrections_sent: 0, errors: 0 };
+  const results = { followups_sent: 0, marked_lost: 0, resurrections_sent: 0, errors: 0, skipped_hours: false };
   // Bug #40 fix: Track IDs that received goodbye in this run to exclude from mark-ghosted
   const goodbyeSentIds = new Set<string>();
+
+  // Bug #125 fix: Check Chile local time — skip sending if outside business hours (9am-8pm CLT/CLST).
+  // The cron still runs (to mark ghosted/lost), but no WA messages are sent during nighttime.
+  // Chile is UTC-3 (CLST, Oct-Mar) or UTC-4 (CLT, Apr-Sep).
+  const chileHour = new Date(now.toLocaleString('en-US', { timeZone: 'America/Santiago' })).getHours();
+  const outsideBusinessHours = chileHour < 9 || chileHour >= 20;
+  if (outsideBusinessHours) {
+    console.log(`[prospect-followup] Bug #125: Chile local hour is ${chileHour}, outside 9am-8pm. Skipping WA sends.`);
+    results.skipped_hours = true;
+  }
 
   try {
     // ============================================================
@@ -156,6 +166,9 @@ export async function prospectFollowup(c: Context) {
 
           // Truncate
           if (followupMsg.length > 400) followupMsg = followupMsg.slice(0, 397) + '...';
+
+          // Bug #125 fix: skip sending if outside Chile business hours
+          if (outsideBusinessHours) continue;
 
           // Send via Twilio
           await sendWhatsApp(`+${prospect.phone}`, followupMsg);
@@ -306,6 +319,9 @@ export async function prospectFollowup(c: Context) {
           let msg = (aiData.content?.[0]?.text || '').trim();
           if (!msg) continue;
           if (msg.length > 400) msg = msg.slice(0, 397) + '...';
+
+          // Bug #125 fix: skip resurrection sends outside Chile business hours
+          if (outsideBusinessHours) continue;
 
           await sendWhatsApp(`+${dead.phone}`, msg);
 

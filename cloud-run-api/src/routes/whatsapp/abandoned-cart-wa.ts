@@ -160,12 +160,22 @@ export async function abandonedCartWA(c: Context) {
           body: message,
         });
       } catch (sendErr) {
-        // Refund the credit since send failed
-        await supabase.rpc('deduct_wa_credit', {
-          p_client_id: cart.client_id,
-          p_amount: -1,
-          p_description: 'Refund: cart reminder send failed',
-        });
+        // Bug #116 fix: Refund credit without corrupting total_used.
+        // Do NOT use deduct_wa_credit with -1 — read current balance and increment directly.
+        try {
+          const { data: currentCredits } = await supabase
+            .from('wa_credits')
+            .select('balance')
+            .eq('client_id', cart.client_id)
+            .single();
+          const currentBalance = (currentCredits as any)?.balance ?? 0;
+          await supabase
+            .from('wa_credits')
+            .update({ balance: currentBalance + 1 })
+            .eq('client_id', cart.client_id);
+        } catch (refundErr) {
+          console.error(`[abandoned-cart-wa] Refund direct update failed for client ${cart.client_id}:`, refundErr);
+        }
         throw sendErr; // re-throw to be caught by outer handler
       }
 

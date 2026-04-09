@@ -124,22 +124,14 @@ export async function merchantWAWebhook(c: Context) {
 
   try {
     const body = await c.req.parseBody();
-    const from = String(body['From'] || '');
-    const messageBody = String(body['Body'] || '');
-    const profileName = String(body['ProfileName'] || '');
-    const messageSid = String(body['MessageSid'] || '');
 
-    if (!from || !messageBody) {
-      return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
-    }
-
-    const phone = from.replace('whatsapp:', '').replace('+', '').trim();
-
-    // Get merchant's WA account
+    // Bug #114 fix: Twilio HMAC signature validation — reject forged webhooks.
+    // Merchant WA webhooks are signed with the merchant's Twilio subaccount auth token.
+    // We fetch the encrypted token, decrypt it, and validate the signature before processing.
     const waAccount = await safeQuerySingleOrDefault<any>(
       supabase
         .from('wa_twilio_accounts')
-        .select('phone_number')
+        .select('phone_number, twilio_auth_token')
         .eq('client_id', clientId)
         .eq('status', 'active')
         .single(),
@@ -150,6 +142,45 @@ export async function merchantWAWebhook(c: Context) {
     if (!waAccount) {
       return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
     }
+
+    {
+      const merchantAuthToken = waAccount.twilio_auth_token
+        ? decryptToken(waAccount.twilio_auth_token)
+        : null;
+      if (!merchantAuthToken) {
+        console.error(`[merchant-wa] No auth token for client ${clientId} — rejecting webhook`);
+        return c.text('Forbidden', 403);
+      }
+      const sig = c.req.header('X-Twilio-Signature') || '';
+      const proto = c.req.header('x-forwarded-proto') || 'https';
+      const host = c.req.header('host') || '';
+      const reqUrl = c.req.url;
+      const rawUrl = host
+        ? `${proto}://${host}${new URL(reqUrl).pathname}`
+        : reqUrl.replace(/^http:\/\//i, 'https://');
+      const params: Record<string, string> = {};
+      for (const [k, v] of Object.entries(body)) params[k] = String(v ?? '');
+      const twilioMod = await import('twilio');
+      // ESM: validateRequest is on default.validateRequest, not the module root
+      const validateRequest = (twilioMod.default as any)?.validateRequest ?? (twilioMod as any).validateRequest;
+      if (typeof validateRequest !== 'function') {
+        console.error('[merchant-wa-hmac] validateRequest not found in twilio module — skipping validation');
+      } else if (!validateRequest(merchantAuthToken, sig, rawUrl, params)) {
+        console.warn(`[merchant-wa-hmac] Invalid signature — rejecting request from ${rawUrl}`);
+        return c.text('Forbidden', 403);
+      }
+    }
+
+    const from = String(body['From'] || '');
+    const messageBody = String(body['Body'] || '');
+    const profileName = String(body['ProfileName'] || '');
+    const messageSid = String(body['MessageSid'] || '');
+
+    if (!from || !messageBody) {
+      return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
+    }
+
+    const phone = from.replace('whatsapp:', '').replace('+', '').trim();
 
     // Save inbound message
     await supabase.from('wa_messages').insert({

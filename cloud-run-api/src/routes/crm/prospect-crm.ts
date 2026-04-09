@@ -5,6 +5,26 @@ import { sendMetaCAPIEvent } from '../../lib/meta-capi.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { getUserClientIds, verifyProspectOwnership } from '../../lib/user-scoping.js';
 
+// Bug #129 fix: valid stage transitions map — prevents arbitrary stage jumps
+// Each stage maps to the set of stages it can transition TO.
+// 'lost' can be reached from any active stage. 'converted' only from 'closing'.
+const VALID_STAGE_TRANSITIONS: Record<string, string[]> = {
+  new:        ['discovery', 'lost'],
+  discovery:  ['qualifying', 'new', 'lost'],
+  qualifying: ['pitching', 'discovery', 'lost'],
+  pitching:   ['closing', 'qualifying', 'lost'],
+  closing:    ['converted', 'pitching', 'lost'],
+  converted:  [],  // terminal state — no transitions out
+  lost:       ['new'],  // can reopen to 'new' only
+};
+
+function isValidTransition(from: string, to: string): boolean {
+  if (from === to) return true; // no-op is always valid
+  const allowed = VALID_STAGE_TRANSITIONS[from];
+  if (!allowed) return false; // unknown source stage
+  return allowed.includes(to);
+}
+
 /** Update deal value, win probability, expected close date */
 export async function prospectUpdateDeal(c: Context) {
   try {
@@ -59,6 +79,12 @@ export async function prospectDetail(c: Context) {
     const { prospect_id } = await c.req.json();
     if (!prospect_id) return c.json({ error: 'prospect_id required' }, 400);
 
+    // Bug #123 fix: Validate prospect_id is a valid UUID before passing to .eq()
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (typeof prospect_id !== 'string' || !uuidRegex.test(prospect_id)) {
+      return c.json({ error: 'Invalid prospect_id format' }, 400);
+    }
+
     const supabase = getSupabaseAdmin();
     const user = c.get('user');
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
@@ -100,7 +126,9 @@ export async function prospectDetail(c: Context) {
       messages: messages || [],
     });
   } catch (error: any) {
-    return c.json({ error: error.message || 'Internal server error' }, 500);
+    // Bug #123 fix: sanitize error to avoid exposing internal details
+    console.error('[prospectDetail] Error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
   }
 }
 
@@ -167,7 +195,12 @@ export async function prospectChangeStage(c: Context) {
       null,
       'prospectCrm.getCurrentStage',
     );
-    const oldStage = prospect?.stage || 'unknown';
+    const oldStage = prospect?.stage || 'new';
+
+    // Bug #129 fix: validate stage transition
+    if (!isValidTransition(oldStage, stage)) {
+      return c.json({ error: `Transición inválida: no se puede pasar de '${oldStage}' a '${stage}'` }, 400);
+    }
 
     const { error } = await supabase
       .from('wa_prospects')
@@ -315,12 +348,35 @@ export async function prospectDelete(c: Context) {
     const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
     if (!allowed) return c.json({ error: 'Forbidden' }, 403);
 
-    // Delete related records first (events, tasks, proposals)
+    // Bug #118 fix: Get the prospect's phone BEFORE deleting so we can clean up wa_messages
+    const prospect = await safeQuerySingleOrDefault<any>(
+      supabase.from('wa_prospects').select('phone, name, profile_name').eq('id', prospect_id).single(),
+      null,
+      'prospectCrm.getProspectForDelete',
+    );
+    const prospectPhone = prospect?.phone || null;
+
+    // Bug #118 fix: Log the delete event BEFORE actually deleting the prospect
+    // (after delete, the prospect_id FK may cause issues in some setups)
+    logProspectEvent(prospect_id, 'deleted', {
+      phone: prospectPhone,
+      name: prospect?.name || prospect?.profile_name || null,
+    }, `admin:${user?.id || 'unknown'}`);
+
+    // Delete related records first (events, tasks, proposals, wa_messages)
     await Promise.all([
       supabase.from('wa_prospect_events').delete().eq('prospect_id', prospect_id),
       supabase.from('sales_tasks').delete().eq('prospect_id', prospect_id),
       supabase.from('proposals').delete().eq('prospect_id', prospect_id),
     ]);
+
+    // Bug #118 fix: Also delete orphaned wa_messages by contact_phone
+    if (prospectPhone) {
+      await supabase.from('wa_messages').delete()
+        .eq('contact_phone', prospectPhone)
+        .eq('channel', 'prospect')
+        .is('client_id', null);
+    }
 
     const { error } = await supabase
       .from('wa_prospects')
@@ -328,8 +384,6 @@ export async function prospectDelete(c: Context) {
       .eq('id', prospect_id);
 
     if (error) return c.json({ error: error.message }, 500);
-
-    logProspectEvent(prospect_id, 'deleted', {}, `admin:${user?.id || 'unknown'}`);
 
     return c.json({ success: true });
   } catch (error: any) {
@@ -359,9 +413,14 @@ export async function prospectMoveStage(c: Context) {
       null,
       'prospectCrm.getProspectForMove',
     );
-    const oldStage = prospect?.stage || 'unknown';
+    const oldStage = prospect?.stage || 'new';
 
     if (oldStage === new_stage) return c.json({ success: true, moved: false });
+
+    // Bug #129 fix: validate stage transition for drag & drop
+    if (!isValidTransition(oldStage, new_stage)) {
+      return c.json({ error: `Transición inválida: no se puede pasar de '${oldStage}' a '${new_stage}'` }, 400);
+    }
 
     const { error } = await supabase
       .from('wa_prospects')

@@ -507,6 +507,11 @@ export async function steveWAChat(c: Context) {
       replyText = head;
     }
 
+    // Bug #130 fix: hard cap at 4096 chars (WhatsApp message limit)
+    if (replyText.length > 4096) {
+      replyText = replyText.slice(0, 4090) + '...[+]';
+    }
+
     // Save outbound message
     await supabase.from('wa_messages').insert({
       client_id: client.id,
@@ -1033,6 +1038,14 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
     // Truncate second part separately (600 char budget for part 2)
     if (secondReply && secondReply.length > MAX_SECOND) {
       secondReply = secondReply.slice(0, MAX_SECOND - 3) + '...';
+    }
+
+    // Bug #130 fix: hard cap at 4096 chars (WhatsApp message limit) — defense in depth
+    if (firstReply.length > 4096) {
+      firstReply = firstReply.slice(0, 4090) + '...[+]';
+    }
+    if (secondReply && secondReply.length > 4096) {
+      secondReply = secondReply.slice(0, 4090) + '...[+]';
     }
 
     // ============================================================
@@ -1579,46 +1592,64 @@ async function processProspectAsync(
         const chileNow = new Date(
           new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' })
         );
-        if (meetingDate && meetingDate.getTime() > chileNow.getTime()) {
-          await supabase
-            .from('wa_prospects')
-            .update({
-              meeting_at: meetingDate.toISOString(),
-              meeting_status: 'scheduled',
-              reminder_24h_sent: false,
-              reminder_2h_sent: false,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', prospect.id);
-        } else if (meetingDate && meetingDate.getTime() <= chileNow.getTime()) {
+        if (meetingDate && meetingDate.getTime() <= chileNow.getTime()) {
           console.warn(`[meeting-confirm] Rejected past date: ${meetingDate.toISOString()} for ${prospect.phone}`);
         }
 
         if (meetingDate && meetingDate.getTime() > chileNow.getTime()) {
-          // If there's an assigned seller, create Calendar event via booking API
+          // Fix Bug#120: if there's a seller, verify availability via booking API BEFORE marking as scheduled
+          let bookingSucceeded = true;
           if (prospect.assigned_seller_id) {
             const bookingApiUrl = process.env.CLOUD_RUN_URL || 'http://localhost:8080';
             if (bookingApiUrl && !bookingApiUrl.startsWith('https://') && !bookingApiUrl.startsWith('http://localhost')) {
               console.warn('[steve-wa] Invalid booking URL (not HTTPS):', bookingApiUrl);
               // Skip booking confirmation — SSRF protection
+              bookingSucceeded = false;
             } else {
-              fetch(`${bookingApiUrl}/api/booking/confirm`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                signal: AbortSignal.timeout(10000),
-                body: JSON.stringify({
-                  seller_id: prospect.assigned_seller_id,
-                  slot_start: meetingDate.toISOString(),
-                  prospect_name: prospect.name || prospect.profile_name || 'Prospecto',
-                  prospect_phone: prospect.phone,
-                  prospect_id: prospect.id,
-                }),
-              }).catch(err => console.error('[meeting-confirm] Booking API error:', err));
+              try {
+                const bookingRes = await fetch(`${bookingApiUrl}/api/booking/confirm`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  signal: AbortSignal.timeout(10000),
+                  body: JSON.stringify({
+                    seller_id: prospect.assigned_seller_id,
+                    slot_start: meetingDate.toISOString(),
+                    prospect_name: prospect.name || prospect.profile_name || 'Prospecto',
+                    prospect_phone: prospect.phone,
+                    prospect_id: prospect.id,
+                  }),
+                });
+                if (!bookingRes.ok) {
+                  const errBody = await bookingRes.json().catch(() => ({})) as any;
+                  console.error('[meeting-confirm] Booking API returned error:', bookingRes.status, errBody?.error);
+                  bookingSucceeded = false;
+                }
+              } catch (err) {
+                console.error('[meeting-confirm] Booking API error:', err);
+                bookingSucceeded = false;
+              }
             }
           }
 
-          logProspectEvent(prospect.id, 'meeting_booked', { meeting_at: meetingDate.toISOString(), method: 'text_confirmation' }, 'steve');
-          console.log(`[prospect ${prospect.phone}] Meeting scheduled via text: ${meetingDate.toISOString()}`);
+          if (bookingSucceeded) {
+            // Only mark as scheduled if booking API succeeded (or no seller assigned)
+            await supabase
+              .from('wa_prospects')
+              .update({
+                meeting_at: meetingDate.toISOString(),
+                meeting_status: 'scheduled',
+                reminder_24h_sent: false,
+                reminder_2h_sent: false,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', prospect.id);
+
+            logProspectEvent(prospect.id, 'meeting_booked', { meeting_at: meetingDate.toISOString(), method: 'text_confirmation' }, 'steve');
+            console.log(`[prospect ${prospect.phone}] Meeting scheduled via text: ${meetingDate.toISOString()}`);
+          } else {
+            // Booking failed — keep meeting_status as-is (don't mark scheduled)
+            console.warn(`[meeting-confirm] Booking failed for ${prospect.phone}, NOT marking as scheduled`);
+          }
         }
       } else if (meetingResult.rejected) {
         // R7-#27: Si el prospecto propone alternativa de horario, NO es rechazo — mantener en 'proposed'

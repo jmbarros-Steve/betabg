@@ -20,8 +20,13 @@ export async function webFormsCrud(c: Context) {
       if (!user?.id) return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    // Fix Bug#7: multi-tenant scoping — non-admins only see their own forms
-    const { isSuperAdmin } = await getUserClientIds(supabase, user?.id);
+    // Fix Bug#119: skip getUserClientIds for public_submit (user is null)
+    let isSuperAdmin = false;
+    if (action !== 'public_submit') {
+      // Fix Bug#7: multi-tenant scoping — non-admins only see their own forms
+      const scoping = await getUserClientIds(supabase, user?.id);
+      isSuperAdmin = scoping.isSuperAdmin;
+    }
 
     if (action === 'list') {
       let query = supabase

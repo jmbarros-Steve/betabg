@@ -93,6 +93,41 @@ export function WAInbox({ clientId }: Props) {
     };
   }, [clientId]);
 
+  // Bug #117: Realtime subscription for new wa_messages — append to chat in real time
+  useEffect(() => {
+    const msgChannel = supabase
+      .channel(`wa-messages-${clientId}`)
+      .on(
+        'postgres_changes' as any,
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'wa_messages',
+          filter: `client_id=eq.${clientId}`,
+        },
+        (payload: any) => {
+          const newMsg = payload.new as Message & { contact_phone?: string; channel?: string };
+          // Only append if we have a conversation selected and the message matches it
+          if (
+            selectedConv &&
+            newMsg.contact_phone === selectedConv.contact_phone &&
+            (newMsg.channel === 'merchant_wa' || !newMsg.channel)
+          ) {
+            setMessages(prev => {
+              // Deduplicate: don't add if already present (e.g. optimistic insert from sendReply)
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(msgChannel);
+    };
+  }, [clientId, selectedConv]);
+
   async function fetchConversations() {
     setLoading(true);
     let query = supabase
