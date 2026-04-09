@@ -66,7 +66,9 @@ export async function fetchInstagramInsights(c: Context) {
   }
 
   // 2. Fallback: discover from first page with IG
-  if (!resolvedIgId) {
+  //    SKIP for SUAT connections — /me/accounts returns ALL merchants' pages (cross-contamination)
+  const isSuat = conn.connection_type === 'bm_partner' || conn.connection_type === 'leadsie';
+  if (!resolvedIgId && !isSuat) {
     const pagesRes = await metaApiJson<{ data: any[] }>('/me/accounts', token, {
       params: { fields: 'id,instagram_business_account', limit: '10' },
     });

@@ -265,7 +265,7 @@ export default function Auth() {
                   variant="outline"
                   size="sm"
                   onClick={async () => {
-                    await signOut();
+                    try { await signOut(); } catch { /* ignore signOut errors */ }
                     navigate('/auth', { replace: true });
                   }}
                 >

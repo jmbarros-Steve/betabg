@@ -31,7 +31,8 @@ export async function predictiveAlerts(c: Context) {
       supabase
         .from('campaign_metrics')
         .select('connection_id, campaign_name, spend, impressions, clicks, conversions, conversion_value, metric_date')
-        .gte('metric_date', fourteenDaysAgo),
+        .gte('metric_date', fourteenDaysAgo)
+        .limit(5000),
       'predictiveAlerts.fetchRecentMetrics',
     );
 

@@ -102,18 +102,18 @@ export async function metaApiFetch(
       const isRateLimit = res.status === 429;
       const isServerError = res.status >= 500;
 
-      if (isRateLimit || isServerError) {
-        // Check if it's a Meta rate-limit error code
-        let isMetaRateLimit = isRateLimit;
-        if (res.status === 403 || res.status === 400) {
-          const cloned = res.clone();
-          const errBody: any = await cloned.json().catch(() => ({}));
-          const errCode = errBody?.error?.code;
-          if (errCode === 4 || errCode === 80004 || errCode === 32) {
-            isMetaRateLimit = true;
-          }
+      // Meta sometimes returns rate-limit errors as 400/403 with specific error codes
+      let isMetaRateLimit = isRateLimit;
+      if (!isRateLimit && (res.status === 403 || res.status === 400)) {
+        const cloned = res.clone();
+        const errBody: any = await cloned.json().catch(() => ({}));
+        const errCode = errBody?.error?.code;
+        if (errCode === 4 || errCode === 80004 || errCode === 32) {
+          isMetaRateLimit = true;
         }
+      }
 
+      if (isRateLimit || isServerError || isMetaRateLimit) {
         recordFailure(CIRCUIT_SERVICE, `HTTP ${res.status}`, isRateLimit || isMetaRateLimit);
 
         // If we have retries left, wait and retry

@@ -50,8 +50,12 @@ export async function performanceEvaluator(c: Context) {
   let evaluated = 0;
   let tasksCreated = 0;
 
-  for (const creative of measured) {
-    try {
+  // Process creatives in batches of 5 with Promise.allSettled to avoid sequential Anthropic API calls
+  const BATCH_SIZE = 5;
+  for (let batchStart = 0; batchStart < measured.length; batchStart += BATCH_SIZE) {
+    const batch = measured.slice(batchStart, batchStart + BATCH_SIZE);
+
+    const batchResults = await Promise.allSettled(batch.map(async (creative) => {
       // Build metrics summary based on channel
       let metricsSummary: string;
       if (creative.channel === 'meta') {
@@ -92,7 +96,7 @@ VS PROMEDIO MERCHANT: ${JSON.stringify(creative.benchmark_comparison || {})}
 
       if (!response.ok) {
         console.error(`[perf-evaluator] Anthropic error for ${creative.id}: ${response.status}`);
-        continue;
+        return;
       }
 
       const aiData: any = await response.json();
@@ -106,7 +110,7 @@ VS PROMEDIO MERCHANT: ${JSON.stringify(creative.benchmark_comparison || {})}
 
       if (updateError) {
         console.error(`[perf-evaluator] Update error for ${creative.id}:`, updateError);
-        continue;
+        return;
       }
 
       evaluated++;
@@ -138,8 +142,13 @@ VS PROMEDIO MERCHANT: ${JSON.stringify(creative.benchmark_comparison || {})}
           );
         }
       }
-    } catch (error) {
-      console.error(`[perf-evaluator] Error evaluating creative ${creative.id}:`, error);
+    }));
+
+    // Log any unexpected rejections from the batch
+    for (let i = 0; i < batchResults.length; i++) {
+      if (batchResults[i].status === 'rejected') {
+        console.error(`[perf-evaluator] Error evaluating creative ${batch[i].id}:`, (batchResults[i] as PromiseRejectedResult).reason);
+      }
     }
   }
 

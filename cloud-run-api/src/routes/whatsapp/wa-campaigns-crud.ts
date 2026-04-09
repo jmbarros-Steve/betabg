@@ -122,6 +122,8 @@ export async function waCampaignsCrud(c: Context) {
         }
       }
 
+      if (safeUpdate.scheduled_at && isNaN(new Date(safeUpdate.scheduled_at as string).getTime())) return c.json({ error: 'Invalid scheduled_at date' }, 400);
+
       const { error: updateError } = await supabase
         .from('wa_campaigns')
         .update(safeUpdate)

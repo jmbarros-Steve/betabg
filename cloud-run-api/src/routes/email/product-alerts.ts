@@ -256,16 +256,21 @@ export async function productAlerts(c: Context) {
 
       const results: Array<{ alert_id: string; email: string; success: boolean; error?: string }> = [];
 
-      for (const alert of activeAlerts) {
-        const alertTypeName = alert.alert_type === 'back_in_stock' ? 'Back in Stock' : 'Price Drop';
-        const productTitle = alert.product_title || 'Product';
-        const subject = `${alertTypeName}: ${productTitle} is now available!`;
+      // Process alerts in batches of 10 with Promise.allSettled instead of sequentially
+      const ALERT_BATCH_SIZE = 10;
+      for (let batchStart = 0; batchStart < activeAlerts.length; batchStart += ALERT_BATCH_SIZE) {
+        const batch = activeAlerts.slice(batchStart, batchStart + ALERT_BATCH_SIZE);
 
-        const imageBlock = alert.product_image
-          ? `<div style="text-align:center;margin:20px 0;"><img src="${alert.product_image}" alt="${productTitle}" style="max-width:300px;border-radius:8px;" /></div>`
-          : '';
+        const batchResults = await Promise.allSettled(batch.map(async (alert: any) => {
+          const alertTypeName = alert.alert_type === 'back_in_stock' ? 'Back in Stock' : 'Price Drop';
+          const productTitle = alert.product_title || 'Product';
+          const subject = `${alertTypeName}: ${productTitle} is now available!`;
 
-        const htmlContent = `
+          const imageBlock = alert.product_image
+            ? `<div style="text-align:center;margin:20px 0;"><img src="${alert.product_image}" alt="${productTitle}" style="max-width:300px;border-radius:8px;" /></div>`
+            : '';
+
+          const htmlContent = `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
@@ -286,7 +291,6 @@ export async function productAlerts(c: Context) {
 </body>
 </html>`;
 
-        try {
           const sendResult = await sendSingleEmail({
             to: alert.email,
             subject,
@@ -305,20 +309,28 @@ export async function productAlerts(c: Context) {
               .eq('id', alert.id);
           }
 
-          results.push({
+          return {
             alert_id: alert.id,
             email: alert.email,
             success: sendResult.success,
             error: sendResult.error,
-          });
-        } catch (err: any) {
-          console.error(`Failed to send alert ${alert.id}:`, err);
-          results.push({
-            alert_id: alert.id,
-            email: alert.email,
-            success: false,
-            error: err.message,
-          });
+          };
+        }));
+
+        for (let i = 0; i < batchResults.length; i++) {
+          const settled = batchResults[i];
+          if (settled.status === 'fulfilled') {
+            results.push(settled.value);
+          } else {
+            const alert = batch[i];
+            console.error(`Failed to send alert ${alert.id}:`, settled.reason);
+            results.push({
+              alert_id: alert.id,
+              email: alert.email,
+              success: false,
+              error: settled.reason?.message || 'Unknown error',
+            });
+          }
         }
       }
 

@@ -120,12 +120,14 @@ export async function emailSendQueue(c: Context) {
         }
       }
 
+      const success = totalInserted > 0;
       return c.json({
-        success: true,
+        success,
         queued: totalInserted,
         total: items.length,
         smart_send: smartSendEnabled,
-      });
+        ...(totalInserted < items.length && { partial_failure: true }),
+      }, success ? 200 : 500);
     }
 
     case 'process': {
@@ -216,10 +218,16 @@ export async function emailSendQueue(c: Context) {
       const emailMap: Record<string, string> = {};
       for (const s of subs || []) emailMap[s.id] = s.email;
 
+      // Collect IDs for bulk DB updates after the send loop
+      const successIds: string[] = [];
+      const notFoundIds: string[] = [];
+      // Failed items need individual updates (each has unique error/attempts/status)
+      const failedUpdates: Array<{ id: string; status: string; attempts: number; last_error: string; processed_at?: string }> = [];
+
       for (const item of itemsToProcess) {
         const subscriberEmail = emailMap[item.subscriber_id];
         if (!subscriberEmail) {
-          await supabase.from('email_send_queue').update({ status: 'failed', last_error: 'Subscriber not found' }).eq('id', item.id);
+          notFoundIds.push(item.id);
           failed++;
           continue;
         }
@@ -239,41 +247,63 @@ export async function emailSendQueue(c: Context) {
           });
 
           if (result.success) {
-            await supabase
-              .from('email_send_queue')
-              .update({
-                status: 'sent',
-                processed_at: new Date().toISOString(),
-                attempts: (item.attempts ?? 0) + 1,
-              })
-              .eq('id', item.id);
+            successIds.push(item.id);
             sent++;
           } else {
             const newAttempts = (item.attempts ?? 0) + 1;
             const newStatus = newAttempts >= item.max_attempts ? 'failed' : 'queued';
-            await supabase
-              .from('email_send_queue')
-              .update({
-                status: newStatus,
-                attempts: newAttempts,
-                last_error: result.error || 'Unknown error',
-                ...(newStatus === 'failed' && { processed_at: new Date().toISOString() }),
-              })
-              .eq('id', item.id);
+            failedUpdates.push({
+              id: item.id,
+              status: newStatus,
+              attempts: newAttempts,
+              last_error: result.error || 'Unknown error',
+              ...(newStatus === 'failed' && { processed_at: new Date().toISOString() }),
+            });
             failed++;
           }
         } catch (err: any) {
           const newAttempts = (item.attempts ?? 0) + 1;
-          await supabase
-            .from('email_send_queue')
-            .update({
-              status: newAttempts >= item.max_attempts ? 'failed' : 'queued',
-              attempts: newAttempts,
-              last_error: err.message,
-            })
-            .eq('id', item.id);
+          failedUpdates.push({
+            id: item.id,
+            status: newAttempts >= item.max_attempts ? 'failed' : 'queued',
+            attempts: newAttempts,
+            last_error: err.message,
+          });
           failed++;
         }
+      }
+
+      // Bulk update successful sends in one query
+      if (successIds.length > 0) {
+        await supabase
+          .from('email_send_queue')
+          .update({
+            status: 'sent',
+            processed_at: new Date().toISOString(),
+            attempts: 1, // All claimed items had attempts=0 before processing
+          })
+          .in('id', successIds);
+      }
+
+      // Bulk update "subscriber not found" failures in one query
+      if (notFoundIds.length > 0) {
+        await supabase
+          .from('email_send_queue')
+          .update({ status: 'failed', last_error: 'Subscriber not found' })
+          .in('id', notFoundIds);
+      }
+
+      // Individual updates for failed items (each has unique error/attempts/status)
+      for (const upd of failedUpdates) {
+        await supabase
+          .from('email_send_queue')
+          .update({
+            status: upd.status,
+            attempts: upd.attempts,
+            last_error: upd.last_error,
+            ...(upd.processed_at && { processed_at: upd.processed_at }),
+          })
+          .eq('id', upd.id);
       }
 
       // Update campaign sent_count and status if applicable.
@@ -320,17 +350,21 @@ export async function emailSendQueue(c: Context) {
         ? supabase.from('email_send_queue').select('status', { count: 'exact' }).eq('campaign_id', campaign_id)
         : supabase.from('email_send_queue').select('status', { count: 'exact' }).eq('client_id', client_id);
 
-      // Count by status
+      // Count by status — fire all 5 count queries in parallel
       const statuses = ['queued', 'processing', 'sent', 'failed', 'cancelled'] as const;
       const counts: Record<string, number> = {};
 
-      for (const s of statuses) {
-        const baseQuery = campaign_id
-          ? supabase.from('email_send_queue').select('*', { count: 'exact', head: true }).eq('campaign_id', campaign_id).eq('status', s)
-          : supabase.from('email_send_queue').select('*', { count: 'exact', head: true }).eq('client_id', client_id).eq('status', s);
+      const countResults = await Promise.all(
+        statuses.map(s => {
+          const baseQuery = campaign_id
+            ? supabase.from('email_send_queue').select('*', { count: 'exact', head: true }).eq('campaign_id', campaign_id).eq('status', s)
+            : supabase.from('email_send_queue').select('*', { count: 'exact', head: true }).eq('client_id', client_id).eq('status', s);
+          return baseQuery;
+        })
+      );
 
-        const { count } = await baseQuery;
-        counts[s] = count || 0;
+      for (let i = 0; i < statuses.length; i++) {
+        counts[statuses[i]] = countResults[i].count || 0;
       }
 
       return c.json({ counts, total: Object.values(counts).reduce((a, b) => a + b, 0) });

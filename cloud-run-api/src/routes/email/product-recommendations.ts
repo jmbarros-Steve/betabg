@@ -365,6 +365,13 @@ export async function generateRecommendationBlock(
  * Get real best-seller product IDs from Shopify orders (last 90 days).
  * Aggregates line_items by product_id and sorts by quantity sold.
  * Results are cached in-memory for 1 hour.
+ *
+ * NOTE: This function fetches the Shopify connection (store_url + access_token)
+ * independently from getProductCatalog(). Both functions query platform_connections
+ * for the same client. This is a known redundancy but is mitigated by the 1-hour
+ * in-memory cache on both functions, so the duplicate DB query only happens on
+ * cache miss. Refactoring to share the connection would require changing the call
+ * signatures across multiple callers, which is risky for low benefit.
  */
 async function getBestSellerProductIds(supabase: any, clientId: string): Promise<string[]> {
   // Check cache
@@ -373,7 +380,7 @@ async function getBestSellerProductIds(supabase: any, clientId: string): Promise
     return cached.productIds;
   }
 
-  // Get Shopify credentials
+  // Get Shopify credentials (see NOTE above re: redundancy with getProductCatalog)
   const connection = await safeQuerySingleOrDefault<any>(
     supabase
       .from('platform_connections')

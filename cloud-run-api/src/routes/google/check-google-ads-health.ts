@@ -20,7 +20,7 @@ export async function checkGoogleAdsHealth(c: Context) {
       .single();
 
     if (connError || !connection) {
-      return c.json({ healthy: false, error: 'Connection not found' });
+      return c.json({ healthy: false, error: 'Connection not found' }, 404);
     }
 
     const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
@@ -30,13 +30,13 @@ export async function checkGoogleAdsHealth(c: Context) {
 
     const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
     if (!developerToken) {
-      return c.json({ healthy: false, error: 'GOOGLE_ADS_DEVELOPER_TOKEN not configured' });
+      return c.json({ healthy: false, error: 'GOOGLE_ADS_DEVELOPER_TOKEN not configured' }, 500);
     }
 
     const googleToken = await getGoogleTokenForConnection(supabase, connection);
     const customerId = connection.account_id;
     if (!customerId) {
-      return c.json({ healthy: false, error: 'No account_id on connection' });
+      return c.json({ healthy: false, error: 'No account_id on connection' }, 400);
     }
 
     const loginCustomerId = googleToken.mccCustomerId || customerId;
@@ -59,7 +59,7 @@ export async function checkGoogleAdsHealth(c: Context) {
     if (!response.ok) {
       const text = await response.text();
       console.error('[check-google-ads-health] API error:', text);
-      return c.json({ healthy: false, error: `Google Ads API error: ${response.status}` });
+      return c.json({ healthy: false, error: `Google Ads API error: ${response.status}` }, 502);
     }
 
     const responseText = await response.text();
@@ -77,6 +77,6 @@ export async function checkGoogleAdsHealth(c: Context) {
     return c.json({
       healthy: false,
       error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    }, 500);
   }
 }

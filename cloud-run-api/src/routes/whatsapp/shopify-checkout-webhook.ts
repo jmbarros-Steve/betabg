@@ -65,7 +65,7 @@ export async function shopifyCheckoutWebhook(c: Context) {
     }));
 
     // Upsert checkout (Shopify may send multiple events for same checkout)
-    await supabase.from('shopify_abandoned_checkouts').upsert({
+    const { error: upsertError } = await supabase.from('shopify_abandoned_checkouts').upsert({
       client_id: client.id,
       checkout_id: String(body.id),
       customer_phone: cleanPhone,
@@ -74,12 +74,17 @@ export async function shopifyCheckoutWebhook(c: Context) {
         : body.shipping_address?.name || null,
       customer_email: body.email || body.customer?.email || null,
       line_items: lineItems,
-      total_price: parseFloat(body.total_price || '0'),
+      total_price: parseFloat(body.total_price) || 0,
       currency: body.currency || 'CLP',
       abandoned_checkout_url: body.abandoned_checkout_url || null,
       wa_reminder_sent: false,
       order_completed: false,
     }, { onConflict: 'client_id,checkout_id' });
+
+    if (upsertError) {
+      console.error('[checkout-webhook] Upsert error:', upsertError);
+      return c.json({ error: 'Failed to save checkout' }, 500);
+    }
 
     console.log(`[checkout-webhook] Saved checkout ${body.id} for ${shopDomain}, phone: ${cleanPhone}`);
 

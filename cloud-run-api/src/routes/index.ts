@@ -175,6 +175,13 @@ import { validateContexts } from './cron/validate-contexts.js';
 import { refreshPlatformTokens } from './cron/refresh-platform-tokens.js';
 import { chinoExecutor } from './cron/chino-executor.js';
 
+// Steve Social
+import { socialFeed } from './social/feed.js';
+import { socialSubscribe } from './social/subscribe.js';
+import { socialPostGenerator } from './cron/social-post-generator.js';
+import { socialReplyGenerator } from './cron/social-reply-generator.js';
+import { socialDigestSender } from './cron/social-digest-sender.js';
+
 // WhatsApp
 import { steveWAChat } from './whatsapp/steve-wa-chat.js';
 import { merchantWAWebhook } from './whatsapp/merchant-wa.js';
@@ -407,6 +414,10 @@ export function registerRoutes(app: Hono) {
   // ============================================================
   app.post('/api/audit-store', auditStore); // No JWT — landing page store audit
 
+  // Steve Social (public — no JWT)
+  app.get('/api/social/feed', socialFeed);
+  app.post('/api/social/subscribe', socialSubscribe);
+
   // ============================================================
   // Phase 4: Auth & OAuth
   // ============================================================
@@ -571,6 +582,9 @@ export function registerRoutes(app: Hono) {
   cron.post('/validate-contexts', validateContexts);
   cron.post('/refresh-platform-tokens', refreshPlatformTokens);
   cron.post('/chino-executor', chinoExecutor);
+  cron.post('/social-post-generator', socialPostGenerator);
+  cron.post('/social-reply-generator', socialReplyGenerator);
+  cron.post('/social-digest-sender', socialDigestSender);
   app.route('/api/cron', cron);
 
   // ============================================================

@@ -29,7 +29,8 @@ export async function funnelDiagnosis(c: Context) {
     supabase
       .from('campaign_metrics')
       .select('connection_id, campaign_name, impressions, clicks, conversions, conversion_value, spend, platform')
-      .gte('metric_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+      .gte('metric_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+      .limit(5000),
     'funnelDiagnosis.fetchCampaignMetrics',
   );
 

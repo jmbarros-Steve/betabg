@@ -30,9 +30,13 @@ export async function createShopifyDiscount(c: Context) {
     if (!clientId || !code || !discountType) {
       return c.json({ error: 'Missing required fields: clientId, code, discountType' }, 400);
     }
-    if (discountType !== 'free_shipping' && (!discountValue || discountValue <= 0)) {
+    if (discountType !== 'free_shipping' && (typeof discountValue !== 'number' || isNaN(discountValue) || discountValue <= 0)) {
       return c.json({ error: 'discountValue required for percentage/fixed_amount' }, 400);
     }
+
+    if (startsAt && isNaN(new Date(startsAt).getTime())) return c.json({ error: 'Invalid startsAt date' }, 400);
+    if (endsAt && isNaN(new Date(endsAt).getTime())) return c.json({ error: 'Invalid endsAt date' }, 400);
+    if (startsAt && endsAt && new Date(endsAt) <= new Date(startsAt)) return c.json({ error: 'endsAt must be after startsAt' }, 400);
 
     const supabase = getSupabaseAdmin();
 

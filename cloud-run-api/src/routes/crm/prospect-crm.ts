@@ -20,13 +20,18 @@ export async function prospectUpdateDeal(c: Context) {
     if (!allowed) return c.json({ error: 'Forbidden' }, 403);
 
     const update: Record<string, any> = { updated_at: new Date().toISOString(), last_activity_at: new Date().toISOString() };
-    if (deal_value != null) update.deal_value = Number(deal_value) || 0;
+    if (deal_value != null) {
+      const dv = Number(deal_value);
+      if (isNaN(dv) || dv < 0) return c.json({ error: 'deal_value must be a non-negative number' }, 400);
+      update.deal_value = dv;
+    }
     if (win_probability != null) {
       // Bug #54 fix: Number("alta") = NaN passes < 0 and > 100 checks (both false)
       const wp = Number(win_probability);
       if (isNaN(wp) || wp < 0 || wp > 100) return c.json({ error: 'win_probability must be a number 0-100' }, 400);
       update.win_probability = wp;
     }
+    if (expected_close_date && isNaN(new Date(expected_close_date).getTime())) return c.json({ error: 'Invalid expected_close_date' }, 400);
     if (expected_close_date !== undefined) update.expected_close_date = expected_close_date || null;
 
     const { error } = await supabase

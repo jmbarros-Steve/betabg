@@ -428,5 +428,6 @@ export async function cronPublishFacebook(c: Context) {
     }
   }
 
-  return c.json({ published, errors: errors.length > 0 ? errors : undefined });
+  const status = published > 0 || errors.length === 0 ? 200 : 500;
+  return c.json({ published, errors: errors.length > 0 ? errors : undefined }, status);
 }

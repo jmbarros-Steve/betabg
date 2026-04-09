@@ -193,7 +193,7 @@ function generateEmailHtml(email: EmailStep): string {
   </style>
 </head>
 <body>
-  <div class="preheader">${email.previewText || ''}</div>
+  <div class="preheader">${escapeHtml(email.previewText || '')}</div>
   ${(email.content || '').replace(/\n/g, '<br>')}
 </body>
 </html>`.trim();

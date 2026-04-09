@@ -527,6 +527,8 @@ export async function syncCompetitorAds(c: Context) {
       }
     }
 
+    const warnings: string[] = [];
+
     if (!accessToken) {
       const metaAppId = process.env.META_APP_ID;
       const metaAppSecret = process.env.META_APP_SECRET;
@@ -549,7 +551,9 @@ export async function syncCompetitorAds(c: Context) {
             tokenSource = 'app_token';
           }
         } catch (e) {
+          const msg = e instanceof Error ? e.message : 'Unknown error';
           console.error('[sync-competitor-ads] App token fetch failed:', e);
+          warnings.push(`App token fetch failed: ${msg}`);
         }
       }
     }
@@ -754,7 +758,9 @@ export async function syncCompetitorAds(c: Context) {
               return { pageId: json.data[0].id, pageName: json.data[0].name };
             }
           } catch (e) {
+            const msg = e instanceof Error ? e.message : 'Unknown error';
             console.error(`[sync-competitor-ads] Page search failed for "${searchQuery}":`, e);
+            warnings.push(`Page search failed for "${searchQuery}": ${msg}`);
           }
           return null;
         }
@@ -890,7 +896,7 @@ export async function syncCompetitorAds(c: Context) {
     }
 
     console.log('[sync-competitor-ads] Complete:', results);
-    return c.json({ success: true, results });
+    return c.json({ success: true, results, ...(warnings.length > 0 && { warnings }) });
 
   } catch (error) {
     console.error('Sync error:', error);

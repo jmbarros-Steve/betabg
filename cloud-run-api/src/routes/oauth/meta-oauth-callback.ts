@@ -23,17 +23,19 @@ export async function metaOauthCallback(c: Context) {
       return c.json({ error: 'Missing required parameters' }, 400);
     }
 
-    // Backend CSRF state validation (supplements frontend check in OAuthMetaCallback.tsx)
-    if (state) {
-      const { data: stateCheck } = await supabase
-        .from('oauth_states')
-        .select('id')
-        .eq('state', state)
-        .maybeSingle();
-      if (!stateCheck) {
-        console.warn('[meta-oauth] Invalid state parameter — possible CSRF');
-        return c.json({ error: 'Invalid state parameter — possible CSRF attack' }, 403);
-      }
+    // Backend CSRF state validation (mandatory)
+    if (!state) {
+      console.warn('[meta-oauth] Missing state parameter — possible CSRF');
+      return c.json({ error: 'Missing state parameter' }, 400);
+    }
+    const { data: stateCheck } = await supabase
+      .from('oauth_states')
+      .select('id')
+      .eq('state', state)
+      .maybeSingle();
+    if (!stateCheck) {
+      console.warn('[meta-oauth] Invalid state parameter — possible CSRF');
+      return c.json({ error: 'Invalid state parameter — possible CSRF attack' }, 403);
     }
 
     const { data: client, error: clientError } = await supabase

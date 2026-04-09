@@ -100,6 +100,11 @@ export async function updateShopifyProduct(c: Context) {
         productPayload.product.images = images;
       }
 
+      if (price !== undefined) {
+        const numPrice = Number(price);
+        if (isNaN(numPrice) || numPrice < 0) return c.json({ error: 'price must be a non-negative number' }, 400);
+      }
+
       // Price is on the variant, not the product
       if (price !== undefined && variant_id) {
         productPayload.product.variants = [{ id: variant_id, price: String(price) }];

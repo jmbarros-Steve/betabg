@@ -50,6 +50,8 @@ export async function salesTasksCrud(c: Context) {
         const { prospect_id, title, description, task_type, due_at } = body;
         if (!title) return c.json({ error: 'title required' }, 400);
 
+        if (due_at && isNaN(new Date(due_at).getTime())) return c.json({ error: 'Invalid due_at date' }, 400);
+
         // Verify ownership of the prospect if one is specified
         if (prospect_id && !isSuperAdmin) {
           const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
@@ -91,6 +93,11 @@ export async function salesTasksCrud(c: Context) {
             .maybeSingle();
           if (!task || task.assigned_to !== user.id) return c.json({ error: 'Forbidden' }, 403);
         }
+
+        const validStatuses = ['pending', 'in_progress', 'completed'];
+        if (status !== undefined && !validStatuses.includes(status)) return c.json({ error: 'Invalid status' }, 400);
+
+        if (due_at !== undefined && due_at && isNaN(new Date(due_at).getTime())) return c.json({ error: 'Invalid due_at date' }, 400);
 
         const updatePayload: Record<string, any> = {};
         if (title !== undefined) updatePayload.title = title;

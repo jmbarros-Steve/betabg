@@ -1201,33 +1201,38 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
                   onClick={async () => {
                     // Reset account_id in DB to force wizard
                     if (metaConnection) {
-                      await supabase
-                        .from('platform_connections')
-                        .update({
-                          account_id: null,
-                          store_name: null,
-                          business_id: null,
-                          portfolio_name: null,
-                          page_id: null,
-                          ig_account_id: null,
-                          pixel_id: null,
-                        })
-                        .eq('id', metaConnection.id);
-                      setMetaConnection(prev =>
-                        prev ? { ...prev, account_id: null, store_name: null, business_id: null, portfolio_name: null, page_id: null, ig_account_id: null, pixel_id: null } : null,
-                      );
-                      setSelectedAssets({
-                        connectionId: metaConnection.id,
-                        businessId: null,
-                        businessName: null,
-                        adAccountId: null,
-                        adAccountName: null,
-                        pageId: null,
-                        pageName: null,
-                        igAccountId: null,
-                        igAccountName: null,
-                        pixelId: null,
-                      });
+                      try {
+                        await supabase
+                          .from('platform_connections')
+                          .update({
+                            account_id: null,
+                            store_name: null,
+                            business_id: null,
+                            portfolio_name: null,
+                            page_id: null,
+                            ig_account_id: null,
+                            pixel_id: null,
+                          })
+                          .eq('id', metaConnection.id);
+                        setMetaConnection(prev =>
+                          prev ? { ...prev, account_id: null, store_name: null, business_id: null, portfolio_name: null, page_id: null, ig_account_id: null, pixel_id: null } : null,
+                        );
+                        setSelectedAssets({
+                          connectionId: metaConnection.id,
+                          businessId: null,
+                          businessName: null,
+                          adAccountId: null,
+                          adAccountName: null,
+                          pageId: null,
+                          pageName: null,
+                          igAccountId: null,
+                          igAccountName: null,
+                          pixelId: null,
+                        });
+                      } catch (err) {
+                        console.error('[MetaAdsManager] Switch account error:', err);
+                        toast.error('Error al cambiar de cuenta');
+                      }
                     }
                   }}
                 >

@@ -287,6 +287,7 @@ export async function generateCampaignRecommendations(c: Context) {
   }
 
   // AI recommendations
+  let aiError: string | null = null;
   if (ANTHROPIC_API_KEY && campaigns.length > 0) {
     try {
       const platformCategoria = connection.platform === 'google' ? 'google_ads' : 'meta_ads';
@@ -328,6 +329,7 @@ export async function generateCampaignRecommendations(c: Context) {
       recommendations.push(...aiRecommendations.map(r => ({ ...r, connection_id })));
     } catch (e) {
       console.error('AI recommendation error:', e);
+      aiError = e instanceof Error ? e.message : 'AI analysis failed';
     }
   }
 
@@ -354,5 +356,6 @@ export async function generateCampaignRecommendations(c: Context) {
     success: true,
     recommendations_count: recommendations.length,
     recommendations,
+    ...(aiError && { ai_error: aiError }),
   });
 }

@@ -90,9 +90,12 @@ export async function sendMetaCAPIEvent(event: CAPIEventData): Promise<void> {
   };
 
   try {
-    const res = await fetch(`${GRAPH_URL}?access_token=${CAPI_TOKEN}`, {
+    const res = await fetch(GRAPH_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${CAPI_TOKEN}`,
+      },
       body: JSON.stringify(body),
     });
 

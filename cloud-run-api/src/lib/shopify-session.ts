@@ -2,7 +2,7 @@
  * Shared Shopify Session Token validation with HMAC signature verification.
  * Replaces the unsafe atob-only decoding used in multiple routes.
  */
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 interface SessionTokenResult {
   valid: boolean;
@@ -44,7 +44,9 @@ export async function validateShopifySessionToken(
         .replace(/=+$/, '');
       const normalizedExpected = expectedSig.replace(/=+$/, '');
 
-      if (normalizedReceived !== normalizedExpected) {
+      const receivedBuf = Buffer.from(normalizedReceived);
+      const expectedBuf = Buffer.from(normalizedExpected);
+      if (receivedBuf.length !== expectedBuf.length || !timingSafeEqual(receivedBuf, expectedBuf)) {
         console.error('[shopify-session] JWT signature verification failed');
         return { valid: false, error: 'Invalid token signature' };
       }

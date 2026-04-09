@@ -90,58 +90,72 @@ export async function autoRuleScanner(c: Context) {
   let failed = 0;
   let drifted = 0;
 
-  for (const err of unique) {
-    try {
-      const res = await fetch(`${baseUrl}/api/cron/auto-rule-generator`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Cron-Secret': cronSecret,
-        },
-        body: JSON.stringify({
-          error_detail: err.error_detail.slice(0, 1000),
-          error_type: err.error_type,
-          entity_type: err.check_type,
-        }),
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
+  // Fire all rule-generator calls in parallel instead of sequentially (up to MAX_PER_RUN=5)
+  const settledResults = await Promise.allSettled(unique.map(async (err) => {
+    const res = await fetch(`${baseUrl}/api/cron/auto-rule-generator`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Cron-Secret': cronSecret,
+      },
+      body: JSON.stringify({
+        error_detail: err.error_detail.slice(0, 1000),
+        error_type: err.error_type,
+        entity_type: err.check_type,
+      }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
 
-      if (!res.ok) {
-        failed++;
-        const text = await res.text().catch(() => '');
-        results.push({ error_type: err.error_type, status: `http_${res.status}` });
-        console.error(
-          `[auto-rule-scanner] ${err.error_type} → HTTP ${res.status}: ${text.slice(0, 200)}`
-        );
-        continue;
-      }
-
-      const data = (await res.json()) as GeneratorResponse;
-
-      if ('created' in data && data.created === true) {
-        generated++;
-        results.push({ error_type: err.error_type, status: 'created', rule_id: data.rule_id });
-      } else if ('existing_covers' in data && data.existing_covers === true) {
-        covered++;
-        results.push({
-          error_type: err.error_type,
-          status: 'existing_covers',
-          rule_id: data.rule_id,
-        });
-      } else {
-        // Contract drift — not a failure, but worth surfacing in monitoring.
-        drifted++;
-        results.push({ error_type: err.error_type, status: 'unknown_response' });
-        console.warn(
-          `[auto-rule-scanner] contract drift for ${err.error_type}: keys=${Object.keys(data).join(',')}`
-        );
-      }
-    } catch (e: any) {
-      failed++;
-      results.push({ error_type: err.error_type, status: 'exception' });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
       console.error(
-        `[auto-rule-scanner] exception for ${err.error_type}:`,
-        e?.message?.slice(0, 200) || e
+        `[auto-rule-scanner] ${err.error_type} → HTTP ${res.status}: ${text.slice(0, 200)}`
+      );
+      return { err, outcome: 'http_error' as const, status: res.status };
+    }
+
+    const data = (await res.json()) as GeneratorResponse;
+    return { err, outcome: 'ok' as const, data };
+  }));
+
+  for (const settled of settledResults) {
+    if (settled.status === 'rejected') {
+      failed++;
+      // Extract error_type from the rejection — fallback to 'unknown'
+      const reason = settled.reason;
+      const errorType = reason?.error_type || 'unknown';
+      results.push({ error_type: errorType, status: 'exception' });
+      console.error(
+        `[auto-rule-scanner] exception:`,
+        reason?.message?.slice(0, 200) || reason
+      );
+      continue;
+    }
+
+    const result = settled.value;
+    if (result.outcome === 'http_error') {
+      failed++;
+      results.push({ error_type: result.err.error_type, status: `http_${result.status}` });
+      continue;
+    }
+
+    const { err: errItem, data } = result;
+    if ('created' in data && data.created === true) {
+      generated++;
+      results.push({ error_type: errItem.error_type, status: 'created', rule_id: data.rule_id });
+    } else if ('existing_covers' in data && data.existing_covers === true) {
+      covered++;
+      results.push({
+        error_type: errItem.error_type,
+        status: 'existing_covers',
+        rule_id: data.rule_id,
+      });
+    } else {
+      // Contract drift — not a failure, but worth surfacing in monitoring.
+      drifted++;
+      results.push({ error_type: errItem.error_type, status: 'unknown_response' });
+      console.warn(
+        `[auto-rule-scanner] contract drift for ${errItem.error_type}: keys=${Object.keys(data).join(',')}`
       );
     }
   }

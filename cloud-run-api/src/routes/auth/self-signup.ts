@@ -50,7 +50,7 @@ export async function selfSignup(c: Context) {
       // Not an error — user exists, frontend will just sign in
       return c.json({ exists: true });
     }
-    return c.json({ error: createError.message });
+    return c.json({ error: createError.message }, 500);
   }
 
   const userId = newUser.user.id;

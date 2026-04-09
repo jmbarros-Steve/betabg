@@ -182,6 +182,7 @@ export async function syncCampaignMetrics(c: Context) {
 
     console.log(`Upserting ${campaignMetrics.length} campaign metric records (all in CLP)`);
 
+    let recordsSynced = 0;
     if (campaignMetrics.length > 0) {
       // Upsert in batches of 100
       for (let i = 0; i < campaignMetrics.length; i += 100) {
@@ -195,6 +196,8 @@ export async function syncCampaignMetrics(c: Context) {
 
         if (upsertError) {
           console.error('Upsert error:', upsertError);
+        } else {
+          recordsSynced += batch.length;
         }
       }
     }
@@ -257,7 +260,7 @@ export async function syncCampaignMetrics(c: Context) {
     return c.json({
       success: true,
       campaigns_synced: new Set(campaignMetrics.map(m => m.campaign_id)).size,
-      records_synced: campaignMetrics.length,
+      records_synced: recordsSynced,
       adsets_synced: adsetsSynced,
       currency: 'CLP'
     }, 200);

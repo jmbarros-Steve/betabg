@@ -37,7 +37,11 @@ export async function queryEmailSubscribers(c: Context) {
       if (status) query = query.eq('status', status);
       if (source) query = query.eq('source', source);
       if (search) {
-        query = query.or(`email.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%`);
+        // Sanitize search input to prevent PostgREST filter injection
+        const sanitized = search.replace(/[,().*\\]/g, '').trim();
+        if (sanitized) {
+          query = query.or(`email.ilike.%${sanitized}%,first_name.ilike.%${sanitized}%,last_name.ilike.%${sanitized}%`);
+        }
       }
       if (tags && tags.length > 0) query = query.overlaps('tags', tags);
 
@@ -108,12 +112,14 @@ export async function queryEmailSubscribers(c: Context) {
     case 'export': {
       // Export subscribers as JSON (CSV can be built client-side)
       const { filters } = body;
+      const EXPORT_LIMIT = 10000;
 
       let query = supabase
         .from('email_subscribers')
         .select('email, first_name, last_name, status, source, tags, total_orders, total_spent, last_order_at, subscribed_at')
         .eq('client_id', client_id)
-        .order('email', { ascending: true });
+        .order('email', { ascending: true })
+        .limit(EXPORT_LIMIT);
 
       if (filters && Array.isArray(filters)) {
         for (const filter of filters) {
@@ -123,7 +129,7 @@ export async function queryEmailSubscribers(c: Context) {
 
       const { data, error } = await query;
       if (error) return c.json({ error: error.message }, 500);
-      return c.json({ subscribers: data, count: data?.length || 0 });
+      return c.json({ subscribers: data, count: data?.length || 0, truncated: (data?.length || 0) >= EXPORT_LIMIT });
     }
 
     default:

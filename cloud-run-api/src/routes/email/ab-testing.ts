@@ -21,37 +21,37 @@ async function calculateVariantStats(
   open_rate: string;
   click_rate: string;
 }> {
-  const { count: sent } = await supabase
-    .from('email_events')
-    .select('*', { count: 'exact', head: true })
-    .eq('campaign_id', campaignId)
-    .eq('event_type', 'sent')
-    .eq('ab_variant', variant);
-
-  const { count: opens } = await supabase
-    .from('email_events')
-    .select('*', { count: 'exact', head: true })
-    .eq('campaign_id', campaignId)
-    .eq('event_type', 'opened')
-    .eq('ab_variant', variant);
-
-  const { count: clicks } = await supabase
-    .from('email_events')
-    .select('*', { count: 'exact', head: true })
-    .eq('campaign_id', campaignId)
-    .eq('event_type', 'clicked')
-    .eq('ab_variant', variant);
-
-  const conversionEvents = await safeQueryOrDefault<any>(
+  // Fire all 4 queries in parallel instead of sequentially
+  const [sentResult, opensResult, clicksResult, conversionEvents] = await Promise.all([
     supabase
       .from('email_events')
-      .select('metadata')
+      .select('*', { count: 'exact', head: true })
       .eq('campaign_id', campaignId)
-      .eq('event_type', 'converted')
+      .eq('event_type', 'sent')
       .eq('ab_variant', variant),
-    [],
-    'calculateVariantStats.getConversionEvents',
-  );
+    supabase
+      .from('email_events')
+      .select('*', { count: 'exact', head: true })
+      .eq('campaign_id', campaignId)
+      .eq('event_type', 'opened')
+      .eq('ab_variant', variant),
+    supabase
+      .from('email_events')
+      .select('*', { count: 'exact', head: true })
+      .eq('campaign_id', campaignId)
+      .eq('event_type', 'clicked')
+      .eq('ab_variant', variant),
+    safeQueryOrDefault<any>(
+      supabase
+        .from('email_events')
+        .select('metadata')
+        .eq('campaign_id', campaignId)
+        .eq('event_type', 'converted')
+        .eq('ab_variant', variant),
+      [],
+      'calculateVariantStats.getConversionEvents',
+    ),
+  ]);
 
   const conversions = conversionEvents?.length || 0;
   const revenue = (conversionEvents || []).reduce(
@@ -59,9 +59,9 @@ async function calculateVariantStats(
     0
   );
 
-  const sentCount = sent || 0;
-  const openCount = opens || 0;
-  const clickCount = clicks || 0;
+  const sentCount = sentResult.count || 0;
+  const openCount = opensResult.count || 0;
+  const clickCount = clicksResult.count || 0;
 
   return {
     sent: sentCount,
@@ -150,8 +150,10 @@ export async function emailAbTesting(c: Context) {
 
       if (testErr || !test) return c.json({ error: 'Test not found' }, 404);
 
-      const variantA = await calculateVariantStats(supabase, campaign_id, 'a');
-      const variantB = await calculateVariantStats(supabase, campaign_id, 'b');
+      const [variantA, variantB] = await Promise.all([
+        calculateVariantStats(supabase, campaign_id, 'a'),
+        calculateVariantStats(supabase, campaign_id, 'b'),
+      ]);
 
       return c.json({
         test,
@@ -211,9 +213,11 @@ export async function executeAbTestWinner(c: Context) {
     return c.json({ skipped: true, reason: 'Test is not in testing state' });
   }
 
-  // Calculate stats for both variants
-  const variantAStats = await calculateVariantStats(supabase, test.campaign_id, 'a');
-  const variantBStats = await calculateVariantStats(supabase, test.campaign_id, 'b');
+  // Calculate stats for both variants in parallel
+  const [variantAStats, variantBStats] = await Promise.all([
+    calculateVariantStats(supabase, test.campaign_id, 'a'),
+    calculateVariantStats(supabase, test.campaign_id, 'b'),
+  ]);
 
   // Select winner based on winning_metric
   let winner: 'a' | 'b';

@@ -46,6 +46,8 @@ export async function proposalsCrud(c: Context) {
           return c.json({ error: 'prospect_id, title, and content required' }, 400);
         }
 
+        if (monthly_price != null && (isNaN(Number(monthly_price)) || Number(monthly_price) < 0)) return c.json({ error: 'monthly_price must be a non-negative number' }, 400);
+
         // Verify ownership of the prospect
         if (!isSuperAdmin) {
           const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);

@@ -29,6 +29,10 @@ export async function shopifyHmacMiddleware(c: Context, next: Next) {
 
   // Store raw body for handler access
   c.set('rawBody', rawBody);
-  c.set('parsedBody', JSON.parse(rawBody));
+  try {
+    c.set('parsedBody', JSON.parse(rawBody));
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
   await next();
 }
