@@ -38,12 +38,12 @@ export async function fetchInstagramInsights(c: Context) {
     .eq('platform', 'meta')
     .maybeSingle();
 
-  if (!conn?.access_token_encrypted) {
+  if (!conn) {
     return c.json({ error: 'No hay conexión a Meta/Instagram' }, 404);
   }
 
   const token = await getTokenForConnection(supabase, conn);
-  if (!token) return c.json({ error: 'Error descifrando token' }, 500);
+  if (!token) return c.json({ error: 'Error resolviendo token Meta' }, 500);
 
   // Find Instagram Business Account ID
   let resolvedIgId = conn.ig_account_id;

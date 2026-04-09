@@ -5,7 +5,12 @@ const REFRESH_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /**
  * Drop-in replacement for inline decrypt_platform_token calls.
- * Handles bm_partner connections (SUAT) vs oauth/flbi (encrypted token).
+ * Handles SUAT-based connections (bm_partner, leadsie) vs oauth/flbi (encrypted token).
+ *
+ * Both bm_partner (manual onboarding) and leadsie (Leadsie webhook) share the
+ * same Business Manager Partner SUAT — they only differ in how the asset got
+ * shared with our BM. Treating them identically here avoids touching 24+
+ * downstream files while preserving connection_type for analytics/billing.
  *
  * @param supabase - Supabase admin client (already instantiated by caller)
  * @param connection - Row from platform_connections with at minimum:
@@ -20,8 +25,8 @@ export async function getTokenForConnection(
     access_token_encrypted?: string | null;
   },
 ): Promise<string | null> {
-  // BM Partner: use System User Access Token from env (never expires)
-  if (connection.connection_type === 'bm_partner') {
+  // BM Partner / Leadsie: use System User Access Token from env (never expires)
+  if (connection.connection_type === 'bm_partner' || connection.connection_type === 'leadsie') {
     const suat = process.env.META_SYSTEM_TOKEN;
     if (!suat) {
       console.error('[resolve-meta-token] META_SYSTEM_TOKEN env var not set');
@@ -63,8 +68,8 @@ export async function resolveMetaToken(connectionId: string): Promise<string | n
 
   if (error || !conn) return null;
 
-  // BM Partner: SUAT from env, no refresh needed
-  if (conn.connection_type === 'bm_partner') {
+  // BM Partner / Leadsie: SUAT from env, no refresh needed
+  if (conn.connection_type === 'bm_partner' || conn.connection_type === 'leadsie') {
     const suat = process.env.META_SYSTEM_TOKEN;
     if (!suat) {
       console.error('[resolve-meta-token] META_SYSTEM_TOKEN env var not set');

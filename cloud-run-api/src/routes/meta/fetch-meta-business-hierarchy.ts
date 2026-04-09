@@ -297,10 +297,12 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
       }
     }
 
-    // Fetch connection
+    // Fetch connection (include asset IDs so we can scope SUAT calls to the
+    // specific merchant — /me/adaccounts with a System User token would
+    // otherwise return assets of ALL merchants connected via Leadsie.)
     const { data: connection, error: connError } = await supabase
       .from('platform_connections')
-      .select(`id, platform, access_token_encrypted, connection_type, client_id, clients!inner(user_id, client_user_id)`)
+      .select(`id, platform, access_token_encrypted, connection_type, client_id, account_id, page_id, ig_account_id, pixel_id, clients!inner(user_id, client_user_id)`)
       .eq('id', connection_id)
       .eq('platform', 'meta')
       .single();
@@ -324,12 +326,7 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
 
-    // Decrypt token
-    if (!connection.access_token_encrypted) {
-      console.error('[fetch-meta-business-hierarchy] No encrypted token for connection:', connection.id);
-      return c.json({ error: 'No encrypted token found for this connection' }, 500);
-    }
-    // Resolve token (SUAT for bm_partner, decrypt for oauth)
+    // Resolve token (SUAT for bm_partner/leadsie, decrypt for oauth)
     const token = await getTokenForConnection(supabase, connection);
     if (!token) {
       console.error('[fetch-meta-business-hierarchy] Token resolution failed');
@@ -341,37 +338,101 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
     console.log('Fetching business hierarchy...');
 
     // 1. Fetch all businesses (Business Managers)
-    const businesses = await metaGetAll('/me/businesses', token, {
-      fields: 'id,name',
-    });
-    console.log(`Found ${businesses.length} businesses`);
+    //
+    // For SUAT connections (bm_partner/leadsie), /me/businesses returns []
+    // because the System User is scoped to Steve's BM only, not the merchant's.
+    // Instead we fall through to the direct-assets path below, which queries
+    // /me/adaccounts + /me/accounts — these DO return the merchant's assets
+    // because Leadsie/BM Partner adds the System User as a user of each asset.
+    const connType = (connection as any).connection_type as string | null;
+    const isSuat = connType === 'bm_partner' || connType === 'leadsie';
+
+    const businesses = isSuat
+      ? []
+      : await metaGetAll('/me/businesses', token, {
+          fields: 'id,name',
+        });
+    console.log(
+      `Found ${businesses.length} businesses (connection_type=${connType})`,
+    );
 
     if (businesses.length === 0) {
-      // Fallback: user might have ad accounts without a BM
-      const [directAccounts, directPages, directPixels] = await Promise.all([
-        metaGetAll('/me/adaccounts', token, {
-          fields: 'id,account_id,name,account_status,currency,timezone_name',
-        }),
-        metaGetAll('/me/accounts', token, {
-          fields: 'id,name,category,instagram_business_account{id,name,username}',
-        }),
-        // Also fetch pixels for each ad account
-        (async () => {
-          const accs = await metaGetAll('/me/adaccounts', token, { fields: 'id' });
-          const allPixels: PixelInfo[] = [];
-          for (const acc of accs.slice(0, 5)) {
-            const px = await metaGetAll(`/${acc.id}/adspixels`, token, { fields: 'id,name' }).catch(e => { console.warn(`[hierarchy] Pixel fetch failed for ${acc.id}:`, e.message); return []; });
-            allPixels.push(...px);
-          }
-          // Deduplicate by id
-          const seen = new Set<string>();
-          return allPixels.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
-        })(),
-      ]);
+      // Fallback path. Two modes:
+      //
+      // 1. OAuth user without BM: query /me/* endpoints (returns THEIR assets).
+      // 2. SUAT (bm_partner/leadsie): /me/adaccounts would return assets of
+      //    ALL merchants connected via Leadsie → cross-contamination. Instead
+      //    we fetch ONLY the specific assets saved by the Leadsie webhook
+      //    into platform_connections (account_id, page_id, ig_account_id,
+      //    pixel_id). This scopes the response to this merchant only.
+      const scopedAccountId = (connection as any).account_id as string | null;
+      const scopedPageId = (connection as any).page_id as string | null;
+      const scopedIgId = (connection as any).ig_account_id as string | null;
+      const scopedPixelId = (connection as any).pixel_id as string | null;
+
+      let directAccounts: AdAccount[] = [];
+      let directPages: PageInfo[] = [];
+      let directPixels: PixelInfo[] = [];
+
+      if (isSuat) {
+        const [acc, page, pixel] = await Promise.all([
+          scopedAccountId
+            ? metaGet(`/act_${scopedAccountId}`, token, {
+                fields: 'id,account_id,name,account_status,currency,timezone_name',
+              })
+            : null,
+          scopedPageId
+            ? metaGet(`/${scopedPageId}`, token, {
+                fields: 'id,name,category,instagram_business_account{id,name,username}',
+              })
+            : null,
+          scopedPixelId
+            ? metaGet(`/${scopedPixelId}`, token, { fields: 'id,name' })
+            : null,
+        ]);
+
+        if (acc && acc.id) directAccounts = [acc as AdAccount];
+        if (page && page.id) directPages = [page as PageInfo];
+        if (pixel && pixel.id) directPixels = [pixel as PixelInfo];
+
+        // If the saved ig_account_id exists but the page lookup did not
+        // populate it (e.g. page token lacks ig_business permission), surface
+        // it synthetically so the frontend can still pick the IG account.
+        if (scopedIgId && directPages.length > 0 && !directPages[0].instagram_business_account) {
+          directPages[0].instagram_business_account = { id: scopedIgId };
+        }
+      } else {
+        [directAccounts, directPages, directPixels] = await Promise.all([
+          metaGetAll('/me/adaccounts', token, {
+            fields: 'id,account_id,name,account_status,currency,timezone_name',
+          }),
+          metaGetAll('/me/accounts', token, {
+            fields: 'id,name,category,instagram_business_account{id,name,username}',
+          }),
+          // Also fetch pixels for each ad account
+          (async () => {
+            const accs = await metaGetAll('/me/adaccounts', token, { fields: 'id' });
+            const allPixels: PixelInfo[] = [];
+            for (const acc of accs.slice(0, 5)) {
+              const px = await metaGetAll(`/${acc.id}/adspixels`, token, { fields: 'id,name' }).catch(e => { console.warn(`[hierarchy] Pixel fetch failed for ${acc.id}:`, e.message); return []; });
+              allPixels.push(...px);
+            }
+            // Deduplicate by id
+            const seen = new Set<string>();
+            return allPixels.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
+          })(),
+        ]);
+      }
+
+      // IMPORTANT: keep groupId = 'personal' for wire-format compatibility.
+      // MetaConnectionWizard.tsx hardcodes the literal 'personal' in 3 places
+      // (step auto-select, portfolio filter, page lookup). Only the label varies.
+      const groupId = 'personal';
+      const groupName = isSuat ? 'Cuentas compartidas' : 'Cuenta Personal';
 
       const personalPortfolios = buildPortfolios(
-        'personal',
-        'Cuenta Personal',
+        groupId,
+        groupName,
         directAccounts,
         directPages,
         directPixels,
@@ -388,7 +449,7 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
         success: true,
         businesses: [],
         groups: personalPortfolios.length > 0
-          ? [{ business_id: 'personal', business_name: 'Cuenta Personal', portfolios: personalPortfolios, pages: personalPages }]
+          ? [{ business_id: groupId, business_name: groupName, portfolios: personalPortfolios, pages: personalPages }]
           : [],
         all_portfolios: personalPortfolios,
       };

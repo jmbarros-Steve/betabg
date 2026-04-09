@@ -127,10 +127,6 @@ export async function fetchMetaAdAccounts(c: Context) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
 
-    if (!connection.access_token_encrypted) {
-      return c.json({ error: 'Missing Meta access token' }, 400);
-    }
-
     // Resolve access token (supports both direct decrypt and BM Partner SUAT)
     const decryptedToken = await getTokenForConnection(supabase, connection);
     if (!decryptedToken) {

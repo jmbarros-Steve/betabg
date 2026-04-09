@@ -1,59 +1,92 @@
 # Felipe W2 — Meta Ads
-Squad: Marketing | Última sesión: 2026-04-06
+Squad: Marketing | Última sesión: 2026-04-08
 
-## Estado actual: BM Partner migración completa, pendiente activación
+## Estado actual: Leadsie hardening completo, en prod, pendiente config Leadsie dashboard + secret
 
-### Completado (sesión 06/04/2026)
+### Completado sesión 08/04/2026 — Leadsie Hardening + SUAT Scoping Multi-Merchant
 
-#### Token Migration — getTokenForConnection
-- [x] Crear `cloud-run-api/src/lib/resolve-meta-token.ts` (getTokenForConnection + resolveMetaToken)
-- [x] Migrar 11 rutas Meta críticas a getTokenForConnection
-- [x] Migrar 13 rutas Meta secundarias a getTokenForConnection
-- [x] Verificar TypeScript compila sin errores
-- [x] Deploy Cloud Run: revisión `steve-api-00390-2kt`
+**9 fixes críticos** en 2 rondas con cross-review de Isidora W6 + Javiera W12 + Sebastián W5 + Diego W8.
 
-#### BM Partner Backend
-- [x] `discover-client-assets.ts` — enumera activos compartidos con BM via SUAT
-- [x] `leadsie-webhook.ts` — webhook Admatic auto-crea conexión bm_partner
-- [x] Rutas registradas en `routes/index.ts`
-- [x] `sync-all-metrics.ts` incluye filtro bm_partner
-- [x] Migración `connection_type` aplicada en Supabase
+#### Ronda 1 (auto-review manual)
+- [x] #22 Fix RLS `orphan_meta_connections` → `is_super_admin(auth.uid())` (policy anterior usaba `role='admin'` inexistente)
+- [x] #23 Fix silent failure `storeOrphan` → throw + try/catch → 500 → Leadsie reintenta
+- [x] #24 Fix `isActive` permissive → `account_id OR page_id OR ig_account_id`
+- [x] #25 Add shared-secret validation webhook → header `X-Webhook-Secret` o `?secret=`
+- [x] #26 SUAT detection `fetch-meta-business-hierarchy` → skip `/me/businesses`
+- [x] Migration `20260408130000_fix_orphan_meta_connections_rls.sql` (nueva, 18 líneas)
+- [x] Migration history repair (phantom `20260321`, `20260322`, `20260325`)
 
-#### BM Partner Frontend
-- [x] `MetaPartnerSetup.tsx` — wizard 3 estados (leadsie→waiting→connected)
-- [x] Integrado en `ClientPortalConnections.tsx` via Dialog
+#### Ronda 2 (post cross-review)
+- [x] #28 Revert `groupId='personal'` (Isidora HIGH #1) — compat wizard OAuth hardcoded
+- [x] #29 Scoping multi-merchant SUAT (Isidora HIGH #2, CRÍTICO) — evita cross-contamination
+- [x] #30 `MetaPartnerSetup` poll acepta `page_id/ig_account_id` (Isidora MEDIUM #4)
+- [x] #31 Log estructurado `{err, body}` en catch (Isidora MEDIUM #5)
 
-#### Social Hub
-- [x] `SocialHub.tsx` — 5 tabs: Publicar, Calendario, Métricas, Bandeja, Mejor Hora
-- [x] `SocialPublisher.tsx` — publicar en IG + FB
-- [x] `SocialCalendar.tsx` — calendario semanal drag-drop
-- [x] `SocialMetrics.tsx` — toggle IG/FB
-- [x] `FBMetricsDashboard.tsx` — insights Facebook
+#### Deploy + verificación
+- [x] Cloud Run revisión `steve-api-00426-869` → 100% traffic
+- [x] Env vars: 26/20 obligatorias + `META_SYSTEM_TOKEN`
+- [x] Smoke test webhook no-match → 200 OK orfan persistido id `658945a8-de75-42d1-827e-3dc365ded050`
+- [x] Health check 200 OK
+- [x] Type-check archivos Felipe: 0 errores
 
-#### Facebook Routes
-- [x] `publish-facebook.ts` — publicar post/foto/video/link
-- [x] `fetch-facebook-insights.ts` — métricas page
+#### Notion + Supabase sync
+- [x] Notion: sesión "08/04/2026 — Leadsie Hardening + SUAT Scoping Multi-Merchant" bajo hub Felipe W2 → https://www.notion.so/33d9af51b58d816684f8f48d68823660
+- [x] Supabase `agent_sessions` Felipe W2: memory_md + last_challenge + tasks_pending (11) + tasks_completed (25) + session_count=2
 
-### Pendiente
+### Drift crítico prod↔repo
+**CÓDIGO DEPLOYADO EN PROD PERO NO EN GIT**
+- Cloud Run `steve-api-00426-869` ya sirve los 9 fixes
+- Los 4 archivos modificados están en disco (`~/betabg/`) pero **sin commit**
+- Push bloqueado por permiso de JM — preguntar explícitamente antes de `git push`
+- Al retomar mañana: `git status` primero para confirmar cambios
 
-#### BM Partner — Activación (requiere JM)
-- [ ] Crear cuenta Admatic plan Agency ($79/mes)
-- [ ] Configurar Connect Profile en Admatic con BM ID de Steve
-- [ ] Obtener URL Connect Profile → `VITE_LEADSIE_REQUEST_URL`
-- [ ] Configurar webhook en Admatic → URL: `steve-api.../api/webhooks/leadsie`
-- [ ] Obtener webhook secret → `LEADSIE_WEBHOOK_SECRET`
-- [ ] Setear env vars Cloud Run: `META_SYSTEM_TOKEN`, `STEVE_BM_ID`, `LEADSIE_WEBHOOK_SECRET`
+### Archivos tocados 08/04
+1. `supabase/migrations/20260408130000_fix_orphan_meta_connections_rls.sql` (NUEVO)
+2. `cloud-run-api/src/routes/webhooks/leadsie-webhook.ts` (4 fixes)
+3. `cloud-run-api/src/routes/meta/fetch-meta-business-hierarchy.ts` (3 fixes)
+4. `src/components/client-portal/meta-ads/MetaPartnerSetup.tsx` (1 fix)
 
-#### Testing
-- [ ] Adaptar webhook handler si payload Admatic difiere de Leadsie
-- [ ] Test E2E: simular webhook → verificar conexión creada → sync métricas
+### Pendiente (3 blockers + 8 deudas técnicas)
 
-#### Supabase
-- [ ] Reparar migration history (mismatch con remoto: `supabase migration repair --status reverted 20260321 20260322 20260325`)
+#### Blockers test E2E
+- [ ] **#27** Setear `LEADSIE_WEBHOOK_SECRET` en Cloud Run (Sebastián W5 HIGH)
+  - Generar: `openssl rand -hex 32`
+  - Deploy: `gcloud run services update steve-api --region=us-central1 --project=steveapp-agency --update-env-vars=LEADSIE_WEBHOOK_SECRET=<hex>`
+  - Pegar mismo valor en Leadsie dashboard webhook config
+- [ ] **#16** JM configura Leadsie Connect Profile + URL del flow (externo, depende del dashboard Leadsie)
+- [ ] **#18** Test E2E con cliente real (blocked por #27 + #16)
+- [ ] Commit + push con `Reviewed-By: Isidora W6 + Javiera W12 + Sebastián W5 + Diego W8` (blocked por permiso JM)
 
-### Notas
-- 24 rutas Meta total usan getTokenForConnection (0 usan decrypt inline para Meta tokens)
-- SUAT del BM de Steve nunca expira — no necesita refresh
-- check-meta-scopes retorna all scopes granted para bm_partner
-- Page Token para inbox/publishing: SUAT genera via `GET /{page_id}?fields=access_token`
-- Instagram DMs bloqueado: Meta App no tiene Instagram Messaging API habilitado
+#### Deuda técnica de los 4 reviews (no blockers, orden de prioridad)
+1. [ ] Regenerar `src/integrations/supabase/types.ts` para incluir `orphan_meta_connections` + limpiar cols fantasma `end_user_email`/`partner_id` (Diego HIGH #1+#2)
+2. [ ] Migración 130100 idempotente (DO block + EXCEPTION duplicate_object) (Javiera HIGH #1)
+3. [ ] Cron retención `raw_payload` 90 días (nueva ruta `/api/cron/cleanup-orphan-meta` + scheduler) (Diego HIGH #3)
+4. [ ] `timingSafeEqual` en webhook secret compare (hardening vs timing attacks)
+5. [ ] Sanitizar `raw_payload` antes del insert (mask tokens/emails) (Javiera MEDIUM)
+6. [ ] CHECK constraint `connection_type IN ('oauth','bm_partner','leadsie')` en `platform_connections` (Javiera MEDIUM)
+7. [ ] Limpiar `AdminHuerfanasMeta.tsx` — remover referencias a cols fantasma (Diego HIGH #1)
+8. [ ] **Escalar a Diego W8:** fix migración `20260408140300_steve_alerts_table.sql` de otro dev — usa `role='super_admin'` que no existe en enum `app_role`. Va a fallar por la misma razón que falló mi RLS original. NO es mía pero heredamos el riesgo.
+
+### Pendiente legacy (de sesiones anteriores)
+- [ ] `campaign_metrics` solo 25 rows — datos insuficientes para análisis serio
+- [ ] `CampaignCreateWizard.tsx` 141KB — refactor pendiente
+- [ ] `MetaCampaignManager.tsx` 86KB — refactor pendiente
+- [ ] Instagram DMs bloqueado: Meta App no tiene Instagram Messaging API habilitado
+- [ ] Tokens Meta OAuth pueden expirar cada 60 días — alerta de renovación pendiente
+
+### Challenge activo a JM (al retomar mañana)
+> JM, antes del test E2E con cliente real:
+> 1. Setea `LEADSIE_WEBHOOK_SECRET` — el webhook está en dev mode (acepta cualquier request).
+> 2. Verifica `performance-tracker-meta` no esté fallando silencioso para conexiones SUAT sin Ad Account real (solo Page+IG) — ese cron ahora usa `getTokenForConnection`, puede loguear en silencio.
+> 3. `campaign_metrics` solo 25 rows — no gastes un peso en Meta hasta confirmar pipeline métricas post-Leadsie.
+> 4. NO mergees `20260408140300_steve_alerts_table.sql` de otro dev — mismo antipattern `role='super_admin'` que va a fallar.
+
+### Resolver soporta 3 connection types
+- `oauth` (decrypt `access_token_encrypted`)
+- `bm_partner` (SUAT via `META_SYSTEM_TOKEN`)
+- `leadsie` (SUAT via `META_SYSTEM_TOKEN`)
+
+### Notas operativas
+- 2 intentos de deploy reportaron "failed" pero ambos tuvieron éxito — **false alarm de gcloud CLI**, validar siempre con `gcloud run revisions list` antes de reintentar
+- `AdminOrphanMetaConnections.tsx` usa `(supabase as any)` porque `orphan_meta_connections` no está en `types.ts` — necesita regenerar types
+- Cross-review protocol cumplido esta sesión: 4 agentes revisaron en paralelo + 2 rondas de fixes

@@ -36,7 +36,7 @@ async function getMetaToken(supabase: any, clientId: string): Promise<{ token: s
     .eq('is_active', true)
     .single();
 
-  if (!conn?.access_token_encrypted) return null;
+  if (!conn) return null;
 
   const token = await getTokenForConnection(supabase, conn);
   if (!token) return null;

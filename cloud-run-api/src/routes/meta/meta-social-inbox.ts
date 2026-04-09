@@ -670,11 +670,7 @@ export async function metaSocialInbox(c: Context) {
       }
     }
 
-    if (!connection.access_token_encrypted) {
-      return c.json({ error: 'Missing Meta access token' }, 400);
-    }
-
-    // Resolve token (supports both encrypted and system tokens)
+    // Resolve token (supports both encrypted OAuth and SUAT for bm_partner/leadsie)
     const decryptedToken = await getTokenForConnection(supabase, connection);
     if (!decryptedToken) {
       console.error('[meta-social-inbox] Token resolution failed');

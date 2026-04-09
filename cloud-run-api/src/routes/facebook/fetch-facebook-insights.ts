@@ -39,12 +39,12 @@ export async function fetchFacebookInsights(c: Context) {
     .eq('platform', 'meta')
     .maybeSingle();
 
-  if (!conn?.access_token_encrypted) {
+  if (!conn) {
     return c.json({ error: 'No hay conexion a Meta/Facebook' }, 404);
   }
 
   const userToken = await getTokenForConnection(supabase, conn);
-  if (!userToken) return c.json({ error: 'Error descifrando token' }, 500);
+  if (!userToken) return c.json({ error: 'Error resolviendo token Meta' }, 500);
 
   // Find page_id
   let pageId = conn.page_id;

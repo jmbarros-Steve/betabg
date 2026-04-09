@@ -34,6 +34,7 @@ import AdminSwarmSources from "./pages/AdminSwarmSources";
 import AdminOrganigrama from "./pages/AdminOrganigrama";
 import AdminBypass from "./pages/AdminBypass";
 import AdminWaitlist from "./pages/AdminWaitlist";
+import AdminOrphanMetaConnections from "./pages/AdminOrphanMetaConnections";
 import Agendar from "./pages/Agendar";
 import OAuthCalendarCallback from "./pages/OAuthCalendarCallback";
 import WebForm from "./pages/WebForm";
@@ -86,6 +87,7 @@ const App = () => (
             <Route path="/admin/swarm-sources" element={<AdminSwarmSources />} />
             <Route path="/admin/organigrama" element={<AdminOrganigrama />} />
             <Route path="/admin/waitlist" element={<AdminWaitlist />} />
+            <Route path="/admin/huerfanas-meta" element={<AdminOrphanMetaConnections />} />
             <Route path="/entrada-secreta-jm" element={<AdminBypass />} />
             <Route path="/agendar/oauth-callback" element={<OAuthCalendarCallback />} />
             <Route path="/agendar/steve" element={<Navigate to="/agendar/5af514ca-4478-4383-89c8-c669e0641b33" replace />} />

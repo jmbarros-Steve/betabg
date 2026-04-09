@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leadsie + BM Partner — Explicación a prueba de idiotas</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #0f1419;
+    color: #e6edf3;
+    line-height: 1.6;
+    padding: 40px 20px;
+  }
+  .container { max-width: 920px; margin: 0 auto; }
+  h1 {
+    font-size: 42px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #58a6ff, #a371f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { font-size: 18px; color: #8b949e; margin-bottom: 50px; }
+  h2 {
+    font-size: 28px;
+    margin: 60px 0 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #30363d;
+  }
+  h3 { font-size: 20px; margin: 24px 0 12px; color: #79c0ff; }
+  p { margin-bottom: 14px; font-size: 17px; }
+
+  .section-num {
+    display: inline-block;
+    width: 38px; height: 38px;
+    background: #58a6ff;
+    color: #0f1419;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 38px;
+    font-weight: 800;
+    margin-right: 12px;
+    font-size: 18px;
+  }
+
+  /* Cards */
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 16px 0;
+  }
+  .card.bad { border-left: 4px solid #f85149; }
+  .card.good { border-left: 4px solid #3fb950; }
+  .card.warn { border-left: 4px solid #d29922; }
+  .card.info { border-left: 4px solid #58a6ff; }
+
+  /* Flow diagram */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    margin: 30px 0;
+  }
+  .flow-step {
+    background: #161b22;
+    border: 2px solid #30363d;
+    border-radius: 12px;
+    padding: 16px 24px;
+    min-width: 380px;
+    text-align: center;
+    font-size: 17px;
+  }
+  .flow-step.client { border-color: #58a6ff; }
+  .flow-step.leadsie { border-color: #a371f7; }
+  .flow-step.steve { border-color: #3fb950; }
+  .flow-step.meta { border-color: #f0883e; }
+  .flow-arrow {
+    color: #8b949e;
+    font-size: 24px;
+    line-height: 1;
+  }
+
+  /* Comparison */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  @media (max-width: 700px) { .compare { grid-template-columns: 1fr; } }
+
+  .compare > div {
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid #30363d;
+  }
+  .compare .old { background: rgba(248, 81, 73, 0.08); border-color: rgba(248, 81, 73, 0.4); }
+  .compare .new { background: rgba(63, 185, 80, 0.08); border-color: rgba(63, 185, 80, 0.4); }
+  .compare h4 { font-size: 18px; margin-bottom: 12px; }
+  .compare .old h4 { color: #f85149; }
+  .compare .new h4 { color: #3fb950; }
+  .compare ul { list-style: none; padding-left: 0; }
+  .compare li { padding: 6px 0; font-size: 15px; }
+
+  /* Status grid */
+  .status-grid {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 12px 18px;
+    margin: 20px 0;
+    align-items: center;
+  }
+  .status-icon {
+    font-size: 28px;
+    text-align: center;
+    width: 50px;
+    height: 50px;
+    line-height: 50px;
+    border-radius: 50%;
+  }
+  .status-icon.done { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
+  .status-icon.todo { background: rgba(210, 153, 34, 0.15); color: #d29922; }
+  .status-icon.miss { background: rgba(248, 81, 73, 0.15); color: #f85149; }
+
+  /* Code blocks */
+  code {
+    background: #1c2128;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: "SF Mono", Menlo, Monaco, monospace;
+    font-size: 14px;
+    color: #d2a8ff;
+    border: 1px solid #30363d;
+  }
+  pre {
+    background: #1c2128;
+    padding: 18px;
+    border-radius: 10px;
+    overflow-x: auto;
+    border: 1px solid #30363d;
+    font-family: "SF Mono", Menlo, Monaco, monospace;
+    font-size: 13px;
+    margin: 12px 0;
+    line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; border: none; color: #c9d1d9; }
+  .comment { color: #8b949e; }
+  .keyword { color: #ff7b72; }
+  .string { color: #a5d6ff; }
+
+  /* Highlights */
+  .highlight {
+    background: rgba(88, 166, 255, 0.12);
+    border-left: 4px solid #58a6ff;
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin: 16px 0;
+    font-size: 16px;
+  }
+  .highlight strong { color: #58a6ff; }
+
+  .big-quote {
+    font-size: 22px;
+    font-weight: 600;
+    text-align: center;
+    padding: 30px;
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.1), rgba(163, 113, 247, 0.1));
+    border-radius: 16px;
+    margin: 30px 0;
+    border: 1px solid #30363d;
+  }
+
+  /* Action steps */
+  .step {
+    display: flex;
+    gap: 16px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 18px;
+    margin: 12px 0;
+  }
+  .step-num {
+    flex-shrink: 0;
+    width: 40px; height: 40px;
+    background: #d29922;
+    color: #0f1419;
+    border-radius: 50%;
+    font-weight: 800;
+    font-size: 18px;
+    text-align: center;
+    line-height: 40px;
+  }
+  .step-content { flex: 1; }
+  .step-content strong { color: #f0f6fc; font-size: 17px; }
+
+  .footer {
+    margin-top: 80px;
+    padding-top: 30px;
+    border-top: 1px solid #30363d;
+    text-align: center;
+    color: #8b949e;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Leadsie + BM Partner</h1>
+<p class="subtitle">Cómo Steve sigue sacando data de Meta sin que cada cliente haga login con Facebook. Explicado para un humano normal.</p>
+
+<!-- ─────────────────────────────────────────── -->
+<h2><span class="section-num">1</span>El problema que estabas resolviendo</h2>
+
+<p>Antes (modelo OAuth directo):</p>
+<div class="card bad">
+  <p><strong>Cada cliente</strong> tenía que hacer login con su Facebook personal, darle permisos a la app de Steve, y Steve guardaba un <em>token de acceso</em> con su nombre.</p>
+  <p>Ese token <strong>expiraba cada 60 días</strong> y había que renovarlo. Si el cliente cambiaba la contraseña, perdía el 2FA, o el chabón que se conectó dejó la empresa → token muerto → Steve dejaba de trackear sus campañas → llamada de pánico al soporte.</p>
+</div>
+
+<div class="big-quote">
+  "Quiero conectar 10 clientes este mes y escalar a 30. No puedo estar babysitteando 30 tokens que se caen cada 2 meses."
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2><span class="section-num">2</span>La nueva arquitectura: Business Manager Partner</h2>
+
+<p>Meta tiene una figura especial llamada <strong>Business Manager Partner</strong>. Funciona así:</p>
+
+<div class="card info">
+  <p>Vos (Steve) tenés <strong>UN solo Business Manager</strong> en Facebook, registrado como Partner. Dentro de ese BM creás un <strong>System User</strong> (un "usuario robot" que no es una persona). Ese System User genera <strong>UN solo token</strong> llamado <strong>SUAT</strong> (System User Access Token).</p>
+  <p>Ese token <strong>nunca expira</strong>. No tiene mantenimiento. No depende de ningún humano.</p>
+</div>
+
+<p>Cuando un cliente tuyo te quiere dar acceso a su Ad Account de Meta, en vez de hacer login con su Facebook lo que hace es <strong>compartir el asset con tu Business Manager</strong>. Es como darle "permisos de carpeta compartida en Drive" en vez de prestarte su contraseña.</p>
+
+<div class="highlight">
+  <strong>El insight clave:</strong> el SUAT puede llamar Graph API por <em>cualquier</em> Ad Account que esté compartido con tu BM. Un solo token, infinitos clientes.
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2><span class="section-num">3</span>¿Y dónde aparece Leadsie en todo esto?</h2>
+
+<p>El problema con el modelo BM Partner puro es que <strong>compartir un asset con otro Business Manager</strong> en Meta es un infierno de UX. El cliente tiene que: ir a business.facebook.com, encontrar tu Business ID, ir a "Asignar partner", elegir el Ad Account, marcar permisos, dar OK. Tu mamá no lo va a hacer.</p>
+
+<div class="card warn">
+  <p><strong>Leadsie es la capa de UX por encima de eso.</strong> Le da al cliente un link bonito (<code>app.leadsie.com/connect/steve</code>), el cliente le da OK, y Leadsie automáticamente hace el "compartir con BM Partner" por debajo.</p>
+  <p>Leadsie <strong>no toca el token</strong>. No te da credenciales. Solo orquesta el "share". El asset queda en tu BM, listo para que tu SUAT lo use.</p>
+</div>
+
+<h3>Bonus: Leadsie te avisa por webhook</h3>
+<p>Cuando el cliente termina el flow, Leadsie hace POST a <code>steve-api/api/webhooks/leadsie</code> con un JSON que contiene los IDs de los assets que compartió. Steve los guarda en la tabla <code>platform_connections</code>. Listo.</p>
+
+<!-- ─────────────────────────────────────────── -->
+<h2><span class="section-num">4</span>El flow completo, paso a paso</h2>
+
+<div class="flow">
+  <div class="flow-step client">👤 Cliente abre el portal de Steve</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step client">Click "Conectar con Meta"</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step leadsie">🟣 Steve abre Leadsie con <code>?customUserId=&lt;client_id&gt;</code></div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step leadsie">Cliente hace login con su Facebook<br>y aprueba el share</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step meta">🔵 Meta comparte el Ad Account<br>con el BM Partner de Steve</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step leadsie">Leadsie hace POST al webhook de Steve</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step steve">🟢 Steve guarda en DB:<br><code>{ client_id, account_id, connection_type: 'leadsie' }</code></div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step steve">Steve muestra "✅ Conectado"<br>en el portal del cliente</div>
+</div>
+
+<h3>Y cuando el módulo Meta necesita data...</h3>
+
+<div class="flow">
+  <div class="flow-step steve">⚙️ Cron <code>sync-meta-metrics</code> corre cada hora</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step steve">Lee la conexión de la DB</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step steve"><code>getTokenForConnection()</code> ve que es BM Partner<br>→ devuelve el SUAT del env var</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step meta">📊 Llama a <code>graph.facebook.com/act_{account_id}/insights</code><br>con el SUAT en el header</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step steve">Guarda métricas en <code>campaign_metrics</code></div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2><span class="section-num">5</span>Antes vs Ahora</h2>
+
+<div class="compare">
+  <div class="old">
+    <h4>❌ OAuth directo (modelo viejo)</h4>
+    <ul>
+      <li>🔑 1 token por cliente</li>
+      <li>⏰ Expira cada 60 días</li>
+      <li>🔄 Hay que refrescar tokens</li>
+      <li>👤 Depende del humano que se conectó</li>
+      <li>📞 Soporte: tokens caídos = pánico</li>
+      <li>🐌 UX: cliente debe hacer login + revisar permisos en Facebook</li>
+      <li>📱 Cada app nueva en revisión = 4-8 semanas de espera</li>
+    </ul>
+  </div>
+  <div class="new">
+    <h4>✅ BM Partner + Leadsie (modelo nuevo)</h4>
+    <ul>
+      <li>🔑 1 token global (SUAT) en env var</li>
+      <li>♾️ Nunca expira</li>
+      <li>🚫 Cero refresh, cero mantenimiento</li>
+      <li>🤖 Independiente del humano que aprobó</li>
+      <li>😴 Soporte duerme tranquilo</li>
+      <li>🚀 UX: link bonito de Leadsie + 3 clicks</li>
+      <li>⚡ No depende de app review (Leadsie ya pasó por eso)</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2><span class="section-num">6</span>Estado actual del proyecto</h2>
+
+<div class="status-grid">
+  <div class="status-icon done">✓</div>
+  <div><strong>Webhook handler de Leadsie</strong> — recibe POST, parsea v2, mapea assets de Meta (Ad Account, Page, IG, Pixel), upsert en <code>platform_connections</code></div>
+
+  <div class="status-icon done">✓</div>
+  <div><strong>Tabla orphan_meta_connections</strong> — para cuando llegue un webhook que no podemos matchear a un cliente. Aplicada a producción.</div>
+
+  <div class="status-icon done">✓</div>
+  <div><strong>Frontend MetaPartnerSetup</strong> — 3 estados (open Leadsie → waiting → connected). Pasa el <code>customUserId=client_id</code> en la URL para que el match sea automático.</div>
+
+  <div class="status-icon done">✓</div>
+  <div><strong>Plumbing del SUAT (resolve-meta-token.ts)</strong> — 24 archivos del backend ya usan <code>getTokenForConnection()</code>. El día que el SUAT esté seteado, todos los módulos Meta funcionan automáticamente.</div>
+
+  <div class="status-icon todo">⚠</div>
+  <div><strong>Wire del connection_type='leadsie'</strong> al resolver — actualmente solo reconoce <code>'bm_partner'</code>. Hay que agregar 2 líneas para que también acepte <code>'leadsie'</code>. (Está esperando tu OK para ejecutarlo.)</div>
+
+  <div class="status-icon miss">✗</div>
+  <div><strong>SUAT en Cloud Run</strong> — la env var <code>META_SYSTEM_TOKEN</code> NO está seteada en producción. Sin esto, NADA funciona. Es la pieza que falta.</div>
+
+  <div class="status-icon miss">✗</div>
+  <div><strong>Cuenta Leadsie configurada</strong> — necesitás crear el Connect Profile y obtener la URL del flow.</div>
+
+  <div class="status-icon miss">✗</div>
+  <div><strong>VITE_LEADSIE_REQUEST_URL</strong> — env var del frontend en Vercel para que el botón "Conectar con Meta" sepa a qué URL abrir.</div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2><span class="section-num">7</span>Lo que tenés que hacer vos (acción humana)</h2>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <strong>Asegurate que tenés un Business Manager en Meta</strong>
+    <p>Andá a <code>business.facebook.com</code>. Si no tenés uno, creá uno con el nombre de tu empresa (Steve / BG Consult / lo que prefieras).</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <strong>Creá un System User dentro del BM</strong>
+    <p>Business Settings → Users → System Users → "Add". Nombre sugerido: <code>steve-api</code>. Rol: <strong>Admin</strong>.</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <strong>Generá el SUAT (System User Access Token)</strong>
+    <p>En el System User recién creado → "Generate New Token". Elegí tu app de Meta (la que tiene <code>META_APP_ID</code>). Permisos a marcar:</p>
+    <pre><code>ads_management
+ads_read
+business_management
+pages_read_engagement
+pages_show_list
+pages_manage_metadata
+instagram_basic
+instagram_manage_insights
+read_insights</code></pre>
+    <p>Marcá "<strong>Token never expires</strong>". Copiá el token (empieza con <code>EAA...</code>). <strong>Guárdalo en 1Password</strong> — Meta no te lo muestra dos veces.</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">
+    <strong>Setealo en Cloud Run</strong>
+    <pre><code>gcloud run services update steve-api \
+  --update-env-vars=META_SYSTEM_TOKEN=EAAxxxxxx \
+  --region=us-central1 \
+  --project=steveapp-agency</code></pre>
+    <p><em>(Yo te ayudo con el comando exacto cuando tengas el token.)</em></p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">5</div>
+  <div class="step-content">
+    <strong>Configurá Leadsie</strong>
+    <p>En tu cuenta de Leadsie:</p>
+    <ul style="margin: 8px 0 0 20px;">
+      <li>Creá un Connect Profile con los assets que querés pedir (Ad Account, Page, IG, Pixel)</li>
+      <li>Configurá el webhook URL: <code>https://steve-api-850416724643.us-central1.run.app/api/webhooks/leadsie</code></li>
+      <li>Copiá la URL del flow (algo como <code>https://app.leadsie.com/connect/steve-xyz</code>)</li>
+    </ul>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">6</div>
+  <div class="step-content">
+    <strong>Setea VITE_LEADSIE_REQUEST_URL en Vercel</strong>
+    <p>Project Settings → Environment Variables → agregá <code>VITE_LEADSIE_REQUEST_URL</code> con la URL de Leadsie del paso anterior. Redeploy.</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">7</div>
+  <div class="step-content">
+    <strong>Test con un cliente real</strong>
+    <p>Conectate con un cliente de prueba via Leadsie. Verificamos que (a) llega el webhook, (b) la conexión se crea, (c) <code>sync-meta-metrics</code> trae datos.</p>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2><span class="section-num">8</span>FAQ rápido</h2>
+
+<div class="card">
+  <p><strong>¿Y si el cliente quita el acceso desde su Facebook?</strong></p>
+  <p>El asset deja de estar compartido con tu BM. Tu SUAT empieza a recibir 403 al pedir <code>act_{account_id}</code>. Hay que detectar eso y marcar la conexión como inactiva (esto se puede hacer en el handler de errores de sync-meta-metrics, ya existe lógica similar para tokens OAuth expirados).</p>
+</div>
+
+<div class="card">
+  <p><strong>¿Qué pasa si el SUAT se compromete?</strong></p>
+  <p>Es el peor escenario: con ese token cualquiera puede leer/escribir TODOS los Ad Accounts compartidos con tu BM. Por eso el SUAT vive solo como env var en Cloud Run (nunca en código, nunca en DB). Si se filtra: revocar y regenerar inmediatamente desde Business Settings.</p>
+</div>
+
+<div class="card">
+  <p><strong>¿Funciona también para Google Ads?</strong></p>
+  <p>No. Google no tiene un equivalente al BM Partner. Para Google Ads vas a necesitar OAuth + Developer Token + MCC (Manager Account). Ese es otro proyecto, separado de este.</p>
+</div>
+
+<div class="card">
+  <p><strong>¿Y Shopify, Klaviyo?</strong></p>
+  <p>Leadsie también soporta Shopify (vía Collaborator Code) y Klaviyo, PERO los módulos backend de Steve para esos no están construidos para usar tokens compartidos. Los ignoramos por ahora — el handler solo procesa Meta. Cuando los módulos estén listos, el handler se extiende.</p>
+</div>
+
+<div class="card">
+  <p><strong>¿Por qué no usaron Admatic en su lugar?</strong></p>
+  <p>Admatic está construido sobre Bubble.io, no soporta <code>customUserId</code> en la URL, y su webhook no trae forma de matchear el cliente. Habríamos tenido que pedirle al cliente que escriba su email primero y matchear por ahí. Más fricción, más errores. Leadsie soporta <code>customUserId</code> nativamente → el match es automático y a prueba de balas.</p>
+</div>
+
+<div class="footer">
+  Generado por Felipe W2 · Steve Ads · Para JM<br>
+  Última actualización: 7 Abril 2026
+</div>
+
+</div>
+</body>
+</html>

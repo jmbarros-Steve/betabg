@@ -43,7 +43,7 @@ async function getFBPageToken(supabase: any, clientId: string): Promise<FBTokenR
     .eq('is_active', true)
     .single();
 
-  if (!conn?.access_token_encrypted) return null;
+  if (!conn) return null;
 
   const userToken = await getTokenForConnection(supabase, conn);
   if (!userToken) return null;

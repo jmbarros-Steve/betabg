@@ -13,27 +13,42 @@ type SetupState = 'leadsie' | 'waiting' | 'connected';
 
 const LEADSIE_URL = import.meta.env.VITE_LEADSIE_REQUEST_URL || '';
 const POLL_INTERVAL_MS = 3000;
-const POLL_TIMEOUT_MS = 120000; // 2 minutes
+const POLL_TIMEOUT_MS = 180000; // 3 minutes
+
+/**
+ * Build the Leadsie Connect URL with customUserId param.
+ * Leadsie sends this back in the webhook as `body.user`, which the backend
+ * uses to match the connection to the right Steve client.
+ */
+function buildLeadsieUrl(baseUrl: string, clientId: string): string {
+  if (!baseUrl) return '';
+  const separator = baseUrl.includes('?') ? '&' : '?';
+  return `${baseUrl}${separator}customUserId=${encodeURIComponent(clientId)}`;
+}
 
 export function MetaPartnerSetup({ clientId, onConnected }: MetaPartnerSetupProps) {
   const [state, setState] = useState<SetupState>('leadsie');
   const [leadsieOpened, setLeadsieOpened] = useState(false);
   const [pollElapsed, setPollElapsed] = useState(0);
 
-  const leadsieUrl = LEADSIE_URL
-    ? `${LEADSIE_URL}?customUserId=${clientId}`
-    : '';
+  const leadsieUrl = buildLeadsieUrl(LEADSIE_URL, clientId);
 
-  // Poll for connection created by webhook
+  // Poll DB for the connection created by the webhook.
+  // Accept any of account_id / page_id / ig_account_id — merchants that share
+  // only Page+IG (organic only) are still a valid "connected" state.
   const pollForConnection = useCallback(async () => {
     const { data } = await supabase
       .from('platform_connections')
-      .select('id, is_active, account_id')
+      .select('id, is_active, account_id, page_id, ig_account_id, connection_type')
       .eq('client_id', clientId)
       .eq('platform', 'meta')
       .maybeSingle();
 
-    if (data?.is_active && data?.account_id) {
+    if (
+      data?.connection_type === 'leadsie' &&
+      data?.is_active &&
+      (data?.account_id || data?.page_id || data?.ig_account_id)
+    ) {
       setState('connected');
       return true;
     }
@@ -69,7 +84,7 @@ export function MetaPartnerSetup({ clientId, onConnected }: MetaPartnerSetupProp
     };
   }, [state, pollForConnection]);
 
-  // When connected, notify parent after a short delay
+  // Notify parent after a short delay once connected
   useEffect(() => {
     if (state === 'connected') {
       const timer = setTimeout(onConnected, 1500);
@@ -88,7 +103,7 @@ export function MetaPartnerSetup({ clientId, onConnected }: MetaPartnerSetupProp
     setPollElapsed(0);
   };
 
-  // STATE 3: Connected
+  // STATE: Connected
   if (state === 'connected') {
     return (
       <div className="text-center py-8 space-y-4">
@@ -105,7 +120,7 @@ export function MetaPartnerSetup({ clientId, onConnected }: MetaPartnerSetupProp
     );
   }
 
-  // STATE 2: Waiting for webhook
+  // STATE: Waiting for webhook
   if (state === 'waiting') {
     const isTimedOut = pollElapsed > POLL_TIMEOUT_MS;
 
@@ -117,7 +132,7 @@ export function MetaPartnerSetup({ clientId, onConnected }: MetaPartnerSetupProp
             <div>
               <h3 className="text-lg font-semibold">Esperando conexion...</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Si ya completaste el proceso en Leadsie, espera unos segundos mientras se conecta automaticamente.
+                Si ya completaste el proceso, espera unos segundos mientras se conecta automaticamente.
               </p>
             </div>
           </>
@@ -147,7 +162,7 @@ export function MetaPartnerSetup({ clientId, onConnected }: MetaPartnerSetupProp
                 size="sm"
                 onClick={() => setState('leadsie')}
               >
-                Volver a Leadsie
+                Volver
               </Button>
             </div>
           </>
@@ -156,7 +171,7 @@ export function MetaPartnerSetup({ clientId, onConnected }: MetaPartnerSetupProp
     );
   }
 
-  // STATE 1: Leadsie embed
+  // STATE: Open Leadsie
   return (
     <div className="space-y-6 py-4">
       <div className="text-center space-y-2">
@@ -180,7 +195,7 @@ export function MetaPartnerSetup({ clientId, onConnected }: MetaPartnerSetupProp
       {!leadsieUrl && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
           <p className="text-sm text-amber-800">
-            La URL de Leadsie no esta configurada. Contacta al administrador.
+            La URL de conexion no esta configurada. Contacta al administrador.
           </p>
         </div>
       )}
@@ -202,7 +217,7 @@ export function MetaPartnerSetup({ clientId, onConnected }: MetaPartnerSetupProp
             onClick={handleDoneWithLeadsie}
             className="w-full"
           >
-            Ya complete el proceso en Leadsie
+            Ya complete el proceso
           </Button>
         )}
       </div>
