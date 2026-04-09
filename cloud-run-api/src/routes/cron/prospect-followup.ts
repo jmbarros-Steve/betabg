@@ -108,6 +108,12 @@ export async function prospectFollowup(c: Context) {
           const lastMsgTime = new Date(lastOutboundMsg.created_at);
           const hoursSinceLastMsg = (now.getTime() - lastMsgTime.getTime()) / (1000 * 60 * 60);
 
+          // Dedup: skip if a followup was already sent in the last 24h
+          if (prospect.last_followup_at) {
+            const hoursSinceLastFollowup = (now.getTime() - new Date(prospect.last_followup_at).getTime()) / (1000 * 60 * 60);
+            if (hoursSinceLastFollowup < 24) continue;
+          }
+
           // Determine which follow-up to send based on time and count
           let shouldSend = false;
           let followupType: 'insight' | 'fomo' | 'goodbye' = 'insight';

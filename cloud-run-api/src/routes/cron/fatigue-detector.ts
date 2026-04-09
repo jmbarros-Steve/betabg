@@ -4,6 +4,7 @@ import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { metaApiJson } from '../../lib/meta-fetch.js';
 import { sendAlertEmail } from '../../lib/send-alert-email.js';
 import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Fatigue Detector — Paso D.5
@@ -42,10 +43,7 @@ interface Campaign {
 }
 
 export async function fatigueDetector(c: Context) {
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

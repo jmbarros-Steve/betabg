@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { emailSendQueue } from '../email/send-queue.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Email Queue Tick — cron que procesa email_send_queue cada 1 minuto.
@@ -21,10 +22,7 @@ const CONCURRENCY = 5;
 const STUCK_PROCESSING_MINUTES = 30;
 
 export async function emailQueueTick(c: Context) {
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

@@ -27,25 +27,40 @@ export async function trackOpen(c: Context) {
         'trackOpen.getSentEvent',
       );
       if (data) {
-        const { error } = await supabase.from('email_events').insert({
-          client_id: data.client_id,
-          campaign_id: data.campaign_id,
-          flow_id: data.flow_id,
-          subscriber_id: data.subscriber_id,
-          event_type: 'opened',
-          metadata: {
-            original_event_id: eventId,
-            user_agent: c.req.header('user-agent') || null,
-            ip: c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || null,
-          },
-        });
-        if (error) console.error('Failed to record open event:', error);
+        // Dedup: only record one open event per original sent event
+        const existing = await safeQuerySingleOrDefault<{ id: string }>(
+          supabase
+            .from('email_events')
+            .select('id')
+            .eq('event_type', 'opened')
+            .eq('subscriber_id', data.subscriber_id)
+            .eq('metadata->>original_event_id', eventId)
+            .limit(1)
+            .maybeSingle(),
+          null,
+          'trackOpen.dedupCheck',
+        );
+        if (!existing) {
+          const { error } = await supabase.from('email_events').insert({
+            client_id: data.client_id,
+            campaign_id: data.campaign_id,
+            flow_id: data.flow_id,
+            subscriber_id: data.subscriber_id,
+            event_type: 'opened',
+            metadata: {
+              original_event_id: eventId,
+              user_agent: c.req.header('user-agent') || null,
+              ip: c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || null,
+            },
+          });
+          if (error) console.error('Failed to record open event:', error);
 
-        // Update last_engaged_at for smart send time & sunset detection
-        await supabase
-          .from('email_subscribers')
-          .update({ last_engaged_at: new Date().toISOString() })
-          .eq('id', data.subscriber_id);
+          // Update last_engaged_at for smart send time & sunset detection
+          await supabase
+            .from('email_subscribers')
+            .update({ last_engaged_at: new Date().toISOString() })
+            .eq('id', data.subscriber_id);
+        }
       }
     } catch (err) {
       console.error('Open tracking error:', err);
@@ -105,26 +120,42 @@ export async function trackClick(c: Context) {
         'trackClick.getSentEvent',
       );
       if (data) {
-        const { error } = await supabase.from('email_events').insert({
-          client_id: data.client_id,
-          campaign_id: data.campaign_id,
-          flow_id: data.flow_id,
-          subscriber_id: data.subscriber_id,
-          event_type: 'clicked',
-          metadata: {
-            original_event_id: eventId,
-            url: decodedUrl,
-            user_agent: c.req.header('user-agent') || null,
-            ip: c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || null,
-          },
-        });
-        if (error) console.error('Failed to record click event:', error);
+        // Dedup: only record one click event per original sent event + URL
+        const existingClick = await safeQuerySingleOrDefault<{ id: string }>(
+          supabase
+            .from('email_events')
+            .select('id')
+            .eq('event_type', 'clicked')
+            .eq('subscriber_id', data.subscriber_id)
+            .eq('metadata->>original_event_id', eventId)
+            .eq('metadata->>url', decodedUrl)
+            .limit(1)
+            .maybeSingle(),
+          null,
+          'trackClick.dedupCheck',
+        );
+        if (!existingClick) {
+          const { error } = await supabase.from('email_events').insert({
+            client_id: data.client_id,
+            campaign_id: data.campaign_id,
+            flow_id: data.flow_id,
+            subscriber_id: data.subscriber_id,
+            event_type: 'clicked',
+            metadata: {
+              original_event_id: eventId,
+              url: decodedUrl,
+              user_agent: c.req.header('user-agent') || null,
+              ip: c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || null,
+            },
+          });
+          if (error) console.error('Failed to record click event:', error);
 
-        // Update last_engaged_at for smart send time & sunset detection
-        await supabase
-          .from('email_subscribers')
-          .update({ last_engaged_at: new Date().toISOString() })
-          .eq('id', data.subscriber_id);
+          // Update last_engaged_at for smart send time & sunset detection
+          await supabase
+            .from('email_subscribers')
+            .update({ last_engaged_at: new Date().toISOString() })
+            .eq('id', data.subscriber_id);
+        }
       }
     } catch (err) {
       console.error('Click tracking error:', err);
@@ -157,6 +188,16 @@ export async function sesWebhooks(c: Context) {
   const validTypes = ['SubscriptionConfirmation', 'Notification', 'UnsubscribeConfirmation'];
   if (!validTypes.includes(body.Type)) {
     return c.json({ error: `Invalid SNS message Type: ${body.Type}` }, 400);
+  }
+  // Validate TopicArn looks like an AWS SNS ARN (prevents spoofed notifications)
+  if (body.TopicArn && typeof body.TopicArn === 'string') {
+    const snsArnPattern = /^arn:aws:sns:[a-z0-9-]+:\d{12}:.+$/;
+    if (!snsArnPattern.test(body.TopicArn)) {
+      console.error('[ses-webhooks] Rejected invalid TopicArn:', body.TopicArn);
+      return c.json({ error: 'Invalid TopicArn' }, 400);
+    }
+  } else if (body.Type === 'Notification') {
+    return c.json({ error: 'Invalid SNS Notification: missing TopicArn' }, 400);
   }
   // Validate required SNS fields are present
   if (body.Type === 'Notification' && (!body.Message || typeof body.Message !== 'string')) {

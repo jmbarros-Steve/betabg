@@ -60,9 +60,6 @@ export async function prospectTrial(c: Context) {
         client_user_id: userId,
         name: name || email.split('@')[0],
         email,
-        whatsapp_phone: phone,
-        plan: 'visual',
-        onboarding_wa_started: true,
       }).select('id').single(),
       'prospectTrial.createClient',
     );
@@ -99,6 +96,8 @@ export async function prospectTrial(c: Context) {
     // 6. Send welcome WA message
     // Fix Bug#6: wrap WA send in separate try/catch — DB steps (1-5) already succeeded,
     // don't return 500 just because Twilio is down (causes 409 on retry)
+    // TODO: i18n — welcome message hardcoded in Spanish (es-CL).
+    // If expanding to other languages, extract to a config/i18n system.
     const welcomeMsg = `🎉 ¡Bienvenido a Steve!\n\nTu cuenta está lista. Entra a steve.cl con tu email (${email}) y esta clave temporal:\n\n🔑 ${tempPassword}\n\nCámbiala apenas entres.\n\nPróximo paso: conectar tu Shopify para que empiece la magia 🚀\n\n¿Necesitas ayuda? Solo escríbeme aquí.`;
 
     let waSent = false;

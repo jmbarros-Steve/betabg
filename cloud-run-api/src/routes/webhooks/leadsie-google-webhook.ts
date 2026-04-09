@@ -1,4 +1,5 @@
 import { Context } from 'hono';
+import { timingSafeEqual } from 'crypto';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import type { LeadsiePayload, LeadsieAsset } from './leadsie-types.js';
 
@@ -30,7 +31,14 @@ export async function leadsieGoogleWebhook(c: Context) {
     if (expectedSecret) {
       const providedSecret =
         c.req.header('x-webhook-secret') || c.req.query('secret') || '';
-      if (providedSecret !== expectedSecret) {
+      const maxLen = Math.max(expectedSecret.length, providedSecret.length);
+      const expectedBuf = Buffer.alloc(maxLen);
+      const providedBuf = Buffer.alloc(maxLen);
+      Buffer.from(expectedSecret).copy(expectedBuf);
+      Buffer.from(providedSecret).copy(providedBuf);
+      const isValid = providedSecret.length === expectedSecret.length &&
+        timingSafeEqual(providedBuf, expectedBuf);
+      if (!isValid) {
         console.warn('[leadsie-google-webhook] Rejected: invalid secret');
         return c.json({ error: 'Unauthorized' }, 401);
       }

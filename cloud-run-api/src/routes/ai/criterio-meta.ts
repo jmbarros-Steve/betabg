@@ -2,8 +2,8 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 interface CriterioRule {
   id: string;
@@ -237,6 +237,10 @@ function evaluateMetaRule(
 // --- Main criterioMeta function ---
 
 export async function criterioMeta(campaignData: Record<string, any>, shopId: string, clientId?: string): Promise<CriterioResponse> {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    console.error('[criterio-meta] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured');
+    return { score: 0, total: 0, passed: 0, failed: 0, blockers: 0, can_publish: true, reason: 'SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured', failed_rules: [] };
+  }
   const supabase = getSupabaseAdmin();
 
   // 1. Fetch active META rules

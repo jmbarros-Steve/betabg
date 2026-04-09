@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingle } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Root Cause Analysis — Paso C.2
@@ -12,10 +13,7 @@ import { safeQuerySingle } from '../../lib/safe-supabase.js';
  * Auth: X-Cron-Secret header
  */
 export async function rootCauseAnalysis(c: Context) {
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

@@ -314,12 +314,23 @@ export function SteveChat({ clientId }: SteveChatProps) {
       setUploadedAssets(prev => ({ ...prev, [category]: prev[category].filter(u => u !== url) }));
       toast.success('Archivo eliminado');
     } catch (error) {
-      // Delete error handled silently
+      toast.error('Error al eliminar archivo');
     }
   }
 
   async function initializeConversation() {
     setIsInitializing(true);
+    setMessages([]);
+    setConversationId(null);
+    setIsComplete(false);
+    setProgress({ answered: 0, total: 17 });
+    setExamples([]);
+    setCurrentFields([]);
+    setFieldValidation(undefined);
+    setShowAssetUpload(false);
+    setAcceptedResponses([]);
+    setCurrentQuestionLabel(null);
+    setShowSummary(false);
     try {
       const { data: existingConvs, error: convError } = await supabase
         .from('steve_conversations')

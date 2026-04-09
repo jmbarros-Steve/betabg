@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { convertToCLP, fetchGoogleAccountCurrency } from '../../lib/currency.js';
 import { getGoogleTokenForConnection } from '../../lib/resolve-google-token.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 interface GoogleAdsRow {
   metrics: {
@@ -33,9 +34,7 @@ export async function syncGoogleAdsMetrics(c: Context) {
     }
 
     // Check for cron secret (automated sync)
-    const cronSecret = process.env.CRON_SECRET;
-    const providedCronSecret = c.req.header('X-Cron-Secret');
-    const isCron = !!(cronSecret && providedCronSecret === cronSecret);
+    const isCron = isValidCronSecret(c.req.header('X-Cron-Secret'));
 
     let user: { id: string } | null = null;
 

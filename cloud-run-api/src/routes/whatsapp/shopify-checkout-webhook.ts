@@ -1,35 +1,6 @@
 import { Context } from 'hono';
-import { createHmac, timingSafeEqual } from 'crypto';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
-
-/**
- * Verify Shopify webhook HMAC signature.
- * Returns true if valid, false if invalid.
- * If SHOPIFY_WEBHOOK_SECRET is not set, logs a warning and returns true (graceful degradation).
- */
-function verifyShopifyHmac(rawBody: string, hmacHeader: string | undefined): boolean {
-  const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
-
-  if (!secret) {
-    console.warn('[checkout-webhook] SHOPIFY_WEBHOOK_SECRET not set — skipping HMAC verification (graceful degradation)');
-    return true;
-  }
-
-  if (!hmacHeader) {
-    console.error('[checkout-webhook] Missing X-Shopify-Hmac-Sha256 header');
-    return false;
-  }
-
-  const digest = createHmac('sha256', secret).update(rawBody, 'utf8').digest('base64');
-
-  try {
-    return timingSafeEqual(Buffer.from(digest, 'utf8'), Buffer.from(hmacHeader, 'utf8'));
-  } catch {
-    // timingSafeEqual throws if buffers differ in length
-    return false;
-  }
-}
 
 /**
  * Shopify Checkout Webhook — receives checkouts/create events.
@@ -37,20 +8,13 @@ function verifyShopifyHmac(rawBody: string, hmacHeader: string | undefined): boo
  * The abandoned-cart-wa cron checks if the checkout converted to an order.
  *
  * Route: POST /api/whatsapp/shopify-checkout-webhook
- * Auth: Shopify HMAC (X-Shopify-Hmac-Sha256)
+ * Auth: Shopify HMAC verified by shopifyHmacMiddleware (applied in index.ts)
  */
 export async function shopifyCheckoutWebhook(c: Context) {
   try {
-    // Read raw body for HMAC verification before parsing JSON
-    const rawBody = await c.req.text();
-    const hmacHeader = c.req.header('X-Shopify-Hmac-Sha256');
-
-    if (!verifyShopifyHmac(rawBody, hmacHeader)) {
-      console.error('[checkout-webhook] HMAC verification failed');
-      return c.json({ error: 'Unauthorized: invalid HMAC signature' }, 401);
-    }
-
-    const body = JSON.parse(rawBody);
+    // HMAC verification is handled by shopifyHmacMiddleware (applied in index.ts).
+    // The middleware stores the parsed body via c.set('parsedBody', ...).
+    const body = c.get('parsedBody');
 
     // Shopify sends the shop domain in headers
     const shopDomain = c.req.header('X-Shopify-Shop-Domain') || '';

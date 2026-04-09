@@ -169,7 +169,7 @@ export async function churnDetector(c: Context) {
             const { data: existingTask } = await supabase
               .from('tasks')
               .select('id')
-              .eq('related_id', client.id)
+              .eq('shop_id', client.id)
               .eq('status', 'pending')
               .ilike('title', '%CHURN%')
               .maybeSingle();
@@ -180,8 +180,9 @@ export async function churnDetector(c: Context) {
                 description: `Cliente ${clientName} (${client.email}) no ha entrado a Steve en ${Math.round(daysSinceActive)} días. Riesgo alto de churn. Requiere atención personal.`,
                 priority: 'high',
                 status: 'pending',
-                related_id: client.id,
-                assigned_to: '3d195082-aa83-48c0-b514-a8052264a1e7',
+                type: 'churn_alert',
+                shop_id: client.id,
+                assigned_agent: '3d195082-aa83-48c0-b514-a8052264a1e7',
                 created_at: now.toISOString(),
               });
               if (!taskResult.error) results.tasks_created++;

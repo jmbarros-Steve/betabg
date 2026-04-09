@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Cron endpoint: sync metrics for all active platform connections.
@@ -9,15 +10,39 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
  * (set CRON_SECRET env var on Cloud Run and Cloud Scheduler).
  */
 export async function syncAllMetrics(c: Context) {
-  // Validate cron secret
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
+  const cronSecret = process.env.CRON_SECRET!;
 
   const supabase = getSupabaseAdmin();
+
+  // Mutex: prevent overlapping cron runs using steve_knowledge as lock table
+  const lockKey = 'cron_lock_sync_all_metrics';
+  const { data: lockRow } = await supabase
+    .from('steve_knowledge')
+    .select('id, contenido')
+    .eq('categoria', 'system')
+    .eq('titulo', lockKey)
+    .maybeSingle();
+
+  const now = new Date();
+  if (lockRow) {
+    const lockedAt = new Date(lockRow.contenido || '');
+    const lockAgeMinutes = (now.getTime() - lockedAt.getTime()) / 60000;
+    if (lockAgeMinutes < 10) {
+      console.log(`[cron] sync-all-metrics already running (locked ${Math.round(lockAgeMinutes)}min ago), skipping`);
+      return c.json({ skipped: true, reason: 'Another run in progress' });
+    }
+  }
+
+  // Acquire lock
+  await supabase.from('steve_knowledge').upsert(
+    { categoria: 'system', titulo: lockKey, contenido: now.toISOString(), activo: true, orden: 0 },
+    { onConflict: 'categoria,titulo' },
+  );
+
+  try {
   const results: Array<{ connection_id: string; platform: string; status: string; error?: string }> = [];
 
   // Fetch all active connections, then filter in JS to avoid fragile .or() with RLS
@@ -116,4 +141,12 @@ export async function syncAllMetrics(c: Context) {
     failed,
     results,
   });
+  } finally {
+    // Release mutex lock
+    await supabase
+      .from('steve_knowledge')
+      .delete()
+      .eq('categoria', 'system')
+      .eq('titulo', lockKey);
+  }
 }

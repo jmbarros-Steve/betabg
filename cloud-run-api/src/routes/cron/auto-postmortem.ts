@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingle } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Auto Postmortem — Paso C.3
@@ -11,10 +12,7 @@ import { safeQuerySingle } from '../../lib/safe-supabase.js';
  * Auth: X-Cron-Secret header
  */
 export async function autoPostmortem(c: Context) {
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

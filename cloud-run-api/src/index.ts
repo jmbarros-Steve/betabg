@@ -32,6 +32,36 @@ process.on('exit', (code) => {
   console.log(`[LIFECYCLE] Process exit with code ${code}`);
 });
 
+// Mandatory env vars — fail fast on startup if any are missing
+const REQUIRED_ENV_VARS = [
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_ANON_KEY',
+  'ANTHROPIC_API_KEY',
+  'RESEND_API_KEY',
+  'OPENAI_API_KEY',
+  'GEMINI_API_KEY',
+  'META_APP_ID',
+  'META_APP_SECRET',
+  'META_SYSTEM_TOKEN',
+  'STEVE_BM_ID',
+  'APIFY_TOKEN',
+  'ENCRYPTION_KEY',
+  'CRON_SECRET',
+  'SELF_URL',
+  'UNSUBSCRIBE_SECRET',
+  'TWILIO_ACCOUNT_SID',
+  'TWILIO_AUTH_TOKEN',
+  'TWILIO_PHONE_NUMBER',
+] as const;
+
+const missing = REQUIRED_ENV_VARS.filter((name) => !process.env[name]);
+if (missing.length > 0) {
+  console.error(`[STARTUP] Missing required env vars: ${missing.join(', ')}`);
+  // Log but don't crash — Cloud Run needs the process alive to receive health checks
+  // so operators can see the error in logs and fix it.
+}
+
 const app = new Hono();
 
 // Global middleware

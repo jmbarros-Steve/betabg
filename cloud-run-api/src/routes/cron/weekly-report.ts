@@ -1,7 +1,8 @@
 import { Context } from 'hono';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-import { safeQuery, safeQueryOrDefault } from '../../lib/safe-supabase.js';
+import { safeQuery, safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Weekly Report — Merchant-facing + QA Scorecard
@@ -153,10 +154,7 @@ function generateRecommendedAction(params: {
 // ─── Main handler ───────────────────────────────────────────────────────────
 
 export async function weeklyReport(c: Context) {
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -174,15 +172,34 @@ export async function weeklyReport(c: Context) {
   const clients = await safeQuery<{ id: string; name: string; user_id: string }>(
     supabase
       .from('clients')
-      .select('id, name, user_id')
-      .eq('active', true),
+      .select('id, name, user_id'),
     'weeklyReport.fetchActiveClients',
   );
 
   const merchantResults: Array<{ client_id: string; name: string; email_sent: boolean; error?: string }> = [];
 
+  const reportDate = now.toISOString().split('T')[0];
+
   for (const client of clients) {
     try {
+      // Dedup: skip if report already sent for this client this week
+      const existingReport = await safeQuerySingleOrDefault<{ id: string }>(
+        supabase
+          .from('qa_log')
+          .select('id')
+          .eq('check_type', 'weekly_merchant_report')
+          .eq('details->>client_id', client.id)
+          .eq('details->>report_date', reportDate)
+          .limit(1)
+          .maybeSingle(),
+        null,
+        'weeklyReport.dedupCheck',
+      );
+      if (existingReport) {
+        merchantResults.push({ client_id: client.id, name: client.name, email_sent: false, error: 'already sent today' });
+        continue;
+      }
+
       // Get merchant email
       const { data: userData } = await supabase.auth.admin.getUserById(client.user_id);
       const merchantEmail = userData?.user?.email;
@@ -232,27 +249,46 @@ export async function weeklyReport(c: Context) {
       }
 
       // Shopify revenue this week
-      const shopifyThisWeek = await safeQuery<{ total_sales: number | null }>(
-        supabase
-          .from('shopify_metrics')
-          .select('total_sales')
-          .eq('client_id', client.id)
-          .gte('date', weekAgo.split('T')[0]),
-        'weeklyReport.fetchShopifyThisWeek',
-      );
-
-      const shopifyLastWeek = await safeQuery<{ total_sales: number | null }>(
-        supabase
-          .from('shopify_metrics')
-          .select('total_sales')
-          .eq('client_id', client.id)
-          .gte('date', twoWeeksAgo.split('T')[0])
-          .lt('date', weekAgo.split('T')[0]),
-        'weeklyReport.fetchShopifyLastWeek',
-      );
-
-      const totalSales = shopifyThisWeek.reduce((s: number, r: any) => s + (r.total_sales || 0), 0);
-      const lastWeekSales = shopifyLastWeek.reduce((s: number, r: any) => s + (r.total_sales || 0), 0);
+      // TODO: shopify_metrics table does not exist yet — using platform_metrics as fallback
+      let totalSales = 0;
+      let lastWeekSales = 0;
+      try {
+        const shopifyConnections = await safeQuery<{ id: string }>(
+          supabase
+            .from('platform_connections')
+            .select('id')
+            .eq('client_id', client.id)
+            .eq('platform', 'shopify')
+            .eq('is_active', true),
+          'weeklyReport.fetchShopifyConnections',
+        );
+        const shopifyConnIds = shopifyConnections.map(c => c.id);
+        if (shopifyConnIds.length > 0) {
+          const shopifyThisWeek = await safeQuery<{ metric_value: number | string }>(
+            supabase
+              .from('platform_metrics')
+              .select('metric_value')
+              .in('connection_id', shopifyConnIds)
+              .eq('metric_type', 'revenue')
+              .gte('metric_date', weekAgo.split('T')[0]),
+            'weeklyReport.fetchShopifyThisWeek',
+          );
+          const shopifyLastWeek = await safeQuery<{ metric_value: number | string }>(
+            supabase
+              .from('platform_metrics')
+              .select('metric_value')
+              .in('connection_id', shopifyConnIds)
+              .eq('metric_type', 'revenue')
+              .gte('metric_date', twoWeeksAgo.split('T')[0])
+              .lt('metric_date', weekAgo.split('T')[0]),
+            'weeklyReport.fetchShopifyLastWeek',
+          );
+          totalSales = shopifyThisWeek.reduce((s: number, r: any) => s + (Number(r.metric_value) || 0), 0);
+          lastWeekSales = shopifyLastWeek.reduce((s: number, r: any) => s + (Number(r.metric_value) || 0), 0);
+        }
+      } catch (shopifyErr) {
+        console.error(`[weekly-report] Shopify metrics error for ${client.name}:`, shopifyErr);
+      }
 
       // Top campaign by conversions
       const campaignTotals: Record<string, { spend: number; conversions: number }> = {};
@@ -282,7 +318,7 @@ export async function weeklyReport(c: Context) {
         supabase
           .from('creative_history')
           .select('performance_score')
-          .eq('shop_id', client.id)
+          .eq('client_id', client.id)
           .not('performance_score', 'is', null)
           .gte('measured_at', weekAgo),
         'weeklyReport.fetchCreativeScores',
@@ -493,8 +529,6 @@ export async function weeklyReport(c: Context) {
   };
 
   // ─── Save internal report ─────────────────────
-
-  const reportDate = now.toISOString().split('T')[0];
 
   await supabase.from('qa_log').insert({
     check_type: 'weekly_report',

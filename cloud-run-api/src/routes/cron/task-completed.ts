@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Task Completed Hook — triggers QA smoke when Leonardo marks a task as completed.
@@ -57,13 +58,10 @@ function determineQaScope(task: TaskRecord): string {
 }
 
 export async function taskCompleted(c: Context) {
-  // Validate cron secret
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
+  const cronSecret = process.env.CRON_SECRET!;
 
   const supabase = getSupabaseAdmin();
 

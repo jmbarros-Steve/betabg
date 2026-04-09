@@ -451,7 +451,10 @@ function InterestSearch({
       if (data?.success && Array.isArray(data.results)) {
         setResults(data.results.filter((r: any) => !selectedInterests.find(s => s.id === r.id)));
       }
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error('[InterestSearch] Error:', err);
+      toast.error('Error al buscar intereses');
+    }
     setSearching(false);
   }, [connectionId, selectedInterests]);
 
@@ -605,7 +608,10 @@ function LocationSearch({
       if (data?.success && Array.isArray(data.results)) {
         setResults(data.results.filter((r: any) => !selectedLocations.find(s => s.key === r.key)));
       }
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error('[LocationSearch] Error:', err);
+      toast.error('Error al buscar ubicaciones');
+    }
     setSearching(false);
   }, [connectionId, selectedLocations]);
 

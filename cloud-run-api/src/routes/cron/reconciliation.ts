@@ -4,6 +4,7 @@ import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { decryptPlatformToken } from '../../lib/decrypt-token.js';
 import { metaApiFetch } from '../../lib/meta-fetch.js';
 import { createTask } from '../../lib/task-creator.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 /**
@@ -340,10 +341,7 @@ async function checkStuckTasks(
 // Main handler
 // ────────────────────────────────────────────────────────
 export async function reconciliation(c: Context) {
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

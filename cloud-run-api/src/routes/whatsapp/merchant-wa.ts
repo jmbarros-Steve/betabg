@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { decryptToken } from './setup-merchant.js';
+import { scrubPII } from '../../lib/pii-scrubber.js';
 
 /**
  * Merchant WA Webhook — When a CUSTOMER writes to a merchant's WhatsApp number.
@@ -33,6 +34,21 @@ ESCALAR CUANDO:
 
 Si debes escalar, incluye exactamente [ESCALAR] al inicio de tu respuesta.
 Si puedes responder normalmente, responde directo sin tags.`;
+
+// Bug #137 fix: In-memory rate limiter — 10s cooldown per phone to prevent spam burning credits
+const merchantRateLimit = new Map<string, number>();
+const MERCHANT_RATE_LIMIT_MS = 10_000; // 10 seconds
+
+// Cleanup stale entries every 5 minutes
+let _merchantRateLimitCleanup: NodeJS.Timeout | null = null;
+if (!_merchantRateLimitCleanup) {
+  _merchantRateLimitCleanup = setInterval(() => {
+    const cutoff = Date.now() - 5 * 60 * 1000; // 5 min
+    for (const [phone, time] of merchantRateLimit) {
+      if (time < cutoff) merchantRateLimit.delete(phone);
+    }
+  }, 5 * 60 * 1000); // every 5 min
+}
 
 async function buildMerchantContext(clientId: string): Promise<string> {
   const supabase = getSupabaseAdmin();
@@ -91,10 +107,11 @@ ${productList}`;
 async function getConversationHistory(
   clientId: string,
   contactPhone: string,
-  limit = 8,
+  limit = 50, // Bug #156 fix: increased from 8, but capped at 50 to avoid exceeding Claude context window
 ): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
   const supabase = getSupabaseAdmin();
 
+  // Bug #156 fix: Fetch most recent N messages (descending) then reverse for chronological order
   const messages = await safeQueryOrDefault<any>(
     supabase
       .from('wa_messages')
@@ -102,7 +119,7 @@ async function getConversationHistory(
       .eq('client_id', clientId)
       .eq('channel', 'merchant_wa')
       .eq('contact_phone', contactPhone)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(limit),
     [],
     'merchantWa.getHistory.getMessages',
@@ -110,7 +127,9 @@ async function getConversationHistory(
 
   if (!messages.length) return [];
 
+  // Reverse to chronological order (oldest first) for Claude conversation context
   return messages
+    .reverse()
     .filter((m: any) => m.body)
     .map((m: any) => ({
       role: m.direction === 'inbound' ? 'user' as const : 'assistant' as const,
@@ -174,25 +193,52 @@ export async function merchantWAWebhook(c: Context) {
     const from = String(body['From'] || '');
     const messageBody = String(body['Body'] || '');
     const profileName = String(body['ProfileName'] || '');
-    const messageSid = String(body['MessageSid'] || '');
+    const messageSid = String(body['MessageSid'] || body['SmsMessageSid'] || '');
 
     if (!from || !messageBody) {
       return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
     }
 
+    // Bug #143 fix: Idempotency — Twilio retries can cause double AI response + double charge
+    if (messageSid) {
+      const { data: existingMsg } = await supabase
+        .from('wa_messages')
+        .select('id')
+        .eq('message_sid', messageSid)
+        .eq('client_id', clientId)
+        .maybeSingle();
+      if (existingMsg) {
+        return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
+      }
+    }
+
     const phone = from.replace('whatsapp:', '').replace('+', '').trim();
 
-    // Save inbound message
+    // Bug #137 fix: Rate limit — 10s cooldown per phone
+    const lastTime = merchantRateLimit.get(phone) || 0;
+    if (Date.now() - lastTime < MERCHANT_RATE_LIMIT_MS) {
+      return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
+    }
+    merchantRateLimit.set(phone, Date.now());
+
+    // Bug #136 fix: Scrub PII (credit cards, RUT) before saving and before sending to AI
+    const { scrubbed: scrubbedBody, hadPII } = scrubPII(messageBody);
+    if (hadPII) {
+      console.log(`[merchant-wa] PII detected and scrubbed from ${phone}`);
+    }
+
+    // Save inbound message (with scrubbed body)
     await supabase.from('wa_messages').insert({
       client_id: clientId,
       channel: 'merchant_wa',
       direction: 'inbound',
       from_number: phone,
       to_number: waAccount.phone_number,
-      body: messageBody,
+      body: scrubbedBody,
       message_sid: messageSid,
       contact_name: profileName,
       contact_phone: phone,
+      metadata: messageSid ? { message_sid: messageSid } : undefined,
     });
 
     // Upsert conversation
@@ -209,11 +255,13 @@ export async function merchantWAWebhook(c: Context) {
     );
 
     if (existingConv) {
+      // Bug #142 fix: unread_count increment is not atomic (TOCTOU race).
+      // TODO: Create increment_unread_count RPC for atomic increment. For now, accept the race condition.
       await supabase
         .from('wa_conversations')
         .update({
           last_message_at: new Date().toISOString(),
-          last_message_preview: messageBody.substring(0, 100),
+          last_message_preview: scrubbedBody.substring(0, 100),
           unread_count: (existingConv.unread_count || 0) + 1,
           status: 'open',
         })
@@ -226,7 +274,7 @@ export async function merchantWAWebhook(c: Context) {
         contact_name: profileName,
         status: 'open',
         last_message_at: new Date().toISOString(),
-        last_message_preview: messageBody.substring(0, 100),
+        last_message_preview: scrubbedBody.substring(0, 100),
         unread_count: 1,
         assigned_to: 'steve',
       });
@@ -249,7 +297,7 @@ export async function merchantWAWebhook(c: Context) {
       if (merchant?.phone) {
         await sendWhatsApp(
           `whatsapp:+${merchant.phone}`,
-          `${profileName || phone} te escribio: "${messageBody.slice(0, 80)}"\nResponde en app.steveads.com/portal (tab WhatsApp)`,
+          `${profileName || phone} te escribio: "${scrubbedBody.slice(0, 80)}"\nResponde en app.steveads.com/portal (tab WhatsApp)`,
         ).catch(() => {}); // Don't fail if notification fails
       }
 
@@ -330,15 +378,16 @@ export async function merchantWAWebhook(c: Context) {
         messages.push({ ...msg });
       }
     }
-    if (messages.length === 0 || messages[messages.length - 1].content !== messageBody) {
+    // Bug #136 fix: Use scrubbed body for AI context (PII already stripped)
+    if (messages.length === 0 || messages[messages.length - 1].content !== scrubbedBody) {
       if (messages.length > 0 && messages[messages.length - 1].role === 'user') {
-        messages[messages.length - 1].content += '\n' + messageBody;
+        messages[messages.length - 1].content += '\n' + scrubbedBody;
       } else {
-        messages.push({ role: 'user', content: messageBody });
+        messages.push({ role: 'user', content: scrubbedBody });
       }
     }
     if (messages[0]?.role !== 'user') {
-      messages.unshift({ role: 'user', content: messageBody });
+      messages.unshift({ role: 'user', content: scrubbedBody });
     }
 
     let replyText: string;
@@ -346,14 +395,15 @@ export async function merchantWAWebhook(c: Context) {
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     if (!ANTHROPIC_API_KEY) {
       console.error('[merchant-wa] ANTHROPIC_API_KEY not set');
-      // Refund credit — config error means we can't provide AI service
-      const { error: refundErr } = await supabase.rpc('deduct_wa_credit', {
-        p_client_id: clientId,
-        p_amount: -1,
-        p_description: `Refund: config error para ${profileName || phone}`,
-      });
-      if (refundErr) {
-        console.warn('[merchant-wa] deduct_wa_credit refund failed, using direct update:', refundErr);
+      // Bug #131 fix: Use refund_wa_credit RPC instead of deduct_wa_credit(-1) which corrupts total_used
+      try {
+        await supabase.rpc('refund_wa_credit', {
+          p_client_id: clientId,
+          p_amount: 1,
+          p_reason: 'config_error_refund',
+        });
+      } catch (refundErr) {
+        console.warn('[merchant-wa] refund_wa_credit failed, using direct balance update:', refundErr);
         await supabase
           .from('wa_credits')
           .update({ balance: (deductData.new_balance ?? 0) + 1 })
@@ -364,29 +414,42 @@ export async function merchantWAWebhook(c: Context) {
 
     const systemPrompt = `${MERCHANT_WA_SYSTEM_PROMPT}\n\n${context}`;
 
-    const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 400,
-        system: systemPrompt.slice(0, 6000),
-        messages,
-      }),
-    });
+    try {
+      const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 400,
+          system: systemPrompt.slice(0, 6000),
+          messages,
+        }),
+      });
 
-    if (!aiRes.ok) {
-      console.error('[merchant-wa] Claude API error:', aiRes.status);
+      if (!aiRes.ok) {
+        console.error('[merchant-wa] Claude API error:', aiRes.status);
+        // Bug #138 fix: Refund credit on AI failure — customer gets no AI value
+        try {
+          await supabase.rpc('refund_wa_credit', { p_client_id: clientId, p_amount: 1, p_reason: 'ai_api_error_refund' });
+        } catch (refundErr) { console.error('[merchant-wa] Refund after AI error failed:', refundErr); }
+        replyText = 'Gracias por tu mensaje, te responderemos pronto.';
+      } else {
+        const aiData: any = await aiRes.json();
+        replyText = (aiData.content?.[0]?.text || '')
+          .replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '')
+          .trim() || 'Gracias por tu mensaje, te responderemos pronto.';
+      }
+    } catch (aiError) {
+      // Bug #138 fix: Refund credit on AI exception — customer gets no AI value
+      console.error('[merchant-wa] AI call exception:', aiError);
+      try {
+        await supabase.rpc('refund_wa_credit', { p_client_id: clientId, p_amount: 1, p_reason: 'ai_failure_refund' });
+      } catch (refundErr) { console.error('[merchant-wa] Refund after AI exception failed:', refundErr); }
       replyText = 'Gracias por tu mensaje, te responderemos pronto.';
-    } else {
-      const aiData: any = await aiRes.json();
-      replyText = (aiData.content?.[0]?.text || '')
-        .replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '')
-        .trim() || 'Gracias por tu mensaje, te responderemos pronto.';
     }
 
     // Check if Steve wants to escalate
@@ -416,7 +479,7 @@ export async function merchantWAWebhook(c: Context) {
       if (merchant?.phone) {
         await sendWhatsApp(
           `whatsapp:+${merchant.phone}`,
-          `${merchant.name}, ${profileName || phone} necesita atencion humana:\n"${messageBody.slice(0, 100)}"\nResponde en app.steveads.com/portal`,
+          `${merchant.name}, ${profileName || phone} necesita atencion humana:\n"${scrubbedBody.slice(0, 100)}"\nResponde en app.steveads.com/portal`,
         ).catch(() => {});
       }
 
@@ -426,7 +489,8 @@ export async function merchantWAWebhook(c: Context) {
 
     // Truncate for WA
     if (replyText.length > 1500) replyText = replyText.slice(0, 1497) + '...';
-    replyText = replyText.replace('[ESCALAR]', '').trim();
+    // Bug #141 fix: Use global regex — .replace(string) only replaces first occurrence
+    replyText = replyText.replace(/\[ESCALAR\]/g, '').trim();
 
     // Save outbound
     await supabase.from('wa_messages').insert({

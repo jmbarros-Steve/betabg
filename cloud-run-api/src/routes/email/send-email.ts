@@ -15,8 +15,11 @@ function getResendClient(): Resend {
 
 const API_BASE_URL = () => process.env.API_BASE_URL || 'https://steve-api-850416724643.us-central1.run.app';
 const UNSUBSCRIBE_SECRET = () => {
-  if (!process.env.UNSUBSCRIBE_SECRET) console.warn('[send-email] UNSUBSCRIBE_SECRET not set, using fallback');
-  return process.env.UNSUBSCRIBE_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const secret = process.env.UNSUBSCRIBE_SECRET;
+  if (!secret) {
+    throw new Error('UNSUBSCRIBE_SECRET not configured');
+  }
+  return secret;
 };
 
 // 1x1 transparent GIF

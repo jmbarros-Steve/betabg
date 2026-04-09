@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuery, safeQuerySingle } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Error Budget Calculator — Paso C.1
@@ -35,11 +36,7 @@ const CUJ_QUERIES: Record<string, {
 };
 
 export async function errorBudgetCalculator(c: Context) {
-  // Validate cron secret
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { createTask } from '../../lib/task-creator.js';
 import { sendAlertEmail } from '../../lib/send-alert-email.js';
 import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Performance Evaluator — Paso D.2
@@ -16,10 +17,7 @@ import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
  * Auth: X-Cron-Secret header
  */
 export async function performanceEvaluator(c: Context) {
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

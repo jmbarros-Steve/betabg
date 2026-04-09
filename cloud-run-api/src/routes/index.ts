@@ -524,7 +524,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/whatsapp/campaigns', authMiddleware, waCampaignsCrud); // Portal: CRUD WA campaign drafts
   app.post('/api/whatsapp/send-campaign', authMiddleware, waSendCampaign); // Portal: send bulk WA campaign
   app.post('/api/whatsapp/mark-read', authMiddleware, waMarkRead); // Bug #98: mark conversation read via backend (bypasses RLS)
-  app.post('/api/whatsapp/shopify-checkout-webhook', shopifyCheckoutWebhook); // No JWT — Shopify HMAC
+  app.post('/api/whatsapp/shopify-checkout-webhook', shopifyHmacMiddleware, shopifyCheckoutWebhook); // No JWT — Shopify HMAC verified by middleware
   app.post('/api/task-completed', taskCompleted); // No JWT — uses X-Cron-Secret, called by Leonardo when task is done
 
   // ============================================================

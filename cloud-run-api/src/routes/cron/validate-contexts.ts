@@ -150,9 +150,9 @@ export async function validateContexts(c: Context) {
     const { error: taskErr } = await supabase.from('tasks').insert({
       title: `Context files desactualizados — ${unassigned.length} tablas sin asignar`,
       description: `validate-contexts encontró tablas sin dueño: ${unassigned.join(', ')}. Revisar agents/state/_unassigned.md`,
-      severity: 'medium',
+      type: 'context_validation',
+      priority: 'medium',
       status: 'pending',
-      agent_code: 'system',
     });
 
     if (taskErr) {

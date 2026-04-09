@@ -2,8 +2,8 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 interface EmailData {
   id?: string;
@@ -183,6 +183,10 @@ interface CriterioResult {
 }
 
 async function criterioEmailEvaluate(emailData: EmailData, shopId: string): Promise<CriterioResult> {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    console.error('[criterio-email] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured');
+    return { can_publish: true, score: 0, reason: 'SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured', failed_rules: [] };
+  }
   const supabase = getSupabaseAdmin();
 
   // 1. Fetch active EMAIL rules

@@ -797,7 +797,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         }
       }
     } catch {
-      // Error handled silently
+      toast.error('Error al cargar la jerarquía de Meta Ads');
     } finally {
       setHierarchyLoading(false);
     }

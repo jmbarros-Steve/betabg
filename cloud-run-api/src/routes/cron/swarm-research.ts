@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuery } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * POST /api/cron/swarm-research
@@ -8,9 +9,7 @@ import { safeQuery } from '../../lib/safe-supabase.js';
  * Opus synthesizes cross-domain insights → saves to steve_knowledge as pending.
  */
 export async function swarmResearch(c: Context) {
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

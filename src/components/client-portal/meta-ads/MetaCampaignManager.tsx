@@ -457,8 +457,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       setCampaigns(Array.from(campaignMap.values()));
     } catch (err: any) {
       // Error handled by toast
-      setError(err?.message || 'Error al cargar campañas');
-      toast.error('Error al cargar campañas');
+      toast.error(err?.message || 'Error al cargar campañas');
     } finally {
       setLoading(false);
     }
@@ -612,9 +611,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           : `Campaña "${campaign.campaign_name}" pausada`,
       );
     } catch (err: any) {
-      toast.error(err?.message || "Error en la operación");
-      // Error handled by toast
-      toast.error('Error al cambiar estado de la campaña');
+      toast.error(err?.message || 'Error al cambiar estado de la campaña');
     } finally {
       setActionLoading((prev) => ({ ...prev, [campaign.campaign_id]: false }));
     }
@@ -637,9 +634,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       toast.success(`Campaña duplicada: "${campaign.campaign_name} (Copia)"`);
       await fetchCampaigns();
     } catch (err: any) {
-      toast.error(err?.message || "Error en la operación");
-      // Error handled by toast
-      toast.error('Error al duplicar la campaña');
+      toast.error(err?.message || 'Error al duplicar la campaña');
     } finally {
       setActionLoading((prev) => ({ ...prev, [campaign.campaign_id]: false }));
     }
@@ -667,9 +662,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       );
       toast.success(`Campaña "${campaign.campaign_name}" archivada`);
     } catch (err: any) {
-      toast.error(err?.message || "Error en la operación");
-      // Error handled by toast
-      toast.error('Error al archivar la campaña');
+      toast.error(err?.message || 'Error al archivar la campaña');
     } finally {
       setActionLoading((prev) => ({ ...prev, [campaign.campaign_id]: false }));
     }
@@ -722,9 +715,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       setFormData({ ...EMPTY_FORM });
       await fetchCampaigns();
     } catch (err: any) {
-      toast.error(err?.message || "Error en la operación");
-      // Error handled by toast
-      toast.error('Error al crear la campaña');
+      toast.error(err?.message || 'Error al crear la campaña');
     } finally {
       setFormSubmitting(false);
     }
@@ -763,9 +754,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       setFormData({ ...EMPTY_FORM });
       await fetchCampaigns();
     } catch (err: any) {
-      toast.error(err?.message || "Error en la operación");
-      // Error handled by toast
-      toast.error('Error al actualizar la campaña');
+      toast.error(err?.message || 'Error al actualizar la campaña');
     } finally {
       setFormSubmitting(false);
     }
@@ -810,9 +799,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
       );
       setBudgetDialogOpen(false);
     } catch (err: any) {
-      toast.error(err?.message || "Error en la operación");
-      // Error handled by toast
-      toast.error('Error al ajustar presupuesto');
+      toast.error(err?.message || 'Error al ajustar presupuesto');
     } finally {
       setActionLoading((prev) => ({ ...prev, [campaign.campaign_id]: false }));
     }
@@ -892,6 +879,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
     setBulkActionLoading(true);
     let successCount = 0;
     let errorCount = 0;
+    const succeededIds = new Set<string>();
 
     for (const campaignId of selectedCampaigns) {
       try {
@@ -905,18 +893,21 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
         });
         if (fnErr) throw new Error(fnErr);
         successCount++;
+        succeededIds.add(campaignId);
       } catch {
         errorCount++;
       }
     }
 
-    // Optimistic update
+    // Only update status for campaigns that actually succeeded
     const newStatus: CampaignStatus = action === 'pause' ? 'PAUSED' : action === 'resume' ? 'ACTIVE' : 'ARCHIVED';
-    setCampaigns((prev) =>
-      prev.map((c) =>
-        selectedCampaigns.has(c.campaign_id) ? { ...c, status: newStatus } : c,
-      ),
-    );
+    if (succeededIds.size > 0) {
+      setCampaigns((prev) =>
+        prev.map((c) =>
+          succeededIds.has(c.campaign_id) ? { ...c, status: newStatus } : c,
+        ),
+      );
+    }
 
     setSelectedCampaigns(new Set());
     setBulkActionLoading(false);

@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { snapshotBeforeUpdate } from '../../lib/knowledge-versioner.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 // Fórmula de scoring extraída para reutilizar después de auto-rewrite.
 // 5 criterios × 20 pts = 100 max.
@@ -36,9 +37,7 @@ function computeQualityScore(
 }
 
 export async function knowledgeQualityScore(c: Context) {
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

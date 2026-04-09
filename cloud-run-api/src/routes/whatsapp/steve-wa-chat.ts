@@ -54,6 +54,13 @@ async function downloadImageForVision(
   contentType: string,
 ): Promise<{ base64: string; mediaType: string } | null> {
   try {
+    // Fix #134: SSRF protection — only send Twilio credentials to Twilio domains
+    const mediaHost = new URL(mediaUrl).hostname;
+    if (!mediaHost.endsWith('.twilio.com')) {
+      console.warn('[image-vision] Blocked non-Twilio media URL:', mediaUrl);
+      return null;
+    }
+
     const twilioSid = process.env.TWILIO_ACCOUNT_SID || '';
     const twilioToken = process.env.TWILIO_AUTH_TOKEN || '';
     const authHeader = 'Basic ' + Buffer.from(`${twilioSid}:${twilioToken}`).toString('base64');
@@ -149,35 +156,48 @@ async function quickScrapeUrl(rawUrl: string): Promise<string | null> {
 
     // Fix #31: SSRF protection — block private/internal IPs before fetching
     // Fix #70: DNS rebinding protection — resolve hostname and check resolved IP too
+    let parsed: URL;
     try {
-      const parsed = new URL(url);
-      if (isPrivateOrReservedHost(parsed.hostname)) {
-        console.warn(`[quick-scrape] Blocked SSRF attempt to private/reserved host: ${parsed.hostname}`);
-        return null;
-      }
-      // Resolve DNS and check the actual IP to prevent DNS rebinding attacks
-      try {
-        const { address } = await dns.promises.lookup(parsed.hostname);
-        if (isPrivateOrReservedHost(address)) {
-          console.warn(`[quick-scrape] Blocked DNS rebinding SSRF: ${parsed.hostname} resolves to private IP ${address}`);
-          return null;
-        }
-      } catch (dnsErr: any) {
-        console.warn(`[quick-scrape] DNS resolution failed for ${parsed.hostname}: ${dnsErr.message}`);
-        return null;
-      }
+      parsed = new URL(url);
     } catch {
       console.warn(`[quick-scrape] Invalid URL, skipping: ${url}`);
       return null;
     }
+    if (isPrivateOrReservedHost(parsed.hostname)) {
+      console.warn(`[quick-scrape] Blocked SSRF attempt to private/reserved host: ${parsed.hostname}`);
+      return null;
+    }
+    // Resolve DNS and check the actual IP to prevent DNS rebinding attacks
+    // Fix #153: Use resolved IP directly in fetch to close TOCTOU gap
+    let resolvedAddress: string;
+    try {
+      const { address } = await dns.promises.lookup(parsed.hostname);
+      if (isPrivateOrReservedHost(address)) {
+        console.warn(`[quick-scrape] Blocked DNS rebinding SSRF: ${parsed.hostname} resolves to private IP ${address}`);
+        return null;
+      }
+      resolvedAddress = address;
+    } catch (dnsErr: any) {
+      console.warn(`[quick-scrape] DNS resolution failed for ${parsed.hostname}: ${dnsErr.message}`);
+      return null;
+    }
+
+    // Fix #153: Fetch using resolved IP to prevent DNS rebinding between lookup and fetch
+    const resolvedUrl = new URL(url);
+    const originalHost = resolvedUrl.hostname;
+    resolvedUrl.hostname = resolvedAddress;
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
-    const res = await fetch(url, {
+    const fetchTimeout = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(resolvedUrl.toString(), {
       signal: controller.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SteveBot/1.0)' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SteveBot/1.0)',
+        'Host': originalHost,
+      },
+      redirect: 'manual',
     });
-    clearTimeout(timeout);
+    clearTimeout(fetchTimeout);
     if (!res.ok) return null;
 
     let html = await res.text();
@@ -275,6 +295,11 @@ async function quickScrapeUrl(rawUrl: string): Promise<string | null> {
 }
 
 // Rate limiting: track last response time per phone (in-memory + DB fallback)
+// NOTE (Bug #133): In-memory rate limiter is per-instance. With multiple Cloud Run instances
+// (typically 2-5), rate limiting is best-effort (~50-80% effective). A determined spammer
+// hitting different instances can bypass the limit. For strict rate limiting, migrate to
+// Supabase-based rate limiting (adds ~50ms per request). Current tradeoff: latency > strictness
+// since this is a defense-in-depth measure, not a security boundary.
 const lastResponseTime = new Map<string, number>();
 const RATE_LIMIT_MS = 30_000; // 30 seconds (Fix #5: was 5s, causing duplicate responses on slow typing)
 
@@ -338,6 +363,24 @@ export async function steveWAChat(c: Context) {
     const profileName = String(body['ProfileName'] || '');
     const messageSid = String(body['MessageSid'] || '');
     const numMedia = parseInt(String(body['NumMedia'] || '0'), 10);
+
+    // Fix #144: Idempotency — deduplicate by MessageSid to prevent Twilio retry double-processing
+    if (messageSid) {
+      const { data: existingMsg } = await supabase.from('wa_messages')
+        .select('id').contains('metadata', { message_sid: messageSid }).maybeSingle();
+      if (!existingMsg) {
+        // Also check the message_sid column directly (some messages store it there)
+        const { data: existingBySid } = await supabase.from('wa_messages')
+          .select('id').eq('message_sid', messageSid).maybeSingle();
+        if (existingBySid) {
+          console.log(`[idempotency] Duplicate MessageSid ${messageSid} — skipping`);
+          return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
+        }
+      } else {
+        console.log(`[idempotency] Duplicate MessageSid ${messageSid} — skipping`);
+        return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
+      }
+    }
 
     // Media handling: audio transcription, image vision, or fallback
     let imageData: { base64: string; mediaType: string } | null = null;
@@ -826,15 +869,22 @@ async function handleProspect(
     if (humanEscalationTriggers.some(t => lowerMsgEarly.includes(t))) {
       replyText = 'Sí, soy un asistente de IA del equipo de Steve. Te conecto con José Manuel — te va a escribir pronto por este mismo chat. Si prefieres agendar directo: www.steve.cl/agendar/steve';
       skipMultiBrain = true;
-      // Fire & forget: create escalation task
-      supabase.from('tasks').insert({
-        title: `[ESCALAR] Prospecto ${phone} pidió hablar con humano`,
-        description: `El prospecto solicitó hablar con una persona real. Mensaje: "${messageBody}"`,
-        priority: 'high',
-        status: 'pending',
-        assigned_to: '3d195082-aa83-48c0-b514-a8052264a1e7',
-        created_at: new Date().toISOString(),
-      }).then(() => {}, () => {});
+      // Fix #150: Dedup escalation tasks — check before inserting
+      supabase.from('tasks')
+        .select('id').eq('status', 'pending').ilike('title', `%${phone}%`).maybeSingle()
+        .then(({ data: existingTask }: any) => {
+          if (!existingTask) {
+            return supabase.from('tasks').insert({
+              title: `[ESCALAR] Prospecto ${phone} pidió hablar con humano`,
+              description: `El prospecto solicitó hablar con una persona real. Mensaje: "${messageBody}"`,
+              priority: 'high',
+              status: 'pending',
+              type: 'wa_task',
+              assigned_agent: '3d195082-aa83-48c0-b514-a8052264a1e7',
+              created_at: new Date().toISOString(),
+            });
+          }
+        }).then(() => {}, () => {});
     }
 
     // Cambio 1: Quick intel for first message (Haiku, ~1s)
@@ -919,17 +969,32 @@ async function handleProspect(
     } // end if (!skipMultiBrain)
 
     // Paso 13: Detect frustration (3+ very short messages in a row)
+    // Fix #149: Filter out normal affirmations ("si", "ok", "ya") — messages under 5 chars
+    // should NOT count toward frustration. Only count messages that are 5+ chars but still short (<=15).
     const recentUserMsgs = history.filter(m => m.role === 'user').slice(-3);
-    if (recentUserMsgs.length >= 3 && recentUserMsgs.every(m => m.content.length <= 5)) {
+    const normalAffirmations = new Set(['si', 'sí', 'ok', 'ya', 'no', 'va', 'dale', 'bien']);
+    const frustrationMsgs = recentUserMsgs.filter(m => {
+      const trimmed = m.content.trim().toLowerCase();
+      return trimmed.length >= 5 || !normalAffirmations.has(trimmed);
+    });
+    if (frustrationMsgs.length >= 3 && frustrationMsgs.every(m => m.content.length <= 15)) {
       // Possible frustration — escalate
-      supabase.from('tasks').insert({
-        title: `[ESCALAR] Prospecto ${phone} posible frustración (mensajes cortos)`,
-        description: `3+ mensajes consecutivos de 1-5 caracteres. Puede estar frustrado.`,
-        priority: 'medium',
-        status: 'pending',
-        assigned_to: '3d195082-aa83-48c0-b514-a8052264a1e7',
-        created_at: new Date().toISOString(),
-      }).then(() => {}, () => {});
+      // Fix #150: Dedup escalation tasks — check before inserting
+      supabase.from('tasks')
+        .select('id').eq('status', 'pending').ilike('title', `%${phone}%`).maybeSingle()
+        .then(({ data: existingTask }: any) => {
+          if (!existingTask) {
+            return supabase.from('tasks').insert({
+              title: `[ESCALAR] Prospecto ${phone} posible frustración (mensajes cortos)`,
+              description: `3+ mensajes consecutivos de 1-5 caracteres. Puede estar frustrado.`,
+              priority: 'medium',
+              status: 'pending',
+              type: 'wa_task',
+              assigned_agent: '3d195082-aa83-48c0-b514-a8052264a1e7',
+              created_at: new Date().toISOString(),
+            });
+          }
+        }).then(() => {}, () => {});
     }
 
     // R7-#11: no enviar link si el mensaje contiene negación de disponibilidad
@@ -1172,8 +1237,20 @@ Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 
     // Paso 17: Detect URL in prospect message (reuse earlier detection)
     const urlMatch = detectedUrl ? [detectedUrl] : null;
 
-    processProspectAsync(prospect, fullHistory, meetingLinkSent, disqResult.disqualified ? disqResult.reason : undefined, urlMatch?.[0], meetingProposed, true /* isInbound */).catch(err => {
-      console.error('[steve-wa-chat] processProspectAsync error:', err);
+    // Fix #147: Wrap fire-and-forget with recovery — if Cloud Run kills the instance
+    // after TwiML response, the recovery row ensures wa-action-processor can retry.
+    processProspectAsync(prospect, fullHistory, meetingLinkSent, disqResult.disqualified ? disqResult.reason : undefined, urlMatch?.[0], meetingProposed, true /* isInbound */).catch(async (err) => {
+      console.error('[steve-wa-chat] processProspectAsync failed, enqueueing recovery:', err);
+      try {
+        await supabase.from('wa_pending_actions').insert({
+          action_type: 'process_prospect_recovery',
+          payload: { prospect_id: prospect.id, phone: prospect.phone, error: String(err) },
+          status: 'pending',
+          client_id: (prospect as any).client_id || null,
+        });
+      } catch (e) {
+        console.error('[steve-wa-chat] Recovery insert also failed:', e);
+      }
     });
 
     return c.text(twiml, 200, { 'Content-Type': 'text/xml' });
@@ -1497,16 +1574,24 @@ async function processProspectAsync(
     const msgCount = prospect.message_count || 0;
     if (msgCount > 20 && effectiveStage === 'discovery') {
       // Prospect has 20+ messages and still in discovery → escalate
+      // Fix #150: Dedup escalation tasks — check before inserting
       try {
-        await supabase.from('tasks').insert({
-          title: `[ESCALAR] Prospecto ${prospect.phone} estancado en discovery (${msgCount} msgs)`,
-          description: `El prospecto lleva ${msgCount} mensajes y sigue en discovery con score ${score}. Requiere intervención humana.`,
-          priority: 'high',
-          status: 'pending',
-          assigned_to: '3d195082-aa83-48c0-b514-a8052264a1e7', // JM user_id
-          created_at: new Date().toISOString(),
-        });
-        console.log(`[prospect ${prospect.phone}] ESCALATED: stuck in discovery after ${msgCount} msgs`);
+        const { data: existingTask } = await supabase.from('tasks')
+          .select('id').eq('status', 'pending').ilike('title', `%${prospect.phone}%`).maybeSingle();
+        if (!existingTask) {
+          await supabase.from('tasks').insert({
+            title: `[ESCALAR] Prospecto ${prospect.phone} estancado en discovery (${msgCount} msgs)`,
+            description: `El prospecto lleva ${msgCount} mensajes y sigue en discovery con score ${score}. Requiere intervenci��n humana.`,
+            priority: 'high',
+            status: 'pending',
+            type: 'wa_task',
+            assigned_agent: '3d195082-aa83-48c0-b514-a8052264a1e7', // JM user_id
+            created_at: new Date().toISOString(),
+          });
+          console.log(`[prospect ${prospect.phone}] ESCALATED: stuck in discovery after ${msgCount} msgs`);
+        } else {
+          console.log(`[prospect ${prospect.phone}] Escalation task already exists — skipping duplicate`);
+        }
       } catch {} // Don't fail if tasks table doesn't exist
     }
 

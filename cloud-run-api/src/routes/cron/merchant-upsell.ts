@@ -111,14 +111,14 @@ export async function merchantUpsell(c: Context) {
         if (!opportunity) continue;
 
         // Check if we already suggested this type recently (avoid spam)
-        // Bug #95: Exclude 'draft' records from dedup — drafts are cleaned up on failure
+        // Bug #95: Exclude 'suggested' records from dedup — they are cleaned up on failure
         const recentUpsell = await safeQuery<{ id: string }>(
           supabase
             .from('merchant_upsell_opportunities')
             .select('id')
             .eq('client_id', client.id)
             .eq('type', opportunity.type)
-            .neq('outcome', 'draft')
+            .neq('outcome', 'suggested')
             .gte('created_at', new Date(now.getTime() - 30 * 86400000).toISOString())
             .limit(1),
           'merchantUpsell.fetchRecentUpsell',
@@ -126,14 +126,14 @@ export async function merchantUpsell(c: Context) {
 
         if (recentUpsell.length > 0) continue;
 
-        // Bug #95 fix: Insert opportunity as 'draft' before WA send. If send fails,
-        // delete the draft so the dedup check allows retry on the next run.
+        // Bug #95 fix: Insert opportunity as 'suggested' before WA send. If send fails,
+        // delete it so the dedup check allows retry on the next run.
         const { data: insertedOpp } = await supabase.from('merchant_upsell_opportunities').insert({
           client_id: client.id,
           type: opportunity.type,
           reason: opportunity.reason,
           metric_data: opportunity.metric_data,
-          outcome: 'draft',
+          outcome: 'suggested',
         }).select('id').single();
 
         // Generate and send WA message
@@ -155,7 +155,7 @@ export async function merchantUpsell(c: Context) {
         });
 
         if (!aiRes.ok) {
-          // Delete draft so dedup allows retry
+          // Delete suggested record so dedup allows retry
           if (insertedOpp?.id) {
             await supabase.from('merchant_upsell_opportunities').delete().eq('id', insertedOpp.id);
           }
@@ -166,7 +166,7 @@ export async function merchantUpsell(c: Context) {
         const aiData: any = await aiRes.json();
         let msg = (aiData.content?.[0]?.text || '').trim();
         if (!msg) {
-          // Delete draft so dedup allows retry
+          // Delete suggested record so dedup allows retry
           if (insertedOpp?.id) {
             await supabase.from('merchant_upsell_opportunities').delete().eq('id', insertedOpp.id);
           }
@@ -177,14 +177,14 @@ export async function merchantUpsell(c: Context) {
         try {
           await sendWhatsApp(`+${phone}`, msg);
         } catch (sendErr) {
-          // WA send failed — delete draft so dedup allows retry
+          // WA send failed — delete suggested record so dedup allows retry
           if (insertedOpp?.id) {
             await supabase.from('merchant_upsell_opportunities').delete().eq('id', insertedOpp.id);
           }
           throw sendErr;
         }
 
-        // Send succeeded — promote draft to pending and mark as sent
+        // Send succeeded — promote to pending and mark as sent
         results.opportunities_found++;
         await supabase
           .from('merchant_upsell_opportunities')

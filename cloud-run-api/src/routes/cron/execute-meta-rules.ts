@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { metaApiFetch } from '../../lib/meta-fetch.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { safeQuery } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Cron: Execute all active Meta automated rules across all clients.
@@ -10,15 +11,37 @@ import { safeQuery } from '../../lib/safe-supabase.js';
  * POST /api/cron/execute-meta-rules
  */
 export async function executeMetaRulesCron(c: Context) {
-  // Validate cron secret
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
   const startTime = Date.now();
   const supabase = getSupabaseAdmin();
+
+  // Mutex: prevent overlapping cron runs using steve_knowledge as lock table
+  const lockKey = 'cron_lock_execute_meta_rules';
+  const { data: lockRow } = await supabase
+    .from('steve_knowledge')
+    .select('id, contenido')
+    .eq('categoria', 'system')
+    .eq('titulo', lockKey)
+    .maybeSingle();
+
+  const lockNow = new Date();
+  if (lockRow) {
+    const lockedAt = new Date(lockRow.contenido || '');
+    const lockAgeMinutes = (lockNow.getTime() - lockedAt.getTime()) / 60000;
+    if (lockAgeMinutes < 10) {
+      console.log(`[execute-meta-rules] Already running (locked ${Math.round(lockAgeMinutes)}min ago), skipping`);
+      return c.json({ skipped: true, reason: 'Another run in progress' });
+    }
+  }
+
+  // Acquire lock
+  await supabase.from('steve_knowledge').upsert(
+    { categoria: 'system', titulo: lockKey, contenido: lockNow.toISOString(), activo: true, orden: 0 },
+    { onConflict: 'categoria,titulo' },
+  );
 
   try {
     // Fetch all active rules with left join on platform_connections (no !inner)
@@ -62,6 +85,7 @@ export async function executeMetaRulesCron(c: Context) {
       // Resolve token (supports both encrypted and system tokens)
       const decryptedToken = await getTokenForConnection(supabase, conn);
       if (!decryptedToken) {
+        console.warn(`[execute-meta-rules] Connection ${connectionId}: token resolution failed`);
         errors.push(`Connection ${connectionId}: token resolution failed`);
         continue;
       }
@@ -157,9 +181,11 @@ export async function executeMetaRulesCron(c: Context) {
                   execDetails = `Budget ${actionType === 'INCREASE_BUDGET' ? 'increased' : 'decreased'} by ${pct}%`;
                 }
               } else {
+                console.warn(`[execute-meta-rules] Unknown action type: ${actionType}`);
                 execDetails = `Unknown action: ${actionType}`;
               }
             } catch (execErr: any) {
+              console.error(`[execute-meta-rules] Action execution error for campaign ${campaignId}:`, execErr.message);
               execDetails = `Execution error: ${execErr.message}`;
             }
 
@@ -207,6 +233,13 @@ export async function executeMetaRulesCron(c: Context) {
   } catch (err: any) {
     console.error('[execute-meta-rules] Fatal error:', err);
     return c.json({ error: err.message }, 500);
+  } finally {
+    // Release mutex lock
+    await supabase
+      .from('steve_knowledge')
+      .delete()
+      .eq('categoria', 'system')
+      .eq('titulo', lockKey);
   }
 }
 

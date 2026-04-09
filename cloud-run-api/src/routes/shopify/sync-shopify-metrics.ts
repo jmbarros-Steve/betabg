@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin, getSupabaseWithUserToken } from '../../lib/supabase.js';
 import { convertToCLP } from '../../lib/currency.js';
 import { validateShopifySessionToken } from '../../lib/shopify-session.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 interface ShopifyOrder {
   id: number;
@@ -17,9 +18,7 @@ export async function syncShopifyMetrics(c: Context) {
     const supabaseService = getSupabaseAdmin();
 
     // Check for cron secret (automated sync)
-    const cronSecret = process.env.CRON_SECRET;
-    const providedCronSecret = c.req.header('X-Cron-Secret');
-    const isCron = !!(cronSecret && providedCronSecret === cronSecret);
+    const isCron = isValidCronSecret(c.req.header('X-Cron-Secret'));
 
     // Check for Shopify Session Token first (embedded app)
     const shopifySessionToken = c.req.header('X-Shopify-Session-Token');

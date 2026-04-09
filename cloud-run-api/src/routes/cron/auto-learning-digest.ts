@@ -1,15 +1,14 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * POST /api/cron/auto-learning-digest
  * Daily 9am Chile (12 UTC): sends WA to JM with pending insights summary + approval link.
  */
 export async function autoLearningDigest(c: Context) {
-  const cronSecret = process.env.CRON_SECRET;
-  const providedSecret = c.req.header('X-Cron-Secret');
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

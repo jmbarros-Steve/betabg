@@ -137,6 +137,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
 
   // Delete confirmation
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadCampaigns = useCallback(async () => {
     setLoading(true);
@@ -379,6 +380,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   };
 
   const confirmSend = async () => {
+    if (sending) return;
     // CRITERIO pre-flight check
     setCriterioLoading(true);
     setCriterioResult(null);
@@ -423,17 +425,24 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     // CRITERIO passed — proceed with send/schedule
     if (sendMode === 'schedule') {
       if (!scheduleDate) { toast.error('Selecciona una fecha'); return; }
-      const savedId = await handleSaveCampaign();
-      const campaignId = savedId || editingCampaign?.id;
-      if (!campaignId) { toast.error('Guarda la campaña primero'); return; }
-      const { error } = await callApi('manage-email-campaigns', {
-        body: { action: 'schedule', client_id: clientId, campaign_id: campaignId, scheduled_at: scheduleDate },
-      });
-      if (error) { toast.error(error); return; }
-      toast.success('Campaña programada');
-      setShowSendDialog(false);
-      setShowEditor(false);
-      loadCampaigns();
+      setSending(true);
+      try {
+        const savedId = await handleSaveCampaign();
+        const campaignId = savedId || editingCampaign?.id;
+        if (!campaignId) { toast.error('Guarda la campaña primero'); return; }
+        const { error } = await callApi('manage-email-campaigns', {
+          body: { action: 'schedule', client_id: clientId, campaign_id: campaignId, scheduled_at: scheduleDate },
+        });
+        if (error) { toast.error(error); return; }
+        toast.success('Campaña programada');
+        setShowSendDialog(false);
+        setShowEditor(false);
+        loadCampaigns();
+      } catch (err: any) {
+        toast.error(err?.message || 'Error al programar campaña');
+      } finally {
+        setSending(false);
+      }
       return;
     }
 
@@ -462,6 +471,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       toast.success(msg);
       setShowEditor(false);
       loadCampaigns();
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al enviar campaña');
     } finally {
       setSending(false);
     }
@@ -498,13 +509,21 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   };
 
   const handleDelete = async (campaignId: string) => {
-    const { error } = await callApi('manage-email-campaigns', {
-      body: { action: 'delete', client_id: clientId, campaign_id: campaignId },
-    });
-    if (error) { toast.error(error); return; }
-    toast.success('Campaña eliminada');
-    setDeleteConfirmId(null);
-    loadCampaigns();
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      const { error } = await callApi('manage-email-campaigns', {
+        body: { action: 'delete', client_id: clientId, campaign_id: campaignId },
+      });
+      if (error) { toast.error(error); return; }
+      toast.success('Campaña eliminada');
+      setDeleteConfirmId(null);
+      loadCampaigns();
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al eliminar campaña');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const openEditor = (campaign?: Campaign) => {
@@ -1766,9 +1785,10 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
               onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
             >
-              Eliminar
+              {deleting ? 'Eliminando...' : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

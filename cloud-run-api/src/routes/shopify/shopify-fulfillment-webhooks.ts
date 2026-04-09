@@ -91,17 +91,30 @@ async function handleOrderFulfilled(
     );
 
     if (conn) {
-      await supabase.from('platform_metrics').upsert(
-        {
+      // Try to increment existing row; if none exists, insert with value 1
+      const { data: existing } = await supabase
+        .from('platform_metrics')
+        .select('id, metric_value')
+        .eq('connection_id', conn.id)
+        .eq('metric_type', 'fulfilled_orders')
+        .eq('metric_date', today)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from('platform_metrics')
+          .update({ metric_value: (Number(existing.metric_value) || 0) + 1 })
+          .eq('id', existing.id);
+      } else {
+        await supabase.from('platform_metrics').insert({
           connection_id: conn.id,
           shop_domain: shopDomain,
           metric_type: 'fulfilled_orders',
           metric_date: today,
-          metric_value: 1,          // will be summed in queries
+          metric_value: 1,
           currency: payload.currency,
-        },
-        { onConflict: 'connection_id,metric_type,metric_date' },
-      );
+        });
+      }
     }
   } catch (err) {
     console.error(`[${webhookId}] Metrics upsert error:`, err);
