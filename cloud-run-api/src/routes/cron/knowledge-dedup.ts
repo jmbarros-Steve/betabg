@@ -27,6 +27,7 @@ export async function knowledgeDedup(c: Context) {
       .from('steve_knowledge')
       .select('id, categoria, titulo, contenido, orden')
       .eq('activo', true)
+      .is('purged_at', null)
       .order('orden', { ascending: false })
       .order('id', { ascending: true })
       .range(offset, offset + BATCH_SIZE - 1);

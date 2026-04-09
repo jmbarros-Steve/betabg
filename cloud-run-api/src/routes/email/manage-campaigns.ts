@@ -1,6 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { safeQuerySingleOrDefault, safeMutateSingle } from '../../lib/safe-supabase.js';
 import { sendSingleEmail } from './send-email.js';
 import { renderEmailTemplate, buildTemplateContext } from '../../lib/template-engine.js';
 import { processEmailHtml } from '../../lib/email-html-processor.js';
@@ -253,19 +253,22 @@ export async function manageEmailCampaigns(c: Context) {
       const abConfig = body.ab_test;
       if (abConfig && abConfig.variant_b_subject) {
         // Create A/B test record from frontend config
-        const { data: newTest } = await supabase
-          .from('email_ab_tests')
-          .upsert({
-            client_id,
-            campaign_id,
-            variant_b_subject: abConfig.variant_b_subject,
-            test_percentage: abConfig.test_percentage || 20,
-            winning_metric: abConfig.winning_metric || 'open_rate',
-            test_duration_hours: abConfig.test_duration_hours || 4,
-            status: 'pending',
-          }, { onConflict: 'campaign_id' })
-          .select()
-          .single();
+        const newTest = await safeMutateSingle<any>(
+          supabase
+            .from('email_ab_tests')
+            .upsert({
+              client_id,
+              campaign_id,
+              variant_b_subject: abConfig.variant_b_subject,
+              test_percentage: abConfig.test_percentage || 20,
+              winning_metric: abConfig.winning_metric || 'open_rate',
+              test_duration_hours: abConfig.test_duration_hours || 4,
+              status: 'pending',
+            }, { onConflict: 'campaign_id' })
+            .select()
+            .single(),
+          'manageCampaigns.upsertAbTest',
+        );
         abTest = newTest;
       } else {
         // Check for existing A/B test

@@ -22,6 +22,7 @@ export async function knowledgePropagationCatchup(c: Context) {
       .eq('approval_status', 'approved')
       .eq('activo', true)
       .is('propagated_at', null)
+      .is('purged_at', null)
       .limit(50);
 
     if (error) {

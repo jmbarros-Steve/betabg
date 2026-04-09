@@ -28,7 +28,8 @@ export async function propagateKnowledge(insightIds: string[]): Promise<void> {
     .select('id, titulo, contenido, categoria')
     .in('id', insightIds)
     .eq('approval_status', 'approved')
-    .is('propagated_at', null);
+    .is('propagated_at', null)
+    .is('purged_at', null);
 
   if (fetchErr || !insights || insights.length === 0) {
     console.log('[propagator] No unpropagated approved insights found');

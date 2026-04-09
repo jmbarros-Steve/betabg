@@ -360,8 +360,11 @@ export async function weeklyReport(c: Context) {
     'weeklyReport.fetchLastWeekErrors',
   );
 
-  const thisWeekCount = thisWeekErrors.length;
-  const lastWeekCount = lastWeekErrors.length;
+  // Solo contar fails reales para el QA score — warns y auto_fixed no son errores
+  const thisWeekFails = thisWeekErrors.filter((e: any) => e.status === 'fail' || e.status === 'error');
+  const lastWeekFails = lastWeekErrors.filter((e: any) => e.status === 'fail' || e.status === 'error');
+  const thisWeekCount = thisWeekFails.length;
+  const lastWeekCount = lastWeekFails.length;
   const errorTrend = thisWeekCount < lastWeekCount ? 'bajando' : thisWeekCount > lastWeekCount ? 'subiendo' : 'estable';
 
   const autoFixed = thisWeekErrors.filter((e: any) => e.status === 'auto_fixed').length;

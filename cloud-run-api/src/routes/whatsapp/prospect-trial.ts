@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
+import { safeMutateSingle } from '../../lib/safe-supabase.js';
 
 /**
  * Activate trial for a prospect — creates Supabase Auth user, client record,
@@ -52,15 +53,18 @@ export async function prospectTrial(c: Context) {
     );
 
     // 3. Create client record with Visual plan (trial)
-    const { data: newClient } = await supabase.from('clients').insert({
-      user_id: userId,
-      client_user_id: userId,
-      name: name || email.split('@')[0],
-      email,
-      whatsapp_phone: phone,
-      plan: 'visual',
-      onboarding_wa_started: true,
-    }).select('id').single();
+    const newClient = await safeMutateSingle<any>(
+      supabase.from('clients').insert({
+        user_id: userId,
+        client_user_id: userId,
+        name: name || email.split('@')[0],
+        email,
+        whatsapp_phone: phone,
+        plan: 'visual',
+        onboarding_wa_started: true,
+      }).select('id').single(),
+      'prospectTrial.createClient',
+    );
 
     if (!newClient) {
       throw new Error('Failed to create client record');

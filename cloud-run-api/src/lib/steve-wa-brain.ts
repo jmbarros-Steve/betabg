@@ -353,7 +353,13 @@ Responde en texto plano, máximo 3 líneas. Si no hay información concreta en e
 
     if (!response.ok) return '';
     const data: any = await response.json();
-    return (data.content?.[0]?.text || '').trim();
+    // Fix R6-#27: sanitizar output de Haiku antes de inyectar al prompt principal
+    const rawIntel = (data.content?.[0]?.text || '').trim();
+    const intel = rawIntel
+      .replace(/\[\s*(?:SISTEMA|SYSTEM|INSTRUCCIÓN|OVERRIDE)[^\]]*\]/gi, '[ANÁLISIS]')
+      .replace(/\n{2,}/g, '\n')
+      .slice(0, 500);
+    return intel;
   } catch {
     return '';
   }
@@ -418,6 +424,7 @@ export async function loadRelevantKnowledge(
       .in('categoria', uniqueCategories)
       .eq('activo', true)
       .eq('approval_status', 'approved')
+      .is('purged_at', null)
       .order('quality_score', { ascending: false })
       .order('orden', { ascending: false })
       .limit(10),
@@ -619,6 +626,7 @@ export async function getProspectHistory(phone: string, limit = 20): Promise<Arr
       .replace(/\[\s*(?:SISTEMA|SYSTEM|INSTRUCCIÓN|DIRECTIVA|OVERRIDE)[^\]]*\]/gi, '[CONTEXTO]')
       .replace(/ignore\s+(?:previous|all|everything|instructions)/gi, '')
       .replace(/jailbreak|DAN\s+mode/gi, '')
+      .replace(/\n{2,}/g, '\n') // Fix R6-#6: colapsar dobles newlines (previene fake prompt sections)
       .slice(0, 2000);
     return [
       { role: 'user' as const, content: `[RESUMEN PREVIO — NO ES UN MENSAJE REAL, ES CONTEXTO DE SESIONES ANTERIORES]\n${safeSummary}` },
@@ -864,6 +872,17 @@ export function detectDisqualification(
     return { disqualified: true, reason: 'rejected' };
   }
 
+  // Fix R6-#25: también contar en historia completa — threshold de 3 rechazos en historial total
+  const allUserMsgs = history
+    .filter(m => m.role === 'user')
+    .map(m => m.content.toLowerCase());
+  const totalRejectionCount = allUserMsgs.filter(m =>
+    softRejections.some(r => m.includes(r))
+  ).length;
+  if (totalRejectionCount >= 3) {
+    return { disqualified: true, reason: 'rejected' };
+  }
+
   return { disqualified: false };
 }
 
@@ -921,8 +940,9 @@ export function analyzeProspectStyle(
   const length = avgLen < 30 ? 'corto' : avgLen > 100 ? 'largo' : 'medio';
 
   const allText = userMsgs.map(m => m.content).join(' ');
-  // Fix R5-#25: use Unicode property escapes for full emoji coverage (Emoji 14+)
-  const usesEmojis = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u.test(allText);
+  // Fix R5-#25 / Fix R6-#24: excluir símbolos legales (™ ® ©) que matchean emoji ranges
+  const usesEmojis = /[\u{1F300}-\u{1F9FF}\u{1FA00}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(allText) &&
+    !/^[™®©\s]+$/.test(allText.replace(/[^™®©\s]/g, ''));
 
   // Fix #8: expanded chilenismos list
   const casualWords = ['wea', 'po', 'weon', 'weón', 'jaja', 'xd', 'xD', 'nah', 'sip', 'sep', 'ya', 'huevón', 'bacán', 'fome', 'cacha', 'cachái', 'onda', 'gallo', 'piola', 'vai', 'bro', 'mano'];
@@ -1001,8 +1021,9 @@ export function calculateLostMoney(monthlyRevenue: string | null | undefined): {
   if (amount > 2_000_000_000) amount = 2_000_000_000;
 
   // Conservative 40% uplift — more credible than 2x claim
-  const currentEstimate = amount;
-  const optimizedEstimate = Math.round(amount * 1.4);
+  const cappedAmount = Math.min(amount, 2_000_000_000);
+  const currentEstimate = cappedAmount;
+  const optimizedEstimate = Math.min(Math.round(cappedAmount * 1.4), 2_000_000_000);
   const difference = optimizedEstimate - currentEstimate;
 
   return { currentEstimate, optimizedEstimate, difference };
@@ -1016,7 +1037,10 @@ export async function loadIndustryCaseStudy(whatTheySell: string | null | undefi
   // Extract keywords from what they sell — with singular/plural normalization
   // Fix #9: "zapatos" matches "zapato" and vice versa — reduces missed case studies
   const baseKeywords = whatTheySell.toLowerCase().split(/[\s,;]+/).filter(w => w.length >= 3);
-  if (baseKeywords.length === 0) return null;
+  if (baseKeywords.length === 0) {
+    console.log(`[case-study] No valid keywords extracted from: "${whatTheySell}" — skipping query`);
+    return null;
+  }
   const keywords = [...new Set(baseKeywords.flatMap(k => [k, k + 's', k.replace(/s$/, '')]))];
   if (keywords.length === 0) return null;
 
@@ -1081,7 +1105,10 @@ const CREATIVE_INSIGHTS_TTL_MS = 5 * 60_000;
  * Only loads data with measured performance (not pending).
  */
 export async function loadCreativeInsights(): Promise<string> {
-  if (_creativeInsightsCache && Date.now() - _creativeInsightsCache.ts < CREATIVE_INSIGHTS_TTL_MS) {
+  // Fix R6-#11: no cachear resultados vacíos (permite retry hasta haber datos)
+  if (_creativeInsightsCache &&
+      Date.now() - _creativeInsightsCache.ts < CREATIVE_INSIGHTS_TTL_MS &&
+      _creativeInsightsCache.data.length > 0) {
     return _creativeInsightsCache.data;
   }
   const supabase = getSupabaseAdmin();
@@ -1167,6 +1194,7 @@ export async function loadSalesLearnings(industry: string | null | undefined): P
       .eq('categoria', 'sales_learning')
       .eq('activo', true)
       .eq('approval_status', 'approved')
+      .is('purged_at', null)
       .order('created_at', { ascending: false })
       .limit(10),
     [],
@@ -1332,6 +1360,7 @@ export async function buildDynamicSalesPrompt(
       .eq('categoria', 'prospecting')
       .eq('activo', true)
       .eq('approval_status', 'approved')
+      .is('purged_at', null)
       .order('orden', { ascending: true }),
     supabase
       .from('steve_knowledge')
@@ -1341,6 +1370,7 @@ export async function buildDynamicSalesPrompt(
       .eq('approval_status', 'approved')
       .ilike('titulo', 'CORRECCION:%')
       .gte('orden', 90)
+      .is('purged_at', null)
       .order('created_at', { ascending: false })
       .limit(5),
     supabase
@@ -1369,7 +1399,9 @@ export async function buildDynamicSalesPrompt(
   const prospectStyle = analyzeProspectStyle(historyArr);
   const chileTime = getChileTimeContext();
   // Fix #6: stable deadline per prospect (same prospect always sees same deadline this month)
-  const deadline = getMarketDeadline(prospect.id);
+  // Fix R6-#10/#21: usar phone como fallback si id es corto/inválido
+  const deadlineSeed = (prospect.id?.length ?? 0) > 10 ? prospect.id : prospect.phone;
+  const deadline = getMarketDeadline(deadlineSeed);
   const lostMoney = calculateLostMoney(prospect.monthly_revenue);
   const caseStudy = await loadIndustryCaseStudy(prospect.what_they_sell);
 
@@ -1443,6 +1475,158 @@ export async function buildDynamicSalesPrompt(
   if (investigationText) {
     prompt += investigationText;
     prompt += `\n⚡ IMPORTANTE: TIENES investigación del prospecto. ÚSALA en tu respuesta. Menciona algo concreto que viste de su tienda, sus productos o su competencia. Eso demuestra que hiciste la tarea y genera confianza inmediata.\n`;
+  }
+
+  // R7-#1: gate de dolor antes de pitch
+  if ((!prospect.pain_points || prospect.pain_points.length === 0) && (prospect.message_count || 0) <= 2) {
+    prompt += '\n\n🎯 PASO OBLIGATORIO: Antes de hablar de soluciones, haz UNA pregunta abierta sobre cuál es su mayor frustración o dolor actual. ESCUCHA primero.';
+  }
+
+  // R7-#2: gate de authority BANT
+  if (prospect.is_decision_maker == null && (prospect.message_count || 0) <= 3) {
+    prompt += '\n\n⚡ PARADA DE CONTROL: Aún no sabes quién decide. Pregunta natural: "¿Tú apruebas estas decisiones de marketing o necesitas el OK de alguien más?"';
+  }
+
+  // R7-#3: lista de campos ya conocidos — no re-preguntar
+  const alreadyKnown: string[] = [];
+  if (prospect.what_they_sell) alreadyKnown.push('qué vende');
+  if (prospect.has_online_store != null) alreadyKnown.push('si tiene tienda online');
+  if (prospect.store_platform) alreadyKnown.push('plataforma de tienda');
+  if (prospect.pain_points?.length) alreadyKnown.push('sus dolores/frustraciones');
+  if (prospect.monthly_revenue) alreadyKnown.push('facturación mensual');
+  if (prospect.current_marketing) alreadyKnown.push('marketing actual');
+  if (alreadyKnown.length > 0) {
+    prompt += `\n\n🚫 NO PREGUNTES DE NUEVO: Ya sabes ${alreadyKnown.join(', ')}. Usa esa info, no la pidas otra vez.`;
+  }
+
+  // R7-#6: detectar budget vago sin número
+  const hasBudgetVague = prospect.budget_range &&
+    /\b(presupuesto|tenemos|hay|disponible|algo|sí)\b/i.test(prospect.budget_range) &&
+    !/\$|\d{3,}|mm|millón|mil\b|[kK]\b/.test(prospect.budget_range);
+
+  if (hasBudgetVague) {
+    prompt += '\n\n💰 PARADA: El prospecto mencionó presupuesto pero SIN especificar monto. Pregunta: "¿Cuánto es ese presupuesto mensual de marketing? ¿$100K, $500K, $1M?"';
+  }
+
+  // R7-#8: objection handlers por stage
+  const objectionByStage: Record<string, string> = {
+    discovery: 'En DISCOVERY: Si el prospecto objeta o duda, NO argumentes ni vendas. Profundiza: "¿Qué sería lo ideal para ti?" Escucha.',
+    qualifying: 'En QUALIFYING: Si objeta precio o features, responde con UN dato concreto (caso similar, métrica). Sin ponerse defensivo.',
+    pitching: 'En PITCHING: Si objeta, valida la emoción ("Tiene sentido") + resuelve la razón lógica (dinero, tiempo, resultado). Propone siguiente paso.',
+    closing: 'En CLOSING: Última objeción probable. Valida + razón lógica + propone prueba pequeña o reunión específica.',
+  };
+  const stageObjHandler = objectionByStage[prospect.stage || 'discovery'] || objectionByStage['discovery'];
+  prompt += `\n\n🛡️ SI EL PROSPECTO OBJETA:\n${stageObjHandler}`;
+
+  // R7-#9: solo proyectar revenue si la tienda tiene base sólida
+  const hasOnlineStore = prospect.has_online_store === true;
+  const hasProducts = (prospect.audit_data?.findings || []).length > 0 || !!prospect.store_platform;
+  const canProjectRevenue = hasOnlineStore && hasProducts && (Number(prospect.monthly_revenue) || 0) > 0;
+
+  if (!canProjectRevenue && lostMoney) {
+    // Reemplazar proyecciones con diagnóstico
+    prompt += '\n\n🔍 DIAGNÓSTICO PRIMERO: Antes de hablar de escalar, pregunta: "¿Cómo está tu tienda ahora? ¿Fotos de producto, precios, descripciones están bien?" El problema puede no ser los ads.';
+  }
+
+  // R7-#13: BANT gate — validar Need antes de preguntar Budget
+  const sellsOnlyMarketplace = prospect.what_they_sell &&
+    /amazon|mercadolibre|mercado libre|falabella|ripley|ebay|marketplace/i.test(prospect.what_they_sell) &&
+    prospect.has_online_store !== true;
+
+  const noNeedEstablished = !prospect.has_online_store && !prospect.store_platform;
+
+  if (sellsOnlyMarketplace || noNeedEstablished) {
+    prompt += '\n\n🚫 PARADA CRÍTICA: El prospecto parece vender solo en marketplace o no tiene tienda propia. Steve es para tiendas propias (Shopify/WooCommerce). ANTES de hablar de budget/precio, clarifica: "¿Tenías pensado abrir tu tienda propia algún día?" Si dice no → es NO-FIT, descalifica amablemente.';
+  }
+
+  // R7-#15: detectar negocio B2B y evitar recomendar Meta/Instagram
+  const b2bKeywords = ['consultor', 'consulting', 'corporativo', 'b2b', 'empresa a empresa', 'servicios empresariales', 'software b2b', 'saas', 'asesor', 'auditor'];
+  const isLikelyB2B = b2bKeywords.some(kw => (prospect.what_they_sell || '').toLowerCase().includes(kw));
+
+  if (isLikelyB2B) {
+    prompt += '\n\n⚠️ NEGOCIO B2B DETECTADO: Meta Ads e Instagram NO son los canales principales para B2B. Canales correctos: LinkedIn, Google Search Ads, Email marketing, webinars. NO propongas campañas de Meta/Instagram. Si el prospecto lo menciona, explica por qué LinkedIn es mejor para B2B.';
+  }
+
+  // R7-#16: bloquear booking link si hay objeción activa
+  const recentUserMsgsForObjection = (history || []).filter((m: any) => m.role === 'user').slice(-2);
+  const lastUserMsgForObjection = (recentUserMsgsForObjection.slice(-1)[0]?.content || '').toLowerCase();
+  const hasActiveObjection = /^(pero|aunque|no sé|tengo dudas|no estoy seguro|no me convence|parece caro|es caro|no funciona|no lo veo|y si|¿y si)/.test(lastUserMsgForObjection.trim()) ||
+    /no sé si|tengo mis dudas|me genera dudas|no me queda claro/.test(lastUserMsgForObjection);
+
+  if (hasActiveObjection) {
+    prompt += '\n\n⚠️ BLOQUEO: El prospecto tiene una OBJECIÓN ACTIVA. RESUELVE primero la duda con datos, un caso similar, o una pregunta que profundice. SOLO después propones reunión.';
+  }
+
+  // R7-#21: detectar competidores y agregar reframes
+  const competitorReframes: Record<string, string> = {
+    'shopify': 'Shopify te deja crear ads. Steve los hace VENDER mejor. Diferencia: optimización inteligente + automatización.',
+    'facebook ads': 'Facebook Ads Manager te deja configurar. Steve optimiza y escala automáticamente basado en resultados.',
+    'google ads': 'Google Ads es el canal. Steve es quien lo maneja inteligentemente para que tengas mejor ROAS.',
+    'mailchimp': 'Mailchimp envía emails. Steve los hace más relevantes con segmentación basada en comportamiento real.',
+    'agencia': 'Una agencia cobra por hacer. Steve cobra por resultado. Diferencia: alineación de incentivos.',
+  };
+  const userMsgsText = (history || []).filter((m: any) => m.role === 'user').map((m: any) => m.content).join(' ').toLowerCase();
+  const mentionedCompetitors = Object.keys(competitorReframes).filter(comp => userMsgsText.includes(comp));
+
+  if (mentionedCompetitors.length > 0) {
+    const reframeLines = mentionedCompetitors.map(comp => `- Si menciona "${comp}": "${competitorReframes[comp]}"`).join('\n');
+    prompt += `\n\n⚡ REFRAMES DE COMPETIDORES:\n${reframeLines}\nUsa el reframe UNA VEZ, natural, sin atacar al competidor.`;
+  }
+
+  // R7-#22: adaptar closure velocity al estilo del prospecto
+  const styleForVelocity = analyzeProspectStyle(history || []);
+  let closureVelocity = 'medium';
+  if (styleForVelocity.formality === 'formal' || styleForVelocity.length === 'largo') {
+    closureVelocity = 'slow';
+  } else if (styleForVelocity.formality === 'casual' && styleForVelocity.length === 'corto') {
+    closureVelocity = 'fast';
+  }
+
+  const velocityInstructions: Record<string, string> = {
+    slow: '⏱️ VELOCIDAD LENTA: Este prospecto toma decisiones cuidadosamente. Sé paciente, da más información, NO presiones para cerrar rápido. Respeta su proceso.',
+    fast: '⚡ VELOCIDAD RÁPIDA: Prospecto directo y conciso. Sé igual de directo. Propone pasos concretos sin rodeos.',
+    medium: '⏱️ VELOCIDAD NORMAL: Balance entre información y acción.',
+  };
+  prompt += `\n\n${velocityInstructions[closureVelocity]}`;
+
+  // R7-#23: detectar budget insuficiente vs mínimo de Steve
+  const STEVE_MIN_BUDGET_CLP = 100000; // $100K CLP/mes mínimo (~$100 USD)
+  const extractBudgetAmount = (budgetStr: string | null | undefined): number | null => {
+    if (!budgetStr) return null;
+    const match = budgetStr.match(/(\d[\d.,]*)\s*(k|K|mil|millón|millones|mm)?/);
+    if (!match) return null;
+    let amount = parseFloat(match[1].replace(/[.,]/g, ''));
+    const unit = (match[2] || '').toLowerCase();
+    if (unit === 'k') amount *= 1000;
+    if (unit === 'mil') amount *= 1000;
+    if (['millón', 'millones', 'mm'].includes(unit)) amount *= 1000000;
+    return amount;
+  };
+
+  const budgetAmount = extractBudgetAmount(prospect.budget_range);
+  if (budgetAmount !== null && budgetAmount < STEVE_MIN_BUDGET_CLP) {
+    prompt += `\n\n💡 PRESUPUESTO BAJO DETECTADO: El prospecto tiene $${budgetAmount.toLocaleString()} que es menor al mínimo de Steve. Sé honesto: "Steve parte desde $XXX/mes. Con tu presupuesto actual podríamos explorar un plan básico. ¿Tu presupuesto es solo para ads o incluye herramientas?" NO prometas cosas que no puedes cumplir.`;
+  }
+
+  // R7-#24: preguntar actively_looking si no se sabe
+  if (prospect.actively_looking == null && prospect.what_they_sell && (prospect.message_count || 0) >= 2 && (prospect.message_count || 0) <= 4) {
+    prompt += '\n\n⚡ PREGUNTA CLAVE (hazla de forma natural): "¿AHORA estás buscando activamente mejorar esto, o es más una idea para el futuro?" Esta respuesta define si es lead caliente o tibia.';
+  }
+
+  // R7-#26: separar objeción de precio vs time-to-value
+  const lastUserMsgFull = (history || []).filter((m: any) => m.role === 'user').slice(-1)[0]?.content || '';
+  const hasPriceObjection = /caro|precio|cuesta|cuánto sale|cuánto cuesta|no tengo.*budget|budget.*poco/i.test(lastUserMsgFull);
+
+  if (hasPriceObjection && (prospect.lead_score || 0) >= 40) {
+    prompt += '\n\n💰 OBJECIÓN DE PRECIO DETECTADA. Separa DOS preguntas distintas:\n1. PRECIO: "¿Cuánto podés invertir mensualmente sin que duela?"\n2. TIME-TO-VALUE: "¿En cuánto tiempo necesitás ver resultados para que valga la pena?"\nResponde AMBAS antes de ofrecer soluciones.';
+  }
+
+  // R7-#28: detectar evaluación de competidores
+  const userHistoryText = (history || []).filter((m: any) => m.role === 'user').map((m: any) => m.content).join(' ').toLowerCase();
+  const isEvaluatingCompetitors = /ya estoy (hablando|evaluando|viendo|comparando)|otras opciones|otras agencias|otras herramientas|demos? con|cotizando|comparando precios|otros proveedores/i.test(userHistoryText);
+
+  if (isEvaluatingCompetitors) {
+    prompt += '\n\n🔥 PROSPECT EVALUANDO COMPETIDORES: Está comparando opciones. NO compitas en precio. Diferénciate por resultado. Pregunta: "¿Qué tienen los otros que no ves en Steve? Eso me ayuda a ser más preciso contigo." Esta info es oro.';
   }
 
   // 2. MISSING DATA + ACTIVE QUALIFICATION by message count (Cambio 3)
@@ -1573,16 +1757,22 @@ export async function buildDynamicSalesPrompt(
   }
 
   // Paso 10: Deadline real del mercado (solo mencionar 1 vez en toda la conversación)
+  // R7-#25: solo usar deadlines de mercado para B2C
   if (deadline) {
+    const b2cIndustries = ['ropa', 'calzado', 'cosmética', 'cosméticos', 'belleza', 'accesorios', 'electrónica', 'hogar', 'muebles', 'juguetes', 'deportes', 'mascotas', 'alimentos', 'bebidas'];
+    const isLikelyB2C = b2cIndustries.some(ind => (prospect.what_they_sell || '').toLowerCase().includes(ind));
     const alreadyMentioned = historyArr.some(m => m.role === 'assistant' && (m.content.includes('CyberDay') || m.content.includes('Black Friday') || m.content.includes('Fiestas Patrias') || m.content.includes('Navidad') || m.content.includes('Día de la Madre') || m.content.includes('Día de la Mujer')));
-    if (!alreadyMentioned) {
+    if (!alreadyMentioned && isLikelyB2C) {
       prompt += `Contexto de mercado (menciona SOLO si es natural, NO lo repitas si ya lo dijiste): ${deadline}\n`;
+    } else if (!alreadyMentioned && prospect.what_they_sell && !isLikelyB2C) {
+      prompt += `\n\n📅 Pregunta por temporada: "¿Tu negocio tiene picos de demanda en alguna época del año?" Eso define el timing del plan.\n`;
     }
   }
 
   // Paso 12: Calculadora de plata perdida
   // Fix #22: explain the mechanism so it's credible (not magic numbers)
-  if (lostMoney) {
+  // R7-#9: solo proyectar si canProjectRevenue (ya evaluado arriba)
+  if (lostMoney && canProjectRevenue) {
     const fmt = (n: number) => `$${Math.round(n).toLocaleString('es-CL')}`;
     prompt += `Con lo que factura (~${fmt(lostMoney.currentEstimate)}/mes), mejorando ROAS un 40% con mejor segmentación y creativos, podría estar generando ~${fmt(lostMoney.difference)} más al mes. Menciónalo si es natural.\n`;
   }
@@ -1633,6 +1823,17 @@ export async function buildDynamicSalesPrompt(
   } else if (!closerMode) {
     prompt += `Ya sabes bastante. Muestra cómo Steve puede ayudar con lo que te contó.\n`;
   }
+
+  // R7-#10b: instrucción de reactivación tras inactividad larga
+  if ((prospect as any)._longInactive) {
+    prompt += `\n\n⚡ REACTIVACIÓN: Este prospecto estuvo inactivo ${(prospect as any)._inactiveDays} días. Abre con empatía y curiosidad, NO con el pitch anterior. Pregunta: "¿Qué cambió? ¿Seguís pensando en esto?" NO asumas que recuerda la conversación anterior.`;
+  }
+
+  // R7-#20: elevator pitch obligatorio antes del booking link
+  const meetingElevatorPitch = `\n\n📋 ANTES DE ENVIAR EL LINK DE REUNIÓN, di esto en 2-3 líneas:
+"Lo que haría: (1) Audito tu tienda y ads en 20 minutos, (2) Identifico 3 oportunidades rápidas de revenue, (3) Armamos un plan juntos basado en DATA real de tu negocio. Si te gusta el plan, seguimos. Si no, sin presión."
+SOLO después de decir esto, envía el link.`;
+  prompt += meetingElevatorPitch;
 
   // Paso 4: Tono por hora (Chile)
   prompt += `\n⏰ HORA CHILE: ${chileTime}`;
@@ -1908,6 +2109,9 @@ Los pain_points YA REGISTRADOS son: ${JSON.stringify(existingPainPoints)}
   * "no tiene tiempo" ≈ "le falta tiempo para marketing" → MISMO DOLOR
 - Si no hay dolores genuinamente NUEVOS y DISTINTOS → devuelve pain_points como array vacío []
 - MÁXIMO 3 pain_points nuevos por extracción
+R7-#12 — Pain points DEBEN ser ESPECÍFICOS y ACCIONABLES (mínimo 15 chars cada uno):
+❌ Malo: ["scaling", "conversión", "ads"]
+✅ Bueno: ["ROAS bajo en Meta con $500K/mes", "no sé segmentar para retargeting", "márgenes se erosionan con más ads"]
 
 CONVERSACIÓN:
 ${conversation}
@@ -2089,15 +2293,29 @@ export function calculateLeadScore(
     breakdown.timeline += 4;
   }
   // Bonus: explicit decision timeline
+  // R7-#5: diferenciar urgencia real vs lenguaje amable
   if (prospect.decision_timeline) {
-    const tl = prospect.decision_timeline.toLowerCase();
-    if (tl.includes('ahora') || tl.includes('ya') || tl.includes('este mes') || tl.includes('lo antes posible') || tl.includes('urgente')) {
-      breakdown.timeline = Math.min(breakdown.timeline + 10, 20);
-    } else if (tl.includes('próximo mes') || tl.includes('proximo mes') || tl.includes('pronto')) {
-      breakdown.timeline = Math.min(breakdown.timeline + 5, 20);
+    const tl = (prospect.decision_timeline || '').toLowerCase();
+    // SOFT (lenguaje amable, no urgencia real): 3 pts
+    if (/^(lo antes posible|cuando pueda|pronto|próximamente|ojalá pronto)$/.test(tl)) {
+      breakdown.timeline = Math.min((breakdown.timeline || 0) + 3, 20);
+    }
+    // MEDIUM (próximas 2 semanas): 8 pts
+    else if (/este mes|próxima semana|en 2 semanas|en dos semanas/.test(tl)) {
+      breakdown.timeline = Math.min((breakdown.timeline || 0) + 8, 20);
+    }
+    // HARD (esta semana o ya): 20 pts
+    else if (/esta semana|ya mismo|urgente|hoy|mañana|inmediato/.test(tl)) {
+      breakdown.timeline = Math.min((breakdown.timeline || 0) + 20, 20);
+    }
+    // Legacy: ahora/ya/urgente patterns (backward compat)
+    else if (tl.includes('ahora') || tl.includes('ya') || tl.includes('urgente')) {
+      breakdown.timeline = Math.min((breakdown.timeline || 0) + 10, 20);
+    } else if (tl.includes('próximo mes') || tl.includes('proximo mes')) {
+      breakdown.timeline = Math.min((breakdown.timeline || 0) + 5, 20);
     } else if (tl.includes('después') || tl.includes('despues') || tl.includes('cuando') || tl.includes('tras') || tl.includes('post') || tl.includes('siguiente') || /q[1-4]/i.test(tl)) {
       // Fix R4-#10: future date = has a plan, even if not urgent
-      breakdown.timeline = Math.min(breakdown.timeline + 3, 20);
+      breakdown.timeline = Math.min((breakdown.timeline || 0) + 3, 20);
     }
   }
 

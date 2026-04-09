@@ -783,6 +783,7 @@ async function check49_briefMentionsRealData(
     .from('steve_knowledge')
     .select('contenido, client_id')
     .eq('categoria', 'brief')
+    .is('purged_at', null)
     .order('created_at', { ascending: false })
     .limit(5);
 
@@ -844,6 +845,7 @@ async function check50_scrapingFreshData(
     .from('steve_knowledge')
     .select('source_url, created_at')
     .not('source_url', 'is', null)
+    .is('purged_at', null)
     .order('created_at', { ascending: false })
     .limit(10);
 
@@ -1220,7 +1222,8 @@ async function check76_knowledgeBaseSize(supabase: SupabaseClient): Promise<Chec
 
   const { count, error } = await supabase
     .from('steve_knowledge')
-    .select('id', { count: 'exact', head: true });
+    .select('id', { count: 'exact', head: true })
+    .is('purged_at', null);
 
   if (error) throw new Error(`DB error: ${error.message}`);
 
@@ -1983,7 +1986,7 @@ export async function executeDataQuality(
         return { result: 'pass', steve_value: 'Audience size check via Meta API sync', duration_ms: Date.now() - start };
       }
       case 136: { // No knowledge entries with score < 0
-        const { count: cnt136, error: e136 } = await supabase.from('steve_knowledge').select('id', { count: 'exact', head: true }).lt('relevance_score', 0);
+        const { count: cnt136, error: e136 } = await supabase.from('steve_knowledge').select('id', { count: 'exact', head: true }).lt('relevance_score', 0).is('purged_at', null);
         if (e136) throw new Error(e136.message);
         if (cnt136 && cnt136 > 0) return { result: 'fail', steve_value: cnt136, error_message: `${cnt136} knowledge entries con score < 0`, duration_ms: Date.now() - start };
         return { result: 'pass', steve_value: '0 scores negativos', duration_ms: Date.now() - start };

@@ -29,6 +29,7 @@ export async function generateBriefVisual(c: Context) {
       .in('categoria', ['anuncios', 'meta_ads'])
       .eq('activo', true)
       .eq('approval_status', 'approved')
+      .is('purged_at', null)
       .order('orden', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(15),

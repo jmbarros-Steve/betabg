@@ -35,6 +35,7 @@ export async function autoLearningDigest(c: Context) {
         .select('id, titulo, contenido, categoria, confidence, created_at')
         .eq('approval_status', 'pending')
         .eq('activo', true)
+        .is('purged_at', null)
         .order('confidence', { ascending: false, nullsFirst: false })
         .order('id', { ascending: true })
         .range(offset, offset + BATCH_SIZE - 1);

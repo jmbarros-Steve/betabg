@@ -48,6 +48,7 @@ export async function steveAgentLoop(c: Context) {
         .from('steve_knowledge')
         .select('id, categoria, approval_status, activo')
         .eq('activo', true)
+        .is('purged_at', null)
         .order('id', { ascending: true })
         .range(offset, offset + BATCH_SIZE - 1);
       if (error) {
@@ -204,6 +205,7 @@ Sin markdown.`,
                 .select('id, titulo, contenido, quality_score')
                 .eq('activo', true)
                 .eq('approval_status', 'approved')
+                .is('purged_at', null)
                 .lt('quality_score', 40)
                 .order('quality_score', { ascending: true })
                 .limit(3),

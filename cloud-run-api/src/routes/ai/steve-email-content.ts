@@ -59,6 +59,7 @@ async function loadKlaviyoContext(supabase: any, clientId: string): Promise<Klav
       .in('categoria', ['klaviyo', 'email'])
       .eq('activo', true)
       .eq('approval_status', 'approved')
+      .is('purged_at', null)
       .order('orden', { ascending: false })
       .limit(20),
     supabase

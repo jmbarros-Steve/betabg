@@ -82,6 +82,7 @@ export async function steveStrategy(c: Context) {
       .in('categoria', categories)
       .eq('activo', true)
       .eq('approval_status', 'approved')
+      .is('purged_at', null)
       .order('orden', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(30),

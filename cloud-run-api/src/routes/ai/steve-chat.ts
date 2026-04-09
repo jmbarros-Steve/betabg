@@ -892,6 +892,7 @@ export async function steveChat(c: Context) {
         .in('categoria', [categoriaRelevante, 'brief'])
         .eq('activo', true)
         .eq('approval_status', 'approved')
+        .is('purged_at', null)
         .order('orden', { ascending: false })
         .limit(8),
       // 5. Get client's connections grouped by platform
@@ -907,6 +908,7 @@ export async function steveChat(c: Context) {
         .eq('client_id', client_id)
         .eq('activo', true)
         .eq('approval_status', 'approved')
+        .is('purged_at', null)
         .order('orden', { ascending: false })
         .limit(10),
       // 7. Load pending commitments for this client (Mejora #8)
@@ -1871,6 +1873,7 @@ REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de re
       .in('categoria', [categoriaRelevante, 'brief', 'anuncios'])
       .eq('activo', true)
       .eq('approval_status', 'approved')
+      .is('purged_at', null)
       .order('orden', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(30),
@@ -1887,6 +1890,7 @@ REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de re
       .eq('client_id', client_id)
       .eq('activo', true)
       .eq('approval_status', 'approved')
+      .is('purged_at', null)
       .order('orden', { ascending: false })
       .limit(10),
   ]);

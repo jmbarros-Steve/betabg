@@ -57,6 +57,7 @@ export async function knowledgeQualityScore(c: Context) {
         .from('steve_knowledge')
         .select('id, titulo, contenido, orden, veces_usada, ultima_vez_usada, ejemplo_real, created_at, merged_from, effectiveness_score')
         .eq('activo', true)
+        .is('purged_at', null)
         .order('id', { ascending: true })
         .range(offset, offset + BATCH_SIZE - 1);
       if (error) throw error;

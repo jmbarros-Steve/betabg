@@ -247,7 +247,8 @@ export async function processQueueItem(c: Context) {
     const existingRules = await safeQueryOrDefault<any>(
       supabase
         .from('steve_knowledge')
-        .select('titulo'),
+        .select('titulo')
+        .is('purged_at', null),
       [],
       'processQueueItem.getExistingRules',
     );

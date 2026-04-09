@@ -29,6 +29,7 @@ export async function knowledgeConsolidator(c: Context) {
       .from('steve_knowledge')
       .select('id, categoria, titulo, contenido, orden, veces_usada')
       .eq('activo', true)
+      .is('purged_at', null)
       .order('orden', { ascending: false })
       .order('id', { ascending: true })
       .range(offset, offset + BATCH_SIZE - 1);

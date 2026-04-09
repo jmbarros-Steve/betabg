@@ -754,7 +754,7 @@ export async function generateMetaCopy(c: Context) {
       supabase.from('buyer_personas').select('*').eq('client_id', cId).eq('is_complete', true).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('brand_research').select('brand_name, industry, target_audience, value_proposition, brand_voice, competitor_analysis, product_details').eq('client_id', cId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('steve_bugs').select('descripcion, ejemplo_bueno').eq('categoria', 'meta_ads').eq('activo', true),
-      supabase.from('steve_knowledge').select('id, titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).eq('approval_status', 'approved').order('orden', { ascending: false }).limit(10),
+      supabase.from('steve_knowledge').select('id, titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).eq('approval_status', 'approved').is('purged_at', null).order('orden', { ascending: false }).limit(10),
     ]);
 
     const personaData = briefData?.persona_data || briefData?.raw_data || {};
@@ -877,7 +877,7 @@ export async function generateMetaCopy(c: Context) {
 
     const [{ data: kbBugsVar }, { data: kbKnowledgeVar }] = await Promise.all([
       supabase.from('steve_bugs').select('descripcion, ejemplo_bueno').eq('categoria', 'meta_ads').eq('activo', true),
-      supabase.from('steve_knowledge').select('id, titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).eq('approval_status', 'approved').order('orden', { ascending: false }).order('created_at', { ascending: false }).limit(20),
+      supabase.from('steve_knowledge').select('id, titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).eq('approval_status', 'approved').is('purged_at', null).order('orden', { ascending: false }).order('created_at', { ascending: false }).limit(20),
     ]);
     const kbKnowledgeVarIds = (kbKnowledgeVar || []).map((k: any) => k.id).filter(Boolean);
     if (kbKnowledgeVarIds.length > 0) {
@@ -995,7 +995,7 @@ Responde SOLO en JSON válido sin markdown ni backticks:
 
     const [{ data: kbBugsBV }, { data: kbKnowledgeBV }] = await Promise.all([
       supabase.from('steve_bugs').select('descripcion, ejemplo_bueno').eq('categoria', 'anuncios').eq('activo', true),
-      supabase.from('steve_knowledge').select('id, titulo, contenido').in('categoria', ['anuncios', 'meta_ads']).eq('activo', true).eq('approval_status', 'approved').order('orden', { ascending: false }).order('created_at', { ascending: false }).limit(15),
+      supabase.from('steve_knowledge').select('id, titulo, contenido').in('categoria', ['anuncios', 'meta_ads']).eq('activo', true).eq('approval_status', 'approved').is('purged_at', null).order('orden', { ascending: false }).order('created_at', { ascending: false }).limit(15),
     ]);
     const kbKnowledgeBVIds = (kbKnowledgeBV || []).map((k: any) => k.id).filter(Boolean);
     if (kbKnowledgeBVIds.length > 0) {
@@ -1229,7 +1229,7 @@ las preferencias específicas de cada cliente cuando las conozco.
 
   const [{ data: kbBugsLegacy }, { data: kbKnowledgeLegacy }, { data: brandResearchLegacy }, { data: shopifyProductsLegacy }, { data: clientInfoLegacy }] = await Promise.all([
     supabase.from('steve_bugs').select('descripcion, ejemplo_bueno').eq('categoria', 'meta_ads').eq('activo', true),
-    supabase.from('steve_knowledge').select('id, titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).eq('approval_status', 'approved').order('orden', { ascending: false }).order('created_at', { ascending: false }).limit(20),
+    supabase.from('steve_knowledge').select('id, titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).eq('approval_status', 'approved').is('purged_at', null).order('orden', { ascending: false }).order('created_at', { ascending: false }).limit(20),
     supabase.from('brand_research').select('brand_name, industry, target_audience, value_proposition, brand_voice, competitor_analysis, product_details').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('shopify_products').select('title, product_type, price, image_url').eq('client_id', clientId).limit(10),
     supabase.from('clients').select('name, company, shop_domain').eq('id', clientId).maybeSingle(),

@@ -179,3 +179,22 @@ export async function safeQuerySingleOrDefault<T>(
   }
   return data ?? defaultValue;
 }
+
+/**
+ * Await una mutation Supabase (insert/upsert) con `.select().single()`.
+ * Throws `SupabaseQueryError` si falla. Retorna la fila insertada/upserted.
+ *
+ * @param promise - Query builder con `.insert()/.upsert().select().single()`.
+ * @param context - String para identificar la query en logs/errores.
+ * @returns Fila insertada/upserted o null.
+ */
+export async function safeMutateSingle<T>(
+  promise: PromiseLike<PostgrestSingleResponse<T | null>>,
+  context: string,
+): Promise<T | null> {
+  const { data, error } = await promise;
+  if (error) {
+    throw new SupabaseQueryError(context, error);
+  }
+  return data;
+}

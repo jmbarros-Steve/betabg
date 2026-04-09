@@ -16,7 +16,7 @@ export async function approveKnowledge(c: Context) {
       await supabase.from('steve_knowledge').update({ approval_status: 'approved', activo: true, orden: 90 }).in('id', ids);
       // Also approve siblings sharing the same insight_group_id
       const rows = await safeQueryOrDefault<any>(
-        supabase.from('steve_knowledge').select('insight_group_id').in('id', ids),
+        supabase.from('steve_knowledge').select('insight_group_id').in('id', ids).is('purged_at', null),
         [],
         'approveKnowledge.getGroupIds',
       );
@@ -30,7 +30,7 @@ export async function approveKnowledge(c: Context) {
       const allIds = [...ids];
       if (groupIds.length > 0) {
         const siblingRows = await safeQueryOrDefault<any>(
-          supabase.from('steve_knowledge').select('id').in('insight_group_id', groupIds),
+          supabase.from('steve_knowledge').select('id').in('insight_group_id', groupIds).is('purged_at', null),
           [],
           'approveKnowledge.getSiblingRows',
         );
@@ -43,7 +43,7 @@ export async function approveKnowledge(c: Context) {
       await supabase.from('steve_knowledge').update({ approval_status: 'rejected', activo: false }).in('id', ids);
       // Also reject siblings sharing the same insight_group_id
       const rejRows = await safeQueryOrDefault<any>(
-        supabase.from('steve_knowledge').select('insight_group_id').in('id', ids),
+        supabase.from('steve_knowledge').select('insight_group_id').in('id', ids).is('purged_at', null),
         [],
         'approveKnowledge.getRejectGroupIds',
       );
@@ -63,6 +63,7 @@ export async function approveKnowledge(c: Context) {
           .select('id, titulo, contenido, categoria, source_url, created_at')
           .eq('approval_status', 'pending')
           .eq('activo', true)
+          .is('purged_at', null)
           .order('created_at', { ascending: false })
           .limit(50),
         [],

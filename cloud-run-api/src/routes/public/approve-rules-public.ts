@@ -40,6 +40,7 @@ async function handleGet(c: Context, supabase: any) {
     .select('id, titulo, contenido, categoria, source_explanation, confidence, sources_urls, created_at')
     .eq('approval_status', 'pending')
     .eq('activo', true)
+    .is('purged_at', null)
     .order('confidence', { ascending: false });
 
   if (queryErr) {
@@ -98,7 +99,7 @@ async function handlePost(c: Context, supabase: any) {
 
     // Also approve siblings sharing the same insight_group_id
     const rows = await safeQueryOrDefault<any>(
-      supabase.from('steve_knowledge').select('insight_group_id').in('id', ids),
+      supabase.from('steve_knowledge').select('insight_group_id').in('id', ids).is('purged_at', null),
       [],
       'approveRulesPublic.getGroupIds',
     );
@@ -114,7 +115,7 @@ async function handlePost(c: Context, supabase: any) {
     const allIds = [...ids];
     if (groupIds.length > 0) {
       const siblingRows = await safeQueryOrDefault<any>(
-        supabase.from('steve_knowledge').select('id').in('insight_group_id', groupIds),
+        supabase.from('steve_knowledge').select('id').in('insight_group_id', groupIds).is('purged_at', null),
         [],
         'approveRulesPublic.getSiblingRows',
       );
@@ -133,7 +134,7 @@ async function handlePost(c: Context, supabase: any) {
 
     // Also reject siblings sharing the same insight_group_id
     const rejRows = await safeQueryOrDefault<any>(
-      supabase.from('steve_knowledge').select('insight_group_id').in('id', ids),
+      supabase.from('steve_knowledge').select('insight_group_id').in('id', ids).is('purged_at', null),
       [],
       'approveRulesPublic.getRejectGroupIds',
     );
@@ -153,7 +154,8 @@ async function handlePost(c: Context, supabase: any) {
         .from('steve_knowledge')
         .select('id')
         .eq('approval_status', 'pending')
-        .eq('activo', true),
+        .eq('activo', true)
+        .is('purged_at', null),
       [],
       'approveRulesPublic.getPendingRows',
     );

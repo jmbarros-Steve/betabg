@@ -38,6 +38,7 @@ export async function stevePromptEvolver(c: Context) {
         .select('titulo, contenido, veces_usada, quality_score')
         .eq('activo', true)
         .eq('approval_status', 'approved')
+        .is('purged_at', null)
         .order('veces_usada', { ascending: false })
         .limit(10),
     ]);
@@ -47,7 +48,6 @@ export async function stevePromptEvolver(c: Context) {
     if (rulesRes.error) console.error('[steve-prompt-evolver] knowledge fetch error:', rulesRes.error.message);
 
     const feedback = fbRes.data || [];
-    const qaResults = qaRes.data || [];
     const usedRules = rulesRes.data || [];
 
     const positivePatterns = (feedback || [])

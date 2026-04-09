@@ -1,6 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { safeQuerySingleOrDefault, safeMutateSingle } from '../../lib/safe-supabase.js';
 
 /**
  * Public endpoint (no JWT required) - handles self-signup.
@@ -59,12 +59,15 @@ export async function selfSignup(c: Context) {
   );
 
   // Create client record (user manages their own account)
-  const { data: newClient } = await supabase.from('clients').insert({
-    user_id: userId,
-    client_user_id: userId,
-    name: email.split('@')[0],
-    email,
-  }).select('id').single();
+  const newClient = await safeMutateSingle<any>(
+    supabase.from('clients').insert({
+      user_id: userId,
+      client_user_id: userId,
+      name: email.split('@')[0],
+      email,
+    }).select('id').single(),
+    'selfSignup.createClient',
+  );
 
   // Seed onboarding steps
   if (newClient) {

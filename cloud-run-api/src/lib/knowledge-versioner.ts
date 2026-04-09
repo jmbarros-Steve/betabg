@@ -16,6 +16,7 @@ export async function snapshotBeforeUpdate(
     .from('steve_knowledge')
     .select('titulo, contenido, categoria, orden, version_number')
     .eq('id', knowledgeId)
+    .is('purged_at', null)
     .maybeSingle();
 
   if (readErr || !current) {

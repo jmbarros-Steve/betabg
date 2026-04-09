@@ -439,6 +439,7 @@ async function testNoPlaintextKeys(supabase: SupabaseClient): Promise<CheckResul
     supabase
       .from('steve_knowledge')
       .select('id, contenido')
+      .is('purged_at', null)
       .order('created_at', { ascending: false })
       .limit(200),
     [],

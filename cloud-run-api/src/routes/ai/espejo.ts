@@ -55,6 +55,7 @@ async function loadDynamicVisualCriteria(entityType: 'email' | 'ad'): Promise<st
         .eq('approval_status', 'approved')
         .eq('activo', true)
         .in('categoria', relevantCategories)
+        .is('purged_at', null)
         .order('orden', { ascending: false })
         .limit(10),
       [],

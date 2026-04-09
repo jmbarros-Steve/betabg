@@ -44,6 +44,7 @@ export async function knowledgeDecay(c: Context) {
       .from('steve_knowledge')
       .select('id, titulo, categoria, orden, updated_at')
       .eq('activo', true)
+      .is('purged_at', null)
       .order('id', { ascending: true })
       .range(offset, offset + BATCH_SIZE - 1);
 

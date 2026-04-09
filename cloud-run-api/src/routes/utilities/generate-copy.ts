@@ -77,6 +77,7 @@ export async function generateCopy(c: Context) {
       .in('categoria', [categoriaRelevante, 'anuncios', 'meta_ads'])
       .eq('activo', true)
       .eq('approval_status', 'approved')
+      .is('purged_at', null)
       .order('orden', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(20),

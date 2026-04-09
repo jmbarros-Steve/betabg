@@ -153,7 +153,7 @@ export default function AdminCerebro() {
     if (data && data.length > 0) {
       const details = data[0].details as any;
       const score = details?.qa_scorecard?.errors_this_week != null
-        ? Math.max(0, 100 - (details.qa_scorecard.errors_this_week * 5))
+        ? Math.max(0, 100 - (details.qa_scorecard.errors_this_week * 3))
         : null;
       setLastQaScore(score);
       setLastQaDate(data[0].checked_at);

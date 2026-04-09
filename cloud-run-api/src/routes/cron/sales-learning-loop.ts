@@ -190,13 +190,15 @@ Analiza y responde SOLO con un JSON (sin markdown):
       .from('steve_knowledge')
       .select('id', { count: 'exact', head: true })
       .eq('categoria', 'sales_learning')
-      .eq('activo', true);
+      .eq('activo', true)
+      .is('purged_at', null);
 
     const { count: strategyCount } = await supabase
       .from('steve_knowledge')
       .select('id', { count: 'exact', head: true })
       .eq('categoria', 'sales_strategy')
-      .eq('activo', true);
+      .eq('activo', true)
+      .is('purged_at', null);
 
     // Generate meta-patterns every 10 new learnings
     if ((learningCount || 0) >= 10 && (learningCount || 0) > ((strategyCount || 0) * 10)) {
@@ -208,6 +210,7 @@ Analiza y responde SOLO con un JSON (sin markdown):
             .select('titulo, contenido')
             .eq('categoria', 'sales_learning')
             .eq('activo', true)
+            .is('purged_at', null)
             .order('created_at', { ascending: false })
             .limit(30),
           'salesLearningLoop.fetchAllLearnings',

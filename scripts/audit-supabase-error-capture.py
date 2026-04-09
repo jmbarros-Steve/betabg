@@ -142,7 +142,12 @@ def main():
     parser.add_argument("--severity", default=None, help="Filter by minimum severity (CRITICAL|HIGH|MEDIUM|LOW)")
     args = parser.parse_args()
 
-    root = Path(args.dir)
+    # Resolver paths relativos desde la raíz del repo (no del CWD)
+    if not Path(args.dir).is_absolute():
+        script_root = Path(__file__).resolve().parent.parent
+        root = script_root / args.dir
+    else:
+        root = Path(args.dir)
     if not root.is_dir():
         print(f"ERROR: {root} no es un directorio", file=sys.stderr)
         sys.exit(1)

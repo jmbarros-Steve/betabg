@@ -48,6 +48,7 @@ export async function autoBriefGenerator(c: Context) {
             .eq('client_id', conn.client_id)
             .eq('categoria', 'brief')
             .eq('activo', true)
+            .is('purged_at', null)
             .limit(1),
           'autoBriefGenerator.checkExistingBrief',
         );

@@ -51,6 +51,7 @@ export async function detectKnowledgeConflicts(
       .select('categoria, titulo, contenido')
       .in('categoria', categories)
       .eq('activo', true)
+      .is('purged_at', null)
       .order('orden', { ascending: false })
       .limit(50),
     [],

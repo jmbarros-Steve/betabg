@@ -14,11 +14,11 @@ function getSquadForEndpoint(name: string): string {
   // Ventas: WhatsApp + CRM + prospección
   if (name.match(/whatsapp|wa-|twilio|crm|prospect|sales|web-form/)) return 'ventas';
   // Producto PRIMERO (anclado con ^ para precisión): Steve AI/Brain
-  if (name.match(/^steve-chat|^steve-strategy|^steve-email-content|^analyze-brand|^generate-meta-copy|^generate-copy/)) return 'producto';
+  if (name.match(/^steve-chat|^steve-strategy|^steve-email-content|^steve-bulk-analyze|^analyze-brand|^generate-meta-copy|^generate-copy|^generate-google-copy|^generate-image|^criterio-meta|^espejo|^train-steve|^approve-knowledge|^submit-correction|^manage-sources|^creative-preview/)) return 'producto';
   // Marketing: Meta + Google + Shopify + Klaviyo + Email/Steve Mail + Instagram/Facebook
-  if (name.match(/meta|campaign|audience|pixel|social-inbox|competitor/)) return 'marketing';
-  if (name.match(/klaviyo|email|flow|mail-|steve-mail|manage-email|query-email/)) return 'marketing';
-  if (name.match(/shopify|google|instagram|facebook|publish-/)) return 'marketing';
+  if (name.match(/meta|campaign|audience|pixel|social-inbox|competitor|targeting/)) return 'marketing';
+  if (name.match(/klaviyo|email|flow|mail-|steve-mail|manage-email|query-email|send-test|verify-domain|email-templates/)) return 'marketing';
+  if (name.match(/shopify|google|instagram|facebook|publish-|discount/)) return 'marketing';
   // Infra: cloud-run root, oauth, sesiones, frontend
   if (name.match(/cloud-run|shopify-session|oauth|^frontend$/)) return 'infra';
   return 'producto';
@@ -100,6 +100,7 @@ serve(async (req) => {
     // Endpoints críticos: Cloud Run API (activo) + frontend
     // NOTA: Las Edge Functions de Supabase son dead code — todo el tráfico real va por Cloud Run
     // Cobertura ampliada Javiera W12 (2026-04-07): 11 → 36 endpoints (14% → >50% de los 69 críticos)
+    // Cobertura ampliada OJOS Fase 2 (2026-04-09): 36 → 60 endpoints (~25% de 235 total)
     // Reviewed-By: Isidora W6
     // Filosofía: status < 500 es OK (401 del middleware es esperado, 5xx es real)
     const endpoints = [
@@ -109,6 +110,12 @@ serve(async (req) => {
       { name: 'steve-email-content', url: `${CLOUD_RUN_URL}/api/steve-email-content`, method: 'POST', body: { client_id: 'health-check' } },
       { name: 'analyze-brand', url: `${CLOUD_RUN_URL}/api/analyze-brand`, method: 'POST', body: { client_id: 'health-check' } },
       { name: 'generate-meta-copy', url: `${CLOUD_RUN_URL}/api/generate-meta-copy`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'steve-bulk-analyze', url: `${CLOUD_RUN_URL}/api/steve-bulk-analyze`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'criterio-meta', url: `${CLOUD_RUN_URL}/api/criterio-meta`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'espejo', url: `${CLOUD_RUN_URL}/api/espejo`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'generate-image', url: `${CLOUD_RUN_URL}/api/generate-image`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'analyze-brand-research', url: `${CLOUD_RUN_URL}/api/analyze-brand-research`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'creative-preview', url: `${CLOUD_RUN_URL}/api/creative-preview`, method: 'POST', body: { client_id: 'health-check' } },
 
       // ─── Shopify ────────────────────────────────────────────────
       { name: 'fetch-shopify-analytics', url: `${CLOUD_RUN_URL}/api/fetch-shopify-analytics`, method: 'POST', body: { client_id: 'health-check' } },
@@ -116,6 +123,9 @@ serve(async (req) => {
       { name: 'fetch-shopify-collections', url: `${CLOUD_RUN_URL}/api/fetch-shopify-collections`, method: 'POST', body: { client_id: 'health-check' } },
       { name: 'fetch-shopify-customers', url: `${CLOUD_RUN_URL}/api/fetch-shopify-customers`, method: 'POST', body: { client_id: 'health-check' } },
       { name: 'sync-shopify-metrics', url: `${CLOUD_RUN_URL}/api/sync-shopify-metrics`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'create-shopify-discount', url: `${CLOUD_RUN_URL}/api/create-shopify-discount`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'fetch-shopify-discounts', url: `${CLOUD_RUN_URL}/api/fetch-shopify-discounts`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'update-shopify-product', url: `${CLOUD_RUN_URL}/api/update-shopify-product`, method: 'POST', body: { client_id: 'health-check' } },
 
       // ─── Meta Ads ───────────────────────────────────────────────
       { name: 'sync-meta-metrics', url: `${CLOUD_RUN_URL}/api/sync-meta-metrics`, method: 'POST', body: { client_id: 'health-check' } },
@@ -124,6 +134,10 @@ serve(async (req) => {
       { name: 'fetch-meta-business-hierarchy', url: `${CLOUD_RUN_URL}/api/fetch-meta-business-hierarchy`, method: 'POST', body: { client_id: 'health-check' } },
       { name: 'manage-meta-campaign', url: `${CLOUD_RUN_URL}/api/manage-meta-campaign`, method: 'POST', body: { client_id: 'health-check', action: 'list' } },
       { name: 'meta-social-inbox', url: `${CLOUD_RUN_URL}/api/meta-social-inbox`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'manage-meta-audiences', url: `${CLOUD_RUN_URL}/api/manage-meta-audiences`, method: 'POST', body: { client_id: 'health-check', action: 'list' } },
+      { name: 'manage-meta-pixel', url: `${CLOUD_RUN_URL}/api/manage-meta-pixel`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'manage-meta-rules', url: `${CLOUD_RUN_URL}/api/manage-meta-rules`, method: 'POST', body: { client_id: 'health-check', action: 'list' } },
+      { name: 'meta-targeting-search', url: `${CLOUD_RUN_URL}/api/meta-targeting-search`, method: 'POST', body: { client_id: 'health-check', query: 'ping' } },
 
       // ─── Klaviyo ────────────────────────────────────────────────
       { name: 'klaviyo-push-emails', url: `${CLOUD_RUN_URL}/api/klaviyo-push-emails`, method: 'POST', body: { client_id: 'health-check' } },
@@ -131,6 +145,7 @@ serve(async (req) => {
       { name: 'fetch-klaviyo-top-products', url: `${CLOUD_RUN_URL}/api/fetch-klaviyo-top-products`, method: 'POST', body: { client_id: 'health-check' } },
       { name: 'import-klaviyo-templates', url: `${CLOUD_RUN_URL}/api/import-klaviyo-templates`, method: 'POST', body: { client_id: 'health-check' } },
       { name: 'klaviyo-manage-flows', url: `${CLOUD_RUN_URL}/api/klaviyo-manage-flows`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'create-klaviyo-campaign', url: `${CLOUD_RUN_URL}/api/klaviyo/create-campaign`, method: 'POST', body: { client_id: 'health-check' } },
 
       // ─── Google Ads ─────────────────────────────────────────────
       { name: 'sync-google-ads-metrics', url: `${CLOUD_RUN_URL}/api/sync-google-ads-metrics`, method: 'POST', body: { client_id: 'health-check' } },
@@ -145,6 +160,9 @@ serve(async (req) => {
       { name: 'manage-email-flows', url: `${CLOUD_RUN_URL}/api/manage-email-flows`, method: 'POST', body: { client_id: 'health-check', action: 'list' } },
       { name: 'query-email-subscribers', url: `${CLOUD_RUN_URL}/api/query-email-subscribers`, method: 'POST', body: { client_id: 'health-check' } },
       { name: 'email-campaign-analytics', url: `${CLOUD_RUN_URL}/api/email-campaign-analytics`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'send-test-email', url: `${CLOUD_RUN_URL}/api/email/send-test`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'verify-email-domain', url: `${CLOUD_RUN_URL}/api/verify-email-domain`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'email-templates', url: `${CLOUD_RUN_URL}/api/email-templates`, method: 'POST', body: { client_id: 'health-check', action: 'list' } },
 
       // ─── WhatsApp ───────────────────────────────────────────────
       { name: 'wa-send-message', url: `${CLOUD_RUN_URL}/api/whatsapp/send-message`, method: 'POST', body: { client_id: 'health-check' } },
@@ -154,6 +172,16 @@ serve(async (req) => {
       { name: 'crm-prospects-kanban', url: `${CLOUD_RUN_URL}/api/crm/prospects/kanban`, method: 'POST', body: { client_id: 'health-check' } },
       { name: 'crm-proposals', url: `${CLOUD_RUN_URL}/api/crm/proposals`, method: 'POST', body: { action: 'list', client_id: 'health-check' } },
       { name: 'crm-sales-tasks', url: `${CLOUD_RUN_URL}/api/crm/tasks`, method: 'POST', body: { action: 'list', client_id: 'health-check' } },
+      { name: 'crm-web-forms', url: `${CLOUD_RUN_URL}/api/crm/web-forms`, method: 'POST', body: { action: 'list', client_id: 'health-check' } },
+      { name: 'crm-tasks-auto-generate', url: `${CLOUD_RUN_URL}/api/crm/tasks/auto-generate`, method: 'POST', body: { client_id: 'health-check' } },
+
+      // ─── Utilities ──────────────────────────────────────────────
+      { name: 'train-steve', url: `${CLOUD_RUN_URL}/api/train-steve`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'approve-knowledge', url: `${CLOUD_RUN_URL}/api/approve-knowledge`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'generate-copy', url: `${CLOUD_RUN_URL}/api/generate-copy`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'generate-google-copy', url: `${CLOUD_RUN_URL}/api/generate-google-copy`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'submit-correction', url: `${CLOUD_RUN_URL}/api/submit-correction`, method: 'POST', body: { client_id: 'health-check' } },
+      { name: 'manage-sources', url: `${CLOUD_RUN_URL}/api/manage-sources`, method: 'POST', body: { action: 'list', client_id: 'health-check' } },
 
       // ─── Infra / Root ───────────────────────────────────────────
       { name: 'frontend', url: 'https://www.steve.cl', method: 'GET' },

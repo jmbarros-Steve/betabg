@@ -252,6 +252,7 @@ async function generateQuestions(supabase: any, apiKey: string): Promise<string[
       .from('steve_knowledge')
       .select('titulo')
       .eq('activo', true)
+      .is('purged_at', null)
       .order('created_at', { ascending: false })
       .limit(50),
     'swarmResearch.fetchExistingKnowledge',

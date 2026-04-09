@@ -138,6 +138,7 @@ export async function runInvestigator(
         .eq('categoria', 'sales_learning')
         .eq('activo', true)
         .eq('approval_status', 'approved')
+        .is('purged_at', null)
         .order('created_at', { ascending: false })
         .limit(5),
       [],
@@ -166,6 +167,13 @@ export async function runInvestigator(
   // Fix R5-#27: log when investigator returns entirely empty (helps diagnose missing data)
   if (!result.investigationContext && !result.competitorInsights && !result.salesLearnings) {
     console.warn(`[multi-brain/investigator] Empty result for prospect ${prospect.phone} — no investigation data, competitor ads, or learnings found`);
+    // Fix R6-#1: loguear en qa_log para que sea visible en dashboard
+    void getSupabaseAdmin().from('qa_log').insert({
+      check_type: 'investigator_empty',
+      status: 'info',
+      details: JSON.stringify({ phone: prospect.phone, prospect_id: prospect.id }),
+      detected_by: 'multi-brain-investigator',
+    });
   }
 
   return result;
@@ -203,11 +211,28 @@ export async function runStrategist(
     if (prospect.store_platform) knownData.push(`Plataforma: ${prospect.store_platform}`);
     knownData.push(`Score: ${prospect.lead_score || 0}, Stage: ${prospect.stage || 'discovery'}, Msgs: ${prospect.message_count || 0}`);
 
+    // R7-#18: extraer historial de objeciones para el Strategist
+    const objectionPatterns = [
+      { regex: /caro|precio|presupuesto|no tengo plata|costoso|muy caro/i, name: 'precio' },
+      { regex: /no sé|tengo dudas|no me convence|no estoy seguro|no funciona/i, name: 'escepticismo' },
+      { regex: /no tengo tiempo|ocupado|después|más adelante/i, name: 'timing' },
+      { regex: /ya tengo|ya uso|ya trabajo con/i, name: 'competencia' },
+    ];
+    const detectedObjections = [...new Set(
+      history
+        .filter(m => m.role === 'user')
+        .flatMap(m => objectionPatterns.filter(p => p.regex.test(m.content)).map(p => p.name))
+    )];
+
+    const objectionContext = detectedObjections.length > 0
+      ? `\nOBJECIONES PREVIAS DETECTADAS: ${detectedObjections.join(', ')}\nNO insistas en estos temas. Aborda desde otro ángulo.\n`
+      : '';
+
     const prompt = `Eres un estratega de ventas senior. Analiza esta conversación y produce un BRIEF TÁCTICO para el vendedor.
 
 DATOS DEL PROSPECTO:
 ${knownData.join('\n')}
-
+${objectionContext}
 ${investigatorResults.investigationContext || ''}
 ${investigatorResults.competitorInsights || ''}
 ${investigatorResults.salesLearnings || ''}
@@ -240,15 +265,41 @@ Responde SOLO con un JSON (sin markdown):
     const jsonStr = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
     const parsed = JSON.parse(jsonStr);
 
+    const VALID_STRATEGIST_ACTIONS = new Set([
+      'validate_emotion', 'ask_discovery', 'show_data', 'pitch_soft', 'pitch_hard',
+      'send_case_study', 'suggest_meeting', 'close_trial', 'back_off', 'continue_discovery',
+    ]);
+    const rawAction = parsed.suggestedAction || 'continue_discovery';
+    if (!VALID_STRATEGIST_ACTIONS.has(rawAction)) {
+      console.warn(`[multi-brain/strategist] Invalid action "${rawAction}" — fallback to continue_discovery`);
+    }
     const result = {
       brief: parsed.brief || '',
-      suggestedAction: parsed.suggestedAction || 'continue_discovery',
+      suggestedAction: VALID_STRATEGIST_ACTIONS.has(rawAction) ? rawAction : 'continue_discovery',
       tone: parsed.tone || 'friendly',
     };
     // Fix R5-#29: warn if brief is empty after successful API call (unexpected)
     if (!result.brief.trim()) {
       console.warn(`[multi-brain/strategist] Brief is empty after successful API call for prospect`);
     }
+
+    // R7-#4: pitch-readiness score para calibrar suggestedAction
+    const pitchReadiness = (() => {
+      let score = 0;
+      if ((prospect.pain_points?.length ?? 0) >= 2) score += 30;
+      if (prospect.budget_range) score += 20;
+      if ((prospect.lead_score || 0) >= 50) score += 20;
+      if ((prospect.message_count || 0) >= 4) score += 15;
+      if (prospect.actively_looking === true) score += 15;
+      return score;
+    })();
+
+    // Override la acción si pitch-readiness es insuficiente
+    if (['pitch_soft', 'pitch_hard'].includes(result.suggestedAction) && pitchReadiness < 40) {
+      console.warn(`[strategist] Override pitch → ask_discovery (pitchReadiness=${pitchReadiness})`);
+      result.suggestedAction = 'ask_discovery';
+    }
+
     return result;
   } catch (err) {
     console.error('[multi-brain/strategist] Error:', err);
@@ -280,7 +331,10 @@ export async function runConversationalist(
     let systemPrompt = dynamicPrompt;
     if (strategistBrief.brief) {
       // Fix R5-#23: truncate brief to max 400 chars to prevent system prompt bloat
-      const truncatedBrief = strategistBrief.brief.slice(0, 400);
+      // Fix R6-#2: truncar en límite de palabra para no cortar instrucción a mitad
+      const truncatedBrief = strategistBrief.brief.length <= 400
+        ? strategistBrief.brief
+        : strategistBrief.brief.slice(0, 400).replace(/\s\S*$/, '') + '...';
       systemPrompt = `🧠 BRIEF DEL ESTRATEGA (SIGUE ESTA DIRECTRIZ):
 ${truncatedBrief}
 Acción sugerida: ${strategistBrief.suggestedAction}
@@ -288,6 +342,36 @@ Tono: ${strategistBrief.tone}
 
 ${dynamicPrompt}`;
     }
+
+    // R7-#29: action directives obligatorias del Strategist (se inyectan AL INICIO del systemPrompt)
+    const actionDirectives: Record<string, string> = {
+      back_off: '🚨 PARADA OBLIGATORIA: El Strategist detectó que el prospecto está resistiendo. NO sigas vendiendo ni pitcheando. Haz UNA pregunta abierta y ESCUCHA. Retrocede completamente del pitch.',
+      ask_discovery: '🔍 MODO DISCOVERY: Aún no hay suficiente información. Sigue preguntando con curiosidad genuina. NO menciones soluciones todavía.',
+      validate_emotion: '❤️ VALIDA PRIMERO: El prospecto tiene una emoción fuerte (frustración, duda, miedo). PRIMERO di que entiendes. DESPUÉS propones. Si validás la emoción primero, el resto fluye.',
+      show_data: '📊 MUESTRA DATOS: El prospecto necesita evidencia. Comparte UN caso concreto o UNA métrica relevante a su situación. Conciso.',
+      pitch_soft: '💡 PITCH SUAVE: Presenta la solución como opción, no como presión. Deja espacio para que decida.',
+      pitch_hard: '🔥 CIERRE: El prospecto está listo. Sé directo, propone el siguiente paso concreto ahora.',
+      suggest_meeting: '📅 PROPONE REUNIÓN: Es el momento. Sugiere fecha/hora específica. Di qué pasa en la reunión.',
+      close_trial: '🎯 PROPONE PRUEBA: Ofrece empezar pequeño. Reduce el riesgo percibido.',
+      send_case_study: '📖 CASO DE ESTUDIO: Comparte un caso real y breve de un negocio similar. Muestra el resultado.',
+    };
+
+    const actionDirective = actionDirectives[strategistBrief.suggestedAction];
+    if (actionDirective) {
+      systemPrompt = actionDirective + '\n\n' + systemPrompt;
+    }
+
+    // R7-#14: inyectar tone directive del Strategist
+    const toneDirectives: Record<string, string> = {
+      empathetic: '❤️ TONO EMPÁTICO: El prospecto está frustrado o en dificultad. PRIMERO valida su emoción ("Entiendo, eso es duro"). DESPUÉS propones solución. NO minimices ni te pongas energético.',
+      urgent: '⚡ TONO URGENTE: Sé directo y conciso. Propone acción concreta YA. Sin relleno.',
+      provocative: '🔥 TONO PROVOCADOR: Cuestiona supuestos. Desafía creencias limitantes con datos. Usa una pregunta incómoda pero honesta.',
+      confident: '💪 TONO CONFIADO: Habla con datos y hechos. Prueba social concreta. Sin dudar.',
+      casual: '😊 TONO CASUAL: Relajado, como amigo que sabe del tema. Sin jerga corporativa.',
+      friendly: '🙂 TONO AMIGABLE: Cálido, cercano, conversacional.',
+    };
+    const toneDirective = toneDirectives[strategistBrief.tone] || toneDirectives['friendly'];
+    systemPrompt = toneDirective + '\n\n' + systemPrompt;
 
     const { ok, data, status } = await anthropicFetch(
       {

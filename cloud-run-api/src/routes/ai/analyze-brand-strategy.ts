@@ -897,6 +897,7 @@ export async function analyzeBrandStrategy(c: Context) {
         .in('categoria', ['meta_ads', 'brief', 'anuncios', 'google', 'seo', 'shopify', 'klaviyo'])
         .eq('activo', true)
         .eq('approval_status', 'approved')
+        .is('purged_at', null)
         .order('orden', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(20),
