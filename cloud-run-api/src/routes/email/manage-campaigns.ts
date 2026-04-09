@@ -28,6 +28,7 @@ async function enqueueCampaignItems(
   }>,
 ): Promise<number> {
   let inserted = 0;
+  const errors: string[] = [];
   const CHUNK = 500;
   for (let i = 0; i < items.length; i += CHUNK) {
     const batch = items.slice(i, i + CHUNK).map((item) => ({
@@ -38,9 +39,13 @@ async function enqueueCampaignItems(
     const { error } = await supabase.from('email_send_queue').insert(batch);
     if (error) {
       console.error(`[enqueueCampaignItems] batch ${i} error:`, error.message);
+      errors.push(`batch ${i}: ${error.message}`);
     } else {
       inserted += batch.length;
     }
+  }
+  if (errors.length > 0 && inserted === 0) {
+    throw new Error(`All batches failed: ${errors[0]}`);
   }
   return inserted;
 }

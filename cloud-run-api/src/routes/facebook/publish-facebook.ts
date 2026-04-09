@@ -160,6 +160,20 @@ export async function publishFacebook(c: Context) {
       return c.json({ error: 'client_id is required' }, 400);
     }
 
+    // Verify user owns this client (IDOR prevention)
+    const { data: ownerCheck } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('id', client_id)
+      .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+      .maybeSingle();
+    if (!ownerCheck) {
+      const { data: role } = await supabase.from('user_roles').select('is_super_admin').eq('user_id', user.id).maybeSingle();
+      if (!role?.is_super_admin) {
+        return c.json({ error: 'No tienes acceso a este cliente' }, 403);
+      }
+    }
+
     switch (action) {
       // ─── PUBLISH NOW ────────────────────────────────────────
       case 'publish': {

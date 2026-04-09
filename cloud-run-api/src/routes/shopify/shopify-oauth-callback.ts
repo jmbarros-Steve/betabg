@@ -181,7 +181,7 @@ export async function shopifyOauthCallback(c: Context) {
     let stateParam: string | null = null;
 
     if (isDirectRedirect) {
-      const url = new URL(c.req.url);
+      const url = new URL(c.req.url, `https://${c.req.header('host') || 'localhost'}`);
       code = url.searchParams.get('code') || '';
       shop = url.searchParams.get('shop') || '';
       hmac = url.searchParams.get('hmac');

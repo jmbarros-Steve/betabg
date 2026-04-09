@@ -38,13 +38,15 @@ export async function authMiddleware(c: Context, next: Next) {
   c.set('user', user);
   c.set('token', token);
 
-  // Fire & forget: update last_active_at for churn detection
-  Promise.resolve(
-    supabase
+  // Update last_active_at for churn detection (non-blocking but awaited)
+  try {
+    await supabase
       .from('clients')
       .update({ last_active_at: new Date().toISOString() })
-      .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
-  ).catch(() => {});
+      .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`);
+  } catch (e) {
+    console.warn('[auth] last_active_at update failed:', (e as Error).message);
+  }
 
   await next();
 }

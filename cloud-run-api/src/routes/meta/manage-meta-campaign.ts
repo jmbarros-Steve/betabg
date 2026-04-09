@@ -112,7 +112,6 @@ async function uploadImageFromUrl(
     const base64 = Buffer.from(imgBuffer).toString('base64');
 
     const formData = new FormData();
-    formData.append('access_token', accessToken);
     // Meta adimages API accepts filename + bytes (base64)
     formData.append('filename', 'ad_image.jpg');
     formData.append('bytes', base64);
@@ -120,6 +119,7 @@ async function uploadImageFromUrl(
     const uploadUrl = `${META_API_BASE}/act_${accountId}/adimages`;
     const uploadResponse = await fetch(uploadUrl, {
       method: 'POST',
+      headers: { 'Authorization': `Bearer ${accessToken}` },
       body: formData,
     });
     const uploadData: any = await uploadResponse.json();

@@ -93,14 +93,20 @@ Si ya hay regla que cubre, responde: {"existing_covers": true, "rule_id": "R-XXX
     }),
   });
 
-  const aiResponse = await response.json() as any;
+  let aiResponse: any;
+  try {
+    aiResponse = await response.json();
+  } catch {
+    console.error('[auto-rule-gen] Failed to parse Anthropic response as JSON');
+    return c.json({ error: 'AI response not valid JSON' }, 502);
+  }
 
   let result: any;
   try {
     const text = aiResponse.content?.[0]?.text || '';
     result = JSON.parse(text.replace(/```json|```/g, '').trim());
   } catch {
-    console.error('[auto-rule-gen] Failed to parse AI response');
+    console.error('[auto-rule-gen] Failed to parse AI response content');
     return c.json({ error: 'AI response parse failed' }, 500);
   }
 

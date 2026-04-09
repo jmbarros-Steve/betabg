@@ -58,9 +58,14 @@ export async function leadsieWebhook(c: Context) {
       }
       const providedSecret =
         c.req.header('x-webhook-secret') || c.req.query('secret') || '';
-      const isValid = providedSecret &&
-        expectedSecret.length === providedSecret.length &&
-        timingSafeEqual(Buffer.from(providedSecret), Buffer.from(expectedSecret));
+      // Pad to same length before timingSafeEqual to avoid length-based info leak
+      const maxLen = Math.max(expectedSecret.length, providedSecret.length);
+      const expectedBuf = Buffer.alloc(maxLen);
+      const providedBuf = Buffer.alloc(maxLen);
+      Buffer.from(expectedSecret).copy(expectedBuf);
+      Buffer.from(providedSecret).copy(providedBuf);
+      const isValid = providedSecret.length === expectedSecret.length &&
+        timingSafeEqual(providedBuf, expectedBuf);
       if (!isValid) {
         console.warn('[leadsie-webhook] Rejected: invalid secret');
         return c.json({ error: 'Unauthorized' }, 401);

@@ -125,7 +125,7 @@ async function getNotPurchasedRecommendations(
     .map(p => ({ ...p, score: popularityMap.get(p.id) || 0 }))
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
-      return parseFloat(b.price) - parseFloat(a.price);
+      return (parseFloat(b.price) || 0) - (parseFloat(a.price) || 0);
     });
 
   return sorted.slice(0, count);
@@ -152,7 +152,7 @@ async function getBestSellersFallback(
 
   // No conversion data at all -- return highest priced products
   return [...allProducts]
-    .sort((a, b) => parseFloat(b.price) - parseFloat(a.price))
+    .sort((a, b) => (parseFloat(b.price) || 0) - (parseFloat(a.price) || 0))
     .slice(0, count)
     .map(p => ({ ...p, score: 0 }));
 }

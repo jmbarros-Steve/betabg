@@ -60,6 +60,8 @@ export async function generateVideo(c: Context) {
     if (!replicateResp.ok) {
       const errText = await replicateResp.text();
       console.error('[generate-video] Replicate API error:', replicateResp.status, errText);
+      // Refund credits — Replicate failed
+      await supabase.rpc('deduct_credits', { p_client_id: clientId, p_amount: -VIDEO_CREDIT_COST });
       return c.json({ error: 'Error generando el video. Intenta de nuevo.' }, 500);
     }
 
@@ -67,6 +69,8 @@ export async function generateVideo(c: Context) {
 
     if (!prediction.id) {
       console.error('[generate-video] No prediction ID returned from Replicate');
+      // Refund credits — no prediction ID
+      await supabase.rpc('deduct_credits', { p_client_id: clientId, p_amount: -VIDEO_CREDIT_COST });
       return c.json({ error: 'Error generando el video. Intenta de nuevo.' }, 500);
     }
 
