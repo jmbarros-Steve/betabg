@@ -10,7 +10,6 @@ const columns = [
       { label: 'Copies Ads', href: '#features' },
       { label: 'Analytics', href: '#features' },
       { label: 'Precios', href: '#planes' },
-      { label: 'Steve Social', href: '/social' },
     ],
   },
   {
