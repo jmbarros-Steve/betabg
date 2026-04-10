@@ -124,12 +124,12 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
           </h3>
 
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full text-sm border-collapse" style={{ tableLayout: 'fixed' }}>
+            <table className="w-full text-sm border-collapse min-w-[600px]" style={{ tableLayout: 'fixed' }}>
               <colgroup>
-                <col style={{ width: '46%' }} />
-                <col style={{ width: '18%' }} />
-                <col style={{ width: '18%' }} />
-                <col style={{ width: '18%' }} />
+                <col className="w-[52%]" />
+                <col className="w-[16%]" />
+                <col className="w-[16%]" />
+                <col className="w-[16%]" />
               </colgroup>
               <thead className="sticky top-0 z-10">
                 <tr className="bg-[#1E3A7B]">
@@ -137,9 +137,8 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
                     Feature
                   </th>
                   {PLAN_SLUGS.map((slug) => (
-                    <th key={slug} className="py-3.5 px-3 font-semibold text-white text-sm text-center">
-                      <span className="hidden sm:inline">{PLAN_INFO[slug].emoji} </span>
-                      {PLAN_INFO[slug].nombre}
+                    <th key={slug} className="py-3.5 font-semibold text-white text-sm text-center">
+                      {PLAN_INFO[slug].emoji} {PLAN_INFO[slug].nombre}
                     </th>
                   ))}
                 </tr>
@@ -157,15 +156,15 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
                 </tr>
                 <tr className="hover:bg-slate-50/50">
                   <td className="py-2.5 pl-8 pr-4 text-slate-600">Reunión de implementación</td>
-                  <td className="py-2.5 px-3 text-center text-sm font-medium text-slate-700">1</td>
-                  <td className="py-2.5 px-3 text-center text-sm font-medium text-slate-700">3</td>
-                  <td className="py-2.5 px-3 text-center text-sm font-medium text-slate-700">3</td>
+                  <td className="py-2.5 text-center text-sm font-medium text-slate-700">1</td>
+                  <td className="py-2.5 text-center text-sm font-medium text-slate-700">3</td>
+                  <td className="py-2.5 text-center text-sm font-medium text-slate-700">3</td>
                 </tr>
                 <tr className="hover:bg-slate-50/50">
                   <td className="py-2.5 pl-8 pr-4 text-slate-600">Reunión mensual con agente</td>
-                  <td className="py-2.5 px-3"><CellIcon value={false} /></td>
-                  <td className="py-2.5 px-3"><CellIcon value={false} /></td>
-                  <td className="py-2.5 px-3"><CellIcon value={true} /></td>
+                  <td className="py-2.5"><CellIcon value={false} /></td>
+                  <td className="py-2.5"><CellIcon value={false} /></td>
+                  <td className="py-2.5"><CellIcon value={true} /></td>
                 </tr>
               </tbody>
             </table>
@@ -205,9 +204,9 @@ function ModuloBlock({ section }: { section: { modulo: string; features: { nombr
       {section.features.map((feature) => (
         <tr key={feature.nombre} className="hover:bg-slate-50/50">
           <td className="py-2.5 pl-8 pr-4 text-slate-600">{feature.nombre}</td>
-          <td className="py-2.5 px-3"><CellIcon value={feature.visual} /></td>
-          <td className="py-2.5 px-3"><CellIcon value={feature.estrategia} /></td>
-          <td className="py-2.5 px-3"><CellIcon value={feature.full} /></td>
+          <td className="py-2.5"><CellIcon value={feature.visual} /></td>
+          <td className="py-2.5"><CellIcon value={feature.estrategia} /></td>
+          <td className="py-2.5"><CellIcon value={feature.full} /></td>
         </tr>
       ))}
     </>
