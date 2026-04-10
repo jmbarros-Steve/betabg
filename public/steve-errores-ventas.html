@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>18 Errores de Steve Ventas — Alta Prioridad</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f0f12;
+    color: #e8e8f0;
+    min-height: 100vh;
+    padding: 40px 20px 80px;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+  .header p {
+    color: #888;
+    font-size: 1rem;
+  }
+  .stats {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-bottom: 48px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    background: #1a1a22;
+    border: 1px solid #2a2a38;
+    border-radius: 12px;
+    padding: 16px 28px;
+    text-align: center;
+  }
+  .stat .num { font-size: 2rem; font-weight: 800; }
+  .stat .label { font-size: 0.75rem; color: #888; margin-top: 2px; }
+  .stat.pitch .num { color: #f87171; }
+  .stat.calificacion .num { color: #fb923c; }
+  .stat.revenue .num { color: #4ade80; }
+
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+    margin-top: 40px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #2a2a38;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .card {
+    background: #1a1a22;
+    border: 1px solid #2a2a38;
+    border-radius: 16px;
+    padding: 24px;
+    transition: border-color 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .card:hover { border-color: #444; }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .card.pitch::before { background: linear-gradient(90deg, #f87171, #fb923c); }
+  .card.calificacion::before { background: linear-gradient(90deg, #fb923c, #fbbf24); }
+
+  .card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .card-num {
+    background: #252530;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #666;
+    white-space: nowrap;
+    margin-top: 2px;
+  }
+  .card h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.4;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+  }
+  .badge.pitch { background: #3f1515; color: #f87171; }
+  .badge.calificacion { background: #3f2010; color: #fb923c; }
+
+  .description {
+    font-size: 0.875rem;
+    color: #aaa;
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+
+  /* WhatsApp simulation */
+  .wa-sim {
+    background: #0b141a;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    border: 1px solid #1a2930;
+  }
+  .wa-label {
+    font-size: 0.65rem;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+  .bubble {
+    max-width: 85%;
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    margin-bottom: 6px;
+    position: relative;
+  }
+  .bubble.user {
+    background: #005c4b;
+    color: #e9edef;
+    margin-left: auto;
+    border-bottom-right-radius: 4px;
+  }
+  .bubble.steve {
+    background: #202c33;
+    color: #e9edef;
+    border-bottom-left-radius: 4px;
+  }
+  .bubble.steve.bad {
+    background: #2d1515;
+    border: 1px solid #5a2020;
+  }
+  .bubble.steve.good {
+    background: #0d2b1e;
+    border: 1px solid #1a5a3a;
+  }
+  .bubble-label {
+    font-size: 0.65rem;
+    color: #555;
+    margin-bottom: 2px;
+    margin-top: 8px;
+  }
+  .highlight {
+    background: #5a1a1a;
+    border-radius: 3px;
+    padding: 0 3px;
+    color: #f87171;
+  }
+  .highlight.good {
+    background: #0d3a1f;
+    color: #4ade80;
+  }
+
+  .impact {
+    background: #1f1508;
+    border: 1px solid #3a2510;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 0.8rem;
+    color: #fbbf24;
+    margin-bottom: 12px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .impact::before { content: '💸'; flex-shrink: 0; }
+
+  .fix {
+    background: #0d1f18;
+    border: 1px solid #1a3a28;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 0.8rem;
+    color: #4ade80;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .fix::before { content: '🔧'; flex-shrink: 0; }
+
+  .max-width { max-width: 1200px; margin: 0 auto; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>18 Errores de Alta Prioridad — Steve Ventas WA</h1>
+  <p>Conversación con prospecto que invierte $3.000 USD/mes en ads. Cada error puede costar esa venta.</p>
+</div>
+
+<div class="max-width">
+<div class="stats">
+  <div class="stat pitch"><div class="num">10</div><div class="label">Errores de Pitch</div></div>
+  <div class="stat calificacion"><div class="num">8</div><div class="label">Errores de Calificación</div></div>
+  <div class="stat revenue"><div class="num">$36K</div><div class="label">Revenue anual en riesgo por error</div></div>
+</div>
+
+<!-- PITCH ERRORS -->
+<div class="section-title max-width">🎯 Errores de Pitch — Lo que Steve dice puede perder la venta</div>
+<div class="grid">
+
+  <!-- Error 1 -->
+  <div class="card pitch">
+    <div class="card-header">
+      <div class="card-num">#1</div>
+      <h3>Repite ROAS 3 veces en la misma conversación</h3>
+    </div>
+    <div class="badge pitch">Pitch</div>
+    <div class="description">Steve tiene prohibido repetir argumentos, pero el prompt carga benchmarks de industria (ROAS 3-5x), el contexto de creativos los menciona de nuevo, y luego el cierre también los usa. El prospecto siente que Steve es un loro.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Ejemplo real</div>
+      <div class="bubble user">Tengo una tienda de ropa en Shopify</div>
+      <div class="bubble steve bad">Con ropa el ROAS saludable es 3-5x. Hoy seguro estás por debajo.</div>
+      <div class="bubble user">¿Qué me puede ofrecer Steve?</div>
+      <div class="bubble steve bad">Un <span class="highlight">ROAS de 3-4x</span> es alcanzable para tu sector.</div>
+      <div class="bubble user">¿Cuánto tiempo tarda?</div>
+      <div class="bubble steve bad">En 60 días podemos llevarte a un <span class="highlight">ROAS de 3x</span> mínimo.</div>
+    </div>
+    <div class="impact">Prospecto percibe falta de profundidad. Un buen vendedor no repite la misma palanca 3 veces.</div>
+    <div class="fix">Rastrear qué KPIs ya se usaron y excluirlos del siguiente mensaje. Alternar con CPA, CPM, tasa de conversión.</div>
+  </div>
+
+  <!-- Error 2 -->
+  <div class="card pitch">
+    <div class="card-header">
+      <div class="card-num">#2</div>
+      <h3>Steve inventa la industria del prospecto en el primer mensaje</h3>
+    </div>
+    <div class="badge pitch">Pitch</div>
+    <div class="description">El quick intel de primer mensaje tiene instrucción de "NUNCA digas que no hay info — haz una hipótesis." Si el nombre de WhatsApp es "Contacto 4821" o un número, el AI inventa una industria y la usa como entrada.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Ejemplo real</div>
+      <div class="bubble user">Hola, me interesa Steve Ads</div>
+      <div class="bubble steve bad">¡Hola! Vi que en el <span class="highlight">sector deportivo</span> la clave es el UGC en Meta. ¿Tu tienda es de deporte o fitness?</div>
+      <div class="bubble user">No... vendo materiales de construcción</div>
+    </div>
+    <div class="impact">Primer mensaje destruye credibilidad. Si Steve "investigó" y se equivocó de industria, el prospecto piensa que es un bot genérico.</div>
+    <div class="fix">Cambiar prompt: "Si no hay info suficiente, retorna {}. NO inventes." Steve debe hacer una pregunta abierta en lugar de asumir.</div>
+  </div>
+
+  <!-- Error 3 -->
+  <div class="card pitch">
+    <div class="card-header">
+      <div class="card-num">#3</div>
+      <h3>FOMO de "máximo 3 marcas por categoría" no se verifica</h3>
+    </div>
+    <div class="badge pitch">Pitch</div>
+    <div class="description">El prompt permite mencionar "Steve trabaja máximo 3 marcas por categoría para no competirte." Pero NUNCA se consulta la DB para validar si es cierto. Si ya hay 12 clientes de moda, esta frase es mentira verificable en LinkedIn.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Ejemplo real</div>
+      <div class="bubble user">¿Trabajan con muchas tiendas de cosméticos?</div>
+      <div class="bubble steve bad">Trabajamos máximo <span class="highlight">3 marcas por categoría</span> para no competirte. Hay 1 cupo disponible.</div>
+      <div class="bubble user">Mmm vi en Instagram que tienen como 8 clientes de cosméticos</div>
+    </div>
+    <div class="impact">Si el prospecto lo comprueba y es mentira → trust = 0, venta = 0, reputación dañada.</div>
+    <div class="fix">Consultar <code>clients</code> por industria antes de inyectar esta instrucción. Solo mencionar si count &lt; 3.</div>
+  </div>
+
+  <!-- Error 4 -->
+  <div class="card pitch">
+    <div class="card-header">
+      <div class="card-num">#4</div>
+      <h3>Oferta de "1 millón para armarte tienda" se repite</h3>
+    </div>
+    <div class="badge pitch">Pitch</div>
+    <div class="description">Cuando el prospecto no tiene tienda, Steve ofrece armarla por 1 millón. No hay check de si ya lo ofreció. En mensajes 3, 6 y 9 puede repetir la misma oferta.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Ejemplo real</div>
+      <div class="bubble user">No tengo Shopify, vendo por Instagram</div>
+      <div class="bubble steve bad">Podemos armarte la tienda desde 1 millón de pesos.</div>
+      <div class="bubble user">Ya entendí, pero quiero ver primero cómo funcionan los ads</div>
+      <div class="bubble steve bad">Claro, y si quieres avanzar también podemos armar tu <span class="highlight">Shopify desde 1 millón</span>.</div>
+    </div>
+    <div class="impact">Suena a script repetitivo. El prospecto siente que Steve no escucha.</div>
+    <div class="fix">Antes de inyectar la oferta, verificar si ya aparece en el historial reciente de Steve.</div>
+  </div>
+
+  <!-- Error 5 -->
+  <div class="card pitch">
+    <div class="card-header">
+      <div class="card-num">#5</div>
+      <h3>Steve menciona un producto del sitio con nombre vacío</h3>
+    </div>
+    <div class="badge pitch">Pitch</div>
+    <div class="description">Cuando investiga la tienda y el nombre del producto estrella está vacío en el scraping, el prompt queda: "Vi tu [vacío], tiene pinta de vender bien en ads".</div>
+    <div class="wa-sim">
+      <div class="wa-label">Ejemplo real</div>
+      <div class="bubble steve bad">Vi tu tienda — <span class="highlight">tu "[  ]"</span> tiene buena pinta para ads de Meta. ¿Cuánto vendes de ese producto?</div>
+      <div class="bubble user">...¿qué producto?</div>
+    </div>
+    <div class="impact">El "wow factor" de "vi tu tienda" se convierte en "bug visible". Pierde toda credibilidad de investigación.</div>
+    <div class="fix">Validar <code>productName?.trim()</code>. Si está vacío, omitir la instrucción completamente.</div>
+  </div>
+
+  <!-- Error 6 -->
+  <div class="card pitch">
+    <div class="card-header">
+      <div class="card-num">#6</div>
+      <h3>ROAS prometido usa multiplicador fijo 2x para todas las industrias</h3>
+    </div>
+    <div class="badge pitch">Pitch</div>
+    <div class="description">La función que calcula "cuánto podrías ganar con Steve" asume ROAS actual de 2x para todos. Para joyería (ROAS ideal 5-8x) o SaaS, los números son completamente distintos. Si el prospecto ya tiene 3.5x, Steve promete "doble de ingresos" que ya tiene.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Ejemplo real</div>
+      <div class="bubble user">Gasto 500k en ads y genero 2 millones. ¿Me sirve Steve?</div>
+      <div class="bubble steve bad">Con optimización podrías <span class="highlight">duplicar tus ingresos a 4 millones</span>. El potencial es enorme.</div>
+      <div class="bubble user">Pero si ya tengo ROAS 4x... ¿cómo dupliqué?</div>
+    </div>
+    <div class="impact">El prospecto que conoce sus métricas detecta el error inmediatamente. Pierde credibilidad técnica.</div>
+    <div class="fix">Usar benchmarks por industria. "Si tu ROAS actual es 4x, podemos llevarte a 6x" — número realista.</div>
+  </div>
+
+  <!-- Error 7 -->
+  <div class="card pitch">
+    <div class="card-header">
+      <div class="card-num">#7</div>
+      <h3>Deadline de temporada puede estar pasado</h3>
+    </div>
+    <div class="badge pitch">Pitch</div>
+    <div class="description">Steve usa urgencia de temporada para cerrar: "CyberDay está a la vuelta de la esquina." Los deadlines son hardcodeados. Si CyberDay fue en mayo y estamos en agosto, el prospecto sabe que Steve está equivocado.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Ejemplo real (agosto)</div>
+      <div class="bubble steve bad">El <span class="highlight">CyberDay se viene pronto</span> — hay que preparar las campañas YA si quieres aprovechar el peak.</div>
+      <div class="bubble user">...El CyberDay fue hace 3 meses</div>
+    </div>
+    <div class="impact">Steve pierde autoridad en marketing si no sabe cuándo es CyberDay. Es lo básico.</div>
+    <div class="fix">Validar <code>deadline &gt; today</code> antes de usar. O mantener lista de fechas reales en DB.</div>
+  </div>
+
+  <!-- Error 8 -->
+  <div class="card pitch">
+    <div class="card-header">
+      <div class="card-num">#8</div>
+      <h3>Steve propone reunión 3 veces sin notar que el prospecto ya dijo "después"</h3>
+    </div>
+    <div class="badge pitch">Pitch</div>
+    <div class="description">No hay chequeo de "¿ya propuse reunión en los últimos mensajes?" El prospecto que dijo "no ahora" recibe la propuesta de reunión en el siguiente mensaje, y el siguiente, y el siguiente.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Ejemplo real</div>
+      <div class="bubble steve bad">¿Agendamos 15 min? www.steve.cl/agendar/steve</div>
+      <div class="bubble user">Ahora no puedo, luego te escribo</div>
+      <div class="bubble steve bad">Entiendo, ¿te parece bien que <span class="highlight">agendemos una llamada rápida</span>?</div>
+      <div class="bubble user">Te dije que después...</div>
+      <div class="bubble steve bad">Claro, cuando puedas. Mientras, ¿<span class="highlight">agendamos</span> mañana?</div>
+    </div>
+    <div class="impact">El prospecto cierra el chat. Pierde la venta por insistente.</div>
+    <div class="fix">Si los últimos 3 mensajes de Steve incluyen "agendar", no volver a proponer. Esperar señal del prospecto.</div>
+  </div>
+
+  <!-- Error 9 -->
+  <div class="card pitch">
+    <div class="card-header">
+      <div class="card-num">#9</div>
+      <h3>Deck o mockup enviado demasiado temprano rompe el rapport</h3>
+    </div>
+    <div class="badge pitch">Pitch</div>
+    <div class="description">El deck y el mockup se envían cuando stage = pitching + tiene datos + no se envió antes. Esto puede ocurrir en el mensaje 3-4 si el scoring subió rápido. Un deck comercial antes de tener rapport se siente como presión de venta.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Ejemplo real</div>
+      <div class="bubble user">Tengo Shopify de ropa, gasto 200k en Meta</div>
+      <div class="bubble steve bad">¡Perfecto! Aquí te envío una <span class="highlight">propuesta comercial personalizada</span> [PDF adjunto]</div>
+      <div class="bubble user">Oe espera... ni me preguntaste qué necesito</div>
+    </div>
+    <div class="impact">Prospecto siente que Steve es un vendedor agresivo. Cierra el chat.</div>
+    <div class="fix">Requerir <code>message_count &gt;= 6</code> O que haya señal de compra detectada antes de enviar deck/mockup.</div>
+  </div>
+
+  <!-- Error 10 -->
+  <div class="card pitch">
+    <div class="card-header">
+      <div class="card-num">#10</div>
+      <h3>Case study de industria puede ser un "bug conocido" en vez de un éxito</h3>
+    </div>
+    <div class="badge pitch">Pitch</div>
+    <div class="description">El fallback de case studies busca por keywords en la tabla steve_knowledge. Si hay un entry con "error en módulo de ropa" con esas palabras, puede retornarlo como case study de la industria.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Ejemplo real</div>
+      <div class="bubble steve bad">Aquí un caso real de tu industria: <span class="highlight">"BUG: error en sincronización de catálogo Shopify para tiendas de ropa"</span> — así es como lo resolvimos.</div>
+      <div class="bubble user">??? Qué caso de éxito es ese</div>
+    </div>
+    <div class="impact">El prospecto ve que el bot sacó un bug interno como ejemplo de éxito. Confianza destruida.</div>
+    <div class="fix">Agregar <code>.eq('categoria', 'case_study')</code> a la query. Solo retornar entries categorizados como caso de éxito.</div>
+  </div>
+
+</div>
+
+<!-- CALIFICACIÓN ERRORS -->
+<div class="section-title max-width" style="margin-top:60px;">🎯 Errores de Calificación — Steve califica mal al prospecto</div>
+<div class="grid">
+
+  <!-- Error 11 -->
+  <div class="card calificacion">
+    <div class="card-header">
+      <div class="card-num">#11</div>
+      <h3>"Entre 2 y 3 millones" se guarda como texto, score queda en 0</h3>
+    </div>
+    <div class="badge calificacion">Calificación</div>
+    <div class="description">Cuando el prospecto dice "facturamos entre 2 y 3 millones", la extracción guarda el texto "2-3". El sistema de scoring intenta parsear ese número y falla silenciosamente. El prospecto con 3M de facturación tiene score de 0 en budget.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Qué pasa en la DB</div>
+      <div class="bubble user">Vendemos entre 2 y 3 millones al mes</div>
+      <div class="bubble steve">Impresionante. ¿Cuánto estás invirtiendo en publicidad hoy?</div>
+      <div class="bubble-label">❌ En Supabase: monthly_revenue = "2-3" → budget_score = 0 → stage = discovery</div>
+    </div>
+    <div class="impact">Prospecto con facturación alta queda en stage "discovery" indefinidamente. Steve no cierra porque el sistema cree que no califica.</div>
+    <div class="fix">Extraer el número menor del rango como piso conservador: "entre 2 y 3 millones" → guardar "2000000".</div>
+  </div>
+
+  <!-- Error 12 -->
+  <div class="card calificacion">
+    <div class="card-header">
+      <div class="card-num">#12</div>
+      <h3>"Necesito resolver esto ya" no activa el cierre</h3>
+    </div>
+    <div class="badge calificacion">Calificación</div>
+    <div class="description">El detector de señales de compra busca "precio", "demo", "cómo empiezo" — pero NO busca urgencia temporal. "Antes de fin de mes", "tengo deadline", "necesito resolver urgente" son HUGE buying signals que Steve ignora.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Ejemplo real</div>
+      <div class="bubble user">Necesito <span class="highlight">solucionar esto antes de fin de mes</span>, tenemos una campaña que empieza el 1 de mayo</div>
+      <div class="bubble steve bad">Entiendo la urgencia. ¿Me cuentas un poco más sobre tu tienda? ¿Tienes Shopify?</div>
+      <div class="bubble-label">❌ Debería haber activado el cierre con link de reunión inmediato</div>
+    </div>
+    <div class="impact">El prospecto CON urgencia real recibe preguntas de discovery. El momentum de compra se pierde.</div>
+    <div class="fix">Agregar keywords: "antes de", "fin de mes", "deadline", "urgente", "necesito resolver ya", "campaña que empieza".</div>
+  </div>
+
+  <!-- Error 13 -->
+  <div class="card calificacion">
+    <div class="card-header">
+      <div class="card-num">#13</div>
+      <h3>Prospecto fantasma no se descalifica nunca</h3>
+    </div>
+    <div class="badge calificacion">Calificación</div>
+    <div class="description">Si el prospecto desaparece y Steve manda 5 mensajes seguidos sin respuesta (followup automático), el sistema no marca al prospecto como "perdido". Sigue activo en el pipeline ocupando espacio y enviando mensajes a alguien que claramente no está.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Ejemplo real</div>
+      <div class="bubble steve">Hola, ¿pudiste revisar lo que te envié?</div>
+      <div class="bubble steve">¿Todo bien por tu lado?</div>
+      <div class="bubble steve">Quería retomar la conversación sobre tus campañas.</div>
+      <div class="bubble steve">¿Te llego mi mensaje anterior?</div>
+      <div class="bubble steve bad"><span class="highlight">Último intento: ¿agendamos esa llamada?</span></div>
+      <div class="bubble-label">❌ Nunca se marca como perdido, sigue en pipeline</div>
+    </div>
+    <div class="impact">Pipeline inflado con prospectos muertos. Métricas falsas. Nadie sabe cuántos leads reales hay.</div>
+    <div class="fix">Si los últimos 5 mensajes son todos de Steve (sin respuesta), marcar como <code>stage: 'lost', reason: 'ghosted'</code>.</div>
+  </div>
+
+  <!-- Error 14 -->
+  <div class="card calificacion">
+    <div class="card-header">
+      <div class="card-num">#14</div>
+      <h3>Pain points de los primeros mensajes se pierden</h3>
+    </div>
+    <div class="badge calificacion">Calificación</div>
+    <div class="description">Si el prospecto tiene 15 pain points acumulados, el sistema guarda solo los últimos 8. Los primeros 7 — que pueden ser los más críticos ("llevo 6 meses quemando plata en ads") — se pierden del scoring.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Qué se pierde</div>
+      <div class="bubble user">Msg 1: "llevo 6 meses quemando plata en Meta, CERO ventas"</div>
+      <div class="bubble-label">... 14 mensajes después...</div>
+      <div class="bubble-label">❌ El pain point del msg 1 ya no está en el array → score de urgencia más bajo</div>
+    </div>
+    <div class="impact">Prospecto con dolor urgente queda clasificado con score más bajo del real. El cierre llega tarde o nunca.</div>
+    <div class="fix">En error de consolidación, mantener TODOS los pain points. No truncar el array original.</div>
+  </div>
+
+  <!-- Error 15 -->
+  <div class="card calificacion">
+    <div class="card-header">
+      <div class="card-num">#15</div>
+      <h3>Score se infla si listan todas sus integraciones aunque no las usen</h3>
+    </div>
+    <div class="badge calificacion">Calificación</div>
+    <div class="description">Cada integración mencionada (Shopify, Meta, Google, Klaviyo) suma puntos al score. Si el prospecto las lista en un solo mensaje sin usarlas realmente ("tenemos Shopify pero no lo usamos bien"), el score FIT sube como si fuera un cliente ideal.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Ejemplo real</div>
+      <div class="bubble user">Tenemos Shopify, Meta Ads, Google Ads y Klaviyo aunque la verdad ninguno funciona bien</div>
+      <div class="bubble-label">❌ Score FIT: +10 (Shopify) +3 (Meta) +3 (Google) +3 (Klaviyo) = 19/15 pts → cap = 15 pts</div>
+      <div class="bubble-label">✅ Debería ser: fit real basado en si efectivamente están activos</div>
+    </div>
+    <div class="impact">Prospecto que "tiene todo pero no sabe usarlo" puede ser excelente cliente — pero el score inflado puede hacer que Steve lo cierre demasiado rápido sin entender la profundidad del problema.</div>
+    <div class="fix">Solo sumar integraciones si el prospecto confirma que las usa activamente, no solo que las tiene.</div>
+  </div>
+
+  <!-- Error 16 -->
+  <div class="card calificacion">
+    <div class="card-header">
+      <div class="card-num">#16</div>
+      <h3>meeting_link_sent = true cuando Steve propone, no cuando el prospecto acepta</h3>
+    </div>
+    <div class="badge calificacion">Calificación</div>
+    <div class="description">El sistema marca la reunión como "link enviado" en cuanto Steve incluye el link en el mensaje. Si el prospecto dice "no puedo ese día", el sistema ya no vuelve a proponer reunión porque cree que ya se envió el link.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Ejemplo real</div>
+      <div class="bubble steve">¿Agendamos? www.steve.cl/agendar/steve</div>
+      <div class="bubble user">No puedo esta semana, quizás la próxima</div>
+      <div class="bubble-label">❌ DB: meeting_link_sent = TRUE → el prompt de cierre deja de activarse</div>
+      <div class="bubble steve bad">Perfecto, ¿pudiste revisar la propuesta que te envié?</div>
+      <div class="bubble-label">❌ Nunca vuelve a proponer la reunión "la próxima semana"</div>
+    </div>
+    <div class="impact">Steve pierde el segundo intento de cerrar la reunión. El prospecto que dijo "quizás la próxima" nunca recibe seguimiento.</div>
+    <div class="fix"><code>meeting_link_sent = true</code> solo cuando el prospecto CONFIRMA (detecta una confirmación), no cuando Steve propone.</div>
+  </div>
+
+  <!-- Error 17 -->
+  <div class="card calificacion">
+    <div class="card-header">
+      <div class="card-num">#17</div>
+      <h3>Hora de Chile calculada con offset manual — falla en horario de verano</h3>
+    </div>
+    <div class="badge calificacion">Calificación</div>
+    <div class="description">El tono del mensaje de Steve cambia según la hora del día. La hora se calcula con UTC-4 hardcodeado. En verano Chile es UTC-3. El tono de "mañana tranquilo" puede activarse a las 4PM porque la hora calculada está desfasada 1 hora.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Ejemplo real (enero, verano)</div>
+      <div class="bubble user">Hola, tengo una consulta [14:00 Chile = UTC-3]</div>
+      <div class="bubble steve bad">Buenas tardes... [<span class="highlight">calcula UTC-4 → 13:00 → "buenas tardes temprano"</span>]</div>
+      <div class="bubble-label">✅ Fix: usar Intl.DateTimeFormat('es-CL', {timeZone: 'America/Santiago'})</div>
+    </div>
+    <div class="impact">Menor, pero genera inconsistencia en el tono. Un mensaje de noche que suena de mañana es raro.</div>
+    <div class="fix">Usar siempre <code>Intl.DateTimeFormat</code> con timezone real de Santiago, no cálculo manual.</div>
+  </div>
+
+  <!-- Error 18 -->
+  <div class="card calificacion">
+    <div class="card-header">
+      <div class="card-num">#18</div>
+      <h3>Extracción de datos falla y score queda en 0 para siempre</h3>
+    </div>
+    <div class="badge calificacion">Calificación</div>
+    <div class="description">Si Claude falla al extraer info (timeout, error de API, respuesta sin JSON), la extracción retorna null. Sin datos extraídos, calculateLeadScore solo tiene lo que ya había antes. Si el prospecto es nuevo, score = 0 y se queda ahí aunque haya dado toda su info.</div>
+    <div class="wa-sim">
+      <div class="wa-label">Qué pasa</div>
+      <div class="bubble user">Tengo Shopify, vendo 3 millones al mes, soy el dueño, uso Meta Ads</div>
+      <div class="bubble-label">Claude API timeout → extractProspectInfo retorna null</div>
+      <div class="bubble-label">❌ DB: score = 0, stage = discovery</div>
+      <div class="bubble steve bad">¡Interesante! ¿Me cuentas qué tipo de productos vendes?</div>
+      <div class="bubble-label">❌ Steve hace preguntas que ya fueron contestadas</div>
+    </div>
+    <div class="impact">Prospecto da toda la info pero Steve no la registra. Repite preguntas → parece bot sin memoria → pierde confianza.</div>
+    <div class="fix">En fallo de extracción, retornar objeto vacío válido (no null) para que el score se calcule con lo que ya había. Implementar retry 1 vez.</div>
+  </div>
+
+</div>
+
+<div style="text-align:center; margin-top:60px; color:#555; font-size:0.8rem;">
+  Steve Ads — Auditoría de Ventas WA · Generado 2026-04-07 · Paula W19
+</div>
+
+</div>
+</body>
+</html>

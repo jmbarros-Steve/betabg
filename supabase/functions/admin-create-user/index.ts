@@ -75,13 +75,22 @@ Deno.serve(async (req) => {
     }
     const newUserId = userData.id;
 
-    // 2. Assign client role
+    // 2. Assign client role (upsert — trigger handle_new_user may have already created it)
     const { error: roleErr } = await supabase
       .from('user_roles')
-      .insert({ user_id: newUserId, role: 'client', is_super_admin: false });
-    if (roleErr) console.error('Role insert error:', roleErr);
+      .upsert(
+        { user_id: newUserId, role: 'client', is_super_admin: false },
+        { onConflict: 'user_id,role' },
+      );
+    if (roleErr) console.error('Role upsert error:', roleErr);
 
-    // 3. Create client record
+    // 2b. Delete orphan client created by handle_new_user trigger
+    await supabase
+      .from('clients')
+      .delete()
+      .eq('user_id', newUserId);
+
+    // 3. Create client record (admin owns the client, new user is the client_user)
     const { data: clientData, error: clientErr } = await supabase
       .from('clients')
       .insert({
@@ -90,8 +99,6 @@ Deno.serve(async (req) => {
         name,
         email,
         company: company || null,
-        rut: rut || null,
-        razon_social: razon_social || null,
       })
       .select('id')
       .single();

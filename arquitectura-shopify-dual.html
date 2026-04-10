@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arquitectura Dual Shopify — Custom App + App Store ready</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  pre { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 13px; line-height: 1.55; }
+  .code-ts { background: #0f172a; color: #e2e8f0; border-left: 4px solid #3b82f6; }
+  .code-sql { background: #1e1b4b; color: #c7d2fe; border-left: 4px solid #8b5cf6; }
+  .code-bash { background: #052e16; color: #bbf7d0; border-left: 4px solid #22c55e; }
+  .code-diff-add { color: #86efac; }
+  .code-diff-rem { color: #fca5a5; }
+  .anchor { scroll-margin-top: 80px; }
+  .grad-hero { background: linear-gradient(135deg, #0f172a, #1e3a8a, #4c1d95); }
+  .grad-now { background: linear-gradient(135deg, #14532d, #052e16); }
+  .grad-future { background: linear-gradient(135deg, #1e3a8a, #1e1b4b); }
+  .grad-switch { background: linear-gradient(135deg, #b45309, #78350f); }
+  .flow-arrow::after { content: '→'; margin: 0 8px; color: #64748b; }
+  .diagram { font-family: 'SF Mono', Monaco, Menlo, monospace; }
+  .pulse-dot { animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<!-- HEADER -->
+<header class="bg-slate-900 text-white sticky top-0 z-50 shadow-xl">
+  <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-bold">Arquitectura Dual Shopify</h1>
+      <p class="text-xs text-slate-400">Custom App hoy · App Store mañana · Sin reescribir nada</p>
+    </div>
+    <nav class="hidden md:flex gap-4 text-sm">
+      <a href="#idea" class="hover:text-blue-400">Idea</a>
+      <a href="#diagrama" class="hover:text-blue-400">Diagrama</a>
+      <a href="#resolver" class="hover:text-blue-400">Resolver</a>
+      <a href="#db" class="hover:text-blue-400">DB</a>
+      <a href="#ahora" class="hover:text-green-400">Hoy</a>
+      <a href="#preparado" class="hover:text-blue-400">Preparado</a>
+      <a href="#switch" class="hover:text-orange-400">Switch Day</a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <div class="grad-hero text-white rounded-2xl p-8 shadow-2xl">
+    <p class="text-blue-300 font-mono text-sm uppercase tracking-wider mb-2">La estrategia ganadora</p>
+    <h2 class="text-4xl font-bold mb-4">No elegir. Dejar ambos modos listos.</h2>
+    <p class="text-slate-200 text-lg leading-relaxed max-w-3xl mb-6">
+      La clave es <strong class="text-white">abstraer el origen de las credenciales</strong> detrás
+      de una capa común. El código de negocio (sync, webhooks, analytics) no sabe si está en modo
+      Custom App o App Store — solo pregunta <em>"dame las credenciales para este shop"</em> y
+      un <strong class="text-yellow-300">Credential Resolver</strong> decide de dónde sacarlas.
+    </p>
+    <p class="text-slate-300 text-base leading-relaxed max-w-3xl">
+      Resultado: <strong class="text-green-300">hoy funcionamos 100% con Custom Apps</strong>, y el
+      día que Shopify apruebe la app pública, <strong class="text-orange-300">seteamos 3 env vars
+      y un feature flag</strong>. Los dos modos coexisten. Los clientes existentes no se enteran
+      del cambio.
+    </p>
+
+    <div class="grid grid-cols-3 gap-3 mt-8">
+      <div class="bg-green-950/60 border border-green-500/30 rounded-lg p-4">
+        <div class="text-xs text-green-300 mb-1">AHORA (día 1)</div>
+        <div class="text-lg font-bold text-white">Custom Apps</div>
+        <div class="text-xs text-slate-300 mt-1">Sin dependencias de Shopify Partners review</div>
+      </div>
+      <div class="bg-blue-950/60 border border-blue-500/30 rounded-lg p-4">
+        <div class="text-xs text-blue-300 mb-1">PREPARADO</div>
+        <div class="text-lg font-bold text-white">App Store dormido</div>
+        <div class="text-xs text-slate-300 mt-1">Código presente, desactivado por flag</div>
+      </div>
+      <div class="bg-orange-950/60 border border-orange-500/30 rounded-lg p-4">
+        <div class="text-xs text-orange-300 mb-1">SWITCH DAY</div>
+        <div class="text-lg font-bold text-white">3 env vars + flag</div>
+        <div class="text-xs text-slate-300 mt-1">Sin deploy grande, sin reescribir</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LA IDEA -->
+<section id="idea" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6 border-b-4 border-slate-900 pb-2 inline-block">La idea central</h2>
+
+  <div class="bg-white border-2 border-slate-200 rounded-xl p-6 mb-6">
+    <h3 class="text-xl font-bold mb-4">Imagina que tu cocina tiene dos fuentes de agua</h3>
+    <p class="text-slate-700 mb-4">
+      Una es del grifo municipal (App Store = credenciales globales). La otra es de un estanque
+      propio (Custom App = credenciales por-cliente). Tú NO quieres que cada receta diga
+      <em>"ve al grifo"</em> o <em>"ve al estanque"</em>. Quieres un solo caño que te dé agua,
+      y el plomero decide de dónde la saca.
+    </p>
+    <p class="text-slate-700">
+      Ese "plomero" en el código se llama <strong>Credential Resolver</strong>. Es una función única
+      que recibe un <code class="bg-slate-100 px-1 rounded">shop_domain</code> y devuelve las
+      credenciales necesarias (client_id, client_secret, access_token, webhook_secret). El resto
+      del sistema no sabe ni le importa cómo se obtuvieron.
+    </p>
+  </div>
+
+  <div class="grid md:grid-cols-3 gap-4">
+    <div class="bg-white border-2 border-green-200 rounded-xl p-5">
+      <div class="text-2xl font-bold text-green-700 mb-2">1</div>
+      <h4 class="font-bold mb-2">Abstraer credenciales</h4>
+      <p class="text-sm text-slate-600">Un solo <code>shopify-credentials.ts</code> es la ÚNICA puerta para leer credenciales.</p>
+    </div>
+    <div class="bg-white border-2 border-blue-200 rounded-xl p-5">
+      <div class="text-2xl font-bold text-blue-700 mb-2">2</div>
+      <h4 class="font-bold mb-2">Marcar cada conexión</h4>
+      <p class="text-sm text-slate-600">Nueva columna <code>connection_mode</code> en <code>platform_connections</code>: <code>'custom_app'</code> o <code>'app_store'</code>.</p>
+    </div>
+    <div class="bg-white border-2 border-orange-200 rounded-xl p-5">
+      <div class="text-2xl font-bold text-orange-700 mb-2">3</div>
+      <h4 class="font-bold mb-2">Feature flag global</h4>
+      <p class="text-sm text-slate-600">Env var <code>SHOPIFY_MODE</code>: <code>custom</code> | <code>appstore</code> | <code>both</code>. Controla el flujo de onboarding.</p>
+    </div>
+  </div>
+</section>
+
+<!-- DIAGRAMA -->
+<section id="diagrama" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6 border-b-4 border-slate-900 pb-2 inline-block">Diagrama de arquitectura</h2>
+
+  <div class="bg-slate-900 text-white rounded-2xl p-8 shadow-xl overflow-x-auto">
+    <pre class="diagram text-xs leading-relaxed">
+                    ┌────────────────────────────────┐
+                    │      FRONTEND (React)          │
+                    │                                │
+                    │  ┌──────────────────────────┐  │
+                    │  │ &lt;ShopifyConnect /&gt;       │  │
+                    │  │  lee SHOPIFY_MODE desde  │  │
+                    │  │  /api/shopify/config     │  │
+                    │  │                          │  │
+                    │  │  mode === 'custom'    ───┼──┼──&gt; &lt;CustomAppWizard /&gt;
+                    │  │  mode === 'appstore'  ───┼──┼──&gt; &lt;OneClickInstall /&gt;
+                    │  │  mode === 'both'      ───┼──┼──&gt; &lt;ChooseMethod /&gt;
+                    │  └──────────────────────────┘  │
+                    └────────────────┬───────────────┘
+                                     │
+                                     ▼
+           ┌─────────────────────────────────────────────────┐
+           │          BACKEND (Cloud Run · Hono)             │
+           │                                                 │
+           │  ┌───────────────────────────────────────────┐  │
+           │  │  routes/shopify/* (sync, fetch, create)   │  │
+           │  │                                           │  │
+           │  │  const creds = await resolveShopify(      │  │
+           │  │    shopDomain                             │  │
+           │  │  )                                        │  │
+           │  │  //   ↓ no sabe NI LE IMPORTA             │  │
+           │  │  //     si es custom o app store          │  │
+           │  └─────────────────┬─────────────────────────┘  │
+           │                    │                            │
+           │                    ▼                            │
+           │  ┌───────────────────────────────────────────┐  │
+           │  │  lib/shopify-credentials.ts               │  │
+           │  │                                           │  │
+           │  │  resolveShopify(shopDomain):              │  │
+           │  │    1. buscar platform_connections         │  │
+           │  │    2. if connection_mode === 'custom_app' │  │
+           │  │       → leer creds de la conexión         │  │
+           │  │    3. if connection_mode === 'app_store'  │  │
+           │  │       → leer env vars globales            │  │
+           │  │       + access_token de la conexión       │  │
+           │  │    4. devolver { clientId, secret,        │  │
+           │  │                  accessToken,             │  │
+           │  │                  webhookSecret }          │  │
+           │  └─────────────────┬─────────────────────────┘  │
+           │                    │                            │
+           └────────────────────┼────────────────────────────┘
+                                │
+                    ┌───────────┴────────────┐
+                    │                        │
+                    ▼                        ▼
+          ┌─────────────────┐      ┌──────────────────┐
+          │ platform_       │      │ Cloud Run ENV    │
+          │ connections     │      │                  │
+          │                 │      │ SHOPIFY_MODE     │
+          │ shop_domain     │      │ SHOPIFY_CLIENT_  │
+          │ connection_mode │      │   ID             │
+          │ shopify_client_ │      │ SHOPIFY_CLIENT_  │
+          │   id            │      │   SECRET         │
+          │ shopify_client_ │      │ SHOPIFY_WEBHOOK_ │
+          │   secret_enc    │      │   SECRET         │
+          │ access_token_   │      └──────────────────┘
+          │   encrypted     │              ↑
+          └─────────────────┘              │
+                    ↑                      │
+                    │                      │
+              Custom App mode       App Store mode
+              (cliente pega)        (globales en Cloud Run)
+    </pre>
+  </div>
+
+  <p class="text-sm text-slate-600 mt-4 italic">
+    El <strong>resolver</strong> es el único archivo que conoce la lógica dual. El resto del código
+    (19 backend routes + 11 edge functions) solo habla con el resolver.
+  </p>
+</section>
+
+<!-- EL RESOLVER -->
+<section id="resolver" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6 border-b-4 border-slate-900 pb-2 inline-block">El Credential Resolver (código real)</h2>
+
+  <div class="bg-white border-2 border-blue-200 rounded-xl p-6 mb-6">
+    <h3 class="text-xl font-bold mb-3">Archivo nuevo: <code class="text-sm bg-slate-100 px-2 py-1 rounded">cloud-run-api/src/lib/shopify-credentials.ts</code></h3>
+    <p class="text-slate-700 mb-4">
+      Este es el corazón de la arquitectura dual. ~100 líneas. Es la ÚNICA forma en que el resto
+      del código lee credenciales de Shopify.
+    </p>
+
+<pre class="code-ts p-4 rounded-lg overflow-x-auto"><span class="text-slate-500">// cloud-run-api/src/lib/shopify-credentials.ts</span>
+<span class="text-purple-400">import</span> { getSupabaseAdmin } <span class="text-purple-400">from</span> <span class="text-yellow-300">'./supabase.js'</span>;
+
+<span class="text-purple-400">export type</span> <span class="text-cyan-300">ShopifyMode</span> = <span class="text-yellow-300">'custom_app'</span> | <span class="text-yellow-300">'app_store'</span>;
+
+<span class="text-purple-400">export interface</span> <span class="text-cyan-300">ShopifyCredentials</span> {
+  mode: ShopifyMode;
+  shopDomain: <span class="text-cyan-300">string</span>;
+  connectionId: <span class="text-cyan-300">string</span>;
+  clientId: <span class="text-cyan-300">string</span>;       <span class="text-slate-500">// OAuth app id</span>
+  clientSecret: <span class="text-cyan-300">string</span>;   <span class="text-slate-500">// OAuth app secret (también sirve como webhook HMAC)</span>
+  accessToken: <span class="text-cyan-300">string</span>;    <span class="text-slate-500">// Admin API token del cliente</span>
+  webhookSecret: <span class="text-cyan-300">string</span>;  <span class="text-slate-500">// Para validar HMAC de webhooks</span>
+}
+
+<span class="text-slate-500">/**
+ * Resuelve credenciales de Shopify para un shop_domain específico.
+ * Funciona en ambos modos (Custom App y App Store) de forma transparente.
+ *
+ * @param shopDomain - ej. "mi-tienda.myshopify.com"
+ */</span>
+<span class="text-purple-400">export async function</span> <span class="text-yellow-400">resolveShopifyCredentials</span>(
+  shopDomain: <span class="text-cyan-300">string</span>
+): <span class="text-cyan-300">Promise</span>&lt;<span class="text-cyan-300">ShopifyCredentials</span> | <span class="text-cyan-300">null</span>&gt; {
+  <span class="text-purple-400">const</span> supabase = <span class="text-yellow-400">getSupabaseAdmin</span>();
+
+  <span class="text-slate-500">// 1. Buscar la conexión</span>
+  <span class="text-purple-400">const</span> { data: connection } = <span class="text-purple-400">await</span> supabase
+    .<span class="text-yellow-400">from</span>(<span class="text-yellow-300">'platform_connections'</span>)
+    .<span class="text-yellow-400">select</span>(<span class="text-yellow-300">'*'</span>)
+    .<span class="text-yellow-400">eq</span>(<span class="text-yellow-300">'platform'</span>, <span class="text-yellow-300">'shopify'</span>)
+    .<span class="text-yellow-400">eq</span>(<span class="text-yellow-300">'shop_domain'</span>, shopDomain)
+    .<span class="text-yellow-400">eq</span>(<span class="text-yellow-300">'is_active'</span>, <span class="text-orange-400">true</span>)
+    .<span class="text-yellow-400">maybeSingle</span>();
+
+  <span class="text-purple-400">if</span> (!connection) <span class="text-purple-400">return</span> <span class="text-orange-400">null</span>;
+
+  <span class="text-slate-500">// 2. Desencriptar el access_token (siempre vive en la conexión)</span>
+  <span class="text-purple-400">const</span> { data: accessToken } = <span class="text-purple-400">await</span> supabase
+    .<span class="text-yellow-400">rpc</span>(<span class="text-yellow-300">'decrypt_platform_token'</span>, {
+      encrypted: connection.access_token_encrypted,
+    });
+
+  <span class="text-slate-500">// 3. Decidir de dónde sacar client_id y client_secret</span>
+  <span class="text-purple-400">const</span> mode: ShopifyMode = connection.connection_mode || <span class="text-yellow-300">'custom_app'</span>;
+
+  <span class="text-purple-400">if</span> (mode === <span class="text-yellow-300">'custom_app'</span>) {
+    <span class="text-slate-500">// ── Modo Custom App: credenciales por-conexión ──</span>
+    <span class="text-purple-400">const</span> { data: clientSecret } = <span class="text-purple-400">await</span> supabase
+      .<span class="text-yellow-400">rpc</span>(<span class="text-yellow-300">'decrypt_platform_token'</span>, {
+        encrypted: connection.shopify_client_secret_encrypted,
+      });
+
+    <span class="text-purple-400">return</span> {
+      mode: <span class="text-yellow-300">'custom_app'</span>,
+      shopDomain,
+      connectionId: connection.id,
+      clientId: connection.shopify_client_id,
+      clientSecret,
+      accessToken,
+      <span class="text-slate-500">// En Custom Apps, el webhook HMAC se firma con el client_secret</span>
+      webhookSecret: clientSecret,
+    };
+  }
+
+  <span class="text-slate-500">// ── Modo App Store: credenciales globales desde Cloud Run env ──</span>
+  <span class="text-purple-400">const</span> globalClientId = process.env.SHOPIFY_CLIENT_ID;
+  <span class="text-purple-400">const</span> globalClientSecret = process.env.SHOPIFY_CLIENT_SECRET;
+  <span class="text-purple-400">const</span> globalWebhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET;
+
+  <span class="text-purple-400">if</span> (!globalClientId || !globalClientSecret || !globalWebhookSecret) {
+    <span class="text-purple-400">throw new</span> <span class="text-yellow-400">Error</span>(
+      <span class="text-yellow-300">'App Store mode activo pero faltan env vars globales'</span>
+    );
+  }
+
+  <span class="text-purple-400">return</span> {
+    mode: <span class="text-yellow-300">'app_store'</span>,
+    shopDomain,
+    connectionId: connection.id,
+    clientId: globalClientId,
+    clientSecret: globalClientSecret,
+    accessToken,
+    webhookSecret: globalWebhookSecret,
+  };
+}
+
+<span class="text-slate-500">/**
+ * Lee el modo global del sistema desde env.
+ * Útil para decidir qué UI mostrar (wizard vs 1-click vs ambos).
+ */</span>
+<span class="text-purple-400">export function</span> <span class="text-yellow-400">getShopifyMode</span>(): <span class="text-yellow-300">'custom'</span> | <span class="text-yellow-300">'appstore'</span> | <span class="text-yellow-300">'both'</span> {
+  <span class="text-purple-400">const</span> mode = (process.env.SHOPIFY_MODE || <span class="text-yellow-300">'custom'</span>).<span class="text-yellow-400">toLowerCase</span>();
+  <span class="text-purple-400">if</span> (mode === <span class="text-yellow-300">'appstore'</span>) <span class="text-purple-400">return</span> <span class="text-yellow-300">'appstore'</span>;
+  <span class="text-purple-400">if</span> (mode === <span class="text-yellow-300">'both'</span>) <span class="text-purple-400">return</span> <span class="text-yellow-300">'both'</span>;
+  <span class="text-purple-400">return</span> <span class="text-yellow-300">'custom'</span>;
+}</pre>
+  </div>
+
+  <div class="bg-amber-50 border-l-4 border-amber-500 p-5 rounded mb-6">
+    <p class="text-slate-800">
+      <strong>Clave del diseño:</strong> la función <code>resolveShopifyCredentials</code> recibe
+      <code>shop_domain</code> y no <code>connectionId</code>. ¿Por qué? Porque los webhooks llegan
+      con el header <code>X-Shopify-Shop-Domain</code> pero NO con el connectionId. Usar shop_domain
+      nos permite usar el mismo resolver tanto en routes del backend como en webhooks de edge functions.
+    </p>
+  </div>
+
+  <h3 class="text-xl font-bold mb-3">Cómo se usa en un webhook handler</h3>
+<pre class="code-ts p-4 rounded-lg overflow-x-auto"><span class="text-slate-500">// shopify-fulfillment-webhooks/index.ts (refactor)</span>
+<span class="text-purple-400">const</span> shopDomain = req.headers.<span class="text-yellow-400">get</span>(<span class="text-yellow-300">'x-shopify-shop-domain'</span>) || <span class="text-yellow-300">''</span>;
+<span class="text-purple-400">const</span> creds = <span class="text-purple-400">await</span> <span class="text-yellow-400">resolveShopifyCredentials</span>(shopDomain);
+
+<span class="text-purple-400">if</span> (!creds) {
+  <span class="text-purple-400">return new</span> <span class="text-yellow-400">Response</span>(<span class="text-yellow-300">'Shop not registered'</span>, { status: <span class="text-orange-400">404</span> });
+}
+
+<span class="text-slate-500">// Verifica HMAC con el secret correcto (custom o global, transparente)</span>
+<span class="text-purple-400">if</span> (!<span class="text-yellow-400">verifyWebhookHmac</span>(rawBody, hmacHeader, creds.webhookSecret)) {
+  <span class="text-purple-400">return new</span> <span class="text-yellow-400">Response</span>(<span class="text-yellow-300">'Unauthorized'</span>, { status: <span class="text-orange-400">401</span> });
+}
+
+<span class="text-slate-500">// ... procesa el webhook como siempre</span></pre>
+
+  <p class="text-sm text-slate-600 mt-4">
+    <strong>Nota:</strong> las edge functions de Supabase (Deno) no pueden importar directamente
+    del backend Node.js. Hay que duplicar este resolver en
+    <code class="bg-slate-100 px-1 rounded">supabase/functions/_shared/shopify-credentials.ts</code>
+    (versión Deno). Es ~30 líneas, no es drama, y asegura que ambos mundos comparten la lógica.
+  </p>
+</section>
+
+<!-- DB -->
+<section id="db" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6 border-b-4 border-slate-900 pb-2 inline-block">La migración de base de datos</h2>
+
+  <div class="bg-white border-2 border-purple-200 rounded-xl p-6 mb-6">
+    <h3 class="text-xl font-bold mb-3">Nueva columna en <code class="text-sm bg-slate-100 px-2 py-1 rounded">platform_connections</code></h3>
+    <p class="text-slate-700 mb-4">
+      Marcamos cada conexión Shopify con su modo. Las conexiones existentes (las que tienes hoy
+      con tus clientes de prueba) se marcan como <code>'custom_app'</code> por default.
+    </p>
+
+<pre class="code-sql p-4 rounded-lg overflow-x-auto"><span class="text-slate-400">-- supabase/migrations/20260408_shopify_dual_mode.sql</span>
+
+<span class="text-pink-400">ALTER TABLE</span> platform_connections
+<span class="text-pink-400">ADD COLUMN IF NOT EXISTS</span> connection_mode <span class="text-cyan-300">text</span>
+  <span class="text-pink-400">NOT NULL DEFAULT</span> <span class="text-yellow-300">'custom_app'</span>
+  <span class="text-pink-400">CHECK</span> (connection_mode <span class="text-pink-400">IN</span> (<span class="text-yellow-300">'custom_app'</span>, <span class="text-yellow-300">'app_store'</span>));
+
+<span class="text-pink-400">COMMENT ON COLUMN</span> platform_connections.connection_mode <span class="text-pink-400">IS</span>
+  <span class="text-yellow-300">'Cómo fue conectado: custom_app (cliente crea su propia app) o app_store (OAuth público)'</span>;
+
+<span class="text-slate-400">-- Índice para queries por modo (útil en el dashboard de admin)</span>
+<span class="text-pink-400">CREATE INDEX IF NOT EXISTS</span> idx_platform_connections_mode
+  <span class="text-pink-400">ON</span> platform_connections(platform, connection_mode)
+  <span class="text-pink-400">WHERE</span> platform = <span class="text-yellow-300">'shopify'</span>;
+
+<span class="text-slate-400">-- Las conexiones existentes ya tienen shopify_client_id/secret por-cliente,
+-- así que quedan marcadas como 'custom_app' automáticamente via DEFAULT.</span>
+
+<span class="text-slate-400">-- El día del switch a App Store, los clientes nuevos se marcarán
+-- como 'app_store' desde el callback de OAuth público.</span></pre>
+  </div>
+
+  <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+    <p class="text-sm text-slate-800">
+      <strong>¿Y los clientes híbridos?</strong> Un cliente NO puede tener dos conexiones activas
+      al mismo Shopify (una custom y otra app store). El resolver siempre retorna la primera
+      <code>is_active = true</code>. Si en el futuro quieres migrar a un cliente de custom a app store,
+      solo desactivas la conexión vieja y la reemplazas.
+    </p>
+  </div>
+</section>
+
+<!-- LO QUE ESCRIBIMOS AHORA -->
+<section id="ahora" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <div class="grad-now text-white rounded-2xl p-8 shadow-2xl mb-8">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-green-700 text-white text-xs font-bold px-3 py-1 rounded-full">HOY</span>
+      <span class="text-green-200 text-sm">Lo que hay que escribir esta semana</span>
+    </div>
+    <h2 class="text-4xl font-bold mb-2">Sprint Custom App (5 pasos)</h2>
+    <p class="text-green-100">Con esto vendes el primer cliente Custom App mañana.</p>
+  </div>
+
+  <div class="space-y-4">
+
+    <div class="bg-white border-l-4 border-green-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center gap-3 mb-3">
+        <span class="w-8 h-8 rounded-full bg-green-600 text-white font-bold flex items-center justify-center">1</span>
+        <h3 class="text-lg font-bold">Migración DB + Credential Resolver</h3>
+        <span class="text-xs text-slate-500 ml-auto">~1h</span>
+      </div>
+      <ul class="text-sm text-slate-600 space-y-1 ml-11">
+        <li>• Crear migración <code>20260408_shopify_dual_mode.sql</code> (ver arriba)</li>
+        <li>• Crear <code>cloud-run-api/src/lib/shopify-credentials.ts</code> (ver arriba)</li>
+        <li>• Crear <code>supabase/functions/_shared/shopify-credentials.ts</code> (versión Deno)</li>
+        <li>• Tests: resolver devuelve correctamente en ambos modos</li>
+      </ul>
+    </div>
+
+    <div class="bg-white border-l-4 border-green-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center gap-3 mb-3">
+        <span class="w-8 h-8 rounded-full bg-green-600 text-white font-bold flex items-center justify-center">2</span>
+        <h3 class="text-lg font-bold">Refactor de webhook handlers</h3>
+        <span class="text-xs text-slate-500 ml-auto">~1h</span>
+      </div>
+      <ul class="text-sm text-slate-600 space-y-1 ml-11">
+        <li>• <code>shopify-fulfillment-webhooks/index.ts</code>: usar <code>resolveShopifyCredentials(shopDomain)</code></li>
+        <li>• <code>shopify-gdpr-webhooks/index.ts</code>: igual (para cuando el App Store esté activo)</li>
+        <li>• Eliminar el fallback a <code>SHOPIFY_CLIENT_SECRET</code> (ya no aplica)</li>
+        <li>• Test con un webhook de prueba firmado con secret de Custom App</li>
+      </ul>
+    </div>
+
+    <div class="bg-white border-l-4 border-green-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center gap-3 mb-3">
+        <span class="w-8 h-8 rounded-full bg-green-600 text-white font-bold flex items-center justify-center">3</span>
+        <h3 class="text-lg font-bold">Auto-registro de webhooks post-wizard</h3>
+        <span class="text-xs text-slate-500 ml-auto">~1.5h</span>
+      </div>
+      <ul class="text-sm text-slate-600 space-y-1 ml-11">
+        <li>• Nueva función <code>registerShopifyWebhooks(shopDomain, accessToken)</code> en <code>lib/shopify-webhooks.ts</code></li>
+        <li>• Se invoca desde <code>shopify-oauth-callback.ts</code> después de guardar el token</li>
+        <li>• 7 webhooks: orders/create, orders/fulfilled, orders/cancelled, orders/paid, app/uninstalled, customers/create, customers/update</li>
+        <li>• NOTA: GDPR webhooks (customers/data_request, redact) solo en modo App Store</li>
+      </ul>
+    </div>
+
+    <div class="bg-white border-l-4 border-green-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center gap-3 mb-3">
+        <span class="w-8 h-8 rounded-full bg-green-600 text-white font-bold flex items-center justify-center">4</span>
+        <h3 class="text-lg font-bold">Mejoras al wizard</h3>
+        <span class="text-xs text-slate-500 ml-auto">~1h</span>
+      </div>
+      <ul class="text-sm text-slate-600 space-y-1 ml-11">
+        <li>• Timeout de 5 min en el polling (fix N3)</li>
+        <li>• Validación del dominio antes de guardar credenciales (fix N4)</li>
+        <li>• Quitar URL hardcoded, usar <code>VITE_API_URL</code> obligatorio (fix A6)</li>
+        <li>• Mensajes de error claros en cada paso</li>
+        <li>• Después del paso 6 (éxito), llamar <code>registerShopifyWebhooks</code></li>
+      </ul>
+    </div>
+
+    <div class="bg-white border-l-4 border-green-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center gap-3 mb-3">
+        <span class="w-8 h-8 rounded-full bg-green-600 text-white font-bold flex items-center justify-center">5</span>
+        <h3 class="text-lg font-bold">Endpoint de config + UI condicional</h3>
+        <span class="text-xs text-slate-500 ml-auto">~1h</span>
+      </div>
+      <ul class="text-sm text-slate-600 space-y-1 ml-11">
+        <li>• Nuevo endpoint <code>GET /api/shopify/config</code> que devuelve <code>{ mode: getShopifyMode() }</code></li>
+        <li>• Frontend: <code>ShopifyConnect</code> lee ese config al cargar</li>
+        <li>• Si <code>mode === 'custom'</code> → muestra wizard (único flujo visible)</li>
+        <li>• Código para <code>'appstore'</code> y <code>'both'</code> ya presente pero detrás del flag</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <div class="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
+    <p class="text-sm text-green-900">
+      <strong>Total estimado del Sprint Custom App:</strong> ~5.5 horas de trabajo. Resultado:
+      Custom Apps funciona de verdad con webhooks reales + el código queda preparado para activar
+      App Store sin reescribir nada.
+    </p>
+  </div>
+</section>
+
+<!-- LO QUE DEJAMOS PREPARADO -->
+<section id="preparado" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <div class="grad-future text-white rounded-2xl p-8 shadow-2xl mb-8">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-blue-700 text-white text-xs font-bold px-3 py-1 rounded-full">PREPARADO</span>
+      <span class="text-blue-200 text-sm">Código que escribimos hoy pero queda dormido</span>
+    </div>
+    <h2 class="text-4xl font-bold mb-2">Lo que dejamos listo para App Store</h2>
+    <p class="text-blue-100">Código presente pero inactivo hasta que llegue la aprobación.</p>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-4">
+
+    <div class="bg-white border-2 border-blue-200 rounded-xl p-5">
+      <h3 class="text-lg font-bold mb-2">El resolver YA soporta App Store</h3>
+      <p class="text-sm text-slate-600 mb-2">
+        La rama <code>if (mode === 'app_store')</code> del resolver lee de env vars globales. Está
+        escrita desde el día 1. Solo se activa cuando hay una conexión con <code>connection_mode = 'app_store'</code>.
+      </p>
+      <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mt-2">0 líneas extra para activar</span>
+    </div>
+
+    <div class="bg-white border-2 border-blue-200 rounded-xl p-5">
+      <h3 class="text-lg font-bold mb-2">Los webhook handlers YA soportan ambos</h3>
+      <p class="text-sm text-slate-600 mb-2">
+        Porque usan el resolver, el mismo handler valida HMAC contra cualquier secret (per-cliente
+        o global) sin cambios.
+      </p>
+      <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mt-2">0 líneas extra</span>
+    </div>
+
+    <div class="bg-white border-2 border-blue-200 rounded-xl p-5">
+      <h3 class="text-lg font-bold mb-2"><code>shopify-install/</code> queda dormido</h3>
+      <p class="text-sm text-slate-600 mb-2">
+        NO lo borramos. Se queda en el repo pero el frontend nunca lo llama cuando
+        <code>mode === 'custom'</code>. El día del switch, el frontend empieza a linkearlo.
+      </p>
+      <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mt-2">~80 líneas dormidas</span>
+    </div>
+
+    <div class="bg-white border-2 border-blue-200 rounded-xl p-5">
+      <h3 class="text-lg font-bold mb-2"><code>shopify-gdpr-webhooks/</code> queda dormido</h3>
+      <p class="text-sm text-slate-600 mb-2">
+        NO lo borramos. Shopify solo enviará webhooks GDPR cuando la app sea pública. Mientras tanto,
+        el endpoint existe pero nunca recibe tráfico.
+      </p>
+      <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mt-2">~358 líneas dormidas</span>
+    </div>
+
+    <div class="bg-white border-2 border-blue-200 rounded-xl p-5">
+      <h3 class="text-lg font-bold mb-2">Componente <code>&lt;OneClickInstall /&gt;</code></h3>
+      <p class="text-sm text-slate-600 mb-2">
+        Nuevo componente React que muestra el flow "1 clic" de App Store. Se renderiza solo cuando
+        <code>mode === 'appstore'</code> o <code>'both'</code>. Hoy nadie lo ve.
+      </p>
+      <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mt-2">Nuevo · ~50 líneas dormidas</span>
+    </div>
+
+    <div class="bg-white border-2 border-blue-200 rounded-xl p-5">
+      <h3 class="text-lg font-bold mb-2">Componente <code>&lt;ChooseMethod /&gt;</code></h3>
+      <p class="text-sm text-slate-600 mb-2">
+        Selector visual ("Instalar con 1 clic" vs "Conectar Custom App"). Solo se muestra cuando
+        <code>mode === 'both'</code>.
+      </p>
+      <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mt-2">Nuevo · ~40 líneas dormidas</span>
+    </div>
+
+    <div class="bg-white border-2 border-blue-200 rounded-xl p-5">
+      <h3 class="text-lg font-bold mb-2">OAuth callback con detección de modo</h3>
+      <p class="text-sm text-slate-600 mb-2">
+        <code>shopify-oauth-callback.ts</code> detecta si el <code>state</code> viene del flujo
+        público (App Store) o del wizard (Custom). Marca <code>connection_mode</code> correctamente.
+      </p>
+      <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mt-2">Refactor · 40 líneas</span>
+    </div>
+
+    <div class="bg-white border-2 border-blue-200 rounded-xl p-5">
+      <h3 class="text-lg font-bold mb-2">Admin panel muestra el modo</h3>
+      <p class="text-sm text-slate-600 mb-2">
+        En <code>/admin/clientes</code>, cada conexión Shopify muestra un badge
+        ("Custom App" o "App Store") para que JM vea de un vistazo cómo se conectó cada cliente.
+      </p>
+      <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mt-2">Nuevo · ~20 líneas</span>
+    </div>
+
+  </div>
+</section>
+
+<!-- SWITCH DAY -->
+<section id="switch" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <div class="grad-switch text-white rounded-2xl p-8 shadow-2xl mb-8">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-orange-700 text-white text-xs font-bold px-3 py-1 rounded-full">SWITCH DAY</span>
+      <span class="text-orange-200 text-sm">El día que Shopify te apruebe la app</span>
+    </div>
+    <h2 class="text-4xl font-bold mb-2">El "día D": activar App Store en ~15 minutos</h2>
+    <p class="text-orange-100">Sin deploy grande, sin riesgo, sin tocar clientes existentes.</p>
+  </div>
+
+  <div class="bg-white border-2 border-orange-300 rounded-xl p-6 mb-6">
+    <h3 class="text-xl font-bold mb-4">Checklist del Switch Day</h3>
+
+    <div class="space-y-4">
+
+      <div class="flex gap-4 items-start">
+        <span class="shrink-0 w-8 h-8 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-sm">1</span>
+        <div class="flex-1">
+          <h4 class="font-bold">Setear las 3 env vars globales en Cloud Run</h4>
+<pre class="code-bash p-3 rounded mt-2 overflow-x-auto text-xs">gcloud run services update steve-api \
+  --region=us-central1 \
+  --project=steveapp-agency \
+  --update-env-vars \
+    SHOPIFY_CLIENT_ID=xxx,\
+    SHOPIFY_CLIENT_SECRET=yyy,\
+    SHOPIFY_WEBHOOK_SECRET=zzz</pre>
+          <p class="text-xs text-slate-500 mt-1">Estas credenciales las da Shopify cuando aprueban tu app pública.</p>
+        </div>
+      </div>
+
+      <div class="flex gap-4 items-start">
+        <span class="shrink-0 w-8 h-8 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-sm">2</span>
+        <div class="flex-1">
+          <h4 class="font-bold">Cambiar el feature flag a "both"</h4>
+<pre class="code-bash p-3 rounded mt-2 overflow-x-auto text-xs">gcloud run services update steve-api \
+  --region=us-central1 \
+  --project=steveapp-agency \
+  --update-env-vars SHOPIFY_MODE=both</pre>
+          <p class="text-xs text-slate-500 mt-1">
+            <strong>'both'</strong> significa: clientes nuevos ven ambas opciones (1 clic o wizard).
+            Clientes existentes siguen con su Custom App sin enterarse.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex gap-4 items-start">
+        <span class="shrink-0 w-8 h-8 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-sm">3</span>
+        <div class="flex-1">
+          <h4 class="font-bold">Smoke test: instalar con un clic en una tienda de prueba</h4>
+          <p class="text-sm text-slate-600 mt-1">
+            Crea una tienda Shopify de desarrollo nueva. Ve a Steve Ads → Shopify → "Instalar con 1 clic".
+            Verifica que el OAuth fluya, el token se guarde, y los webhooks se auto-registren contra
+            las mismas edge functions que ya existen.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex gap-4 items-start">
+        <span class="shrink-0 w-8 h-8 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-sm">4</span>
+        <div class="flex-1">
+          <h4 class="font-bold">Smoke test: webhook real del cliente de prueba</h4>
+          <p class="text-sm text-slate-600 mt-1">
+            Haz una compra de prueba en la tienda. Verifica que llegue el webhook a
+            <code>shopify-fulfillment-webhooks</code>, que el HMAC valide con
+            <code>SHOPIFY_WEBHOOK_SECRET</code> global, y que el pedido se procese.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex gap-4 items-start">
+        <span class="shrink-0 w-8 h-8 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-sm">5</span>
+        <div class="flex-1">
+          <h4 class="font-bold">Verificar que clientes Custom App siguen funcionando</h4>
+          <p class="text-sm text-slate-600 mt-1">
+            Abre el dashboard de un cliente que conectó con Custom App. Verifica que sus productos,
+            órdenes y métricas sigan cargando. <strong>No debería haber cambios.</strong>
+          </p>
+        </div>
+      </div>
+
+      <div class="flex gap-4 items-start">
+        <span class="shrink-0 w-8 h-8 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-sm">6</span>
+        <div class="flex-1">
+          <h4 class="font-bold">Actualizar landing: "Instala con 1 clic desde Shopify App Store"</h4>
+          <p class="text-sm text-slate-600 mt-1">
+            Este es el cambio de marketing más importante. Ahora el pitch es "1 clic", no "6 pasos".
+          </p>
+        </div>
+      </div>
+
+      <div class="flex gap-4 items-start">
+        <span class="shrink-0 w-8 h-8 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-sm">7</span>
+        <div class="flex-1">
+          <h4 class="font-bold">(Opcional, más adelante) Migrar clientes Custom App a App Store</h4>
+          <p class="text-sm text-slate-600 mt-1">
+            Si quieres unificar todo bajo App Store, puedes invitar a los clientes Custom App a
+            re-conectar. Pero <strong>no es obligatorio</strong> — el sistema dual soporta ambos
+            para siempre.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="mt-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
+      <p class="text-sm text-orange-900">
+        <strong>Tiempo total del Switch Day:</strong> ~15 minutos de cambios + ~30 minutos de smoke
+        tests. Sin deploy de código. Sin downtime. Sin tocar clientes existentes.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- MATRIZ DE ESTADOS -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6 border-b-4 border-slate-900 pb-2 inline-block">Matriz de estados (qué pasa en cada modo)</h2>
+
+  <div class="overflow-x-auto">
+    <table class="w-full bg-white border-2 border-slate-200 rounded-xl overflow-hidden text-sm">
+      <thead class="bg-slate-900 text-white">
+        <tr>
+          <th class="p-3 text-left">Acción del cliente</th>
+          <th class="p-3 text-left">SHOPIFY_MODE=custom</th>
+          <th class="p-3 text-left">SHOPIFY_MODE=both</th>
+          <th class="p-3 text-left">SHOPIFY_MODE=appstore</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-b border-slate-200">
+          <td class="p-3 font-semibold">Cliente nuevo abre "Conectar Shopify"</td>
+          <td class="p-3">Ve wizard Custom App</td>
+          <td class="p-3">Ve selector (1 clic o wizard)</td>
+          <td class="p-3">Ve botón "1 clic"</td>
+        </tr>
+        <tr class="border-b border-slate-200 bg-slate-50">
+          <td class="p-3 font-semibold">Instala con 1 clic</td>
+          <td class="p-3 text-red-600">404 (endpoint deshabilitado)</td>
+          <td class="p-3 text-green-600">Funciona</td>
+          <td class="p-3 text-green-600">Funciona</td>
+        </tr>
+        <tr class="border-b border-slate-200">
+          <td class="p-3 font-semibold">Completa wizard Custom App</td>
+          <td class="p-3 text-green-600">Funciona</td>
+          <td class="p-3 text-green-600">Funciona</td>
+          <td class="p-3 text-amber-600">Funciona (oculto)</td>
+        </tr>
+        <tr class="border-b border-slate-200 bg-slate-50">
+          <td class="p-3 font-semibold">Cliente existente (Custom App) usa dashboard</td>
+          <td class="p-3 text-green-600">Funciona</td>
+          <td class="p-3 text-green-600">Funciona</td>
+          <td class="p-3 text-green-600">Funciona</td>
+        </tr>
+        <tr class="border-b border-slate-200">
+          <td class="p-3 font-semibold">Cliente existente (App Store) usa dashboard</td>
+          <td class="p-3 text-green-600">Funciona*</td>
+          <td class="p-3 text-green-600">Funciona</td>
+          <td class="p-3 text-green-600">Funciona</td>
+        </tr>
+        <tr class="border-b border-slate-200 bg-slate-50">
+          <td class="p-3 font-semibold">Webhook llega de Custom App</td>
+          <td class="p-3 text-green-600">HMAC por-cliente</td>
+          <td class="p-3 text-green-600">HMAC por-cliente</td>
+          <td class="p-3 text-green-600">HMAC por-cliente</td>
+        </tr>
+        <tr>
+          <td class="p-3 font-semibold">Webhook llega de App Store</td>
+          <td class="p-3 text-green-600">HMAC global*</td>
+          <td class="p-3 text-green-600">HMAC global</td>
+          <td class="p-3 text-green-600">HMAC global</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="text-xs text-slate-500 mt-3">
+    * Los webhooks de App Store funcionan incluso en modo <code>custom</code> porque el resolver
+    lee la marca <code>connection_mode</code> de la conexión, no el flag global. El flag global
+    solo controla qué UI ve el cliente, no qué webhooks procesa el backend.
+  </p>
+</section>
+
+<!-- INVARIANTES -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6 border-b-4 border-slate-900 pb-2 inline-block">Reglas de oro (invariantes del sistema dual)</h2>
+
+  <div class="space-y-3">
+    <div class="bg-white border-l-4 border-blue-600 rounded-r-xl p-4">
+      <div class="font-bold">1. Ningún archivo (excepto el resolver) puede leer <code>SHOPIFY_CLIENT_ID</code> directamente</div>
+      <p class="text-sm text-slate-600 mt-1">Si un dev lo hace, rompe la dualidad. Enforced por lint rule o grep en CI.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-blue-600 rounded-r-xl p-4">
+      <div class="font-bold">2. Los webhooks siempre buscan credenciales por <code>shop_domain</code>, nunca por connectionId</div>
+      <p class="text-sm text-slate-600 mt-1">Porque los headers de Shopify traen shop_domain, no el UUID interno.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-blue-600 rounded-r-xl p-4">
+      <div class="font-bold">3. <code>connection_mode</code> es inmutable tras crearse</div>
+      <p class="text-sm text-slate-600 mt-1">Si un cliente quiere migrar, se crea una nueva conexión y se desactiva la vieja. Nunca se edita el modo.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-blue-600 rounded-r-xl p-4">
+      <div class="font-bold">4. El feature flag <code>SHOPIFY_MODE</code> solo controla UI, nunca backend</div>
+      <p class="text-sm text-slate-600 mt-1">Cambiar el flag no debe afectar las conexiones existentes. Solo decide qué flujo ve un cliente nuevo.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-blue-600 rounded-r-xl p-4">
+      <div class="font-bold">5. El resolver devuelve <code>null</code> si la conexión no existe o está inactiva</div>
+      <p class="text-sm text-slate-600 mt-1">Los callers siempre deben manejar el caso null. Nunca asumir que hay credenciales.</p>
+    </div>
+  </div>
+</section>
+
+<!-- DESAFÍO FINAL -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <div class="grad-hero text-white rounded-2xl p-8 shadow-2xl">
+    <p class="text-blue-300 font-mono text-sm uppercase tracking-wider mb-2">Matías W13 cierra</p>
+    <h2 class="text-3xl font-bold mb-6">La belleza de este enfoque</h2>
+
+    <div class="space-y-4">
+      <div class="bg-black/30 border border-blue-500/30 rounded-lg p-4">
+        <div class="font-bold text-blue-300 mb-1">Hoy escribes 1 vez, funciona para siempre</div>
+        <p class="text-slate-300 text-sm">
+          El sprint de 5.5h que hacemos esta semana no es un "parche mientras esperamos Shopify".
+          Es la arquitectura final. Cuando llegue la aprobación, NO hay que reescribir nada. Solo
+          cambias un flag.
+        </p>
+      </div>
+
+      <div class="bg-black/30 border border-blue-500/30 rounded-lg p-4">
+        <div class="font-bold text-blue-300 mb-1">Clientes felices siempre</div>
+        <p class="text-slate-300 text-sm">
+          Los clientes Custom App que onboardees esta semana siguen funcionando para siempre,
+          incluso después del switch. Nadie tiene que re-conectar.
+        </p>
+      </div>
+
+      <div class="bg-black/30 border border-blue-500/30 rounded-lg p-4">
+        <div class="font-bold text-blue-300 mb-1">Rollback trivial</div>
+        <p class="text-slate-300 text-sm">
+          Si el switch day algo sale mal, cambias <code>SHOPIFY_MODE=custom</code> y vuelves al
+          estado anterior en 30 segundos. Los clientes App Store siguen funcionando (porque el
+          resolver ignora el flag para conexiones existentes).
+        </p>
+      </div>
+
+      <div class="bg-black/30 border border-blue-500/30 rounded-lg p-4">
+        <div class="font-bold text-blue-300 mb-1">Testeable sin Shopify aprobación</div>
+        <p class="text-slate-300 text-sm">
+          Puedes probar el flujo App Store HOY seteando las env vars con tu app de desarrollo
+          de Shopify Partners. No necesitas que Shopify apruebe nada para validar que la arquitectura
+          funciona.
+        </p>
+      </div>
+
+      <div class="bg-black/30 border border-blue-500/30 rounded-lg p-4">
+        <div class="font-bold text-blue-300 mb-1">¿Quieres que implementemos esto ya?</div>
+        <p class="text-slate-300 text-sm">
+          Puedo ejecutar el Sprint Custom App completo (5 pasos, ~5.5h) en esta sesión. Spawnaría
+          sub-agentes en paralelo y haría cross-review con Javiera W12 y Isidora W6 antes de commit.
+          Dime si autorizas y empiezo por el paso 1 (migración DB + resolver).
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="max-w-6xl mx-auto px-6 py-8 text-center text-slate-500 text-sm border-t border-slate-200 mt-12">
+  <p>Arquitectura dual generada por <strong>Matías W13 — Shopify</strong> · Steve Ads · 8 abril 2026</p>
+  <p class="mt-1">Credential Resolver pattern · 1 migración DB · 1 feature flag · 0 re-escrituras futuras</p>
+</footer>
+
+</body>
+</html>

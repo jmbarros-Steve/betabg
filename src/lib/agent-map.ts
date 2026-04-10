@@ -1,7 +1,7 @@
 export interface Agent {
   name: string;
   tmux_window: number;
-  squad: 'marketing' | 'producto' | 'infra';
+  squad: 'marketing' | 'producto' | 'infra' | 'ventas';
   speciality: string;
 }
 
@@ -15,6 +15,7 @@ export const AGENTS: Agent[] = [
   { name: 'W6-metricas',  tmux_window: 6, squad: 'producto',  speciality: 'dashboard, analytics, reportes, graficos' },
   { name: 'W7-brief',     tmux_window: 7, squad: 'producto',  speciality: 'steve ai, chat, brand research, estrategia' },
   { name: 'W8-database',  tmux_window: 8, squad: 'infra',     speciality: 'supabase, sql, rls, migrations' },
+  { name: 'W22-revenue', tmux_window: 22, squad: 'ventas',   speciality: 'planes, pricing, billing, stripe, subscriptions, upgrade, paywall, revenue' },
 ];
 
 export function getAgentForSquad(squad: string): Agent {

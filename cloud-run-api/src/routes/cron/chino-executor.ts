@@ -304,46 +304,15 @@ async function processSingleFix(
 
   console.log(`[chino/executor] Processing fix ${fixId} for check #${checkNumber}`);
 
-  // ── Caso 1: difficulty=manual con archivos a tocar → escalar
+  // ── Caso 1: difficulty=manual con archivos a tocar → skip (chino-code-executor se encarga)
   if (fix.difficulty === 'manual' && Array.isArray(fix.files_to_check) && fix.files_to_check.length > 0) {
-    console.log(`[chino/executor] Fix #${checkNumber} requires CODE changes (${fix.files_to_check.length} files) — escalating`);
-
-    const { error: updErr } = await supabase
-      .from('steve_fix_queue')
-      .update({
-        status: 'escalated',
-        escalated: true,
-        agent_response: `Escalated by executor: requires code changes in ${fix.files_to_check.length} file(s). Executor only handles DATA fixes.`,
-      })
-      .eq('id', fixId);
-
-    if (updErr) {
-      console.error(`[chino/executor] Failed to mark escalated:`, updErr.message);
-    }
-
-    // Cargar el check para enriquecer el WhatsApp
-    const check = await safeQuerySingleOrDefault<any>(
-      supabase
-        .from('chino_routine')
-        .select('*')
-        .eq('id', fix.check_id)
-        .maybeSingle(),
-      null,
-      'chinoExecutor.loadCheckForEscalation',
-    );
-
-    try {
-      await sendEscalationWhatsApp({ ...fix, chino_routine: check });
-    } catch (err: any) {
-      console.error(`[chino/executor] WhatsApp escalation failed:`, err.message);
-    }
-
-    result.escalated++;
+    console.log(`[chino/executor] Fix #${checkNumber} requires CODE changes (${fix.files_to_check.length} files) — skipping, chino-code-executor will handle`);
+    result.skipped++;
     result.details.push({
       fix_id: fixId,
       check_number: checkNumber,
-      outcome: 'escalated',
-      note: 'requires code changes',
+      outcome: 'skipped',
+      note: 'code fix — delegated to chino-code-executor',
     });
     return;
   }

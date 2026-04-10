@@ -141,25 +141,34 @@ export async function syncGoogleAdsMetrics(c: Context) {
 
     console.log(`Fetching Google Ads insights for customer ${customerId}`);
 
-    const googleAdsResponse = await fetch(
-      `https://googleads.googleapis.com/v18/customers/${customerId}/googleAds:searchStream`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'developer-token': developerToken,
-          'login-customer-id': loginCustomerId,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query }),
-      }
-    );
+    const makeGoogleAdsRequest = async (loginId: string) => {
+      return fetch(
+        `https://googleads.googleapis.com/v23/customers/${customerId}/googleAds:searchStream`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'developer-token': developerToken,
+            'login-customer-id': loginId,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ query }),
+        }
+      );
+    };
+
+    let googleAdsResponse = await makeGoogleAdsRequest(loginCustomerId);
+
+    // Fallback: if MCC login-customer-id fails with 403, retry with customer's own ID
+    if (googleAdsResponse.status === 403 && loginCustomerId !== customerId) {
+      console.warn(`[sync-google] MCC login-customer-id ${loginCustomerId} denied, retrying with customer ID ${customerId}`);
+      googleAdsResponse = await makeGoogleAdsRequest(customerId);
+    }
 
     if (!googleAdsResponse.ok) {
       const errorText = await googleAdsResponse.text();
       console.error('Google Ads API error:', errorText);
 
-      // Check if it's an auth error
       if (googleAdsResponse.status === 401) {
         return c.json({ error: 'Token expired. Please reconnect your Google Ads account.' }, 401);
       }

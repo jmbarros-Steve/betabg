@@ -98,8 +98,8 @@ export async function syncAllMetrics(c: Context) {
           body = { connectionId: conn.id };
           break;
         case 'google':
-          endpoint = '/api/sync-google-ads-metrics';
-          body = { connection_id: conn.id };
+          endpoint = '/api/sync-campaign-metrics';
+          body = { connection_id: conn.id, platform: 'google' };
           break;
         case 'klaviyo':
           endpoint = '/api/sync-klaviyo-metrics';

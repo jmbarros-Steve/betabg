@@ -1018,7 +1018,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
           />
         )}
         {key === 'create-wizard' && (
-          <PlanGate feature="meta_ads.create">
+          <PlanGate feature="meta_ads.create" clientId={clientId}>
             <CampaignCreateWizard
               clientId={clientId}
               onBack={() => handleNavClick('tree-view')}
@@ -1033,7 +1033,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
           />
         )}
         {key === 'create-ad' && (
-          <PlanGate feature="meta_ads.create">
+          <PlanGate feature="meta_ads.create" clientId={clientId}>
             <MetaAdCreator
               clientId={clientId}
               onBack={() => handleNavClick('dashboard')}
@@ -1042,13 +1042,13 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
           </PlanGate>
         )}
         {key === 'audiences' && (
-          <PlanGate feature="meta_ads.audiences">
+          <PlanGate feature="meta_ads.audiences" clientId={clientId}>
             <MetaAudienceManager clientId={clientId} />
           </PlanGate>
         )}
         {key === 'library' && <AdCreativesLibrary clientId={clientId} />}
         {key === 'analytics' && (
-          <PlanGate feature="meta_ads.analysis">
+          <PlanGate feature="meta_ads.analysis" clientId={clientId}>
             <MetaAnalyticsDashboard
               clientId={clientId}
               key={`analytics-${selectedAssets.adAccountId || 'none'}`}
@@ -1056,7 +1056,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
           </PlanGate>
         )}
         {key === 'rules' && (
-          <PlanGate feature="meta_ads.rules">
+          <PlanGate feature="meta_ads.rules" clientId={clientId}>
             <MetaAutomatedRules clientId={clientId} />
           </PlanGate>
         )}
@@ -1064,7 +1064,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         {key === 'pixel' && <PixelSetupWizard clientId={clientId} />}
         {key === 'creative-perf' && <CreativePerformancePanel clientId={clientId} />}
         {key === 'competitors' && (
-          <PlanGate feature="competencia.ads">
+          <PlanGate feature="competencia.ads" clientId={clientId}>
             <CompetitorAdsPanel clientId={clientId} />
           </PlanGate>
         )}
@@ -1313,7 +1313,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
                     <div key={item.key} className={isActive ? 'block' : 'hidden'}>
                       {item.key === 'library' && <AdCreativesLibrary clientId={clientId} />}
                       {item.key === 'competitors' && (
-                        <PlanGate feature="competencia.ads">
+                        <PlanGate feature="competencia.ads" clientId={clientId}>
                           <CompetitorAdsPanel clientId={clientId} />
                         </PlanGate>
                       )}

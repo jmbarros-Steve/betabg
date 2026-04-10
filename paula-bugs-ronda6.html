@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paula W19 - Bug Hunt Ronda 6 (#131-#160) — WhatsApp Deep Dive</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;padding:24px}
+  h1{font-size:1.8rem;margin-bottom:8px}
+  .subtitle{color:#94a3b8;margin-bottom:24px}
+  .stats{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+  .stat{background:#1e293b;border-radius:12px;padding:16px 24px;min-width:130px}
+  .stat-value{font-size:2rem;font-weight:700}
+  .stat-label{color:#94a3b8;font-size:.85rem}
+  .critical .stat-value{color:#ef4444}.high .stat-value{color:#f97316}.medium .stat-value{color:#eab308}.total .stat-value{color:#3b82f6}
+  .bug-card{background:#1e293b;border-radius:12px;margin-bottom:12px;overflow:hidden;border-left:4px solid #64748b}
+  .bug-card.sev-critical{border-left-color:#ef4444}.bug-card.sev-high{border-left-color:#f97316}.bug-card.sev-medium{border-left-color:#eab308}
+  .bug-header{display:flex;align-items:center;gap:10px;padding:14px 18px;cursor:pointer;user-select:none;flex-wrap:wrap}
+  .bug-header:hover{background:#273548}
+  .bug-num{font-weight:700;color:#60a5fa;min-width:44px}
+  .bug-sev{font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:9999px;text-transform:uppercase}
+  .sev-critical .bug-sev{background:#7f1d1d;color:#fca5a5}.sev-high .bug-sev{background:#7c2d12;color:#fdba74}.sev-medium .bug-sev{background:#713f12;color:#fde047}
+  .bug-title{flex:1;font-weight:500;min-width:200px;font-size:.95rem}
+  .bug-file{color:#94a3b8;font-size:.75rem;font-family:monospace}
+  .bug-details{display:none;padding:0 18px 18px}
+  .bug-details.open{display:block}
+  .bug-desc{color:#cbd5e1;margin-bottom:12px;line-height:1.5;font-size:.9rem}
+  .code-block{background:#0f172a;border-radius:8px;padding:12px;margin-bottom:10px;overflow-x:auto;font-family:'SF Mono','Fira Code',monospace;font-size:.78rem;line-height:1.4;white-space:pre-wrap}
+  .code-label{color:#94a3b8;font-size:.75rem;margin-bottom:4px;font-weight:600}
+  .code-bad{border:1px solid #7f1d1d}.code-good{border:1px solid #14532d}
+  .chevron{transition:transform .2s;color:#64748b}.chevron.open{transform:rotate(90deg)}
+  .section-title{font-size:1.1rem;margin:28px 0 14px;color:#f8fafc;border-bottom:1px solid #334155;padding-bottom:6px}
+  .acum{background:#1e293b;border-radius:12px;padding:20px;margin-top:32px}
+  .acum h3{margin-bottom:12px;color:#60a5fa}
+  .acum table{width:100%;border-collapse:collapse}
+  .acum th,.acum td{text-align:left;padding:6px 10px;border-bottom:1px solid #334155;font-size:.9rem}
+  .acum th{color:#94a3b8;font-size:.75rem;text-transform:uppercase}
+</style>
+</head>
+<body>
+
+<h1>Paula W19 - Bug Hunt Ronda 6</h1>
+<p class="subtitle">30 bugs WhatsApp deep dive (#131-#160) | 9 abril 2026</p>
+
+<div class="stats">
+  <div class="stat critical"><div class="stat-value">2</div><div class="stat-label">Critical</div></div>
+  <div class="stat high"><div class="stat-value">14</div><div class="stat-label">High</div></div>
+  <div class="stat medium"><div class="stat-value">14</div><div class="stat-label">Medium</div></div>
+  <div class="stat total"><div class="stat-value">30</div><div class="stat-label">Total</div></div>
+</div>
+
+<div class="section-title">Critical (2)</div>
+
+<div class="bug-card sev-critical"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#147</span><span class="bug-sev">critical</span><span class="bug-title">processProspectAsync fire-and-forget muere en shutdown de Cloud Run</span><span class="bug-file">steve-wa-chat.ts:1177</span></div><div class="bug-details"><p class="bug-desc">Despu&eacute;s de enviar TwiML, <code>processProspectAsync()</code> corre como Promise detached. Cloud Run puede matar la instancia despu&eacute;s del HTTP response, dejando updates de prospect parciales: score actualizado pero stage no, HubSpot push incompleto, meeting status inconsistente. No hay recovery.</p><div class="code-label">Problema:</div><div class="code-block code-bad">processProspectAsync(prospect, ...).catch(err => console.error(err));
+return c.text(twiml, 200); // Cloud Run puede matar despu&eacute;s de esto</div><div class="code-label">Fix:</div><div class="code-block code-good">// Encolar como wa_pending_actions para retry por wa-action-processor
+await supabase.from('wa_pending_actions').insert({
+  action_type: 'process_prospect_async',
+  payload: { prospect_id, fullHistory, ... },
+  status: 'pending'
+});</div></div></div>
+
+<div class="bug-card sev-critical"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#151</span><span class="bug-sev">critical</span><span class="bug-title">status-callback valida con master token, no sub-account &mdash; delivery tracking roto para merchants</span><span class="bug-file">status-callback.ts:13</span></div><div class="bug-details"><p class="bug-desc">Los status callbacks de sub-accounts Twilio se firman con el auth token del sub-account, pero <code>status-callback.ts</code> valida con <code>TWILIO_AUTH_TOKEN</code> (master). La firma SIEMPRE falla para merchants &rarr; 403 &rarr; <code>delivered_count</code>, <code>read_count</code> nunca se actualizan.</p><div class="code-label">Problema:</div><div class="code-block code-bad">const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN; // MASTER token
+// Sub-account webhooks use SUB-ACCOUNT token to sign</div><div class="code-label">Fix:</div><div class="code-block code-good">// Parsear AccountSid del body, buscar en wa_twilio_accounts
+const accountSid = params.AccountSid || '';
+let authToken = process.env.TWILIO_AUTH_TOKEN!;
+if (accountSid !== process.env.TWILIO_ACCOUNT_SID) {
+  const { data: subAcct } = await supabase.from('wa_twilio_accounts')
+    .select('twilio_auth_token').eq('twilio_account_sid', accountSid).single();
+  if (subAcct) authToken = decryptToken(subAcct.twilio_auth_token);
+}</div></div></div>
+
+<div class="section-title">High (14)</div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#131</span><span class="bug-sev">high</span><span class="bug-title">merchant-wa: deduct_wa_credit(-1) corrompe total_used</span><span class="bug-file">merchant-wa.ts:350</span></div><div class="bug-details"><p class="bug-desc">Mismo antipatr&oacute;n de Bug #116, pero sin arreglar en <code>merchant-wa.ts</code>. <code>total_used + (-1)</code> decrementa el contador. Usar <code>refund_wa_credit</code> RPC.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#135</span><span class="bug-sev">high</span><span class="bug-title">Status regression: callback out-of-order sobreescribe &quot;failed&quot; con &quot;delivered&quot;</span><span class="bug-file">status-callback.ts:78</span></div><div class="bug-details"><p class="bug-desc">Twilio env&iacute;a callbacks fuera de orden. No hay guard de orden de status. Un callback stale <code>delivered</code> puede sobreescribir <code>failed</code>, mostrando el mensaje como entregado cuando realmente fall&oacute;.</p><div class="code-label">Fix:</div><div class="code-block code-good">const ORDER = { queued:0, sent:1, delivered:2, read:3, failed:99, undelivered:99 };
+if ((ORDER[newStatus] || 0) < (ORDER[currentStatus] || 0)) return; // skip regression</div></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#136</span><span class="bug-sev">high</span><span class="bug-title">merchant-wa: sin PII scrubbing &mdash; tarjetas y RUT se guardan raw y se env&iacute;an a Claude</span><span class="bug-file">merchant-wa.ts:185</span></div><div class="bug-details"><p class="bug-desc"><code>steve-wa-chat.ts</code> usa <code>scrubPII()</code> antes de guardar y antes de enviar al AI. <code>merchant-wa.ts</code> NO hace ning&uacute;n scrubbing. N&uacute;meros de tarjeta, RUT chileno y datos sensibles quedan en <code>wa_messages.body</code> y se env&iacute;an a la API de Anthropic.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#137</span><span class="bug-sev">high</span><span class="bug-title">merchant-wa: sin rate limiting &mdash; spam quema cr&eacute;ditos ilimitados</span><span class="bug-file">merchant-wa.ts</span></div><div class="bug-details"><p class="bug-desc"><code>steve-wa-chat.ts</code> tiene rate limit de 30s por tel&eacute;fono. <code>merchant-wa.ts</code> no tiene NINGUNO. Un cliente spammeando 100 mensajes en 1 minuto: 100 cr&eacute;ditos + 100 Claude calls + 100 Twilio sends = ~$1.20 por burst.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#143</span><span class="bug-sev">high</span><span class="bug-title">merchant-wa: sin idempotency &mdash; Twilio retries causan doble respuesta AI + doble cobro</span><span class="bug-file">merchant-wa.ts:121</span></div><div class="bug-details"><p class="bug-desc">Twilio retries webhooks si no recibe 200 en 15s. Claude puede tardar &gt;15s. Sin check de <code>MessageSid</code> duplicado, cada retry: guarda mensaje duplicado, deduce otro cr&eacute;dito, llama Claude otra vez, env&iacute;a otra respuesta (diferente).</p><div class="code-label">Fix:</div><div class="code-block code-good">const { data: existing } = await supabase.from('wa_messages')
+  .select('id').eq('message_sid', messageSid).maybeSingle();
+if (existing) return c.text('&lt;Response&gt;&lt;/Response&gt;', 200);</div></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#144</span><span class="bug-sev">high</span><span class="bug-title">steve-wa-chat: sin idempotency de MessageSid para prospects</span><span class="bug-file">steve-wa-chat.ts:302</span></div><div class="bug-details"><p class="bug-desc">Mismo problema que #143 pero para el handler de Steve. El rate limiter de 30s mitiga parcialmente, pero si el retry llega justo despu&eacute;s de 30s, se procesa completo (AI call, DB saves, score update).</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#148</span><span class="bug-sev">high</span><span class="bug-title">email nurture: AI genera HTML sin sanitizar &mdash; stored XSS v&iacute;a prompt injection</span><span class="bug-file">prospect-email-nurture.ts:228</span></div><div class="bug-details"><p class="bug-desc">Claude genera HTML para emails nurture que se inyecta directo en el template sin sanitizar. La conversaci&oacute;n del prospect (user-controlled) va en el prompt. Un prospect malicioso puede lograr que Claude incluya <code>&lt;script&gt;</code> o tracking pixels.</p><div class="code-label">Fix:</div><div class="code-block code-good">// Sanitizar HTML generado por AI
+const allowedTags = ['p','strong','em','ul','ol','li','a','div','span','br','h1','h2','h3'];
+emailContent.body = sanitizeHtml(emailContent.body, { allowedTags });</div></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#150</span><span class="bug-sev">high</span><span class="bug-title">Escalation tasks sin dedup: 30+ tareas duplicadas por prospect</span><span class="bug-file">steve-wa-chat.ts:830,926,1503</span></div><div class="bug-details"><p class="bug-desc">Tres paths de escalaci&oacute;n crean tasks sin verificar si ya existe una pendiente. Un prospect con 50 mensajes genera 30+ tasks de &quot;estancado en discovery&quot;. JM no puede hacer triage efectivo.</p><div class="code-label">Fix:</div><div class="code-block code-good">const { data: existingTask } = await supabase.from('tasks')
+  .select('id').eq('status','pending').ilike('title', `%${phone}%`).maybeSingle();
+if (!existingTask) await supabase.from('tasks').insert({...});</div></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#152</span><span class="bug-sev">high</span><span class="bug-title">send-campaign refund_wa_credit RPC sin fallback si migraci&oacute;n no existe</span><span class="bug-file">send-campaign.ts:286</span></div><div class="bug-details"><p class="bug-desc">Si el RPC <code>refund_wa_credit</code> no existe (migraci&oacute;n no deployeada), el refund falla silenciosamente. El merchant pierde cr&eacute;ditos permanentemente. <code>send-message.ts</code> tiene fallback pero <code>send-campaign.ts</code> no.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#154</span><span class="bug-sev">high</span><span class="bug-title">WACampaigns + WAAutomations: Supabase directo bypasses RLS &mdash; merchant isolation rota</span><span class="bug-file">WACampaigns.tsx:70 + WAAutomations.tsx:90</span></div><div class="bug-details"><p class="bug-desc">Ambos componentes hacen queries directas a Supabase con <code>as any</code>. El <code>clientId</code> viene de props (manipulable via DevTools). Si RLS est&aacute; mal configurada, merchant A ve campa&ntilde;as de merchant B. Tambi&eacute;n <code>.update()</code> directo para toggle automations.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#134</span><span class="bug-sev">high</span><span class="bug-title">downloadImageForVision: SSRF + Twilio credentials leak via media URL</span><span class="bug-file">steve-wa-chat.ts:52</span></div><div class="bug-details"><p class="bug-desc"><code>downloadImageForVision</code> env&iacute;a el header <code>Authorization: Basic(TWILIO_SID:TOKEN)</code> a cualquier URL en <code>MediaUrl0</code>. Si HMAC se bypasses, un atacante setea MediaUrl a su servidor y recibe las credenciales Twilio.</p><div class="code-label">Fix:</div><div class="code-block code-good">// Validar que mediaUrl sea de *.twilio.com
+const mediaHost = new URL(mediaUrl).hostname;
+if (!mediaHost.endsWith('.twilio.com')) return null;</div></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#138</span><span class="bug-sev">high</span><span class="bug-title">merchant-wa: AI failure no refund &mdash; merchant paga por respuesta gen&eacute;rica</span><span class="bug-file">merchant-wa.ts:382</span></div><div class="bug-details"><p class="bug-desc">Si Claude API falla (rate limit, outage), se env&iacute;a &quot;Gracias por tu mensaje, te responderemos pronto&quot; pero NO se refund el cr&eacute;dito. El merchant pag&oacute; por AI pero recibi&oacute; una respuesta gen&eacute;rica sin valor.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#132</span><span class="bug-sev">high</span><span class="bug-title">send-message + abandoned-cart: refund TOCTOU, deber&iacute;an usar refund_wa_credit RPC</span><span class="bug-file">send-message.ts:91 + abandoned-cart-wa.ts:166</span></div><div class="bug-details"><p class="bug-desc">Bug #116 reemplaz&oacute; <code>deduct(-1)</code> con read-then-write directo, pero eso a&uacute;n tiene TOCTOU race. Deber&iacute;a usar el RPC at&oacute;mico <code>refund_wa_credit</code> (ya deployeado).</p></div></div>
+
+<div class="section-title">Medium (14)</div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#133</span><span class="bug-sev">medium</span><span class="bug-title">Rate limiter in-memory no funciona multi-instance + se pierde en restart</span><span class="bug-file">steve-wa-chat.ts:278</span></div><div class="bug-details"><p class="bug-desc">El <code>lastResponseTime</code> Map es por-instancia. Con 2-5 instancias Cloud Run, ~50-80% de rate limits se bypassean. Al reciclar instancia, Map vac&iacute;o = sin rate limit.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#139</span><span class="bug-sev">medium</span><span class="bug-title">WAInbox realtime: stale closure + channel name collision al cambiar conversaci&oacute;n</span><span class="bug-file">WAInbox.tsx:97</span></div><div class="bug-details"><p class="bug-desc">Channel name <code>wa-messages-${clientId}</code> no incluye <code>selectedConv.id</code>. Al cambiar conversaci&oacute;n, cleanup y re-subscribe con mismo nombre puede causar race. <code>selectedConv</code> como objeto en deps causa re-subscribe innecesario en cada UPDATE de conversations.</p><div class="code-label">Fix:</div><div class="code-block code-good">const convId = selectedConv?.id;
+const convPhone = selectedConv?.contact_phone;
+// Channel name &uacute;nico por conversaci&oacute;n
+.channel(`wa-messages-${clientId}-${convId}`)
+// Deps: solo IDs, no objetos
+}, [clientId, convId, convPhone]);</div></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#140</span><span class="bug-sev">medium</span><span class="bug-title">Campaign alreadySent check: JSONB .contains() sin index = timeout = double-send</span><span class="bug-file">send-campaign.ts:187</span></div><div class="bug-details"><p class="bug-desc">El check de idempotency usa <code>.contains('metadata', { campaign_id })</code> sin GIN index en metadata. En tablas grandes, sequential scan puede timeout &rarr; <code>safeQueryOrDefault</code> retorna [] &rarr; <code>alreadySentPhones</code> vac&iacute;o &rarr; re-env&iacute;a a todos.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#141</span><span class="bug-sev">medium</span><span class="bug-title">[ESCALAR] tag: solo se reemplaza primera ocurrencia en merchant-wa</span><span class="bug-file">merchant-wa.ts:429</span></div><div class="bug-details"><p class="bug-desc"><code>.replace('[ESCALAR]', '')</code> solo reemplaza la primera ocurrencia. Si Claude incluye <code>[ESCALAR]</code> dos veces, el segundo tag aparece verbatim en el mensaje del cliente.</p><div class="code-label">Fix:</div><div class="code-block code-good">replyText = replyText.replace(/\[ESCALAR\]/g, '').trim();</div></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#142</span><span class="bug-sev">medium</span><span class="bug-title">merchant-wa: unread_count incremento no at&oacute;mico (TOCTOU)</span><span class="bug-file">merchant-wa.ts:217</span></div><div class="bug-details"><p class="bug-desc">Read <code>existingConv.unread_count</code>, write <code>+1</code>. Dos mensajes simult&aacute;neos: ambos leen 3, ambos escriben 4. Un incremento perdido. Dashboard muestra count incorrecto.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#145</span><span class="bug-sev">medium</span><span class="bug-title">onboarding-wa: sin claim mechanism &mdash; cron overlap env&iacute;a reminders duplicados</span><span class="bug-file">onboarding-wa.ts:32</span></div><div class="bug-details"><p class="bug-desc">Sin batchId/claim como <code>wa-action-processor.ts</code>. Si dos invocaciones del cron se solapan, ambas procesan los mismos pending steps. <code>reminder_count</code> increment tambi&eacute;n es non-atomic.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#146</span><span class="bug-sev">medium</span><span class="bug-title">abandoned-cart: total_sent update no at&oacute;mico (read-then-write)</span><span class="bug-file">abandoned-cart-wa.ts:214</span></div><div class="bug-details"><p class="bug-desc">Lee <code>automationRow.total_sent</code>, escribe <code>+ count</code>. Cron concurrentes pierden incrementos. Dashboard muestra menos env&iacute;os de los reales.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#149</span><span class="bug-sev">medium</span><span class="bug-title">Escalation: frustration false positives con &quot;si&quot;, &quot;ok&quot;, &quot;ya&quot;</span><span class="bug-file">steve-wa-chat.ts:926</span></div><div class="bug-details"><p class="bug-desc">Tres mensajes cortos consecutivos (&quot;si&quot;, &quot;ok&quot;, &quot;ya&quot;) triggean escalaci&oacute;n por &quot;frustraci&oacute;n&quot;. Son afirmaciones normales, no frustraci&oacute;n. Genera ruido en tasks.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#153</span><span class="bug-sev">medium</span><span class="bug-title">quickScrapeUrl: DNS rebinding TOCTOU entre dns.lookup y fetch</span><span class="bug-file">steve-wa-chat.ts:145</span></div><div class="bug-details"><p class="bug-desc">Bug #70 agreg&oacute; DNS check, pero hay gap entre <code>dns.lookup()</code> (IP p&uacute;blica) y <code>fetch()</code> (resuelve de nuevo, podr&iacute;a ser IP privada). Atacante con DNS controlado puede hacer rebinding.</p><div class="code-label">Fix:</div><div class="code-block code-good">// Usar IP resuelta directamente en la URL
+const resolvedUrl = new URL(url);
+resolvedUrl.hostname = address; // IP ya verificada
+const res = await fetch(resolvedUrl.toString(), {
+  headers: { 'Host': originalHost }
+});</div></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#155</span><span class="bug-sev">medium</span><span class="bug-title">WAInbox: sin auto-scroll al fondo cuando llegan mensajes nuevos</span><span class="bug-file">WAInbox.tsx:256</span></div><div class="bug-details"><p class="bug-desc">El contenedor de mensajes es scrollable pero no tiene <code>scrollIntoView</code>. Mensajes nuevos quedan invisible debajo del fold. El merchant debe hacer scroll manual.</p><div class="code-label">Fix:</div><div class="code-block code-good">const messagesEndRef = useRef&lt;HTMLDivElement&gt;(null);
+useEffect(() =&gt; {
+  messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+}, [messages]);</div></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#156</span><span class="bug-sev">medium</span><span class="bug-title">merchant-wa: conversation history sin l&iacute;mite puede exceder context window de Claude</span><span class="bug-file">merchant-wa.ts:326</span></div><div class="bug-details"><p class="bug-desc">Se cargan los &uacute;ltimos mensajes de la conversaci&oacute;n sin l&iacute;mite estricto de tokens. Con conversaciones largas, puede exceder el context window de Haiku (200K) o generar costos excesivos.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#157</span><span class="bug-sev">medium</span><span class="bug-title">prospect-trial: welcome message hardcoded en espa&ntilde;ol, no adaptable</span><span class="bug-file">prospect-trial.ts</span></div><div class="bug-details"><p class="bug-desc">El mensaje de bienvenida del trial est&aacute; hardcoded en espa&ntilde;ol. Si Steve se expande a otros pa&iacute;ses, no hay forma de cambiar el idioma sin editar c&oacute;digo.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#158</span><span class="bug-sev">medium</span><span class="bug-title">setup-merchant: webhook URL hardcoded sin verificar que el dominio est&eacute; activo</span><span class="bug-file">setup-merchant.ts</span></div><div class="bug-details"><p class="bug-desc">Al configurar webhooks de Twilio para el sub-account, la URL base se toma de env var o se hardcodea. Si el deploy cambia de URL (nuevo Cloud Run revision con URL diferente), los webhooks de merchants existentes apuntan a una URL muerta.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#160</span><span class="bug-sev">medium</span><span class="bug-title">WACampaigns: template variables {{nombre}} no se escapean &mdash; posible inyecci&oacute;n</span><span class="bug-file">WACampaigns.tsx + send-campaign.ts</span></div><div class="bug-details"><p class="bug-desc">Las variables de template como <code>{{nombre}}</code> se reemplazan con datos del prospect sin escapear. Si el nombre contiene caracteres especiales de WhatsApp (<code>*bold*</code>, <code>_italic_</code>), el formato del mensaje se rompe.</p></div></div>
+
+<div class="acum">
+  <h3>Acumulado Paula W19 &mdash; 6 Rondas</h3>
+  <table>
+    <tr><th>Ronda</th><th>Encontrados</th><th>Arreglados</th><th>Commits</th></tr>
+    <tr><td>Ronda 1 (#1-#30)</td><td>30</td><td>10</td><td>315607e</td></tr>
+    <tr><td>Ronda 2 (#31-#60)</td><td>30</td><td>30</td><td>ebfcdad</td></tr>
+    <tr><td>Ronda 3 (#61-#100)</td><td>40</td><td>40</td><td>40bf4ee</td></tr>
+    <tr><td>Ronda 4 (#101-#110)</td><td>10</td><td>&mdash;</td><td>(otros dominios)</td></tr>
+    <tr><td>Ronda 5 (#111-#130)</td><td>20</td><td>20</td><td>2a6f53bc</td></tr>
+    <tr><td>Ronda 6 (#131-#160)</td><td>30</td><td>pendiente</td><td>&mdash;</td></tr>
+    <tr style="font-weight:700;color:#60a5fa"><td>TOTAL</td><td>160</td><td>100 + 60 pendientes</td><td>4 deploys</td></tr>
+  </table>
+</div>
+
+<script>function toggle(h){const d=h.nextElementSibling,c=h.querySelector('.chevron');d.classList.toggle('open');c.classList.toggle('open')}</script>
+</body>
+</html>

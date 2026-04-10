@@ -85,18 +85,24 @@ export async function createClientUser(c: Context) {
 
   console.log('User created:', newUser.user.id);
 
-  // Assign client role
+  // Assign client role (upsert — trigger handle_new_user may have already created it)
   const { error: roleError } = await supabase
     .from('user_roles')
-    .insert({
-      user_id: newUser.user.id,
-      role: 'client',
-    });
+    .upsert(
+      { user_id: newUser.user.id, role: 'client' },
+      { onConflict: 'user_id,role' },
+    );
 
   if (roleError) {
     console.error('Error assigning role:', roleError);
-    // Don't fail - user is created, role can be fixed
   }
+
+  // Delete orphan client created by handle_new_user trigger
+  await supabase
+    .from('clients')
+    .delete()
+    .eq('user_id', newUser.user.id)
+    .neq('id', client_id);
 
   // Link user to client
   const { error: linkError } = await supabase

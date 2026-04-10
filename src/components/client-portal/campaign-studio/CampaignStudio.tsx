@@ -224,14 +224,14 @@ export function CampaignStudio({ clientId }: CampaignStudioProps) {
 
         {/* TAB: Plantillas — Editor drag & drop, CRUD de templates */}
         <TabsContent value="plantillas" className="mt-6">
-          <PlanGate feature="klaviyo.editor">
+          <PlanGate feature="klaviyo.editor" clientId={clientId}>
             <TemplatesPanel clientId={clientId} brand={brand} />
           </PlanGate>
         </TabsContent>
 
         {/* TAB: Campañas — Crear campañas seleccionando tipo */}
         <TabsContent value="campanas" className="mt-6">
-          <PlanGate feature="klaviyo.create">
+          <PlanGate feature="klaviyo.create" clientId={clientId}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {CAMPAIGN_TYPE_LIST.map((type) => {
               const template = CAMPAIGN_TEMPLATES[type];

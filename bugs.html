@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Bugs por Agente — Steve Ads</title>
+<style>
+body{font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:900px;margin:0 auto;padding:20px 24px 80px;background:#fff;color:#1a1a2e;line-height:1.7}
+h1{text-align:center;font-size:28px;margin-bottom:4px}
+.sub{text-align:center;color:#888;margin-bottom:30px}
+.stats{display:flex;justify-content:center;gap:12px;margin-bottom:40px;flex-wrap:wrap}
+.stat{border:2px solid #eee;border-radius:10px;padding:12px 24px;text-align:center}
+.stat b{font-size:28px;display:block}
+.stat small{color:#888;font-size:11px;text-transform:uppercase;letter-spacing:1px}
+.cr b{color:#d32f2f} .hi b{color:#ef6c00} .me b{color:#1565c0} .to b{color:#6a1b9a}
+
+.agent{margin-top:50px;border-top:3px solid #eee;padding-top:24px}
+.agent-head{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+.avatar{width:44px;height:44px;border-radius:12px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex-shrink:0}
+.agent-head h2{margin:0;font-size:20px}
+.agent-head small{color:#888;font-size:13px}
+.theme{color:#7c3aed;font-style:italic;margin:0 0 20px 58px;font-size:14px}
+.tags{margin-left:auto;display:flex;gap:4px;flex-shrink:0}
+.tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px}
+.tag-c{background:#ffebee;color:#d32f2f}
+.tag-h{background:#fff3e0;color:#ef6c00}
+.tag-m{background:#e3f2fd;color:#1565c0}
+
+.bug{border:1px solid #e0e0e0;border-radius:12px;padding:20px;margin-bottom:14px}
+.bug-c{border-left:4px solid #d32f2f}
+.bug-h{border-left:4px solid #ef6c00}
+.bug-m{border-left:4px solid #1565c0}
+.sev{font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;color:#fff;margin-right:8px}
+.sev-c{background:#d32f2f} .sev-h{background:#ef6c00} .sev-m{background:#1565c0}
+.file{font-family:monospace;font-size:12px;color:#888;background:#f5f5f5;padding:2px 6px;border-radius:4px}
+.bug h3{font-size:15px;margin:10px 0 8px;color:#1a1a2e}
+.bug p{font-size:14px;color:#555;margin:0 0 12px}
+
+.ex{background:#f8f8fa;border:1px solid #e8e8ee;border-radius:8px;margin-bottom:8px;overflow:hidden}
+.ex-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;padding:6px 12px}
+.ex-bad .ex-label{color:#d32f2f;background:#fff5f5}
+.ex-good .ex-label{color:#2e7d32;background:#f1f8e9}
+.ex-scene .ex-label{color:#ef6c00;background:#fff8e1}
+.ex pre{font-family:'SF Mono',monospace;font-size:12.5px;line-height:1.6;padding:10px 14px;margin:0;white-space:pre-wrap;word-break:break-all;border-top:1px solid #e8e8ee;color:#333}
+
+.alert{margin-top:10px;padding:10px 14px;border-radius:8px;font-size:13px;background:#ffebee;border:1px solid #ffcdd2;color:#c62828}
+</style>
+</head>
+<body>
+
+<h1>Auditoria de Bugs — Steve Ads</h1>
+<p class="sub">62 bugs funcionales verificados linea por linea &middot; 9 abril 2026</p>
+
+<div class="stats">
+  <div class="stat cr"><b>11</b><small>Critical</small></div>
+  <div class="stat hi"><b>21</b><small>High</small></div>
+  <div class="stat me"><b>30</b><small>Medium</small></div>
+  <div class="stat to"><b>62</b><small>Total</small></div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- FELIPE W2                          -->
+<!-- ═══════════════════════════════════ -->
+<div class="agent">
+  <div class="agent-head">
+    <div class="avatar" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)">F</div>
+    <div><h2>Felipe W2</h2><small>Meta Ads &amp; Instagram</small></div>
+    <div class="tags"><span class="tag tag-c">3 CRITICAL</span><span class="tag tag-h">3 HIGH</span><span class="tag tag-m">5 MEDIUM</span></div>
+  </div>
+  <p class="theme">7 de 11 bugs son el mismo patron: archivos que no soportan conexiones SUAT</p>
+
+  <div class="bug bug-c">
+    <span class="sev sev-c">CRITICAL</span><span class="file">manage-meta-campaign.ts:1435</span>
+    <h3>Merchants BM Partner no pueden gestionar campanas</h3>
+    <p>El codigo revisa si hay token en la base de datos. Pero los merchants SUAT guardan su token en una variable de entorno del servidor. Como no lo encuentra en la BD, devuelve error y el merchant <b>no puede crear, pausar ni editar campanas</b>.</p>
+    <div class="ex ex-bad"><div class="ex-label">Codigo actual (malo)</div><pre>// Linea 1435 — rechaza si no hay token en DB
+if (!connection.access_token_encrypted) {
+  return c.json({ error: 'Missing Meta credentials' }, 400);
+}
+// Merchant SUAT nunca pasa de aqui</pre></div>
+    <div class="ex ex-good"><div class="ex-label">Como deberia ser</div><pre>if (!connection) return c.json({ error: 'Not found' }, 404);
+// getTokenForConnection() busca en DB o en env var
+const token = await getTokenForConnection(supabase, connection);</pre></div>
+  </div>
+
+  <div class="bug bug-c">
+    <span class="sev sev-c">CRITICAL</span><span class="file">execute-meta-rules.ts:55</span>
+    <h3>Reglas automaticas nunca ejecutan para merchants SUAT</h3>
+    <p>Regla: "si CPA sube de $5.000, pausar campana". El cron salta silenciosamente todas las conexiones SUAT. La campana sigue quemando plata sin que nadie la pause.</p>
+    <div class="ex ex-scene"><div class="ex-label">Escenario real</div><pre>1. Merchant crea regla: "Si ROAS < 1.0, pausar campana"
+2. ROAS baja a 0.3 — campana quemando plata
+3. Cron llega a su conexion...
+4. if (!conn?.access_token_encrypted) continue; // lo salta
+5. La campana sigue quemando plata indefinidamente</pre></div>
+  </div>
+
+  <div class="bug bug-c">
+    <span class="sev sev-c">CRITICAL</span><span class="file">fatigue-detector.ts:74</span>
+    <h3>Fatiga creativa nunca detectada para SUAT</h3>
+    <p>Usa <code>decryptPlatformToken()</code> que devuelve null para SUAT. Anuncios cansados siguen corriendo sin alerta.</p>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">fetch-meta-ad-accounts.ts:189</span>
+    <h3>Merchant SUAT ve las cuentas de TODOS los demas merchants</h3>
+    <p>Llamar <code>/me/adaccounts</code> con un SUAT devuelve TODAS las cuentas del Business Manager. Merchant A ve datos de B, C y D.</p>
+    <div class="ex ex-scene"><div class="ex-label">Que pasa</div><pre>Merchant A pide sus ad accounts
+→ GET /me/adaccounts con SUAT
+→ Devuelve: cuenta_A, cuenta_B, cuenta_C, cuenta_D...
+→ Merchant A ve los datos de todos los demas</pre></div>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">reconciliation.ts:112</span>
+    <h3>Reconciliacion salta merchants SUAT</h3>
+    <p>Filtra con <code>.not('access_token_encrypted', 'is', null)</code> y usa legacy decrypt. Campanas fantasma nunca se detectan para SUAT.</p>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">check-meta-scopes.ts:60</span>
+    <h3>Leadsie no se maneja igual que BM Partner</h3>
+    <p>El shortcut de scopes solo aplica para <code>bm_partner</code>, no para <code>leadsie</code>. Merchants Leadsie ven permisos incorrectos.</p>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">performance-tracker-meta.ts:168</span>
+    <h3>ROAS siempre mal — usa $50.000 inventados por conversion</h3>
+    <p>En vez de usar el revenue real de Meta API, multiplica conversiones × $50.000 CLP hardcodeado. Tiendas con ticket $5.000 aparecen con ROAS 10x inflado.</p>
+    <div class="ex ex-bad"><div class="ex-label">Calculo actual</div><pre>const roas = (conversions * 50000) / spend;
+// Ticket $5.000 → ROAS inflado 10x
+// Ticket $200.000 → ROAS deflactado 4x</pre></div>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">sync-meta-metrics.ts:449</span>
+    <h3>Metricas historicas (>30 dias) se borran en cada sync</h3>
+    <p>El cleanup borra todas las metricas que no estan en la ventana actual de 30 dias. Datos antiguos desaparecen del dashboard.</p>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">manage-meta-rules.ts vs execute-meta-rules.ts</span>
+    <h3>Nombres de metricas en MAYUSCULA vs minuscula</h3>
+    <p>Un archivo usa 'SPEND', el otro 'spend'. Si la regla se crea con uno y se ejecuta con el otro, la metrica evalua a 0 y la regla nunca se activa.</p>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">fatigue-detector.ts:154</span>
+    <h3>Query por shop_id pero data insertada con client_id</h3>
+    <p>El detector busca por <code>shop_id</code> pero los datos se guardan con <code>client_id</code>. Nunca encuentra datos historicos y siempre sugiere el angulo generico.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- VALENTINA W1                       -->
+<!-- ═══════════════════════════════════ -->
+<div class="agent">
+  <div class="agent-head">
+    <div class="avatar" style="background:linear-gradient(135deg,#ec4899,#be185d)">V</div>
+    <div><h2>Valentina W1</h2><small>Steve Mail — Email Marketing</small></div>
+    <div class="tags"><span class="tag tag-c">1 CRITICAL</span><span class="tag tag-h">7 HIGH</span><span class="tag tag-m">8 MEDIUM</span></div>
+  </div>
+  <p class="theme">7 endpoints de email NO tienen autenticacion — cualquier persona en internet puede usarlos</p>
+
+  <div class="bug bug-c">
+    <span class="sev sev-c">CRITICAL</span><span class="file">flow-webhooks.ts:493</span>
+    <h3>Usuarios que se desuscribieron son re-suscritos sin permiso (GDPR)</h3>
+    <p>Cuando alguien compra en Shopify, el webhook siempre pone <code>status: 'subscribed'</code>. Si esa persona ya se habia desuscrito, se le vuelve a suscribir <b>sin su consentimiento</b>.</p>
+    <div class="ex ex-scene"><div class="ex-label">Escenario real</div><pre>1. Maria se desuscribe de emails → status: 'unsubscribed'
+2. Maria compra algo en Shopify
+3. Webhook: upsertSubscriber({ status: 'subscribed' })
+4. Maria vuelve a recibir emails sin querer
+5. Viola GDPR Art 7(3) — derecho a opt-out</pre></div>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">send-email.ts, manage-campaigns.ts, manage-email-lists.ts, send-queue.ts + 3 mas</span>
+    <h3>7 endpoints de email sin autenticacion</h3>
+    <p>Usan <code>getSupabaseAdmin()</code> y no verifican JWT. Cualquiera puede enviar emails masivos, crear listas, borrar campanas — todo sin login.</p>
+    <div class="ex ex-bad"><div class="ex-label">Ataque posible</div><pre>curl -X POST https://steve-api.../api/send-email \
+  -d '{"action":"send-test",
+       "to":"victima@gmail.com",
+       "subject":"Phishing",
+       "html_content":"&lt;script&gt;..."}'
+
+# Sin auth → se envia desde el dominio de Steve
+# Dano: reputacion, Resend credits, phishing</pre></div>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">prospect-email-nurture.ts:241</span>
+    <h3>Emails de nurture sin link de desuscripcion (CAN-SPAM)</h3>
+    <p>Se envian directo por Resend API sin footer de unsubscribe. El unico mecanismo es un texto que dice "responde 'no mas emails'" — no es valido legalmente.</p>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">send-email.ts:46</span>
+    <h3>HMAC de unsubscribe vulnerable a timing attack</h3>
+    <p>Compara tokens con <code>!==</code> en vez de <code>timingSafeEqual</code>. Un atacante puede adivinar el token midiendo tiempos de respuesta.</p>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">track-events.ts:147</span>
+    <h3>Webhooks SES sin verificar firma — un atacante puede marcar emails como bounce</h3>
+    <p>No valida la firma de AWS SNS. Cualquiera puede enviar bounces/complaints falsos y desactivar subscribers legítimos.</p>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">send-queue.ts:170</span>
+    <h3>Race condition: emails duplicados</h3>
+    <p>Si 2 instancias de Cloud Run procesan la cola al mismo tiempo, ambas leen y envian los mismos emails. El subscriber recibe 2 copias.</p>
+    <div class="ex ex-scene"><div class="ex-label">Que pasa</div><pre>Instancia A: SELECT WHERE status='queued' → 50 emails
+Instancia B: SELECT WHERE status='queued' → mismos 50
+Ambas envian → subscriber recibe 2 copias</pre></div>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">unsubscribe.ts:82</span>
+    <h3>XSS almacenado via nombre de subscriber</h3>
+    <p>El nombre se interpola directo en HTML sin escapar. Si el nombre contiene <code>&lt;script&gt;</code>, se ejecuta en el browser del visitante.</p>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">smart-send-time.ts, email-templates-api.ts, generate-email-content.ts, flow-webhooks.ts:695, flow-webhooks.ts:889</span>
+    <h3>5 endpoints mas sin auth</h3>
+    <p>Smart send time, templates, AI email generation, winback cron, browse tracking — todos sin verificar identidad.</p>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">track-events.ts:39</span>
+    <h3>IPs de usuarios almacenadas sin politica GDPR</h3>
+    <p>La IP completa se guarda en <code>email_events.metadata</code> sin anonimizar ni tener politica de retencion.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- TOMAS W7                           -->
+<!-- ═══════════════════════════════════ -->
+<div class="agent">
+  <div class="agent-head">
+    <div class="avatar" style="background:linear-gradient(135deg,#a78bfa,#7c3aed)">T</div>
+    <div><h2>Tomas W7</h2><small>Steve AI &amp; Cerebro</small></div>
+    <div class="tags"><span class="tag tag-h">3 HIGH</span><span class="tag tag-m">5 MEDIUM</span></div>
+  </div>
+  <p class="theme">steve-strategy.ts no valida quien pide los datos — cualquier usuario ve data de cualquier cliente</p>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">steve-strategy.ts:60</span>
+    <h3>Cualquier usuario logueado puede ver datos de OTRO cliente</h3>
+    <p>Acepta <code>client_id</code> del body sin verificar que el usuario sea el dueno. Es como si un cliente del banco pudiera pedir el saldo de otro solo con su numero de cuenta.</p>
+    <div class="ex ex-bad"><div class="ex-label">Codigo actual</div><pre>const { client_id } = await c.req.json();
+// Busca directo sin validar ownership
+const client = await supabase.from('clients')
+  .select('name, company, presupuesto_ads')
+  .eq('id', client_id) // cualquier UUID funciona
+  .single();</pre></div>
+    <div class="ex ex-good"><div class="ex-label">steve-chat.ts SI lo hace bien</div><pre>if (!isSuperAdmin
+    && client.client_user_id !== userId
+    && client.user_id !== userId) {
+  return c.json({ error: 'Access denied' }, 403);
+}</pre></div>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">steve-strategy.ts</span>
+    <h3>Sin rate limiting — quema ilimitada de Anthropic</h3>
+    <p><code>steve-chat.ts</code> usa <code>checkRateLimit()</code>. <code>steve-strategy.ts</code> no. Un script puede hacer 10.000 requests/minuto → $6.000 USD/hora.</p>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">prospect-trial.ts:32</span>
+    <h3>Password temporal predecible y nunca se envia al usuario</h3>
+    <p>La clave es <code>Steve + timestamp</code>. Si sabes cuando se creo la cuenta, la puedes adivinar. Peor: el mensaje dice "la clave que te enviamos" pero nunca la envia.</p>
+    <div class="ex ex-scene"><div class="ex-label">Que ve el nuevo usuario</div><pre>WhatsApp: "Entra con la clave temporal que te enviamos"
+Usuario: "...cual clave? Nadie me envio nada"
+→ No puede entrar a la plataforma
+→ Primera impresion: ROTA</pre></div>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">steve-chat.ts:1481</span>
+    <h3>guardar_regla inserta knowledge sin saber quien lo hizo</h3>
+    <p>La herramienta del AI inserta reglas en <code>steve_knowledge</code> sin <code>client_id</code> ni <code>user_id</code>. No hay audit trail.</p>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">steve-wa-chat.ts:220, steve-email-content.ts:356, steve-multi-brain.ts:266, steve-strategy.ts:176, steve-email-content.ts:487</span>
+    <h3>4 bugs menores: rate limiter in-memory, count sin cap, JSON parse crash, messages sin sanitizar</h3>
+    <p>Rate limiter no funciona con multi-instance Cloud Run. Parametro <code>count</code> de A/B sin limite. JSON parse falla si Claude agrega texto despues del JSON. Messages sin truncar.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- JAVIERA W12                        -->
+<!-- ═══════════════════════════════════ -->
+<div class="agent">
+  <div class="agent-head">
+    <div class="avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706)">J</div>
+    <div><h2>Javiera W12</h2><small>El Chino — QA &amp; Reconciliacion</small></div>
+    <div class="tags"><span class="tag tag-c">1 CRITICAL</span><span class="tag tag-h">2 HIGH</span><span class="tag tag-m">3 MEDIUM</span></div>
+  </div>
+  <p class="theme">El Chino esta ciego a merchants SUAT y tiene un secret pegado en el codigo</p>
+
+  <div class="bug bug-c">
+    <span class="sev sev-c">CRITICAL</span><span class="file">chino/auto-fixer.ts:91</span>
+    <h3>CRON_SECRET hardcodeado en el codigo fuente</h3>
+    <p>Si la variable de entorno no existe, usa <code>'steve-cron-secret-2024'</code>. Cualquiera que lea el repo puede llamar endpoints de cron.</p>
+    <div class="ex ex-bad"><div class="ex-label">Codigo actual</div><pre>const cronSecret = process.env.CRON_SECRET || 'steve-cron-secret-2024';
+// Si CRON_SECRET no existe → usa el string visible en GitHub</pre></div>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">chino/runner.ts:248 + chino/fixer.ts:95</span>
+    <h3>El Chino no puede verificar NADA para merchants SUAT</h3>
+    <p>Usa <code>decryptPlatformToken()</code> que devuelve null para SUAT. Los 800 checks diarios se saltan con "Token no disponible".</p>
+    <div class="ex ex-scene"><div class="ex-label">Situacion</div><pre>Merchant OAuth: todos los checks se ejecutan
+Merchant SUAT: TODOS los checks = "Token no disponible"
+→ Bugs en merchants SUAT pasan desapercibidos para siempre</pre></div>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">chino/runner.ts:444</span>
+    <h3>Solo usa resultado del ULTIMO merchant</h3>
+    <p>Si merchant A falla pero B pasa, el check se marca "pass". El error de A se pierde silenciosamente.</p>
+    <div class="ex ex-scene"><div class="ex-label">Ejemplo</div><pre>Merchant A: token expirado → FAIL
+Merchant B: todo ok → PASS
+El Chino guarda: lastResult = PASS
+→ Problema de Merchant A nunca se reporta</pre></div>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">chino/endpoints.ts:174, instruction-handler.ts:75</span>
+    <h3>Race conditions en fix queue e instrucciones</h3>
+    <p>Sin optimistic lock en chinoFixNext (2 agentes pueden tomar el mismo fix). check_number puede colisionar si llegan 2 instrucciones simultaneas.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- SEBASTIAN W5                       -->
+<!-- ═══════════════════════════════════ -->
+<div class="agent">
+  <div class="agent-head">
+    <div class="avatar" style="background:linear-gradient(135deg,#22c55e,#16a34a)">S</div>
+    <div><h2>Sebastian W5</h2><small>Cloud Run &amp; Crons</small></div>
+    <div class="tags"><span class="tag tag-c">2 CRITICAL</span><span class="tag tag-h">1 HIGH</span><span class="tag tag-m">2 MEDIUM</span></div>
+  </div>
+  <p class="theme">Si CRON_SECRET se pierde en un deploy, 12+ crons quedan abiertos al publico</p>
+
+  <div class="bug bug-c">
+    <span class="sev sev-c">CRITICAL</span><span class="file">12 archivos cron + chino/endpoints.ts</span>
+    <h3>Si CRON_SECRET no esta seteado, cualquiera ejecuta los crons</h3>
+    <p>Comparan <code>cronSecret !== process.env.CRON_SECRET</code>. Si ambos son <code>undefined</code>, la comparacion da <code>false</code> y el auth pasa. Como tener una cerradura que se abre sola si le sacas la llave.</p>
+    <div class="ex ex-bad"><div class="ex-label">Patron vulnerable (12 archivos)</div><pre>if (cronSecret !== process.env.CRON_SECRET) {
+  return c.json({ error: 'Unauthorized' }, 401);
+}
+// Si CRON_SECRET no existe:
+// undefined !== undefined → false → auth pasa!</pre></div>
+    <div class="ex ex-good"><div class="ex-label">Patron seguro (otros crons)</div><pre>const expected = process.env.CRON_SECRET;
+if (!expected || cronSecret !== expected) {
+  return c.json({ error: 'Unauthorized' }, 401);
+}
+// Si no existe → !expected = true → 401</pre></div>
+  </div>
+
+  <div class="bug bug-c">
+    <span class="sev sev-c">CRITICAL</span><span class="file">wa-action-processor.ts:26</span>
+    <h3>Mismo bug pero con variante — empty string falsy</h3>
+    <p>Usa <code>process.env.CRON_SECRET || ''</code>. Cuando no existe, queda <code>''</code> que es falsy, y el <code>if ('' && ...)</code> se salta.</p>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">60 archivos cron/chino/trigger</span>
+    <h3>CERO errores llegan a Sentry — todo se pierde en console.log</h3>
+    <p>Sentry esta configurado pero ningun cron usa <code>Sentry.captureException()</code>. Errores criticos pasan dias sin que nadie los note.</p>
+    <div class="ex ex-bad"><div class="ex-label">Patron actual en todos los crons</div><pre>catch (err) {
+  console.error('[weekly-report]', err); // se pierde en logs
+  // Sentry.captureException(err); ← NUNCA se llama
+}</pre></div>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">restart-service.ts:14</span>
+    <h3>Auto-restart compara contra la clave equivocada</h3>
+    <p>Compara contra <code>SUPABASE_SERVICE_ROLE_KEY</code> en vez de <code>CRON_SECRET</code>. Cloud Scheduler envia CRON_SECRET → siempre 401 → auto-restart nunca funciona.</p>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">2 trigger files</span>
+    <h3>Triggers abiertos cuando CRON_SECRET no existe</h3>
+    <p>Usan <code>if (cronSecret && ...)</code> — si no existe, el if es false y se salta la verificacion.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- MATIAS W13                         -->
+<!-- ═══════════════════════════════════ -->
+<div class="agent">
+  <div class="agent-head">
+    <div class="avatar" style="background:linear-gradient(135deg,#06b6d4,#0891b2)">M</div>
+    <div><h2>Matias W13</h2><small>Shopify</small></div>
+    <div class="tags"><span class="tag tag-c">1 CRITICAL</span><span class="tag tag-h">4 HIGH</span></div>
+  </div>
+  <p class="theme">La seguridad de Shopify esta rota en todos los puntos: JWT, HMAC, OAuth, webhooks</p>
+
+  <div class="bug bug-c">
+    <span class="sev sev-c">CRITICAL</span><span class="file">fetch-shopify-products.ts:17</span>
+    <h3>JWT de Shopify se acepta sin verificar firma — cualquiera puede forjarlo</h3>
+    <p>El codigo toma el JWT, lo parte por los puntos y decodifica el payload con <code>atob()</code>. <b>Nunca verifica la firma.</b> Es como aceptar un cheque sin verificar que la firma del banco sea real.</p>
+    <div class="ex ex-bad"><div class="ex-label">Codigo peligroso</div><pre>const token = c.req.header('X-Shopify-Session-Token');
+const payload = JSON.parse(atob(token.split('.')[1]));
+const shopDomain = new URL(payload.dest).hostname;
+// No verifica firma HMAC
+// No verifica expiracion
+// No verifica audience</pre></div>
+    <div class="ex ex-scene"><div class="ex-label">Ataque en 30 segundos</div><pre>1. Atacante crea JWT falso:
+   { "dest": "https://tienda-victima.myshopify.com" }
+2. Lo codifica en base64
+3. GET /api/fetch-shopify-products
+   X-Shopify-Session-Token: xxx.{falso}.xxx
+4. Recibe TODOS los productos con precios y costos</pre></div>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">index.ts:407-408</span>
+    <h3>Webhooks de Shopify sin verificar firma HMAC</h3>
+    <p>Existe <code>shopifyHmacMiddleware</code> pero nunca se aplica a las rutas. Cualquiera puede enviar webhooks falsos de fulfillment o GDPR.</p>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">shopify-oauth-callback.ts:212</span>
+    <h3>Si CSRF falla, el OAuth continua igual</h3>
+    <p>La proteccion CSRF existe pero si falla solo hace <code>console.warn</code> y sigue conectando. Alarma que suena pero nunca cierra la puerta.</p>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">shopify-install.ts:195</span>
+    <h3>HMAC fail en install → continua igual</h3>
+    <p>Si la firma HMAC del install request falla, el codigo loguea warning pero procede con el OAuth flow.</p>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">shopify-oauth-callback.ts:598</span>
+    <h3>Password temporal visible en la URL del browser</h3>
+    <p>Al crear usuario nuevo, la clave temporal va como query param en la URL de redirect. Queda en historial del browser, logs de Vercel, y headers Referer.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- SOFIA W14                          -->
+<!-- ═══════════════════════════════════ -->
+<div class="agent">
+  <div class="agent-head">
+    <div class="avatar" style="background:linear-gradient(135deg,#f472b6,#db2777)">S</div>
+    <div><h2>Sofia W14</h2><small>Integraciones &amp; OAuth</small></div>
+    <div class="tags"><span class="tag tag-c">1 CRITICAL</span><span class="tag tag-m">3 MEDIUM</span></div>
+  </div>
+  <p class="theme">Ownership checks que no funcionan y CSRF validation solo cosmetica</p>
+
+  <div class="bug bug-c">
+    <span class="sev sev-c">CRITICAL</span><span class="file">store-shopify-token.ts:46 + store-shopify-credentials.ts:44</span>
+    <h3>Check de ownership esta MUERTO — usa variable que nunca existe</h3>
+    <p>Lee <code>(c as any).userId</code> pero el middleware guarda <code>c.set('user', user)</code>. Como <code>userId</code> siempre es <code>undefined</code>, el <code>if</code> es <code>false</code> y el bloque de seguridad nunca se ejecuta.</p>
+    <div class="ex ex-bad"><div class="ex-label">Codigo actual</div><pre>const userId = (c as any).userId; // siempre undefined
+if (userId) { // false siempre → se salta
+  // verificar ownership...
+}
+// → Cualquier usuario guarda tokens para CUALQUIER cliente</pre></div>
+    <div class="ex ex-good"><div class="ex-label">Deberia ser</div><pre>const user = c.get('user'); // asi lo setea el middleware
+if (user) {
+  // verificar user.id === client.client_user_id
+}</pre></div>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">meta-oauth-callback.ts:26</span>
+    <h3>CSRF de Meta OAuth se valida solo en frontend</h3>
+    <p>El backend no valida <code>state</code>. Un comentario dice literalmente: "CSRF handled by frontend". Cualquier herramienta puede llamar al API directo.</p>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">google-ads-oauth-callback.ts:30</span>
+    <h3>State de Google OAuth opcional y predecible</h3>
+    <p>Si no se envia <code>state</code>, el check se salta. Cuando se envia, es <code>base64(client_id:user_id)</code> sin nonce random — facil de forjar.</p>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">meta-token-refresh.ts:68</span>
+    <h3>getValidMetaToken falla para SUAT</h3>
+    <p>Funcion legacy que chequea <code>access_token_encrypted</code>. Devuelve null para conexiones SUAT.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- PAULA W19                          -->
+<!-- ═══════════════════════════════════ -->
+<div class="agent">
+  <div class="agent-head">
+    <div class="avatar" style="background:linear-gradient(135deg,#fb923c,#ea580c)">P</div>
+    <div><h2>Paula W19</h2><small>WhatsApp, CRM &amp; Ventas</small></div>
+    <div class="tags"><span class="tag tag-c">1 CRITICAL</span><span class="tag tag-h">1 HIGH</span><span class="tag tag-m">1 MEDIUM</span></div>
+  </div>
+  <p class="theme">El CRM no tiene aislamiento entre clientes — todos ven los datos de todos</p>
+
+  <div class="bug bug-c">
+    <span class="sev sev-c">CRITICAL</span><span class="file">prospect-crm.ts, sales-tasks.ts, proposals.ts, sellers.ts</span>
+    <h3>El CRM no filtra por cliente — todos ven TODOS los prospectos</h3>
+    <p>Imagina un CRM donde abres la app y ves los clientes de TODAS las empresas que usan el sistema, no solo los tuyos. Eso pasa aqui.</p>
+    <div class="ex ex-scene"><div class="ex-label">Que pasa</div><pre>Usuario A (Tienda de Ropa) abre el CRM
+→ Ve sus prospectos
+→ TAMBIEN ve los de Panaderia Carlos
+→ TAMBIEN ve los de Clinica Dental Sur
+→ Puede editar, cambiar etapa, agregar notas a TODOS</pre></div>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">prospect-trial.ts:32</span>
+    <h3>Password predecible + nunca se envia</h3>
+    <p>(Compartido con Tomas W7) La clave temporal es <code>Steve + timestamp</code> y el mensaje de bienvenida la menciona pero no la incluye.</p>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">steve-multi-brain.ts:109</span>
+    <h3>LIKE wildcards sin sanitizar en busqueda de competidores</h3>
+    <p>Si <code>what_they_sell</code> contiene <code>%</code>, la query ilike hace full table scan.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- DIEGO W8                           -->
+<!-- ═══════════════════════════════════ -->
+<div class="agent">
+  <div class="agent-head">
+    <div class="avatar" style="background:linear-gradient(135deg,#64748b,#475569)">D</div>
+    <div><h2>Diego W8</h2><small>Database &amp; Data Pipeline</small></div>
+    <div class="tags"><span class="tag tag-c">1 CRITICAL</span><span class="tag tag-m">1 MEDIUM</span></div>
+  </div>
+  <p class="theme">Un endpoint admin con la llave debajo del felpudo</p>
+
+  <div class="bug bug-c">
+    <span class="sev sev-c">CRITICAL</span><span class="file">admin-create-client.ts:19</span>
+    <h3>Endpoint admin con clave pegada en el codigo — acceso total a la BD</h3>
+    <p>Usa <code>'setup-jardin-eva-2026'</code> como clave, escrita en el codigo fuente. Cualquiera que lea el repo puede: listar clientes con emails, resetear passwords (default: <code>'Jardin2026'</code>), borrar registros.</p>
+    <div class="ex ex-bad"><div class="ex-label">Codigo actual</div><pre>const adminSecret = 'setup-jardin-eva-2026'; // visible en GitHub
+
+// Este endpoint puede:
+// - Listar TODOS los clientes con emails
+// - Resetear cualquier password
+// - Borrar registros de clientes
+// - Ver todas las conexiones</pre></div>
+    <div class="alert">Cualquier persona con acceso al repo puede hacer dump completo de la BD de clientes.</div>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">middleware/auth.ts:19</span>
+    <h3>Llamadas internas no setean user context</h3>
+    <p>Cuando un request usa service role key, el middleware no setea <code>c.set('user', ...)</code>. Handlers downstream que leen <code>c.get('user')</code> reciben undefined.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- CAMILA W4                          -->
+<!-- ═══════════════════════════════════ -->
+<div class="agent">
+  <div class="agent-head">
+    <div class="avatar" style="background:linear-gradient(135deg,#e879f9,#a855f7)">C</div>
+    <div><h2>Camila W4</h2><small>Frontend &amp; Admin Dashboard</small></div>
+    <div class="tags"><span class="tag tag-h">3 HIGH</span><span class="tag tag-m">1 MEDIUM</span></div>
+  </div>
+  <p class="theme">Flujos rotos donde el usuario cree que algo funciono pero no paso nada</p>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">CampaignBuilder.tsx:471</span>
+    <h3>Email de prueba se envia a la direccion equivocada</h3>
+    <p>Se envia al <code>from_email</code> (remitente de la campana) en vez del email del usuario logueado. El usuario lo espera y nunca le llega.</p>
+    <div class="ex ex-scene"><div class="ex-label">Que pasa</div><pre>Jose (jose@tienda.cl) crea campana con from: marketing@tienda.cl
+Click "Enviar prueba"
+→ Email se envia a marketing@tienda.cl (nadie lo lee)
+→ Jose espera y nunca llega
+→ Piensa que el sistema esta roto</pre></div>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">CampaignBuilder.tsx:435</span>
+    <h3>No se puede enviar campana nueva sin cerrar y reabrir el editor</h3>
+    <p>Al guardar, el ID se actualiza con <code>setState</code> (asincrono). La siguiente linea ya lo chequea pero todavia es <code>undefined</code>. Siempre dice "Guarda primero" aunque se acaba de guardar.</p>
+    <div class="ex ex-scene"><div class="ex-label">Flujo roto</div><pre>1. Crea campana nueva, disena email
+2. Click "Enviar ahora"
+3. handleSaveCampaign() → OK, guarda con id=abc123
+4. setState({ id: 'abc123' }) → se aplica en PROXIMO render
+5. if (!editingCampaign?.id) → todavia undefined
+6. Toast: "Guarda la campana primero"
+7. Tiene que cerrar → reabrir → enviar</pre></div>
+  </div>
+
+  <div class="bug bug-h">
+    <span class="sev sev-h">HIGH</span><span class="file">DashboardStats.tsx:22</span>
+    <h3>Dashboard siempre muestra "0 Clientes"</h3>
+    <p>Consulta <code>.eq('user_id', userId)</code> pero la tabla usa <code>client_user_id</code>. Nunca encuentra nada.</p>
+    <div class="ex ex-bad"><div class="ex-label">Codigo actual</div><pre>supabase.from('clients').select('id').eq('user_id', userId)
+// user_id = admin que creo el registro
+// client_user_id = usuario dueno ← el correcto</pre></div>
+  </div>
+
+  <div class="bug bug-m">
+    <span class="sev sev-m">MEDIUM</span><span class="file">ClientPortal.tsx:291</span>
+    <h3>Pantalla blanca si el usuario no tiene client record</h3>
+    <p>Si un usuario tiene rol <code>client</code> pero su registro en la tabla <code>clients</code> no existe, la pagina retorna <code>null</code> — pantalla blanca sin mensaje ni redirect.</p>
+  </div>
+</div>
+
+<div style="text-align:center;padding:50px 0 0;color:#aaa;font-size:13px">
+  Generado por Javiera W12 — QA Permanente · 9 abril 2026<br>
+  62 bugs verificados linea por linea en el repo betabg
+</div>
+
+</body>
+</html>

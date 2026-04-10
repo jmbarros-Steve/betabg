@@ -102,7 +102,7 @@ export async function googleAdsOauthCallback(c: Context) {
     // Get list of accessible Google Ads customers
     console.log('Fetching accessible customers...');
     const customersResponse = await fetch(
-      'https://googleads.googleapis.com/v18/customers:listAccessibleCustomers',
+      'https://googleads.googleapis.com/v23/customers:listAccessibleCustomers',
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -132,7 +132,7 @@ export async function googleAdsOauthCallback(c: Context) {
     let accountName = `Google Ads ${firstCustomerId}`;
     try {
       const customerDetailsResponse = await fetch(
-        `https://googleads.googleapis.com/v18/customers/${firstCustomerId}`,
+        `https://googleads.googleapis.com/v23/customers/${firstCustomerId}`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,

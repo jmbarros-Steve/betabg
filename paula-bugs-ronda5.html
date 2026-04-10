@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paula W19 - Bug Hunt Ronda 5 (#111-#130) — WhatsApp, CRM & Ventas</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;padding:24px}
+  h1{font-size:1.8rem;margin-bottom:8px}
+  .subtitle{color:#94a3b8;margin-bottom:24px}
+  .stats{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+  .stat{background:#1e293b;border-radius:12px;padding:16px 24px;min-width:140px}
+  .stat-value{font-size:2rem;font-weight:700}
+  .stat-label{color:#94a3b8;font-size:.85rem}
+  .critical .stat-value{color:#ef4444}
+  .high .stat-value{color:#f97316}
+  .medium .stat-value{color:#eab308}
+  .total .stat-value{color:#3b82f6}
+  .bug-card{background:#1e293b;border-radius:12px;margin-bottom:16px;overflow:hidden;border-left:4px solid #64748b}
+  .bug-card.sev-critical{border-left-color:#ef4444}
+  .bug-card.sev-high{border-left-color:#f97316}
+  .bug-card.sev-medium{border-left-color:#eab308}
+  .bug-header{display:flex;align-items:center;gap:12px;padding:16px 20px;cursor:pointer;user-select:none;flex-wrap:wrap}
+  .bug-header:hover{background:#273548}
+  .bug-num{font-weight:700;color:#60a5fa;min-width:44px}
+  .bug-sev{font-size:.75rem;font-weight:600;padding:2px 10px;border-radius:9999px;text-transform:uppercase}
+  .sev-critical .bug-sev{background:#7f1d1d;color:#fca5a5}
+  .sev-high .bug-sev{background:#7c2d12;color:#fdba74}
+  .sev-medium .bug-sev{background:#713f12;color:#fde047}
+  .bug-title{flex:1;font-weight:500;min-width:200px}
+  .bug-file{color:#94a3b8;font-size:.8rem;font-family:monospace}
+  .bug-details{display:none;padding:0 20px 20px}
+  .bug-details.open{display:block}
+  .bug-desc{color:#cbd5e1;margin-bottom:16px;line-height:1.6}
+  .code-block{background:#0f172a;border-radius:8px;padding:16px;margin-bottom:12px;overflow-x:auto;font-family:'SF Mono','Fira Code',monospace;font-size:.82rem;line-height:1.5;white-space:pre-wrap}
+  .code-label{color:#94a3b8;font-size:.8rem;margin-bottom:6px;font-weight:600}
+  .code-bad{border:1px solid #7f1d1d}
+  .code-good{border:1px solid #14532d}
+  .chevron{transition:transform .2s;color:#64748b}
+  .chevron.open{transform:rotate(90deg)}
+  .section-title{font-size:1.2rem;margin:32px 0 16px;color:#f8fafc;border-bottom:1px solid #334155;padding-bottom:8px}
+  .acum{background:#1e293b;border-radius:12px;padding:20px;margin-top:32px}
+  .acum h3{margin-bottom:12px;color:#60a5fa}
+  .acum table{width:100%;border-collapse:collapse}
+  .acum th,.acum td{text-align:left;padding:8px 12px;border-bottom:1px solid #334155}
+  .acum th{color:#94a3b8;font-size:.8rem;text-transform:uppercase}
+</style>
+</head>
+<body>
+
+<h1>Paula W19 - Bug Hunt Ronda 5</h1>
+<p class="subtitle">20 bugs en WhatsApp, CRM & Ventas (#111-#130) | 9 abril 2026</p>
+
+<div class="stats">
+  <div class="stat critical"><div class="stat-value">3</div><div class="stat-label">Critical</div></div>
+  <div class="stat high"><div class="stat-value">12</div><div class="stat-label">High</div></div>
+  <div class="stat medium"><div class="stat-value">5</div><div class="stat-label">Medium</div></div>
+  <div class="stat total"><div class="stat-value">20</div><div class="stat-label">Total Ronda 5</div></div>
+</div>
+
+<!-- CRITICAL -->
+<div class="section-title">Critical (3)</div>
+
+<div class="bug-card sev-critical">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#111</span><span class="bug-sev">critical</span>
+    <span class="bug-title">Credit refund TOCTOU: read-then-write pierde cr&eacute;ditos entre campa&ntilde;as concurrentes</span>
+    <span class="bug-file">send-campaign.ts:261</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">El refund de cr&eacute;ditos en el <code>finally</code> lee <code>balance</code>, luego escribe <code>balance + unusedCredits</code>. Si dos campa&ntilde;as del mismo cliente terminan simult&aacute;neamente, la segunda lectura puede ocurrir antes del primer write &mdash; perdiendo un refund entero. Ejemplo: balance=100, campa&ntilde;a A lee 100, campa&ntilde;a B lee 100, A escribe 300, B sobreescribe a 250. Se perdieron 200 cr&eacute;ditos.</p>
+    <div class="code-label">Problema:</div>
+    <div class="code-block code-bad">const { data: currentCredits } = await supabase
+  .from('wa_credits').select('balance').eq('client_id', client_id).single();
+if (currentCredits) {
+  await supabase.from('wa_credits')
+    .update({ balance: currentCredits.balance + unusedCredits })
+    .eq('client_id', client_id);
+}</div>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">// RPC at&oacute;mico: UPDATE wa_credits SET balance = balance + p_amount
+await supabase.rpc('refund_wa_credit', {
+  p_client_id: client_id,
+  p_amount: unusedCredits,
+  p_description: `Refund campa&ntilde;a: ${unusedCredits} no usados`
+});</div>
+  </div>
+</div>
+
+<div class="bug-card sev-critical">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#112</span><span class="bug-sev">critical</span>
+    <span class="bug-title">Booking no guarda google_event_id &mdash; cancelaciones imposibles</span>
+    <span class="bug-file">booking-api.ts:477</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc"><code>bookingConfirm</code> crea un evento en Google Calendar y recibe <code>event.id</code>, pero NUNCA lo persiste. No existe endpoint de cancelaci&oacute;n. Si el prospecto cancela, el slot queda ocupado para siempre en el calendario del vendedor.</p>
+    <div class="code-label">Problema:</div>
+    <div class="code-block code-bad">const event = await eventRes.json();
+const meetLink = event.conferenceData?.entryPoints?.[0]?.uri;
+// Guarda meetLink pero NO event.id
+await supabase.from('wa_prospects').update({
+  meeting_url: meetLink || event.htmlLink,
+  meeting_status: 'scheduled',
+  // Falta: google_calendar_event_id: event.id
+});</div>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">await supabase.from('wa_prospects').update({
+  meeting_url: meetLink || event.htmlLink,
+  meeting_status: 'scheduled',
+  google_calendar_event_id: event.id, // Persistir para cancelaciones
+});
+// + Crear endpoint POST /api/booking/cancel que use este ID</div>
+  </div>
+</div>
+
+<div class="bug-card sev-critical">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#113</span><span class="bug-sev">critical</span>
+    <span class="bug-title">Slot generation rompe con slotDuration &ge; 55min: pierde &uacute;ltimo slot del d&iacute;a</span>
+    <span class="bug-file">booking-api.ts:226</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">El loop anidado genera slots hora por hora con step <code>slotDuration + buffer</code>. Con <code>slotDuration=60</code>, solo genera 1 slot por hora (:00), pero el check <code>endHour > workEnd</code> excluye el &uacute;ltimo slot v&aacute;lido (17:00-18:00 con workEnd=18). Adem&aacute;s, con <code>slotDuration+buffer > 60</code>, los slots pueden solaparse en el boundary de hora.</p>
+    <div class="code-label">Problema:</div>
+    <div class="code-block code-bad">for (let hour = workStart; hour < workEnd; hour++) {
+  for (let min = 0; min < 60; min += slotDuration + buffer) {
+    // Solo genera dentro de una hora, pierde slots cross-hour
+    if (endChile.getHours() > workEnd) break;
+  }
+}</div>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">// Un solo loop lineal en minutos (sin nested hour loop)
+for (let offset = 0; ; offset += slotDuration + buffer) {
+  const totalMin = workStart * 60 + offset;
+  if (Math.floor(totalMin / 60) >= workEnd) break;
+  const slotEnd = new Date(slotStart.getTime() + slotDuration * 60000);
+  // Permitir que termine exactamente en workEnd
+  if (endHour > workEnd || (endHour === workEnd && endMin > 0)) break;
+  candidateSlots.push({ start: slotStart, end: slotEnd });
+}</div>
+  </div>
+</div>
+
+<!-- HIGH -->
+<div class="section-title">High (12)</div>
+
+<div class="bug-card sev-high">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#114</span><span class="bug-sev">high</span>
+    <span class="bug-title">merchant-wa.ts sin Twilio HMAC &mdash; webhooks falsificables</span>
+    <span class="bug-file">merchant-wa.ts:121</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc"><code>steve-wa-chat.ts</code> y <code>status-callback.ts</code> validan firma Twilio, pero <code>merchant-wa.ts</code> NO. Un atacante puede forjar POST a <code>/api/whatsapp/merchant-wa/:clientId</code> para inyectar mensajes falsos y quemar cr&eacute;ditos activando respuestas AI.</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">// Copiar validaci&oacute;n de HMAC de steve-wa-chat.ts
+const sig = c.req.header('X-Twilio-Signature') || '';
+const twilioMod = await import('twilio');
+if (!validateRequest(authToken, sig, rawUrl, params)) {
+  return c.text('Forbidden', 403);
+}</div>
+  </div>
+</div>
+
+<div class="bug-card sev-high">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#115</span><span class="bug-sev">high</span>
+    <span class="bug-title">shopify-checkout-webhook sin HMAC &mdash; carritos falsos queman cr&eacute;ditos</span>
+    <span class="bug-file">shopify-checkout-webhook.ts:13</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">Sin verificaci&oacute;n de <code>X-Shopify-Hmac-Sha256</code>. Un atacante puede forjar eventos de checkout que se guardan como abandoned carts, triggering mensajes WA reales v&iacute;a el cron <code>abandoned-cart-wa</code>.</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">const rawBody = await c.req.text();
+const hmac = c.req.header('X-Shopify-Hmac-Sha256') || '';
+const computed = createHmac('sha256', SHOPIFY_WEBHOOK_SECRET)
+  .update(rawBody).digest('base64');
+if (!timingSafeEqual(Buffer.from(hmac), Buffer.from(computed)))
+  return c.json({ error: 'Unauthorized' }, 401);</div>
+  </div>
+</div>
+
+<div class="bug-card sev-high">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#116</span><span class="bug-sev">high</span>
+    <span class="bug-title">deduct_wa_credit con -1 corrompe total_used (3 archivos)</span>
+    <span class="bug-file">send-message.ts:89 + abandoned-cart-wa.ts:164</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">Bug #83 se arregl&oacute; en <code>send-campaign.ts</code>, pero el mismo antipatr&oacute;n sigue en <code>send-message.ts</code> y <code>abandoned-cart-wa.ts</code>. El RPC hace <code>total_used = total_used + p_amount</code> &mdash; con -1, total_used se decrementa. Despu&eacute;s de suficientes refunds, total_used llega a negativo.</p>
+    <div class="code-label">Problema:</div>
+    <div class="code-block code-bad">await supabase.rpc('deduct_wa_credit', {
+  p_client_id: client_id,
+  p_amount: -1, // CORROMPE total_used
+});</div>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">// Update directo a balance sin tocar total_used
+const { data: credits } = await supabase.from('wa_credits')
+  .select('balance').eq('client_id', client_id).single();
+if (credits) {
+  await supabase.from('wa_credits')
+    .update({ balance: credits.balance + 1 })
+    .eq('client_id', client_id);
+}</div>
+  </div>
+</div>
+
+<div class="bug-card sev-high">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#117</span><span class="bug-sev">high</span>
+    <span class="bug-title">WAInbox sin realtime en wa_messages &mdash; chat se congela</span>
+    <span class="bug-file">WAInbox.tsx:56-94</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">Realtime subscription solo escucha <code>wa_conversations</code> (INSERT/UPDATE), pero NO <code>wa_messages</code>. Cuando el merchant tiene un chat abierto, los nuevos mensajes del cliente no aparecen hasta navegar fuera y volver. El fetch de mensajes es one-shot al seleccionar conversaci&oacute;n.</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">// Agregar subscription a wa_messages
+.on('postgres_changes', {
+  event: 'INSERT', table: 'wa_messages',
+  filter: `client_id=eq.${clientId}`
+}, (payload) => {
+  if (selectedConv?.contact_phone === payload.new.contact_phone) {
+    setMessages(prev => [...prev, payload.new]);
+  }
+})</div>
+  </div>
+</div>
+
+<div class="bug-card sev-high">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#118</span><span class="bug-sev">high</span>
+    <span class="bug-title">Prospect delete orphans wa_messages + logEvent roto post-delete</span>
+    <span class="bug-file">prospect-crm.ts:319-332</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">Dos bugs: (1) <code>prospectDelete</code> borra events/tasks/proposals pero NO <code>wa_messages</code> &mdash; mensajes quedan hu&eacute;rfanos y si alguien reutiliza el tel&eacute;fono, hereda mensajes de otro. (2) <code>logProspectEvent</code> se llama DESPU&Eacute;S de borrar el prospect, causando FK violation o row hu&eacute;rfana.</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">// 1. Loguear ANTES de borrar
+logProspectEvent(prospect_id, 'deleted', {...}, `admin:${user.id}`);
+// 2. Incluir wa_messages en el cleanup
+await Promise.all([
+  supabase.from('wa_prospect_events').delete().eq('prospect_id', prospect_id),
+  supabase.from('sales_tasks').delete().eq('prospect_id', prospect_id),
+  supabase.from('proposals').delete().eq('prospect_id', prospect_id),
+  prospect.phone
+    ? supabase.from('wa_messages').delete()
+        .eq('contact_phone', prospect.phone).eq('channel','prospect')
+    : Promise.resolve(),
+]);</div>
+  </div>
+</div>
+
+<div class="bug-card sev-high">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#119</span><span class="bug-sev">high</span>
+    <span class="bug-title">web-forms: getUserClientIds innecesario en cada public_submit</span>
+    <span class="bug-file">web-forms.ts:24</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc"><code>getUserClientIds(supabase, user?.id)</code> se ejecuta para TODAS las acciones incluyendo <code>public_submit</code> donde user es null. Genera una query in&uacute;til a Supabase con <code>user_id.eq.undefined</code> en cada submit p&uacute;blico.</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">const { isSuperAdmin } = action === 'public_submit'
+  ? { isSuperAdmin: false }
+  : await getUserClientIds(supabase, user?.id);</div>
+  </div>
+</div>
+
+<div class="bug-card sev-high">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#120</span><span class="bug-sev">high</span>
+    <span class="bug-title">Meeting por texto: no verifica FreeBusy + fire-and-forget pierde errores</span>
+    <span class="bug-file">steve-wa-chat.ts:1563</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">Cuando un prospecto confirma reuni&oacute;n por texto, se guarda <code>meeting_status: 'scheduled'</code> ANTES de verificar disponibilidad. El <code>fetch</code> al booking API es fire-and-forget (<code>.catch()</code>). Si el slot est&aacute; ocupado (409), nadie lo atrapa &mdash; el prospecto cree que qued&oacute; agendado pero no hay evento en Calendar.</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">// Awaitar respuesta del booking API
+const bookingRes = await fetch(`${bookingApiUrl}/api/booking/confirm`, {...});
+const bookingData = await bookingRes.json();
+if (!bookingRes.ok) {
+  // Revertir status y notificar al prospecto
+  await supabase.from('wa_prospects').update({
+    meeting_status: 'proposed'
+  }).eq('id', prospect.id);
+  await sendWhatsApp(phone, 'Ese horario no est&aacute; disponible.');
+}</div>
+  </div>
+</div>
+
+<div class="bug-card sev-high">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#121</span><span class="bug-sev">high</span>
+    <span class="bug-title">Booking rate limit in-memory: inefectivo en multi-instance Cloud Run</span>
+    <span class="bug-file">booking-api.ts:17</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">El <code>bookingRateLimit</code> Map es por-instancia. Cloud Run puede tener m&uacute;ltiples instancias, as&iacute; que un atacante hace 3 requests a instancia A y 3 a instancia B, bypasseando el l&iacute;mite. Adem&aacute;s, el Map no tiene cleanup peri&oacute;dico como <code>steve-wa-chat.ts</code>.</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">// 1. Agregar setInterval de cleanup (como web-forms.ts)
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, ts] of bookingRateLimit) {
+    const recent = ts.filter(t => now - t < WINDOW);
+    if (!recent.length) bookingRateLimit.delete(ip);
+    else bookingRateLimit.set(ip, recent);
+  }
+}, 300_000);
+// 2. Para multi-instance: check at&oacute;mico en Supabase</div>
+  </div>
+</div>
+
+<div class="bug-card sev-high">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#122</span><span class="bug-sev">high</span>
+    <span class="bug-title">Slot generation overlaps cuando slotDuration + buffer &gt; 60</span>
+    <span class="bug-file">booking-api.ts:226</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">Con <code>slotDuration=55, buffer=10</code> (step=65), el loop por hora genera slot :00-:55 con buffer hasta 1:05. El slot de la siguiente hora empieza a 1:00, solapando 5 minutos con el buffer anterior. El freeBusy check no atrapa esto porque el buffer no es un evento de Calendar.</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">// Usar loop lineal en minutos (no nested por hora)
+// Ver fix de Bug #113 — un solo loop elimina overlaps</div>
+  </div>
+</div>
+
+<div class="bug-card sev-high">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#123</span><span class="bug-sev">high</span>
+    <span class="bug-title">prospectDetail no valida UUID + expone errores internos</span>
+    <span class="bug-file">prospect-crm.ts:59</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc"><code>prospect_id</code> se pasa directo a <code>.eq('id', prospect_id)</code> sin validar formato UUID. Caracteres especiales causan errores PostgREST cuyo <code>error.message</code> se retorna al cliente, exponiendo estructura interna.</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+if (!UUID_RE.test(prospect_id))
+  return c.json({ error: 'Invalid prospect_id' }, 400);</div>
+  </div>
+</div>
+
+<div class="bug-card sev-high">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#124</span><span class="bug-sev">high</span>
+    <span class="bug-title">send-campaign progreso no persiste: crash = reinicio desde cero</span>
+    <span class="bug-file">send-campaign.ts:99</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">Bug #99 agreg&oacute; tracking de progreso cada 10 mensajes, pero solo actualiza <code>sent_count</code> en DB. Si Cloud Run mata la instancia mid-campaign (timeout, OOM, deploy), el campaign status queda en <code>sending</code> para siempre. No hay mecanismo de reanudaci&oacute;n &mdash; los prospects que ya recibieron no se filtran, causando mensajes duplicados al reintentar.</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">// Guardar last_processed_index en wa_campaigns
+// Al reanudar, skip prospects ya procesados:
+const resumeFrom = campaign.last_processed_index || 0;
+for (let i = resumeFrom; i < prospects.length; i++) {
+  // ...enviar...
+  if (i % 10 === 0) await supabase.from('wa_campaigns')
+    .update({ last_processed_index: i, sent_count: sentCount })
+    .eq('id', campaign_id);
+}</div>
+  </div>
+</div>
+
+<!-- MEDIUM -->
+<div class="section-title">Medium (5)</div>
+
+<div class="bug-card sev-medium">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#125</span><span class="bug-sev">medium</span>
+    <span class="bug-title">prospect-followup env&iacute;a WA de madrugada en Chile</span>
+    <span class="bug-file">prospect-followup.ts:161</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">El cron corre cada 4 horas sin verificar hora local en Chile. Un run a las 4am UTC = 1am Chile. Enviar follow-ups de ventas a la 1am es mala UX y puede causar que WhatsApp flaggee el n&uacute;mero como spam.</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">const chileHour = new Date(new Date().toLocaleString('en-US',
+  { timeZone: 'America/Santiago' })).getHours();
+if (chileHour < 9 || chileHour >= 20) {
+  console.log('Fuera de horario comercial Chile, skip');
+  continue;
+}</div>
+  </div>
+</div>
+
+<div class="bug-card sev-medium">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#126</span><span class="bug-sev">medium</span>
+    <span class="bug-title">WAAutomations createDefaults race condition: duplicados</span>
+    <span class="bug-file">WAAutomations.tsx:100</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">Si el merchant abre Automations en dos pesta&ntilde;as simult&aacute;neamente, ambas ven 0 automations y ambas llaman <code>createDefaults()</code>. Resultado: 8 automations duplicadas. No hay UNIQUE constraint en <code>(client_id, trigger_type)</code>.</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">// Agregar UNIQUE constraint en tabla + upsert
+await supabase.from('wa_automations').upsert(defaults, {
+  onConflict: 'client_id,trigger_type',
+  ignoreDuplicates: true
+});</div>
+  </div>
+</div>
+
+<div class="bug-card sev-medium">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#127</span><span class="bug-sev">medium</span>
+    <span class="bug-title">WACampaigns permite reanudar campa&ntilde;a ya completada</span>
+    <span class="bug-file">WACampaigns.tsx</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">El bot&oacute;n de "Enviar" en la UI no verifica si la campa&ntilde;a ya tiene status <code>completed</code>. Un merchant puede hacer click en enviar de nuevo, re-enviando a todos los prospects (doble mensaje). El backend tampoco valida status previo.</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">// Frontend: deshabilitar bot&oacute;n si status es completed/sending
+disabled={campaign.status === 'completed' || campaign.status === 'sending'}
+// Backend: validar status antes de enviar
+if (campaign.status === 'completed')
+  return c.json({ error: 'Campaign already completed' }, 400);</div>
+  </div>
+</div>
+
+<div class="bug-card sev-medium">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#128</span><span class="bug-sev">medium</span>
+    <span class="bug-title">wa-action-processor: sin timeout en procesamiento individual</span>
+    <span class="bug-file">wa-action-processor.ts</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">Cada acci&oacute;n pendiente se procesa secuencialmente sin timeout. Si una acci&oacute;n cuelga (ej: llamada a Twilio o AI que no responde), el batch entero se bloquea y el cron no procesa las dem&aacute;s acciones.</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">const actionTimeout = 30000; // 30s per action
+for (const action of actions) {
+  try {
+    await Promise.race([
+      processAction(action),
+      new Promise((_, reject) => setTimeout(
+        () => reject(new Error('Action timeout')), actionTimeout))
+    ]);
+  } catch (e) { /* mark as failed, continue */ }
+}</div>
+  </div>
+</div>
+
+<div class="bug-card sev-medium">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#129</span><span class="bug-sev">medium</span>
+    <span class="bug-title">Prospect stage transitions sin validaci&oacute;n de flujo</span>
+    <span class="bug-file">prospect-crm.ts</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">El endpoint <code>prospectUpdate</code> permite setear cualquier <code>stage</code> sin validar transiciones v&aacute;lidas. Un prospect puede saltar de <code>new</code> a <code>won</code> sin pasar por <code>contacted</code>/<code>meeting</code>/<code>proposal</code>. Invalida reportes de pipeline.</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">const VALID_TRANSITIONS = {
+  new: ['contacted','lost'],
+  contacted: ['meeting','proposal','lost'],
+  meeting: ['proposal','won','lost'],
+  proposal: ['won','lost'],
+};
+if (updates.stage && VALID_TRANSITIONS[currentStage] &&
+    !VALID_TRANSITIONS[currentStage].includes(updates.stage))
+  return c.json({ error: `Invalid transition: ${currentStage} → ${updates.stage}` }, 400);</div>
+  </div>
+</div>
+
+<div class="bug-card sev-medium">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="chevron">&#9654;</span><span class="bug-num">#130</span><span class="bug-sev">medium</span>
+    <span class="bug-title">Mensaje WA &gt; 4096 chars no se trunca (Twilio rechaza silenciosamente)</span>
+    <span class="bug-file">steve-wa-chat.ts</span>
+  </div>
+  <div class="bug-details">
+    <p class="bug-desc">Las respuestas del AI vendedor pueden exceder 4096 caracteres (l&iacute;mite de Twilio para WhatsApp). Twilio rechaza el mensaje sin error claro, y el prospecto nunca recibe respuesta. El AI tiende a generar respuestas largas en modo "estrategia".</p>
+    <div class="code-label">Fix:</div>
+    <div class="code-block code-good">const MAX_WA_LENGTH = 4096;
+if (replyText.length > MAX_WA_LENGTH) {
+  // Truncar con indicador
+  replyText = replyText.substring(0, MAX_WA_LENGTH - 20) + '\n\n[mensaje truncado]';
+}</div>
+  </div>
+</div>
+
+<!-- ACUMULADO -->
+<div class="acum">
+  <h3>Acumulado Paula W19 &mdash; 5 Rondas (WhatsApp, CRM & Ventas)</h3>
+  <table>
+    <tr><th>Ronda</th><th>Encontrados</th><th>Arreglados</th><th>Commits</th></tr>
+    <tr><td>Ronda 1 (#1-#30)</td><td>30</td><td>10 critical</td><td>315607e</td></tr>
+    <tr><td>Ronda 2 (#31-#60)</td><td>30</td><td>30</td><td>ebfcdad</td></tr>
+    <tr><td>Ronda 3 (#61-#100)</td><td>40</td><td>40</td><td>40bf4ee</td></tr>
+    <tr><td>Ronda 4 (#101-#110)</td><td>10</td><td>pendiente</td><td>&mdash;</td></tr>
+    <tr><td>Ronda 5 (#111-#130)</td><td>20</td><td>pendiente</td><td>&mdash;</td></tr>
+    <tr style="font-weight:700;color:#60a5fa"><td>TOTAL</td><td>130</td><td>80 + 50 pendientes</td><td>3 deploys</td></tr>
+  </table>
+</div>
+
+<script>
+function toggle(h){const d=h.nextElementSibling,c=h.querySelector('.chevron');d.classList.toggle('open');c.classList.toggle('open')}
+</script>
+</body>
+</html>

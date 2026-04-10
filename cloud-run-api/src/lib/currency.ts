@@ -84,19 +84,24 @@ export async function fetchGoogleAccountCurrency(
 ): Promise<string> {
   try {
     const query = `SELECT customer.currency_code FROM customer LIMIT 1`;
-    const response = await fetch(
-      `https://googleads.googleapis.com/v18/customers/${customerId}/googleAds:searchStream`,
+    const effectiveLoginId = loginCustomerId || customerId;
+    const makeRequest = async (loginId: string) => fetch(
+      `https://googleads.googleapis.com/v23/customers/${customerId}/googleAds:searchStream`,
       {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'developer-token': developerToken,
-          'login-customer-id': loginCustomerId || customerId,
+          'login-customer-id': loginId,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ query }),
       }
     );
+    let response = await makeRequest(effectiveLoginId);
+    if (response.status === 403 && effectiveLoginId !== customerId) {
+      response = await makeRequest(customerId);
+    }
     if (!response.ok) return 'USD';
     const text = await response.text();
     const json = JSON.parse(text);

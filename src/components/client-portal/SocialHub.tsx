@@ -64,7 +64,7 @@ export function SocialHub({ clientId }: SocialHubProps) {
         </TabsList>
 
         <TabsContent value="publish" className="mt-4">
-          <PlanGate feature="instagram.publish">
+          <PlanGate feature="instagram.publish" clientId={clientId}>
             <SocialPublisher
               clientId={clientId}
               prefillDate={prefillDate}

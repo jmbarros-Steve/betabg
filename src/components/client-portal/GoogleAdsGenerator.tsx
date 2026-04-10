@@ -315,7 +315,7 @@ export function GoogleAdsGenerator({ clientId }: GoogleAdsGeneratorProps) {
 
         {/* Generate Tab */}
         <TabsContent value="generate" className="mt-6">
-          <PlanGate feature="google_ads.create">
+          <PlanGate feature="google_ads.create" clientId={clientId}>
           <div className="space-y-6">
             {/* Progress */}
             {step !== 'campaign' && (

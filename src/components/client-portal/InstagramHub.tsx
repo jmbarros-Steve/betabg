@@ -59,7 +59,7 @@ export function InstagramHub({ clientId }: InstagramHubProps) {
         </TabsList>
 
         <TabsContent value="publish" className="mt-4">
-          <PlanGate feature="instagram.publish">
+          <PlanGate feature="instagram.publish" clientId={clientId}>
             <InstagramPublisher
               clientId={clientId}
               prefillDate={prefillDate}
@@ -77,7 +77,7 @@ export function InstagramHub({ clientId }: InstagramHubProps) {
         </TabsContent>
 
         <TabsContent value="metrics" className="mt-4">
-          <PlanGate feature="instagram.analysis">
+          <PlanGate feature="instagram.analysis" clientId={clientId}>
             <IGMetricsDashboard clientId={clientId} />
           </PlanGate>
         </TabsContent>

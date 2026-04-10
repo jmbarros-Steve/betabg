@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paula W19 - Bug Hunt Ronda 7 (#161-#190) — WhatsApp Brain + CRM Deep Dive</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;padding:24px}
+  h1{font-size:1.8rem;margin-bottom:8px}
+  .subtitle{color:#94a3b8;margin-bottom:24px}
+  .stats{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+  .stat{background:#1e293b;border-radius:12px;padding:16px 24px;min-width:130px}
+  .stat-value{font-size:2rem;font-weight:700}
+  .stat-label{color:#94a3b8;font-size:.85rem}
+  .critical .stat-value{color:#ef4444}.high .stat-value{color:#f97316}.medium .stat-value{color:#eab308}.total .stat-value{color:#3b82f6}
+  .bug-card{background:#1e293b;border-radius:12px;margin-bottom:12px;overflow:hidden;border-left:4px solid #64748b}
+  .bug-card.sev-critical{border-left-color:#ef4444}.bug-card.sev-high{border-left-color:#f97316}.bug-card.sev-medium{border-left-color:#eab308}
+  .bug-header{display:flex;align-items:center;gap:10px;padding:14px 18px;cursor:pointer;user-select:none;flex-wrap:wrap}
+  .bug-header:hover{background:#273548}
+  .bug-num{font-weight:700;color:#60a5fa;min-width:44px}
+  .bug-sev{font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:9999px;text-transform:uppercase}
+  .sev-critical .bug-sev{background:#7f1d1d;color:#fca5a5}.sev-high .bug-sev{background:#7c2d12;color:#fdba74}.sev-medium .bug-sev{background:#713f12;color:#fde047}
+  .bug-title{flex:1;font-weight:500;min-width:200px;font-size:.95rem}
+  .bug-file{color:#94a3b8;font-size:.75rem;font-family:monospace}
+  .bug-details{display:none;padding:0 18px 18px}
+  .bug-details.open{display:block}
+  .bug-desc{color:#cbd5e1;margin-bottom:12px;line-height:1.5;font-size:.9rem}
+  .code-block{background:#0f172a;border-radius:8px;padding:12px;margin-bottom:10px;overflow-x:auto;font-family:'SF Mono','Fira Code',monospace;font-size:.78rem;line-height:1.4;white-space:pre-wrap}
+  .code-label{color:#94a3b8;font-size:.75rem;margin-bottom:4px;font-weight:600}
+  .code-bad{border:1px solid #7f1d1d}.code-good{border:1px solid #14532d}
+  .chevron{transition:transform .2s;color:#64748b}.chevron.open{transform:rotate(90deg)}
+  .section-title{font-size:1.1rem;margin:28px 0 14px;color:#f8fafc;border-bottom:1px solid #334155;padding-bottom:6px}
+  .acum{background:#1e293b;border-radius:12px;padding:20px;margin-top:32px}
+  .acum h3{margin-bottom:12px;color:#60a5fa}
+  .acum table{width:100%;border-collapse:collapse}
+  .acum th,.acum td{text-align:left;padding:6px 10px;border-bottom:1px solid #334155;font-size:.9rem}
+  .acum th{color:#94a3b8;font-size:.75rem;text-transform:uppercase}
+</style>
+</head>
+<body>
+
+<h1>Paula W19 - Bug Hunt Ronda 7</h1>
+<p class="subtitle">30 bugs WhatsApp Brain + CRM Deep Dive (#161-#190) | 9 abril 2026</p>
+
+<div class="stats">
+  <div class="stat critical"><div class="stat-value">3</div><div class="stat-label">Critical</div></div>
+  <div class="stat high"><div class="stat-value">12</div><div class="stat-label">High</div></div>
+  <div class="stat medium"><div class="stat-value">15</div><div class="stat-label">Medium</div></div>
+  <div class="stat total"><div class="stat-value">30</div><div class="stat-label">Total</div></div>
+</div>
+
+<div class="section-title">Critical (3)</div>
+
+<div class="bug-card sev-critical"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#161</span><span class="bug-sev">critical</span><span class="bug-title">GEMINI_API_KEY leaked in URL query parameter en mockup generator</span><span class="bug-file">steve-mockup-generator.ts:88</span></div><div class="bug-details"><p class="bug-desc">La API key de Gemini se pasa como <code>?key=${GEMINI_API_KEY}</code> en la URL del mockup generator, mientras que <code>steve-sales-deck.ts</code> correctamente usa el header <code>x-goog-api-key</code>. La key queda en Cloud Run logs, Sentry breadcrumbs y cualquier proxy/CDN.</p><div class="code-label">Fix:</div><div class="code-block code-good">// Mover key de URL a header
+headers: { 'x-goog-api-key': GEMINI_API_KEY, 'Content-Type': 'application/json' }
+// Remover ?key= de la URL</div></div></div>
+
+<div class="bug-card sev-critical"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#173</span><span class="bug-sev">critical</span><span class="bug-title">prospectUpdateTags acepta valores arbitrarios &mdash; stored XSS + payload stuffing</span><span class="bug-file">prospect-crm.ts:253</span></div><div class="bug-details"><p class="bug-desc">El endpoint valida que <code>tags</code> sea array pero no valida el contenido. Un caller puede enviar <code>[{}, "&lt;script&gt;", null, 12345]</code> directo a DB. Cualquier frontend que renderice tags sin sanitizar es vulnerable a stored XSS. Sin l&iacute;mite de largo del array (podr&iacute;a enviar 10,000 tags).</p><div class="code-label">Fix:</div><div class="code-block code-good">// Validar cada tag: string, no vac&iacute;o, max 50 chars, max 20 tags
+const safeTags = tags
+  .filter((t: any) => typeof t === 'string' && t.trim().length > 0)
+  .map((t: string) => t.trim().slice(0, 50).replace(/[<>]/g, ''))
+  .slice(0, 20);</div></div></div>
+
+<div class="bug-card sev-critical"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#189</span><span class="bug-sev">critical</span><span class="bug-title">merchant-wa outer catch env&iacute;a TwiML message sin deducir cr&eacute;dito &mdash; Twilio bill leak</span><span class="bug-file">merchant-wa.ts:521</span></div><div class="bug-details"><p class="bug-desc">El catch externo captura TODOS los errores (parseBody, HMAC, early failures) y env&iacute;a <code>&lt;Message&gt;</code> fallback via TwiML. Twilio entrega el mensaje al cliente (cobra del sub-account), pero nunca se dedujo de <code>wa_credits</code>. Con el tiempo crea discrepancia entre la factura Twilio y el balance del merchant.</p><div class="code-label">Fix:</div><div class="code-block code-good">// Outer catch: empty TwiML (no message = no Twilio cost)
+return c.text('&lt;Response&gt;&lt;/Response&gt;', 200, { 'Content-Type': 'text/xml' });
+// Solo enviar fallback message si credits ya fueron deducidos</div></div></div>
+
+<div class="section-title">High (12)</div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#162</span><span class="bug-sev">high</span><span class="bug-title">SQL injection via ilike con input no sanitizado del prospect</span><span class="bug-file">steve-investigator.ts:319</span></div><div class="bug-details"><p class="bug-desc"><code>.ilike('ad_text', '%${keywords[0]}%')</code> donde keywords viene de <code>prospect.what_they_sell</code> (texto de WhatsApp). Mismo patr&oacute;n en steve-multi-brain.ts:117 y steve-wa-brain.ts:1066. Un prospect que escriba <code>ropa%' OR '1'='1</code> manipula el query ILIKE.</p><div class="code-label">Fix:</div><div class="code-block code-good">// Escapar wildcards SQL antes de interpolar
+const safeKw = keyword.replace(/[%_\\]/g, '\\$&amp;');
+.ilike('ad_text', `%${safeKw}%`)</div></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#163</span><span class="bug-sev">high</span><span class="bug-title">8+ llamadas directas a Anthropic API sin timeout ni circuit breaker</span><span class="bug-file">steve-wa-brain.ts:328</span></div><div class="bug-details"><p class="bug-desc"><code>quickFirstMessageIntel</code> y 6+ funciones m&aacute;s usan <code>fetch('https://api.anthropic.com/...')</code> directo sin usar el wrapper <code>anthropicFetch()</code> que provee retry, timeout (25s AbortController) y circuit breaker. Si la API de Anthropic cuelga, estas llamadas bloquean indefinidamente las instancias de Cloud Run.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#164</span><span class="bug-sev">high</span><span class="bug-title">extractInstagramHandle matchea @mentions que no son IG &mdash; desperdicia cr&eacute;ditos Apify</span><span class="bug-file">steve-investigator.ts:397</span></div><div class="bug-details"><p class="bug-desc">El regex <code>/@([a-zA-Z0-9._]{2,30})/</code> matchea CUALQUIER @menci&oacute;n en la conversaci&oacute;n, no solo handles de IG. Si un prospect dice &quot;mi email es @gmail.com&quot; o &quot;contacta @support&quot;, Steve intenta scrapear esos como perfiles de Instagram, gastando cr&eacute;ditos Apify ($0.01-0.10/call) y almacenando datos incorrectos.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#171</span><span class="bug-sev">high</span><span class="bug-title">web-forms delete no cascade a web_form_submissions &mdash; registros hu&eacute;rfanos</span><span class="bug-file">web-forms.ts:101</span></div><div class="bug-details"><p class="bug-desc">Al eliminar un web form, solo se borra la fila en <code>web_forms</code>. Las <code>web_form_submissions</code> con <code>form_id</code> del form eliminado quedan hu&eacute;rfanas permanentemente. Si no hay ON DELETE CASCADE en la FK, estos registros ocupan storage y pueden causar errores en queries.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#174</span><span class="bug-sev">high</span><span class="bug-title">prospectUpdateDeal acepta fechas arbitrarias en expected_close_date</span><span class="bug-file">prospect-crm.ts:54</span></div><div class="bug-details"><p class="bug-desc">Solo rechaza fechas que producen NaN via <code>new Date().getTime()</code>. Un usuario puede enviar <code>&quot;1990-01-01&quot;</code> (pasada) o <code>&quot;2099-12-31&quot;</code> (absurdamente futura). Sin validaci&oacute;n de que la fecha sea futura, en rango razonable, o en formato ISO.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#175</span><span class="bug-sev">high</span><span class="bug-title">prospect-rotting-detector fetch ALL prospects sin paginaci&oacute;n</span><span class="bug-file">prospect-rotting-detector.ts:42</span></div><div class="bug-details"><p class="bug-desc">La query trae todos los prospects activos sin <code>.limit()</code>. Si el pipeline crece a miles, todo se carga en memoria. Adem&aacute;s el <code>.in('id', toMarkRotting)</code> falla si el array supera el l&iacute;mite de largo de URL de PostgREST (~2000 IDs).</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#178</span><span class="bug-sev">high</span><span class="bug-title">sales-tasks: status permite regresi&oacute;n de completed a pending sin limpiar completed_at</span><span class="bug-file">sales-tasks.ts:102</span></div><div class="bug-details"><p class="bug-desc">El update valida que status sea uno de <code>['pending','in_progress','completed']</code> pero no impone transiciones direccionales. Un task completado puede volver a <code>pending</code> sin limpiar <code>completed_at</code>, creando estado inconsistente.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#180</span><span class="bug-sev">high</span><span class="bug-title">web-forms get: submissions query sin scope de user_id &mdash; IDOR potencial</span><span class="bug-file">web-forms.ts:73</span></div><div class="bug-details"><p class="bug-desc">La acci&oacute;n <code>get</code> scopa el form por <code>user_id</code> para non-admins, pero la query paralela de submissions filtra solo por <code>form_id</code> sin verificar ownership. Un usuario que descubra el <code>form_id</code> de otro podr&iacute;a ver sus submissions.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#181</span><span class="bug-sev">high</span><span class="bug-title">buildMerchantContext query shopify_products con shop_id=clientId &mdash; FK equivocada</span><span class="bug-file">merchant-wa.ts:88</span></div><div class="bug-details"><p class="bug-desc"><code>.eq('shop_id', clientId)</code> usa el UUID del client como shop_id, pero <code>shop_id</code> referencia al identificador de Shopify (dominio o ID), no al <code>clients.id</code>. Resultado: siempre 0 productos &rarr; &quot;Sin productos cargados&quot; para TODOS los merchants.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#182</span><span class="bug-sev">high</span><span class="bug-title">refund_wa_credit RPC: par&aacute;metro p_reason vs p_description inconsistente entre callers</span><span class="bug-file">merchant-wa.ts:400 + send-campaign.ts:324</span></div><div class="bug-details"><p class="bug-desc">merchant-wa usa <code>p_reason</code>, send-campaign/send-message usan <code>p_description</code>. Si el RPC espera <code>p_reason</code>, las llamadas con <code>p_description</code> pasan el par&aacute;metro como desconocido (ignorado silenciosamente) &rarr; audit trail con raz&oacute;n null.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#184</span><span class="bug-sev">high</span><span class="bug-title">Frustration detection logic invertida &mdash; filtro excluye los mensajes que deber&iacute;a detectar</span><span class="bug-file">steve-wa-chat.ts:972</span></div><div class="bug-details"><p class="bug-desc">El filtro de frustraci&oacute;n mantiene mensajes &gt;= 5 chars (incluyendo mensajes largos), luego chequea <code>.every(m =&gt; m.content.length &lt;= 15)</code>. Si hay un mensaje largo mezclado con cortos, pasa el filtro pero falla el <code>.every()</code>, as&iacute; que la frustraci&oacute;n NUNCA se detecta.</p><div class="code-label">Fix:</div><div class="code-block code-good">// Mantener solo mensajes 5-15 chars que no son afirmaciones
+return trimmed.length >= 5 && trimmed.length <= 15
+  && !normalAffirmations.has(trimmed);</div></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#187</span><span class="bug-sev">high</span><span class="bug-title">prospect-trial: contrase&ntilde;a temporal enviada en texto plano v&iacute;a WhatsApp + Cloud Logging</span><span class="bug-file">prospect-trial.ts:101</span></div><div class="bug-details"><p class="bug-desc">El <code>tempPassword</code> se env&iacute;a v&iacute;a WhatsApp sin redactar. Queda visible en Twilio Message Logs, Cloud Logging (console.log del evento), y en el historial del tel&eacute;fono del prospect. Debiera usar magic link o password reset flow.</p></div></div>
+
+<div class="section-title">Medium (15)</div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#165</span><span class="bug-sev">medium</span><span class="bug-title">sendTextDeck update por phone en vez de id &mdash; riesgo cross-prospect</span><span class="bug-file">steve-sales-deck.ts:317</span></div><div class="bug-details"><p class="bug-desc">El fallback <code>sendTextDeck</code> usa <code>.eq('phone', phone)</code> para marcar <code>deck_sent=true</code>, mientras el path principal usa <code>.eq('id', prospect.id)</code>. Si un n&uacute;mero fue reutilizado (portado), actualiza el prospect equivocado.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#166</span><span class="bug-sev">medium</span><span class="bug-title">Apify store scrape polling sin timeout total + token leaked en URL</span><span class="bug-file">steve-investigator.ts:184</span></div><div class="bug-details"><p class="bug-desc">Polling a Apify hasta 9 veces con 5s waits (45s max) pero sin AbortController en cada fetch individual. Si un fetch cuelga, la funci&oacute;n se bloquea indefinidamente. El token tambi&eacute;n se pasa como query parameter en vez de header Authorization.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#167</span><span class="bug-sev">medium</span><span class="bug-title">PII scrubber redacta n&uacute;meros de pedido/tracking leg&iacute;timos</span><span class="bug-file">pii-scrubber.ts:94</span></div><div class="bug-details"><p class="bug-desc">En contexto financiero, TODOS los n&uacute;meros de 10-19 d&iacute;gitos se reemplazan con <code>[NUMERO-REDACTED]</code>. Un prospect diciendo &quot;mi pedido es 1234567890&quot; pierde el n&uacute;mero de orden, haciendo imposible el seguimiento por soporte o Steve.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#168</span><span class="bug-sev">medium</span><span class="bug-title">Price objection prompt usa voseo prohibido</span><span class="bug-file">steve-wa-brain.ts:1621</span></div><div class="bug-details"><p class="bug-desc">L&iacute;nea 1621 contiene &quot;Cuanto pod&eacute;s invertir&quot; con voseo, violando la regla del system prompt &quot;PROHIBIDO voseo: vos, vend&eacute;s, ten&eacute;s, quer&eacute;s, sab&eacute;s, pod&eacute;s, hac&eacute;s.&quot; Ense&ntilde;a al modelo a usar voseo en objeciones de precio.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#169</span><span class="bug-sev">medium</span><span class="bug-title">Reactivation prompt usa &quot;segu&iacute;s&quot; (voseo) + campos undocumented</span><span class="bug-file">steve-wa-brain.ts:1828</span></div><div class="bug-details"><p class="bug-desc">L&iacute;nea 1829 inyecta &quot;Segu&iacute;s pensando en esto?&quot; (voseo). Adem&aacute;s <code>_longInactive</code> y <code>_inactiveDays</code> se acceden via <code>(prospect as any)</code> &mdash; pueden ser undefined sin check runtime.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#170</span><span class="bug-sev">medium</span><span class="bug-title">Audio download de Twilio sin timeout &mdash; hang indefinido en media lenta</span><span class="bug-file">audio-transcriber.ts:52</span></div><div class="bug-details"><p class="bug-desc">El fetch para bajar audio de Twilio no tiene AbortController. El check de 25MB solo corre DESPU&Eacute;S de bajar todo el archivo en memoria. Una respuesta lenta de Twilio CDN puede bloquear el pipeline de mensajes indefinidamente.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#172</span><span class="bug-sev">medium</span><span class="bug-title">proposals: monthly_price=0 coercionado a null por operador ||</span><span class="bug-file">proposals.ts:65</span></div><div class="bug-details"><p class="bug-desc"><code>monthly_price || null</code> usa OR l&oacute;gico. Si el usuario env&iacute;a <code>monthly_price: 0</code> (plan trial/gratis v&aacute;lido), el <code>0</code> falsy se convierte en <code>null</code>, perdiendo el pricing expl&iacute;cito. Fix: usar <code>monthly_price ?? null</code> (nullish coalescing).</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#176</span><span class="bug-sev">medium</span><span class="bug-title">booking confirm actualiza TODOS los prospects con mismo tel&eacute;fono</span><span class="bug-file">booking-api.ts:524</span></div><div class="bug-details"><p class="bug-desc">Sin <code>prospect_id</code>, el update usa <code>.eq('phone', phone)</code> sin <code>.limit(1)</code>. Si dos prospects comparten tel&eacute;fono (mismo cliente, dos formularios), AMBOS se actualizan con meeting data, corrompiendo datos del otro prospect.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#177</span><span class="bug-sev">medium</span><span class="bug-title">prospect-followup ignora prospects con followup_count NULL</span><span class="bug-file">prospect-followup.ts:57</span></div><div class="bug-details"><p class="bug-desc"><code>.lt('followup_count', 3)</code> &mdash; en PostgreSQL <code>NULL &lt; 3</code> es NULL (no TRUE). Prospects nuevos con <code>followup_count = NULL</code> nunca entran al pipeline de followup. Fix: <code>.or('followup_count.lt.3,followup_count.is.null')</code>.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#179</span><span class="bug-sev">medium</span><span class="bug-title">onboarding-wa excluye rows con reminder_count NULL</span><span class="bug-file">onboarding-wa.ts:59</span></div><div class="bug-details"><p class="bug-desc">Mismo patr&oacute;n que #177. <code>.lt('reminder_count', 3)</code> excluye rows con <code>reminder_count = NULL</code>. Merchants que nunca recibieron un reminder no entran al pipeline de onboarding.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#183</span><span class="bug-sev">medium</span><span class="bug-title">Idempotency check usa .contains() JSONB sin index &mdash; inconsistente con fix #140</span><span class="bug-file">steve-wa-chat.ts:370</span></div><div class="bug-details"><p class="bug-desc">Bug #140 ya identific&oacute; que <code>.contains()</code> en JSONB sin GIN index causa full table scan. El fix en send-campaign cambi&oacute; a <code>.eq('metadata-&gt;&gt;')</code>, pero en steve-wa-chat.ts se dej&oacute; el antipatr&oacute;n original. En tabla con millones de mensajes, el query es lento y puede fallar &rarr; idempotency bypass.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#185</span><span class="bug-sev">medium</span><span class="bug-title">WAInbox realtime filter sin client_id &mdash; cross-tenant message leakage</span><span class="bug-file">WAInbox.tsx:115</span></div><div class="bug-details"><p class="bug-desc">La suscripci&oacute;n realtime filtra solo por <code>contact_phone</code> sin incluir <code>client_id</code>. Si dos merchants tienen conversaciones con el mismo tel&eacute;fono, mensajes del merchant B aparecen en el inbox del merchant A en tiempo real.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#186</span><span class="bug-sev">medium</span><span class="bug-title">Inactivity detection usa updated_at DESPU&Eacute;S de sobreescribirlo &mdash; daysSinceLastMsg siempre ~0</span><span class="bug-file">steve-wa-chat.ts:740</span></div><div class="bug-details"><p class="bug-desc"><code>updated_at</code> se setea a <code>new Date()</code> en l&iacute;nea 660, luego l&iacute;nea 740 lee <code>prospect.updated_at</code> (ya actualizado). <code>daysSinceLastMsg</code> es efectivamente 0 y <code>isLongInactive</code> siempre es false. Deber&iacute;a usar el <code>updated_at</code> original (antes del mensaje actual).</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#188</span><span class="bug-sev">medium</span><span class="bug-title">Phone normalization pierde ceros iniciales y falla con m&uacute;ltiples +</span><span class="bug-file">send-campaign.ts:248</span></div><div class="bug-details"><p class="bug-desc"><code>rawPhone.replace('+', '')</code> solo remueve UN <code>+</code>. Si rawPhone tiene <code>++56987654321</code> (data corrupta), produce <code>whatsapp:++56...</code> que Twilio rechaza, pero el cr&eacute;dito ya fue deducido. Fix: <code>.replace(/^\++/, '')</code> y validar formato/largo antes de enviar.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#190</span><span class="bug-sev">medium</span><span class="bug-title">WhatsAppHub: balance de cr&eacute;ditos nunca se refresca despu&eacute;s de cambiar tab</span><span class="bug-file">WhatsAppHub.tsx:24</span></div><div class="bug-details"><p class="bug-desc"><code>checkSetup</code> corre solo al montar (useEffect con <code>[clientId]</code>). Al enviar campa&ntilde;a, mensajes, o automatizaciones, el header sigue mostrando el balance viejo. No hay polling, realtime subscription, ni callback de refresh post-acci&oacute;n.</p></div></div>
+
+<div class="acum">
+  <h3>Acumulado Paula W19 &mdash; 7 Rondas</h3>
+  <table>
+    <tr><th>Ronda</th><th>Encontrados</th><th>Arreglados</th><th>Commits</th></tr>
+    <tr><td>Ronda 1 (#1-#30)</td><td>30</td><td>10</td><td>315607e</td></tr>
+    <tr><td>Ronda 2 (#31-#60)</td><td>30</td><td>30</td><td>ebfcdad</td></tr>
+    <tr><td>Ronda 3 (#61-#100)</td><td>40</td><td>40</td><td>40bf4ee</td></tr>
+    <tr><td>Ronda 4 (#101-#110)</td><td>10</td><td>&mdash;</td><td>(otros dominios)</td></tr>
+    <tr><td>Ronda 5 (#111-#130)</td><td>20</td><td>20</td><td>2a6f53bc</td></tr>
+    <tr><td>Ronda 6 (#131-#160)</td><td>30</td><td>30</td><td>6a96d8b0</td></tr>
+    <tr><td>Ronda 7 (#161-#190)</td><td>30</td><td>pendiente</td><td>&mdash;</td></tr>
+    <tr style="font-weight:700;color:#60a5fa"><td>TOTAL</td><td>190</td><td>130 + 60 pendientes</td><td>5 deploys</td></tr>
+  </table>
+</div>
+
+<script>function toggle(h){const d=h.nextElementSibling,c=h.querySelector('.chevron');d.classList.toggle('open');c.classList.toggle('open')}</script>
+</body>
+</html>

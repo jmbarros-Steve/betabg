@@ -74,13 +74,30 @@ Deno.serve(async (req) => {
       { onConflict: 'user_id,role' },
     );
 
-    // Create client record (user manages their own account)
-    await supabase.from('clients').insert({
-      user_id: userId,
-      client_user_id: userId,
-      name: email.split('@')[0],
-      email,
-    });
+    // Create client record — skip if handle_new_user trigger already created it
+    const { data: existingClient } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!existingClient) {
+      const { error: clientError } = await supabase.from('clients').insert({
+        user_id: userId,
+        client_user_id: userId,
+        name: email.split('@')[0],
+        email,
+      });
+      if (clientError) {
+        console.error('Client insert error (non-blocking):', clientError.message);
+      }
+    } else {
+      // Ensure client_user_id is set (trigger might not set it)
+      await supabase.from('clients')
+        .update({ client_user_id: userId })
+        .eq('id', existingClient.id)
+        .is('client_user_id', null);
+    }
 
     console.log('Self-signup complete for:', email);
 

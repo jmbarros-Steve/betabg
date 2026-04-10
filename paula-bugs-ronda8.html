@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paula W19 - Bug Hunt Ronda 8 (#191-#220) — Edge Cases & Business Logic</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;padding:24px}
+  h1{font-size:1.8rem;margin-bottom:8px}
+  .subtitle{color:#94a3b8;margin-bottom:24px}
+  .stats{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+  .stat{background:#1e293b;border-radius:12px;padding:16px 24px;min-width:130px}
+  .stat-value{font-size:2rem;font-weight:700}
+  .stat-label{color:#94a3b8;font-size:.85rem}
+  .critical .stat-value{color:#ef4444}.high .stat-value{color:#f97316}.medium .stat-value{color:#eab308}.total .stat-value{color:#3b82f6}
+  .bug-card{background:#1e293b;border-radius:12px;margin-bottom:12px;overflow:hidden;border-left:4px solid #64748b}
+  .bug-card.sev-critical{border-left-color:#ef4444}.bug-card.sev-high{border-left-color:#f97316}.bug-card.sev-medium{border-left-color:#eab308}
+  .bug-header{display:flex;align-items:center;gap:10px;padding:14px 18px;cursor:pointer;user-select:none;flex-wrap:wrap}
+  .bug-header:hover{background:#273548}
+  .bug-num{font-weight:700;color:#60a5fa;min-width:44px}
+  .bug-sev{font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:9999px;text-transform:uppercase}
+  .sev-critical .bug-sev{background:#7f1d1d;color:#fca5a5}.sev-high .bug-sev{background:#7c2d12;color:#fdba74}.sev-medium .bug-sev{background:#713f12;color:#fde047}
+  .bug-title{flex:1;font-weight:500;min-width:200px;font-size:.95rem}
+  .bug-file{color:#94a3b8;font-size:.75rem;font-family:monospace}
+  .bug-details{display:none;padding:0 18px 18px}
+  .bug-details.open{display:block}
+  .bug-desc{color:#cbd5e1;margin-bottom:12px;line-height:1.5;font-size:.9rem}
+  .code-block{background:#0f172a;border-radius:8px;padding:12px;margin-bottom:10px;overflow-x:auto;font-family:'SF Mono','Fira Code',monospace;font-size:.78rem;line-height:1.4;white-space:pre-wrap}
+  .code-label{color:#94a3b8;font-size:.75rem;margin-bottom:4px;font-weight:600}
+  .code-bad{border:1px solid #7f1d1d}.code-good{border:1px solid #14532d}
+  .chevron{transition:transform .2s;color:#64748b}.chevron.open{transform:rotate(90deg)}
+  .section-title{font-size:1.1rem;margin:28px 0 14px;color:#f8fafc;border-bottom:1px solid #334155;padding-bottom:6px}
+  .acum{background:#1e293b;border-radius:12px;padding:20px;margin-top:32px}
+  .acum h3{margin-bottom:12px;color:#60a5fa}
+  .acum table{width:100%;border-collapse:collapse}
+  .acum th,.acum td{text-align:left;padding:6px 10px;border-bottom:1px solid #334155;font-size:.9rem}
+  .acum th{color:#94a3b8;font-size:.75rem;text-transform:uppercase}
+</style>
+</head>
+<body>
+
+<h1>Paula W19 - Bug Hunt Ronda 8</h1>
+<p class="subtitle">30 bugs Edge Cases &amp; Business Logic (#191-#220) | 10 abril 2026</p>
+
+<div class="stats">
+  <div class="stat critical"><div class="stat-value">2</div><div class="stat-label">Critical</div></div>
+  <div class="stat high"><div class="stat-value">21</div><div class="stat-label">High</div></div>
+  <div class="stat medium"><div class="stat-value">7</div><div class="stat-label">Medium</div></div>
+  <div class="stat total"><div class="stat-value">30</div><div class="stat-label">Total</div></div>
+</div>
+
+<div class="section-title">Critical (2)</div>
+
+<div class="bug-card sev-critical"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#202</span><span class="bug-sev">critical</span><span class="bug-title">extractBudgetAmount parser destroys LATAM decimal notation &mdash; $1.5mm parsed as $15M</span><span class="bug-file">steve-wa-brain.ts:1588</span></div><div class="bug-details"><p class="bug-desc">El parser usa <code>parseFloat(match.replace(/[.,]/g, ''))</code> que elimina TODOS los puntos y comas. <code>$1.5mm</code> (1.5 millones CLP, notaci&oacute;n com&uacute;n LATAM) se convierte en <code>15 * 1000000 = 15M</code> en vez de <code>1.5M</code>. El budget-low detection no se activa cuando deber&iacute;a, y Steve no adapta su pitch para presupuestos bajos.</p></div></div>
+
+<div class="bug-card sev-critical"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#210</span><span class="bug-sev">critical</span><span class="bug-title">Audit findings regex &quot;s&oacute;lid&quot; nunca matchea &quot;s&oacute;lido/a&quot; &mdash; fit score system&aacute;ticamente bajo</span><span class="bug-file">steve-wa-brain.ts:2318</span></div><div class="bug-details"><p class="bug-desc"><code>\b(s&oacute;lid)\b</code> requiere non-word char despu&eacute;s de &quot;d&quot;, pero &quot;s&oacute;lido&quot; tiene &quot;o&quot; (word char). El regex NUNCA matchea. Prospects con findings positivos como &quot;estructura s&oacute;lida&quot; no reciben el bonus de fit (+5), subestimando sistem&aacute;ticamente su score. Dead code que penaliza ventas.</p></div></div>
+
+<div class="section-title">High (21)</div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#191</span><span class="bug-sev">high</span><span class="bug-title">Audio HEAD sin credenciales Twilio &mdash; size check siempre falla, audios grandes pasan</span><span class="bug-file">steve-wa-chat.ts:397</span></div><div class="bug-details"><p class="bug-desc"><code>fetch(mediaUrl, { method: 'HEAD' })</code> sin header Authorization. Twilio retorna 401. El catch lo ignora silenciosamente. Todo audio pasa directo a transcripci&oacute;n sin l&iacute;mite de tama&ntilde;o.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#192</span><span class="bug-sev">high</span><span class="bug-title">New prospect insert failure crea prospect fantasma con id='' &mdash; pipeline completo opera sobre nada</span><span class="bug-file">steve-wa-chat.ts:728</span></div><div class="bug-details"><p class="bug-desc">Si el INSERT de prospect falla, <code>prospect = newProspect || { id: '', phone, ... }</code>. El id vac&iacute;o causa: wa_messages con client_id null, updates que matchean 0 rows, eventos de log corruptos. Todo el pipeline (scoring, HubSpot, meetings) opera sobre un fantasma.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#193</span><span class="bug-sev">high</span><span class="bug-title">Escalation notification env&iacute;a desde n&uacute;mero de Steve, no del merchant &mdash; mensaje confuso + posible fallo 24h window</span><span class="bug-file">merchant-wa.ts:286</span></div><div class="bug-details"><p class="bug-desc">Cuando se escala a humano, la notificaci&oacute;n al merchant usa <code>sendWhatsApp()</code> con el n&uacute;mero maestro de Steve, no el sub-account del merchant. El merchant recibe mensaje de un n&uacute;mero desconocido, y si no tiene conversaci&oacute;n previa, Twilio rechaza por la regla de 24h.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#194</span><span class="bug-sev">high</span><span class="bug-title">Escalation task description dice &quot;1-5 caracteres&quot; pero el filtro es 5-15 &mdash; misleading para JM</span><span class="bug-file">steve-wa-chat.ts:999</span></div><div class="bug-details"><p class="bug-desc">La descripci&oacute;n de la task de frustraci&oacute;n dice &quot;3+ mensajes consecutivos de 1-5 caracteres&quot; pero el filtro actual (#149 fix) es 5-15 chars. JM lee la task y espera un patr&oacute;n que no coincide con lo que realmente trigger&oacute; la escalaci&oacute;n.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#195</span><span class="bug-sev">high</span><span class="bug-title">abandoned-cart phone no sanitizado &mdash; espacios y par&eacute;ntesis crean whatsapp: inv&aacute;lido</span><span class="bug-file">abandoned-cart-wa.ts:137</span></div><div class="bug-details"><p class="bug-desc">Si <code>customer_phone</code> tiene espacios/par&eacute;ntesis de Shopify, <code>whatsapp:+56 9 8765 4321</code> es inv&aacute;lido para Twilio. El cr&eacute;dito ya fue deducido, el refund agrega churn innecesario.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#196</span><span class="bug-sev">high</span><span class="bug-title">Redundant question fixer llama Claude sin system prompt &mdash; prompt injection + no anthropicFetch</span><span class="bug-file">steve-wa-chat.ts:1032</span></div><div class="bug-details"><p class="bug-desc">El &quot;fix de pregunta redundante&quot; llama Anthropic con fetch directo (sin timeout/retry) y SIN system prompt. Los datos del prospect van en el user message sin sanitizar. La respuesta se acepta directamente si es &lt;400 chars, sin stripear tags de inyecci&oacute;n.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#199</span><span class="bug-sev">high</span><span class="bug-title">status-callback query por message_sid sin client_id &mdash; puede actualizar mensaje equivocado</span><span class="bug-file">status-callback.ts:99</span></div><div class="bug-details"><p class="bug-desc">La query usa <code>.eq('message_sid', sid).single()</code> sin scope por client_id. Si existe un SID duplicado (test, migraci&oacute;n, import), se actualiza el mensaje equivocado y los contadores de campa&ntilde;a se incrementan para la campa&ntilde;a incorrecta.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#200</span><span class="bug-sev">high</span><span class="bug-title">Escalation task dedup es fire-and-forget &mdash; race condition entre instancias permite duplicados</span><span class="bug-file">steve-wa-chat.ts:880</span></div><div class="bug-details"><p class="bug-desc">El check de dedup + insert es un Promise chain NO awaiteado. Dos requests simult&aacute;neos en diferentes instancias Cloud Run: ambos leen &quot;no hay task pendiente&quot;, ambos insertan. El fix #150 agreg&oacute; dedup pero como fire-and-forget, la race condition persiste.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#201</span><span class="bug-sev">high</span><span class="bug-title">process_prospect_recovery action type nunca manejado en wa-action-processor</span><span class="bug-file">wa-action-processor.ts:175</span></div><div class="bug-details"><p class="bug-desc">El fix #147 encola <code>process_prospect_recovery</code> en wa_pending_actions, pero el dispatcher solo maneja 6 action types. El recovery siempre falla 3 veces, env&iacute;a fallback incorrecto al prospect, y marca como failed. Scoring, HubSpot y meetings nunca se ejecutan.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#203</span><span class="bug-sev">high</span><span class="bug-title">HubSpot push corre despu&eacute;s de atomic update sin verificar si fue no-op &mdash; datos stale en HubSpot</span><span class="bug-file">steve-wa-chat.ts:1609</span></div><div class="bug-details"><p class="bug-desc">Si el optimistic lock detect&oacute; race condition (0 rows updated), el push a HubSpot igual se ejecuta con datos stale. Peor: escribe <code>hubspot_contact_id</code> y <code>pushed_to_hubspot_at</code> sin lock, previniendo que el proceso autoritativo actualice HubSpot correctamente.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#205</span><span class="bug-sev">high</span><span class="bug-title">calculateLeadScore fit puede llegar a 25 &mdash; score total excede rango 0-100 documentado</span><span class="bug-file">steve-wa-brain.ts:2262</span></div><div class="bug-details"><p class="bug-desc">Fit: actively_looking(5) + shopify(10) + integrations(5) + audit(5) = 25, pero el m&aacute;x documentado es 15. El <code>Math.min(score, 100)</code> capea el total, pero el <code>breakdown</code> guardado en DB muestra fit=25, inconsistente con la documentaci&oacute;n y confuso para an&aacute;lisis.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#206</span><span class="bug-sev">high</span><span class="bug-title">Strategist brief truncation regex puede producir string vac&iacute;o</span><span class="bug-file">steve-multi-brain.ts:340</span></div><div class="bug-details"><p class="bug-desc"><code>.slice(0,400).replace(/\s\S*$/, '')</code> &mdash; si el primer char es espacio, el regex matchea TODO y queda <code>'...'</code>. El Conversationalist recibe &quot;Brief del Estratega: ...&quot; vac&iacute;o, perdiendo todo el contexto estrat&eacute;gico.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#208</span><span class="bug-sev">high</span><span class="bug-title">Short affirmation &quot;skip meeting detection&quot; no skipea &mdash; falls through a detectMeetingConfirmation</span><span class="bug-file">steve-wa-chat.ts:1639</span></div><div class="bug-details"><p class="bug-desc">Cuando <code>isShortAffirmation=true</code> y <code>steveWasAskingMeeting=false</code>, el log dice &quot;skipping meeting detection&quot; pero NO hay return/continue. El c&oacute;digo cae a <code>detectMeetingConfirmation</code>, desperdiciando una llamada a Haiku y potencialmente clasificando un &quot;si&quot; genérico como confirmaci&oacute;n de meeting.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#211</span><span class="bug-sev">high</span><span class="bug-title">Notes save APPENDS full textarea &mdash; cada guardado duplica todo el contenido</span><span class="bug-file">prospect-crm.ts:168 + ProspectDetail.tsx:100</span></div><div class="bug-details"><p class="bug-desc">Frontend carga <code>admin_notes</code> completo en textarea, env&iacute;a todo al backend. Backend APPENDS con separador. Cada save duplica: &quot;Hello&quot; &rarr; &quot;Hello --- Hello&quot; &rarr; &quot;Hello --- Hello --- Hello --- Hello&quot;. Crecimiento exponencial.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#212</span><span class="bug-sev">high</span><span class="bug-title">prospectUpdateTags rechaza array vac&iacute;o &mdash; imposible borrar todos los tags</span><span class="bug-file">prospect-crm.ts:274</span></div><div class="bug-details"><p class="bug-desc">El fix #173 agreg&oacute; <code>if (safeTags.length === 0) return 400</code>. Pero enviar <code>tags: []</code> es la forma de borrar todos los tags. El frontend muestra tag removido pero la DB lo conserva &mdash; desync permanente hasta refresh.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#213</span><span class="bug-sev">high</span><span class="bug-title">web-forms CRUD endpoint acepta public_submit en auth bypass guard &mdash; footgun para futuros cambios</span><span class="bug-file">web-forms.ts:19</span></div><div class="bug-details"><p class="bug-desc">El auth guard en <code>webFormsCrud</code> tiene bypass para <code>action === 'public_submit'</code>. Si alguien agrega un case para esa acci&oacute;n, se ejecuta con admin supabase y sin rate limiter. El bypass solo deber&iacute;a existir en el endpoint p&uacute;blico dedicado.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#214</span><span class="bug-sev">high</span><span class="bug-title">Web form required field validation usa falsy check &mdash; rechaza 0 y false como &quot;campo vac&iacute;o&quot;</span><span class="bug-file">web-forms.ts:224</span></div><div class="bug-details"><p class="bug-desc"><code>if (field.required && !data[field.name])</code> &mdash; si el campo es num&eacute;rico y el usuario envi&oacute; <code>0</code>, o booleano con <code>false</code>, el falsy check lo rechaza como missing. Fix: <code>=== undefined || === null || === ''</code>.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#215</span><span class="bug-sev">high</span><span class="bug-title">Proposal create ignora status del request &mdash; &quot;Guardar y enviar&quot; siempre crea draft</span><span class="bug-file">proposals.ts:57</span></div><div class="bug-details"><p class="bug-desc">El frontend env&iacute;a <code>status: 'sent'</code> pero el backend no lo incluye en el INSERT. Siempre se crea como draft (default DB). El bot&oacute;n &quot;Guardar y marcar enviada&quot; no funciona &mdash; el usuario cree que envi&oacute; pero est&aacute; en draft.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#216</span><span class="bug-sev">high</span><span class="bug-title">Booking confirm valida solo hora, ignora minutos &mdash; permite slots que terminan fuera de horario</span><span class="bug-file">booking-api.ts:404</span></div><div class="bug-details"><p class="bug-desc"><code>slotHour &lt; workStart || slotHour &gt;= workEnd</code> solo valida la hora. Slot a las 17:45 con duraci&oacute;n 30 min termina a 18:15 (fuera de horario si workEnd=18). Un atacante puede crafted slot_start que no fue generado por bookingSlots.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#217</span><span class="bug-sev">high</span><span class="bug-title">Campaign segment filtering es non-functional &mdash; TODOS los segmentos env&iacute;an a TODOS los contactos</span><span class="bug-file">send-campaign.ts:86</span></div><div class="bug-details"><p class="bug-desc">El <code>segment_query</code> se extrae pero se ignora completamente. Lines 88-113 cargan TODOS los contactos sin filtro. El merchant selecciona &quot;VIP (3+ compras)&quot; en la UI pero el backend env&iacute;a a todos, quemando cr&eacute;ditos en recipients no targetados.</p></div></div>
+
+<div class="bug-card sev-high"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#219</span><span class="bug-sev">high</span><span class="bug-title">salesTasksAutoGenerate crea duplicados cuando prospect matchea m&uacute;ltiples reglas</span><span class="bug-file">sales-tasks.ts:160</span></div><div class="bug-details"><p class="bug-desc">El dedup solo chequea tasks PENDING. Si el usuario complet&oacute; un auto_meeting_prep, el pr&oacute;ximo auto-generate crea otro inmediatamente. Con el tiempo, flood de tasks auto-generadas repetitivas que el vendedor ya atendi&oacute;.</p></div></div>
+
+<div class="section-title">Medium (7)</div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#197</span><span class="bug-sev">medium</span><span class="bug-title">Campaign already-sent recipients inflan sentCount &mdash; menos refund del esperado</span><span class="bug-file">send-campaign.ts:244</span></div><div class="bug-details"><p class="bug-desc">Recipients ya enviados cuentan como <code>sentCount++</code>. En crash-resume, credits deducidos en ambas runs pero sentCount = total &rarr; refund = 0. Credits perdidos permanentemente.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#198</span><span class="bug-sev">medium</span><span class="bug-title">pain_points como string (no array) se destruyen en merge en vez de normalizar</span><span class="bug-file">steve-wa-chat.ts:1474</span></div><div class="bug-details"><p class="bug-desc">Si <code>extractProspectInfo</code> retorna <code>pain_points: "No tiene presupuesto"</code> (string en vez de array), el type guard lo resetea a <code>[]</code>. Debiera normalizar a <code>["No tiene presupuesto"]</code>.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#204</span><span class="bug-sev">medium</span><span class="bug-title">parseMeetingTime usa toLocaleString trick para timezone &mdash; unreliable cross-platform</span><span class="bug-file">steve-wa-chat.ts:1687</span></div><div class="bug-details"><p class="bug-desc"><code>new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))</code> es implementation-defined. Compara timestamps &quot;fake UTC&quot; (Chile local re-interpretado como UTC) contra timestamps reales. Puede rechazar meetings v&aacute;lidos o aceptar pasados.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#207</span><span class="bug-sev">medium</span><span class="bug-title">Store scrape: product_images: [&quot;&quot;] bloquea re-investigaci&oacute;n permanentemente</span><span class="bug-file">steve-investigator.ts:56</span></div><div class="bug-details"><p class="bug-desc">Si un scrape anterior guard&oacute; <code>product_images: [""]</code> (un string vac&iacute;o), <code>.length === 1</code> (truthy) bloquea re-investigaci&oacute;n. El prospect queda marcado como &quot;ya tiene data de tienda&quot; con data basura.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#209</span><span class="bug-sev">medium</span><span class="bug-title">getMarketDeadline hash function con distribuci&oacute;n d&eacute;bil para tel&eacute;fonos secuenciales</span><span class="bug-file">steve-wa-brain.ts:986</span></div><div class="bug-details"><p class="bug-desc">El hash sobre phones de 11 d&iacute;gitos satura el espacio 31-bit. Tel&eacute;fonos secuenciales del mismo carrier siempre caen en el mismo deadline. Muchos prospects ven la misma fecha, reduciendo la percepci&oacute;n de personalizaci&oacute;n.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#218</span><span class="bug-sev">medium</span><span class="bug-title">Kanban drag-and-drop no actualiza stageTotals/pipelineTotal optimisticamente</span><span class="bug-file">ProspectKanban.tsx:107</span></div><div class="bug-details"><p class="bug-desc">Al mover una card entre columnas, los montos en d&oacute;lares de los headers y el pipeline total quedan stale hasta el pr&oacute;ximo fetch. Si el prospect tiene deal_value=$50k, ambas columnas muestran totales incorrectos.</p></div></div>
+
+<div class="bug-card sev-medium"><div class="bug-header" onclick="toggle(this)"><span class="chevron">&#9654;</span><span class="bug-num">#220</span><span class="bug-sev">medium</span><span class="bug-title">Proposal generate: monthly_price=0 muestra &quot;a definir&quot; en vez de $0</span><span class="bug-file">proposals.ts:190</span></div><div class="bug-details"><p class="bug-desc"><code>monthly_price ? ... : 'a definir'</code> &mdash; <code>0</code> es falsy, entonces un plan trial/gratuito muestra &quot;a definir&quot; en la propuesta generada. Inconsistente con la intenci&oacute;n del usuario de ofrecer $0.</p></div></div>
+
+<div class="acum">
+  <h3>Acumulado Paula W19 &mdash; 8 Rondas</h3>
+  <table>
+    <tr><th>Ronda</th><th>Encontrados</th><th>Arreglados</th><th>Commits</th></tr>
+    <tr><td>R1 (#1-#30)</td><td>30</td><td>10</td><td>315607e</td></tr>
+    <tr><td>R2 (#31-#60)</td><td>30</td><td>30</td><td>ebfcdad</td></tr>
+    <tr><td>R3 (#61-#100)</td><td>40</td><td>40</td><td>40bf4ee</td></tr>
+    <tr><td>R4 (#101-#110)</td><td>10</td><td>&mdash;</td><td>(otros dominios)</td></tr>
+    <tr><td>R5 (#111-#130)</td><td>20</td><td>20</td><td>2a6f53bc</td></tr>
+    <tr><td>R6 (#131-#160)</td><td>30</td><td>30</td><td>6a96d8b0</td></tr>
+    <tr><td>R7 (#161-#190)</td><td>30</td><td>30</td><td>b3de0fcc</td></tr>
+    <tr><td>R8 (#191-#220)</td><td>30</td><td>pendiente</td><td>&mdash;</td></tr>
+    <tr style="font-weight:700;color:#60a5fa"><td>TOTAL</td><td>220</td><td>160 + 60 pendientes</td><td>6 deploys</td></tr>
+  </table>
+</div>
+
+<script>function toggle(h){const d=h.nextElementSibling,c=h.querySelector('.chevron');d.classList.toggle('open');c.classList.toggle('open')}</script>
+</body>
+</html>

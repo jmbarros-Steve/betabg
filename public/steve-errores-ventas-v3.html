@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Steve Ventas — Errores Ronda 3</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.6; }
+  .header { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-bottom: 1px solid #334155; padding: 28px 40px; display: flex; justify-content: space-between; align-items: center; }
+  .header h1 { font-size: 1.5rem; font-weight: 700; color: #f8fafc; }
+  .header .subtitle { color: #94a3b8; font-size: 0.85rem; margin-top: 4px; }
+  .stats-bar { display: flex; gap: 16px; }
+  .stat { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px 20px; text-align: center; }
+  .stat .num { font-size: 1.8rem; font-weight: 800; }
+  .stat .label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat.critico .num { color: #ef4444; }
+  .stat.alto .num { color: #f97316; }
+  .stat.medio .num { color: #eab308; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 40px; }
+  .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; margin: 32px 0 12px; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; margin-bottom: 16px; overflow: hidden; transition: border-color 0.2s; }
+  .card:hover { border-color: #475569; }
+  .card.critico { border-left: 4px solid #ef4444; }
+  .card.alto { border-left: 4px solid #f97316; }
+  .card.medio { border-left: 4px solid #eab308; }
+  .card-header { padding: 16px 20px; cursor: pointer; display: flex; align-items: flex-start; gap: 12px; }
+  .badge { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-radius: 4px; padding: 2px 8px; white-space: nowrap; flex-shrink: 0; margin-top: 3px; }
+  .badge.critico { background: #ef444420; color: #ef4444; }
+  .badge.alto { background: #f9731620; color: #f97316; }
+  .badge.medio { background: #eab30820; color: #eab308; }
+  .card-title { font-weight: 600; color: #f1f5f9; flex: 1; }
+  .card-meta { font-size: 0.78rem; color: #64748b; margin-top: 2px; }
+  .card-body { padding: 0 20px 20px; display: none; }
+  .card.open .card-body { display: block; }
+  .chevron { color: #475569; font-size: 0.8rem; margin-left: auto; flex-shrink: 0; margin-top: 4px; transition: transform 0.2s; }
+  .card.open .chevron { transform: rotate(90deg); }
+  .problem { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
+  .problem h4 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 6px; }
+  .problem p { font-size: 0.875rem; color: #cbd5e1; }
+  pre { background: #020617; border: 1px solid #1e293b; border-radius: 6px; padding: 12px 16px; font-size: 0.78rem; color: #a5f3fc; overflow-x: auto; margin: 8px 0; white-space: pre-wrap; word-break: break-word; }
+  .fix { background: #052e16; border: 1px solid #166534; border-radius: 8px; padding: 14px 16px; margin-top: 12px; }
+  .fix h4 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #4ade80; margin-bottom: 6px; }
+  .fix p, .fix pre { color: #86efac; }
+  .fix pre { background: #021a0d; border-color: #14532d; }
+  .impact { font-size: 0.82rem; color: #fbbf24; font-weight: 500; margin-top: 6px; }
+  .toggle-all { background: #334155; color: #94a3b8; border: none; border-radius: 6px; padding: 6px 16px; font-size: 0.8rem; cursor: pointer; margin-bottom: 16px; }
+  .toggle-all:hover { background: #475569; color: #e2e8f0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Steve Ventas — Errores Ronda 3</h1>
+    <div class="subtitle">20 nuevos errores críticos detectados • Generado 07/04/2026</div>
+  </div>
+  <div class="stats-bar">
+    <div class="stat critico"><div class="num">5</div><div class="label">Críticos</div></div>
+    <div class="stat alto"><div class="num">8</div><div class="label">Altos</div></div>
+    <div class="stat medio"><div class="num">7</div><div class="label">Medios</div></div>
+  </div>
+</div>
+
+<div class="container">
+  <button class="toggle-all" onclick="toggleAll()">▶ Expandir todo</button>
+
+  <div class="section-title">🔴 Críticos (5)</div>
+
+  <!-- 1 -->
+  <div class="card critico" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge critico">Crítico</span>
+      <div>
+        <div class="card-title">#1 — Sin validación HMAC de Twilio en webhook</div>
+        <div class="card-meta">steve-wa-chat.ts:193 · steveWAChat()</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>El webhook acepta CUALQUIER POST sin verificar la firma HMAC de Twilio. Cualquiera puede enviar mensajes falsos como si fueran de WhatsApp real.</p>
+<pre>export async function steveWAChat(c: Context) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const body = await c.req.parseBody();  // ← Sin validación firma</pre>
+        <p class="impact">⚠ Riesgo: inyección de mensajes fraudulentos, suplantación de identidad, spam ilimitado.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+        <p>Validar la firma X-Twilio-Signature antes de procesar el body.</p>
+<pre>import twilio from 'twilio';
+const sig = c.req.header('X-Twilio-Signature') || '';
+const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+const isValid = twilio.validateRequest(twilioAuthToken, sig, fullUrl, bodyParams);
+if (!isValid) return c.text('Unauthorized', 401);</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2 -->
+  <div class="card critico" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge critico">Crítico</span>
+      <div>
+        <div class="card-title">#2 — Tags de acción detectados ANTES de remover &lt;thinking&gt;</div>
+        <div class="card-meta">steve-wa-chat.ts:766 · Tag stripping logic</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>Claude puede generar <code>[SEND_CASE_STUDY]</code> dentro de <code>&lt;thinking&gt;</code>. El código detecta los tags en <code>fullText</code> ANTES de quitar el thinking, por lo que encola acciones que nunca debían ejecutarse.</p>
+<pre>// ACTUAL (buggy):
+const fullReplyText = replyText;   // ← incluyendo thinking tags
+const caseStudyTag = fullReplyText.includes('[SEND_CASE_STUDY]');
+replyText = replyText.replace(/&lt;thinking&gt;[\s\S]*?&lt;\/thinking&gt;/gi, '');
+// Si [SEND_CASE_STUDY] estaba solo en &lt;thinking&gt;, ya se encoló!</pre>
+        <p class="impact">⚠ Riesgo: se envía deck / mockup / case study al prospecto cuando Claude solo lo "consideró internamente".</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+<pre>// Primero remover thinking, LUEGO detectar tags
+replyText = replyText.replace(/&lt;thinking&gt;[\s\S]*?&lt;\/thinking&gt;\s*/gi, '').trim();
+const fullReplyText = replyText;  // Solo texto limpio
+const caseStudyTag = fullReplyText.includes('[SEND_CASE_STUDY]');
+// ... resto de detección</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 -->
+  <div class="card critico" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge critico">Crítico</span>
+      <div>
+        <div class="card-title">#3 — Race condition: deck/mockup puede enviarse doble</div>
+        <div class="card-meta">steve-wa-chat.ts:891 · deck_sent check</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>El check <code>!prospect.deck_sent</code> usa el objeto in-memory del inicio del request. Si dos mensajes llegan casi en paralelo, ambos pasan el check y encolan 2 decks.</p>
+<pre>if (deckTag && !(prospect as any).deck_sent) {
+  // freshDeck check es post-hoc — ya se encoló arriba
+  const { data: freshDeck } = await supabase...
+  if (!freshDeck?.deck_sent) {
+    enqueueWAAction(phone, 'send_deck', {...}, 7);  // ← duplicado posible
+  }
+}</pre>
+        <p class="impact">⚠ El prospecto recibe el deck de ventas 2 veces seguidas. Pésima UX.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+        <p>Usar UPDATE condicional atómico en la DB (solo actualiza si deck_sent = false):</p>
+<pre>const { data: updated } = await supabase
+  .from('wa_prospects')
+  .update({ deck_sent: true, deck_sent_at: new Date().toISOString() })
+  .eq('id', prospect.id)
+  .is('deck_sent', null)  // Solo si aún no fue enviado
+  .select('id');
+if (updated?.length) {
+  enqueueWAAction(phone, 'send_deck', {...}, 7);  // Solo si ganó la "carrera"
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <div class="card critico" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge critico">Crítico</span>
+      <div>
+        <div class="card-title">#4 — JSON de extractProspectInfo sin validación de estructura</div>
+        <div class="card-meta">steve-wa-brain.ts:1862 · extractProspectInfo()</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>El JSON retornado por Haiku se parsea y se guarda directamente. Si Haiku alucina campos inesperados (<code>{"unexpected_field": "value"}</code>), éstos se cuelan a la DB sin validación.</p>
+<pre>const parsed = JSON.parse(jsonStr);
+// ← No hay validación de que los campos sean los esperados
+return Object.keys(cleaned).length > 0 ? (cleaned as ExtractedProspectInfo) : null;</pre>
+        <p class="impact">⚠ Datos corruptos en wa_prospects si Haiku genera JSON inesperado.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+<pre>const ALLOWED_FIELDS = ['name','apellido','email','company','what_they_sell',
+  'monthly_revenue','has_online_store','store_platform','is_decision_maker',
+  'actively_looking','current_marketing','pain_points','integrations_used',
+  'team_size','budget_range','decision_timeline'];
+const parsed = JSON.parse(jsonStr);
+const cleaned: Record&lt;string, any&gt; = {};
+for (const key of ALLOWED_FIELDS) {
+  if (key in parsed && parsed[key] != null) cleaned[key] = parsed[key];
+}
+return Object.keys(cleaned).length > 0 ? cleaned as ExtractedProspectInfo : null;</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5 -->
+  <div class="card critico" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge critico">Crítico</span>
+      <div>
+        <div class="card-title">#5 — message.content puede ser null → crash en sanitizeForClaude</div>
+        <div class="card-meta">steve-wa-chat.ts:557 + línea 1370 · sanitizeForClaude()</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>Si un row en wa_messages tiene <code>body = NULL</code>, el historial pasa <code>{ content: null }</code> a sanitizeForClaude. Allí se hace <code>content += '\n' + null</code> → el string "null" llega a Claude y genera respuestas raras.</p>
+<pre>// getProspectHistory():
+.map((m: any) => ({
+  role: m.direction === 'inbound' ? 'user' : 'assistant',
+  content: m.body,  // ← puede ser null
+}))
+
+// sanitizeForClaude():
+merged[...].content += '\n' + msg.content;  // 'anterior\nnull' ← bug</pre>
+        <p class="impact">⚠ Claude ve "null" como texto — respuestas inconsistentes o confusas.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+<pre>// En getProspectHistory:
+content: m.body ? String(m.body) : '[mensaje vacío]',
+
+// En sanitizeForClaude:
+for (const msg of msgs) {
+  if (!msg.content || typeof msg.content !== 'string') continue;
+  // ... resto del merge
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">🟠 Altos (8)</div>
+
+  <!-- 6 -->
+  <div class="card alto" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge alto">Alto</span>
+      <div>
+        <div class="card-title">#6 — URL de agendamiento inconsistente en todo el código</div>
+        <div class="card-meta">steve-wa-brain.ts:1409 + 1533 + chat.ts:615 · Múltiples líneas</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>El código usa 3 URLs distintas para agendar según la línea:</p>
+<pre>// steve-wa-brain.ts línea 1409 (BOOKING_BASE_URL env)
+const bookingBaseUrl = process.env.BOOKING_BASE_URL || 'https://www.steve.cl/agendar';
+
+// steve-wa-brain.ts línea 1533 (hardcoded diferente)
+"www.steve.cl/agendar/steve"
+
+// steve-wa-chat.ts línea 615 (hardcoded igual)
+'www.steve.cl/agendar/steve'
+
+// steve-wa-chat.ts línea 915 (detector usa otra URL)
+fullReplyText.includes('meetings.hubspot.com') || fullReplyText.includes('steve.cl/agendar')</pre>
+        <p class="impact">⚠ La métrica meeting_link_sent puede ser falsa si Steve envía /agendar/steve pero el detector busca /agendar sin el /steve.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+        <p>Definir una constante única y usarla en todo el código:</p>
+<pre>// En steve-wa-brain.ts (top level)
+export const BOOKING_URL = 'www.steve.cl/agendar/steve';
+
+// En el detector (steve-wa-chat.ts)
+const meetingLinkSent = fullReplyText.includes(BOOKING_URL) ||
+                        fullReplyText.includes('meetings.hubspot.com');</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7 -->
+  <div class="card alto" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge alto">Alto</span>
+      <div>
+        <div class="card-title">#7 — extractProspectInfo falla silenciosamente sin notificación</div>
+        <div class="card-meta">steve-wa-brain.ts:1830 + chat.ts:1002 · extractProspectInfo()</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>Si ambas llamadas a Haiku fallan (timeout, quota), retorna <code>null</code> silenciosamente. El prospect queda congelado sin datos nuevos y nadie lo sabe.</p>
+<pre>for (let attempt = 0; attempt < 2; attempt++) {
+  try { /* Haiku call */ }
+  catch (err) {
+    if (attempt < 1) { await new Promise(r => setTimeout(r, 800)); continue; }
+    return null;  // ← silencio total
+  }
+}
+// En processProspectAsync():
+if (extracted) { /* merge */ }
+// Si extracted=null → merged queda vacío → nada se actualiza</pre>
+        <p class="impact">⚠ Prospects con conversaciones activas se quedan con score 0 y datos vacíos sin que JM lo sepa.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+<pre>if (!extracted) {
+  console.warn(`[extract] Failed after 2 attempts for ${prospect.phone}`);
+  // Log en qa_log para visibilidad
+  supabase.from('qa_log').insert({
+    check_type: 'extraction_failure',
+    status: 'warning',
+    details: JSON.stringify({ phone: prospect.phone, msg_count: prospect.message_count }),
+    detected_by: 'steve-wa-chat',
+  }).catch(() => {});
+  return;
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8 -->
+  <div class="card alto" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge alto">Alto</span>
+      <div>
+        <div class="card-title">#8 — Reunion se agenda sin considerar timezone del prospecto</div>
+        <div class="card-meta">steve-wa-brain.ts:parseMeetingTime · Timezone assumption</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>Cuando el prospecto dice "el lunes a las 3pm", la extracción no conoce la zona horaria. Si el servidor corre en UTC, la reunión se crea con offset incorrecto de -3 o -4 horas.</p>
+<pre>// parseMeetingTime() extrae hora sin timezone
+// Si prospecto dice "3pm" y servidor está en UTC:
+// Reunión agendada para 3pm UTC = 11am o 12pm Santiago
+// → El prospecto espera a las 3pm Santiago, nadie aparece a las 3pm UTC</pre>
+        <p class="impact">⚠ Reuniones agendadas en hora incorrecta. Prospecto no aparece. Oportunidad perdida.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+        <p>Siempre asumir zona horaria Santiago (America/Santiago) para parsear horas dadas por el prospecto:</p>
+<pre>// En parseMeetingTime(), usar Intl para crear el Date en timezone de Santiago
+function parseChileTime(hour: number, minute: number, date: Date): Date {
+  // Create date assuming Santiago time, then convert to UTC
+  const d = new Date(date);
+  d.setHours(hour, minute, 0, 0);
+  // Adjust for Santiago offset (DST-aware)
+  const chileOffset = getChileUTCOffset();  // -4 o -3 según DST
+  d.setMinutes(d.getMinutes() - chileOffset * 60);
+  return d;
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9 -->
+  <div class="card alto" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge alto">Alto</span>
+      <div>
+        <div class="card-title">#9 — Prospect que cancela reunión nunca puede volver a recibirla</div>
+        <div class="card-meta">steve-wa-chat.ts:1232 · meeting_status = 'cancelled'</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>Cuando el prospecto rechaza la reunión, se guarda <code>meeting_status='cancelled'</code> permanentemente. Si vuelve a escribir 5 días después, Steve NUNCA vuelve a proponer reunión porque el status no se resetea.</p>
+<pre>} else if (meetingResult.rejected) {
+  await supabase
+    .from('wa_prospects')
+    .update({ meeting_status: 'cancelled' })  // ← permanente
+    .eq('id', prospect.id);
+  // No hay reset automático después de N días</pre>
+        <p class="impact">⚠ Prospects interesados que dijeron "no ahora" nunca reciben follow-up de reunión. Oportunidad perdida.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+        <p>En processProspectAsync, resetear meeting_status a 'none' si canceló hace 5+ días:</p>
+<pre>const daysSinceCancelled = prospect.meeting_suggested_at
+  ? (Date.now() - new Date(prospect.meeting_suggested_at).getTime()) / 86400000
+  : 0;
+if (prospect.meeting_status === 'cancelled' && daysSinceCancelled > 5) {
+  updatePayload.meeting_status = 'none';  // Reset → Steve puede volver a proponer
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10 -->
+  <div class="card alto" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge alto">Alto</span>
+      <div>
+        <div class="card-title">#10 — meeting_link_sent con false positive al mencionar URL de pasada</div>
+        <div class="card-meta">steve-wa-chat.ts:915 · meetingLinkSent detection</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>Si Steve dice "los clientes pueden ver más en steve.cl/agendar después", eso marca <code>meeting_link_sent=true</code> aunque no haya propuesto reunión explícitamente.</p>
+<pre>const meetingLinkSent = fullReplyText.includes('meetings.hubspot.com')
+  || fullReplyText.includes('steve.cl/agendar');
+// ↑ Cualquier mención de la URL → true, aunque sea contextual</pre>
+        <p class="impact">⚠ Métricas infladas de "reuniones propuestas". El prospect puede no saber que Steve espera que agende.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+        <p>Detectar la URL junto con una acción explícita de propuesta:</p>
+<pre>const meetingLinkSent = /(?:agendar|agenda|reserva|reservar|link|reunión|llamada|muéstrate|agendemos)[\s\S]{0,100}(?:steve\.cl\/agendar|meetings\.hubspot\.com)/i.test(fullReplyText)
+  || /(?:steve\.cl\/agendar|meetings\.hubspot\.com)[\s\S]{0,50}(?:elige|horario|disponible|cuando)/i.test(fullReplyText);</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 11 -->
+  <div class="card alto" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge alto">Alto</span>
+      <div>
+        <div class="card-title">#11 — Imagen corrupta/no-imagen no detectada — Claude responde sin verla</div>
+        <div class="card-meta">steve-wa-chat.ts:49 · downloadImageForVision()</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>Si Twilio retorna un archivo descargado pero corrupto, el base64 es válido pero la imagen no. Claude recibe datos inválidos y puede fallar silenciosamente o generar descripción incorrecta.</p>
+<pre>const base64 = buffer.toString('base64');
+// ← No se verifica que el buffer sea JPEG/PNG válido
+return { base64, mediaType };  // Se pasa a Claude incluso si es datos corruptos</pre>
+        <p class="impact">⚠ Steve responde sin ver la imagen enviada. Mal UX — el prospecto no entiende por qué Steve no comenta la imagen.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+<pre>// Validar magic bytes del archivo
+const first4 = Array.from(buffer.slice(0, 4));
+const isJpeg = first4[0] === 0xff && first4[1] === 0xd8;
+const isPng  = first4[0] === 0x89 && first4[1] === 0x50 && first4[2] === 0x4e && first4[3] === 0x47;
+const isGif  = first4[0] === 0x47 && first4[1] === 0x49;
+if (!isJpeg && !isPng && !isGif) {
+  console.warn('[image-vision] Invalid file format, skipping');
+  return null;
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 12 -->
+  <div class="card alto" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge alto">Alto</span>
+      <div>
+        <div class="card-title">#12 — Meeting cancellation marca 'cancelled' con primer rechazo vago</div>
+        <div class="card-meta">steve-wa-chat.ts:1232 · meetingResult.rejected</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>Un "no por ahora" puede ser interpretado por detectMeetingConfirmation() como <code>rejected=true</code>. Eso marca <code>meeting_status='cancelled'</code> permanentemente, aunque el prospecto solo quiso posponer.</p>
+<pre>} else if (meetingResult.rejected) {
+  // ← No distingue "no ahora" vs "no nunca"
+  updatePayload.meeting_status = 'cancelled';  // permanente
+}</pre>
+        <p class="impact">⚠ Prospects en proceso de compra marcados como rechazados. Pipeline de ventas sesgado.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+        <p>Usar dos niveles: 'deferred' (primer rechazo) y 'cancelled' (rechazo explícito 2 veces):</p>
+<pre>if (meetingResult.rejected) {
+  const prevStatus = prospect.meeting_status;
+  if (prevStatus === 'deferred') {
+    updatePayload.meeting_status = 'cancelled';  // Segundo rechazo = definitivo
+  } else {
+    updatePayload.meeting_status = 'deferred';   // Primer rechazo = "no ahora"
+  }
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 13 -->
+  <div class="card alto" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge alto">Alto</span>
+      <div>
+        <div class="card-title">#13 — WA_SALES_PROMPT_BASE no tiene respuesta para "¿hay trial?"</div>
+        <div class="card-meta">steve-wa-brain.ts:WA_SALES_PROMPT_BASE · Trial handling</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>El prompt PROHÍBE ofrecer trial pero NO da alternativa para cuando el prospect insiste. Steve solo puede redirigir a "agendar reunión", que suena repetitivo si el prospect pregunta 2-3 veces.</p>
+<pre>// Actual en WA_SALES_PROMPT_BASE:
+"NUNCA ofrezcas cuenta gratis, trial, prueba gratis. Steve NO regala acceso."
+// Falta: ¿qué DECIR cuando insisten en trial?</pre>
+        <p class="impact">⚠ Steve suena como robot broken record: "No hay trial, agenda reunión. No hay trial, agenda reunión."</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+        <p>Agregar manejo específico en el prompt base:</p>
+<pre>// Añadir a WA_SALES_PROMPT_BASE:
+- Si piden trial, responde: "Entiendo que quieres probar antes de comprometerte — eso es súper razonable.
+  Te ofrezco algo mejor: te muestro Steve con TUS datos reales en 15 min, sin costo y sin compromiso.
+  Es como un trial instantáneo pero personalizado. ¿Te tinca?"</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">🟡 Medios (7)</div>
+
+  <!-- 14 -->
+  <div class="card medio" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge medio">Medio</span>
+      <div>
+        <div class="card-title">#14 — scoreToStage puede avanzar a qualifying con BANT incompleto</div>
+        <div class="card-meta">steve-wa-brain.ts:scoreToStage · Thresholds inconsistentes</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>Un prospect puede entrar a "qualifying" stage con score 20+ sin haber dicho budget ni quién toma decisiones. El threshold de 20 es demasiado bajo para qualifying.</p>
+<pre>function scoreToStage(score: number): string {
+  if (score >= 75) return 'closing';
+  if (score >= 50) return 'pitching';
+  if (score >= 20) return 'qualifying';  // ← 20 es muy bajo
+  return 'discovery';
+}
+// Un prospect que solo tiene tienda online (need=15) + vende algo (need+5) = 20 → qualifying
+// Nunca dijo presupuesto, nunca confirmó que toma decisiones</pre>
+        <p class="impact">⚠ Steve propone reunión a prospects no calificados con score artificialmente alto.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+<pre>function scoreToStage(score: number): string {
+  if (score >= 75) return 'closing';
+  if (score >= 55) return 'pitching';  // Subir umbral de 50 a 55
+  if (score >= 30) return 'qualifying'; // Subir umbral de 20 a 30
+  return 'discovery';
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 15 -->
+  <div class="card medio" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge medio">Medio</span>
+      <div>
+        <div class="card-title">#15 — updateRollingConversationSummary puede correrse en paralelo</div>
+        <div class="card-meta">steve-wa-chat.ts:1124 · Rolling summary race condition</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>Si llegan 2 mensajes con diferencia de &lt;2s, ambos ejecutan updateRollingConversationSummary en paralelo. El segundo puede sobreescribir el resumen del primero, perdiendo mensajes.</p>
+<pre>// msg 1 → updateRollingConversationSummary() → Haiku genera resumen A
+// msg 2 → updateRollingConversationSummary() → Haiku genera resumen B
+// msg 2 llega antes → guarda resumen B (más viejo)
+// msg 1 llega después → sobreescribe con resumen A (pierde msg 2 en resumen)</pre>
+        <p class="impact">⚠ Resumen de conversación puede perder mensajes recientes. Contexto incompleto para conversaciones largas.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+        <p>Verificar si ya hay un resumen más reciente antes de guardar:</p>
+<pre>// Al final de updateRollingConversationSummary, antes de guardar:
+const { data: current } = await supabase.from('wa_prospects')
+  .select('summary_up_to_msg')
+  .eq('phone', phone)
+  .maybeSingle();
+// Solo guardar si el resumen actual cubre más mensajes
+if ((current?.summary_up_to_msg || 0) < msgCount) {
+  await supabase.from('wa_prospects').update({ conversation_summary: summary, summary_up_to_msg: msgCount })...
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 16 -->
+  <div class="card medio" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge medio">Medio</span>
+      <div>
+        <div class="card-title">#16 — disqualification no preserva resumen de conversación</div>
+        <div class="card-meta">steve-wa-chat.ts:966 · Disqualification early return</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>Cuando un prospect es disqualificado, se hace <code>return</code> antes de ejecutar updateRollingConversationSummary. Si el prospect vuelve a escribir (reactivación), no tiene historial comprimido.</p>
+<pre>if (disqualifiedReason) {
+  await supabase.from('wa_prospects').update({ stage: 'lost', ... })
+  logProspectEvent(...)
+  return;  // ← updateRollingConversationSummary nunca corre
+}
+// Fix #19 ya re-activa el stage, pero sin el resumen de la conversación previa</pre>
+        <p class="impact">⚠ Lost prospects que regresan pierden el contexto de por qué se fueron. Steve empieza de cero.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+<pre>if (disqualifiedReason) {
+  await supabase.from('wa_prospects').update({ stage: 'lost', ... })
+  logProspectEvent(...)
+  // Preservar resumen antes de salir (fire & forget)
+  updateRollingConversationSummary({ ...prospect, stage: 'lost' }, prospect.phone)
+    .catch(err => console.error('[disq-summary]', err));
+  return;
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 17 -->
+  <div class="card medio" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge medio">Medio</span>
+      <div>
+        <div class="card-title">#17 — pain_points sin peso diferenciado en scoring</div>
+        <div class="card-meta">steve-wa-brain.ts:1949 · calculateLeadScore() TIMELINE</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>1 pain_point suma +5 TIMELINE igual que 10 pain_points. Además, actively_looking Y pain_points ambos pueden sumar TIMELINE, pero sin interacción entre sí.</p>
+<pre>if (prospect.actively_looking === true) breakdown.timeline += 10;
+if (prospect.pain_points && prospect.pain_points.length > 0) {
+  breakdown.timeline += Math.min(prospect.pain_points.length * 5, 10);
+  // ← 1 pain_point = +5, 2+ pain_points = +10 (igual que actively_looking)
+}</pre>
+        <p class="impact">⚠ Prospect con 1 vago dolor ("no sé si me sirve") y sin urgencia puede quedar con mismo score que uno con 3 dolores claros + timeline definido.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+<pre>if (prospect.pain_points?.length >= 3) {
+  breakdown.timeline += 10;  // 3+ dolores = urgencia alta
+} else if (prospect.pain_points?.length === 2) {
+  breakdown.timeline += 7;
+} else if (prospect.pain_points?.length === 1) {
+  breakdown.timeline += 4;
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 18 -->
+  <div class="card medio" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge medio">Medio</span>
+      <div>
+        <div class="card-title">#18 — SPLIT messages pueden llegar en orden incorrecto</div>
+        <div class="card-meta">steve-wa-chat.ts:833 · enqueueWAAction('split_message')</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>Si Steve envía un [SPLIT] y casi inmediatamente llega otro mensaje del prospecto también con SPLIT, el worker puede procesar la cola fuera de orden. El prospecto ve los mensajes desordenados.</p>
+<pre>enqueueWAAction(phone, 'split_message', {
+  body: secondReply,
+  profileName: profileName || phone,
+}, 2);  // ← 2s delay, pero sin garantía de orden si hay 2 splits</pre>
+        <p class="impact">⚠ Conversación confusa — el prospecto ve "B, A" en vez de "A, B".</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+        <p>Incluir message_order en el payload para que el worker lo respete:</p>
+<pre>enqueueWAAction(phone, 'split_message', {
+  body: secondReply,
+  message_order: (prospect.message_count || 0) + 0.5,  // Ordenar después del primer split
+}, 2);</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 19 -->
+  <div class="card medio" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge medio">Medio</span>
+      <div>
+        <div class="card-title">#19 — consolidatePainPoints fallback no reintenta</div>
+        <div class="card-meta">steve-wa-brain.ts:1740 · consolidatePainPoints() catch</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>Si Haiku falla, retorna los pain_points sin consolidar. Duplicados semánticos quedan en la DB y pueden inflar el timeline score.</p>
+<pre>} catch (err) {
+  console.error('[consolidatePainPoints] Error:', err);
+  return deduped;  // ← retorna sin consolidar si Haiku falla
+  // Duplicados semánticos como ["no vendo", "sin ventas", "pocas ventas"] quedan</pre>
+        <p class="impact">⚠ Scoring de TIMELINE puede inflarse con pain_points duplicados semánticamente.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+        <p>Si Haiku falla, usar al menos dedup simple por prefijo (palabras raíz):</p>
+<pre>} catch (err) {
+  console.error('[consolidatePainPoints] Error:', err);
+  // Fallback: dedup por primeras 15 chars (atrapa duplicados obvios)
+  const seenPrefix = new Set&lt;string&gt;();
+  return deduped.filter(p => {
+    const prefix = p.toLowerCase().trim().slice(0, 15);
+    if (seenPrefix.has(prefix)) return false;
+    seenPrefix.add(prefix);
+    return true;
+  });
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 20 -->
+  <div class="card medio" onclick="toggle(this)">
+    <div class="card-header">
+      <span class="badge medio">Medio</span>
+      <div>
+        <div class="card-title">#20 — Respuesta truncada en el lugar equivocado si hay [SPLIT]</div>
+        <div class="card-meta">steve-wa-chat.ts:840 · Truncation after SPLIT</div>
+      </div>
+      <span class="chevron">▶</span>
+    </div>
+    <div class="card-body">
+      <div class="problem">
+        <h4>Problema</h4>
+        <p>Si Claude genera un [SPLIT] y la segunda parte es larga, el truncado de 1200 chars corta el mensaje por la mitad. Pero el truncado ocurre ANTES de separar el split, potencialmente cortando en medio de la primera parte.</p>
+<pre>// ACTUAL:
+let finalReply = replyText.slice(0, 1200);  // ← trunca TODO el texto
+const parts = finalReply.split('|||SPLIT|||');
+// Si el split estaba en posición 900, partes[0] OK pero partes[1] truncada o desaparecida</pre>
+        <p class="impact">⚠ Segunda parte del split puede llegar truncada o vacía al prospecto.</p>
+      </div>
+      <div class="fix">
+        <h4>Fix sugerido</h4>
+        <p>Separar el split PRIMERO, luego truncar cada parte individualmente:</p>
+<pre>const parts = replyText.split('|||SPLIT|||');
+const [firstReply, secondReply] = [
+  (parts[0] || '').trim().slice(0, 800),   // Primera parte: 800 chars
+  (parts[1] || '').trim().slice(0, 600),   // Segunda parte: 600 chars
+];
+// Total: máx 1400 chars, distribuido</pre>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function toggle(card) {
+  card.classList.toggle('open');
+}
+function toggleAll() {
+  const cards = document.querySelectorAll('.card');
+  const anyOpen = [...cards].some(c => c.classList.contains('open'));
+  cards.forEach(c => anyOpen ? c.classList.remove('open') : c.classList.add('open'));
+  document.querySelector('.toggle-all').textContent = anyOpen ? '▶ Expandir todo' : '▼ Colapsar todo';
+}
+</script>
+</body>
+</html>

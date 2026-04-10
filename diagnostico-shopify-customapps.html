@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagnóstico Shopify · Custom Apps Only — Matías W13</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  pre { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 13px; line-height: 1.5; }
+  .code-bad { background: #2d1b1b; color: #ffb3b3; border-left: 4px solid #dc2626; }
+  .code-good { background: #1b2d1b; color: #b3ffb3; border-left: 4px solid #16a34a; }
+  .code-neutral { background: #1e293b; color: #e2e8f0; border-left: 4px solid #64748b; }
+  .anchor { scroll-margin-top: 80px; }
+  .grad-resolved { background: linear-gradient(135deg, #14532d, #052e16); }
+  .grad-blocker { background: linear-gradient(135deg, #7f1d1d, #450a0a); }
+  .grad-critical { background: linear-gradient(135deg, #dc2626, #991b1b); }
+  .grad-zombie { background: linear-gradient(135deg, #581c87, #2e1065); }
+  .grad-flow { background: linear-gradient(135deg, #1e3a8a, #1e1b4b); }
+  .grad-plan { background: linear-gradient(135deg, #0f172a, #020617); }
+  .strike-out { position: relative; }
+  .strike-out::after {
+    content: ''; position: absolute; left: -4px; right: -4px; top: 50%;
+    height: 3px; background: #16a34a; transform: rotate(-2deg);
+  }
+  .glow-green { box-shadow: 0 0 30px rgba(34, 197, 94, 0.3); }
+  .glow-red { box-shadow: 0 0 30px rgba(239, 68, 68, 0.3); }
+  details summary { cursor: pointer; }
+  details summary::-webkit-details-marker { display: none; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<!-- HEADER -->
+<header class="bg-slate-900 text-white sticky top-0 z-50 shadow-xl">
+  <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-bold">Diagnóstico Shopify · Custom Apps Only</h1>
+      <p class="text-xs text-slate-400">Matías W13 · Re-diagnóstico tras decisión arquitectural · 7 abril 2026</p>
+    </div>
+    <nav class="hidden md:flex gap-4 text-sm">
+      <a href="#cambio" class="hover:text-blue-400">El cambio</a>
+      <a href="#resueltos" class="hover:text-green-400">Resueltos</a>
+      <a href="#nuevos" class="hover:text-red-400">Nuevos blockers</a>
+      <a href="#siguen" class="hover:text-orange-400">Siguen</a>
+      <a href="#zombie" class="hover:text-purple-400">Código zombie</a>
+      <a href="#plan" class="hover:text-blue-400">Plan</a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <div class="grad-flow text-white rounded-2xl p-8 shadow-2xl">
+    <p class="text-blue-300 font-mono text-sm uppercase tracking-wider mb-2">Decisión arquitectural</p>
+    <h2 class="text-4xl font-bold mb-4">Vamos solo con Custom Apps. Esto cambia todo.</h2>
+    <p class="text-slate-200 text-lg leading-relaxed max-w-3xl mb-6">
+      JM decidió: <strong class="text-white">por ahora no publicamos en Shopify App Store</strong>. Cada cliente
+      crea su propia Custom App en Shopify Partners y nos pega las credenciales en el wizard.
+      Esta decisión <strong class="text-green-300">elimina 3 problemas</strong>, pero
+      <strong class="text-red-300">crea 4 nuevos</strong> y vuelve obsoletas ~1.200 líneas de código.
+    </p>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-8">
+      <div class="bg-green-950/60 border border-green-500/30 rounded-lg p-4">
+        <div class="text-3xl font-bold text-green-400">3</div>
+        <div class="text-xs text-slate-300 mt-1">Issues resueltos</div>
+      </div>
+      <div class="bg-red-950/60 border border-red-500/30 rounded-lg p-4">
+        <div class="text-3xl font-bold text-red-400">4</div>
+        <div class="text-xs text-slate-300 mt-1">Nuevos blockers</div>
+      </div>
+      <div class="bg-orange-950/60 border border-orange-500/30 rounded-lg p-4">
+        <div class="text-3xl font-bold text-orange-400">12</div>
+        <div class="text-xs text-slate-300 mt-1">Siguen iguales</div>
+      </div>
+      <div class="bg-purple-950/60 border border-purple-500/30 rounded-lg p-4">
+        <div class="text-3xl font-bold text-purple-400">~1.200</div>
+        <div class="text-xs text-slate-300 mt-1">Líneas a borrar</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EL CAMBIO -->
+<section id="cambio" class="anchor max-w-6xl mx-auto px-6 py-8">
+  <h2 class="text-3xl font-bold mb-6 border-b-4 border-slate-900 pb-2 inline-block">¿Qué significa "Custom Apps Only"?</h2>
+
+  <div class="grid md:grid-cols-2 gap-6 mb-8">
+    <div class="bg-white border-2 border-red-200 rounded-xl p-6">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded">ANTES (App Store público)</span>
+      </div>
+      <h3 class="text-lg font-bold mb-3">Las credenciales eran globales</h3>
+      <ul class="text-sm text-slate-700 space-y-2">
+        <li>• <strong>Una sola app</strong> de Steve Ads instalada por todos los clientes</li>
+        <li>• <strong>3 env vars globales</strong> en Cloud Run (CLIENT_ID, SECRET, WEBHOOK_SECRET)</li>
+        <li>• <strong>Un solo webhook secret</strong> firmaba todos los webhooks</li>
+        <li>• <strong>Aprobación de Shopify</strong> obligatoria (2-4 semanas)</li>
+        <li>• Cliente da 1 clic → instalado</li>
+      </ul>
+    </div>
+
+    <div class="bg-white border-2 border-green-200 rounded-xl p-6">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded">AHORA (Custom Apps)</span>
+      </div>
+      <h3 class="text-lg font-bold mb-3">Cada cliente tiene SU propia app</h3>
+      <ul class="text-sm text-slate-700 space-y-2">
+        <li>• <strong>Una app por cliente</strong> creada en su Shopify Partners</li>
+        <li>• <strong>Credenciales por conexión</strong> guardadas encriptadas en DB</li>
+        <li>• <strong>Cada cliente tiene su webhook secret</strong> distinto</li>
+        <li>• <strong>Sin aprobación de Shopify</strong>, podemos vender mañana</li>
+        <li>• Cliente sigue 6 pasos en el wizard</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="bg-amber-50 border-l-4 border-amber-500 p-5 rounded">
+    <p class="text-slate-800">
+      <strong>El insight clave:</strong> el código actual <strong>fue diseñado para el modelo App Store
+      público</strong>. Hay piezas que "funcionaban por casualidad" porque los clientes de prueba usaban
+      las mismas credenciales que JM puso en su Shopify Partners. Cuando lleguen 5 clientes reales con
+      5 Custom Apps distintas, varias cosas se rompen.
+    </p>
+  </div>
+</section>
+
+<!-- ISSUES RESUELTOS -->
+<section id="resueltos" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <div class="grad-resolved text-white rounded-2xl p-8 shadow-2xl mb-8 glow-green">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-green-700 text-white text-xs font-bold px-3 py-1 rounded-full">RESUELTOS</span>
+      <span class="text-green-200 text-sm">3 problemas que desaparecen al elegir Custom Apps</span>
+    </div>
+    <h2 class="text-4xl font-bold mb-2">Lo que YA NO es problema</h2>
+    <p class="text-green-100">Buenas noticias antes de las malas.</p>
+  </div>
+
+  <!-- R1 -->
+  <div class="bg-white border-2 border-green-300 rounded-xl p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold strike-out inline-block">Blocker #0 — Faltan 3 env vars</h3>
+      <span class="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full">RESUELTO</span>
+    </div>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Por qué ya no importa?</h4>
+    <p class="text-slate-700 mb-4">
+      Las 3 variables (<code class="bg-slate-100 px-1 rounded">SHOPIFY_CLIENT_ID</code>,
+      <code class="bg-slate-100 px-1 rounded">SHOPIFY_CLIENT_SECRET</code>,
+      <code class="bg-slate-100 px-1 rounded">SHOPIFY_WEBHOOK_SECRET</code>) eran necesarias porque
+      había <strong>una sola app pública</strong> firmando todo. En el modelo Custom App, cada cliente
+      genera SUS propias credenciales en su Shopify Partners y las pega en el wizard. Las credenciales
+      viven encriptadas en <code class="bg-slate-100 px-1 rounded">platform_connections</code>.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Antes te preocupaba conseguir <strong>la llave maestra</strong> del edificio. Ahora cada
+        oficina tiene su propia chapa y cada inquilino trae su propia llave. La llave maestra
+        ya no existe ni hace falta.
+      </p>
+    </div>
+
+    <p class="text-sm text-green-700 bg-green-50 border border-green-200 rounded p-3">
+      <strong>Acción:</strong> No hacer nada. Las env vars pueden quedar vacías para siempre.
+      Eventualmente las podemos eliminar de la lista de "vars pendientes" en CLAUDE.md.
+    </p>
+  </div>
+
+  <!-- R2 -->
+  <div class="bg-white border-2 border-green-300 rounded-xl p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold strike-out inline-block">Esperar aprobación de Shopify</h3>
+      <span class="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full">RESUELTO</span>
+    </div>
+    <p class="text-slate-700 mb-4">
+      Las apps públicas requieren <strong>review de Shopify</strong> que toma 2-4 semanas y exige
+      cumplir ~80 requisitos (políticas de privacidad, GDPR, performance, screenshots, video demo, etc.).
+      Las Custom Apps <strong>no requieren ninguna aprobación</strong>. Podemos cobrar plata mañana.
+    </p>
+    <p class="text-sm text-green-700 bg-green-50 border border-green-200 rounded p-3">
+      <strong>Acción:</strong> Olvidarse del proceso de Shopify Partners review.
+    </p>
+  </div>
+
+  <!-- R3 -->
+  <div class="bg-white border-2 border-green-300 rounded-xl p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold strike-out inline-block">S5 · Fallback peligroso a SHOPIFY_CLIENT_SECRET</h3>
+      <span class="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full">RESUELTO (a la fuerza)</span>
+    </div>
+    <p class="text-slate-700 mb-4">
+      El fallback a <code class="bg-slate-100 px-1 rounded">SHOPIFY_CLIENT_SECRET</code> en el handler
+      de webhooks ya no aplica porque <strong>esa variable no existe</strong>. Pero ojo: este "fix"
+      es ilusorio, porque ahora <strong>NINGÚN secret global sirve</strong> y aparece un nuevo blocker
+      (ver N1).
+    </p>
+  </div>
+</section>
+
+<!-- NUEVOS BLOCKERS -->
+<section id="nuevos" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <div class="grad-blocker text-white rounded-2xl p-8 shadow-2xl mb-8 glow-red">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">NUEVOS BLOCKERS</span>
+      <span class="text-red-200 text-sm">4 problemas que aparecen al elegir Custom Apps</span>
+    </div>
+    <h2 class="text-4xl font-bold mb-2">Lo NUEVO que ahora es crítico</h2>
+    <p class="text-red-100">No está roto todavía porque no tienes 5 clientes con Custom Apps distintas. Pero el día que llegue el segundo cliente, esto explota.</p>
+  </div>
+
+  <!-- N1 -->
+  <div class="bg-white border-2 border-red-400 rounded-xl p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">N1 · Los webhooks NO se pueden validar con un secret global</h3>
+      <span class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">BLOCKER #1</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">supabase/functions/shopify-fulfillment-webhooks/index.ts:288-306<br>supabase/functions/shopify-gdpr-webhooks/index.ts:79-83</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      Los handlers de webhook leen un único <code class="bg-slate-100 px-1 rounded">SHOPIFY_WEBHOOK_SECRET</code>
+      global para verificar el HMAC. Pero en Custom Apps, <strong>cada app del cliente firma con SU
+      propio secret</strong>. Si el Cliente A manda un webhook firmado con su secret, y nosotros lo
+      verificamos con el secret del Cliente B, falla siempre.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Eres notario. Recibes documentos firmados de varios clientes. Cada cliente firma con
+        <strong>su propia rúbrica</strong>. Tú tienes en tu cajón <strong>una sola muestra</strong>
+        de firma que comparas con todos. Como ninguna firma coincide con tu única muestra,
+        rechazas TODOS los documentos.
+      </p>
+    </div>
+
+    <h4 class="font-bold text-slate-900 mb-2">Ejemplo concreto</h4>
+    <p class="text-slate-700 mb-4">
+      Cliente A configura su Custom App con secret <code class="bg-slate-100 px-1 rounded">aaa-secret</code>.
+      Cliente B con <code class="bg-slate-100 px-1 rounded">bbb-secret</code>. Llega un webhook de
+      "orders/fulfilled" del Cliente A. El handler intenta verificarlo con
+      <code class="bg-slate-100 px-1 rounded">SHOPIFY_WEBHOOK_SECRET</code> (vacío o random).
+      <strong>El HMAC falla. El webhook se rechaza con 401.</strong> El pedido nunca se procesa.
+      Felipe (W2) sigue mostrando "stock disponible" para un producto que ya se vendió.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">El código actual (malo)</h4>
+    <pre class="code-bad p-4 rounded-lg overflow-x-auto mb-3">// Lee UN secret global, no por cliente
+const shopifySecret = Deno.env.get('SHOPIFY_WEBHOOK_SECRET')
+                   || Deno.env.get('SHOPIFY_CLIENT_SECRET');
+
+if (!verifyWebhookHmac(rawBody, hmacHeader, shopifySecret)) {
+  return new Response('Unauthorized', { status: 401 });
+}</pre>
+
+    <h4 class="font-bold text-slate-900 mb-2">El fix (bueno)</h4>
+    <pre class="code-good p-4 rounded-lg overflow-x-auto">// Buscar el secret específico del cliente usando el shop_domain del header
+const shopDomain = req.headers.get('x-shopify-shop-domain') || '';
+
+const { data: connection } = await supabaseAdmin
+  .from('platform_connections')
+  .select('shopify_client_secret_encrypted')
+  .eq('platform', 'shopify')
+  .eq('shop_domain', shopDomain)
+  .eq('is_active', true)
+  .maybeSingle();
+
+if (!connection) {
+  return new Response('Shop not registered', { status: 404 });
+}
+
+// Desencriptar el secret del cliente
+const { data: clientSecret } = await supabaseAdmin
+  .rpc('decrypt_platform_token', { encrypted: connection.shopify_client_secret_encrypted });
+
+if (!verifyWebhookHmac(rawBody, hmacHeader, clientSecret)) {
+  return new Response('Unauthorized', { status: 401 });
+}</pre>
+
+    <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-3 mt-3">
+      <strong>OJO:</strong> En Custom Apps, el "webhook secret" suele ser el mismo
+      <code class="bg-amber-100 px-1 rounded">API secret key</code> de la app. Eso ya lo tenemos
+      guardado como <code class="bg-amber-100 px-1 rounded">shopify_client_secret_encrypted</code>.
+      Hay que verificarlo con la primera Custom App real.
+    </p>
+  </div>
+
+  <!-- N2 -->
+  <div class="bg-white border-2 border-red-400 rounded-xl p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">N2 · No hay registro automático de webhooks en Custom Apps</h3>
+      <span class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">BLOCKER #2</span>
+    </div>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      El registro automático de los 7 webhooks (orders/create, fulfilled, GDPR, etc.) <strong>solo se
+      ejecuta dentro del flujo OAuth público</strong>, en
+      <code class="bg-slate-100 px-1 rounded">shopify-oauth-callback.ts</code>. En el wizard de
+      Custom App, <strong>nadie llama a esa función</strong>. Resultado: después del wizard, los
+      webhooks NO existen y los handlers no reciben absolutamente nada.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Contratas un servicio de mensajería. Te firman el contrato pero <strong>nunca pasas
+        tu dirección por WhatsApp</strong>. Los mensajeros existen, los paquetes existen, pero
+        no saben dónde dejarlos. Tú esperas paquetes que nunca llegan y no entiendes por qué.
+      </p>
+    </div>
+
+    <h4 class="font-bold text-slate-900 mb-2">Ejemplo concreto</h4>
+    <p class="text-slate-700 mb-4">
+      Cliente A termina el wizard. Su tienda Shopify queda conectada a Steve Ads.
+      Hace una venta. Shopify <strong>NO envía un webhook a Steve Ads</strong> porque nadie le dijo
+      a Shopify "manda eventos a esta URL". El cliente ve su venta en Shopify pero NO en Steve Ads.
+      Felipe (W2) reporta revenue desactualizado. Ignacio (W17) dice "no tengo data".
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">El fix</h4>
+    <p class="text-slate-700 mb-3">
+      Después de que el wizard guarda el <code class="bg-slate-100 px-1 rounded">access_token</code>,
+      llamar inmediatamente a la Admin API del cliente para registrar los 7 webhooks contra las
+      URLs de nuestras Edge Functions:
+    </p>
+    <pre class="code-good p-4 rounded-lg overflow-x-auto">// Después del wizard, en store-shopify-token.ts:
+async function registerWebhooks(shopDomain, accessToken) {
+  const topics = [
+    'orders/create', 'orders/fulfilled', 'orders/cancelled',
+    'app/uninstalled',
+    'customers/data_request', 'customers/redact', 'shop/redact',
+  ];
+  for (const topic of topics) {
+    await fetch(`https://${shopDomain}/admin/api/2024-01/webhooks.json`, {
+      method: 'POST',
+      headers: {
+        'X-Shopify-Access-Token': accessToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        webhook: {
+          topic,
+          address: `https://zpswjccsxjtnhetkkqde.supabase.co/functions/v1/shopify-${topic.includes('redact') || topic.includes('data_request') ? 'gdpr' : 'fulfillment'}-webhooks`,
+          format: 'json',
+        },
+      }),
+    });
+  }
+}</pre>
+  </div>
+
+  <!-- N3 -->
+  <div class="bg-white border-2 border-red-400 rounded-xl p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">N3 · El wizard hace polling sin timeout</h3>
+      <span class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">BLOCKER #3</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">src/components/client-portal/ShopifyCustomAppWizard.tsx:71-94</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      El paso 5 del wizard hace polling cada 3 segundos esperando que aparezca el
+      <code class="bg-slate-100 px-1 rounded">access_token_encrypted</code>. <strong>Si nunca aparece
+      (porque el cliente abandonó, dio mal el secret, o el OAuth falló), el polling sigue para siempre</strong>
+      hasta que el usuario cierre el browser.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Vas al Registro Civil a buscar tu carnet. Te dicen "espera ahí". <strong>Nunca te dicen
+        cuánto</strong>. Pasan 5, 10, 30 minutos. No hay reloj, no hay aviso. Tienes que decidir
+        tú cuándo darte por vencido. La mitad de la gente se va frustrada pensando "no me lo van a dar".
+      </p>
+    </div>
+
+    <h4 class="font-bold text-slate-900 mb-2">Ejemplo concreto</h4>
+    <p class="text-slate-700 mb-4">
+      Cliente pega bien sus credenciales (paso 4). Hace clic en "Instalar" (paso 5). Pero su Custom
+      App tiene los <strong>scopes mal configurados</strong>. Shopify rechaza el OAuth con error.
+      El callback nunca guarda el token. El wizard sigue mostrando "Esperando instalación..."
+      durante 20 minutos. El cliente abandona. Tú no te enteras de que falló.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">El fix</h4>
+    <pre class="code-good p-4 rounded-lg overflow-x-auto">useEffect(() => {
+  if (step !== 5 || !open) return;
+
+  const startTime = Date.now();
+  const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos máximo
+
+  pollRef.current = setInterval(async () => {
+    // ... fetch ...
+
+    // Timeout: dar feedback útil
+    if (Date.now() - startTime > TIMEOUT_MS) {
+      clearInterval(pollRef.current!);
+      setError('La instalación tardó demasiado. Verifica que los scopes estén bien configurados o reinicia el wizard.');
+      setPolling(false);
+    }
+  }, 3000);
+}, [step, open]);</pre>
+  </div>
+
+  <!-- N4 -->
+  <div class="bg-white border-2 border-red-400 rounded-xl p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">N4 · No hay validación de credenciales antes de guardar</h3>
+      <span class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">BLOCKER #4</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">cloud-run-api/src/routes/shopify/store-shopify-credentials.ts:55-104</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      El endpoint <code class="bg-slate-100 px-1 rounded">store-shopify-credentials</code> guarda
+      lo que le mandes <strong>sin verificar que las credenciales sean válidas</strong>. Si el cliente
+      pega un Client ID o Secret incorrecto (typo, copy-paste mal), nadie se da cuenta hasta el paso 5
+      del wizard cuando OAuth falla silenciosamente.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Vas al banco a abrir cuenta. Te piden tu RUT. Pones <strong>cualquier número</strong>.
+        El cajero te dice "perfecto, cuenta abierta". 3 días después, cuando intentas hacer la
+        primera transacción, descubres que el RUT no era válido y la cuenta nunca existió.
+      </p>
+    </div>
+
+    <h4 class="font-bold text-slate-900 mb-2">El fix</h4>
+    <p class="text-slate-700 mb-3">
+      Antes de guardar las credenciales, hacer una llamada de prueba a la Admin API del cliente
+      con esas credenciales. Si responde 401/403, devolver error inmediatamente:
+    </p>
+    <pre class="code-good p-4 rounded-lg overflow-x-auto">// Validar credenciales contra Shopify antes de guardar
+const testResponse = await fetch(
+  `https://${normalizedDomain}/admin/oauth/access_scopes.json`,
+  {
+    headers: {
+      'X-Shopify-Access-Token': 'test', // No funcionará pero validará el dominio
+    },
+  }
+);
+
+if (testResponse.status === 404) {
+  return c.json({ error: 'El dominio Shopify no existe o está mal escrito' }, 400);
+}
+
+// (validación del API secret se hace en el siguiente paso del OAuth)</pre>
+  </div>
+</section>
+
+<!-- ISSUES QUE SIGUEN -->
+<section id="siguen" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <div class="grad-critical text-white rounded-2xl p-8 shadow-2xl mb-8">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-red-700 text-white text-xs font-bold px-3 py-1 rounded-full">SIGUEN IGUAL</span>
+      <span class="text-red-200 text-sm">12 issues que no cambian con la decisión arquitectural</span>
+    </div>
+    <h2 class="text-4xl font-bold mb-2">Lo que sigue roto sin importar el camino</h2>
+    <p class="text-red-100">Estos issues son agnósticos del modelo (App Store o Custom App).</p>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-4">
+
+    <div class="bg-white border-l-4 border-red-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-bold">S1 · data-verify sin auth</h3>
+        <span class="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">CRÍTICO</span>
+      </div>
+      <p class="text-sm text-slate-600">Endpoint público sin <code>X-Cron-Secret</code>. Cualquiera lo invoca.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-red-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-bold">S2 · create-discount sin ownership</h3>
+        <span class="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">CRÍTICO</span>
+      </div>
+      <p class="text-sm text-slate-600">Cualquier user logueado puede crear cupones en tiendas ajenas. <strong>Más grave en Custom Apps</strong> porque cada cliente puso su propia plata en su Shopify.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-red-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-bold">S3 · fetch-collections sin ownership</h3>
+        <span class="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">CRÍTICO</span>
+      </div>
+      <p class="text-sm text-slate-600">Mismo bug en otro endpoint. Leak de datos cross-cliente.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-red-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-bold">S4 · JWT sin verificar firma</h3>
+        <span class="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">CRÍTICO</span>
+      </div>
+      <p class="text-sm text-slate-600">3 archivos hacen <code>atob(token)</code> sin validar HMAC del JWT.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-red-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-bold">A4 · Funnel inventa datos</h3>
+        <span class="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">CRÍTICO</span>
+      </div>
+      <p class="text-sm text-slate-600">Multiplica carritos × 5 cuando no tiene sesiones reales. Le miente al cliente.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-red-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-bold">S6 · enqueueBackgroundJob es console.log</h3>
+        <span class="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">CRÍTICO</span>
+      </div>
+      <p class="text-sm text-slate-600">No hay cola real. Los webhooks pesados se procesan inline o se pierden.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-orange-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-bold">A1 · Duplicación Backend ↔ Edge</h3>
+        <span class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">ALTO</span>
+      </div>
+      <p class="text-sm text-slate-600">Mismo problema. Borrar las edge functions de fetch/sync.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-orange-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-bold">A3 · Double-fetch en orders</h3>
+        <span class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">ALTO</span>
+      </div>
+      <p class="text-sm text-slate-600">Quema rate limit en clientes nuevos sin pedidos.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-orange-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-bold">A5 · Customers cap silencioso</h3>
+        <span class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">ALTO</span>
+      </div>
+      <p class="text-sm text-slate-600">slice(0, 100) sin paginación. Clientes pierden 401+ contactos.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-orange-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-bold">A6 · API_URL hardcoded</h3>
+        <span class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">ALTO</span>
+      </div>
+      <p class="text-sm text-slate-600"><strong>Más crítico ahora</strong>: el wizard es EL flujo principal y depende de esto.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-yellow-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-bold">M4 · No hay cron de sync</h3>
+        <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">MEDIO</span>
+      </div>
+      <p class="text-sm text-slate-600">Sin webhooks funcionando (N1+N2), este cron es <strong>la única fuente de actualización</strong>.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-yellow-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-bold">M5 · Sin token health check</h3>
+        <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">MEDIO</span>
+      </div>
+      <p class="text-sm text-slate-600">Token de Custom App expira, nadie avisa. Cliente cree que Steve Ads está roto.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- CÓDIGO ZOMBIE -->
+<section id="zombie" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <div class="grad-zombie text-white rounded-2xl p-8 shadow-2xl mb-8">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-purple-700 text-white text-xs font-bold px-3 py-1 rounded-full">CÓDIGO ZOMBIE</span>
+      <span class="text-purple-200 text-sm">~1.200 líneas que ya no se usan pero siguen ahí</span>
+    </div>
+    <h2 class="text-4xl font-bold mb-2">Lo que ahora es código MUERTO</h2>
+    <p class="text-purple-100">Borrar esto reduce ~10% del módulo Shopify y elimina superficie de ataque.</p>
+  </div>
+
+  <div class="bg-white border-2 border-purple-300 rounded-xl p-6 mb-6">
+    <h3 class="text-xl font-bold mb-4">Imagina que...</h3>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-6">
+      <p class="text-slate-800">
+        Tienes una bodega con un piso entero dedicado a "envíos internacionales". Decides que ya
+        no haces envíos internacionales. Pero el piso sigue ahí, con cajas a medio embalar, etiquetas
+        viejas, máquinas de franqueo prendidas. Pagas luz, ocupa espacio y un día <strong>alguien
+        nuevo va a entrar y empezar a usarlo</strong> creyendo que está activo.
+      </p>
+    </div>
+
+    <h3 class="text-xl font-bold mb-4">Archivos a borrar (parcial o completo)</h3>
+
+    <div class="space-y-3">
+      <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <div class="flex items-center justify-between mb-2">
+          <code class="font-mono text-sm font-bold text-purple-900">supabase/functions/shopify-install/</code>
+          <span class="text-xs bg-purple-200 text-purple-900 px-2 py-0.5 rounded">~80 líneas</span>
+        </div>
+        <p class="text-sm text-slate-700">Edge function que armaba el link público de instalación. <strong>BORRAR.</strong> Custom Apps no usan link público.</p>
+      </div>
+
+      <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <div class="flex items-center justify-between mb-2">
+          <code class="font-mono text-sm font-bold text-purple-900">cloud-run-api/src/routes/shopify/shopify-oauth-callback.ts</code>
+          <span class="text-xs bg-purple-200 text-purple-900 px-2 py-0.5 rounded">~280 líneas</span>
+        </div>
+        <p class="text-sm text-slate-700">
+          <strong>NO BORRAR completamente</strong> — Custom Apps SÍ usan OAuth para obtener el access_token,
+          pero usando las credenciales del cliente (no las globales). <strong>Refactor:</strong>
+          eliminar referencias a env vars globales y leer las del <code>platform_connections</code>.
+        </p>
+      </div>
+
+      <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <div class="flex items-center justify-between mb-2">
+          <code class="font-mono text-sm font-bold text-purple-900">src/pages/ShopifyApp.tsx</code>
+          <span class="text-xs bg-purple-200 text-purple-900 px-2 py-0.5 rounded">~466 líneas</span>
+        </div>
+        <p class="text-sm text-slate-700">Landing page pública para "Install from App Store". <strong>BORRAR.</strong> Sin App Store no hay landing.</p>
+      </div>
+
+      <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <div class="flex items-center justify-between mb-2">
+          <code class="font-mono text-sm font-bold text-purple-900">src/pages/ConnectShopify.tsx</code>
+          <span class="text-xs bg-purple-200 text-purple-900 px-2 py-0.5 rounded">~185 líneas</span>
+        </div>
+        <p class="text-sm text-slate-700">Página intermedia que redirigía al install endpoint público. <strong>BORRAR o reemplazar</strong> por un re-render del wizard.</p>
+      </div>
+
+      <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <div class="flex items-center justify-between mb-2">
+          <code class="font-mono text-sm font-bold text-purple-900">src/pages/OAuthShopifyCallback.tsx</code>
+          <span class="text-xs bg-purple-200 text-purple-900 px-2 py-0.5 rounded">~242 líneas (parcial)</span>
+        </div>
+        <p class="text-sm text-slate-700">El "legacy flow" de las líneas 97-152 ya no aplica. <strong>Borrar el legacy flow</strong>, mantener solo el query-string flow para Custom Apps.</p>
+      </div>
+
+      <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <div class="flex items-center justify-between mb-2">
+          <code class="font-mono text-sm font-bold text-purple-900">supabase/functions/shopify-gdpr-webhooks/</code>
+          <span class="text-xs bg-purple-200 text-purple-900 px-2 py-0.5 rounded">~358 líneas</span>
+        </div>
+        <p class="text-sm text-slate-700">
+          <strong>Caso especial.</strong> Shopify NO obliga GDPR a Custom Apps. Estos webhooks
+          <strong>nunca van a recibir nada</strong>. Decisión: o lo dejas como código defensivo
+          (por si algún día publicamos), o lo borras (~358 líneas). Yo recomiendo: <strong>borrarlo</strong>.
+          Si algún día publicamos, lo recuperamos del git history.
+        </p>
+      </div>
+    </div>
+
+    <div class="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
+      <p class="text-sm text-green-900">
+        <strong>Total a borrar/refactorizar:</strong> ~1.200 líneas. Reduce 10% del módulo, elimina 6
+        archivos del codebase, baja la superficie de ataque y simplifica el mental model para cualquier
+        agente que toque Shopify en el futuro.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- FLUJO IDEAL -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <div class="grad-flow text-white rounded-2xl p-8 shadow-2xl mb-8">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-blue-700 text-white text-xs font-bold px-3 py-1 rounded-full">FLUJO IDEAL</span>
+    </div>
+    <h2 class="text-4xl font-bold mb-2">Cómo debería verse el Custom App ideal</h2>
+    <p class="text-blue-100">Lo que el cliente debería experimentar después de los fixes.</p>
+  </div>
+
+  <div class="bg-white border-2 border-blue-200 rounded-xl p-8">
+    <div class="space-y-6">
+
+      <div class="flex gap-4">
+        <div class="shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center">1</div>
+        <div>
+          <h4 class="font-bold mb-1">Cliente entra a Steve Ads → pestaña Shopify → "Conectar"</h4>
+          <p class="text-sm text-slate-600">Aparece el wizard de 6 pasos. Sin links rotos, sin landing pública.</p>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center">2</div>
+        <div>
+          <h4 class="font-bold mb-1">Wizard le explica cómo crear la Custom App en Shopify Partners</h4>
+          <p class="text-sm text-slate-600">Con screenshots, los scopes prearmados (botón "copiar"), y un link directo a Partners.</p>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center">3</div>
+        <div>
+          <h4 class="font-bold mb-1">Cliente pega Client ID + Secret + dominio</h4>
+          <p class="text-sm text-slate-600">El backend valida que el dominio existe (fix N4) antes de guardar.</p>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center">4</div>
+        <div>
+          <h4 class="font-bold mb-1">Click en "Instalar" → OAuth flow con SUS credenciales</h4>
+          <p class="text-sm text-slate-600">El callback intercambia código por token. Polling con timeout de 5 min (fix N3).</p>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center">5</div>
+        <div>
+          <h4 class="font-bold mb-1">Auto-registro de webhooks usando SU access_token (fix N2)</h4>
+          <p class="text-sm text-slate-600">7 webhooks registrados contra nuestras Edge Functions. Una sola llamada por topic.</p>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center">6</div>
+        <div>
+          <h4 class="font-bold mb-1">Webhooks llegan, el handler busca el secret POR cliente (fix N1)</h4>
+          <p class="text-sm text-slate-600">HMAC validado contra <code>shopify_client_secret_encrypted</code> de la conexión específica.</p>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center">7</div>
+        <div>
+          <h4 class="font-bold mb-1">Cron de sync cada 15 min como respaldo (fix M4)</h4>
+          <p class="text-sm text-slate-600">Si por alguna razón un webhook se pierde, el cron lo recupera en máximo 15 min.</p>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center">8</div>
+        <div>
+          <h4 class="font-bold mb-1">Token health check diario (fix M5)</h4>
+          <p class="text-sm text-slate-600">Si el token expira, JM recibe WhatsApp con "Cliente X necesita reconectar".</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- PLAN -->
+<section id="plan" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <div class="grad-plan text-white rounded-2xl p-8 shadow-2xl mb-8">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-slate-700 text-white text-xs font-bold px-3 py-1 rounded-full">PLAN</span>
+    </div>
+    <h2 class="text-4xl font-bold mb-2">Plan de ataque actualizado</h2>
+    <p class="text-slate-300">Re-priorizado para Custom Apps. Lo más urgente arriba.</p>
+  </div>
+
+  <div class="space-y-4">
+
+    <div class="bg-white border-l-4 border-red-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">SPRINT 1</span>
+        <h3 class="text-xl font-bold">Hacer que Custom Apps FUNCIONEN de verdad</h3>
+        <span class="text-xs text-slate-500">~3 horas</span>
+      </div>
+      <ul class="text-sm text-slate-600 space-y-1 ml-2">
+        <li>• <strong>N1</strong> — Webhooks por-cliente: leer secret de <code>platform_connections</code></li>
+        <li>• <strong>N2</strong> — Auto-registro de webhooks tras el wizard</li>
+        <li>• <strong>N3</strong> — Timeout en el polling del wizard (5 min)</li>
+        <li>• <strong>N4</strong> — Validar dominio antes de guardar credenciales</li>
+        <li>• Smoke test con una Custom App real (la tuya)</li>
+      </ul>
+      <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mt-3">
+        <strong>Bloqueo absoluto:</strong> sin esto, el segundo cliente con Custom App rompe los webhooks.
+      </p>
+    </div>
+
+    <div class="bg-white border-l-4 border-red-700 rounded-r-xl p-5 shadow">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="bg-red-700 text-white text-xs font-bold px-3 py-1 rounded-full">SPRINT 2</span>
+        <h3 class="text-xl font-bold">Cerrar agujeros de seguridad agnósticos</h3>
+        <span class="text-xs text-slate-500">~1.5 horas</span>
+      </div>
+      <ul class="text-sm text-slate-600 space-y-1 ml-2">
+        <li>• <strong>S1</strong> — Cron secret en data-verify</li>
+        <li>• <strong>S2</strong> — Ownership en create-discount</li>
+        <li>• <strong>S3</strong> — Ownership en fetch-collections</li>
+        <li>• <strong>S4</strong> — Reemplazar JWT manual por <code>auth.getUser</code></li>
+        <li>• <strong>A4</strong> — Quitar funnel inventado</li>
+      </ul>
+    </div>
+
+    <div class="bg-white border-l-4 border-purple-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full">SPRINT 3</span>
+        <h3 class="text-xl font-bold">Borrar código zombie</h3>
+        <span class="text-xs text-slate-500">~1 hora</span>
+      </div>
+      <ul class="text-sm text-slate-600 space-y-1 ml-2">
+        <li>• Borrar <code>supabase/functions/shopify-install/</code></li>
+        <li>• Borrar <code>src/pages/ShopifyApp.tsx</code></li>
+        <li>• Borrar <code>src/pages/ConnectShopify.tsx</code></li>
+        <li>• Borrar legacy flow en <code>OAuthShopifyCallback.tsx</code></li>
+        <li>• Refactor de <code>shopify-oauth-callback.ts</code> para leer credenciales por-cliente</li>
+        <li>• Decidir si borramos GDPR webhooks (recomiendo SÍ)</li>
+        <li>• Actualizar CLAUDE.md (sacar las 3 env vars de "pendientes")</li>
+      </ul>
+    </div>
+
+    <div class="bg-white border-l-4 border-orange-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="bg-orange-600 text-white text-xs font-bold px-3 py-1 rounded-full">SPRINT 4</span>
+        <h3 class="text-xl font-bold">Operaciones</h3>
+        <span class="text-xs text-slate-500">~2 horas</span>
+      </div>
+      <ul class="text-sm text-slate-600 space-y-1 ml-2">
+        <li>• <strong>M4</strong> — Cron <code>shopify-sync-15min</code> en Cloud Scheduler</li>
+        <li>• <strong>M5</strong> — Cron diario de token health check + alerta WhatsApp</li>
+        <li>• <strong>S6</strong> — Eliminar el <code>enqueueBackgroundJob</code> mentiroso (procesar inline si es rápido)</li>
+        <li>• <strong>A1</strong> — Borrar edge functions duplicadas (fetch/sync)</li>
+        <li>• <strong>A3</strong> — Fix double-fetch en orders</li>
+      </ul>
+    </div>
+
+    <div class="bg-white border-l-4 border-yellow-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="bg-yellow-600 text-white text-xs font-bold px-3 py-1 rounded-full">SPRINT 5</span>
+        <h3 class="text-xl font-bold">Polish del wizard</h3>
+        <span class="text-xs text-slate-500">~2 horas</span>
+      </div>
+      <ul class="text-sm text-slate-600 space-y-1 ml-2">
+        <li>• <strong>A6</strong> — Quitar URL hardcoded del wizard</li>
+        <li>• <strong>A5</strong> — Paginación en customers panel</li>
+        <li>• Mejor manejo de errores en cada paso del wizard (mensajes claros)</li>
+        <li>• Botón "Reconectar" cuando el token expira</li>
+        <li>• Screenshots actualizados del proceso de Shopify Partners</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<!-- DESAFÍO -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <div class="grad-blocker text-white rounded-2xl p-8 shadow-2xl">
+    <p class="text-orange-400 font-mono text-sm uppercase tracking-wider mb-2">Matías W13 te desafía</p>
+    <h2 class="text-3xl font-bold mb-6">JM, ahora que decidimos Custom Apps</h2>
+
+    <div class="space-y-4">
+      <div class="bg-black/30 border border-red-500/30 rounded-lg p-4">
+        <div class="font-bold text-red-300 mb-1">1. Tu Custom App actual seguramente "funciona por casualidad"</div>
+        <p class="text-slate-300 text-sm">
+          Probablemente está usando los mismos secretos que pusiste en tu Shopify Partners cuando
+          probaste el flujo App Store. <strong>Eso explota con el segundo cliente.</strong> Hay que
+          fixear N1 antes de vender el primer Custom App a un externo.
+        </p>
+      </div>
+
+      <div class="bg-black/30 border border-red-500/30 rounded-lg p-4">
+        <div class="font-bold text-red-300 mb-1">2. Sin webhooks, no hay tiempo real</div>
+        <p class="text-slate-300 text-sm">
+          Hoy mismo: si los webhooks no se auto-registran (N2), el cliente hace una venta y Steve Ads
+          no se entera. Felipe, Ignacio y Paula quedan ciegos. <strong>El cron de sync cada 15 min
+          es indispensable como respaldo</strong>, pero igual hay que arreglar N1 y N2.
+        </p>
+      </div>
+
+      <div class="bg-black/30 border border-red-500/30 rounded-lg p-4">
+        <div class="font-bold text-red-300 mb-1">3. ¿Borramos los GDPR webhooks?</div>
+        <p class="text-slate-300 text-sm">
+          Custom Apps NO reciben webhooks GDPR de Shopify. Son 358 líneas de código que nunca se
+          ejecutan. Mi recomendación: <strong>borrar y recuperar del git history</strong> si algún
+          día decidimos publicar en App Store. ¿De acuerdo?
+        </p>
+      </div>
+
+      <div class="bg-black/30 border border-red-500/30 rounded-lg p-4">
+        <div class="font-bold text-red-300 mb-1">4. ¿Vas a marketear esto como "instala con un clic"?</div>
+        <p class="text-slate-300 text-sm">
+          Porque el wizard tiene <strong>6 pasos manuales</strong>. Hay que ser honesto en la landing:
+          "Toma 5 minutos, te pedimos que crees una Custom App en tu Shopify Partners". Si vendes
+          "1 clic" y son 6, los clientes se frustran y se van.
+        </p>
+      </div>
+
+      <div class="bg-black/30 border border-red-500/30 rounded-lg p-4">
+        <div class="font-bold text-red-300 mb-1">5. ¿Quién soporta a clientes que no saben usar Shopify Partners?</div>
+        <p class="text-slate-300 text-sm">
+          Custom Apps requiere que el cliente entienda <strong>scopes, API keys, OAuth, dominios myshopify</strong>.
+          Eso filtra al 80% de tus clientes potenciales. ¿Plan: video tutorial? ¿Soporte 1-a-1 con Paula W19?
+          ¿Onboarding en vivo con JM?
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARACIÓN FINAL -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6 border-b-4 border-slate-900 pb-2 inline-block">Resumen comparativo</h2>
+
+  <div class="overflow-x-auto">
+    <table class="w-full bg-white border-2 border-slate-200 rounded-xl overflow-hidden">
+      <thead class="bg-slate-900 text-white">
+        <tr>
+          <th class="p-3 text-left">Aspecto</th>
+          <th class="p-3 text-left">App Store público</th>
+          <th class="p-3 text-left">Custom Apps (decidido)</th>
+        </tr>
+      </thead>
+      <tbody class="text-sm">
+        <tr class="border-b border-slate-200">
+          <td class="p-3 font-semibold">Tiempo a producción</td>
+          <td class="p-3">2-4 semanas (review)</td>
+          <td class="p-3 text-green-700 font-semibold">Mañana mismo</td>
+        </tr>
+        <tr class="border-b border-slate-200 bg-slate-50">
+          <td class="p-3 font-semibold">Onboarding del cliente</td>
+          <td class="p-3 text-green-700">1 clic</td>
+          <td class="p-3">6 pasos guiados</td>
+        </tr>
+        <tr class="border-b border-slate-200">
+          <td class="p-3 font-semibold">Env vars en Cloud Run</td>
+          <td class="p-3">3 obligatorias</td>
+          <td class="p-3 text-green-700">0 obligatorias</td>
+        </tr>
+        <tr class="border-b border-slate-200 bg-slate-50">
+          <td class="p-3 font-semibold">Webhooks</td>
+          <td class="p-3">Auto-registro, secret global</td>
+          <td class="p-3 text-orange-700">Auto-registro pendiente, secret por-cliente</td>
+        </tr>
+        <tr class="border-b border-slate-200">
+          <td class="p-3 font-semibold">GDPR compliance</td>
+          <td class="p-3">Obligatorio</td>
+          <td class="p-3 text-green-700">No aplica</td>
+        </tr>
+        <tr class="border-b border-slate-200 bg-slate-50">
+          <td class="p-3 font-semibold">Líneas de código</td>
+          <td class="p-3">~14.500</td>
+          <td class="p-3 text-green-700">~13.300 tras limpieza</td>
+        </tr>
+        <tr class="border-b border-slate-200">
+          <td class="p-3 font-semibold">Soporte técnico al cliente</td>
+          <td class="p-3 text-green-700">Bajo</td>
+          <td class="p-3 text-red-700">Alto (filtra clientes técnicos)</td>
+        </tr>
+        <tr class="bg-slate-50">
+          <td class="p-3 font-semibold">Total issues activos</td>
+          <td class="p-3">20</td>
+          <td class="p-3"><span class="text-green-700 font-semibold">17</span> (3 resueltos + 4 nuevos − 0 ignorables = balance peor pero más manejable)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="max-w-6xl mx-auto px-6 py-8 text-center text-slate-500 text-sm border-t border-slate-200 mt-12">
+  <p>Re-diagnóstico generado por <strong>Matías W13 — Shopify</strong> · Steve Ads · 7 abril 2026</p>
+  <p class="mt-1">Decisión arquitectural: <strong>Custom Apps Only</strong> · 17 issues activos · 4 nuevos blockers · ~1.200 líneas a borrar</p>
+</footer>
+
+</body>
+</html>

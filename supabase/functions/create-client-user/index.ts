@@ -87,7 +87,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (client.user_id !== adminUser.id) {
+    // Check if super admin
+    const { data: adminProfile } = await supabaseAdmin
+      .from('user_roles')
+      .select('is_super_admin')
+      .eq('user_id', adminUser.id)
+      .maybeSingle();
+
+    if (!adminProfile?.is_super_admin && client.user_id !== adminUser.id) {
       return new Response(
         JSON.stringify({ error: 'Access denied' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -120,20 +127,27 @@ Deno.serve(async (req) => {
 
     console.log('User created:', newUser.user.id);
 
-    // Assign client role
+    // Assign client role (upsert — trigger handle_new_user may have already created it)
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
-      .insert({
-        user_id: newUser.user.id,
-        role: 'client',
-      });
+      .upsert(
+        { user_id: newUser.user.id, role: 'client' },
+        { onConflict: 'user_id,role' },
+      );
 
     if (roleError) {
       console.error('Error assigning role:', roleError);
-      // Don't fail - user is created, role can be fixed
     }
 
-    // Link user to client
+    // Delete the orphan client created by handle_new_user trigger
+    // (the trigger always creates a new client, but we want to link to the existing one)
+    await supabaseAdmin
+      .from('clients')
+      .delete()
+      .eq('user_id', newUser.user.id)
+      .neq('id', client_id);
+
+    // Link user to the existing client
     const { error: linkError } = await supabaseAdmin
       .from('clients')
       .update({ client_user_id: newUser.user.id })

@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Shopify Dual Mode — Qué hice, en simple</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; }
+  .code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; }
+  .analogy { background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); border-left: 4px solid #D97706; }
+  .example { background: #F0FDF4; border-left: 4px solid #16A34A; }
+  .danger  { background: #FEF2F2; border-left: 4px solid #DC2626; }
+  .info    { background: #EFF6FF; border-left: 4px solid #2563EB; }
+  .step-num { min-width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 700; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<!-- Hero -->
+<header class="bg-gradient-to-br from-green-600 to-emerald-700 text-white py-12 px-6">
+  <div class="max-w-4xl mx-auto">
+    <div class="inline-block bg-white/20 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase mb-4">
+      Resumen ejecutivo · 8 de abril 2026
+    </div>
+    <h1 class="text-4xl font-bold mb-3">Qué hice con Shopify hoy</h1>
+    <p class="text-xl text-green-100">
+      Dejé el sistema preparado para que funcione HOY con Custom Apps
+      y mañana con App Store, sin reescribir nada.
+    </p>
+  </div>
+</header>
+
+<main class="max-w-4xl mx-auto px-6 py-10 space-y-12">
+
+  <!-- La idea en 30 segundos -->
+  <section>
+    <h2 class="text-2xl font-bold mb-4">La idea en 30 segundos</h2>
+    <div class="analogy p-5 rounded-lg">
+      <p class="font-semibold mb-2">Imagina un portero de un edificio.</p>
+      <p class="text-slate-800">
+        Antes, el portero tenía una sola llave maestra que abría todos los departamentos.
+        Problema: cuando el edificio tenga muchos dueños, cada uno tiene SU llave. El
+        portero no puede seguir usando una maestra.
+      </p>
+      <p class="mt-3 text-slate-800">
+        Hoy le enseñé al portero a mirar el número del departamento primero, y
+        <strong>automáticamente</strong> decidir si usa la llave del dueño (guardada en un
+        llavero) o la maestra del edificio (colgada en su oficina). El portero no elige
+        — el sistema elige por él.
+      </p>
+    </div>
+  </section>
+
+  <!-- Por qué -->
+  <section>
+    <h2 class="text-2xl font-bold mb-4">¿Por qué hacía falta esto?</h2>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="info p-5 rounded-lg">
+        <div class="font-bold mb-2">Antes (roto para Custom Apps)</div>
+        <p class="text-sm">
+          Cuando un cliente se conectaba con Custom App, sus credenciales quedaban
+          guardadas en la base de datos — pero el código que verifica los webhooks
+          seguía leyendo una variable global <code class="bg-slate-200 px-1 rounded">SHOPIFY_WEBHOOK_SECRET</code>
+          que NO existe para ese cliente. Resultado: <strong>todos los webhooks fallaban con HMAC mismatch</strong>.
+        </p>
+      </div>
+      <div class="example p-5 rounded-lg">
+        <div class="font-bold mb-2">Ahora (dual mode)</div>
+        <p class="text-sm">
+          Cada conexión queda marcada como <code class="bg-slate-200 px-1 rounded">custom_app</code> o <code class="bg-slate-200 px-1 rounded">app_store</code>.
+          Cuando llega un webhook, el código mira la marca y saca las credenciales del
+          lugar correcto. Un solo código, dos modos.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cambio concreto 1 -->
+  <section>
+    <h2 class="text-2xl font-bold mb-4">Cambio #1 — Columna nueva en la base de datos</h2>
+    <div class="analogy p-5 rounded-lg mb-4">
+      <p class="font-semibold mb-1">Imagina que...</p>
+      <p class="text-slate-800">
+        A cada ficha de cliente en el archivador le pegué un sticker de color:
+        <strong>sticker verde = Custom App</strong>, <strong>sticker azul = App Store</strong>.
+        Cuando necesites algo del cliente, primero mirás el sticker y sabés a qué gaveta ir.
+      </p>
+    </div>
+    <div class="bg-slate-900 text-green-400 code p-4 rounded-lg overflow-x-auto">
+<pre>ALTER TABLE platform_connections
+ADD COLUMN connection_mode text
+  NOT NULL DEFAULT 'custom_app'
+  CHECK (connection_mode IN ('custom_app', 'app_store'));</pre>
+    </div>
+    <p class="text-sm text-slate-600 mt-2">
+      Default = <code class="bg-slate-200 px-1 rounded">custom_app</code> → todas las conexiones existentes quedan marcadas automáticamente así. No hay que tocar nada manualmente.
+    </p>
+  </section>
+
+  <!-- Cambio concreto 2 -->
+  <section>
+    <h2 class="text-2xl font-bold mb-4">Cambio #2 — El "portero" inteligente (Credential Resolver)</h2>
+    <div class="analogy p-5 rounded-lg mb-4">
+      <p class="font-semibold mb-1">Imagina que...</p>
+      <p class="text-slate-800">
+        Antes, cada función del backend leía las credenciales directo de las variables
+        de entorno. Como si cada empleado de la empresa tuviera su propia copia de las
+        llaves y las chequeara cada uno por su lado — un desastre cuando hay dos tipos
+        de llaves.
+      </p>
+      <p class="mt-2 text-slate-800">
+        Ahora TODOS le preguntan a una sola función: "¿cuáles son las credenciales de la
+        tienda <em>tienda-x.myshopify.com</em>?" y esa función se encarga de mirar la
+        base de datos, ver el sticker, y devolver las credenciales correctas.
+      </p>
+    </div>
+    <div class="example p-5 rounded-lg">
+      <p class="font-semibold mb-2">Ejemplo concreto:</p>
+      <div class="bg-slate-900 text-slate-100 code p-3 rounded overflow-x-auto">
+<pre>// ANTES (en cada archivo, repetido 10 veces)
+const secret = process.env.SHOPIFY_CLIENT_SECRET;
+if (!secret) return error;
+
+// AHORA (una sola llamada en todos lados)
+const creds = await resolveShopifyCredentials(shopDomain);
+if (!creds) return error;
+const secret = creds.webhookSecret; // ← el correcto, siempre</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cambio concreto 3 -->
+  <section>
+    <h2 class="text-2xl font-bold mb-4">Cambio #3 — Webhooks que ya no fallan</h2>
+    <div class="analogy p-5 rounded-lg mb-4">
+      <p class="font-semibold mb-1">Imagina que...</p>
+      <p class="text-slate-800">
+        Shopify te llama al teléfono cada vez que hay una venta. Para saber que es realmente
+        Shopify (no un estafador), usa un <strong>sello secreto</strong> que solo vos y ellos conocen.
+        Antes, tenías un solo sello global. Ahora cada cliente tiene SU sello, y el sistema
+        automáticamente saca el sello correcto del cajón de cada cliente antes de verificar.
+      </p>
+    </div>
+    <div class="example p-5 rounded-lg">
+      <p class="font-semibold mb-2">Archivos que arreglé:</p>
+      <ul class="text-sm space-y-1 text-slate-700">
+        <li>✅ <code>supabase/functions/shopify-fulfillment-webhooks/index.ts</code> — pedidos cumplidos/cancelados</li>
+        <li>✅ <code>supabase/functions/shopify-gdpr-webhooks/index.ts</code> — GDPR + desinstalación</li>
+        <li>✅ <code>cloud-run-api/src/routes/shopify/shopify-fulfillment-webhooks.ts</code> — (versión Cloud Run)</li>
+        <li>✅ <code>cloud-run-api/src/routes/shopify/shopify-gdpr-webhooks.ts</code> — (versión Cloud Run)</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Cambio concreto 4 -->
+  <section>
+    <h2 class="text-2xl font-bold mb-4">Cambio #4 — Registro automático de los 3 webhooks GDPR faltantes</h2>
+    <div class="danger p-5 rounded-lg mb-4">
+      <p class="font-semibold text-red-900 mb-1">Problema que había:</p>
+      <p class="text-sm text-red-900">
+        Cuando un cliente terminaba el wizard, Steve registraba automáticamente 8 webhooks
+        en su tienda — pero <strong>faltaban 3 obligatorios de GDPR</strong> (customers/data_request,
+        customers/redact, shop/redact). Estos son mandatorios para Shopify App Store.
+      </p>
+    </div>
+    <div class="example p-5 rounded-lg">
+      <p class="font-semibold mb-2">Ahora se registran los 11 webhooks completos:</p>
+      <div class="grid md:grid-cols-2 gap-2 text-xs text-slate-700">
+        <div>1. <code>app/uninstalled</code></div>
+        <div>7. <code>orders/fulfilled</code></div>
+        <div>2. <code>customers/data_request</code> ⭐</div>
+        <div>8. <code>orders/partially_fulfilled</code></div>
+        <div>3. <code>customers/redact</code> ⭐</div>
+        <div>9. <code>orders/cancelled</code></div>
+        <div>4. <code>shop/redact</code> ⭐</div>
+        <div>10. <code>customers/create</code></div>
+        <div>5. <code>checkouts/create</code></div>
+        <div>11. <code>products/update</code></div>
+        <div>6. <code>orders/create</code></div>
+      </div>
+      <p class="text-xs mt-2 text-slate-600">⭐ = los 3 que faltaban</p>
+    </div>
+  </section>
+
+  <!-- Cambio concreto 5 -->
+  <section>
+    <h2 class="text-2xl font-bold mb-4">Cambio #5 — Wizard mejorado</h2>
+    <div class="grid md:grid-cols-3 gap-3">
+      <div class="example p-4 rounded-lg">
+        <div class="font-bold text-sm mb-1">Validación de formato</div>
+        <p class="text-xs text-slate-700">
+          Antes podías pegar cualquier garabato como Client Secret. Ahora se valida
+          el formato (32+ hex o empieza con <code>shpss_</code>) ANTES de enviarlo al
+          backend. Error visible al instante.
+        </p>
+      </div>
+      <div class="example p-4 rounded-lg">
+        <div class="font-bold text-sm mb-1">Timeout del polling</div>
+        <p class="text-xs text-slate-700">
+          El wizard "esperaba para siempre" a que el usuario terminara de instalar.
+          Ahora tiene un timeout de 10 minutos con botón "Reintentar detección".
+        </p>
+      </div>
+      <div class="example p-4 rounded-lg">
+        <div class="font-bold text-sm mb-1">URL hardcodeada eliminada</div>
+        <p class="text-xs text-slate-700">
+          Antes tenía fallback a una URL hardcodeada de Cloud Run. Ahora solo usa
+          <code>VITE_API_URL</code>. Si falta, avisa en consola.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cambio concreto 6 -->
+  <section>
+    <h2 class="text-2xl font-bold mb-4">Cambio #6 — Endpoint de configuración + Hook dormido</h2>
+    <div class="analogy p-5 rounded-lg mb-4">
+      <p class="font-semibold mb-1">Imagina que...</p>
+      <p class="text-slate-800">
+        Pusiste un <strong>interruptor</strong> en la pared. Hoy está apagado: solo se ve
+        el botón "Configurar Custom App". Cuando Shopify apruebe la public app, giras el
+        interruptor y <strong>aparece mágicamente</strong> el botón "Instalar en 1 clic"
+        al lado. Sin deploy, sin código nuevo.
+      </p>
+    </div>
+    <div class="info p-5 rounded-lg">
+      <p class="font-semibold mb-2">Piezas creadas:</p>
+      <ul class="text-sm space-y-2">
+        <li>
+          <strong>Backend</strong>: <code>GET /api/shopify/config</code> → devuelve
+          <code>{ mode: 'custom' | 'appstore' | 'both', appStoreAvailable, customAppAvailable }</code>
+        </li>
+        <li>
+          <strong>Frontend</strong>: <code>src/hooks/useShopifyConfig.ts</code> → hook React
+          que lee la configuración. Hoy devuelve <code>custom</code> (por la env var), mañana devolverá <code>both</code>.
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Qué pasa el Switch Day -->
+  <section>
+    <h2 class="text-2xl font-bold mb-4">El "Switch Day" — 15 minutos cuando Shopify apruebe</h2>
+    <div class="bg-white border-2 border-green-500 rounded-lg p-6 space-y-3">
+      <div class="flex gap-3">
+        <span class="step-num bg-green-600 text-white">1</span>
+        <div>
+          <div class="font-semibold">Setear 3 env vars en Cloud Run</div>
+          <code class="text-xs text-slate-600">SHOPIFY_CLIENT_ID + SHOPIFY_CLIENT_SECRET + SHOPIFY_WEBHOOK_SECRET</code>
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <span class="step-num bg-green-600 text-white">2</span>
+        <div>
+          <div class="font-semibold">Cambiar SHOPIFY_MODE=both</div>
+          <p class="text-xs text-slate-600">El endpoint de config ahora devuelve "both" → el hook del frontend lo ve → la UI muestra ambas opciones.</p>
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <span class="step-num bg-green-600 text-white">3</span>
+        <div>
+          <div class="font-semibold">Smoke test con una dev store</div>
+          <p class="text-xs text-slate-600">Instalar por App Store → verificar que registra webhooks → verificar que los webhooks llegan.</p>
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <span class="step-num bg-green-600 text-white">4</span>
+        <div>
+          <div class="font-semibold">Listo — los clientes Custom App existentes no se tocan</div>
+          <p class="text-xs text-slate-600">Siguen con su sticker <code>custom_app</code> y leyendo credenciales de la DB como siempre.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Riesgos -->
+  <section>
+    <h2 class="text-2xl font-bold mb-4">Riesgos reales (no te voy a mentir)</h2>
+    <div class="space-y-4">
+
+      <div class="danger p-5 rounded-lg">
+        <div class="font-bold text-red-900 mb-2">⚠️ Riesgo 1 — Clientes Custom App existentes pueden no tener client_secret_encrypted</div>
+        <p class="text-sm text-red-900 mb-2">
+          Si hay tiendas conectadas ANTES del wizard de Custom App (en el modelo viejo
+          con SHOPIFY_CLIENT_SECRET global), esas conexiones NO tienen
+          <code>shopify_client_secret_encrypted</code> en la DB. El resolver las marca como
+          <code>custom_app</code> (default), busca el secret en DB, no lo encuentra → retorna null → webhook falla.
+        </p>
+        <p class="text-sm text-red-900">
+          <strong>Mitigador ya aplicado</strong>: los 4 handlers de webhooks tienen <strong>fallback a env vars</strong>
+          cuando el resolver retorna null. O sea, si <code>SHOPIFY_WEBHOOK_SECRET</code> sigue
+          seteado globalmente, las conexiones viejas siguen funcionando.
+        </p>
+        <p class="text-sm text-red-900 mt-2">
+          <strong>Acción recomendada</strong>: antes de deploy, correr este query para ver si hay tiendas en esa situación:
+        </p>
+        <div class="bg-slate-900 text-slate-100 code p-3 rounded mt-2 overflow-x-auto text-xs">
+<pre>SELECT id, shop_domain, connection_mode,
+  shopify_client_id IS NULL AS missing_client_id,
+  shopify_client_secret_encrypted IS NULL AS missing_secret
+FROM platform_connections
+WHERE platform = 'shopify' AND is_active = true;</pre>
+        </div>
+      </div>
+
+      <div class="danger p-5 rounded-lg">
+        <div class="font-bold text-red-900 mb-2">⚠️ Riesgo 2 — Migration falla si ya existe la columna</div>
+        <p class="text-sm text-red-900">
+          La migration usa <code>ADD COLUMN IF NOT EXISTS</code> → seguro contra rerun.
+          Pero si <code>CHECK (...)</code> choca con data existente, falla. Como el default es
+          <code>custom_app</code> y la columna es nueva, no debería pasar. Aun así, revisar logs al ejecutarla.
+        </p>
+      </div>
+
+      <div class="danger p-5 rounded-lg">
+        <div class="font-bold text-red-900 mb-2">⚠️ Riesgo 3 — Doble función con el mismo nombre en shopify-oauth-callback.ts</div>
+        <p class="text-sm text-red-900">
+          Ese archivo YA tenía una función local <code>resolveShopifyCredentials</code> distinta.
+          Yo NO la toqué porque funciona. Pero hay dos funciones con el mismo nombre en el
+          proyecto (una en el lib, una en el archivo del callback). TypeScript lo permite
+          porque están en scopes distintos, pero es confuso. Merece un rename en el futuro.
+        </p>
+      </div>
+
+      <div class="danger p-5 rounded-lg">
+        <div class="font-bold text-red-900 mb-2">⚠️ Riesgo 4 — Edge functions y Cloud Run tienen handlers duplicados</div>
+        <p class="text-sm text-red-900">
+          Existen DOS implementaciones de cada webhook: una en <code>supabase/functions/</code>
+          (Deno) y otra en <code>cloud-run-api/src/routes/shopify/</code> (Node). Ambas fueron arregladas.
+          Pero solo UNA es la que realmente recibe los webhooks (la que se registra en
+          <code>registerWebhooks</code> del OAuth callback → apunta a Cloud Run).
+        </p>
+        <p class="text-sm text-red-900 mt-2">
+          Las edge functions son zombies. Arreglé las dos por si se activa alguna eventualmente, pero
+          se podrían borrar en un cleanup futuro (~600 líneas de código muerto).
+        </p>
+      </div>
+
+      <div class="info p-5 rounded-lg">
+        <div class="font-bold mb-2">✅ Lo que NO es riesgo</div>
+        <ul class="text-sm space-y-1 text-slate-700">
+          <li>• TypeScript compila limpio (backend + frontend, exit 0)</li>
+          <li>• El frontend sigue funcionando igual que antes (no cambié el flujo visible del wizard)</li>
+          <li>• Los clientes nuevos del wizard Custom App quedan marcados correctamente</li>
+          <li>• El <code>SHOPIFY_MODE=custom</code> default hace que nada cambie hasta que decidas cambiarlo</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Deploy checklist -->
+  <section>
+    <h2 class="text-2xl font-bold mb-4">Cómo desplegar (orden importa)</h2>
+    <div class="bg-white border rounded-lg p-6 space-y-4">
+      <div>
+        <div class="font-bold text-sm text-slate-500 uppercase tracking-wide">Paso 1 · Base de datos</div>
+        <div class="bg-slate-900 text-green-400 code p-3 rounded mt-2 text-xs">cd ~/betabg && npx supabase db push --linked</div>
+        <p class="text-xs text-slate-600 mt-1">Aplica <code>20260408150000_shopify_dual_mode.sql</code></p>
+      </div>
+      <div>
+        <div class="font-bold text-sm text-slate-500 uppercase tracking-wide">Paso 2 · Backend (Cloud Run)</div>
+        <div class="bg-slate-900 text-green-400 code p-3 rounded mt-2 text-xs">cd cloud-run-api && gcloud run deploy steve-api --source . --project steveapp-agency --region us-central1</div>
+      </div>
+      <div>
+        <div class="font-bold text-sm text-slate-500 uppercase tracking-wide">Paso 3 · Edge Functions (opcional, son zombies)</div>
+        <div class="bg-slate-900 text-green-400 code p-3 rounded mt-2 text-xs">npx supabase functions deploy shopify-fulfillment-webhooks --no-verify-jwt --project-ref zpswjccsxjtnhetkkqde
+npx supabase functions deploy shopify-gdpr-webhooks --no-verify-jwt --project-ref zpswjccsxjtnhetkkqde</div>
+      </div>
+      <div>
+        <div class="font-bold text-sm text-slate-500 uppercase tracking-wide">Paso 4 · Frontend</div>
+        <div class="bg-slate-900 text-green-400 code p-3 rounded mt-2 text-xs">cd ~/betabg && git add . && git commit -m "feat(shopify): dual-mode credential resolver" && git push origin main</div>
+        <p class="text-xs text-slate-600 mt-1">Vercel auto-despliega</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Archivos tocados -->
+  <section>
+    <h2 class="text-2xl font-bold mb-4">Archivos creados/modificados (11 en total)</h2>
+    <div class="bg-white border rounded-lg p-5">
+      <div class="mb-4">
+        <div class="font-bold text-sm text-green-700 mb-2">Creados (5)</div>
+        <ul class="text-xs space-y-1 text-slate-700 code">
+          <li>+ supabase/migrations/20260408150000_shopify_dual_mode.sql</li>
+          <li>+ cloud-run-api/src/lib/shopify-credentials.ts</li>
+          <li>+ supabase/functions/_shared/shopify-credentials.ts</li>
+          <li>+ cloud-run-api/src/routes/shopify/shopify-config.ts</li>
+          <li>+ src/hooks/useShopifyConfig.ts</li>
+        </ul>
+      </div>
+      <div>
+        <div class="font-bold text-sm text-blue-700 mb-2">Modificados (6)</div>
+        <ul class="text-xs space-y-1 text-slate-700 code">
+          <li>~ supabase/functions/shopify-fulfillment-webhooks/index.ts</li>
+          <li>~ supabase/functions/shopify-gdpr-webhooks/index.ts</li>
+          <li>~ cloud-run-api/src/routes/shopify/shopify-fulfillment-webhooks.ts</li>
+          <li>~ cloud-run-api/src/routes/shopify/shopify-gdpr-webhooks.ts</li>
+          <li>~ cloud-run-api/src/routes/shopify/shopify-oauth-callback.ts</li>
+          <li>~ cloud-run-api/src/routes/shopify/store-shopify-credentials.ts</li>
+          <li>~ cloud-run-api/src/routes/index.ts</li>
+          <li>~ src/components/client-portal/ShopifyCustomAppWizard.tsx</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Final -->
+  <section class="bg-slate-900 text-white rounded-xl p-8">
+    <h2 class="text-2xl font-bold mb-3">En una frase</h2>
+    <p class="text-lg text-slate-300">
+      Hoy Steve puede recibir clientes por Custom App <strong>sin romper nada</strong>,
+      y el día que Shopify apruebe la App Store, activar el modo dual es cambiar
+      <strong>3 env vars + 1 flag</strong>. No hay que reescribir código, no hay que tocar
+      los clientes existentes, no hay que coordinar un "big bang deploy".
+    </p>
+  </section>
+
+</main>
+
+<footer class="text-center text-xs text-slate-500 py-8">
+  Generado por Matías W13 · Steve Platform · 8 de abril 2026
+</footer>
+
+</body>
+</html>

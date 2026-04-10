@@ -75,9 +75,10 @@ export async function syncCampaignMetrics(c: Context) {
   try {
     const supabase = getSupabaseAdmin();
 
-    // User is already verified by authMiddleware
+    // Accept either authMiddleware user OR cron secret (for sync-all-metrics)
+    const isCron = c.req.header('X-Cron-Secret') === (process.env.CRON_SECRET || 'steve-cron-secret-2024');
     const user = c.get('user');
-    if (!user) {
+    if (!user && !isCron) {
       return c.json({ error: 'Missing authorization' }, 401);
     }
 
@@ -110,9 +111,10 @@ export async function syncCampaignMetrics(c: Context) {
       return c.json({ error: 'Connection not found' }, 404);
     }
 
-    // Verify ownership
+    // Verify ownership (skip for internal/cron calls)
     const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null; shop_domain: string | null };
-    if (clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
+    const isInternal = c.get('isInternal') || isCron;
+    if (!isInternal && clientData.user_id !== user.id && clientData.client_user_id !== user.id) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
 
@@ -416,19 +418,27 @@ async function syncGoogleCampaigns(
   `;
 
   try {
-    const response = await fetch(
-      `https://googleads.googleapis.com/v18/customers/${customerId}/googleAds:searchStream`,
+    const makeRequest = async (loginId: string) => fetch(
+      `https://googleads.googleapis.com/v23/customers/${customerId}/googleAds:searchStream`,
       {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'developer-token': developerToken,
-          'login-customer-id': effectiveLoginId,
+          'login-customer-id': loginId,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ query }),
       }
     );
+
+    let response = await makeRequest(effectiveLoginId);
+
+    // Fallback: if MCC login-customer-id fails with 403, retry with customer's own ID
+    if (response.status === 403 && effectiveLoginId !== customerId) {
+      console.warn(`[sync-campaign-metrics] MCC ${effectiveLoginId} denied, retrying with ${customerId}`);
+      response = await makeRequest(customerId);
+    }
 
     if (!response.ok) {
       console.error('Google Ads API error:', await response.text());

@@ -1,7 +1,33 @@
 # Felipe W2 — Meta Ads
-Squad: Marketing | Última sesión: 2026-04-08
+Squad: Marketing | Última sesión: 2026-04-10
 
-## Estado actual: Leadsie hardening completo, en prod, pendiente config Leadsie dashboard + secret
+## Estado actual: 126 fixes totales, Leadsie dual-platform (Meta+Google), MetaPartnerSetup hardened
+
+### Completado sesión 10/04/2026 — MetaPartnerSetup fixes + Leadsie dual-platform
+
+**7 fixes** en 2 commits (597bbfd6, 05cf8d09).
+
+#### MetaPartnerSetup + GooglePartnerSetup (commit 597bbfd6)
+- [x] Poll acepta cualquier `connection_type` (no solo `'leadsie'`) → fix spinning infinito con `bm_partner`/`oauth`
+- [x] Check on mount: si ya hay conexión activa, salta directo a "Conectado"
+- [x] Reset state cuando cambia `clientId` (admin switching entre clientes)
+- [x] `buildLeadsieUrl` sanitiza `customUserId` duplicado del base URL (fix "solo conecta a Rueda")
+
+#### Leadsie webhook dual-platform (commit 05cf8d09)
+- [x] `/api/webhooks/leadsie` ahora procesa AMBOS: Meta + Google Ads assets
+- [x] Un solo Connect Profile → un solo webhook → ambas conexiones creadas en `platform_connections`
+- [x] `mapGoogleAssets()` + `triggerGoogleSync()` agregados al webhook
+- [x] Deploy `steve-api-00468-t7k` serving 100%
+
+#### Archivos tocados 10/04
+1. `src/components/client-portal/meta-ads/MetaPartnerSetup.tsx` (3 fixes)
+2. `src/components/client-portal/google-ads/GooglePartnerSetup.tsx` (3 fixes)
+3. `cloud-run-api/src/routes/webhooks/leadsie-webhook.ts` (Google Ads support)
+
+#### Env vars
+- [x] `VITE_LEADSIE_GOOGLE_REQUEST_URL` agregada en `.env.local` y Vercel
+
+---
 
 ### Completado sesión 08/04/2026 — Leadsie Hardening + SUAT Scoping Multi-Merchant
 

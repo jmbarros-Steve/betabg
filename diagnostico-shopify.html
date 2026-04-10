@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagnóstico Shopify — Matías W13 (a prueba de idiotas)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  pre { font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 13px; line-height: 1.5; }
+  .code-bad { background: #2d1b1b; color: #ffb3b3; border-left: 4px solid #dc2626; }
+  .code-good { background: #1b2d1b; color: #b3ffb3; border-left: 4px solid #16a34a; }
+  .anchor { scroll-margin-top: 80px; }
+  .severity-blocker { background: linear-gradient(135deg, #7f1d1d, #450a0a); }
+  .severity-critical { background: linear-gradient(135deg, #dc2626, #991b1b); }
+  .severity-high { background: linear-gradient(135deg, #ea580c, #9a3412); }
+  .severity-medium { background: linear-gradient(135deg, #ca8a04, #713f12); }
+  .severity-ok { background: linear-gradient(135deg, #16a34a, #14532d); }
+  details summary { cursor: pointer; }
+  details summary::-webkit-details-marker { display: none; }
+  .issue-card { transition: all .2s; }
+  .issue-card:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<!-- HEADER -->
+<header class="bg-slate-900 text-white sticky top-0 z-50 shadow-xl">
+  <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-bold">Diagnóstico Shopify</h1>
+      <p class="text-xs text-slate-400">Matías W13 · A prueba de idiotas · 7 abril 2026</p>
+    </div>
+    <nav class="hidden md:flex gap-4 text-sm">
+      <a href="#resumen" class="hover:text-orange-400">Resumen</a>
+      <a href="#blocker" class="hover:text-red-400">Blocker</a>
+      <a href="#criticos" class="hover:text-red-400">Críticos</a>
+      <a href="#altos" class="hover:text-orange-400">Altos</a>
+      <a href="#medios" class="hover:text-yellow-400">Medios</a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <div class="bg-gradient-to-br from-slate-900 to-slate-700 text-white rounded-2xl p-8 shadow-2xl">
+    <p class="text-orange-400 font-mono text-sm uppercase tracking-wider mb-2">Reporte ejecutivo</p>
+    <h2 class="text-4xl font-bold mb-4">El módulo de Shopify funciona, pero tiene 20 problemas serios</h2>
+    <p class="text-slate-300 text-lg leading-relaxed max-w-3xl">
+      Revisé línea por línea <strong class="text-white">14.500 líneas de código</strong> repartidas en
+      <strong class="text-white">48 archivos</strong>. La buena noticia: el módulo no está roto.
+      La mala: hay un bloqueador crítico, 7 agujeros de seguridad y un montón de tierra debajo de la alfombra.
+      Este documento explica cada problema como si nunca hubieras tocado código en tu vida.
+    </p>
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mt-8">
+      <div class="bg-red-950/60 border border-red-500/30 rounded-lg p-4">
+        <div class="text-3xl font-bold text-red-400">1</div>
+        <div class="text-xs text-slate-300 mt-1">Bloqueador</div>
+      </div>
+      <div class="bg-red-900/60 border border-red-500/30 rounded-lg p-4">
+        <div class="text-3xl font-bold text-red-400">7</div>
+        <div class="text-xs text-slate-300 mt-1">Críticos (seguridad)</div>
+      </div>
+      <div class="bg-orange-900/60 border border-orange-500/30 rounded-lg p-4">
+        <div class="text-3xl font-bold text-orange-400">7</div>
+        <div class="text-xs text-slate-300 mt-1">Altos</div>
+      </div>
+      <div class="bg-yellow-900/60 border border-yellow-500/30 rounded-lg p-4">
+        <div class="text-3xl font-bold text-yellow-400">5</div>
+        <div class="text-xs text-slate-300 mt-1">Medios</div>
+      </div>
+      <div class="bg-green-900/60 border border-green-500/30 rounded-lg p-4">
+        <div class="text-3xl font-bold text-green-400">11</div>
+        <div class="text-xs text-slate-300 mt-1">Cosas OK</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RESUMEN -->
+<section id="resumen" class="anchor max-w-6xl mx-auto px-6 py-8">
+  <h2 class="text-3xl font-bold mb-6 border-b-4 border-slate-900 pb-2 inline-block">Cómo leer este documento</h2>
+  <div class="grid md:grid-cols-3 gap-4">
+    <div class="bg-white border-2 border-slate-200 rounded-xl p-5">
+      <div class="text-3xl mb-2">①</div>
+      <h3 class="font-bold mb-2">¿Qué pasa?</h3>
+      <p class="text-sm text-slate-600">Cada problema lo explico en 1 frase, sin jerga técnica.</p>
+    </div>
+    <div class="bg-white border-2 border-slate-200 rounded-xl p-5">
+      <div class="text-3xl mb-2">②</div>
+      <h3 class="font-bold mb-2">Imagina que...</h3>
+      <p class="text-sm text-slate-600">Una analogía del mundo real. Si lo entiendes, ya lo entendiste.</p>
+    </div>
+    <div class="bg-white border-2 border-slate-200 rounded-xl p-5">
+      <div class="text-3xl mb-2">③</div>
+      <h3 class="font-bold mb-2">Ejemplo concreto</h3>
+      <p class="text-sm text-slate-600">Un caso real de cómo te puede fregar con un cliente de Steve Ads.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- BLOCKER #0                                    -->
+<!-- ============================================ -->
+<section id="blocker" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <div class="severity-blocker text-white rounded-2xl p-8 shadow-2xl mb-8">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">BLOQUEADOR</span>
+      <span class="text-red-200 text-sm">Severidad máxima</span>
+    </div>
+    <h2 class="text-4xl font-bold mb-2">Blocker #0 — La integración con Shopify está 100% MUERTA</h2>
+    <p class="text-red-100">Sin esto arreglado, todo lo demás da igual.</p>
+  </div>
+
+  <div class="bg-white border-2 border-red-200 rounded-xl p-6 issue-card">
+    <h3 class="text-xl font-bold mb-4">¿Qué pasa?</h3>
+    <p class="text-slate-700 mb-4">
+      Faltan <strong>3 contraseñas (env vars)</strong> en el servidor de Cloud Run que son obligatorias
+      para que Shopify nos deje hablar con su API:
+    </p>
+    <ul class="bg-red-50 border border-red-200 rounded-lg p-4 font-mono text-sm space-y-1 mb-6">
+      <li class="text-red-700">❌ SHOPIFY_CLIENT_ID</li>
+      <li class="text-red-700">❌ SHOPIFY_CLIENT_SECRET</li>
+      <li class="text-red-700">❌ SHOPIFY_WEBHOOK_SECRET</li>
+    </ul>
+
+    <h3 class="text-xl font-bold mb-3 mt-6">Imagina que...</h3>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-6">
+      <p class="text-slate-800">
+        Tienes una pizzería y quieres recibir pedidos por DiDi Food. DiDi te dice:
+        <em>"toma estas 3 llaves, mete una en la puerta del local, otra en la caja registradora
+        y otra en el teléfono"</em>. Si no metes las 3, DiDi <strong>no te manda un solo pedido</strong>.
+        Tu pizzería puede estar abierta, con horno encendido y empleados esperando, pero
+        sin las 3 llaves <strong>no entra plata</strong>.
+      </p>
+    </div>
+
+    <h3 class="text-xl font-bold mb-3">Ejemplo concreto en Steve Ads</h3>
+    <div class="bg-slate-100 border border-slate-300 rounded-lg p-4 mb-6">
+      <p class="text-slate-800 mb-2"><strong>Hoy mismo, 7 de abril:</strong></p>
+      <p class="text-slate-700">
+        Si un cliente nuevo entra a Steve Ads y hace clic en "Conectar Shopify desde el App Store",
+        la pantalla queda <strong>cargando para siempre</strong>. El cliente piensa que Steve Ads
+        está roto, cierra el browser, y no vuelve. Acabas de perder un usuario por falta de
+        3 strings de texto.
+      </p>
+    </div>
+
+    <h3 class="text-xl font-bold mb-3">¿Hay workaround?</h3>
+    <p class="text-slate-700 mb-3">
+      Sí: el wizard "Custom App" de la pestaña Shopify <strong>SÍ funciona</strong> porque las credenciales
+      las pone el cliente manualmente. Pero es lento, requiere que el cliente sepa entrar al
+      admin de Shopify Partners, y nadie quiere hacer 6 clics cuando esperaba 1.
+    </p>
+
+    <h3 class="text-xl font-bold mb-3">¿Cómo se arregla?</h3>
+    <div class="bg-slate-900 text-green-400 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+<pre>gcloud run services update steve-api \
+  --region=us-central1 \
+  --project=steveapp-agency \
+  --update-env-vars \
+    SHOPIFY_CLIENT_ID=xxx,\
+    SHOPIFY_CLIENT_SECRET=yyy,\
+    SHOPIFY_WEBHOOK_SECRET=zzz</pre>
+    </div>
+    <p class="text-xs text-slate-500 mt-3">
+      <strong>OJO:</strong> Las credenciales se sacan de tu cuenta de Shopify Partners. Si no tienes
+      la app creada en Partners, primero hay que crearla y luego pedir aprobación a Shopify
+      (puede tomar 2-4 semanas).
+    </p>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- CRÍTICOS                                      -->
+<!-- ============================================ -->
+<section id="criticos" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <div class="severity-critical text-white rounded-2xl p-8 shadow-2xl mb-8">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-red-700 text-white text-xs font-bold px-3 py-1 rounded-full">CRÍTICOS</span>
+      <span class="text-red-200 text-sm">7 problemas de seguridad</span>
+    </div>
+    <h2 class="text-4xl font-bold mb-2">Críticos — Agujeros de seguridad</h2>
+    <p class="text-red-100">Cualquier persona con un poquito de curiosidad puede hacer estragos.</p>
+  </div>
+
+  <!-- S1 -->
+  <div class="bg-white border-2 border-red-300 rounded-xl p-6 mb-6 issue-card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">S1 · Endpoint público sin contraseña</h3>
+      <span class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">CRÍTICO</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">supabase/functions/shopify-data-verify/index.ts:18-217</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      Hay un endpoint en internet que cualquiera puede llamar <strong>sin login, sin token, sin nada</strong>.
+      Se supone que solo lo usa nuestro cron interno, pero olvidamos ponerle una contraseña.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Tienes una bodega con un control remoto que abre el portón. Pones el control en una
+        mesa <strong>en la calle</strong> con un cartel que dice "solo para empleados". Cualquier
+        peatón puede agarrar el control, abrir el portón y entrar a husmear.
+      </p>
+    </div>
+
+    <h4 class="font-bold text-slate-900 mb-2">Ejemplo concreto</h4>
+    <p class="text-slate-700 mb-4">
+      Un competidor descubre la URL del endpoint. Hace un script que la llama
+      <strong>10.000 veces por minuto</strong>. Cada llamada gasta nuestro cupo de Shopify
+      (rate limit), envenena la tabla <code class="bg-slate-100 px-1 rounded">qa_log</code>
+      con basura, y nos manda spam por WhatsApp porque cree que hay errores.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">El código actual (malo)</h4>
+    <pre class="code-bad p-4 rounded-lg overflow-x-auto mb-3">// Empieza el endpoint... y ya. No hay check de auth.
+serve(async (req) => {
+  const { connectionId } = await req.json();
+  // ... empieza a comparar datos sin preguntar quién eres
+});</pre>
+
+    <h4 class="font-bold text-slate-900 mb-2">El fix (bueno)</h4>
+    <pre class="code-good p-4 rounded-lg overflow-x-auto">serve(async (req) => {
+  // PRIMERO chequea la contraseña secreta del cron
+  if (req.headers.get('x-cron-secret') !== Deno.env.get('CRON_SECRET')) {
+    return new Response('forbidden', { status: 403 });
+  }
+  // ... ahora sí, hace su trabajo
+});</pre>
+    <p class="text-xs text-slate-500 mt-3"><strong>Tiempo estimado del fix:</strong> 5 minutos.</p>
+  </div>
+
+  <!-- S2 -->
+  <div class="bg-white border-2 border-red-300 rounded-xl p-6 mb-6 issue-card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">S2 · Cualquier usuario puede crear cupones en tiendas ajenas</h3>
+      <span class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">CRÍTICO</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">supabase/functions/create-shopify-discount/index.ts:51-57</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      El endpoint que crea cupones de descuento <strong>no verifica</strong> que el usuario logueado
+      sea el dueño de la tienda Shopify a la que le va a meter el cupón.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Vas a un cajero automático. Insertas <strong>tu</strong> tarjeta. El cajero te pregunta
+        <em>"¿de qué cuenta sacas?"</em> y te da una lista con <strong>todas las cuentas de Chile</strong>.
+        Eliges la del vecino, sacas $500.000, y el cajero te los entrega sin chistar.
+      </p>
+    </div>
+
+    <h4 class="font-bold text-slate-900 mb-2">Ejemplo concreto</h4>
+    <p class="text-slate-700 mb-4">
+      Cliente A (que vende muebles) y Cliente B (que vende ropa) están ambos en Steve Ads.
+      Cliente A descubre el ID de la conexión Shopify de Cliente B (es un UUID, pero igual).
+      Crea un cupón <code class="bg-slate-100 px-1 rounded">TODOGRATIS-100</code> que da
+      <strong>100% de descuento</strong> en todos los productos de Cliente B.
+      Lo publica en redes. Cliente B pierde su catálogo entero en una tarde.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">El código actual (malo)</h4>
+    <pre class="code-bad p-4 rounded-lg overflow-x-auto mb-3">const { data: connection } = await supabase
+  .from('platform_connections')
+  .select('*')
+  .eq('id', connectionId)        // ← solo busca por ID
+  .eq('is_active', true)         // ← y que esté activa
+  .single();
+// ¡Nunca pregunta si el user.id es el dueño!</pre>
+
+    <h4 class="font-bold text-slate-900 mb-2">El fix (bueno)</h4>
+    <pre class="code-good p-4 rounded-lg overflow-x-auto">const { data: connection } = await supabase
+  .from('platform_connections')
+  .select('*, clients!inner(user_id)')  // ← join con clients
+  .eq('id', connectionId)
+  .eq('is_active', true)
+  .single();
+
+// Y verifica que el dueño coincida
+if (connection.clients.user_id !== user.id && !isSuperAdmin) {
+  return c.json({ error: 'Forbidden' }, 403);
+}</pre>
+  </div>
+
+  <!-- S3 -->
+  <div class="bg-white border-2 border-red-300 rounded-xl p-6 mb-6 issue-card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">S3 · Cualquier usuario puede leer las colecciones de tiendas ajenas</h3>
+      <span class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">CRÍTICO</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">supabase/functions/fetch-shopify-collections/index.ts:28-45</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      Mismo bug que S2 pero en otro endpoint: solo valida que tengas un JWT (que estés logueado),
+      pero <strong>no verifica</strong> que la conexión Shopify sea tuya.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Entras a una biblioteca. El guardia te pide carnet (eso está bien). Pero después
+        cualquiera puede pedir <em>"el archivo confidencial del cliente Juan Pérez"</em>
+        y el guardia te lo entrega sin verificar si tú eres Juan.
+      </p>
+    </div>
+
+    <h4 class="font-bold text-slate-900 mb-2">Ejemplo concreto</h4>
+    <p class="text-slate-700 mb-4">
+      Un cliente curioso va a la pestaña Shopify, abre el inspector del browser (F12), copia
+      la llamada que hace el frontend, cambia el <code class="bg-slate-100 px-1 rounded">connectionId</code>
+      por uno random y descubre las colecciones (Verano 2026, Premium VIP, etc.) de un competidor
+      que también usa Steve Ads.
+    </p>
+  </div>
+
+  <!-- S4 -->
+  <div class="bg-white border-2 border-red-300 rounded-xl p-6 mb-6 issue-card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">S4 · Aceptamos JWT falsos sin verificar la firma</h3>
+      <span class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">CRÍTICO</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">3 archivos: sync-shopify-metrics, fetch-shopify-products, fetch-shopify-analytics</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      Cuando alguien envía un token de autenticación (JWT), nosotros <strong>solo leemos lo que dice
+      por dentro sin verificar que sea legítimo</strong>. Es como aceptar un cheque sin mirar la firma.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Llega un tipo al banco con un cheque. El cajero <strong>no mira la firma, no llama al
+        banco emisor, no nada</strong>. Solo lee el monto y entrega la plata. Si el cheque
+        dice "$5.000.000", paga $5.000.000. ¿Lo escribió el dueño? ¿Lo escribió el ladrón?
+        Nadie sabe.
+      </p>
+    </div>
+
+    <h4 class="font-bold text-slate-900 mb-2">Ejemplo concreto</h4>
+    <p class="text-slate-700 mb-4">
+      Un atacante toma un JWT viejo y expirado que encontró en un log. Le cambia la fecha de
+      expiración a mano. Lo manda a nuestro endpoint. Nosotros <strong>no verificamos la firma</strong>,
+      así que pensamos que es legítimo y le damos acceso a productos, ventas, todo.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">El código actual (malo)</h4>
+    <pre class="code-bad p-4 rounded-lg overflow-x-auto mb-3">// Decodifica el JWT manualmente, sin verificar firma
+const payload = JSON.parse(atob(token.split('.')[1]));
+const userId = payload.sub;
+// ↑ Esto acepta CUALQUIER token, hasta uno hecho a mano</pre>
+
+    <h4 class="font-bold text-slate-900 mb-2">El fix (bueno)</h4>
+    <pre class="code-good p-4 rounded-lg overflow-x-auto">// Usa la función oficial de Supabase que verifica la firma
+const { data: { user }, error } = await supabase.auth.getUser(token);
+if (error || !user) {
+  return new Response('Unauthorized', { status: 401 });
+}
+const userId = user.id;</pre>
+  </div>
+
+  <!-- S5 -->
+  <div class="bg-white border-2 border-red-300 rounded-xl p-6 mb-6 issue-card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">S5 · Fallback peligroso a una contraseña vieja</h3>
+      <span class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">CRÍTICO</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">supabase/functions/shopify-fulfillment-webhooks/index.ts:286-290</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      Para verificar webhooks de Shopify usamos <code class="bg-slate-100 px-1 rounded">SHOPIFY_WEBHOOK_SECRET</code>.
+      Si esa variable falta, el código <strong>silenciosamente cae</strong> a usar
+      <code class="bg-slate-100 px-1 rounded">SHOPIFY_CLIENT_SECRET</code> (otra cosa distinta).
+      Shopify dejó de soportar este patrón en 2022.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Tienes una caja fuerte con una clave. Si alguien borra esa clave, la caja
+        <strong>automáticamente</strong> empieza a usar tu fecha de cumpleaños como clave alternativa.
+        Nadie te avisa. Tú piensas que está segura. Cualquiera que sepa tu cumpleaños la abre.
+      </p>
+    </div>
+
+    <h4 class="font-bold text-slate-900 mb-2">Ejemplo concreto</h4>
+    <p class="text-slate-700 mb-4">
+      Algún día rotamos <code class="bg-slate-100 px-1 rounded">SHOPIFY_CLIENT_SECRET</code> pensando
+      que solo afecta el OAuth de login. Resultado: <strong>todos los webhooks de fulfillment
+      empiezan a fallar silenciosamente</strong>. Los pedidos despachados ya no llegan al sistema.
+      Felipe (W2) crea anuncios con stock incorrecto. Te enteras 2 semanas después.
+    </p>
+  </div>
+
+  <!-- S6 -->
+  <div class="bg-white border-2 border-red-300 rounded-xl p-6 mb-6 issue-card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">S6 · La "cola de fondo" es un console.log mentiroso</h3>
+      <span class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">CRÍTICO</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">supabase/functions/shopify-fulfillment-webhooks/index.ts:187-192</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      Existe una función llamada <code class="bg-slate-100 px-1 rounded">enqueueBackgroundJob()</code>
+      que <em>parece</em> que encola tareas para procesar después. <strong>No hace nada</strong>.
+      Solo imprime un mensaje en la consola.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Tienes un buzón en tu casa. Cuando llega una carta importante, la metes
+        en el buzón pensando <em>"el cartero la va a recoger y procesar"</em>. Pero el buzón
+        <strong>no tiene fondo</strong>: las cartas caen directo a la calle y se las lleva el viento.
+      </p>
+    </div>
+
+    <h4 class="font-bold text-slate-900 mb-2">Ejemplo concreto</h4>
+    <p class="text-slate-700 mb-4">
+      Llega un webhook de Shopify diciendo "el pedido #5847 fue despachado". Nuestro código dice
+      <em>"perfecto, lo encolo para procesar"</em>. En realidad solo loguea el evento y lo descarta.
+      El pedido nunca se marca como despachado en nuestra base. El cliente pregunta a Steve Ads
+      <em>"¿salió mi pedido?"</em> y Steve responde "no tengo info".
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">El código actual (malo)</h4>
+    <pre class="code-bad p-4 rounded-lg overflow-x-auto">async function enqueueBackgroundJob(payload: any) {
+  console.log('[fulfillment] enqueued:', payload.id);
+  // ← y ya. Nada más. No hay cola, no hay nada.
+}</pre>
+  </div>
+
+  <!-- S7 -->
+  <div class="bg-white border-2 border-red-300 rounded-xl p-6 mb-6 issue-card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">S7 · Mostramos contraseñas temporales en pantalla</h3>
+      <span class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">CRÍTICO</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">src/components/shopify/ShopifyWelcomeScreen.tsx:99-160</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      Cuando un cliente nuevo conecta Shopify, le creamos una cuenta y le mostramos su
+      contraseña temporal en la pantalla con un botón "copiar". El problema no es mostrarla,
+      es que <strong>hay que verificar</strong> que esa contraseña se invalide inmediatamente
+      después del primer login.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Le das a un cliente nuevo una llave de tu oficina pegada con scotch a la entrada.
+        Le dices <em>"úsala una vez y bótala"</em>. Pero si alguien pasa por ahí y la copia,
+        y tú nunca le pones una llave nueva, esa llave funciona para siempre.
+      </p>
+    </div>
+  </div>
+
+</section>
+
+<!-- ============================================ -->
+<!-- ALTOS                                         -->
+<!-- ============================================ -->
+<section id="altos" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <div class="severity-high text-white rounded-2xl p-8 shadow-2xl mb-8">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-orange-700 text-white text-xs font-bold px-3 py-1 rounded-full">ALTOS</span>
+      <span class="text-orange-200 text-sm">7 problemas serios</span>
+    </div>
+    <h2 class="text-4xl font-bold mb-2">Altos — No son agujeros, pero te van a doler</h2>
+    <p class="text-orange-100">Bugs y deuda técnica que tarde o temprano te muerden el tobillo.</p>
+  </div>
+
+  <!-- A1 -->
+  <div class="bg-white border-2 border-orange-300 rounded-xl p-6 mb-6 issue-card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">A1 · Tenemos el código de Shopify duplicado en 2 lugares</h3>
+      <span class="bg-orange-100 text-orange-800 text-xs font-bold px-3 py-1 rounded-full">ALTO</span>
+    </div>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      Casi todo el módulo Shopify (productos, analytics, collections, sync) está implementado
+      <strong>dos veces</strong>: una en el backend de Cloud Run y otra en Edge Functions de Supabase.
+      Las dos versiones son distintas. El frontend a veces llama una, a veces la otra.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Tienes dos cocineros en tu restaurante. Los dos hacen "el mismo" risotto, pero uno
+        usa parmesano y el otro grana padano. Uno tarda 20 min y el otro 30. El mesero
+        <strong>al azar</strong> pide a uno o al otro. Cada cliente recibe una experiencia
+        diferente. Y si quieres cambiar la receta, tienes que avisarle a los dos cocineros
+        (y vas a olvidar a uno).
+      </p>
+    </div>
+
+    <h4 class="font-bold text-slate-900 mb-2">Ejemplo concreto</h4>
+    <p class="text-slate-700 mb-4">
+      El analytics del <strong>backend</strong> tiene Lifetime Value, cohortes y funnel completo.
+      El analytics de la <strong>edge function</strong> NO los tiene. Si un cliente abre el dashboard
+      y por alguna razón se invoca la edge function, ve métricas pobres. Si invoca el backend,
+      ve métricas ricas. Es ruleta.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">El fix</h4>
+    <p class="text-slate-700">
+      Borrar las edge functions de fetch/sync y dejar SOLO las que tienen sentido como
+      edge function: OAuth callback, webhooks públicos y GDPR.
+    </p>
+  </div>
+
+  <!-- A2 -->
+  <div class="bg-white border-2 border-orange-300 rounded-xl p-6 mb-6 issue-card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">A2 · Hay un flujo OAuth viejo que nadie limpió</h3>
+      <span class="bg-orange-100 text-orange-800 text-xs font-bold px-3 py-1 rounded-full">ALTO</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">src/pages/OAuthShopifyCallback.tsx:97-152</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      El callback de OAuth tiene <strong>dos rutas</strong> internas: una nueva (que funciona)
+      y una vieja (que ya no se usa pero quedó comentada y conectada). Algún día alguien va
+      a tocar el archivo y "restaurar" el código viejo pensando que es el bueno.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Renovaste tu casa. Tienes una llave nueva que abre la puerta nueva. Pero dejaste
+        la cerradura vieja puesta en la puerta, "por si acaso". Cualquier ladrón que tenga
+        la llave vieja todavía entra.
+      </p>
+    </div>
+  </div>
+
+  <!-- A3 -->
+  <div class="bg-white border-2 border-orange-300 rounded-xl p-6 mb-6 issue-card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">A3 · El panel de pedidos hace 2 llamadas en vez de 1</h3>
+      <span class="bg-orange-100 text-orange-800 text-xs font-bold px-3 py-1 rounded-full">ALTO</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">src/components/client-portal/ShopifyOrdersPanel.tsx:97-101</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      Cuando el panel de pedidos carga, hace una llamada a Shopify. Si esa llamada
+      <strong>no devuelve pedidos</strong>, automáticamente hace <strong>una segunda llamada</strong>
+      con un parámetro distinto. Para clientes nuevos sin pedidos, esto significa quemar el
+      doble del rate limit cada vez que abren el tab.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Pides una pizza por teléfono. La pizzería te dice "no tenemos masa". En vez de colgar,
+        <strong>les vuelves a llamar inmediatamente</strong> a preguntar lo mismo. Te dicen
+        otra vez "no tenemos masa". Repites cada vez que abres el menú. La pizzería te bloquea.
+      </p>
+    </div>
+  </div>
+
+  <!-- A4 -->
+  <div class="bg-white border-2 border-orange-300 rounded-xl p-6 mb-6 issue-card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">A4 · Le mentimos a los clientes con datos inventados</h3>
+      <span class="bg-red-100 text-red-800 text-xs font-bold px-3 py-1 rounded-full">CRÍTICO DE NEGOCIO</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">src/components/client-portal/metrics/ShopifyFunnelPanel.tsx:32-33</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      El panel de funnel muestra "sesiones, carritos abandonados, checkouts, compras". Si Shopify
+      no nos da las sesiones (porque el cliente no tiene Shopify Plus), <strong>las inventamos</strong>
+      multiplicando carritos × 5. Le mostramos al cliente un número que <strong>no existe</strong>.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Vas al doctor. Te toma la presión pero el aparato está roto. En vez de decirte
+        <em>"no puedo medirla"</em>, el doctor <strong>se inventa un número</strong> basado
+        en cuántos años tienes. Te dice "120/80" sin tener idea. Tú confías en él y tomas
+        decisiones de salud con eso.
+      </p>
+    </div>
+
+    <h4 class="font-bold text-slate-900 mb-2">Ejemplo concreto</h4>
+    <p class="text-slate-700 mb-4">
+      Un cliente ve "5.000 sesiones este mes" y dice <em>"qué bien, mi tienda está creciendo"</em>.
+      En realidad nunca medimos sesiones. Cuando contrata más anuncios y las "sesiones" no suben
+      proporcionalmente, piensa que Steve Ads no funciona y se va.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">El código actual (malo)</h4>
+    <pre class="code-bad p-4 rounded-lg overflow-x-auto mb-3">// Si no hay sesiones, las inventa multiplicando
+const sessions = funnel.sessions || addToCarts * 5;
+const addToCarts = funnel.addToCarts || checkouts * 2.5;</pre>
+
+    <h4 class="font-bold text-slate-900 mb-2">El fix (bueno)</h4>
+    <pre class="code-good p-4 rounded-lg overflow-x-auto">// Si no hay dato, mostrar "—" (no inventarlo)
+const sessions = funnel.sessions ?? null;
+const addToCarts = funnel.addToCarts ?? null;
+// En el render:
+{sessions !== null ? sessions.toLocaleString() : '—'}</pre>
+  </div>
+
+  <!-- A5 -->
+  <div class="bg-white border-2 border-orange-300 rounded-xl p-6 mb-6 issue-card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">A5 · Cortamos la lista de clientes en 100 sin avisar</h3>
+      <span class="bg-orange-100 text-orange-800 text-xs font-bold px-3 py-1 rounded-full">ALTO</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">src/components/client-portal/ShopifyCustomersPanel.tsx:194</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      El panel de clientes muestra los primeros 100. Si tienes 543, los otros 443
+      <strong>desaparecen</strong> y nadie te avisa. Ni un "ver más", ni un contador.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Vas a la guía telefónica. Buscas "Pérez". La guía te muestra los primeros 100 Pérez
+        de Chile y luego dice "fin del libro". <strong>No hay página 2, no hay nada</strong>.
+        Tú asumes que solo hay 100 Pérez en Chile.
+      </p>
+    </div>
+  </div>
+
+  <!-- A6 -->
+  <div class="bg-white border-2 border-orange-300 rounded-xl p-6 mb-6 issue-card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">A6 · URL del API hardcodeada en el código</h3>
+      <span class="bg-orange-100 text-orange-800 text-xs font-bold px-3 py-1 rounded-full">ALTO</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">src/components/client-portal/ShopifyCustomAppWizard.tsx:26</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      El wizard de Custom App tiene escrita la URL de producción <code class="bg-slate-100 px-1 rounded">https://steve-api-850416724643.us-central1.run.app</code>
+      directamente en el código como respaldo. Si algún día migramos a otro servidor o hacemos
+      pruebas en staging, ese wizard <strong>sigue apuntando a producción</strong>.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Tienes un GPS que normalmente lee las coordenadas del satélite. Pero tiene grabada
+        a fuego la dirección de tu casa anterior <em>"por si falla el satélite"</em>. Te mudas,
+        un día falla el GPS, y termina llevándote a tu casa vieja.
+      </p>
+    </div>
+  </div>
+
+  <!-- A7 -->
+  <div class="bg-white border-2 border-orange-300 rounded-xl p-6 mb-6 issue-card">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-2xl font-bold">A7 · Borrado GDPR muy lento (puede colgar)</h3>
+      <span class="bg-orange-100 text-orange-800 text-xs font-bold px-3 py-1 rounded-full">ALTO</span>
+    </div>
+    <p class="text-xs text-slate-500 font-mono mb-4">supabase/functions/shopify-gdpr-webhooks/index.ts:117-138</p>
+
+    <h4 class="font-bold text-slate-900 mb-2">¿Qué pasa?</h4>
+    <p class="text-slate-700 mb-4">
+      Cuando un cliente desinstala la app y Shopify nos pide borrar sus datos por GDPR,
+      el código borra <strong>una tabla a la vez, esperando que termine cada una</strong>.
+      Para clientes con muchos datos puede tomar más de 2 minutos y exceder el timeout.
+    </p>
+
+    <h4 class="font-bold text-slate-900 mb-2">Imagina que...</h4>
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-4">
+      <p class="text-slate-800">
+        Tienes que vaciar 10 cajones de tu escritorio. En vez de pedirle a 10 amigos que
+        cada uno vacíe un cajón al mismo tiempo, vacías uno tú, esperas a terminar, vacías
+        otro, esperas, y así. Tardas 10 veces más.
+      </p>
+    </div>
+  </div>
+
+</section>
+
+<!-- ============================================ -->
+<!-- MEDIOS                                        -->
+<!-- ============================================ -->
+<section id="medios" class="anchor max-w-6xl mx-auto px-6 py-12">
+  <div class="severity-medium text-white rounded-2xl p-8 shadow-2xl mb-8">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-yellow-700 text-white text-xs font-bold px-3 py-1 rounded-full">MEDIOS</span>
+      <span class="text-yellow-200 text-sm">5 problemas operacionales</span>
+    </div>
+    <h2 class="text-4xl font-bold mb-2">Medios — Tierra debajo de la alfombra</h2>
+    <p class="text-yellow-100">No urgentes pero hay que limpiarlos antes de seguir creciendo.</p>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-4">
+
+    <!-- M1 -->
+    <div class="bg-white border-2 border-yellow-300 rounded-xl p-5 issue-card">
+      <h3 class="text-lg font-bold mb-2">M1 · ShopifyDashboard.tsx tiene 764 líneas</h3>
+      <p class="text-xs text-slate-500 mb-3">Demasiadas responsabilidades en un solo archivo</p>
+      <p class="text-sm text-slate-700 mb-3">
+        <strong>Imagina:</strong> un mecánico que tiene todas sus herramientas tiradas en una sola
+        caja gigante. Cada vez que necesita una llave Allen, tiene que vaciar la caja entera.
+      </p>
+      <p class="text-sm text-slate-600">
+        <strong>Fix:</strong> separar UtmTable y SeoAnalysisCard a archivos propios.
+      </p>
+    </div>
+
+    <!-- M2 -->
+    <div class="bg-white border-2 border-yellow-300 rounded-xl p-5 issue-card">
+      <h3 class="text-lg font-bold mb-2">M2 · El mismo cálculo repetido 2 veces</h3>
+      <p class="text-xs text-slate-500 mb-3">ShopifyProductsPanel.tsx</p>
+      <p class="text-sm text-slate-700 mb-3">
+        <strong>Imagina:</strong> calculas el cambio de tu vuelto dos veces seguidas, cada vez
+        que pagas. Funciona, pero gastas el doble de tiempo sin necesidad.
+      </p>
+      <p class="text-sm text-slate-600">
+        <strong>Fix:</strong> calcular salesMap una vez y reutilizar.
+      </p>
+    </div>
+
+    <!-- M3 -->
+    <div class="bg-white border-2 border-yellow-300 rounded-xl p-5 issue-card">
+      <h3 class="text-lg font-bold mb-2">M3 · Productos demo hardcodeados</h3>
+      <p class="text-xs text-slate-500 mb-3">useShopifyPreviewProducts.tsx:11-18</p>
+      <p class="text-sm text-slate-700 mb-3">
+        <strong>Imagina:</strong> si tu cajero del banco no carga, en vez de decir "error",
+        te muestra el saldo de OTRO cliente como ejemplo "para que veas cómo sería".
+      </p>
+      <p class="text-sm text-slate-600">
+        <strong>Fix:</strong> mostrar empty state real cuando falle el fetch.
+      </p>
+    </div>
+
+    <!-- M4 -->
+    <div class="bg-white border-2 border-yellow-300 rounded-xl p-5 issue-card">
+      <h3 class="text-lg font-bold mb-2">M4 · No hay cron de sync</h3>
+      <p class="text-xs text-slate-500 mb-3">Cloud Scheduler (no creado)</p>
+      <p class="text-sm text-slate-700 mb-3">
+        <strong>Imagina:</strong> tienes un termómetro en tu freezer pero solo lo lees cuando
+        abres la puerta. El resto del tiempo no sabes la temperatura. Si se descompone, te
+        enteras cuando ya está todo derretido.
+      </p>
+      <p class="text-sm text-slate-600">
+        <strong>Fix:</strong> crear cron <code class="bg-slate-100 px-1 rounded">shopify-sync-15min</code>.
+      </p>
+    </div>
+
+    <!-- M5 -->
+    <div class="bg-white border-2 border-yellow-300 rounded-xl p-5 issue-card md:col-span-2">
+      <h3 class="text-lg font-bold mb-2">M5 · No detectamos tokens de Shopify expirados</h3>
+      <p class="text-xs text-slate-500 mb-3">Falta job de health check</p>
+      <p class="text-sm text-slate-700 mb-3">
+        <strong>Imagina:</strong> tu llave del auto se gastó y no abre. En vez de avisarte
+        <em>"renueva la llave"</em>, el auto solo dice "no funciona" cada vez que intentas entrar.
+        No sabes qué cambió ni cuándo.
+      </p>
+      <p class="text-sm text-slate-600">
+        <strong>Fix:</strong> crear cron diario que pruebe los tokens y notifique a JM si alguno
+        está expirado, con instrucción de renovación al cliente.
+      </p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- LO QUE ESTÁ BIEN                              -->
+<!-- ============================================ -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <div class="severity-ok text-white rounded-2xl p-8 shadow-2xl mb-8">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-green-700 text-white text-xs font-bold px-3 py-1 rounded-full">OK</span>
+      <span class="text-green-200 text-sm">11 cosas que están bien hechas</span>
+    </div>
+    <h2 class="text-4xl font-bold mb-2">Lo que NO hay que tocar</h2>
+    <p class="text-green-100">No todo es malo. Estas cosas están bien y hay que mantenerlas así.</p>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-3">
+    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+      <strong class="text-green-900">HMAC SHA-256 timing-safe</strong>
+      <p class="text-sm text-green-800 mt-1">Verificación criptográfica robusta de webhooks.</p>
+    </div>
+    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+      <strong class="text-green-900">CSRF state nonce en OAuth</strong>
+      <p class="text-sm text-green-800 mt-1">Protege contra ataques de inyección de OAuth.</p>
+    </div>
+    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+      <strong class="text-green-900">Encriptación de tokens en DB</strong>
+      <p class="text-sm text-green-800 mt-1">Los tokens nunca se guardan en texto plano.</p>
+    </div>
+    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+      <strong class="text-green-900">Auto-creación user + client</strong>
+      <p class="text-sm text-green-800 mt-1">UX de onboarding sin fricción al instalar.</p>
+    </div>
+    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+      <strong class="text-green-900">Auto-registro de 7 webhooks</strong>
+      <p class="text-sm text-green-800 mt-1">orders/create, fulfilled, GDPR, etc.</p>
+    </div>
+    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+      <strong class="text-green-900">Rate limit de 5 min en sync</strong>
+      <p class="text-sm text-green-800 mt-1">Protege contra quemar el rate limit de Shopify.</p>
+    </div>
+    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+      <strong class="text-green-900">Conversión de monedas a CLP</strong>
+      <p class="text-sm text-green-800 mt-1">Normaliza revenue de tiendas multi-moneda.</p>
+    </div>
+    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+      <strong class="text-green-900">useUserPlan gating</strong>
+      <p class="text-sm text-green-800 mt-1">Control de acceso por plan en operaciones de escritura.</p>
+    </div>
+    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+      <strong class="text-green-900">ShopifyCustomAppWizard</strong>
+      <p class="text-sm text-green-800 mt-1">UX de 6 pasos clarísima, polling cada 3s.</p>
+    </div>
+    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+      <strong class="text-green-900">Algoritmo de precio sugerido</strong>
+      <p class="text-sm text-green-800 mt-1">3 reglas: overstock, fast seller, low margin.</p>
+    </div>
+    <div class="bg-green-50 border border-green-200 rounded-lg p-4 md:col-span-2">
+      <strong class="text-green-900">Combo creator con preview</strong>
+      <p class="text-sm text-green-800 mt-1">Uno de los flows más bonitos del sistema entero. Preview de página de producto + slider de descuento + cálculo de ahorro.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- PLAN DE ATAQUE                                -->
+<!-- ============================================ -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6 border-b-4 border-slate-900 pb-2 inline-block">Plan de ataque sugerido</h2>
+
+  <div class="space-y-4">
+    <div class="bg-white border-l-4 border-red-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">SPRINT 1</span>
+        <h3 class="text-xl font-bold">Cerrar agujeros de seguridad</h3>
+      </div>
+      <p class="text-slate-700 mb-2">~1.5 horas. 6 fixes.</p>
+      <ul class="text-sm text-slate-600 space-y-1">
+        <li>• S1 — Cron secret en data-verify</li>
+        <li>• S2 — Ownership en discount</li>
+        <li>• S3 — Ownership en collections</li>
+        <li>• S4 — Reemplazar JWT manual</li>
+        <li>• S5 — Quitar fallback</li>
+        <li>• A4 — Fix funnel mentiroso</li>
+      </ul>
+    </div>
+
+    <div class="bg-white border-l-4 border-red-900 rounded-r-xl p-5 shadow">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="bg-red-900 text-white text-xs font-bold px-3 py-1 rounded-full">SPRINT 2</span>
+        <h3 class="text-xl font-bold">Desbloquear App Store (depende de JM)</h3>
+      </div>
+      <p class="text-slate-700">Decisión: ¿OAuth público o solo Custom App? Setear las 3 env vars.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-orange-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="bg-orange-600 text-white text-xs font-bold px-3 py-1 rounded-full">SPRINT 3</span>
+        <h3 class="text-xl font-bold">Limpieza arquitectural</h3>
+      </div>
+      <p class="text-slate-700">Borrar duplicación backend ↔ edge functions. Eliminar legacy flows.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-yellow-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="bg-yellow-600 text-white text-xs font-bold px-3 py-1 rounded-full">SPRINT 4</span>
+        <h3 class="text-xl font-bold">Operaciones</h3>
+      </div>
+      <p class="text-slate-700">Crear crons de sync, token health check, paralelizar GDPR.</p>
+    </div>
+
+    <div class="bg-white border-l-4 border-slate-600 rounded-r-xl p-5 shadow">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="bg-slate-600 text-white text-xs font-bold px-3 py-1 rounded-full">SPRINT 5</span>
+        <h3 class="text-xl font-bold">Polish</h3>
+      </div>
+      <p class="text-slate-700">Paginación, refactors menores, eliminar URL hardcoded.</p>
+    </div>
+  </div>
+</section>
+
+<!-- DESAFÍO DE MATÍAS -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <div class="bg-gradient-to-br from-slate-900 via-red-950 to-slate-900 text-white rounded-2xl p-8 shadow-2xl">
+    <p class="text-orange-400 font-mono text-sm uppercase tracking-wider mb-2">Matías W13 te desafía</p>
+    <h2 class="text-3xl font-bold mb-6">JM, antes de seguir agregando features</h2>
+
+    <div class="space-y-4">
+      <div class="bg-black/30 border border-red-500/30 rounded-lg p-4">
+        <div class="font-bold text-red-300 mb-1">1. ¿Vamos a publicar la app en Shopify App Store o no?</div>
+        <p class="text-slate-300 text-sm">Hay 800+ líneas de OAuth público que están MUERTAS si no. Decide y borramos.</p>
+      </div>
+
+      <div class="bg-black/30 border border-red-500/30 rounded-lg p-4">
+        <div class="font-bold text-red-300 mb-1">2. El cron de sync no existe.</div>
+        <p class="text-slate-300 text-sm">Cuando un cliente cierra el dashboard, sus métricas Shopify quedan stale. Felipe está creando anuncios con datos viejos.</p>
+      </div>
+
+      <div class="bg-black/30 border border-red-500/30 rounded-lg p-4">
+        <div class="font-bold text-red-300 mb-1">3. El funnel está MINTIENDO a los clientes (A4).</div>
+        <p class="text-slate-300 text-sm">Le decimos "tienes 5.000 visitas" cuando inventamos el dato. Si un cliente lo descubre, perdemos credibilidad.</p>
+      </div>
+
+      <div class="bg-black/30 border border-red-500/30 rounded-lg p-4">
+        <div class="font-bold text-red-300 mb-1">4. Hay 4 endpoints de seguridad rotos.</div>
+        <p class="text-slate-300 text-sm">Cualquiera con curiosidad puede crear cupones, leer datos ajenos, quemar tu cron. Esto se arregla antes de mañana.</p>
+      </div>
+
+      <div class="bg-black/30 border border-red-500/30 rounded-lg p-4">
+        <div class="font-bold text-red-300 mb-1">5. No hay tests de NADA en Shopify.</div>
+        <p class="text-slate-300 text-sm">Cero. Si tocamos algo no sabemos qué se rompe. ¿Pedimos a Javiera W12 que escriba al menos los smoke tests?</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="max-w-6xl mx-auto px-6 py-8 text-center text-slate-500 text-sm border-t border-slate-200 mt-12">
+  <p>Diagnóstico generado por <strong>Matías W13 — Shopify</strong> · Steve Ads · 7 abril 2026</p>
+  <p class="mt-1">14.500 líneas revisadas · 48 archivos · 20 issues encontrados</p>
+</footer>
+
+</body>
+</html>

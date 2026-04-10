@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Steve — Variaciones de anuncios</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif;
+    background: #0a0a0a;
+    color: #fff;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { padding: 48px 24px 80px; }
+  .header {
+    max-width: 1280px;
+    margin: 0 auto 48px;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 36px;
+    margin-bottom: 10px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .header p {
+    color: #888;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .ad-card {
+    aspect-ratio: 4 / 5;
+    border-radius: 26px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 56px 44px 44px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    transition: transform 0.2s ease;
+  }
+  .ad-card:hover { transform: translateY(-4px); }
+  .ad-card .eyebrow {
+    font-size: 12px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    opacity: 0.55;
+    margin-bottom: 22px;
+    font-weight: 600;
+  }
+  .ad-card h2 {
+    font-size: 38px;
+    line-height: 1.1;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+    margin-bottom: 18px;
+    margin-right: 52px;  /* deja espacio para el botón de descarga */
+  }
+  .ad-card h2 .accent { font-weight: 500; opacity: 0.7; }
+  .ad-card h2 .strong { font-weight: 800; }
+  .ad-card .subtitle {
+    font-size: 16px;
+    line-height: 1.5;
+    opacity: 0.8;
+    font-weight: 400;
+    max-width: 95%;
+  }
+  .ad-card .spacer { flex: 1; min-height: 18px; }
+  .ad-card .screenshot {
+    margin: 22px 0 14px;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 18px 42px rgba(0,0,0,0.45);
+    border: 1px solid rgba(255,255,255,0.12);
+    background: #1a1a1a;
+  }
+  .ad-card .screenshot img {
+    width: 100%;
+    display: block;
+    object-fit: cover;
+    object-position: top;
+    max-height: 220px;
+  }
+  .ad-card .footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 22px;
+    padding-top: 22px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  .ad-card.light .footer { border-top-color: rgba(0,0,0,0.08); }
+  .ad-card .brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .ad-card .avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: rgba(255,255,255,0.08);
+    flex-shrink: 0;
+    border: 2px solid rgba(255,255,255,0.18);
+  }
+  .ad-card.light .avatar { border-color: rgba(0,0,0,0.1); background: rgba(0,0,0,0.04); }
+  .ad-card .avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .ad-card .brand-text { display: flex; flex-direction: column; line-height: 1.2; }
+  .ad-card .brand-text strong { font-size: 18px; font-weight: 700; }
+  .ad-card .brand-text small { font-size: 13px; opacity: 0.68; margin-top: 2px; }
+  .ad-card .cta {
+    background: rgba(255,255,255,0.96);
+    color: #18181b;
+    padding: 13px 22px;
+    border-radius: 100px;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: transform 0.15s ease;
+  }
+  .ad-card .cta:hover { transform: scale(1.04); }
+
+  /* Paleta sobria */
+  .navy       { background: #1a1d3a; color: #f5f5f5; }
+  .cream      { background: #f4eee2; color: #1c1c1c; }
+  .forest     { background: #1e3a2f; color: #f3f3f3; }
+  .charcoal   { background: #26262b; color: #f3f3f3; }
+  .indigo     { background: #2e2b6e; color: #f3f3f3; }
+  .bone       { background: #f8f6f0; color: #1c1c1c; }
+  .slate      { background: #1f2937; color: #f3f3f3; }
+  .stone      { background: #3f3a33; color: #f3f3f3; }
+  .midnight   { background: #0f172a; color: #f3f3f3; }
+  .sand       { background: #d8c9ad; color: #1c1c1c; }
+  .teal       { background: #134e4a; color: #f3f3f3; }
+  .terracotta { background: #e8d5c4; color: #1c1c1c; }
+  .plum       { background: #2d1b3d; color: #f3f3f3; }
+  .graphite   { background: #313438; color: #f3f3f3; }
+  .oxblood    { background: #3c1f1f; color: #f3f3f3; }
+  .linen      { background: #efe9dc; color: #1c1c1c; }
+  .moss       { background: #2a3a25; color: #f3f3f3; }
+  .ivory      { background: #ece7d8; color: #1c1c1c; }
+  .obsidian   { background: #16161d; color: #f3f3f3; }
+  .clay       { background: #5a3d2b; color: #f3f3f3; }
+  .pearl      { background: #ebe5d6; color: #1c1c1c; }
+  .deepblue   { background: #0c1a3d; color: #f3f3f3; }
+  .rust       { background: #6b2e1f; color: #f3f3f3; }
+  .almond     { background: #e6dcc4; color: #1c1c1c; }
+  .ink        { background: #14141a; color: #f3f3f3; }
+
+  /* Logo grids */
+  .logo-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin: 22px 0;
+    padding: 22px 16px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .light .logo-grid {
+    background: rgba(0,0,0,0.05);
+    border-color: rgba(0,0,0,0.08);
+  }
+  .logo-grid img {
+    width: 100%;
+    height: 38px;
+    object-fit: contain;
+    opacity: 0.92;
+  }
+  .platform-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 18px;
+    margin: 28px 0;
+    padding: 26px 18px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .light .platform-row {
+    background: rgba(0,0,0,0.04);
+    border-color: rgba(0,0,0,0.08);
+  }
+  .platform-row img {
+    height: 38px;
+    width: auto;
+    object-fit: contain;
+  }
+  .review {
+    margin: 22px 0;
+    padding: 22px 20px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .light .review {
+    background: rgba(0,0,0,0.04);
+    border-color: rgba(0,0,0,0.08);
+  }
+  .review .stars {
+    font-size: 16px;
+    letter-spacing: 3px;
+    margin-bottom: 10px;
+    opacity: 0.95;
+  }
+  .review .quote {
+    font-size: 15px;
+    line-height: 1.5;
+    margin-bottom: 16px;
+    font-weight: 500;
+  }
+  .review .who {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .review .initials {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    color: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    border: 1.5px solid rgba(255,255,255,0.18);
+  }
+  .light .review .initials {
+    background: rgba(0,0,0,0.08);
+    border-color: rgba(0,0,0,0.12);
+  }
+  .review .meta { display: flex; flex-direction: column; line-height: 1.3; }
+  .review .meta strong { font-size: 14px; font-weight: 700; }
+  .review .meta small { font-size: 12px; opacity: 0.65; margin-top: 2px; }
+  .review-list { display: flex; flex-direction: column; gap: 14px; margin: 22px 0; }
+  .review-list .review { margin: 0; padding: 16px; }
+  .review-list .review .quote { font-size: 13px; margin-bottom: 10px; }
+  .review-list .review .stars { font-size: 13px; margin-bottom: 6px; }
+  .big-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 26px 0;
+    padding: 28px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .light .big-logo {
+    background: rgba(0,0,0,0.04);
+    border-color: rgba(0,0,0,0.08);
+  }
+  .big-logo img {
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  /* DYNAMIC STEVE COMPOSITIONS */
+
+  /* Steve gigante centrado con halo */
+  .steve-hero {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .steve-hero img {
+    width: 78%;
+    aspect-ratio: 1;
+    object-fit: contain;
+    filter: drop-shadow(0 30px 60px rgba(0,0,0,0.5));
+  }
+  .steve-hero.tilt img { transform: rotate(-8deg); }
+
+  /* Steve photo (Imagen-generated, white background) — enmarcado en círculo */
+  .steve-photo-circle {
+    width: 64%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: #fff;
+    margin: 16px auto 22px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 24px 50px rgba(0,0,0,0.35);
+    border: 8px solid rgba(255,255,255,0.92);
+  }
+  .light .steve-photo-circle { border-color: rgba(0,0,0,0.06); }
+  .steve-photo-circle img { width: 100%; height: 100%; object-fit: cover; }
+
+  .steve-photo-square {
+    width: 72%;
+    aspect-ratio: 1;
+    border-radius: 22px;
+    background: #fff;
+    margin: 12px auto 22px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 22px 50px rgba(0,0,0,0.35);
+  }
+  .steve-photo-square img { width: 100%; height: 100%; object-fit: cover; }
+
+  .steve-photo-full {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .steve-photo-full img {
+    width: 86%;
+    aspect-ratio: 1;
+    object-fit: contain;
+    filter: drop-shadow(0 28px 60px rgba(0,0,0,0.4));
+  }
+
+  /* Steve como watermark / fantasma */
+  .steve-ghost {
+    position: absolute;
+    right: -80px;
+    bottom: -80px;
+    width: 380px;
+    height: 380px;
+    opacity: 0.12;
+    pointer-events: none;
+  }
+  .steve-ghost img { width: 100%; height: 100%; object-fit: contain; }
+
+  /* Steve peeking de la esquina */
+  .steve-peek {
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 220px;
+    height: 220px;
+    transform: rotate(15deg);
+    filter: drop-shadow(0 12px 24px rgba(0,0,0,0.4));
+    pointer-events: none;
+  }
+  .steve-peek img { width: 100%; height: 100%; object-fit: contain; }
+
+  /* Steve abajo gigante */
+  .steve-bottom {
+    position: absolute;
+    left: 50%;
+    bottom: -100px;
+    transform: translateX(-50%);
+    width: 360px;
+    height: 360px;
+    pointer-events: none;
+    filter: drop-shadow(0 20px 40px rgba(0,0,0,0.45));
+  }
+  .steve-bottom img { width: 100%; height: 100%; object-fit: contain; }
+
+  /* Speech bubble */
+  .speech {
+    position: relative;
+    background: rgba(255,255,255,0.96);
+    color: #1a1a1a;
+    padding: 18px 22px;
+    border-radius: 22px;
+    font-size: 16px;
+    line-height: 1.4;
+    font-weight: 600;
+    margin: 24px 0 24px 88px;
+    max-width: 260px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.25);
+  }
+  .speech::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    bottom: 18px;
+    width: 24px;
+    height: 24px;
+    background: rgba(255,255,255,0.96);
+    border-radius: 50%;
+  }
+  .speech::after {
+    content: '';
+    position: absolute;
+    left: -22px;
+    bottom: 8px;
+    width: 14px;
+    height: 14px;
+    background: rgba(255,255,255,0.96);
+    border-radius: 50%;
+  }
+
+  /* Steve hablando con bubble */
+  .steve-talk {
+    display: flex;
+    align-items: flex-end;
+    gap: 0;
+    margin: 28px 0;
+    position: relative;
+  }
+  .steve-talk .steve-img {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 3px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.08);
+    z-index: 2;
+  }
+  .light .steve-talk .steve-img {
+    border-color: rgba(0,0,0,0.12);
+    background: rgba(0,0,0,0.04);
+  }
+  .steve-talk .steve-img img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* Trio of Steves */
+  .steve-trio {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin: 30px 0;
+    padding: 24px 0;
+  }
+  .steve-trio .small {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    overflow: hidden;
+    opacity: 0.7;
+    transform: scale(0.85);
+    border: 2px solid rgba(255,255,255,0.2);
+  }
+  .steve-trio .big {
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid rgba(255,255,255,0.3);
+    box-shadow: 0 16px 36px rgba(0,0,0,0.4);
+    z-index: 2;
+  }
+  .light .steve-trio .small { border-color: rgba(0,0,0,0.12); }
+  .light .steve-trio .big { border-color: rgba(0,0,0,0.18); }
+  .steve-trio img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* Steve con stamp / badge */
+  .steve-badge {
+    position: relative;
+    margin: 28px auto;
+    width: 200px;
+    height: 200px;
+  }
+  .steve-badge .ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 3px dashed rgba(255,255,255,0.4);
+    animation: spin 60s linear infinite;
+  }
+  .light .steve-badge .ring { border-color: rgba(0,0,0,0.2); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .steve-badge .img {
+    position: absolute;
+    inset: 14px;
+    border-radius: 50%;
+    overflow: hidden;
+  }
+  .steve-badge .img img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* Steve + Chonga side by side */
+  .steve-duo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0;
+    margin: 24px 0;
+  }
+  .steve-duo .dog {
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid rgba(255,255,255,0.25);
+    box-shadow: 0 14px 30px rgba(0,0,0,0.4);
+  }
+  .light .steve-duo .dog { border-color: rgba(0,0,0,0.15); }
+  .steve-duo .dog:first-child { transform: translateX(20px) rotate(-6deg); z-index: 2; }
+  .steve-duo .dog:last-child { transform: translateX(-20px) rotate(6deg); }
+  .steve-duo img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* Card content needs higher z-index when there's a hero/ghost */
+  .ad-card.has-bg .eyebrow,
+  .ad-card.has-bg h2,
+  .ad-card.has-bg .subtitle,
+  .ad-card.has-bg .footer,
+  .ad-card.has-bg .speech { position: relative; z-index: 3; }
+
+  .light .cta { background: #18181b; color: #f4eee2; }
+
+  /* responsive */
+  @media (max-width: 720px) {
+    .ad-card { padding: 36px 28px; }
+    .ad-card h2 { font-size: 30px; }
+  }
+
+  /* Botón descargar PNG */
+  .dl-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    opacity: 0.55;
+    transition: opacity 0.2s ease, transform 0.15s ease, background 0.15s ease;
+    z-index: 50;
+    font-family: inherit;
+  }
+  .light .dl-btn { background: rgba(0,0,0,0.12); color: #1c1c1c; }
+  .ad-card:hover .dl-btn { opacity: 1; background: rgba(255,255,255,0.28); }
+  .light .ad-card:hover .dl-btn { background: rgba(0,0,0,0.18); }
+  .dl-btn:hover { transform: scale(1.1); }
+  .dl-btn.downloading { opacity: 1 !important; background: #16a34a !important; color: #fff !important; }
+
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Steve — Variaciones de anuncios</h1>
+  <p>52 variaciones · formato 4:5 Instagram · pasa el cursor sobre una card para descargarla</p>
+  <button onclick="downloadAll()" style="margin-top:18px;background:#fff;color:#0a0a0a;border:none;padding:12px 26px;border-radius:100px;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit;">⬇ Descargar todas las 52</button>
+
+</div>
+
+<div class="grid">
+
+  <!-- 01 -->
+  <div class="ad-card navy" data-name="steve-01">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Tu marketing</span><br>te habla<br><span class="strong">por WhatsApp.</span></h2>
+    <p class="subtitle">Sin reuniones. Sin PDFs de 47 páginas. Solo lo que necesitas saber, cuando lo necesitas.</p>
+    <div class="spacer"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 02 -->
+  <div class="ad-card cream light" data-name="steve-02">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Steve aprende tu marca</span><br><span class="strong">antes de hablar por ti.</span></h2>
+    <p class="subtitle">Tu tono. Tu historia. Tus productos. Steve los estudia primero.</p>
+    <div class="screenshot"><img src="screenshots/brand-brief.png" alt="Brand Brief"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 03 -->
+  <div class="ad-card forest" data-name="steve-03">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Cuatro plataformas.</span><br><span class="strong">Una conversación.</span></h2>
+    <p class="subtitle">Meta, Google, Shopify y Klaviyo en un solo lugar. Sin tabs abiertas.</p>
+    <div class="screenshot"><img src="screenshots/connections.png" alt="Conexiones"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 04 -->
+  <div class="ad-card charcoal" data-name="steve-04">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Tus números,</span><br><span class="strong">en español.</span></h2>
+    <p class="subtitle">ROAS, CPA, CTR. Steve te explica qué significa cada uno y qué hacer al respecto.</p>
+    <div class="screenshot"><img src="screenshots/metrics.png" alt="Métricas"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 05 -->
+  <div class="ad-card indigo" data-name="steve-05">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">No te vamos a decir</span><br>"optimizamos<br>tu funnel".<br><span class="strong">Te vamos a decir<br>qué vendiste hoy.</span></h2>
+    <div class="spacer"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 06 -->
+  <div class="ad-card bone light" data-name="steve-06">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Pregúntale lo que sea</span><br><span class="strong">sobre tu negocio.</span></h2>
+    <p class="subtitle">Steve te responde con tus datos, no con frases hechas.</p>
+    <div class="screenshot"><img src="screenshots/steve-chat.png" alt="Steve Chat"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 07 -->
+  <div class="ad-card slate" data-name="steve-07">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Tus campañas Meta,</span><br><span class="strong">sin abrir Meta.</span></h2>
+    <p class="subtitle">Crea, edita y ajusta desde un solo lugar. Steve te avisa qué está funcionando.</p>
+    <div class="screenshot"><img src="screenshots/meta-ads.png" alt="Meta Ads"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 08 -->
+  <div class="ad-card stone" data-name="steve-08">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Email marketing</span><br><span class="strong">que sí mira<br>tus métricas.</span></h2>
+    <p class="subtitle">Steve escribe, programa y aprende de cada apertura.</p>
+    <div class="screenshot"><img src="screenshots/klaviyo.png" alt="Klaviyo"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 09 -->
+  <div class="ad-card midnight" data-name="steve-09">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">No es una agencia.</span><br><span class="accent">No es un software.</span><br><span class="strong">Es un colega.</span></h2>
+    <p class="subtitle">Steve trabaja contigo, no para ti. Le hablas como a un amigo y te responde como un experto.</p>
+    <div class="spacer"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 10 -->
+  <div class="ad-card sand light" data-name="steve-10">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Lo conectas en</span><br><span class="strong">tres minutos.</span></h2>
+    <p class="subtitle">Después solo le cuentas qué quieres lograr. Steve hace el resto.</p>
+    <div class="screenshot"><img src="screenshots/deep-dive.png" alt="Deep Dive"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 11 -->
+  <div class="ad-card teal" data-name="steve-11">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Google Ads que</span><br><span class="strong">entiende tu negocio.</span></h2>
+    <p class="subtitle">Steve revisa qué buscan tus clientes y ajusta tus campañas antes de que pierdas plata.</p>
+    <div class="screenshot"><img src="screenshots/google-ads.png" alt="Google Ads"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 12 -->
+  <div class="ad-card terracotta light" data-name="steve-12">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Steve sabe qué</span><br><span class="strong">vendiste ayer.</span></h2>
+    <p class="subtitle">Tu inventario, tus pedidos, tus productos estrella. Todo conectado, todo en su cabeza.</p>
+    <div class="screenshot"><img src="screenshots/shopify.png" alt="Shopify"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 13 -->
+  <div class="ad-card plum" data-name="steve-13">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Emails escritos por</span><br><span class="strong">alguien que sí<br>te conoce.</span></h2>
+    <p class="subtitle">Steve aprende de cada apertura, cada click, cada compra. Y la próxima vez escribe mejor.</p>
+    <div class="screenshot"><img src="screenshots/steve-mail.png" alt="Steve Mail"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 14 -->
+  <div class="ad-card graphite" data-name="steve-14">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">El dashboard</span><br><span class="strong">que sí miras.</span></h2>
+    <p class="subtitle">Solo lo importante. Ordenado por lo que mueve tu plata, no por lo que se ve bonito.</p>
+    <div class="screenshot"><img src="screenshots/metrics.png" alt="Dashboard"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 15 -->
+  <div class="ad-card oxblood" data-name="steve-15">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Análisis profundo,</span><br><span class="strong">lenguaje simple.</span></h2>
+    <p class="subtitle">Steve te dice qué pasó, por qué pasó, y qué hacer mañana. En una pantalla.</p>
+    <div class="screenshot"><img src="screenshots/deep-dive.png" alt="Deep Dive"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 16 -->
+  <div class="ad-card linen light" data-name="steve-16">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Una decisión.</span><br><span class="strong">Cinco canales<br>aplicándola.</span></h2>
+    <p class="subtitle">Cambias el precio en Shopify y Steve actualiza Meta, Google y los emails al mismo tiempo.</p>
+    <div class="screenshot"><img src="screenshots/connections.png" alt="Conexiones"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 17 -->
+  <div class="ad-card moss" data-name="steve-17">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">"Steve, ¿qué hago</span><br><span class="strong">con el presupuesto?"</span></h2>
+    <p class="subtitle">Le preguntas como a un colega. Steve mira tus datos y te responde en segundos.</p>
+    <div class="screenshot"><img src="screenshots/steve-chat.png" alt="Steve Chat"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 18 -->
+  <div class="ad-card ivory light" data-name="steve-18">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Marcas que ya</span><br><span class="strong">trabajan con Steve.</span></h2>
+    <p class="subtitle">Tiendas reales, vendiendo todos los días, con un equipo de marketing que cabe en una conversación.</p>
+    <div class="logo-grid">
+      <img src="ads-assets/clients/arueda.png" alt="A. Rueda">
+      <img src="ads-assets/clients/vallesecreto.png" alt="Valle Secreto">
+      <img src="ads-assets/clients/puntiferrer.png" alt="Punti Ferrer">
+      <img src="ads-assets/clients/razaspet.png" alt="Razas Pet">
+      <img src="ads-assets/clients/ateliertelas.png" alt="Atelier Telas">
+      <img src="ads-assets/clients/moretta.png" alt="Moretta">
+      <img src="ads-assets/clients/crazydiamond.png" alt="Crazy Diamond">
+      <img src="ads-assets/clients/jardindeeva.png" alt="Jardin de Eva">
+    </div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 19 -->
+  <div class="ad-card obsidian" data-name="steve-19">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Habla con todas</span><br><span class="strong">las plataformas<br>que ya usas.</span></h2>
+    <div class="platform-row">
+      <img src="ads-assets/logos/logo-meta-clean.png" alt="Meta">
+      <img src="ads-assets/logos/logo-google-ads.png" alt="Google">
+      <img src="ads-assets/logos/logo-shopify-clean.png" alt="Shopify">
+      <img src="ads-assets/logos/logo-klaviyo-clean.png" alt="Klaviyo">
+    </div>
+    <p class="subtitle">Sin migrar nada. Sin aprender de cero. Steve se conecta donde tú ya tienes la plata.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 20 -->
+  <div class="ad-card pearl light" data-name="steve-20">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">"Yo lanzo productos.</span><br><span class="strong">Steve lanza<br>campañas."</span></h2>
+    <div class="review">
+      <div class="stars">★★★★★</div>
+      <p class="quote">"Antes pasaba 4 horas en Meta Ads sin saber si estaba haciendo bien. Ahora le pregunto a Steve y listo."</p>
+      <div class="who">
+        <div class="initials">MJ</div>
+        <div class="meta"><strong>María José Vergara</strong><small>Fundadora · Tienda de skincare</small></div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 21 -->
+  <div class="ad-card clay" data-name="steve-21">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">"Quiero saber si</span><br><span class="strong">vendí más.<br>Nada más."</span></h2>
+    <div class="review">
+      <div class="stars">★★★★★</div>
+      <p class="quote">"Steve me manda un WhatsApp en la mañana con tres cosas que me importan. Sin gráficos, sin jerga."</p>
+      <div class="who">
+        <div class="initials">CH</div>
+        <div class="meta"><strong>Cristóbal Hernández</strong><small>CEO · Marca de calzado</small></div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 22 -->
+  <div class="ad-card deepblue" data-name="steve-22">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Meta. Google.</span><br><span class="accent">Shopify. Klaviyo.</span><br><span class="strong">Y un solo Steve.</span></h2>
+    <div class="platform-row">
+      <img src="ads-assets/logos/logo-meta-clean.png" alt="Meta">
+      <img src="ads-assets/logos/logo-google-ads.png" alt="Google">
+      <img src="ads-assets/logos/logo-shopify-clean.png" alt="Shopify">
+      <img src="ads-assets/logos/logo-klaviyo-clean.png" alt="Klaviyo">
+    </div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 23 -->
+  <div class="ad-card almond light" data-name="steve-23">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Tiendas chicas.</span><br><span class="strong">Decisiones grandes.</span></h2>
+    <div class="logo-grid">
+      <img src="ads-assets/clients/telapijamas.png" alt="Tela Pijamas">
+      <img src="ads-assets/clients/piged.png" alt="Piged">
+      <img src="ads-assets/clients/lasoluzione.png" alt="La Soluzione">
+      <img src="ads-assets/clients/amabile.png" alt="Amabile">
+      <img src="ads-assets/clients/timejobs.png" alt="Time Jobs">
+      <img src="ads-assets/clients/mundolimpio.png" alt="Mundo Limpio">
+      <img src="ads-assets/clients/badim.png" alt="Badim">
+      <img src="ads-assets/clients/moretta.png" alt="Moretta">
+    </div>
+    <p class="subtitle">Marcas que decidieron dejar de improvisar.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 24 -->
+  <div class="ad-card rust" data-name="steve-24">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Steve no es</span><br><span class="strong">un avatar más.</span></h2>
+    <div class="big-logo">
+      <img src="logo-steve.png" alt="Steve avatar">
+    </div>
+    <p class="subtitle">Es la cara de un sistema que estudia tu negocio antes de abrir la boca.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 25 -->
+  <div class="ad-card ink" data-name="steve-25">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Cuatro plataformas.</span><br><span class="accent">Una sola voz.</span><br><span class="strong">La tuya.</span></h2>
+    <p class="subtitle">Steve estudia tu marca y la replica con consistencia en cada anuncio, cada email, cada campaña.</p>
+    <div class="screenshot"><img src="screenshots/brand-brief.png" alt="Brand voice"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 26 -->
+  <div class="ad-card forest" data-name="steve-26">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">"Llegué un lunes</span><br><span class="strong">y ya estaba<br>vendiendo el martes."</span></h2>
+    <div class="review">
+      <div class="stars">★★★★★</div>
+      <p class="quote">"Conecté Shopify, Meta y Klaviyo en una tarde. Al día siguiente Steve ya tenía sugerencias concretas."</p>
+      <div class="who">
+        <div class="initials">CS</div>
+        <div class="meta"><strong>Camila Soto</strong><small>Founder · Marca de joyas</small></div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 27 -->
+  <div class="ad-card linen light" data-name="steve-27">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">"Por fin entiendo</span><br><span class="strong">qué significa<br>cada número."</span></h2>
+    <div class="review">
+      <div class="stars">★★★★★</div>
+      <p class="quote">"Antes miraba los reportes de mi agencia y asentía sin entender. Steve me explica cada cosa en cristiano."</p>
+      <div class="who">
+        <div class="initials">SE</div>
+        <div class="meta"><strong>Sebastián Errázuriz</strong><small>Director · Tienda outdoor</small></div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 28 -->
+  <div class="ad-card plum" data-name="steve-28">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">"Es como tener un</span><br><span class="strong">marketing manager<br>sin sueldo fijo."</span></h2>
+    <div class="review">
+      <div class="stars">★★★★★</div>
+      <p class="quote">"Le hablo por chat, me responde con datos. No me agenda reuniones, no me manda PDFs. Solo trabaja."</p>
+      <div class="who">
+        <div class="initials">FL</div>
+        <div class="meta"><strong>Francisca Larraín</strong><small>Co-founder · Marca de pet food</small></div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 29 -->
+  <div class="ad-card almond light" data-name="steve-29">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Lo que dicen</span><br><span class="strong">quienes lo usan.</span></h2>
+    <div class="review-list">
+      <div class="review">
+        <div class="stars">★★★★★</div>
+        <p class="quote">"Me ahorró tres horas diarias de revisar campañas."</p>
+        <div class="who">
+          <div class="initials">TR</div>
+          <div class="meta"><strong>Tomás Rojas</strong><small>Marca de cafés</small></div>
+        </div>
+      </div>
+      <div class="review">
+        <div class="stars">★★★★★</div>
+        <p class="quote">"Mi agencia hacía menos por más. Cambié sin pensarlo."</p>
+        <div class="who">
+          <div class="initials">AV</div>
+          <div class="meta"><strong>Antonia Vidal</strong><small>Tienda de muebles</small></div>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 30 -->
+  <div class="ad-card slate" data-name="steve-30">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">"Lo entendí en</span><br><span class="strong">el primer día."</span></h2>
+    <div class="review">
+      <div class="stars">★★★★★</div>
+      <p class="quote">"No necesité tutorial. Le hablé como hablo a un colega y me respondió igual."</p>
+      <div class="who">
+        <div class="initials">MC</div>
+        <div class="meta"><strong>Matías Concha</strong><small>Founder · Marca de ropa deportiva</small></div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 31 -->
+  <div class="ad-card ivory light" data-name="steve-31">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Tres tiendas.</span><br><span class="strong">Tres rubros.</span><br><span class="accent">Una herramienta.</span></h2>
+    <div class="review-list">
+      <div class="review">
+        <div class="stars">★★★★★</div>
+        <p class="quote">"Lo mejor: que aprende de mi marca y no me hace repetirlo."</p>
+        <div class="who">
+          <div class="initials">FC</div>
+          <div class="meta"><strong>Fernanda Cáceres</strong><small>Marca de cosmética natural</small></div>
+        </div>
+      </div>
+      <div class="review">
+        <div class="stars">★★★★★</div>
+        <p class="quote">"Me sacó del Excel. Y de las planillas raras de mi agencia."</p>
+        <div class="who">
+          <div class="initials">IP</div>
+          <div class="meta"><strong>Ignacio Pizarro</strong><small>Tienda de vinos</small></div>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 32 -->
+  <div class="ad-card oxblood" data-name="steve-32">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">"Me devolvió mis</span><br><span class="strong">tardes."</span></h2>
+    <div class="review">
+      <div class="stars">★★★★★</div>
+      <p class="quote">"Antes vivía pegada al celular revisando si la campaña andaba. Ahora Steve me avisa solo si pasa algo raro."</p>
+      <div class="who">
+        <div class="initials">CF</div>
+        <div class="meta"><strong>Catalina Fuentes</strong><small>Founder · Tienda de decoración</small></div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 33 -->
+  <div class="ad-card midnight" data-name="steve-33">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">"Lo más cercano</span><br><span class="strong">a tener un CMO<br>sin tener uno."</span></h2>
+    <div class="review">
+      <div class="stars">★★★★★</div>
+      <p class="quote">"No reemplaza a una persona. Pero hace lo que mi último marketing manager nunca hizo: explicarme las cosas."</p>
+      <div class="who">
+        <div class="initials">DV</div>
+        <div class="meta"><strong>Diego Valenzuela</strong><small>CEO · Marca de bebidas</small></div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 34 — Steve Hero gigante -->
+  <div class="ad-card indigo has-bg" data-name="steve-34">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <div class="steve-hero"><img src="logo-steve.png" alt="Steve"></div>
+    <div class="steve-ghost"><img src="logo-steve.png" alt=""></div>
+    <h2><span class="strong">Hola.<br>Soy Steve.</span></h2>
+    <div class="spacer"></div>
+    <p class="subtitle">Tu nuevo socio de marketing.<br>Sin contratos. Sin reuniones.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 35 — Steve peeking de la esquina -->
+  <div class="ad-card cream light has-bg" data-name="steve-35">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <div class="steve-peek"><img src="logo-steve.png" alt=""></div>
+    <h2><span class="accent">Hey.</span><br><span class="strong">¿Cómo van<br>las ventas?</span></h2>
+    <p class="subtitle">Steve está pendiente. Y si algo se rompe, te avisa antes de que lo notes.</p>
+    <div class="spacer"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 36 — Steve hablando con bubble -->
+  <div class="ad-card forest" data-name="steve-36">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Steve te</span><br><span class="strong">habla así.</span></h2>
+    <div class="steve-talk">
+      <div class="steve-img"><img src="logo-steve.png" alt="Steve"></div>
+      <div class="speech">"Jefe, ayer vendiste 12% más. Sube el presupuesto del Reel azul."</div>
+    </div>
+    <p class="subtitle">Sin gráficos raros. Sin jerga. Como un colega que te conoce.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 37 — Trio de Steves -->
+  <div class="ad-card slate" data-name="steve-37">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Mañana. Tarde.</span><br><span class="strong">Madrugada.</span></h2>
+    <div class="steve-trio">
+      <div class="small"><img src="logo-steve.png" alt=""></div>
+      <div class="big"><img src="logo-steve.png" alt="Steve"></div>
+      <div class="small"><img src="logo-steve.png" alt=""></div>
+    </div>
+    <p class="subtitle">Steve revisa tus campañas mientras tú haces todo lo demás.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 38 — Steve badge giratoria -->
+  <div class="ad-card oxblood" data-name="steve-38">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Estudia tu marca.</span><br><span class="strong">Después habla.</span></h2>
+    <div class="steve-badge">
+      <div class="ring"></div>
+      <div class="img"><img src="logo-steve.png" alt="Steve"></div>
+    </div>
+    <p class="subtitle">Nada de prompts genéricos. Steve aprende tu negocio antes de mover un dedo.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 39 — Steve gigante abajo -->
+  <div class="ad-card teal has-bg" data-name="steve-39">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <div class="steve-bottom"><img src="logo-steve.png" alt=""></div>
+    <h2><span class="accent">Tu nuevo socio</span><br><span class="strong">ya está aquí.</span></h2>
+    <p class="subtitle">Solo abre la puerta. Steve hace el resto.</p>
+    <div class="spacer"></div>
+    <div class="spacer"></div>
+    <div class="spacer"></div>
+    <div class="spacer"></div>
+    <div class="spacer"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 40 — Steve + Chonga (duo) -->
+  <div class="ad-card almond light" data-name="steve-40">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Steve y</span><br><span class="strong">su hermano.</span></h2>
+    <div class="steve-duo">
+      <div class="dog"><img src="logo-steve.png" alt="Steve"></div>
+      <div class="dog"><img src="ads-assets/avatar-chonga.png" alt="Chonga"></div>
+    </div>
+    <p class="subtitle">Dos perros con un solo objetivo: que vendas más sin volverte loco.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 41 — Steve hero tilt -->
+  <div class="ad-card plum has-bg" data-name="steve-41">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <div class="steve-hero tilt"><img src="logo-steve.png" alt="Steve"></div>
+    <h2><span class="strong">El primer<br>marketing<br>con cara.</span></h2>
+    <div class="spacer"></div>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 42 — Steve hablando 2 -->
+  <div class="ad-card stone" data-name="steve-42">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Le preguntas.</span><br><span class="strong">Te responde.</span></h2>
+    <div class="steve-talk">
+      <div class="steve-img"><img src="logo-steve.png" alt="Steve"></div>
+      <div class="speech">"Tu mejor anuncio del mes fue el del producto rojo. Te paso 3 ideas para escalarlo."</div>
+    </div>
+    <p class="subtitle">Sin esperas. Sin reuniones. Sin "te respondo el lunes".</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 43 — Steve laptop -->
+  <div class="ad-card navy" data-name="steve-43">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Mientras tú duermes,</span><br><span class="strong">Steve trabaja.</span></h2>
+    <div class="steve-photo-circle"><img src="ads-assets/steve-photos/steve-laptop.png" alt="Steve trabajando"></div>
+    <p class="subtitle">Revisa tus campañas, ajusta presupuestos y te resume todo en la mañana.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 44 — Steve phone -->
+  <div class="ad-card forest" data-name="steve-44">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Tu marketing</span><br><span class="strong">en el bolsillo.</span></h2>
+    <div class="steve-photo-circle"><img src="ads-assets/steve-photos/steve-phone.png" alt="Steve con teléfono"></div>
+    <p class="subtitle">Pregúntale por WhatsApp. Te contesta como un socio, no como un bot.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Habla con Steve</a>
+    </div>
+  </div>
+
+  <!-- 45 — Steve thinking -->
+  <div class="ad-card indigo" data-name="steve-45">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">No solo ejecuta.</span><br><span class="strong">Piensa.</span></h2>
+    <div class="steve-photo-circle"><img src="ads-assets/steve-photos/steve-thinking.png" alt="Steve pensando"></div>
+    <p class="subtitle">Steve estudia tu negocio antes de proponerte algo. Lee, analiza, recomienda.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 46 — Steve celebrating -->
+  <div class="ad-card terracotta" data-name="steve-46">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Cuando tus ventas suben,</span><br><span class="strong">también lo celebra.</span></h2>
+    <div class="steve-photo-circle"><img src="ads-assets/steve-photos/steve-celebrating.png" alt="Steve celebrando"></div>
+    <p class="subtitle">Te avisa qué funcionó, qué no, y cómo lo repetimos el próximo mes.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Empieza ahora</a>
+    </div>
+  </div>
+
+  <!-- 47 — Steve coffee -->
+  <div class="ad-card cream light" data-name="steve-47">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">El reporte llega</span><br><span class="strong">con el café.</span></h2>
+    <div class="steve-photo-circle"><img src="ads-assets/steve-photos/steve-coffee.png" alt="Steve con café"></div>
+    <p class="subtitle">Cada mañana, lo importante en una sola pantalla. Sin dashboards confusos.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Pruébalo</a>
+    </div>
+  </div>
+
+  <!-- 48 — Steve running -->
+  <div class="ad-card oxblood" data-name="steve-48">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Tu agencia tarda 3 días.</span><br><span class="strong">Steve, 3 minutos.</span></h2>
+    <div class="steve-photo-circle"><img src="ads-assets/steve-photos/steve-running.png" alt="Steve corriendo"></div>
+    <p class="subtitle">Crear campañas, ajustar copies, lanzar pruebas: todo en el mismo lugar.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 49 — Steve presenting -->
+  <div class="ad-card teal" data-name="steve-49">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Te explica.</span><br><span class="strong">No te confunde.</span></h2>
+    <div class="steve-photo-circle"><img src="ads-assets/steve-photos/steve-presenting.png" alt="Steve presentando"></div>
+    <p class="subtitle">Métricas en español. Recomendaciones concretas. Cero jerga publicitaria.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Ver demo</a>
+    </div>
+  </div>
+
+  <!-- 50 — Steve sleeping -->
+  <div class="ad-card midnight" data-name="steve-50">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Nunca duerme.</span><br><span class="strong">Casi nunca.</span></h2>
+    <div class="steve-photo-circle"><img src="ads-assets/steve-photos/steve-sleeping.png" alt="Steve durmiendo"></div>
+    <p class="subtitle">Mientras descansas, vigila tus campañas. Si algo se rompe, te avisa.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+  <!-- 51 — Steve greeting -->
+  <div class="ad-card bone light" data-name="steve-51">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">Hola.</span><br><span class="strong">Soy Steve.</span></h2>
+    <div class="steve-photo-circle"><img src="ads-assets/steve-photos/steve-greeting.png" alt="Steve saludando"></div>
+    <p class="subtitle">Tu nuevo equipo de marketing. Conectado a Meta, Google, Shopify y Klaviyo.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Empieza gratis</a>
+    </div>
+  </div>
+
+  <!-- 52 — Steve superhero -->
+  <div class="ad-card plum" data-name="steve-52">
+    <button class="dl-btn" data-html2canvas-ignore="true" onclick="downloadCard(this.parentNode)" title="Descargar PNG">⬇</button>
+    <h2><span class="accent">No es un héroe.</span><br><span class="strong">Es tu socio.</span></h2>
+    <div class="steve-photo-circle"><img src="ads-assets/steve-photos/steve-superhero.png" alt="Steve superhéroe"></div>
+    <p class="subtitle">Está de tu lado. Te recomienda lo que a él le funcionaría si fuera tu negocio.</p>
+    <div class="footer">
+      <div class="brand">
+        <div class="avatar"><img src="logo-steve.png" alt="Steve"></div>
+        <div class="brand-text"><strong>Steve</strong><small>steve.cl</small></div>
+      </div>
+      <a href="#" class="cta">Conoce a Steve</a>
+    </div>
+  </div>
+
+</div>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+// Aviso si se abre con file://
+if (window.location.protocol === 'file:') {
+  window.addEventListener('DOMContentLoaded', () => {
+    const banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#dc2626;color:#fff;padding:14px;text-align:center;font-weight:600;z-index:9999;font-family:inherit;font-size:14px;';
+    banner.innerHTML = '⚠ Estás viendo este archivo con file:// — la descarga no funciona por CORS. Abre <a href="http://localhost:8765/steve-ads-variaciones.html" style="color:#fff;text-decoration:underline;">http://localhost:8765/steve-ads-variaciones.html</a>';
+    document.body.prepend(banner);
+    document.body.style.paddingTop = '60px';
+  });
+}
+
+async function downloadCard(card) {
+  const btn = card.querySelector('.dl-btn');
+  const original = btn.innerHTML;
+  btn.classList.add('downloading');
+  btn.innerHTML = '…';
+  try {
+    // Esperar a que TODAS las imágenes de la card carguen
+    const imgs = card.querySelectorAll('img');
+    await Promise.all([...imgs].map(img => {
+      if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
+      return new Promise(resolve => {
+        img.addEventListener('load', resolve, { once: true });
+        img.addEventListener('error', resolve, { once: true });
+      });
+    }));
+
+    const canvas = await html2canvas(card, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: null,
+      logging: false,
+      imageTimeout: 15000,
+    });
+    const link = document.createElement('a');
+    link.download = (card.dataset.name || 'steve-ad') + '.png';
+    link.href = canvas.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    btn.innerHTML = '✓';
+    setTimeout(() => {
+      btn.classList.remove('downloading');
+      btn.innerHTML = original;
+    }, 1200);
+  } catch (e) {
+    console.error('Download error:', e);
+    alert('Error al descargar: ' + e.message + '\n\nSi estás abriendo el archivo con file://, abre http://localhost:8765/steve-ads-variaciones.html');
+    btn.innerHTML = '✗';
+    setTimeout(() => {
+      btn.classList.remove('downloading');
+      btn.innerHTML = original;
+    }, 1500);
+  }
+}
+
+async function downloadAll() {
+  const cards = document.querySelectorAll('.ad-card');
+  for (const card of cards) {
+    await downloadCard(card);
+    await new Promise(r => setTimeout(r, 400));
+  }
+}
+</script>
+
+</body>
+</html>

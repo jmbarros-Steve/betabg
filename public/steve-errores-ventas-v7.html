@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve WA — 30 Mejoras de Inteligencia v7</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #111; }
+
+  header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: white; padding: 32px 24px; text-align: center;
+  }
+  header h1 { font-size: 2rem; font-weight: 800; margin-bottom: 8px; }
+  header p { font-size: 1rem; opacity: 0.75; }
+  .badge { display: inline-block; background: #e74c3c; color: white; border-radius: 20px; padding: 4px 14px; font-size: 0.8rem; font-weight: 700; margin-top: 10px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(680px, 1fr));
+    gap: 24px;
+    padding: 28px 24px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  .card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.13); }
+
+  .card-header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .card-num {
+    min-width: 34px; height: 34px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 0.85rem; color: white;
+    background: #0f3460;
+  }
+  .card-title { font-size: 0.95rem; font-weight: 700; line-height: 1.3; color: #1a1a2e; }
+  .card-problem { font-size: 0.8rem; color: #666; margin-top: 3px; line-height: 1.4; }
+
+  .examples {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+  .example { padding: 14px 16px; }
+  .example.bad { background: #fff8f8; border-right: 1px solid #f0f0f0; }
+  .example.good { background: #f6fff8; }
+
+  .example-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .example.bad .example-label { color: #e74c3c; }
+  .example.good .example-label { color: #27ae60; }
+
+  /* WhatsApp bubbles */
+  .wa-chat { display: flex; flex-direction: column; gap: 6px; }
+  .bubble-row { display: flex; gap: 6px; align-items: flex-end; }
+  .bubble-row.user { flex-direction: row-reverse; }
+
+  .avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.65rem; font-weight: 700; color: white;
+    flex-shrink: 0;
+  }
+  .avatar.user-av { background: #25d366; }
+  .avatar.steve-av { background: #0f3460; }
+
+  .bubble {
+    max-width: 82%;
+    padding: 6px 10px 5px;
+    border-radius: 10px;
+    font-size: 0.76rem;
+    line-height: 1.45;
+    position: relative;
+  }
+  .bubble.user-msg {
+    background: #dcf8c6;
+    border-bottom-right-radius: 2px;
+  }
+  .bubble.steve-msg {
+    background: white;
+    border: 1px solid #e8e8e8;
+    border-bottom-left-radius: 2px;
+  }
+  .bubble.internal-msg {
+    background: #fff3cd;
+    border: 1px dashed #f0ad4e;
+    font-style: italic;
+    font-size: 0.7rem;
+  }
+  .time { font-size: 0.6rem; color: #aaa; text-align: right; margin-top: 2px; }
+
+  .card-footer {
+    padding: 10px 16px;
+    background: #fafafa;
+    border-top: 1px solid #f0f0f0;
+    font-size: 0.72rem;
+    color: #666;
+  }
+  .card-footer strong { color: #0f3460; }
+
+  .tag {
+    display: inline-block;
+    background: #e8f0fe;
+    color: #0f3460;
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    margin-right: 4px;
+    margin-top: 4px;
+  }
+  .tag.red { background: #fde8e8; color: #c0392b; }
+  .tag.green { background: #e8f8ef; color: #1a7a4e; }
+  .tag.yellow { background: #fff8e1; color: #b7770a; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧠 Steve WA — 30 Mejoras de Inteligencia</h1>
+  <p>Ronda 7 · Lógica de ventas, BANT, objeciones, stage transitions, pitch timing</p>
+  <span class="badge">v7 · 08/04/2026</span>
+</header>
+
+<div class="grid" id="cards"></div>
+
+<script>
+const fixes = [
+  {
+    id: 1,
+    titulo: "Pitchea antes de preguntar el dolor",
+    problema: "Lanza propuesta de valor sin saber qué duele. El prospecto no lo pidió.",
+    tags: ["discovery", "pitch timing"],
+    bad: [
+      { role: "user", msg: "Hola, vendo ropa online hace 1 año" },
+      { role: "steve", msg: "Perfecto! Con Meta Ads puedo ayudarte a escalar 3x. Steve tiene plantillas listas, segmentación automática y retargeting inteligente..." }
+    ],
+    good: [
+      { role: "user", msg: "Hola, vendo ropa online hace 1 año" },
+      { role: "steve", msg: "Genial, ropa online 🙌 Dime: ¿cuál es tu mayor frustración ahora? ¿Llegar a más gente, convertir el tráfico, o mantener márgenes?" }
+    ],
+    causa: "buildDynamicSalesPrompt() inyecta value props sin gate de pain_points primero"
+  },
+  {
+    id: 2,
+    titulo: "No valida quién toma la decisión",
+    problema: "Avanza a 'qualifying' sin saber si habla con el dueño o un asistente que no puede comprar.",
+    tags: ["BANT", "authority"],
+    bad: [
+      { role: "user", msg: "Soy Carla, trabajo en marketing" },
+      { role: "steve", msg: "Excelente Carla! Vamos a agendar una reunión para mostrarte el plan completo 📅" }
+    ],
+    good: [
+      { role: "user", msg: "Soy Carla, trabajo en marketing" },
+      { role: "steve", msg: "Perfecto Carla! Rápido: ¿tú decides qué herramientas de marketing comprar, o hay alguien más que deba aprobar?" }
+    ],
+    causa: "calculateLeadScore() suma 15 pts por is_decision_maker pero nunca bloquea el avance si es desconocido"
+  },
+  {
+    id: 3,
+    titulo: "Repite preguntas que ya fueron respondidas",
+    problema: "En el mensaje 4 pregunta '¿tienes tienda online?' cuando el prospecto ya lo dijo en el mensaje 1.",
+    tags: ["discovery", "UX"],
+    bad: [
+      { role: "user", msg: "Llevo 3 meses con mi tienda de cosméticos online" },
+      { role: "steve", msg: "Genial! Una pregunta: ¿tienes tienda online actualmente, o solo vendes presencialmente?" }
+    ],
+    good: [
+      { role: "user", msg: "Llevo 3 meses con mi tienda de cosméticos online" },
+      { role: "steve", msg: "Cosméticos online, excelente 💄 Cuéntame: ¿en estos 3 meses cuántas órdenes llevas?" }
+    ],
+    causa: "buildDynamicSalesPrompt() no tiene lógica condicional: si campo existe → omite esa pregunta"
+  },
+  {
+    id: 4,
+    titulo: "Pitch demasiado temprano: en el mensaje 2",
+    problema: "Steve propone soluciones en el mensaje 2 antes de conocer el contexto del negocio.",
+    tags: ["pitch timing", "score"],
+    bad: [
+      { role: "user", msg: "Hola" },
+      { role: "steve", msg: "Hola! Te quería mostrar 3 estrategias de Meta Ads que funcionan perfecto para escalar 🚀" }
+    ],
+    good: [
+      { role: "user", msg: "Hola, gasto $10K/mes en ads y el ROAS es 1.2x" },
+      { role: "steve", msg: "Eso duele — ROAS 1.2x con $10K es básicamente regalar plata. ¿Qué creatives estás usando? ¿Estáticos o video?" }
+    ],
+    causa: "runStrategist() no calcula pitch-readiness score antes de sugerir pitch_soft/pitch_hard"
+  },
+  {
+    id: 5,
+    titulo: "No distingue urgencia real vs amabilidad",
+    problema: "'Lo antes posible' es lenguaje amable, no urgencia real. Steve lo registra como timeline=20 puntos.",
+    tags: ["BANT", "timeline", "scoring"],
+    bad: [
+      { role: "user", msg: "Me gustaría implementar esto lo antes posible" },
+      { role: "steve", msg: "Perfecto, vamos a agendar para esta semana entonces 📅" },
+      { role: "internal", msg: "⚠️ [timeline=20 pts, stage → closing]" }
+    ],
+    good: [
+      { role: "user", msg: "Me gustaría implementar esto lo antes posible" },
+      { role: "steve", msg: "Cuando dices 'lo antes posible' — ¿estamos hablando de esta semana, este mes, o después del verano?" }
+    ],
+    causa: "calculateLeadScore() asigna 10-20 pts por 'lo antes posible' sin validar si es genuino"
+  },
+  {
+    id: 6,
+    titulo: "Budget vago registrado como budget real",
+    problema: "'Tenemos presupuesto' sin número → Steve asume high-budget y avanza.",
+    tags: ["BANT", "budget"],
+    bad: [
+      { role: "user", msg: "Sí, tenemos presupuesto de marketing" },
+      { role: "steve", msg: "Excelente! Déjame mostrarte la estrategia para empresas con presupuesto medio-alto..." },
+      { role: "internal", msg: "⚠️ [budget_score = alto, stage = qualifying]" }
+    ],
+    good: [
+      { role: "user", msg: "Sí, tenemos presupuesto de marketing" },
+      { role: "steve", msg: "Bien! ¿Y cuánto destinan mensualmente? ¿$5K, $20K, $100K? El plan cambia mucho según eso." }
+    ],
+    causa: "calculateLeadScore() suma puntos si budget_range existe, aunque sea texto genérico sin número"
+  },
+  {
+    id: 7,
+    titulo: "Cualquier 'sí' se interpreta como confirmación de reunión",
+    problema: "Prospect responde 'sí' a otra pregunta y Steve cree que confirmó la reunión.",
+    tags: ["meeting", "parsing"],
+    bad: [
+      { role: "steve", msg: "¿Llevas más de 6 meses vendiendo online?" },
+      { role: "user", msg: "Sí, claro" },
+      { role: "steve", msg: "Excelente! Te espero entonces 🎉 Aquí el link: www.steve.cl/agendar/steve" },
+      { role: "internal", msg: "⚠️ [meeting_status = scheduled] — ERROR: el 'sí' era para otra pregunta" }
+    ],
+    good: [
+      { role: "steve", msg: "¿Agendamos una llamada el jueves?" },
+      { role: "user", msg: "Sí" },
+      { role: "steve", msg: "Perfecto! Entonces confirmamos: jueves a las 10am ¿correcto?" }
+    ],
+    causa: "detectMeetingConfirmation() no valida si el 'sí' era respuesta a una pregunta de reunión o de otra cosa"
+  },
+  {
+    id: 8,
+    titulo: "Mismo script de objeciones para todas las etapas",
+    problema: "Maneja igual una objeción en discovery que en closing. La respuesta debe ser diferente.",
+    tags: ["objeciones", "stage"],
+    bad: [
+      { role: "user", msg: "¿Pero de verdad funciona el AI?" },
+      { role: "steve", msg: "Claro! Hemos ayudado a 500+ negocios a crecer 3x con Steve 🚀" },
+      { role: "internal", msg: "⚠️ [Stage: discovery — debería profundizar el interés, no vender]" }
+    ],
+    good: [
+      { role: "user", msg: "¿Pero de verdad funciona el AI?" },
+      { role: "steve", msg: "Esa duda te la entiendo. Cuéntame: ¿qué tipo de resultado necesitarías ver para decir 'esto sí sirve'?" }
+    ],
+    causa: "buildDynamicSalesPrompt() no inyecta objection handlers contextuales por stage"
+  },
+  {
+    id: 9,
+    titulo: "Promete 3x ROAS sin saber si la tienda está lista",
+    problema: "Le promete escalar a alguien que vende 2 unidades/mes. La tienda puede tener problemas de base.",
+    tags: ["pitch", "diagnóstico"],
+    bad: [
+      { role: "user", msg: "Vendo ropa online, apenas 2 prendas por mes" },
+      { role: "steve", msg: "Perfecto! Con Steve podemos subir tu ROAS hasta 5x. Mira este caso de éxito..." }
+    ],
+    good: [
+      { role: "user", msg: "Vendo ropa online, apenas 2 prendas por mes" },
+      { role: "steve", msg: "Entiendo, 2 prendas/mes es poco. Antes de hablar de crecer, necesito preguntar: ¿las fotos de tu tienda, precios y descripciones están bien? A veces el problema no son los ads." }
+    ],
+    causa: "calculateLostMoney() inyecta '3x de retorno' sin validar si la tienda tiene salud mínima"
+  },
+  {
+    id: 10,
+    titulo: "Sigue el mismo pitch tras 21 días de silencio",
+    problema: "Prospect vuelve después de 3 semanas y Steve retoma donde dejó como si nada.",
+    tags: ["reactivación", "contexto"],
+    bad: [
+      { role: "user", msg: "Hola! ¿Seguís ahí?" },
+      { role: "internal", msg: "⚠️ [21 días sin respuesta — Steve sigue con pitch de antes]" },
+      { role: "steve", msg: "Claro! Te estaba mostrando las 3 estrategias de Meta Ads para ropa..." }
+    ],
+    good: [
+      { role: "user", msg: "Hola! ¿Seguís ahí?" },
+      { role: "steve", msg: "¡Hola de nuevo! Hacía tiempo que no hablábamos 😊 ¿Qué pasó? ¿Seguís pensando en optimizar el marketing o cambió algo?" }
+    ],
+    causa: "processProspectAsync() no detecta inactividad > 14 días para resetear contexto de pitch"
+  },
+  {
+    id: 11,
+    titulo: "Envía link de reunión cuando dijeron 'no puedo'",
+    problema: "El prospect dijo que no tiene tiempo y Steve igual manda el calendario.",
+    tags: ["meeting", "negación"],
+    bad: [
+      { role: "user", msg: "Me encantaría pero no tengo tiempo las próximas 3 semanas" },
+      { role: "steve", msg: "¡Excelente! Aquí mi calendario para que elijas el horario: www.steve.cl/agendar/steve" }
+    ],
+    good: [
+      { role: "user", msg: "Me encantaría pero no tengo tiempo las próximas 3 semanas" },
+      { role: "steve", msg: "Entiendo, 3 semanas ocupado. Entonces hablamos después de eso. ¿Te escribo el 2 de mayo?" }
+    ],
+    causa: "meetingLinkSent no valida si el mensaje contiene negación antes de detectar intención de agenda"
+  },
+  {
+    id: 12,
+    titulo: "Pain points demasiado genéricos",
+    problema: "'Quiero escalar' → registra pain_point='scaling'. No especifica si es tráfico, conversión o margen.",
+    tags: ["extracción", "pain points"],
+    bad: [
+      { role: "user", msg: "Lo difícil es escalar sin gastar más en ads" },
+      { role: "internal", msg: "⚠️ [pain_points=['scaling'] — demasiado vago]" },
+      { role: "steve", msg: "Con Steve resuelves el scaling de forma inteligente..." }
+    ],
+    good: [
+      { role: "user", msg: "Lo difícil es escalar sin gastar más en ads" },
+      { role: "internal", msg: "✅ [pain_points=['escalar sin aumentar budget de ads (ROAS plafón)']]" },
+      { role: "steve", msg: "Ese es el dilema clásico. ¿Ya probaste cambiar la segmentación o los creatives sin tocar el presupuesto?" }
+    ],
+    causa: "extractProspectInfo() no pide contexto específico en el prompt de Haiku — acepta strings cortos"
+  },
+  {
+    id: 13,
+    titulo: "Pregunta budget antes de confirmar que hay Need",
+    problema: "Prospect vende por Amazon (no tiene tienda propia). No necesita Steve. Steve igual pregunta presupuesto.",
+    tags: ["BANT", "need", "fit"],
+    bad: [
+      { role: "user", msg: "Vendo por Amazon, no tengo tienda propia" },
+      { role: "steve", msg: "Entiendo. ¿Cuál es tu presupuesto mensual para marketing?" }
+    ],
+    good: [
+      { role: "user", msg: "Vendo por Amazon, no tengo tienda propia" },
+      { role: "steve", msg: "Amazon está bien, pero Steve es para tiendas propias (Shopify/WooCommerce). ¿Tenías pensado abrir tu tienda algún día?" }
+    ],
+    causa: "buildDynamicSalesPrompt() no tiene orden BANT — pregunta campos al azar sin validar Need primero"
+  },
+  {
+    id: 14,
+    titulo: "Tono energético cuando el prospect está desesperado",
+    problema: "Prospect lleva 6 meses sin vender. Steve responde casual y energético, invalidando la emoción.",
+    tags: ["tono", "empatía"],
+    bad: [
+      { role: "user", msg: "Estoy desesperado, llevo 6 meses sin vender nada" },
+      { role: "steve", msg: "Eso es tough! 😅 Pero no worries, con Steve vamos a flipear esto en 30 días..." }
+    ],
+    good: [
+      { role: "user", msg: "Estoy desesperado, llevo 6 meses sin vender nada" },
+      { role: "steve", msg: "Eso es duro, en serio. 6 meses es mucho tiempo aguantando. ¿Cuándo empezó la caída? ¿Fue gradual o de golpe?" }
+    ],
+    causa: "runConversationalist() recibe strategistBrief.tone='empathetic' pero NO lo inyecta al prompt del modelo"
+  },
+  {
+    id: 15,
+    titulo: "Propone Meta Ads + Instagram a negocio B2B",
+    problema: "Consultoría corporativa no usa Meta Ads. Steve igual recomienda Instagram y Facebook.",
+    tags: ["B2B", "canal"],
+    bad: [
+      { role: "user", msg: "Vendo servicios de consultoría en finanzas corporativas" },
+      { role: "steve", msg: "Perfecto! Con Meta Ads e Instagram podés segmentar por edad e intereses y llegar a tu cliente ideal 🎯" }
+    ],
+    good: [
+      { role: "user", msg: "Vendo servicios de consultoría en finanzas corporativas" },
+      { role: "steve", msg: "Consultoría B2B corporativa — para eso Meta Ads no es el canal, honestamente. ¿Ya estás usando LinkedIn con estrategia?" }
+    ],
+    causa: "buildDynamicSalesPrompt() no detecta B2B vs B2C. Inyecta 'Meta Ads' para todos los negocios"
+  },
+  {
+    id: 16,
+    titulo: "Envía link de reunión cuando hay objeción activa",
+    problema: "Prospect dijo 'no sé si esto funcione'. Steve ignora la duda y manda el calendario.",
+    tags: ["objeciones", "meeting", "timing"],
+    bad: [
+      { role: "user", msg: "Suena bien pero no sé si realmente funcione para mi tipo de negocio" },
+      { role: "steve", msg: "¡Entiendo! Te paso mi calendario: www.steve.cl/agendar/steve para que elijas horario 📅" }
+    ],
+    good: [
+      { role: "user", msg: "Suena bien pero no sé si realmente funcione para mi tipo de negocio" },
+      { role: "steve", msg: "Válida la duda. ¿Qué tipo de negocio tenés exactamente? Te muestro un caso similar y ahí vemos si tiene sentido hablar." }
+    ],
+    causa: "No hay gate en el prompt: 'si hay objeción activa → resuelve PRIMERO, luego propones reunión'"
+  },
+  {
+    id: 17,
+    titulo: "'No tengo tiempo' → stage=lost (debería ser 'diferido')",
+    problema: "Prospect interesado que está ocupado se pierde como 'lost'. Es timing, no desinterés.",
+    tags: ["stage", "reactivación"],
+    bad: [
+      { role: "user", msg: "Me encanta el concepto pero ahora no tengo tiempo para implementar nada" },
+      { role: "internal", msg: "⚠️ [stage = lost, lost_reason = 'rejected'] — ERROR: no es rechazo, es timing" },
+      { role: "steve", msg: "Entendido, adelante!" }
+    ],
+    good: [
+      { role: "user", msg: "Me encanta el concepto pero ahora no tengo tiempo para implementar nada" },
+      { role: "internal", msg: "✅ [stage = deferred, timing_blocker = true]" },
+      { role: "steve", msg: "Entiendo, es timing. ¿Cuándo sí tendrías cabeza para esto — en 2 meses, 3? Yo te escribo cuando estés listo." }
+    ],
+    causa: "detectDisqualification() trata 'no tengo tiempo' igual que 'no me interesa' — ambos → stage=lost"
+  },
+  {
+    id: 18,
+    titulo: "Strategist ignora historial de objeciones previas",
+    problema: "Prospect ya rechazó precio dos veces. Strategist igual sugiere 'pitch_hard'. Vuelve a chocar.",
+    tags: ["strategist", "objeciones"],
+    bad: [
+      { role: "user", msg: "Msg 2: Es que es muy caro" },
+      { role: "steve", msg: "Msg 3: Por $500/mes tienes todo incluido..." },
+      { role: "user", msg: "Msg 4: Aún así no lo veo" },
+      { role: "internal", msg: "⚠️ [Strategist sugiere: pitch_hard] — ERROR: 2 rechazos de precio, debería back_off" },
+      { role: "steve", msg: "Msg 5: Pero el ROI es 5x, ¡lo recuperás en 2 meses!" }
+    ],
+    good: [
+      { role: "user", msg: "Msg 4: Aún así no lo veo" },
+      { role: "internal", msg: "✅ [Strategist detecta: OBJECTIONS_HISTORY=['price','price'] → sugiere back_off]" },
+      { role: "steve", msg: "Msg 5: Ok, te escucho. ¿Cuál sería el número que sí tendría sentido para vos?" }
+    ],
+    causa: "runStrategist() no recibe historial de objeciones — solo ve los últimos 6 mensajes"
+  },
+  {
+    id: 19,
+    titulo: "Confirma reunión sin validar presupuesto mínimo",
+    problema: "El prospect acepta la reunión pero nunca dijo cuánto puede gastar. Puede ser un $200/mes que no califica.",
+    tags: ["meeting", "budget", "calificación"],
+    bad: [
+      { role: "user", msg: "Dale, mañana a las 10am me viene bien" },
+      { role: "steve", msg: "Excelente! Te espero mañana 10am 🎉 Vamos a revisar tu plan completo..." },
+      { role: "internal", msg: "⚠️ [Reunión confirmada sin saber budget — puede ser no-fit]" }
+    ],
+    good: [
+      { role: "user", msg: "Dale, mañana a las 10am me viene bien" },
+      { role: "steve", msg: "¡Perfecto! Antes de confirmar: ¿cuánto es tu presupuesto mensual de marketing? Hay planes desde $500 hasta $5K, depende de tu tamaño." }
+    ],
+    causa: "processProspectAsync() guarda meeting_status='scheduled' sin validar que el budget fue acordado"
+  },
+  {
+    id: 20,
+    titulo: "Manda link de reunión sin explicar qué pasa en la reunión",
+    problema: "Prospect pregunta qué haría Steve exactamente. Steve responde con el link en lugar de explicar.",
+    tags: ["pitch", "elevator pitch"],
+    bad: [
+      { role: "user", msg: "¿Pero qué exactamente harías vos en nuestra tienda?" },
+      { role: "steve", msg: "Excelente pregunta! Te lo explico en detalle en la reunión: www.steve.cl/agendar/steve 📅" }
+    ],
+    good: [
+      { role: "user", msg: "¿Pero qué exactamente harías vos en nuestra tienda?" },
+      { role: "steve", msg: "En 30 segundos: (1) Audito tu tienda + ads, (2) Identifico 3 oportunidades de revenue, (3) Armo un plan con tu input. Si te gusta, seguimos. Si no, sin presión. ¿Charlamos?" }
+    ],
+    causa: "buildDynamicSalesPrompt() no inyecta elevator pitch obligatorio antes del booking link"
+  },
+  {
+    id: 21,
+    titulo: "No reencuadra cuando mencionan Shopify Ads o competidores",
+    problema: "Prospect menciona 'Shopify ya tiene Meta Ads integrado'. Steve no responde eso.",
+    tags: ["competencia", "diferenciación"],
+    bad: [
+      { role: "user", msg: "Pero si estoy en Shopify, ya tiene apps de Meta Ads" },
+      { role: "steve", msg: "Exacto! Y con Steve simplificamos todo eso... para que crezcas más rápido 🚀" }
+    ],
+    good: [
+      { role: "user", msg: "Pero si estoy en Shopify, ya tiene apps de Meta Ads" },
+      { role: "steve", msg: "Sí, Shopify te deja crear ads. Steve los hace VENDER. La diferencia está en la optimización inteligente. ¿Cuál es el ROAS que tenés ahora en Shopify?" }
+    ],
+    causa: "buildDynamicSalesPrompt() no detecta menciones de competidores para activar competitive reframe"
+  },
+  {
+    id: 22,
+    titulo: "Cierra igual de rápido a un prospect formal que a uno casual",
+    problema: "Prospect escribe formal y largo → Steve igual intenta cerrar en mensaje 3. Choca.",
+    tags: ["personalización", "velocity"],
+    bad: [
+      { role: "user", msg: "Estimado Steve, luego de analizar varias opciones, considero que podría ser interesante explorar posibilidades de colaboración..." },
+      { role: "steve", msg: "¡Genial! Agendar aquí: www.steve.cl/agendar/steve 🗓️" },
+      { role: "internal", msg: "⚠️ [Mensaje 3, prospect formal → cerró demasiado rápido]" }
+    ],
+    good: [
+      { role: "user", msg: "Estimado Steve, luego de analizar varias opciones, considero que podría ser interesante explorar posibilidades..." },
+      { role: "steve", msg: "Gracias por escribirme. De las opciones que analizaste, ¿cuál te pareció más cercana a lo que buscás y qué te faltó en cada una?" }
+    ],
+    causa: "analyzeProspectStyle() detecta formalidad pero runConversationalist() no adapta closure velocity"
+  },
+  {
+    id: 23,
+    titulo: "No detecta si el budget es menor al mínimo de Steve",
+    problema: "Prospect tiene $1K/mes. Steve cuesta $2K+. Steve sigue el pitch sin decirlo.",
+    tags: ["budget", "fit", "honestidad"],
+    bad: [
+      { role: "user", msg: "Tengo $1.000 al mes para marketing" },
+      { role: "steve", msg: "Perfecto! Con Steve podés escalar a 5x ese número. Te espero en la reunión 📅" },
+      { role: "internal", msg: "⚠️ [Steve mínimo: $2K. Budget: $1K. No-fit no declarado]" }
+    ],
+    good: [
+      { role: "user", msg: "Tengo $1.000 al mes para marketing" },
+      { role: "steve", msg: "Te soy honesto: Steve parte desde $2K/mes implementado. Con $1K podríamos explorar un plan básico, pero antes que agendemos — ¿ese $1K es solo ads o incluye herramientas?" }
+    ],
+    causa: "calculateLeadScore() suma puntos por budget sin comparar con el mínimo de Steve ($2K)"
+  },
+  {
+    id: 24,
+    titulo: "Nunca pregunta si están buscando activamente ahora",
+    problema: "El campo 'actively_looking' existe en la DB pero nunca se pregunta. Todos se tratan como hot leads.",
+    tags: ["BANT", "temperatura del lead"],
+    bad: [
+      { role: "user", msg: "Vendo ropa online hace 3 años" },
+      { role: "internal", msg: "⚠️ [actively_looking = null — Steve nunca preguntó]" },
+      { role: "steve", msg: "Excelente! Te dejo el link para agendar esta semana: www.steve.cl/agendar/steve" }
+    ],
+    good: [
+      { role: "user", msg: "Vendo ropa online hace 3 años" },
+      { role: "steve", msg: "Ropa online por 3 años, sólido. Una cosa importante: ¿AHORA estás buscando mejorar tu marketing activamente, o es más una idea para el futuro?" }
+    ],
+    causa: "buildDynamicSalesPrompt() nunca inyecta 'ask_actively_looking' en discovery incluso si el campo es null"
+  },
+  {
+    id: 25,
+    titulo: "Aplica urgencia de CyberDay a un negocio B2B",
+    problema: "Le dice 'se viene CyberDay, es buen momento' a un consultor corporativo que no tiene CyberDay.",
+    tags: ["urgencia", "contexto", "B2B"],
+    bad: [
+      { role: "user", msg: "Soy consultor de impuestos para empresas" },
+      { role: "steve", msg: "Genial! Con CyberDay en mayo es el momento perfecto para preparar tu estrategia de marketing digital 🗓️" }
+    ],
+    good: [
+      { role: "user", msg: "Soy consultor de impuestos para empresas" },
+      { role: "steve", msg: "Consultoría B2B — CyberDay no aplica para tu industria. Pregunta: ¿tu negocio tiene temporada alta o es parejo todo el año?" }
+    ],
+    causa: "getMarketDeadline() devuelve fechas genéricas sin filtrar por industria ni B2B/B2C"
+  },
+  {
+    id: 26,
+    titulo: "Mezcla objeción de precio con objeción de tiempo-de-resultado",
+    problema: "Prospect pregunta 'cuándo vería resultados'. Steve responde con ROI de dinero. No separa las dos preguntas.",
+    tags: ["objeciones", "time-to-value"],
+    bad: [
+      { role: "user", msg: "Es muy caro para invertir sin saber si funciona" },
+      { role: "steve", msg: "El ROAS promedio con Steve es 5x. Recuperás la inversión en 2 meses 💰" },
+      { role: "user", msg: "¿Pero cuánto tiempo hasta ver algo?" },
+      { role: "steve", msg: "Como te dije, 2 meses máximo..." }
+    ],
+    good: [
+      { role: "user", msg: "Es muy caro para invertir sin saber si funciona" },
+      { role: "steve", msg: "Hay dos cosas separadas acá. El PRECIO y el TIME-TO-VALUE. ¿Cuál te preocupa más: el dinero que invertís, o cuánto tiempo hasta ver resultados?" }
+    ],
+    causa: "buildDynamicSalesPrompt() no inyecta lógica de separación precio vs tiempo de resultado"
+  },
+  {
+    id: 27,
+    titulo: "meeting_status se vuelve 'deferred' cuando el prospect propuso otra hora",
+    problema: "Prospect no rechazó — propuso un día alternativo. Steve lo registra como 'deferred' (cancelado).",
+    tags: ["meeting", "status", "parsing"],
+    bad: [
+      { role: "steve", msg: "¿Agendamos mañana martes a las 10am?" },
+      { role: "user", msg: "Mejor el jueves" },
+      { role: "internal", msg: "⚠️ [meeting_status = deferred] — ERROR: no canceló, propuso alternativa" },
+      { role: "steve", msg: "Ah, ¿prefieres otro horario?" }
+    ],
+    good: [
+      { role: "steve", msg: "¿Agendamos mañana martes a las 10am?" },
+      { role: "user", msg: "Mejor el jueves" },
+      { role: "internal", msg: "✅ [meeting_status = proposed, meeting_suggested_at = jueves]" },
+      { role: "steve", msg: "Jueves perfecto! ¿A qué hora te viene bien?" }
+    ],
+    causa: "detectMeetingConfirmation() marca 'rejected' si no confirma el horario propuesto, sin detectar alternativa"
+  },
+  {
+    id: 28,
+    titulo: "Ignora que el prospect ya está evaluando a un competidor",
+    problema: "Prospect dijo 'ya estoy en demos con otras agencias'. Steve continúa igual sin adaptar estrategia.",
+    tags: ["competencia", "urgencia"],
+    bad: [
+      { role: "user", msg: "Interesante, pero ya estoy evaluando otras opciones también" },
+      { role: "steve", msg: "Perfecto! Te paso el link para agendar tu demo: www.steve.cl/agendar/steve 🚀" }
+    ],
+    good: [
+      { role: "user", msg: "Interesante, pero ya estoy evaluando otras opciones también" },
+      { role: "steve", msg: "Inteligente comparar. Cuéntame: ¿qué tienen los otros que NO ves en Steve? Eso me ayuda a ser más preciso." }
+    ],
+    causa: "buildDynamicSalesPrompt() no extrae mentions de 'already evaluating' para activar competitive mode"
+  },
+  {
+    id: 29,
+    titulo: "Conversationalist ignora la señal 'back_off' del Strategist",
+    problema: "Strategist detecta escepticismo y dice 'back_off'. Conversationalist igual pitchea agresivo.",
+    tags: ["strategist", "back_off", "pipeline"],
+    bad: [
+      { role: "internal", msg: "🧠 Strategist: brief='Prospect escéptico, resistiendo' → suggestedAction='back_off'" },
+      { role: "steve", msg: "Te muestro los 5 features de Steve que van a transformar tu negocio: automación, segmentación, analytics en tiempo real..." }
+    ],
+    good: [
+      { role: "internal", msg: "🧠 Strategist: suggestedAction='back_off'" },
+      { role: "steve", msg: "Entiendo tu hesitación. No te presiono. Cuéntame: ¿qué sería lo ideal para vos en este momento?" }
+    ],
+    causa: "runConversationalist() no valida suggestedAction. El brief es ignorado — el modelo improvisa sin restricción"
+  },
+  {
+    id: 30,
+    titulo: "No pregunta 'por qué' cuando el prospecto se va",
+    problema: "Prospect dice 'no me interesa más'. Steve responde 'ok' y no captura el motivo real del rechazo.",
+    tags: ["lost", "feedback", "learning"],
+    bad: [
+      { role: "user", msg: "No me interesa más, gracias" },
+      { role: "internal", msg: "⚠️ [stage = lost, lost_reason = 'rejected'] — Sin contexto de por qué" },
+      { role: "steve", msg: "Entendido, cuando quieras acá estoy 👋" }
+    ],
+    good: [
+      { role: "user", msg: "No me interesa más, gracias" },
+      { role: "internal", msg: "✅ [stage = lost, awaiting_loss_feedback = true]" },
+      { role: "steve", msg: "Entendido. Antes de irme, una pregunta rápida: ¿fue por el precio, el timing, o simplemente no era prioridad ahora? Eso me ayuda a mejorar 🙏" }
+    ],
+    causa: "processProspectAsync() guarda lost_reason sin pedir feedback específico — el motivo siempre queda como 'rejected'"
+  }
+];
+
+const tagColors = {
+  "discovery": "blue", "pitch timing": "blue", "BANT": "red", "authority": "red",
+  "UX": "yellow", "meeting": "red", "parsing": "yellow", "objeciones": "red",
+  "stage": "blue", "fit": "red", "tono": "yellow", "empatía": "yellow",
+  "B2B": "red", "canal": "yellow", "reactivación": "blue", "negación": "red",
+  "extracción": "yellow", "pain points": "yellow", "need": "red", "calificación": "red",
+  "personalización": "blue", "velocity": "blue", "budget": "red", "honestidad": "yellow",
+  "temperatura del lead": "blue", "urgencia": "red", "contexto": "yellow",
+  "time-to-value": "yellow", "status": "yellow", "competencia": "red",
+  "diferenciación": "blue", "strategist": "red", "back_off": "red", "pipeline": "blue",
+  "lost": "red", "feedback": "yellow", "learning": "green", "score": "blue",
+  "timeline": "red", "scoring": "red", "diagnóstico": "yellow", "elevator pitch": "green"
+};
+
+function getTagClass(tag) {
+  const color = tagColors[tag] || "blue";
+  if (color === "red") return "tag red";
+  if (color === "green") return "tag green";
+  if (color === "yellow") return "tag yellow";
+  return "tag";
+}
+
+function buildBubbles(msgs) {
+  return msgs.map(m => {
+    const isUser = m.role === "user";
+    const isInternal = m.role === "internal";
+    const isSteve = m.role === "steve";
+
+    if (isInternal) {
+      return `<div class="bubble-row">
+        <div class="bubble internal-msg">${escHtml(m.msg)}</div>
+      </div>`;
+    }
+
+    if (isUser) {
+      return `<div class="bubble-row user">
+        <div class="avatar user-av">Tú</div>
+        <div class="bubble user-msg">${escHtml(m.msg)}</div>
+      </div>`;
+    }
+
+    return `<div class="bubble-row">
+      <div class="avatar steve-av">🐕</div>
+      <div class="bubble steve-msg">${escHtml(m.msg)}</div>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+const container = document.getElementById('cards');
+
+fixes.forEach(fix => {
+  const tagsHtml = fix.tags.map(t => `<span class="${getTagClass(t)}">${t}</span>`).join('');
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <div class="card-header">
+      <div class="card-num">${fix.id}</div>
+      <div>
+        <div class="card-title">${escHtml(fix.titulo)}</div>
+        <div class="card-problem">${escHtml(fix.problema)}</div>
+        <div style="margin-top:6px">${tagsHtml}</div>
+      </div>
+    </div>
+    <div class="examples">
+      <div class="example bad">
+        <div class="example-label">❌ Comportamiento actual</div>
+        <div class="wa-chat">${buildBubbles(fix.bad)}</div>
+      </div>
+      <div class="example good">
+        <div class="example-label">✅ Comportamiento correcto</div>
+        <div class="wa-chat">${buildBubbles(fix.good)}</div>
+      </div>
+    </div>
+    <div class="card-footer">
+      <strong>Causa técnica:</strong> ${escHtml(fix.causa)}
+    </div>
+  `;
+  container.appendChild(card);
+});
+</script>
+</body>
+</html>

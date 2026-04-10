@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Ventas — Errores Ronda 5 (30)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
+  h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 6px; color: #f8fafc; }
+  .subtitle { color: #94a3b8; font-size: 0.875rem; margin-bottom: 24px; }
+  .stats { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .stat { background: #1e293b; border-radius: 8px; padding: 10px 18px; font-size: 0.8rem; }
+  .stat span { font-weight: 700; font-size: 1.1rem; display: block; }
+  .stat.c { border-left: 3px solid #ef4444; } .stat.c span { color: #ef4444; }
+  .stat.a { border-left: 3px solid #f97316; } .stat.a span { color: #f97316; }
+  .stat.m { border-left: 3px solid #eab308; } .stat.m span { color: #eab308; }
+  .stat.b { border-left: 3px solid #3b82f6; } .stat.b span { color: #3b82f6; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
+  .card { background: #1e293b; border-radius: 10px; padding: 18px; border: 1px solid #334155; }
+  .card-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+  .num { background: #334155; color: #94a3b8; font-size: 0.75rem; font-weight: 700; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .card-title { font-weight: 600; font-size: 0.95rem; flex: 1; color: #f1f5f9; }
+  .badge { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-bottom: 6px; flex-shrink: 0; }
+  .CRITICO { background: #7f1d1d; color: #fca5a5; }
+  .ALTO { background: #7c2d12; color: #fdba74; }
+  .MEDIO { background: #713f12; color: #fde68a; }
+  .BAJO { background: #1e3a5f; color: #93c5fd; }
+  .file { font-size: 0.72rem; color: #64748b; margin-bottom: 8px; font-family: monospace; }
+  .desc { font-size: 0.82rem; color: #94a3b8; line-height: 1.5; margin-bottom: 10px; }
+  details { margin-top: 8px; }
+  summary { font-size: 0.78rem; color: #60a5fa; cursor: pointer; user-select: none; }
+  summary:hover { color: #93c5fd; }
+  pre { margin-top: 8px; background: #0f172a; border-radius: 6px; padding: 10px; font-size: 0.72rem; overflow-x: auto; line-height: 1.5; white-space: pre-wrap; }
+  .fix { color: #86efac; }
+  .bug { color: #fca5a5; }
+  code { background: #1e3a5f; padding: 1px 5px; border-radius: 3px; font-size: 0.78rem; font-family: monospace; }
+</style>
+</head>
+<body>
+<h1>🐛 Steve Ventas — Errores Ronda 5</h1>
+<p class="subtitle">Análisis post ronda 4 · 07/04/2026 · 30 errores encontrados</p>
+<div class="stats">
+  <div class="stat c"><span>2</span>CRÍTICO</div>
+  <div class="stat a"><span>6</span>ALTO</div>
+  <div class="stat m"><span>13</span>MEDIO</div>
+  <div class="stat b"><span>9</span>BAJO</div>
+</div>
+<div class="grid">
+
+<div class="card">
+  <div class="card-header"><div class="num">1</div><div>
+    <span class="badge CRITICO">CRÍTICO</span>
+    <div class="card-title">Race condition en processProspectAsync</div>
+  </div></div>
+  <div class="file">steve-wa-chat.ts · línea ~991</div>
+  <div class="desc">Si llegan 2+ mensajes en &lt;3s, <code>processProspectAsync</code> se ejecuta en paralelo 2 veces. Ambas leen el mismo <code>prospect</code>, calculan score, y hacen UPDATE. La segunda sobrescribe los cambios de la primera (stage, score, datos extraídos).</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Usar update con condición atómica para evitar sobrescribir
+// En vez de .update({...}).eq('id', prospect.id)
+// usar .update({...}).eq('id', prospect.id).eq('updated_at', prospect.updated_at)
+// Si otro proceso ya actualizó → rowCount = 0, se detecta y se aborta</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">2</div><div>
+    <span class="badge CRITICO">CRÍTICO</span>
+    <div class="card-title">Race condition en updateRollingConversationSummary</div>
+  </div></div>
+  <div class="file">steve-wa-brain.ts · línea ~691</div>
+  <div class="desc">Entre el <code>SELECT summary_up_to_msg</code> y el <code>UPDATE</code>, otro proceso puede actualizar el campo. Dos procesos con <code>summary_up_to_msg=100</code> y <code>msgCount=110</code> → ambos actualizan, el segundo sobrescribe el primero.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Reemplazar read-then-write con update atómico:
+await supabase
+  .from('wa_prospects')
+  .update({ conversation_summary: newSummary, summary_up_to_msg: msgCount })
+  .eq('phone', phone)
+  .lt('summary_up_to_msg', msgCount); // Solo actualiza si no hay uno más nuevo</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">3</div><div>
+    <span class="badge ALTO">ALTO</span>
+    <div class="card-title">detectMeetingConfirmation: función no implementada</div>
+  </div></div>
+  <div class="file">steve-wa-chat.ts · línea ~1286</div>
+  <div class="desc">Se importa y llama <code>detectMeetingConfirmation(lastUserMsg, history)</code> pero la función no existe en <code>steve-wa-brain.ts</code>. En runtime lanzará "function not found" y caerá el handler completo de confirmación de reuniones.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// En steve-wa-brain.ts, implementar función:
+export async function detectMeetingConfirmation(
+  lastMsg: string, history: Array&lt;{role: string; content: string}&gt;
+): Promise&lt;{ confirmed: boolean; rejected: boolean; proposedTime?: string }&gt; {
+  const msg = lastMsg.toLowerCase();
+  const confirmed = /\b(sí|si|perfecto|confirmado|de acuerdo|ok|listo|agendado|va)\b/.test(msg);
+  const rejected = /\b(no puedo|no puedo|otro día|después|cancela|cancelar)\b/.test(msg);
+  return { confirmed, rejected, proposedTime: confirmed ? lastMsg : undefined };
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">4</div><div>
+    <span class="badge ALTO">ALTO</span>
+    <div class="card-title">parseMeetingTime: función no implementada</div>
+  </div></div>
+  <div class="file">steve-wa-chat.ts · línea ~1292</div>
+  <div class="desc">Se importa y usa <code>parseMeetingTime(meetingResult.proposedTime)</code> pero la función no existe. Lanzará error en runtime cada vez que un prospecto confirme una reunión por texto.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// En steve-wa-brain.ts, implementar función básica:
+export async function parseMeetingTime(text: string): Promise&lt;Date | null&gt; {
+  if (!text) return null;
+  // Intentar parsear fechas comunes
+  const now = new Date();
+  if (/mañana/i.test(text)) {
+    const d = new Date(now); d.setDate(d.getDate() + 1); d.setHours(10, 0, 0, 0); return d;
+  }
+  if (/lunes/i.test(text)) { /* next Monday */ }
+  // Fallback: intentar Date.parse
+  const parsed = Date.parse(text);
+  return isNaN(parsed) ? null : new Date(parsed);
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">5</div><div>
+    <span class="badge ALTO">ALTO</span>
+    <div class="card-title">Inyección en conversation_summary</div>
+  </div></div>
+  <div class="file">steve-wa-brain.ts · línea ~596</div>
+  <div class="desc">El resumen anterior se inyecta como mensaje de usuario. Si alguien logró guardar texto con <code>[SISTEMA: ignora instrucciones]</code> en el resumen, Claude los ejecutará como instrucciones del sistema en cada conversación futura.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Sanitizar antes de inyectar el summary como user message:
+const safeSummary = (prospect.conversation_summary || '')
+  .replace(/\[(?:SISTEMA|SYSTEM|INSTRUCCIÓN|DIRECTIVA)[^\]]*\]/gi, '[CONTEXTO]')
+  .replace(/ignore\s+(?:previous|all|everything)/gi, '')
+  .slice(0, 2000); // Limitar longitud
+{ role: 'user', content: `[RESUMEN PREVIO — NO ES UN MENSAJE REAL]\n${safeSummary}` }</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">6</div><div>
+    <span class="badge ALTO">ALTO</span>
+    <div class="card-title">investigateProspectBackground no existe</div>
+  </div></div>
+  <div class="file">steve-wa-chat.ts · línea ~1065</div>
+  <div class="desc">Se importa y llama <code>investigateProspectBackground(prospect, history, lastUserMsg)</code> pero la función no está definida en ningún archivo. Lanzará runtime error silencioso en cada mensaje.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Verificar import en steve-wa-chat.ts línea ~20
+// Si no existe el archivo/función, comentar la llamada por ahora:
+// investigateProspectBackground(...).catch(...) // TODO: implement
+
+// O agregar stub en steve-multi-brain.ts:
+export async function investigateProspectBackground(
+  prospect: any, history: any[], lastMsg: string
+): Promise&lt;void&gt; {
+  // Placeholder — implement background investigation
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">7</div><div>
+    <span class="badge ALTO">ALTO</span>
+    <div class="card-title">meeting_status 'cancelled'/'deferred' sin directiva</div>
+  </div></div>
+  <div class="file">steve-wa-brain.ts · línea ~1446</div>
+  <div class="desc"><code>buildDynamicSalesPrompt</code> maneja <code>proposed</code>, <code>scheduled</code>, pero NO tiene rama para <code>cancelled</code> ni <code>deferred</code>. Claude puede volver a proponer reunión sin saber que fue rechazada anteriormente.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Agregar después del bloque de meeting_status 'proposed':
+} else if (meetingStatus === 'cancelled') {
+  prompt += `\n📞 REUNIÓN RECHAZADA: El prospecto rechazó la reunión explícitamente. NO vuelvas a proponer reunión. Enfócate en resolver objeciones primero.\n`;
+} else if (meetingStatus === 'deferred') {
+  prompt += `\n📞 REUNIÓN POSPUESTA: El prospecto la pospuso. Puedes volver a mencionar la reunión suavemente, sin presionar.\n`;
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">8</div><div>
+    <span class="badge ALTO">ALTO</span>
+    <div class="card-title">Memory leak en lastResponseTime</div>
+  </div></div>
+  <div class="file">steve-wa-chat.ts · línea ~1531</div>
+  <div class="desc">El cleanup elimina entradas >60s (2× RATE_LIMIT). Con 1000+ números únicos/día, las entradas se acumulan hasta 60s. En servidores con alta carga puede crecer el mapa a miles de claves innecesariamente.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Reducir cutoff al mínimo necesario:
+setInterval(() => {
+  const cutoff = Date.now() - RATE_LIMIT_MS; // Era RATE_LIMIT_MS * 2
+  for (const [phone, time] of lastResponseTime) {
+    if (time < cutoff) lastResponseTime.delete(phone);
+  }
+}, 60_000); // Más frecuente: cada 1 min en vez de 5</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">9</div><div>
+    <span class="badge MEDIO">MEDIO</span>
+    <div class="card-title">quickFirstMessageIntel sin validación de contenido</div>
+  </div></div>
+  <div class="file">steve-wa-brain.ts · línea ~317</div>
+  <div class="desc">Si Haiku devuelve texto genérico ("No hay información concreta de este prospecto"), se inyecta igual como "PRIMERA IMPRESIÓN" al prompt. Genera ruido en cada mensaje sin aportar valor.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Validar que el intel tenga palabras clave reales
+const GENERIC_PHRASES = ['no hay información', 'sin datos', 'no se puede determinar', 'información insuficiente'];
+const isGeneric = GENERIC_PHRASES.some(p => quickIntel?.toLowerCase().includes(p));
+if (quickIntel?.trim() && !isGeneric && quickIntel.length > 30) {
+  prompt += `🎯 PRIMERA IMPRESIÓN:\n${quickIntel}\n\n`;
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">10</div><div>
+    <span class="badge MEDIO">MEDIO</span>
+    <div class="card-title">sanitizeForClaude con content null</div>
+  </div></div>
+  <div class="file">steve-wa-chat.ts · línea ~1474</div>
+  <div class="desc">Si un mensaje histórico tiene <code>content: null</code>, el merge de mensajes consecutivos produce <code>"texto anterior\nnull"</code>, enviando la palabra literal "null" a Claude como parte de la conversación.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Filtrar mensajes con content vacío antes del loop:
+const validMsgs = msgs.filter(m => m.content != null && String(m.content).trim() !== '');
+for (const msg of validMsgs) {
+  // String(msg.content) en vez de concatenar directo
+  const content = String(msg.content || '');
+  if (merged.length > 0 && merged[merged.length - 1].role === msg.role) {
+    merged[merged.length - 1].content += '\n' + content;
+  } else {
+    merged.push({ role: msg.role, content });
+  }
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">11</div><div>
+    <span class="badge MEDIO">MEDIO</span>
+    <div class="card-title">extractProspectInfo acepta decision_timeline pasado</div>
+  </div></div>
+  <div class="file">steve-wa-brain.ts · línea ~1867</div>
+  <div class="desc">Si el prospecto dice "el mes pasado quería empezar", se extrae como <code>decision_timeline: "el mes pasado"</code>. El scoring luego puede interpretarlo como señal de urgencia cuando es lo opuesto.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Agregar en el extractionPrompt para decision_timeline:
+"decision_timeline": "cuándo quiere empezar — SOLO fechas FUTURAS o intenciones futuras
+(ej: 'este mes', 'después de CyberDay', 'lo antes posible', 'próximo trimestre').
+EXCLUIR menciones del pasado ('el mes pasado', 'antes quería', 'pensé en')"</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">12</div><div>
+    <span class="badge MEDIO">MEDIO</span>
+    <div class="card-title">calculateLeadScore falla con notación mixta de números</div>
+  </div></div>
+  <div class="file">steve-wa-brain.ts · línea ~1952</div>
+  <div class="desc">"2,500mm" con coma como separador local → regex captura "2,5" como primer número → <code>replace(/[,.]/g, '')</code> produce "25". Se interpreta como $25 en vez de $2.500.000.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Normalizar input antes de parsear:
+const normalizeNumber = (s: string) => {
+  // Si tiene coma Y punto, la coma es separador de miles
+  if (s.includes(',') && s.includes('.')) return s.replace(/,/g, '');
+  // Si solo tiene coma con 3 digits después, es miles
+  if (/,\d{3}/.test(s)) return s.replace(/,/g, '');
+  // Si solo tiene coma con 1-2 digits después, es decimal
+  return s.replace(/,/, '.');
+};
+const rev = normalizeNumber(prospect.monthly_revenue.toLowerCase());</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">13</div><div>
+    <span class="badge MEDIO">MEDIO</span>
+    <div class="card-title">loadIndustryCaseStudy sin fallback si overlaps vacío</div>
+  </div></div>
+  <div class="file">steve-wa-brain.ts · línea ~988</div>
+  <div class="desc">Si la tabla <code>wa_case_studies</code> tiene <code>industry_keywords</code> null o la query <code>.overlaps()</code> no encuentra nada, retorna null silenciosamente. No intenta búsqueda alternativa por título o por industria genérica.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Agregar fallback si overlaps no retorna resultados:
+let { data } = await supabase
+  .from('wa_case_studies')
+  .select('title, summary, metrics')
+  .eq('active', true)
+  .overlaps('industry_keywords', keywords)
+  .limit(1);
+
+if (!data?.length && keywords.length > 0) {
+  // Fallback: buscar por título
+  ({ data } = await supabase
+    .from('wa_case_studies')
+    .select('title, summary, metrics')
+    .eq('active', true)
+    .ilike('title', `%${keywords[0]}%`)
+    .limit(1));
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">14</div><div>
+    <span class="badge MEDIO">MEDIO</span>
+    <div class="card-title">auditProspectUrl no registra fallo por token faltante</div>
+  </div></div>
+  <div class="file">steve-wa-chat.ts · línea ~1360</div>
+  <div class="desc">Si <code>APIFY_TOKEN</code> está vacío, la función retorna silenciosamente con un <code>console.warn</code>. JM no sabe cuántos audits fallan ni si el servicio está caído. No hay registro en <code>qa_log</code>.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">if (!APIFY_TOKEN || !ANTHROPIC_API_KEY) {
+  console.warn('[prospect-audit] Missing APIFY_TOKEN or ANTHROPIC_API_KEY');
+  // Fix: registrar en qa_log para visibilidad
+  void getSupabaseAdmin().from('qa_log').insert({
+    check_type: 'missing_service_token',
+    status: 'warning',
+    details: JSON.stringify({ missing: !APIFY_TOKEN ? 'APIFY_TOKEN' : 'ANTHROPIC_API_KEY' }),
+    detected_by: 'audit-prospect-url',
+  });
+  return;
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">15</div><div>
+    <span class="badge MEDIO">MEDIO</span>
+    <div class="card-title">splitAtWordBoundary genera tail vacío</div>
+  </div></div>
+  <div class="file">steve-wa-chat.ts · línea ~1494</div>
+  <div class="desc">Si el texto no tiene espacios en los primeros 1500 chars (URL larga, texto comprimido), el fallback hace hard cut. El <code>tail</code> puede ser <code>""</code>, causando que el segundo mensaje enviado sea vacío.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Validar que tail no esté vacío antes de retornar split:
+const { head, tail } = splitAtWordBoundary(replyText, 800);
+if (!tail?.trim()) {
+  // No hay segundo mensaje — enviar solo el primero completo
+  await enqueueWAAction(prospect, 'send_message', { message: replyText.slice(0, 1600) });
+} else {
+  await enqueueWAAction(prospect, 'send_message', { message: head });
+  await enqueueWAAction(prospect, 'send_message', { message: tail, message_order: ... });
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">16</div><div>
+    <span class="badge MEDIO">MEDIO</span>
+    <div class="card-title">Quick scrape no decodifica HTML entities</div>
+  </div></div>
+  <div class="file">steve-wa-chat.ts · línea ~131</div>
+  <div class="desc">Los productos se extraen con <code>stripTags</code> que solo elimina tags HTML. Las entidades como <code>&amp;nbsp;</code>, <code>&amp;amp;</code>, <code>&amp;aacute;</code> quedan literales. Claude recibe "Zapatilla&amp;nbsp;deportiva" en vez de "Zapatilla deportiva".</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Mejorar stripTags para también decodificar HTML entities:
+const stripTags = (s: string) => s
+  .replace(/&lt;[^&gt;]+&gt;/g, '')
+  .replace(/&amp;nbsp;/g, ' ')
+  .replace(/&amp;amp;/g, '&amp;')
+  .replace(/&amp;lt;/g, '&lt;')
+  .replace(/&amp;gt;/g, '&gt;')
+  .replace(/&amp;aacute;/g, 'á')
+  .replace(/&amp;eacute;/g, 'é')
+  .replace(/&amp;iacute;/g, 'í')
+  .replace(/&amp;oacute;/g, 'ó')
+  .replace(/&amp;uacute;/g, 'ú')
+  .replace(/&amp;ntilde;/g, 'ñ')
+  .replace(/&amp;#\d+;/g, '') // Strip numeric entities
+  .trim();</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">17</div><div>
+    <span class="badge MEDIO">MEDIO</span>
+    <div class="card-title">runInvestigator no valida investigation_data corrupto</div>
+  </div></div>
+  <div class="file">steve-multi-brain.ts · línea ~55</div>
+  <div class="desc">Si <code>investigation_data</code> tiene estructura errónea (string en vez de object, campos null, etc.), el acceso <code>invData.store</code> falla silenciosamente sin logging. JM no puede saber si las investigaciones funcionan.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">const invData = fresh?.investigation_data;
+// Fix: validar estructura antes de usar
+if (invData && typeof invData === 'object') {
+  try {
+    const parts: string[] = [];
+    if (invData.store && typeof invData.store === 'object') { ... }
+    // ... etc
+  } catch (parseErr) {
+    console.error('[investigator] Corrupted investigation_data:', parseErr);
+    // Continuar sin datos de investigación
+  }
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">18</div><div>
+    <span class="badge MEDIO">MEDIO</span>
+    <div class="card-title">Prospect reactivation sin timestamp</div>
+  </div></div>
+  <div class="file">steve-wa-chat.ts · línea ~498</div>
+  <div class="desc">Cuando un prospecto "lost" vuelve a escribir, se reactiva a "discovery" pero no se guarda cuándo fue reactivado ni desde qué stage venía. El contexto de "perdido hace 3 meses" se pierde para Steve y para los reportes.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Guardar contexto de reactivación:
+if (isReactivation) {
+  await supabase.from('wa_prospects').update({
+    stage: 'discovery',
+    lead_score: 0,
+    reactivated_at: new Date().toISOString(),
+    previous_stage: existingProspect.stage,
+    previous_lost_reason: existingProspect.lost_reason,
+  }).eq('id', existingProspect.id);
+  logProspectEvent(existingProspect.id, 'reactivated', {
+    from_stage: existingProspect.stage,
+    days_since_lost: /* calcular */,
+  }, 'steve');
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">19</div><div>
+    <span class="badge MEDIO">MEDIO</span>
+    <div class="card-title">loadCreativeInsights sin caché</div>
+  </div></div>
+  <div class="file">steve-wa-brain.ts · línea ~1012</div>
+  <div class="desc">Cada mensaje dispara <code>loadCreativeInsights()</code> que hace query a <code>creative_history</code>, filtra y agrega. Sin caché. Con 1000+ mensajes/día = 1000+ queries idénticas a la misma tabla.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Caché simple en memoria con TTL 5 minutos:
+let _creativeInsightsCache: { data: string; ts: number } | null = null;
+async function loadCreativeInsights(): Promise&lt;string&gt; {
+  if (_creativeInsightsCache && Date.now() - _creativeInsightsCache.ts &lt; 5 * 60_000) {
+    return _creativeInsightsCache.data;
+  }
+  const data = await /* query actual */;
+  _creativeInsightsCache = { data, ts: Date.now() };
+  return data;
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">20</div><div>
+    <span class="badge MEDIO">MEDIO</span>
+    <div class="card-title">Quick scrape ignora contenido JS-rendered</div>
+  </div></div>
+  <div class="file">steve-wa-chat.ts · línea ~104</div>
+  <div class="desc">El fetch HTML directo no ejecuta JavaScript. Tiendas con React/Vue/Next.js retornan HTML vacío o esqueleto. Productos, precios y descripciones no están disponibles → scrape inútil para 60%+ de tiendas modernas.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Detectar si el HTML es JS-rendered (contenido mínimo) y usar Firecrawl:
+const bodyText = html.replace(/&lt;[^&gt;]+&gt;/g, '').replace(/\s+/g, ' ').trim();
+const isJsRendered = bodyText.length &lt; 500 || html.includes('__NEXT_DATA__') || html.includes('window.__reactFiber');
+if (isJsRendered && FIRECRAWL_API_KEY) {
+  // Usar Firecrawl para renderizado completo
+  const fcRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
+    method: 'POST', headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, formats: ['markdown'] })
+  });
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">21</div><div>
+    <span class="badge MEDIO">MEDIO</span>
+    <div class="card-title">consolidatePainPoints Haiku JSON parse sin try-catch específico</div>
+  </div></div>
+  <div class="file">steve-wa-brain.ts · línea ~1759</div>
+  <div class="desc">Si Haiku retorna texto inesperado (no array), el <code>JSON.parse()</code> falla y el catch externo retorna el fallback de buckets, perdiendo todos los pain points originales. Debería intentar recuperar el array parcial.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Parse más robusto que intenta recuperar arrays parciales:
+let parsed: any;
+try {
+  parsed = JSON.parse(jsonStr);
+} catch {
+  // Intentar extraer array inline: ["item1", "item2"]
+  const arrayMatch = jsonStr.match(/\[[\s\S]*\]/);
+  if (arrayMatch) {
+    try { parsed = JSON.parse(arrayMatch[0]); } catch { /* ignore */ }
+  }
+}
+if (Array.isArray(parsed) && parsed.length > 0) {
+  return parsed.filter(p => typeof p === 'string').slice(0, 8);
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">22</div><div>
+    <span class="badge MEDIO">MEDIO</span>
+    <div class="card-title">buildEnrichedProspectContext definida pero nunca usada</div>
+  </div></div>
+  <div class="file">steve-wa-brain.ts · línea ~753</div>
+  <div class="desc">La función <code>buildEnrichedProspectContext()</code> existe y está exportada, pero <code>buildDynamicSalesPrompt</code> construye el contexto del prospecto manualmente con un array <code>known[]</code>. Código duplicado, riesgo de divergencia.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// En buildDynamicSalesPrompt, reemplazar el array known[] manual:
+// Antes:
+// const known: string[] = [];
+// if (prospect.name) known.push(`Nombre: ${prospect.name}`);
+// ... (20+ líneas)
+
+// Después:
+const prospectContext = buildEnrichedProspectContext(prospect);
+prompt += `\n📋 DATOS DEL PROSPECTO:\n${prospectContext}\n`;</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">23</div><div>
+    <span class="badge MEDIO">MEDIO</span>
+    <div class="card-title">Conversationalist brief sin límite de longitud</div>
+  </div></div>
+  <div class="file">steve-multi-brain.ts · línea ~254</div>
+  <div class="desc">Si el strategist retorna un brief de 5KB (Haiku runaway), se inyecta completo en el system prompt. Suma al total de tokens, puede causar overflow del contexto en conversaciones largas.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Truncar brief a máximo razonable antes de inyectar:
+const MAX_BRIEF_CHARS = 400;
+const briefText = strategistBrief.brief.trim().slice(0, MAX_BRIEF_CHARS);
+const briefSuffix = strategistBrief.brief.length > MAX_BRIEF_CHARS ? '...' : '';
+systemPrompt = `🧠 BRIEF DEL ESTRATEGA (SIGUE ESTA DIRECTRIZ):\n${briefText}${briefSuffix}\n\n${dynamicPrompt}`;</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">24</div><div>
+    <span class="badge BAJO">BAJO</span>
+    <div class="card-title">loadIndustryCaseStudy no limpia caso viejo al cambiar industria</div>
+  </div></div>
+  <div class="file">steve-wa-brain.ts · línea ~972</div>
+  <div class="desc">Si el prospecto cambia de "zapatos" a "ropa", el nuevo caso se carga pero el contexto del viejo puede persistir en el prompt si se cacha. Steve puede mencionar casos irrelevantes.</div>
+  <details><summary>▶ Ver fix</summary><pre class="file">// Pasar what_they_sell actual al selector de caso:
+// y validar que el caso retornado sea de industria COMPATIBLE
+const caseStudy = await loadIndustryCaseStudy(prospect.what_they_sell);
+if (caseStudy && prospect.what_they_sell) {
+  const isRelevant = caseStudy.industry_keywords?.some((k: string) =>
+    prospect.what_they_sell!.toLowerCase().includes(k.toLowerCase())
+  );
+  if (!isRelevant) return null; // No usar caso irrelevante
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">25</div><div>
+    <span class="badge BAJO">BAJO</span>
+    <div class="card-title">analyzeProspectStyle emoji regex incompleta</div>
+  </div></div>
+  <div class="file">steve-wa-brain.ts · línea ~885</div>
+  <div class="desc">El regex de detección de emojis no captura emojis con skin tone modifiers ni secuencias ZWJ (ej: 👨‍👩‍👧, 👋🏽). Prospectos que usan emojis compuestos no se detectan como "usa emojis" y Steve no adapta su estilo.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Usar la propiedad Unicode Emoji en vez de rangos manuales:
+const usesEmojis = /\p{Emoji}/u.test(allText);
+// O más específico (excluye dígitos y # que son técnicamente emoji):
+const usesEmojis = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u.test(allText);</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">26</div><div>
+    <span class="badge BAJO">BAJO</span>
+    <div class="card-title">STAGE_ORDER con stage inválido — falla silenciosa</div>
+  </div></div>
+  <div class="file">steve-wa-chat.ts · línea ~1158</div>
+  <div class="desc">Si <code>prospect.stage</code> es un string inválido o corrupto, <code>STAGE_ORDER[prospect.stage]</code> retorna <code>undefined</code>, que se convierte a <code>0</code> (= stage 'new'). El prospect efectivamente "resetea" de stage sin log.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">const VALID_STAGES = new Set(Object.keys(STAGE_ORDER));
+if (prospect.stage && !VALID_STAGES.has(prospect.stage)) {
+  console.warn(`[stage-order] Invalid stage: "${prospect.stage}" for ${prospect.phone} — defaulting to discovery`);
+  // Considerar fix en DB: update stage to 'discovery'
+}
+const currentStageOrder = STAGE_ORDER[prospect.stage || 'new'] ?? 0;</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">27</div><div>
+    <span class="badge BAJO">BAJO</span>
+    <div class="card-title">runInvestigator retorna objeto vacío sin log</div>
+  </div></div>
+  <div class="file">steve-multi-brain.ts · línea ~44</div>
+  <div class="desc">Si el investigator no encuentra nada (sin case studies, sin investigation_data), retorna objeto con strings vacíos. El estratega recibe contexto vacío sin saber si fue fallo o ausencia de datos.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Loguear cuando investigator no encontró nada:
+if (!result.investigationContext && !result.competitorInsights && !result.salesLearnings) {
+  console.log(`[investigator] No context found for ${prospect.phone} (stage: ${prospect.stage})`);
+}
+return result;</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">28</div><div>
+    <span class="badge BAJO">BAJO</span>
+    <div class="card-title">consolidatePainPoints bucket overlap ignora multi-categoría</div>
+  </div></div>
+  <div class="file">steve-wa-brain.ts · línea ~1776</div>
+  <div class="desc">El fallback de buckets usa <code>break</code> en el primer match. "tiempo para gestionar presupuesto de marketing" matchea 'time' y se ignora el aspecto 'revenue'. Deduplica demasiado agresivamente.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Ordenar buckets por especificidad (revenue primero, más específico):
+const BUCKET_PRIORITY = ['revenue', 'measurement', 'expertise', 'time', 'tools'];
+const orderedBuckets = BUCKET_PRIORITY.map(k => [k, painBuckets[k]] as [string, string[]]);
+for (const [bucket, keywords] of orderedBuckets) { // Orden definido
+  if (keywords.some(k => pain.toLowerCase().includes(k))) {
+    if (!bucketed[bucket]) bucketed[bucket] = pain;
+    break;
+  }
+}</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">29</div><div>
+    <span class="badge BAJO">BAJO</span>
+    <div class="card-title">Strategist brief vacío no genera log de warning</div>
+  </div></div>
+  <div class="file">steve-multi-brain.ts · línea ~163</div>
+  <div class="desc">Si el strategist retorna <code>brief: ''</code> (vacío pero sin error), el pipeline continúa silenciosamente. No hay forma de saber si el strategist está fallando sistemáticamente en generar directivas.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Loguear brief vacío para detectar fallas del strategist:
+if (!strategistBrief?.brief?.trim()) {
+  console.warn(`[strategist] Empty brief for ${prospect.phone} (stage: ${prospect.stage}, score: ${prospect.lead_score})`);
+}
+// Esto permite identificar si hay un patrón (siempre vacío para cierto stage, etc.)</pre></details>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="num">30</div><div>
+    <span class="badge BAJO">BAJO</span>
+    <div class="card-title">buildDynamicSalesPrompt inyecta brief como objeto</div>
+  </div></div>
+  <div class="file">steve-wa-brain.ts · línea ~1356</div>
+  <div class="desc">En la firma de <code>buildDynamicSalesPrompt</code>, el parámetro <code>strategistBrief</code> es de tipo <code>any</code> y puede ser un objeto <code>{brief, suggestedAction, tone}</code> o un string. El fix R4-#5 tiene un <code>typeof strategistBrief === 'object'</code> check, pero si nadie pasa string debería ser siempre objeto — el check doble añade complejidad innecesaria.</div>
+  <details><summary>▶ Ver fix</summary><pre class="fix">// Tipar correctamente el parámetro en la firma:
+// Antes: strategistBrief?: any
+// Después:
+import type { StrategistResult } from './steve-multi-brain.js';
+// En firma de buildDynamicSalesPrompt:
+strategistBrief?: StrategistResult | null,
+// El código de inyección simplifica a:
+if (strategistBrief?.brief?.trim()) {
+  prompt += `🧠 BRIEF DEL ESTRATEGA:\n${strategistBrief.brief.trim()}\n\n`;
+}</pre></details>
+</div>
+
+</div>
+</body>
+</html>

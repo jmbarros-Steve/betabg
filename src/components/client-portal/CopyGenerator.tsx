@@ -472,7 +472,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
 
         {/* ─── GENERATE TAB ─── */}
         <TabsContent value="generate" className="mt-6">
-          <PlanGate feature="copies.generate">
+          <PlanGate feature="copies.generate" clientId={clientId}>
           <ClientAssetsGallery clientId={clientId} compact onAssetsLoaded={setAssets} />
 
           {/* Progress */}
@@ -868,7 +868,7 @@ export function CopyGenerator({ clientId }: CopyGeneratorProps) {
         </TabsContent>
 
         <TabsContent value="crear" className="mt-6">
-          <PlanGate feature="meta_ads.create">
+          <PlanGate feature="meta_ads.create" clientId={clientId}>
             <MetaAdCreator clientId={clientId} onBack={() => setActiveTab('crear')} onGoToLibrary={() => setActiveTab('biblioteca')} />
           </PlanGate>
         </TabsContent>

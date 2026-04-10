@@ -42,19 +42,27 @@ export async function checkGoogleAdsHealth(c: Context) {
     const loginCustomerId = googleToken.mccCustomerId || customerId;
 
     const query = `SELECT customer.descriptive_name, customer.currency_code FROM customer LIMIT 1`;
-    const response = await fetch(
-      `https://googleads.googleapis.com/v18/customers/${customerId}/googleAds:searchStream`,
+    const makeRequest = async (loginId: string) => fetch(
+      `https://googleads.googleapis.com/v23/customers/${customerId}/googleAds:searchStream`,
       {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${googleToken.accessToken}`,
           'developer-token': developerToken,
-          'login-customer-id': loginCustomerId,
+          'login-customer-id': loginId,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ query }),
       }
     );
+
+    let response = await makeRequest(loginCustomerId);
+
+    // Fallback: if MCC login-customer-id fails with 403, retry with customer's own ID
+    if (response.status === 403 && loginCustomerId !== customerId) {
+      console.warn(`[check-google-ads-health] MCC ${loginCustomerId} denied, retrying with ${customerId}`);
+      response = await makeRequest(customerId);
+    }
 
     if (!response.ok) {
       const text = await response.text();

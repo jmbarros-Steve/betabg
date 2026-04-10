@@ -16,6 +16,7 @@ import { CohortAnalysisPanel } from './metrics/CohortAnalysisPanel';
 import { MetricsDateFilter, DateRange, CustomDateRange } from './metrics/MetricsDateFilter';
 import { KPIGridSkeleton, ChartSkeleton, TableSkeleton } from './metrics/MetricsSkeleton';
 import { SmartInsightsPanel } from './metrics/SmartInsightsPanel';
+import { PlanGate } from './PlanGate';
 import { BusinessHealthScore } from './metrics/BusinessHealthScore';
 import { DayOfWeekChart } from './metrics/DayOfWeekChart';
 import { ConversionFunnelPanel } from './metrics/ConversionFunnelPanel';
@@ -818,23 +819,25 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
           />
 
           {/* Smart Insights */}
-          <SmartInsightsPanel data={{
-            totalRevenue: current.totalRevenue,
-            totalOrders: current.totalOrders,
-            totalSpend: totalAdSpendWithGoogle,
-            roas: effectiveRoas,
-            breakEvenRoas: profitMetrics.breakEvenRoas,
-            netProfit: profitLossData.netProfit,
-            netProfitMargin: profitLossData.netProfitMargin,
-            aov,
-            conversionRate: customerMetrics?.conversionRate,
-            repeatCustomerRate: customerMetrics?.repeatCustomerRate,
-            abandonedCartsCount: abandonedCarts.length,
-            abandonedCartsValue: abandonedCarts.reduce((s, c) => s + c.totalValue, 0),
-            previousRevenue: previous.totalRevenue,
-            previousOrders: previous.totalOrders,
-            previousSpend: previous.totalSpend,
-          }} />
+          <PlanGate feature="insights.smart" clientId={clientId}>
+            <SmartInsightsPanel data={{
+              totalRevenue: current.totalRevenue,
+              totalOrders: current.totalOrders,
+              totalSpend: totalAdSpendWithGoogle,
+              roas: effectiveRoas,
+              breakEvenRoas: profitMetrics.breakEvenRoas,
+              netProfit: profitLossData.netProfit,
+              netProfitMargin: profitLossData.netProfitMargin,
+              aov,
+              conversionRate: customerMetrics?.conversionRate,
+              repeatCustomerRate: customerMetrics?.repeatCustomerRate,
+              abandonedCartsCount: abandonedCarts.length,
+              abandonedCartsValue: abandonedCarts.reduce((s, c) => s + c.totalValue, 0),
+              previousRevenue: previous.totalRevenue,
+              previousOrders: previous.totalOrders,
+              previousSpend: previous.totalSpend,
+            }} />
+          </PlanGate>
 
           {/* Charts */}
           <MetricsCharts revenueData={chartData} previousRevenueData={previousChartData.length > 0 ? previousChartData : undefined} currency="CLP" />
