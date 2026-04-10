@@ -125,6 +125,10 @@ export default function GoogleConversionSetup({ connectionId, clientId }: Google
 
   const handleCreate = async () => {
     if (!formData.name.trim()) { toast.error('Nombre requerido'); return; }
+    const defaultVal = formData.default_value ? Number(formData.default_value) : undefined;
+    if (defaultVal !== undefined && (!Number.isFinite(defaultVal) || defaultVal < 0)) {
+      toast.error('El valor default debe ser un numero positivo'); return;
+    }
     setCreating(true);
 
     const { error } = await callApi('manage-google-conversions', {
@@ -137,7 +141,7 @@ export default function GoogleConversionSetup({ connectionId, clientId }: Google
           counting_type: formData.counting_type,
           click_through_lookback_days: Number(formData.lookback),
           view_through_lookback_days: 1,
-          default_value: formData.default_value ? Number(formData.default_value) : undefined,
+          default_value: defaultVal,
         },
       },
     });

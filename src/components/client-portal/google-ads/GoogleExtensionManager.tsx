@@ -83,35 +83,40 @@ export default function GoogleExtensionManager({ connectionId, clientId }: Googl
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [assetsRes, campAssetsRes] = await Promise.all([
-      callApi('manage-google-extensions', { body: { action: 'list_assets', connection_id: connectionId } }),
-      callApi('manage-google-extensions', { body: { action: 'list_campaign_assets', connection_id: connectionId } }),
-    ]);
+    try {
+      const [assetsRes, campAssetsRes] = await Promise.all([
+        callApi('manage-google-extensions', { body: { action: 'list_assets', connection_id: connectionId } }),
+        callApi('manage-google-extensions', { body: { action: 'list_campaign_assets', connection_id: connectionId } }),
+      ]);
 
-    if (assetsRes.error) toast.error('Error cargando extensiones: ' + assetsRes.error);
-    if (campAssetsRes.error) toast.error('Error cargando campañas: ' + campAssetsRes.error);
+      if (assetsRes.error) toast.error('Error cargando extensiones: ' + assetsRes.error);
+      if (campAssetsRes.error) toast.error('Error cargando campañas: ' + campAssetsRes.error);
 
-    if (assetsRes.data?.assets) setAssets(assetsRes.data.assets);
-    if (campAssetsRes.data?.campaign_assets) {
-      setCampaignAssets(campAssetsRes.data.campaign_assets);
-      const campMap = new Map<string, string>();
-      for (const ca of campAssetsRes.data.campaign_assets) {
-        campMap.set(ca.campaign_id, ca.campaign_name);
+      if (assetsRes.data?.assets) setAssets(assetsRes.data.assets);
+      if (campAssetsRes.data?.campaign_assets) {
+        setCampaignAssets(campAssetsRes.data.campaign_assets);
+        const campMap = new Map<string, string>();
+        for (const ca of campAssetsRes.data.campaign_assets) {
+          campMap.set(ca.campaign_id, ca.campaign_name);
+        }
+        setCampaigns(Array.from(campMap.entries()).map(([id, name]) => ({ id, name })));
       }
-      setCampaigns(Array.from(campMap.entries()).map(([id, name]) => ({ id, name })));
-    }
 
-    // Also fetch campaigns from campaign manager if none from assets
-    if (!campAssetsRes.data?.campaign_assets?.length) {
-      const { data } = await callApi('manage-google-campaign', {
-        body: { action: 'list_details', connection_id: connectionId },
-      });
-      if (data?.campaigns) {
-        setCampaigns(data.campaigns.map((c: any) => ({ id: c.id, name: c.name })));
+      // Also fetch campaigns from campaign manager if none from assets
+      if (!campAssetsRes.data?.campaign_assets?.length) {
+        const { data } = await callApi('manage-google-campaign', {
+          body: { action: 'list_details', connection_id: connectionId },
+        });
+        if (data?.campaigns) {
+          setCampaigns(data.campaigns.map((c: any) => ({ id: c.id, name: c.name })));
+        }
       }
+    } catch (err) {
+      console.error('fetchAll error:', err);
+      toast.error('Error inesperado cargando extensiones');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }, [connectionId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -141,61 +146,65 @@ export default function GoogleExtensionManager({ connectionId, clientId }: Googl
     }
 
     setCreating(true);
+    try {
+      let actionName = '';
+      let body: Record<string, any> = {};
 
-    let actionName = '';
-    let body: Record<string, any> = {};
+      switch (createType) {
+        case 'sitelink':
+          actionName = 'create_sitelink';
+          body = { link_text: formData.link_text, description1: formData.description1, description2: formData.description2, final_urls: [formData.final_url] };
+          break;
+        case 'callout':
+          actionName = 'create_callout';
+          body = { callout_text: formData.callout_text };
+          break;
+        case 'snippet':
+          actionName = 'create_snippet';
+          body = { header: formData.header, values: formData.values_text?.split('\n').filter((v: string) => v.trim()) };
+          break;
+        case 'call':
+          actionName = 'create_call';
+          body = { country_code: formData.country_code, phone_number: formData.phone_number };
+          break;
+      }
 
-    switch (createType) {
-      case 'sitelink':
-        actionName = 'create_sitelink';
-        body = { link_text: formData.link_text, description1: formData.description1, description2: formData.description2, final_urls: [formData.final_url] };
-        break;
-      case 'callout':
-        actionName = 'create_callout';
-        body = { callout_text: formData.callout_text };
-        break;
-      case 'snippet':
-        actionName = 'create_snippet';
-        body = { header: formData.header, values: formData.values_text?.split('\n').filter((v: string) => v.trim()) };
-        break;
-      case 'call':
-        actionName = 'create_call';
-        body = { country_code: formData.country_code, phone_number: formData.phone_number };
-        break;
+      const { error } = await callApi('manage-google-extensions', {
+        body: { action: actionName, connection_id: connectionId, data: body },
+      });
+
+      if (error) { toast.error('Error: ' + error); return; }
+      toast.success('Extension creada');
+      setCreateType(null);
+      setFormData({});
+      fetchAll();
+    } finally {
+      setCreating(false);
     }
-
-    const { error } = await callApi('manage-google-extensions', {
-      body: { action: actionName, connection_id: connectionId, data: body },
-    });
-
-    setCreating(false);
-    if (error) { toast.error('Error: ' + error); return; }
-    toast.success('Extension creada');
-    setCreateType(null);
-    setFormData({});
-    fetchAll();
   };
 
   const handleLink = async () => {
     if (!linkAsset || !linkCampaignId) return;
     setLinking(true);
+    try {
+      const fieldTypeMap: Record<string, string> = {
+        SITELINK: 'SITELINK', CALLOUT: 'CALLOUT', STRUCTURED_SNIPPET: 'STRUCTURED_SNIPPET', CALL: 'CALL',
+      };
 
-    const fieldTypeMap: Record<string, string> = {
-      SITELINK: 'SITELINK', CALLOUT: 'CALLOUT', STRUCTURED_SNIPPET: 'STRUCTURED_SNIPPET', CALL: 'CALL',
-    };
+      const { error } = await callApi('manage-google-extensions', {
+        body: {
+          action: 'link_asset', connection_id: connectionId,
+          data: { campaign_id: linkCampaignId, asset_id: linkAsset.id, field_type: fieldTypeMap[linkAsset.type] || linkAsset.type },
+        },
+      });
 
-    const { error } = await callApi('manage-google-extensions', {
-      body: {
-        action: 'link_asset', connection_id: connectionId,
-        data: { campaign_id: linkCampaignId, asset_id: linkAsset.id, field_type: fieldTypeMap[linkAsset.type] || linkAsset.type },
-      },
-    });
-
-    setLinking(false);
-    if (error) { toast.error('Error vinculando: ' + error); return; }
-    toast.success('Extension vinculada a campana');
-    setLinkDialogOpen(false);
-    fetchAll();
+      if (error) { toast.error('Error vinculando: ' + error); return; }
+      toast.success('Extension vinculada a campana');
+      setLinkDialogOpen(false);
+      fetchAll();
+    } finally {
+      setLinking(false);
+    }
   };
 
   const handleUnlink = async (assetId: string, campaignId: string) => {
@@ -204,29 +213,33 @@ export default function GoogleExtensionManager({ connectionId, clientId }: Googl
 
     const key = `unlink_${assetId}_${campaignId}`;
     setActionLoading(prev => ({ ...prev, [key]: true }));
+    try {
+      const { error } = await callApi('manage-google-extensions', {
+        body: { action: 'unlink_asset', connection_id: connectionId, data: { resource_name: resourceName } },
+      });
 
-    const { error } = await callApi('manage-google-extensions', {
-      body: { action: 'unlink_asset', connection_id: connectionId, data: { resource_name: resourceName } },
-    });
-
-    setActionLoading(prev => ({ ...prev, [key]: false }));
-    if (error) { toast.error('Error: ' + error); return; }
-    toast.success('Desvinculado');
-    fetchAll();
+      if (error) { toast.error('Error: ' + error); return; }
+      toast.success('Desvinculado');
+      fetchAll();
+    } finally {
+      setActionLoading(prev => ({ ...prev, [key]: false }));
+    }
   };
 
   const handleRemove = async (assetId: string) => {
     const key = `rem_${assetId}`;
     setActionLoading(prev => ({ ...prev, [key]: true }));
+    try {
+      const { error } = await callApi('manage-google-extensions', {
+        body: { action: 'remove_asset', connection_id: connectionId, data: { asset_id: assetId } },
+      });
 
-    const { error } = await callApi('manage-google-extensions', {
-      body: { action: 'remove_asset', connection_id: connectionId, data: { asset_id: assetId } },
-    });
-
-    setActionLoading(prev => ({ ...prev, [key]: false }));
-    if (error) { toast.error('Error eliminando: ' + error); return; }
-    toast.success('Extension eliminada');
-    setAssets(prev => prev.filter(a => a.id !== assetId));
+      if (error) { toast.error('Error eliminando: ' + error); return; }
+      toast.success('Extension eliminada');
+      setAssets(prev => prev.filter(a => a.id !== assetId));
+    } finally {
+      setActionLoading(prev => ({ ...prev, [key]: false }));
+    }
   };
 
   const filterByType = (type: string) => assets.filter(a => a.type === type);

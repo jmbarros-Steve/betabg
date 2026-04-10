@@ -119,7 +119,7 @@ export default function GoogleAdsTab({ clientId }: GoogleAdsTabProps) {
               key={tab.key}
               variant="ghost"
               size="sm"
-              onClick={() => setSubTab(tab.key)}
+              onClick={() => { if (!locked) setSubTab(tab.key); }}
               className={`gap-1.5 rounded-b-none border-b-2 whitespace-nowrap ${
                 subTab === tab.key
                   ? 'border-primary text-primary'

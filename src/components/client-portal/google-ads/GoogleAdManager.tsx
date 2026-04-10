@@ -207,8 +207,8 @@ export default function GoogleAdManager({ connectionId, clientId }: GoogleAdMana
     if (statusFilter !== 'ALL' && ad.status !== statusFilter) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      if (!ad.ad_group_name.toLowerCase().includes(q) && !ad.campaign_name.toLowerCase().includes(q) &&
-          !ad.headlines.some(h => h.text.toLowerCase().includes(q))) return false;
+      if (!(ad.ad_group_name || '').toLowerCase().includes(q) && !(ad.campaign_name || '').toLowerCase().includes(q) &&
+          !(ad.headlines || []).some(h => (h.text || '').toLowerCase().includes(q))) return false;
     }
     return true;
   });
@@ -293,25 +293,25 @@ export default function GoogleAdManager({ connectionId, clientId }: GoogleAdMana
                 <CardContent className="p-4 pt-0 border-t mt-2">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-2">Headlines ({ad.headlines.length})</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Headlines ({(ad.headlines || []).length})</p>
                       <div className="space-y-1">
-                        {ad.headlines.map((h, i) => (
+                        {(ad.headlines || []).map((h, i) => (
                           <div key={i} className="flex items-center gap-2 text-sm">
                             <span className="text-muted-foreground text-xs w-4">{i+1}.</span>
-                            <span className="truncate">{h.text}</span>
-                            <span className="text-xs text-muted-foreground ml-auto">{h.text.length}/30</span>
+                            <span className="truncate">{h.text || ''}</span>
+                            <span className="text-xs text-muted-foreground ml-auto">{(h.text || '').length}/30</span>
                           </div>
                         ))}
                       </div>
                     </div>
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-2">Descriptions ({ad.descriptions.length})</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Descriptions ({(ad.descriptions || []).length})</p>
                       <div className="space-y-1">
-                        {ad.descriptions.map((d, i) => (
+                        {(ad.descriptions || []).map((d, i) => (
                           <div key={i} className="flex items-start gap-2 text-sm">
                             <span className="text-muted-foreground text-xs w-4 mt-0.5">{i+1}.</span>
-                            <span className="flex-1">{d.text}</span>
-                            <span className="text-xs text-muted-foreground">{d.text.length}/90</span>
+                            <span className="flex-1">{d.text || ''}</span>
+                            <span className="text-xs text-muted-foreground">{(d.text || '').length}/90</span>
                           </div>
                         ))}
                       </div>

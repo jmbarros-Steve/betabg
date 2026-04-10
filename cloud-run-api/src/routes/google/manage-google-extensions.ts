@@ -97,17 +97,23 @@ async function googleAdsMutate(
     return { ok: false, error: errorMessage };
   }
 
-  const data = await response.json();
+  let data: any;
+  try {
+    data = await response.json();
+  } catch {
+    return { ok: false, error: 'Failed to parse Google Ads mutate response' };
+  }
   return { ok: true, data };
 }
 
 // --- Helpers ---
 
 function validateNumericId(value: string | undefined): boolean {
-  return !value || /^\d+$/.test(value);
+  return !value || (/^\d+$/.test(value) && value.length <= 20);
 }
 
 function validateResourceName(resourceName: string, customerId: string): boolean {
+  if (resourceName.includes('..') || resourceName.includes('//')) return false;
   return resourceName.startsWith(`customers/${customerId}/`);
 }
 

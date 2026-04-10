@@ -121,7 +121,8 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
     const { data, error } = await callApi('manage-google-keywords', {
       body: { action: 'list_ad_groups', connection_id: connectionId },
     });
-    if (!error && data?.ad_groups) setAdGroups(data.ad_groups);
+    if (error) { toast.error('Error cargando ad groups: ' + error); return; }
+    if (data?.ad_groups) setAdGroups(data.ad_groups);
   }, [connectionId]);
 
   const fetchKeywords = useCallback(async () => {
@@ -191,6 +192,7 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
   };
 
   const handleDelete = async (kw: Keyword) => {
+    if (!window.confirm(`Eliminar keyword "${kw.keyword_text}"? Esta accion no se puede deshacer.`)) return;
     const key = `del_${kw.ad_group_id}_${kw.criterion_id}`;
     setActionLoading(prev => ({ ...prev, [key]: true }));
 
@@ -209,11 +211,13 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
 
   const handleSaveBid = async () => {
     if (!bidKeyword || !newBid) return;
+    const bidValue = Number(newBid);
+    if (!Number.isFinite(bidValue) || bidValue <= 0) { toast.error('El bid debe ser un numero positivo'); return; }
     setSavingBid(true);
     const { error } = await callApi('manage-google-keywords', {
       body: {
         action: 'update_keyword', connection_id: connectionId,
-        data: { ad_group_id: bidKeyword.ad_group_id, criterion_id: bidKeyword.criterion_id, cpc_bid: Number(newBid) },
+        data: { ad_group_id: bidKeyword.ad_group_id, criterion_id: bidKeyword.criterion_id, cpc_bid: bidValue },
       },
     });
     setSavingBid(false);
@@ -228,6 +232,8 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
       toast.error('Completa keyword y ad group');
       return;
     }
+    const bid = newKeyword.cpc_bid ? Number(newKeyword.cpc_bid) : undefined;
+    if (bid !== undefined && (!Number.isFinite(bid) || bid <= 0)) { toast.error('CPC Bid debe ser un numero positivo'); return; }
     setAddingKeyword(true);
     const { error } = await callApi('manage-google-keywords', {
       body: {
@@ -236,7 +242,7 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
           ad_group_id: newKeyword.ad_group_id,
           keyword_text: newKeyword.text,
           match_type: newKeyword.match_type,
-          cpc_bid: newKeyword.cpc_bid ? Number(newKeyword.cpc_bid) : undefined,
+          cpc_bid: bid,
         },
       },
     });

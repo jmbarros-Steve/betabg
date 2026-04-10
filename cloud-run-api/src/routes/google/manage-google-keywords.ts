@@ -18,7 +18,7 @@ interface RequestBody {
 const GOOGLE_ADS_API = 'https://googleads.googleapis.com/v23';
 
 function validateNumericId(value: string | undefined): boolean {
-  return !value || /^\d+$/.test(value);
+  return !value || (/^\d+$/.test(value) && value.length <= 20);
 }
 
 async function googleAdsQuery(
@@ -106,7 +106,12 @@ async function googleAdsMutate(
     return { ok: false, error: errorMessage };
   }
 
-  const data = await response.json();
+  let data: any;
+  try {
+    data = await response.json();
+  } catch {
+    return { ok: false, error: 'Failed to parse Google Ads mutate response' };
+  }
   return { ok: true, data };
 }
 
