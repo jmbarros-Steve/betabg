@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 interface SocialTerminalProps {
   onEnter: () => void;
@@ -58,7 +58,7 @@ export function SocialTerminal({ onEnter }: SocialTerminalProps) {
   const [entering, setEntering] = useState(false);
   const [exitAttempts, setExitAttempts] = useState(0);
 
-  const allLines = TERMINAL_LINES(getBrowserInfo());
+  const allLines = useMemo(() => TERMINAL_LINES(getBrowserInfo()), []);
 
   // Typewriter effect
   useEffect(() => {
