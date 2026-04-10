@@ -29,6 +29,7 @@ import { TopCampaignsBarChart } from '@/components/client-portal/metrics/TopCamp
 import { TrendAreaChart } from '@/components/client-portal/metrics/TrendAreaChart';
 import { DatePresetSelector } from '@/components/client-portal/metrics/DatePresetSelector';
 import { useMetricTargets } from '@/hooks/useMetricTargets';
+import { PlanGate } from '@/components/client-portal/PlanGate';
 import type { MetricKey } from '@/lib/metric-utils';
 
 
@@ -1173,6 +1174,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
         </TabsContent>
 
         <TabsContent value="recommendations" className="mt-4">
+          <PlanGate feature="campaigns.recommendations" clientId={clientId}>
           <AnimatePresence>
             {recommendations.length === 0 ? (
               <Card>
@@ -1204,7 +1206,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                              <div className={`p-2 rounded-lg ${config.color.split(' ').slice(0, 2).join(' ')}`}>
                                <Icon className="w-4 h-4" />
                              </div>
-                             
+
                              <div className="flex-1">
                                <div className="flex items-center gap-2 mb-1">
                                  <Badge variant="outline" className="text-xs capitalize">
@@ -1217,8 +1219,8 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                <p className="text-sm">{rec.recommendation_text}</p>
                              </div>
 
-                             <Button 
-                               variant="ghost" 
+                             <Button
+                               variant="ghost"
                                size="icon"
                                className="shrink-0"
                                onClick={() => dismissRecommendation(rec.id)}
@@ -1234,10 +1236,12 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
              </div>
            )}
            </AnimatePresence>
+          </PlanGate>
          </TabsContent>
 
         {/* Charlie Review Tab */}
         <TabsContent value="charlie" className="mt-4">
+          <PlanGate feature="campaigns.recommendations" clientId={clientId}>
           {allAdSetsForCharlie.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center">
@@ -1307,6 +1311,7 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
               })}
             </div>
           )}
+          </PlanGate>
         </TabsContent>
       </Tabs>
       </>}
