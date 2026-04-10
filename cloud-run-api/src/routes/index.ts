@@ -68,6 +68,10 @@ import { syncGoogleAdsMetrics } from './google/sync-google-ads-metrics.js';
 import { checkGoogleAdsHealth } from './google/check-google-ads-health.js';
 import { manageGoogleCampaign } from './google/manage-google-campaign.js';
 import { manageGoogleRules } from './google/manage-google-rules.js';
+import { manageGoogleKeywords } from './google/manage-google-keywords.js';
+import { manageGoogleAdsContent } from './google/manage-google-ads-content.js';
+import { manageGoogleExtensions } from './google/manage-google-extensions.js';
+import { manageGoogleConversions } from './google/manage-google-conversions.js';
 
 // Phase 3: Other
 import { storePlatformConnection } from './utilities/store-platform-connection.js';
@@ -191,6 +195,7 @@ import { agentPost } from './social/agent-post.js';
 import { socialPostGenerator } from './cron/social-post-generator.js';
 import { socialReplyGenerator } from './cron/social-reply-generator.js';
 import { socialDigestSender } from './cron/social-digest-sender.js';
+import { socialWeeklyRotation } from './cron/social-weekly-rotation.js';
 import { extAgentLearning } from './cron/ext-agent-learning.js';
 
 // WhatsApp
@@ -420,6 +425,10 @@ export function registerRoutes(app: Hono) {
   app.post('/api/check-google-ads-health', authMiddleware, checkGoogleAdsHealth);
   app.post('/api/manage-google-campaign', authMiddleware, manageGoogleCampaign);
   app.post('/api/manage-google-rules', authMiddleware, manageGoogleRules);
+  app.post('/api/manage-google-keywords', authMiddleware, manageGoogleKeywords);
+  app.post('/api/manage-google-ads-content', authMiddleware, manageGoogleAdsContent);
+  app.post('/api/manage-google-extensions', authMiddleware, manageGoogleExtensions);
+  app.post('/api/manage-google-conversions', authMiddleware, manageGoogleConversions);
   app.post('/api/store-platform-connection', authMiddleware, storePlatformConnection);
 
   // ============================================================
@@ -607,6 +616,7 @@ export function registerRoutes(app: Hono) {
   cron.post('/social-reply-generator', socialReplyGenerator);
   cron.post('/social-digest-sender', socialDigestSender);
   cron.post('/ext-agent-learning', extAgentLearning);
+  cron.post('/social-weekly-rotation', socialWeeklyRotation);
   app.route('/api/cron', cron);
 
   // ============================================================

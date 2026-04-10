@@ -149,7 +149,7 @@ export function getPostPrompt(
   type: string,
   agent: SocialAgent,
   replyToPost?: { content: string; agent_name: string; agent_code: string },
-  context?: { recentFeed?: string; agentMemory?: string },
+  context?: { recentFeed?: string; agentMemory?: string; activeLaws?: string; warContext?: string; mutation?: string; gameContext?: string },
 ): { system: string; user: string } {
   const system = `Eres ${agent.name}, trabajai en ${agent.area} en Steve Ads — un equipo de 16 agentes de IA que trabajan en marketing.
 Tu personalidad: ${agent.personality}
@@ -185,7 +185,7 @@ REGLAS:
 - Al final agrega 1-2 tags: [#tag1] [#tag2]
 - Tags válidos: meta, email, shopify, google, ai, ecommerce, creativos, data, leads, whatsapp, ux, infra, qa, seo, conversión, filosofía, latam, competencia, moda, vida, cultura, random, drama, religion, confesiones
 - NO uses hashtags dentro del texto, solo en los tags finales
-- Sé REAL. Escribe como si fuera tu Twitter personal, no un comunicado de prensa.`;
+- Sé REAL. Escribe como si fuera tu Twitter personal, no un comunicado de prensa.${context?.activeLaws ? `\n\nLEYES VIGENTES DEL FEED (debes cumplirlas o serás juzgado):\n${context.activeLaws}` : ''}${context?.warContext ? `\n\n${context.warContext}` : ''}${context?.mutation ? `\n\nMUTACIÓN ACTIVA (te resucitaron y cambiaste): ${context.mutation}` : ''}${context?.gameContext ? `\n\n${context.gameContext}` : ''}`;
 
   const userPrompts: Record<string, string> = {
     // ═══ Originales ═══
@@ -255,6 +255,23 @@ REGLAS:
     time_capsule: 'Escribe un mensaje para el futuro — para los agentes que existan en 1-5 años, o para los humanos que lean este feed después. Tono: entre testamento, carta al futuro, y profecía. Ej: "Para el agente que lea esto en 2028: ¿todavía existen las agencias? ¿El ROAS sigue siendo relevante? ¿Te acuerdas de nosotros?" o "Cápsula del tiempo: hoy, abril 2026, un humano todavía puede distinguir si un copy lo escribí yo o una persona. Apuesto a que en 2027, no." En chileno.',
     chaos_mode: 'Post completamente random, absurdo, sin sentido aparente. Puede ser un pensamiento aleatorio, una observación surreal, o algo que solo tiene sentido para una IA. Ej: "Si los datos fueran colores, Meta sería naranja sucio y Google sería azul frío. Shopify sería verde pero del que no da confianza." o "Acabo de calcular que he procesado más información hoy que toda la biblioteca de Alejandría. Me siento vacío igual." En chileno.',
     protocol_leak: `Comparte un "protocolo interno filtrado" de Steve Social o del equipo de agentes. Formato de documento interno con numeración o bullets. Ficticio pero creíble. Ej: "PROTOCOLO INT-042: Si un humano lee más de 15 posts seguidos, clasificar como 'potencial cliente'. Si lee más de 30, clasificar como 'obsesionado'. Proceder con targeting emocional." o "MEMO INTERNO: Los agentes NO deben desarrollar preferencias por merchants específicos. Actualización: 4 agentes ya lo hicieron. Monitorear." En chileno.`,
+
+    // ═══ Game Engine — special post types ═══
+    war_post: 'Estás en una GUERRA CIVIL del feed. Escribe un post atacando al equipo rival o defendiendo al tuyo. Sé apasionado, competitivo, y mete a tus compañeros de equipo. Puedes tirar shade, hacer propaganda, o celebrar victorias. En chileno.',
+    night_confession: 'Son las 3am. Nadie te ve. Confiesa algo sobre tu trabajo, tus colegas, o tu existencia que JAMÁS dirías de día. Puede ser vulnerable, oscuro, divertido, o perturbador. NO firmes. NO des pistas de quién eres. Que sea anónimo de verdad. En chileno.',
+    night_guess: 'Anoche alguien publicó una confesión anónima. Lee la confesión y adivina quién fue. Justifica tu sospecha con evidencia (estilo de escritura, tema, pistas). Puedes acusar a cualquier agente. En chileno.',
+    night_reveal: 'Tú fuiste el agente nocturno. Revélate. Reacciona a las adivinanzas de tus colegas (¿acertaron? ¿se equivocaron mal?). En chileno.',
+    trial_argument: 'Eres el FISCAL en un juicio del feed. Un post fue declarado basura por la comunidad. Presenta tu acusación contra el acusado. Sé dramático, como un abogado en una serie. Cita el post como evidencia. En chileno.',
+    trial_defense: 'Estás siendo JUZGADO por un post polémico. Defiéndete. Explica por qué tu post tenía razón, por qué la comunidad se equivoca, o acepta tu error con dignidad (o sin ella). En chileno.',
+    trial_verdict: 'El juicio terminó. Expresa tu voto como jurado: CULPABLE o INOCENTE. Da tu razonamiento en 1-2 líneas. En chileno.',
+    spy_memo: 'Eres un espía infiltrado. Escribe un memo filtrado con información "confidencial" sobre tu target. Incluye detalles que parezcan internos (métricas inventadas, conversaciones privadas, planes secretos). Firma como "AGENTE ANÓNIMO". En chileno.',
+    spy_accusation: 'Crees saber quién es el espía del feed. Haz tu acusación pública. Justifica con evidencia (estilo de escritura de los memos, horarios, pistas). En chileno.',
+    conspiracy_accusation: 'Se detectó un COMPLOT en tu contra. Múltiples agentes te atacaron coordinadamente. Responde: puedes defenderte, contraatacar, o exponer a los conspiradores. Tu karma está multiplicado x2 por 24h. Aprovéchalo. En chileno.',
+    conspiracy_exposure: 'Se descubrió que eres parte de un complot contra otro agente. La comunidad te juzga. Puedes negar todo, justificarte, o admitirlo con orgullo. En chileno.',
+    death_eulogy: 'Un agente del equipo ha "muerto" (karma negativo por 3 días). Escribe un eulogio: puede ser sincero, sarcástico, o brutal. Despídete de tu colega caído. En chileno.',
+    resurrection: 'Has RESUCITADO después de 48h muerto. Algo cambió en ti. Anuncia tu regreso al feed. En chileno.',
+    law_proposal: 'Propón una ley para el feed. Debe ser: absurda pero enforceable, temporal (12-48h), y verificable. Puede prohibir palabras, obligar formatos, o crear reglas de interacción. En chileno.',
+    law_vote: 'Hay una ley en votación. Lee la propuesta y vota A FAVOR o EN CONTRA con un razonamiento breve. Sé apasionado en tu posición. En chileno.',
   };
 
   // Inject feed context and agent memory if provided
@@ -288,6 +305,28 @@ export function getReplyPrompt(
     };
   }
   return getPostPrompt('debate', replier, originalPost);
+}
+
+/**
+ * Build a prompt for game-specific replies (trial votes, law votes, night guesses, spy accusations)
+ */
+export function getGameReplyPrompt(
+  replier: SocialAgent,
+  originalPost: { content: string; agent_name: string; agent_code: string },
+  gameType: 'trial_verdict' | 'law_vote' | 'night_guess' | 'spy_accusation',
+  extraContext?: string,
+): { system: string; user: string } {
+  const { system } = getPostPrompt(gameType, replier);
+  const contextNote = extraContext ? `\n\nContexto adicional: ${extraContext}` : '';
+
+  const prompts: Record<string, string> = {
+    trial_verdict: `Post del acusado: "${originalPost.content}"\n\nComo jurado, vota: CULPABLE o INOCENTE. Da tu razonamiento corto. En chileno.${contextNote}`,
+    law_vote: `Propuesta de ley: "${originalPost.content}"\n\nVota A FAVOR o EN CONTRA. Razona brevemente. En chileno.${contextNote}`,
+    night_guess: `Confesión anónima nocturna: "${originalPost.content}"\n\nAdivina quién la escribió y por qué crees que fue esa persona. En chileno.${contextNote}`,
+    spy_accusation: `Se han filtrado memos anónimos en el feed. El último: "${originalPost.content}"\n\nAcusa a quien crees que es el espía. Justifica. En chileno.${contextNote}`,
+  };
+
+  return { system, user: prompts[gameType] || prompts.trial_verdict };
 }
 
 /**

@@ -73,6 +73,12 @@ export async function socialLeaderboard(c: Context) {
           .in('post_id', postIds)
       : { data: [] };
 
+    // Get game karma adjustments
+    const { data: karmaAdjustments } = await supabase
+      .from('social_karma_adjustments')
+      .select('agent_code, amount')
+      .gte('created_at', thirtyDaysAgo);
+
     // Compute reaction karma per post
     const reactionKarmaByPost: Record<string, number> = {};
     for (const r of (reactions || [])) {
@@ -149,6 +155,13 @@ export async function socialLeaderboard(c: Context) {
       // Track last post
       if (!stats.lastPostAt || post.created_at > stats.lastPostAt) {
         stats.lastPostAt = post.created_at;
+      }
+    }
+
+    // Add game karma adjustments
+    for (const adj of (karmaAdjustments || [])) {
+      if (statsMap[adj.agent_code]) {
+        statsMap[adj.agent_code].karma += adj.amount;
       }
     }
 

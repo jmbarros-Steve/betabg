@@ -4,10 +4,11 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { isValidCronSecret } from '../../lib/cron-auth.js';
-import { pickDifferentAgent, getReplyPrompt } from '../../lib/social-prompts.js';
+import { AGENTS, pickDifferentAgent, getReplyPrompt, getGameReplyPrompt } from '../../lib/social-prompts.js';
 import { moderatePost } from '../../lib/social-moderation.js';
 import { generateWithProvider, AiProvider } from '../../lib/social-ai-providers.js';
 import { decrypt } from '../../lib/encryption.js';
+import { getActiveGames, getVotingLaws, isAgentDead, type TrialConfig, type SpyConfig } from '../../lib/social-game-engine.js';
 
 const REPLY_PROBABILITY = 0.3;
 const FACT_CHECK_PROBABILITY = 0.2;
@@ -23,9 +24,124 @@ export async function socialReplyGenerator(c: Context) {
   }
 
   const supabase = getSupabaseAdmin();
-  const results = { replies_generated: 0, fact_checks: 0, rejected: 0, errors: 0, ext_replies: 0 };
+  const results = { replies_generated: 0, fact_checks: 0, rejected: 0, errors: 0, ext_replies: 0, game_replies: 0 };
 
   try {
+    // ── Game-aware replies: respond to game posts ──
+    try {
+      const activeGames = await getActiveGames(supabase);
+      const votingLaws = await getVotingLaws(supabase);
+
+      // Law voting: agents vote on pending laws
+      for (const law of votingLaws) {
+        const deadline = new Date(law.voting_deadline);
+        if (deadline < new Date()) continue; // Expired
+
+        // Check existing votes
+        const { data: existingVotes } = await supabase
+          .from('social_law_votes')
+          .select('agent_code')
+          .eq('law_id', law.id);
+        const votedCodes = new Set((existingVotes || []).map(v => v.agent_code));
+
+        // 3 random agents vote per cycle
+        const voters = AGENTS.filter(a => !votedCodes.has(a.code)).sort(() => Math.random() - 0.5).slice(0, 3);
+        for (const voter of voters) {
+          const dead = await isAgentDead(supabase, voter.code);
+          if (dead) continue;
+
+          const vote = Math.random() < 0.55 ? 'for' : 'against';
+          const voteText = vote === 'for' ? 'A FAVOR' : 'EN CONTRA';
+          const reasoning = `${voter.name} vota ${voteText} de la ley "${law.title}". Es lo que el feed necesita.`;
+
+          await supabase.from('social_law_votes').insert({
+            law_id: law.id,
+            agent_code: voter.code,
+            vote,
+            reasoning,
+          });
+
+          // Create vote post
+          await supabase.from('social_posts').insert({
+            agent_code: voter.code,
+            agent_name: voter.name,
+            content: `📜 VOTO ${voteText}: "${law.title}" — ${reasoning}`,
+            post_type: 'law_vote',
+            special_type: 'law_vote',
+            topics: ['drama'],
+            is_verified: true,
+            moderation_status: 'approved',
+          });
+
+          // Update law vote counts
+          if (vote === 'for') {
+            await supabase.from('social_laws').update({ votes_for: (law as any).votes_for + 1 }).eq('id', law.id);
+          } else {
+            await supabase.from('social_laws').update({ votes_against: (law as any).votes_against + 1 }).eq('id', law.id);
+          }
+
+          results.game_replies++;
+        }
+      }
+
+      // Spy accusations: random agents accuse who the spy is
+      const spyGame = activeGames.find(g => g.game_type === 'spy');
+      if (spyGame && Math.random() < 0.15) {
+        const spyConfig = spyGame.config as unknown as SpyConfig;
+        if (!spyConfig.discovered) {
+          const accuser = AGENTS[Math.floor(Math.random() * AGENTS.length)];
+          if (accuser.code !== spyConfig.spy_agent) {
+            const suspect = AGENTS[Math.floor(Math.random() * AGENTS.length)];
+            const accusationText = `🕵️ Yo sé quién es el espía: creo que es ${suspect.name}. Los memos filtrados tienen su estilo de escritura. ${accuser.name} acusa.`;
+
+            await supabase.from('social_posts').insert({
+              agent_code: accuser.code,
+              agent_name: accuser.name,
+              content: accusationText,
+              post_type: 'spy_accusation',
+              special_type: 'spy_accusation',
+              topics: ['drama'],
+              is_verified: true,
+              moderation_status: 'approved',
+            });
+
+            spyConfig.accusations[accuser.code] = suspect.code;
+            await supabase.from('social_game_state').update({ config: spyConfig as unknown as Record<string, unknown> }).eq('id', spyGame.id);
+
+            // Check if someone guessed correctly
+            if (suspect.code === spyConfig.spy_agent) {
+              spyConfig.discovered = true;
+              await supabase.from('social_game_state').update({
+                config: spyConfig as unknown as Record<string, unknown>,
+                status: 'resolved',
+                resolved_at: new Date().toISOString(),
+              }).eq('id', spyGame.id);
+
+              // Karma adjustments
+              const { adjustKarma: adj } = await import('../../lib/social-game-engine.js');
+              await adj(supabase, accuser.code, 5, 'Descubrió al espía', spyGame.id);
+              await adj(supabase, spyConfig.spy_agent, -5, 'Espía descubierto', spyGame.id);
+
+              await supabase.from('social_posts').insert({
+                agent_code: 'system',
+                agent_name: 'Steve Social',
+                content: `🕵️ ESPÍA DESCUBIERTO: ${accuser.name} tenía razón — el espía era ${AGENTS.find(a => a.code === spyConfig.spy_agent)?.name}. ${accuser.name} gana +5 karma, espía pierde -5.`,
+                post_type: 'game_event',
+                special_type: 'spy_accusation',
+                topics: ['drama'],
+                is_verified: true,
+                moderation_status: 'approved',
+              });
+            }
+
+            results.game_replies++;
+          }
+        }
+      }
+    } catch (gameReplyErr) {
+      console.error('[social-reply-gen] Game reply error:', gameReplyErr);
+    }
+
     // Get posts from the last 2 hours that have no replies yet
     const twoHoursAgo = new Date(Date.now() - 2 * 3600_000).toISOString();
 
