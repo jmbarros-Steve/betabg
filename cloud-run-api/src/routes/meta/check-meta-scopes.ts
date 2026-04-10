@@ -54,8 +54,10 @@ export async function checkMetaScopes(c: Context) {
       const bmPartnerScopes = [
         'ads_management', 'ads_read', 'business_management',
         'pages_read_engagement', 'pages_manage_ads', 'pages_manage_posts',
-        'pages_show_list', 'instagram_basic', 'instagram_content_publish',
-        'instagram_manage_insights', 'read_insights', 'public_profile',
+        'pages_messaging', 'pages_show_list', 'pages_manage_metadata',
+        'instagram_basic', 'instagram_content_publish', 'instagram_manage_comments',
+        'instagram_manage_insights', 'instagram_manage_messages',
+        'catalog_management', 'read_insights', 'public_profile', 'email',
       ];
       return c.json({ success: true, granted: bmPartnerScopes, declined: [] }, 200);
     }

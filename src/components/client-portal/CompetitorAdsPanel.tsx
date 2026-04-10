@@ -13,7 +13,7 @@ import {
   Megaphone, ShoppingCart, ArrowRight, ExternalLink,
   Plus, X, RefreshCw, TrendingUp, AlertCircle, Link2,
   Sparkles, Lightbulb, BarChart3, Target, Zap, Copy,
-  Facebook, DollarSign, Users, Image,
+  DollarSign, Users, Image,
 } from 'lucide-react';
 import MetaScopeAlert from './meta-ads/MetaScopeAlert';
 
@@ -89,13 +89,12 @@ function formatNumber(n: number): string {
 }
 
 interface CompetitorInput {
-  fbUrl: string;
-  igHandle: string;
+  query: string;
 }
 
 export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
   const [competitors, setCompetitors] = useState<CompetitorInput[]>(
-    Array(5).fill(null).map(() => ({ fbUrl: '', igHandle: '' }))
+    Array(5).fill(null).map(() => ({ query: '' }))
   );
   const [tracking, setTracking] = useState<CompetitorTracking[]>([]);
   const [ads, setAds] = useState<CompetitorAd[]>([]);
@@ -136,11 +135,10 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         setTracking(trackingData as CompetitorTracking[]);
         // Populate inputs from existing tracking records
         const existing = trackingData.map(t => ({
-          fbUrl: (t as any).fb_page_url || '',
-          igHandle: t.ig_handle || '',
+          query: (t as any).fb_page_url || t.ig_handle || '',
         }));
         const padCount = Math.max(0, 5 - existing.length);
-        const filled = [...existing, ...Array(padCount).fill(null).map(() => ({ fbUrl: '', igHandle: '' }))].slice(0, 5);
+        const filled = [...existing, ...Array(padCount).fill(null).map(() => ({ query: '' }))].slice(0, 5);
         setCompetitors(filled);
 
         const trackingIds = trackingData.map(t => t.id).filter(Boolean);
@@ -169,10 +167,10 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
 
   async function handleSync() {
     if (syncing) return; // prevent double-click
-    // Need at least one competitor with FB URL or IG handle
-    const validCompetitors = competitors.filter(c => c.fbUrl.trim() || c.igHandle.trim());
+    // Need at least one competitor
+    const validCompetitors = competitors.filter(c => c.query.trim());
     if (validCompetitors.length === 0) {
-      toast.error('Ingresa al menos una URL de Facebook o handle de Instagram');
+      toast.error('Ingresa al menos un competidor');
       return;
     }
 
@@ -184,31 +182,11 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
         return;
       }
 
-      // Build parallel arrays: ig_handles (required key) and fb_urls
-      const igHandles = competitors
-        .filter(c => c.fbUrl.trim() || c.igHandle.trim())
-        .map(c => {
-          // If only FB URL, extract page slug as handle
-          if (!c.igHandle.trim() && c.fbUrl.trim()) {
-            // Remove protocol, www, and facebook.com to get the page slug
-            const slug = c.fbUrl.trim()
-              .replace(/^https?:\/\//, '')
-              .replace(/^(www\.)?facebook\.com\/?/, '')
-              .replace(/\/+$/, '')
-              .split('/')[0];
-            return slug?.toLowerCase() || 'unknown';
-          }
-          return c.igHandle.trim().replace(/^@/, '').toLowerCase();
-        });
+      const queries = validCompetitors.map(c => c.query.trim());
 
-      const fbUrls = competitors
-        .filter(c => c.fbUrl.trim() || c.igHandle.trim())
-        .map(c => c.fbUrl.trim() || null);
-
-      const hasFbUrls = fbUrls.some(u => u);
       const response = await callApi('sync-competitor-ads', {
-        body: { client_id: clientId, ig_handles: igHandles, fb_urls: fbUrls },
-        timeoutMs: hasFbUrls ? 360_000 : 90_000, // 6min for Apify, 90s for Meta API
+        body: { client_id: clientId, queries },
+        timeoutMs: 360_000, // 6min max for Apify resolution
       });
 
       if (response.error) {
@@ -356,7 +334,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
     return tracking.find(t => t.id === trackingId)?.ig_handle || '?';
   };
 
-  const hasAnyCompetitor = competitors.some(c => c.fbUrl.trim() || c.igHandle.trim());
+  const hasAnyCompetitor = competitors.some(c => c.query.trim());
 
   if (loading) {
     return <div className="space-y-4"><Skeleton className="h-48 w-full" /><Skeleton className="h-64 w-full" /></div>;
@@ -415,74 +393,45 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
             Competidores a Rastrear
           </CardTitle>
           <CardDescription>
-            Ingresa la URL de Facebook de tus competidores (recomendado) o su handle de Instagram. Steve buscara sus anuncios activos con metricas reales.
+            Escribe el nombre de tu competidor, su @Instagram, o su pagina de Facebook. Steve resuelve el resto.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="space-y-4">
+          <div className="space-y-3">
             {competitors.map((comp, i) => (
-              <div key={i} className="grid gap-2 sm:grid-cols-2 items-start">
-                {/* FB URL - Primary */}
-                <div className="space-y-1">
-                  <div className="relative">
-                    <Facebook className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#1E3A7B]" />
-                    <Input
-                      value={comp.fbUrl}
-                      onChange={(e) => {
-                        const updated = [...competitors];
-                        updated[i] = { ...updated[i], fbUrl: e.target.value };
-                        setCompetitors(updated);
-                      }}
-                      placeholder="facebook.com/SHEINOFFICIAL"
-                      className="pl-9"
-                      disabled={syncing}
-                    />
-                    {(comp.fbUrl || comp.igHandle) && (
-                      <button
-                        onClick={() => {
-                          const updated = [...competitors];
-                          updated[i] = { fbUrl: '', igHandle: '' };
-                          setCompetitors(updated);
-                        }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        aria-label="Limpiar competidor"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                  {i === 0 && (
-                    <p className="text-[10px] text-muted-foreground">URL de Facebook (con metricas via Apify)</p>
-                  )}
-                </div>
-
-                {/* IG Handle - Secondary */}
-                <div className="space-y-1">
-                  <div className="relative">
-                    <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-pink-500" />
-                    <Input
-                      value={comp.igHandle}
-                      onChange={(e) => {
-                        const updated = [...competitors];
-                        updated[i] = { ...updated[i], igHandle: e.target.value.replace(/^@/, '') };
-                        setCompetitors(updated);
-                      }}
-                      placeholder="@shein_official"
-                      className="pl-9"
-                      disabled={syncing}
-                    />
-                  </div>
-                  {i === 0 && (
-                    <p className="text-[10px] text-muted-foreground">Handle IG (opcional, fallback Meta API)</p>
-                  )}
-                </div>
+              <div key={i} className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={comp.query}
+                  onChange={(e) => {
+                    const updated = [...competitors];
+                    updated[i] = { query: e.target.value };
+                    setCompetitors(updated);
+                  }}
+                  placeholder={i === 0 ? 'Nike, @nike, o facebook.com/nike' : 'Otro competidor...'}
+                  className="pl-9 pr-8"
+                  disabled={syncing}
+                />
+                {comp.query && (
+                  <button
+                    onClick={() => {
+                      const updated = [...competitors];
+                      updated[i] = { query: '' };
+                      setCompetitors(updated);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label="Limpiar competidor"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
 
           <div className="flex items-center justify-between pt-2">
             <p className="text-xs text-muted-foreground">
-              {competitors.filter(c => c.fbUrl.trim() || c.igHandle.trim()).length}/5 competidores configurados
+              {competitors.filter(c => c.query.trim()).length}/5 competidores configurados
               {tracking.length > 0 && tracking[0].last_sync_at && (
                 <span> &bull; Ultima sync: {new Date(tracking[0].last_sync_at).toLocaleDateString('es-CL')}</span>
               )}
@@ -858,7 +807,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
             <Eye className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">Rastreo de Competidores</h3>
             <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">
-              Ingresa la URL de Facebook de tus competidores arriba y Steve buscara sus anuncios
+              Escribe el nombre de tus competidores arriba y Steve buscara sus anuncios
               activos con metricas reales (impresiones, gasto, reach). Los anuncios de mas de 30 dias son los <strong>ganadores</strong>.
             </p>
           </CardContent>
@@ -889,7 +838,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              Tip: Usa la URL de Facebook del competidor para mejores resultados con Apify.
+              Tip: Puedes escribir solo el nombre de la marca y Steve lo resuelve automaticamente.
             </p>
           </CardContent>
         </Card>

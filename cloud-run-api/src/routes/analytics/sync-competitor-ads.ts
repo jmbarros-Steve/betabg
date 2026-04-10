@@ -223,6 +223,42 @@ function buildAdLibraryUrl(fbPageUrl: string): string {
 }
 
 /**
+ * Build Ad Library URL using a resolved page_id (view_all_page_id param).
+ * This gives exact results for a specific page — better than keyword search.
+ */
+function buildAdLibraryUrlWithPageId(pageId: string): string {
+  return `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CL&is_targeted_country=false&media_type=all&search_type=keyword_unordered&view_all_page_id=${pageId}`;
+}
+
+/**
+ * Classify input type: 'fb_url' | 'ig_handle' | 'name'
+ */
+function classifyInput(input: string): 'fb_url' | 'ig_handle' | 'name' {
+  const trimmed = input.trim();
+  if (isFacebookUrl(trimmed)) return 'fb_url';
+  if (trimmed.startsWith('@')) return 'ig_handle';
+  return 'name';
+}
+
+/**
+ * Normalize input to a handle-like key for competitor_tracking upsert.
+ * FB URLs → page slug, @handles → handle, names → lowercased name.
+ */
+function normalizeToHandle(input: string): string {
+  const trimmed = input.trim();
+  const type = classifyInput(trimmed);
+  if (type === 'fb_url') {
+    const slug = extractPageIdOrSlug(trimmed);
+    return slug?.toLowerCase() || trimmed.toLowerCase();
+  }
+  if (type === 'ig_handle') {
+    return trimmed.replace(/^@/, '').toLowerCase();
+  }
+  // Name: lowercase, collapse spaces
+  return trimmed.toLowerCase().replace(/\s+/g, '_');
+}
+
+/**
  * Fetch ads via apify~facebook-ads-scraper (official actor)
  * Uses async pattern: start run → poll status → fetch dataset items
  */
@@ -356,17 +392,20 @@ function mapApifyAdToRow(
   if (displayFmt === 'VIDEO' || (ad.snapshot?.videos && ad.snapshot.videos.length > 0)) adType = 'video';
   if (displayFmt === 'DCO' || (ad.collationCount && ad.collationCount > 1)) adType = 'carousel';
 
-  // CTA detection
+  // CTA detection — prefer direct ctaType field, fallback to text matching
   const ctaMap: Record<string, string> = {
     'comprar': 'SHOP_NOW', 'shop': 'SHOP_NOW', 'buy': 'SHOP_NOW',
     'learn more': 'LEARN_MORE', 'más información': 'LEARN_MORE',
     'sign up': 'SIGN_UP', 'registrarse': 'SIGN_UP',
     'descargar': 'DOWNLOAD', 'download': 'DOWNLOAD',
   };
-  let ctaType = 'OTHER';
-  const ctaText = (ad.snapshot?.ctaText || ad.snapshot?.cta_text || ad.snapshot?.cards?.[0]?.ctaText || ad.snapshot?.cards?.[0]?.cta_text || '').toLowerCase();
-  for (const [key, value] of Object.entries(ctaMap)) {
-    if (ctaText.includes(key)) { ctaType = value; break; }
+  const directCtaType = ad.snapshot?.ctaType || ad.snapshot?.cta_type || '';
+  let ctaType = directCtaType || 'OTHER';
+  if (ctaType === 'OTHER') {
+    const ctaText = (ad.snapshot?.ctaText || ad.snapshot?.cta_text || ad.snapshot?.cards?.[0]?.ctaText || ad.snapshot?.cards?.[0]?.cta_text || '').toLowerCase();
+    for (const [key, value] of Object.entries(ctaMap)) {
+      if (ctaText.includes(key)) { ctaType = value; break; }
+    }
   }
 
   // Impressions — impressionsWithIndex contains text like "1K-5K"
@@ -470,15 +509,29 @@ export async function syncCompetitorAds(c: Context) {
       return c.json({ error: 'Missing authorization' }, 401);
     }
 
-    const { client_id, ig_handles, fb_urls } = await c.req.json();
-    if (!client_id || !ig_handles || !Array.isArray(ig_handles) || ig_handles.length === 0) {
-      return c.json({ error: 'client_id and ig_handles[] required' }, 400);
+    const body = await c.req.json();
+    const { client_id, queries, ig_handles, fb_urls } = body;
+
+    // Support new `queries[]` param, with backward-compat for old `ig_handles[]` + `fb_urls[]`
+    let rawInputs: string[];
+    if (Array.isArray(queries) && queries.length > 0) {
+      rawInputs = queries.map((q: any) => String(q).trim()).filter(Boolean);
+    } else if (Array.isArray(ig_handles) && ig_handles.length > 0) {
+      // Legacy: reconstruct from ig_handles + fb_urls
+      const legacyFbUrls: (string | null)[] = Array.isArray(fb_urls)
+        ? fb_urls.map((u: any) => (typeof u === 'string' && u.trim() ? u.trim() : null))
+        : [];
+      rawInputs = ig_handles.map((h: string, i: number) => {
+        const fb = legacyFbUrls[i];
+        return fb || (h ? `@${h.trim().replace(/^@/, '')}` : '');
+      }).filter(Boolean);
+    } else {
+      return c.json({ error: 'client_id and queries[] required' }, 400);
     }
 
-    // fb_urls is an optional parallel array of Facebook page URLs
-    const fbUrls: (string | null)[] = Array.isArray(fb_urls)
-      ? fb_urls.map((u: any) => (typeof u === 'string' && u.trim() ? u.trim() : null))
-      : [];
+    if (!client_id || rawInputs.length === 0) {
+      return c.json({ error: 'client_id and queries[] required' }, 400);
+    }
 
     // Verify ownership
     const { data: client, error: clientError } = await supabase
@@ -495,12 +548,10 @@ export async function syncCompetitorAds(c: Context) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
 
-    // Limit to 5 handles
-    const handles = ig_handles.slice(0, 5).map((h: string) =>
-      h.trim().replace(/^@/, '').toLowerCase()
-    );
+    // Limit to 5 inputs
+    const inputs = rawInputs.slice(0, 5);
 
-    console.log(`[sync-competitor-ads] Processing ${handles.length} handles for client ${client_id}`);
+    console.log(`[sync-competitor-ads] Processing ${inputs.length} inputs for client ${client_id}`);
 
     // Get Meta access token — needed for fallback (ig_handle only) path
     const metaConn = await safeQuerySingleOrDefault<any>(
@@ -569,14 +620,69 @@ export async function syncCompetitorAds(c: Context) {
 
     console.log(`[sync-competitor-ads] Meta token: ${tokenSource || 'none'}, Apify: ${hasApifyToken ? 'yes' : 'no'}`);
 
+    // Helper: resolve a search query to a Facebook page_id via Pages Search API
+    async function resolvePageId(searchQuery: string): Promise<{ pageId: string; pageName: string } | null> {
+      if (!accessToken) return null;
+      try {
+        const url = new URL('https://graph.facebook.com/v21.0/pages/search');
+        url.searchParams.set('access_token', accessToken);
+        url.searchParams.set('q', searchQuery);
+        url.searchParams.set('fields', 'id,name,verification_status');
+        const res = await fetch(url.toString());
+        const json: any = await res.json();
+        if (json.data && json.data.length > 0) {
+          return { pageId: json.data[0].id, pageName: json.data[0].name };
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Unknown error';
+        console.error(`[sync-competitor-ads] Page search failed for "${searchQuery}":`, e);
+        warnings.push(`Page search failed for "${searchQuery}": ${msg}`);
+      }
+      return null;
+    }
+
+    // Helper: fetch ads from Meta Ad Library API
+    const AD_LIBRARY_FIELDS = 'id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_descriptions,ad_delivery_start_time,ad_delivery_stop_time,page_id,page_name,publisher_platforms,ad_snapshot_url,bylines,collation_count,languages';
+    const AD_LIBRARY_COUNTRIES = '["CL","MX","CO","AR","PE","US"]';
+
+    async function fetchAdLibrary(params: Record<string, string>): Promise<{ ads: AdLibraryAd[]; error?: string }> {
+      const url = new URL('https://graph.facebook.com/v21.0/ads_archive');
+      url.searchParams.set('access_token', accessToken);
+      url.searchParams.set('ad_type', 'ALL');
+      url.searchParams.set('ad_reached_countries', AD_LIBRARY_COUNTRIES);
+      url.searchParams.set('ad_active_status', 'ALL');
+      url.searchParams.set('fields', AD_LIBRARY_FIELDS);
+      url.searchParams.set('limit', params.search_page_ids ? '50' : '25');
+      for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+
+      const res = await fetch(url.toString());
+      const text = await res.text();
+      let json: any;
+      try { json = JSON.parse(text); } catch {
+        return { ads: [], error: 'Non-JSON response from Meta' };
+      }
+      if (!res.ok || json.error) {
+        const code = json.error?.code || 0;
+        const msg = json.error?.message || 'Unknown error';
+        if (code === 190) return { ads: [], error: 'token_expired: El token de Meta expiró. Reconecta Meta Ads en Conexiones.' };
+        if (code === 10 || code === 200) return { ads: [], error: 'permission_denied: La app necesita permisos de Ad Library.' };
+        return { ads: [], error: `api_error: ${msg}` };
+      }
+      return { ads: json.data || [] };
+    }
+
     const results: { handle: string; ads_found: number; status: string }[] = [];
 
-    for (let i = 0; i < handles.length; i++) {
-      const handle = handles[i];
-      const fbUrl = fbUrls[i] || null;
+    for (let i = 0; i < inputs.length; i++) {
+      const input = inputs[i];
+      const inputType = classifyInput(input);
+      const handle = normalizeToHandle(input);
+
+      // For FB URLs, extract the URL; for others, no fbUrl
+      const fbUrl = inputType === 'fb_url' ? input.trim() : null;
 
       try {
-        // Step 1: Upsert competitor tracking record (include fb_page_url if provided)
+        // Step 1: Upsert competitor tracking record
         const upsertData: Record<string, any> = {
           client_id,
           ig_handle: handle,
@@ -599,13 +705,30 @@ export async function syncCompetitorAds(c: Context) {
 
         const effectiveFbUrl = tracking.fb_page_url || fbUrl;
 
-        // Build Apify source: ONLY use when user provided a valid Facebook URL
-        // Do NOT use meta_page_id from Meta API search — it's unreliable (often resolves to wrong pages)
+        // Build Apify source based on input type:
+        // 1. FB URL → use directly
+        // 2. Name → resolve via Meta Pages Search → page_id → Apify with view_all_page_id
+        // 3. @handle → no Apify source (falls through to Meta API fallback)
         let apifySource: string | null = null;
         if (effectiveFbUrl && isFacebookUrl(effectiveFbUrl)) {
           apifySource = effectiveFbUrl;
         } else if (effectiveFbUrl && effectiveFbUrl.includes('ads/library')) {
           apifySource = effectiveFbUrl;
+        } else if (inputType === 'name' && accessToken) {
+          // Resolve name → page_id via Meta Pages Search, then build Apify URL
+          console.log(`[sync-competitor-ads] ${handle}: Resolving name "${input}" via Pages Search...`);
+          const resolved = await resolvePageId(input.trim());
+          if (resolved) {
+            console.log(`[sync-competitor-ads] ${handle}: Resolved to page_id=${resolved.pageId} (${resolved.pageName})`);
+            apifySource = buildAdLibraryUrlWithPageId(resolved.pageId);
+            // Also store the resolved page_id for future use
+            await supabase.from('competitor_tracking').update({
+              meta_page_id: resolved.pageId,
+              display_name: resolved.pageName,
+            }).eq('id', tracking.id);
+          } else {
+            console.log(`[sync-competitor-ads] ${handle}: Could not resolve name, will try Meta API fallback`);
+          }
         }
 
         // Check if we already have Apify metrics for this competitor
@@ -717,54 +840,6 @@ export async function syncCompetitorAds(c: Context) {
         }
 
         console.log(`[sync-competitor-ads] ${handle}: Using Meta API fallback (${tokenSource})`);
-
-        const AD_LIBRARY_FIELDS = 'id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_descriptions,ad_delivery_start_time,ad_delivery_stop_time,page_id,page_name,publisher_platforms,ad_snapshot_url,bylines,collation_count,languages';
-        const AD_LIBRARY_COUNTRIES = '["CL","MX","CO","AR","PE","US"]';
-
-        async function fetchAdLibrary(params: Record<string, string>): Promise<{ ads: AdLibraryAd[]; error?: string }> {
-          const url = new URL('https://graph.facebook.com/v21.0/ads_archive');
-          url.searchParams.set('access_token', accessToken);
-          url.searchParams.set('ad_type', 'ALL');
-          url.searchParams.set('ad_reached_countries', AD_LIBRARY_COUNTRIES);
-          url.searchParams.set('ad_active_status', 'ALL');
-          url.searchParams.set('fields', AD_LIBRARY_FIELDS);
-          url.searchParams.set('limit', params.search_page_ids ? '50' : '25');
-          for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-
-          const res = await fetch(url.toString());
-          const text = await res.text();
-          let json: any;
-          try { json = JSON.parse(text); } catch {
-            return { ads: [], error: 'Non-JSON response from Meta' };
-          }
-          if (!res.ok || json.error) {
-            const code = json.error?.code || 0;
-            const msg = json.error?.message || 'Unknown error';
-            if (code === 190) return { ads: [], error: 'token_expired: El token de Meta expiró. Reconecta Meta Ads en Conexiones.' };
-            if (code === 10 || code === 200) return { ads: [], error: 'permission_denied: La app necesita permisos de Ad Library.' };
-            return { ads: [], error: `api_error: ${msg}` };
-          }
-          return { ads: json.data || [] };
-        }
-
-        async function resolvePageId(searchQuery: string): Promise<{ pageId: string; pageName: string } | null> {
-          try {
-            const url = new URL('https://graph.facebook.com/v21.0/pages/search');
-            url.searchParams.set('access_token', accessToken);
-            url.searchParams.set('q', searchQuery);
-            url.searchParams.set('fields', 'id,name,verification_status');
-            const res = await fetch(url.toString());
-            const json: any = await res.json();
-            if (json.data && json.data.length > 0) {
-              return { pageId: json.data[0].id, pageName: json.data[0].name };
-            }
-          } catch (e) {
-            const msg = e instanceof Error ? e.message : 'Unknown error';
-            console.error(`[sync-competitor-ads] Page search failed for "${searchQuery}":`, e);
-            warnings.push(`Page search failed for "${searchQuery}": ${msg}`);
-          }
-          return null;
-        }
 
         let ads: AdLibraryAd[] = [];
         let searchMethod = '';
