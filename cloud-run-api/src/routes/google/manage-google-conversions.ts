@@ -40,7 +40,7 @@ async function googleAdsQuery(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`[manage-google-conversions] GAQL error (${response.status}):`, errorText.slice(0, 500));
+    console.error(`[manage-google-conversions] GAQL error (${response.status}):`, errorText.slice(0, 2000));
     return { ok: false, error: `Google Ads API error (${response.status})` };
   }
 
@@ -87,7 +87,7 @@ async function googleAdsMutate(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`[manage-google-conversions] Mutate error (${response.status}):`, errorText.slice(0, 500));
+    console.error(`[manage-google-conversions] Mutate error (${response.status}):`, errorText.slice(0, 2000));
     let errorMessage = `Google Ads API error (${response.status})`;
     try {
       const errJson = JSON.parse(errorText);
@@ -122,9 +122,7 @@ async function handleList(
       conversion_action.click_through_lookback_window_days,
       conversion_action.view_through_lookback_window_days,
       conversion_action.counting_type,
-      conversion_action.tag_snippets,
-      metrics.conversions,
-      metrics.conversions_value
+      conversion_action.tag_snippets
     FROM conversion_action
     WHERE conversion_action.status != 'REMOVED'
     ORDER BY conversion_action.name
@@ -144,8 +142,6 @@ async function handleList(
     view_through_lookback_days: row.conversionAction?.viewThroughLookbackWindowDays,
     counting_type: row.conversionAction?.countingType,
     tag_snippets: row.conversionAction?.tagSnippets || [],
-    conversions: Number(row.metrics?.conversions || 0),
-    conversions_value: Number(row.metrics?.conversionsValue || 0),
   }));
 
   return { body: { success: true, conversions }, status: 200 };

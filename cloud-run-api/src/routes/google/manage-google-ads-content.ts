@@ -42,7 +42,7 @@ async function googleAdsQuery(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`[manage-google-ads-content] GAQL error (${response.status}):`, errorText.slice(0, 500));
+    console.error(`[manage-google-ads-content] GAQL error (${response.status}):`, errorText.slice(0, 2000));
     return { ok: false, error: `Google Ads API error (${response.status})` };
   }
 
@@ -89,7 +89,7 @@ async function googleAdsMutate(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`[manage-google-ads-content] Mutate error (${response.status}):`, errorText.slice(0, 500));
+    console.error(`[manage-google-ads-content] Mutate error (${response.status}):`, errorText.slice(0, 2000));
     let errorMessage = `Google Ads API error (${response.status})`;
     try {
       const errJson = JSON.parse(errorText);

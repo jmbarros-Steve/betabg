@@ -40,7 +40,7 @@ async function googleAdsQuery(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`[manage-google-extensions] GAQL error (${response.status}):`, errorText.slice(0, 500));
+    console.error(`[manage-google-extensions] GAQL error (${response.status}):`, errorText.slice(0, 2000));
     return { ok: false, error: `Google Ads API error (${response.status})` };
   }
 
@@ -87,7 +87,7 @@ async function googleAdsMutate(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`[manage-google-extensions] Mutate error (${response.status}):`, errorText.slice(0, 500));
+    console.error(`[manage-google-extensions] Mutate error (${response.status}):`, errorText.slice(0, 2000));
     let errorMessage = `Google Ads API error (${response.status})`;
     try {
       const errJson = JSON.parse(errorText);
@@ -125,7 +125,7 @@ async function handleListAssets(
   const query = `
     SELECT
       asset.id, asset.name, asset.type,
-      asset.sitelink_asset.link_text, asset.sitelink_asset.description1, asset.sitelink_asset.description2, asset.sitelink_asset.final_urls,
+      asset.sitelink_asset.link_text, asset.sitelink_asset.description1, asset.sitelink_asset.description2, asset.final_urls,
       asset.callout_asset.callout_text,
       asset.structured_snippet_asset.header, asset.structured_snippet_asset.values,
       asset.call_asset.phone_number, asset.call_asset.country_code
@@ -148,7 +148,7 @@ async function handleListAssets(
       asset.link_text = row.asset?.sitelinkAsset?.linkText;
       asset.description1 = row.asset?.sitelinkAsset?.description1;
       asset.description2 = row.asset?.sitelinkAsset?.description2;
-      asset.final_urls = row.asset?.sitelinkAsset?.finalUrls;
+      asset.final_urls = row.asset?.finalUrls;
     } else if (row.asset?.type === 'CALLOUT') {
       asset.callout_text = row.asset?.calloutAsset?.calloutText;
     } else if (row.asset?.type === 'STRUCTURED_SNIPPET') {

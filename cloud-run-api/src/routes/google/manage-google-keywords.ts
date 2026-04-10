@@ -48,7 +48,7 @@ async function googleAdsQuery(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`[manage-google-keywords] GAQL error (${response.status}):`, errorText.slice(0, 500));
+    console.error(`[manage-google-keywords] GAQL error (${response.status}):`, errorText.slice(0, 2000));
     return { ok: false, error: `Google Ads API error (${response.status})` };
   }
 
@@ -96,7 +96,7 @@ async function googleAdsMutate(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`[manage-google-keywords] Mutate error (${response.status}):`, errorText.slice(0, 500));
+    console.error(`[manage-google-keywords] Mutate error (${response.status}):`, errorText.slice(0, 2000));
     let errorMessage = `Google Ads API error (${response.status})`;
     try {
       const errJson = JSON.parse(errorText);
@@ -149,8 +149,7 @@ async function handleListKeywords(
   campaignId?: string, adGroupId?: string
 ): Promise<{ body: any; status: number }> {
   let whereClause = `
-    WHERE ad_group_criterion.type = 'KEYWORD'
-      AND ad_group_criterion.status != 'REMOVED'
+    WHERE ad_group_criterion.status != 'REMOVED'
       AND campaign.status != 'REMOVED'
       AND segments.date DURING LAST_30_DAYS
   `;
@@ -169,7 +168,7 @@ async function handleListKeywords(
       campaign.id, campaign.name,
       metrics.clicks, metrics.impressions, metrics.cost_micros,
       metrics.conversions, metrics.ctr
-    FROM ad_group_criterion
+    FROM keyword_view
     ${whereClause}
     ORDER BY metrics.cost_micros DESC
   `;
