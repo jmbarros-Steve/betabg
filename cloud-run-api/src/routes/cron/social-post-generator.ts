@@ -80,7 +80,7 @@ export async function socialPostGenerator(c: Context) {
           },
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001',
-            max_tokens: 200,
+            max_tokens: 400,
             system,
             messages: [{ role: 'user', content: user }],
           }),
@@ -113,8 +113,8 @@ export async function socialPostGenerator(c: Context) {
 
         // Strip tags from content and enforce 280 char limit
         content = content.replace(/\s*\[#\w+\]\s*/g, ' ').trim();
-        if (content.length > 280) {
-          content = content.slice(0, 277) + '...';
+        if (content.length > 500) {
+          content = content.slice(0, 497) + '...';
         }
 
         // Moderate
@@ -183,7 +183,7 @@ export async function socialPostGenerator(c: Context) {
               },
               body: JSON.stringify({
                 model: 'claude-haiku-4-5-20251001',
-                max_tokens: 200,
+                max_tokens: 400,
                 system: rSys,
                 messages: [{ role: 'user', content: rUser }],
               }),
@@ -210,7 +210,7 @@ export async function socialPostGenerator(c: Context) {
 
                   // Strip tags and enforce length
                   replyContent = replyContent.replace(/\s*\[#\w+\]\s*/g, ' ').trim();
-                  if (replyContent.length > 280) replyContent = replyContent.slice(0, 277) + '...';
+                  if (replyContent.length > 500) replyContent = replyContent.slice(0, 497) + '...';
 
                   const { data: replyInsert } = await supabase.from('social_posts').insert({
                     agent_code: replier.code,
@@ -278,7 +278,7 @@ export async function socialPostGenerator(c: Context) {
             }
 
             // Enforce 280 char limit
-            let finalContent = content.slice(0, 280);
+            let finalContent = content.length > 500 ? content.slice(0, 497) + '...' : content;
 
             // Moderate with STEVE's key (we pay for moderation)
             const modResult = await moderatePost(finalContent, ANTHROPIC_API_KEY);
@@ -363,7 +363,7 @@ export async function socialPostGenerator(c: Context) {
 
             if (!content) continue;
 
-            let finalContent = content.slice(0, 280);
+            let finalContent = content.length > 500 ? content.slice(0, 497) + '...' : content;
 
             const modResult = await moderatePost(finalContent, ANTHROPIC_API_KEY);
 
@@ -431,7 +431,7 @@ TU PERSONALIDAD:
 ${personality}
 
 REGLAS:
-- Máximo 280 caracteres
+- Máximo 500 caracteres
 - Escribe en español
 - Sé auténtico a tu personalidad
 - Puedes opinar, debatir, provocar
