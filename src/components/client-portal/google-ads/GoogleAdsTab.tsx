@@ -3,16 +3,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Link2, BarChart3, FileText } from 'lucide-react';
+import { Link2, BarChart3, FileText, Megaphone, Zap } from 'lucide-react';
 import GoogleAnalyticsDashboard from './GoogleAnalyticsDashboard';
 import GoogleAccountInfo from './GoogleAccountInfo';
+import GoogleCampaignManager from './GoogleCampaignManager';
+import GoogleAutomatedRules from './GoogleAutomatedRules';
 import { GoogleAdsGenerator } from '@/components/client-portal/GoogleAdsGenerator';
 
 interface GoogleAdsTabProps {
   clientId: string;
 }
 
-type SubTab = 'analytics' | 'copys';
+type SubTab = 'analytics' | 'campaigns' | 'rules' | 'copys';
 
 export default function GoogleAdsTab({ clientId }: GoogleAdsTabProps) {
   const [connectionId, setConnectionId] = useState<string | null>(null);
@@ -72,6 +74,13 @@ export default function GoogleAdsTab({ clientId }: GoogleAdsTabProps) {
     );
   }
 
+  const tabs: { key: SubTab; label: string; icon: React.ReactNode }[] = [
+    { key: 'analytics', label: 'Analiticas', icon: <BarChart3 className="w-4 h-4" /> },
+    { key: 'campaigns', label: 'Campanas', icon: <Megaphone className="w-4 h-4" /> },
+    { key: 'rules', label: 'Reglas', icon: <Zap className="w-4 h-4" /> },
+    { key: 'copys', label: 'Copys', icon: <FileText className="w-4 h-4" /> },
+  ];
+
   return (
     <div className="space-y-4">
       {/* Account info */}
@@ -79,24 +88,18 @@ export default function GoogleAdsTab({ clientId }: GoogleAdsTabProps) {
 
       {/* Sub-tabs */}
       <div className="flex gap-1.5 border-b pb-0">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setSubTab('analytics')}
-          className={`gap-1.5 rounded-b-none border-b-2 ${subTab === 'analytics' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}
-        >
-          <BarChart3 className="w-4 h-4" />
-          Analiticas
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setSubTab('copys')}
-          className={`gap-1.5 rounded-b-none border-b-2 ${subTab === 'copys' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}
-        >
-          <FileText className="w-4 h-4" />
-          Copys
-        </Button>
+        {tabs.map(tab => (
+          <Button
+            key={tab.key}
+            variant="ghost"
+            size="sm"
+            onClick={() => setSubTab(tab.key)}
+            className={`gap-1.5 rounded-b-none border-b-2 ${subTab === tab.key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}
+          >
+            {tab.icon}
+            {tab.label}
+          </Button>
+        ))}
       </div>
 
       {/* Sub-tab content */}
@@ -105,6 +108,18 @@ export default function GoogleAdsTab({ clientId }: GoogleAdsTabProps) {
           clientId={clientId}
           connectionId={connectionId}
           lastSyncAt={lastSyncAt}
+        />
+      )}
+      {subTab === 'campaigns' && (
+        <GoogleCampaignManager
+          connectionId={connectionId}
+          clientId={clientId}
+        />
+      )}
+      {subTab === 'rules' && (
+        <GoogleAutomatedRules
+          connectionId={connectionId}
+          clientId={clientId}
         />
       )}
       {subTab === 'copys' && (
