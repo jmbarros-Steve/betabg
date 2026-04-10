@@ -61,8 +61,8 @@ export async function proposalsCrud(c: Context) {
             created_by: user.id,
             title,
             content,
-            plan_type: plan_type || null,
-            monthly_price: monthly_price || null,
+            plan_type: plan_type ?? null,
+            monthly_price: monthly_price ?? null,
           })
           .select()
           .single();
@@ -243,7 +243,7 @@ Sé específico al negocio del prospecto. No uses contenido genérico. Máximo 8
       title,
       content,
       plan_type: planLabel,
-      monthly_price: monthly_price || null,
+      monthly_price: monthly_price ?? null,
       prospect_id,
     });
   } catch (error: any) {

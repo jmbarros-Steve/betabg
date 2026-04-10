@@ -13,6 +13,11 @@ import { safeQueryOrDefault, safeQuerySingleOrDefault } from './safe-supabase.js
 import { anthropicFetch } from './anthropic-fetch.js';
 import type { ProspectRecord } from './steve-wa-brain.js';
 
+/** Escape SQL wildcards to prevent injection via ilike */
+function escapeSqlWildcards(str: string): string {
+  return str.replace(/[%_\\]/g, '\\$&');
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -114,7 +119,7 @@ export async function runInvestigator(
           supabase
             .from('competitor_ads')
             .select('ad_text, ad_headline, ad_type, impressions_lower')
-            .ilike('ad_text', `%${keywords[0]}%`)
+            .ilike('ad_text', `%${escapeSqlWildcards(keywords[0])}%`)
             .order('impressions_lower', { ascending: false })
             .limit(3),
           [],
@@ -347,7 +352,7 @@ ${dynamicPrompt}`;
     const actionDirectives: Record<string, string> = {
       back_off: '🚨 PARADA OBLIGATORIA: El Strategist detectó que el prospecto está resistiendo. NO sigas vendiendo ni pitcheando. Haz UNA pregunta abierta y ESCUCHA. Retrocede completamente del pitch.',
       ask_discovery: '🔍 MODO DISCOVERY: Aún no hay suficiente información. Sigue preguntando con curiosidad genuina. NO menciones soluciones todavía.',
-      validate_emotion: '❤️ VALIDA PRIMERO: El prospecto tiene una emoción fuerte (frustración, duda, miedo). PRIMERO di que entiendes. DESPUÉS propones. Si validás la emoción primero, el resto fluye.',
+      validate_emotion: '❤️ VALIDA PRIMERO: El prospecto tiene una emoción fuerte (frustración, duda, miedo). PRIMERO di que entiendes. DESPUÉS propones. Si validas la emoción primero, el resto fluye.',
       show_data: '📊 MUESTRA DATOS: El prospecto necesita evidencia. Comparte UN caso concreto o UNA métrica relevante a su situación. Conciso.',
       pitch_soft: '💡 PITCH SUAVE: Presenta la solución como opción, no como presión. Deja espacio para que decida.',
       pitch_hard: '🔥 CIERRE: El prospecto está listo. Sé directo, propone el siguiente paso concreto ahora.',

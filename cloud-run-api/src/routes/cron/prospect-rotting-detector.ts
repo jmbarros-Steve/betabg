@@ -39,10 +39,12 @@ export async function prospectRottingDetector(c: Context) {
 
   try {
     // Fetch active prospects (not converted/lost)
+    // Bug #175 fix: Add .limit(500) to prevent unbounded fetch
     const { data: prospects, error } = await supabase
       .from('wa_prospects')
       .select('id, stage, last_activity_at, updated_at, is_rotting')
-      .not('stage', 'in', '("converted","lost")');
+      .not('stage', 'in', '("converted","lost")')
+      .limit(500);
 
     if (error) {
       return c.json({ error: error.message }, 500);
@@ -73,16 +75,24 @@ export async function prospectRottingDetector(c: Context) {
       }
     }
 
+    // Bug #175 fix: Batch update in chunks of 100 to avoid oversized .in() queries
     // Batch update: mark as rotting
     if (toMarkRotting.length > 0) {
-      const { error: markErr } = await supabase
-        .from('wa_prospects')
-        .update({ is_rotting: true })
-        .in('id', toMarkRotting);
+      let markErrors = 0;
+      for (let i = 0; i < toMarkRotting.length; i += 100) {
+        const chunk = toMarkRotting.slice(i, i + 100);
+        const { error: markErr } = await supabase
+          .from('wa_prospects')
+          .update({ is_rotting: true })
+          .in('id', chunk);
 
-      if (markErr) {
-        console.error('[rotting-detector] Error marking rotting:', markErr);
-        results.errors++;
+        if (markErr) {
+          console.error('[rotting-detector] Error marking rotting (chunk):', markErr);
+          markErrors++;
+        }
+      }
+      if (markErrors > 0) {
+        results.errors += markErrors;
       } else {
         results.marked_rotting = toMarkRotting.length;
       }
@@ -90,14 +100,21 @@ export async function prospectRottingDetector(c: Context) {
 
     // Batch update: clear rotting
     if (toClearRotting.length > 0) {
-      const { error: clearErr } = await supabase
-        .from('wa_prospects')
-        .update({ is_rotting: false })
-        .in('id', toClearRotting);
+      let clearErrors = 0;
+      for (let i = 0; i < toClearRotting.length; i += 100) {
+        const chunk = toClearRotting.slice(i, i + 100);
+        const { error: clearErr } = await supabase
+          .from('wa_prospects')
+          .update({ is_rotting: false })
+          .in('id', chunk);
 
-      if (clearErr) {
-        console.error('[rotting-detector] Error clearing rotting:', clearErr);
-        results.errors++;
+        if (clearErr) {
+          console.error('[rotting-detector] Error clearing rotting (chunk):', clearErr);
+          clearErrors++;
+        }
+      }
+      if (clearErrors > 0) {
+        results.errors += clearErrors;
       } else {
         results.cleared_rotting = toClearRotting.length;
       }

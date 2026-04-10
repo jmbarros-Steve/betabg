@@ -14,6 +14,11 @@ import { getSupabaseAdmin } from './supabase.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from './safe-supabase.js';
 import type { ProspectRecord } from './steve-wa-brain.js';
 
+/** Escape SQL wildcards to prevent injection via ilike */
+function escapeSqlWildcards(str: string): string {
+  return str.replace(/[%_\\]/g, '\\$&');
+}
+
 /**
  * Investigate prospect background — fire & forget.
  * Only investigates what's missing to avoid redundant API calls.
@@ -206,7 +211,10 @@ async function scrapeStoreProducts(
   let status = 'RUNNING';
   while (status === 'RUNNING' && attempts < 9) {
     await new Promise(r => setTimeout(r, 5000));
-    const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apifyToken}`);
+    const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}`, {
+      headers: { 'Authorization': `Bearer ${apifyToken}` },
+      signal: AbortSignal.timeout(10000),
+    });
     const statusData: any = await statusRes.json();
     status = statusData.data?.status || 'FAILED';
     attempts++;
@@ -216,7 +224,10 @@ async function scrapeStoreProducts(
 
   // Get results
   const datasetId = runData.data?.defaultDatasetId;
-  const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}&limit=5`);
+  const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?limit=5`, {
+    headers: { 'Authorization': `Bearer ${apifyToken}` },
+    signal: AbortSignal.timeout(10000),
+  });
   const items = (await itemsRes.json()) as any[];
   if (!items?.length) return null;
 
@@ -316,7 +327,7 @@ async function findCompetitorAds(industry: string): Promise<Array<{ headline: st
     supabase
       .from('competitor_ads')
       .select('ad_headline, ad_text, impressions_lower')
-      .ilike('ad_text', `%${keywords[0]}%`)
+      .ilike('ad_text', `%${escapeSqlWildcards(keywords[0])}%`)
       .order('impressions_lower', { ascending: false })
       .limit(5),
     [],
@@ -363,7 +374,10 @@ async function scrapeInstagram(
     let status = 'RUNNING';
     while (status === 'RUNNING' && attempts < 6) {
       await new Promise(r => setTimeout(r, 5000));
-      const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apifyToken}`);
+      const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}`, {
+        headers: { 'Authorization': `Bearer ${apifyToken}` },
+        signal: AbortSignal.timeout(10000),
+      });
       const statusData: any = await statusRes.json();
       status = statusData.data?.status || 'FAILED';
       attempts++;
@@ -372,7 +386,10 @@ async function scrapeInstagram(
     if (status !== 'SUCCEEDED') return null;
 
     const datasetId = runData.data?.defaultDatasetId;
-    const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}&limit=1`);
+    const itemsRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?limit=1`, {
+      headers: { 'Authorization': `Bearer ${apifyToken}` },
+      signal: AbortSignal.timeout(10000),
+    });
     const items = (await itemsRes.json()) as any[];
 
     if (!items?.length) return null;
@@ -409,11 +426,20 @@ function extractUrlFromHistory(history: Array<{ role: 'user' | 'assistant'; cont
   return null;
 }
 
+const IG_BLOCKLIST = new Set([
+  'gmail', 'hotmail', 'yahoo', 'outlook', 'support', 'help', 'admin',
+  'info', 'contacto', 'ventas', 'soporte', 'correo', 'mail', 'email',
+]);
+
 function extractInstagramHandle(text: string): string | null {
-  // Match @handle or instagram.com/handle
-  const atMatch = text.match(/@([a-zA-Z0-9._]{2,30})/);
+  // Match instagram.com/handle or @handle not preceded by a dot (email pattern)
   const urlMatch = text.match(/instagram\.com\/([a-zA-Z0-9._]{2,30})/);
-  return urlMatch?.[1] || atMatch?.[1] || null;
+  const atMatch = text.match(/(?<!\.)@([a-zA-Z0-9._]{2,30})/);
+  const handle = urlMatch?.[1] || atMatch?.[1] || null;
+  if (!handle) return null;
+  // Reject handles that look like email prefixes or common non-IG @mentions
+  if (IG_BLOCKLIST.has(handle.toLowerCase())) return null;
+  return handle;
 }
 
 function extractIgFromHistory(history: Array<{ role: 'user' | 'assistant'; content: string }>): string | null {

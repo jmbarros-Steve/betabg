@@ -57,7 +57,8 @@ export async function onboardingWA(c: Context) {
           clients!inner(id, name, email, whatsapp_phone, onboarding_wa_started)
         `)
         .in('status', ['pending', 'in_progress'])
-        .lt('reminder_count', 3)
+        // Bug #179 fix: Include rows with NULL reminder_count (never reminded)
+        .or('reminder_count.lt.3,reminder_count.is.null')
         .order('updated_at', { ascending: true })
         .limit(50),
       'onboardingWA.fetchPendingSteps',

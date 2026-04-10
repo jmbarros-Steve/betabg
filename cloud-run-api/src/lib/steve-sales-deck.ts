@@ -143,7 +143,7 @@ IMPORTANTE: Personaliza TODO con datos reales del prospecto. No seas genérico. 
 
     // 3. Generate deck image with Gemini (or fallback to text if no key)
     if (!GEMINI_API_KEY) {
-      return await sendTextDeck(phone, slides, companyName, industry, profileName);
+      return await sendTextDeck(phone, slides, companyName, industry, profileName, prospect.id);
     }
 
     const slideText = slides.map((s, i) =>
@@ -184,13 +184,13 @@ This should look like a screenshot of a real pitch deck overview.`;
       // Sanitize any potential key leakage in error messages
       const safeMsg = (fetchErr.message || '').replace(GEMINI_API_KEY, '[REDACTED]');
       console.error('[steve-sales-deck] Gemini fetch error:', safeMsg);
-      return await sendTextDeck(phone, slides, companyName, industry, profileName);
+      return await sendTextDeck(phone, slides, companyName, industry, profileName, prospect.id);
     }
 
     if (!geminiRes.ok) {
       console.error('[steve-sales-deck] Gemini error:', geminiRes.status);
       // Fallback: send text-only deck
-      return await sendTextDeck(phone, slides, companyName, industry, profileName);
+      return await sendTextDeck(phone, slides, companyName, industry, profileName, prospect.id);
     }
 
     const geminiData: any = await geminiRes.json();
@@ -204,7 +204,7 @@ This should look like a screenshot of a real pitch deck overview.`;
 
     if (!imageBytes) {
       console.error('[steve-sales-deck] No image data from Gemini');
-      return await sendTextDeck(phone, slides, companyName, industry, profileName);
+      return await sendTextDeck(phone, slides, companyName, industry, profileName, prospect.id);
     }
 
     // 4. Upload to Supabase Storage
@@ -216,7 +216,7 @@ This should look like a screenshot of a real pitch deck overview.`;
 
     if (uploadErr) {
       console.error('[steve-sales-deck] Upload error:', uploadErr);
-      return await sendTextDeck(phone, slides, companyName, industry, profileName);
+      return await sendTextDeck(phone, slides, companyName, industry, profileName, prospect.id);
     }
 
     const { data: { publicUrl } } = supabase.storage
@@ -270,6 +270,7 @@ async function sendTextDeck(
   companyName: string,
   industry: string,
   profileName?: string | null,
+  prospectId?: string | null,
 ): Promise<boolean> {
   const supabase = getSupabaseAdmin();
 
@@ -310,11 +311,11 @@ async function sendTextDeck(
       contact_phone: phone,
     });
 
-    // Mark as sent
+    // Mark as sent — prefer update by id, fallback to phone
     await supabase
       .from('wa_prospects')
       .update({ deck_sent: true, updated_at: new Date().toISOString() })
-      .eq('phone', phone); // fallback by phone number
+      .eq(prospectId ? 'id' : 'phone', prospectId || phone);
 
     return true;
   } catch (err) {

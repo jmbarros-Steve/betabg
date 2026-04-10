@@ -8,8 +8,14 @@
 import { getSupabaseAdmin } from './supabase.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from './safe-supabase.js';
 import { getProductCatalogPrompt } from './steve-product-catalog.js';
+import { anthropicFetch } from './anthropic-fetch.js';
 // Fix R5-#30: import StrategistResult for proper typing of buildDynamicSalesPrompt param
 import type { StrategistResult } from './steve-multi-brain.js';
+
+/** Escape SQL wildcards to prevent injection via ilike */
+function escapeSqlWildcards(str: string): string {
+  return str.replace(/[%_\\]/g, '\\$&');
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -325,14 +331,8 @@ export async function quickFirstMessageIntel(
   if (!ANTHROPIC_API_KEY) return '';
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
+    const { ok, data } = await anthropicFetch(
+      {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 150,
         messages: [{
@@ -348,11 +348,11 @@ Mensaje: "${message}"
 
 Responde en texto plano, máximo 3 líneas. Si no hay información concreta en el mensaje, devuelve texto vacío. NO inventes ni hagas hipótesis sobre la industria.`,
         }],
-      }),
-    });
+      },
+      ANTHROPIC_API_KEY,
+    );
 
-    if (!response.ok) return '';
-    const data: any = await response.json();
+    if (!ok) return '';
     // Fix R6-#27: sanitizar output de Haiku antes de inyectar al prompt principal
     const rawIntel = (data.content?.[0]?.text || '').trim();
     const intel = rawIntel
@@ -692,14 +692,8 @@ export async function updateRollingConversationSummary(
       ? `Resumen previo:\n${existingSummary}\n\nMensajes nuevos desde el último resumen:\n`
       : '';
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
+    const { ok, data } = await anthropicFetch(
+      {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 400,
         messages: [{
@@ -719,11 +713,11 @@ Incluye en el resumen:
 
 Formato: bullets concisos, máximo 10 líneas. Solo hechos, sin opiniones.`,
         }],
-      }),
-    });
+      },
+      ANTHROPIC_API_KEY,
+    );
 
-    if (!response.ok) return;
-    const data: any = await response.json();
+    if (!ok) return;
     const summary = (data.content?.[0]?.text || '').trim();
     if (!summary) return;
 
@@ -1063,7 +1057,7 @@ export async function loadIndustryCaseStudy(whatTheySell: string | null | undefi
         .from('wa_case_studies')
         .select('title, summary, metrics, media_url, industry_keywords')
         .eq('active', true)
-        .ilike('title', `%${keywords[0]}%`)
+        .ilike('title', `%${escapeSqlWildcards(keywords[0])}%`)
         .limit(1),
       [],
       'steveWaBrain.loadCaseStudy.ilikeFallback',
@@ -1618,7 +1612,7 @@ export async function buildDynamicSalesPrompt(
   const hasPriceObjection = /caro|precio|cuesta|cuánto sale|cuánto cuesta|no tengo.*budget|budget.*poco/i.test(lastUserMsgFull);
 
   if (hasPriceObjection && (prospect.lead_score || 0) >= 40) {
-    prompt += '\n\n💰 OBJECIÓN DE PRECIO DETECTADA. Separa DOS preguntas distintas:\n1. PRECIO: "¿Cuánto podés invertir mensualmente sin que duela?"\n2. TIME-TO-VALUE: "¿En cuánto tiempo necesitás ver resultados para que valga la pena?"\nResponde AMBAS antes de ofrecer soluciones.';
+    prompt += '\n\n💰 OBJECIÓN DE PRECIO DETECTADA. Separa DOS preguntas distintas:\n1. PRECIO: "¿Cuánto puedes invertir mensualmente sin que duela?"\n2. TIME-TO-VALUE: "¿En cuánto tiempo necesitas ver resultados para que valga la pena?"\nResponde AMBAS antes de ofrecer soluciones.';
   }
 
   // R7-#28: detectar evaluación de competidores
@@ -1825,8 +1819,10 @@ export async function buildDynamicSalesPrompt(
   }
 
   // R7-#10b: instrucción de reactivación tras inactividad larga
-  if ((prospect as any)._longInactive) {
-    prompt += `\n\n⚡ REACTIVACIÓN: Este prospecto estuvo inactivo ${(prospect as any)._inactiveDays} días. Abre con empatía y curiosidad, NO con el pitch anterior. Pregunta: "¿Qué cambió? ¿Seguís pensando en esto?" NO asumas que recuerda la conversación anterior.`;
+  const longInactive = (prospect as any)._longInactive ?? false;
+  const inactiveDays = (prospect as any)._inactiveDays ?? 0;
+  if (longInactive) {
+    prompt += `\n\n⚡ REACTIVACIÓN: Este prospecto estuvo inactivo ${inactiveDays} días. Abre con empatía y curiosidad, NO con el pitch anterior. Pregunta: "¿Qué cambió? ¿Sigues pensando en esto?" NO asumas que recuerda la conversación anterior.`;
   }
 
   // R7-#20: elevator pitch obligatorio antes del booking link
@@ -1989,14 +1985,8 @@ export async function consolidatePainPoints(painPoints: string[]): Promise<strin
   if (!ANTHROPIC_API_KEY) return deduped; // return all — don't drop early pain points
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
+    const { ok, data, status } = await anthropicFetch(
+      {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 300,
         messages: [{
@@ -2016,15 +2006,14 @@ Ejemplo:
 ["pierde plata en ads", "está perdiendo dinero en publicidad", "no sabe medir ROI"]
 → ["está perdiendo dinero en publicidad", "no sabe medir ROI"]`,
         }],
-      }),
-    });
+      },
+      ANTHROPIC_API_KEY,
+    );
 
-    if (!response.ok) {
-      console.error('[consolidatePainPoints] API error:', response.status);
+    if (!ok) {
+      console.error('[consolidatePainPoints] API error:', status);
       return deduped; // return all — don't drop early pain points on API error
     }
-
-    const data: any = await response.json();
     const text = (data.content?.[0]?.text || '').trim();
     const jsonStr = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
     // Fix R5-#21: robust JSON parse — try inline array recovery if parse fails
@@ -2147,57 +2136,47 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown, sin explicación). Solo 
   "decision_timeline": "cuándo quiere empezar — SOLO fechas FUTURAS o intenciones futuras (ej: 'este mes', 'después de CyberDay', 'lo antes posible', 'próximo trimestre', 'Q2'). EXCLUIR menciones del pasado ('el mes pasado', 'antes quería', 'pensé en', 'iba a'). Si es pasado → null"
 }`;
 
-  // Fix #18: retry once on API failure to avoid silent score=0
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 500,
-          messages: [{ role: 'user', content: extractionPrompt }],
-        }),
-      });
+  // Fix #18: retry on API failure handled by anthropicFetch (circuit breaker + backoff)
+  try {
+    const { ok, data, status } = await anthropicFetch(
+      {
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 500,
+        messages: [{ role: 'user', content: extractionPrompt }],
+      },
+      ANTHROPIC_API_KEY,
+    );
 
-      if (!response.ok) {
-        console.error(`[steve-wa-brain] Extraction API error (attempt ${attempt + 1}):`, response.status);
-        if (attempt < 1) { await new Promise(r => setTimeout(r, 800)); continue; }
-        return null;
-      }
-
-      const data: any = await response.json();
-      const text = (data.content?.[0]?.text || '').trim();
-
-      // Parse JSON — handle potential markdown fences
-      const jsonStr = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
-      const parsed = JSON.parse(jsonStr);
-
-      // Fix #4: whitelist — only keep known fields to prevent hallucinated fields from corrupting DB
-      const ALLOWED_EXTRACT_FIELDS = new Set([
-        'name', 'apellido', 'email', 'company', 'what_they_sell', 'monthly_revenue',
-        'has_online_store', 'store_platform', 'is_decision_maker',
-        'actively_looking', 'current_marketing', 'pain_points',
-        'integrations_used', 'team_size', 'budget_range', 'decision_timeline',
-      ]);
-      const cleaned: Record<string, any> = {};
-      for (const [key, value] of Object.entries(parsed)) {
-        if (!ALLOWED_EXTRACT_FIELDS.has(key)) continue;  // Drop unknown fields
-        if (value != null && value !== '' && !(Array.isArray(value) && value.length === 0)) {
-          cleaned[key] = value;
-        }
-      }
-
-      return Object.keys(cleaned).length > 0 ? (cleaned as ExtractedProspectInfo) : null;
-    } catch (err) {
-      console.error(`[steve-wa-brain] extractProspectInfo error (attempt ${attempt + 1}):`, err);
-      if (attempt < 1) { await new Promise(r => setTimeout(r, 800)); continue; }
+    if (!ok) {
+      console.error(`[steve-wa-brain] Extraction API error:`, status);
       return null;
     }
+
+    const text = (data.content?.[0]?.text || '').trim();
+
+    // Parse JSON — handle potential markdown fences
+    const jsonStr = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const parsed = JSON.parse(jsonStr);
+
+    // Fix #4: whitelist — only keep known fields to prevent hallucinated fields from corrupting DB
+    const ALLOWED_EXTRACT_FIELDS = new Set([
+      'name', 'apellido', 'email', 'company', 'what_they_sell', 'monthly_revenue',
+      'has_online_store', 'store_platform', 'is_decision_maker',
+      'actively_looking', 'current_marketing', 'pain_points',
+      'integrations_used', 'team_size', 'budget_range', 'decision_timeline',
+    ]);
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (!ALLOWED_EXTRACT_FIELDS.has(key)) continue;  // Drop unknown fields
+      if (value != null && value !== '' && !(Array.isArray(value) && value.length === 0)) {
+        cleaned[key] = value;
+      }
+    }
+
+    return Object.keys(cleaned).length > 0 ? (cleaned as ExtractedProspectInfo) : null;
+  } catch (err) {
+    console.error(`[steve-wa-brain] extractProspectInfo error:`, err);
+    return null;
   }
   return null;
 }
@@ -2393,25 +2372,19 @@ export async function generateConversationSummary(
   const convo = history.map(m => `${m.role === 'user' ? 'Prospecto' : 'Steve'}: ${m.content}`).join('\n');
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
+    const { ok, data } = await anthropicFetch(
+      {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 300,
         messages: [{
           role: 'user',
           content: `Resume esta conversación de WhatsApp entre Steve (vendedor AI) y un prospecto en 3-5 bullets concisos para que el vendedor sepa todo antes de la reunión. Enfócate en: qué venden, sus dolores, qué herramientas usan, y su nivel de interés.\n\nConversación:\n${convo.slice(0, 3000)}`,
         }],
-      }),
-    });
+      },
+      ANTHROPIC_API_KEY,
+    );
 
-    if (!response.ok) return 'Error generando resumen.';
-    const data: any = await response.json();
+    if (!ok) return 'Error generando resumen.';
     return (data.content?.[0]?.text || 'Sin resumen.').trim();
   } catch {
     return 'Error generando resumen.';
@@ -2594,26 +2567,20 @@ Responde ÚNICAMENTE con JSON válido (sin markdown):
 }`;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
+    const { ok, data, status } = await anthropicFetch(
+      {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 200,
         messages: [{ role: 'user', content: prompt }],
-      }),
-    });
+      },
+      ANTHROPIC_API_KEY,
+    );
 
-    if (!response.ok) {
-      console.error('[steve-wa-brain] detectMeetingConfirmation API error:', response.status);
+    if (!ok) {
+      console.error('[steve-wa-brain] detectMeetingConfirmation API error:', status);
       return { confirmed: false };
     }
 
-    const data: any = await response.json();
     const text = (data.content?.[0]?.text || '').trim();
     const jsonStr = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
     const parsed = JSON.parse(jsonStr);
@@ -2653,23 +2620,17 @@ Responde ÚNICAMENTE con la fecha en formato ISO 8601, ej: 2026-04-03T10:00:00-0
 Si no puedes interpretar la hora, responde: null`;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
+    const { ok, data } = await anthropicFetch(
+      {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 100,
         messages: [{ role: 'user', content: prompt }],
-      }),
-    });
+      },
+      ANTHROPIC_API_KEY,
+    );
 
-    if (!response.ok) return null;
+    if (!ok) return null;
 
-    const data: any = await response.json();
     const text = (data.content?.[0]?.text || '').trim();
     if (text === 'null' || !text) return null;
 

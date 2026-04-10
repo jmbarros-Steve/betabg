@@ -105,6 +105,10 @@ export async function salesTasksCrud(c: Context) {
         if (status !== undefined) updatePayload.status = status;
         if (due_at !== undefined) updatePayload.due_at = due_at;
 
+        // Bug #178 fix: Clear completed_at when regressing from completed to another status
+        if (status && status !== 'completed') {
+          updatePayload.completed_at = null;
+        }
         if (status === 'completed') {
           updatePayload.completed_at = new Date().toISOString();
         }

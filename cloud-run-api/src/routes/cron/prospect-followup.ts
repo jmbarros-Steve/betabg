@@ -43,6 +43,7 @@ export async function prospectFollowup(c: Context) {
   // Bug #125 fix: Check Chile local time — skip sending if outside business hours (9am-8pm CLT/CLST).
   // The cron still runs (to mark ghosted/lost), but no WA messages are sent during nighttime.
   // Chile is UTC-3 (CLST, Oct-Mar) or UTC-4 (CLT, Apr-Sep).
+  // DST transitions are handled by toLocaleString with the timezone param.
   const chileHour = new Date(now.toLocaleString('en-US', { timeZone: 'America/Santiago' })).getHours();
   const outsideBusinessHours = chileHour < 9 || chileHour >= 20;
   if (outsideBusinessHours) {
@@ -59,7 +60,8 @@ export async function prospectFollowup(c: Context) {
         .from('wa_prospects')
         .select('id, phone, profile_name, name, what_they_sell, stage, followup_count, last_followup_at, updated_at, message_count, pain_points, audit_data, lead_score')
         .not('stage', 'in', '("lost","converted")')
-        .lt('followup_count', 3)
+        // Bug #177 fix: Include prospects with NULL followup_count (never followed up)
+        .or('followup_count.lt.3,followup_count.is.null')
         .order('updated_at', { ascending: true })
         .limit(50),
       'prospectFollowup.fetchActiveProspects',

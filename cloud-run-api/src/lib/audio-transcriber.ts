@@ -57,10 +57,18 @@ export async function transcribeAudio(
 
     const audioRes = await fetch(mediaUrl, {
       headers: { Authorization: authHeader },
+      signal: AbortSignal.timeout(30000),
     });
 
     if (!audioRes.ok) {
       console.error(`[audio-transcriber] Failed to download audio: ${audioRes.status}`);
+      return null;
+    }
+
+    // Check Content-Length before downloading full body to avoid wasting bandwidth
+    const contentLength = audioRes.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > 25 * 1024 * 1024) {
+      console.warn(`[audio-transcriber] Audio too large from Content-Length header (${contentLength} bytes), skipping`);
       return null;
     }
 

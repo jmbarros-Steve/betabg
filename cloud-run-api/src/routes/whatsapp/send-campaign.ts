@@ -245,7 +245,15 @@ export async function waSendCampaign(c: Context) {
               continue;
             }
 
-            const toNorm = `whatsapp:+${rawPhone.replace('+', '')}`;
+            // Bug #188 fix: .replace('+', '') only removes the FIRST '+' — use regex to strip all
+            // leading '+' chars and whitespace, then validate format before sending.
+            const cleanPhone = rawPhone.replace(/^\++/, '').replace(/\s/g, '');
+            if (!/^\d{8,15}$/.test(cleanPhone)) {
+              console.warn(`[wa-campaign] Invalid phone format: ${rawPhone}, skipping`);
+              failedCount++;
+              continue;
+            }
+            const toNorm = `whatsapp:+${cleanPhone}`;
 
             const msg = await subClient.messages.create({
               from: fromNorm,

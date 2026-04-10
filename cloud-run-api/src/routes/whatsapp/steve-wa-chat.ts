@@ -366,8 +366,10 @@ export async function steveWAChat(c: Context) {
 
     // Fix #144: Idempotency — deduplicate by MessageSid to prevent Twilio retry double-processing
     if (messageSid) {
+      // Bug #183 fix: Use ->> operator instead of .contains() JSONB — matches the Bug #140 pattern
+      // in send-campaign.ts. The ->> operator can use a btree index while .contains() requires a GIN index.
       const { data: existingMsg } = await supabase.from('wa_messages')
-        .select('id').contains('metadata', { message_sid: messageSid }).maybeSingle();
+        .select('id').eq('metadata->>message_sid', messageSid).maybeSingle();
       if (!existingMsg) {
         // Also check the message_sid column directly (some messages store it there)
         const { data: existingBySid } = await supabase.from('wa_messages')
@@ -649,6 +651,10 @@ async function handleProspect(
 
     let prospect: ProspectRecord;
 
+    // Bug #186 fix: Save original updated_at BEFORE we overwrite it with updatedAtNow.
+    // This is needed for inactivity detection at line ~742 which checks how long since last message.
+    const originalUpdatedAt = existingProspect?.updated_at || null;
+
     if (existingProspect) {
       // Fix #19: if prospect was 'lost' and writes again — re-activate (reset to discovery)
       const isReactivation = existingProspect.stage === 'lost';
@@ -737,7 +743,9 @@ async function handleProspect(
     }
 
     // R7-#10: detectar inactividad larga y resetear contexto de pitch
-    const lastActive = prospect.updated_at ? new Date(prospect.updated_at).getTime() : 0;
+    // Bug #186 fix: Use originalUpdatedAt (saved before overwrite) instead of prospect.updated_at
+    // which now always equals "now" and would never detect inactivity.
+    const lastActive = originalUpdatedAt ? new Date(originalUpdatedAt).getTime() : 0;
     const daysSinceLastMsg = lastActive ? (Date.now() - lastActive) / 86400000 : 0;
     const isLongInactive = daysSinceLastMsg > 14;
 
@@ -973,11 +981,13 @@ async function handleProspect(
     // should NOT count toward frustration. Only count messages that are 5+ chars but still short (<=15).
     const recentUserMsgs = history.filter(m => m.role === 'user').slice(-3);
     const normalAffirmations = new Set(['si', 'sí', 'ok', 'ya', 'no', 'va', 'dale', 'bien']);
+    // Bug #184 fix: Logic was inverted — OR let almost everything through.
+    // Correct logic: keep messages that are 5-15 chars AND not normal affirmations.
     const frustrationMsgs = recentUserMsgs.filter(m => {
       const trimmed = m.content.trim().toLowerCase();
-      return trimmed.length >= 5 || !normalAffirmations.has(trimmed);
+      return trimmed.length >= 5 && trimmed.length <= 15 && !normalAffirmations.has(trimmed);
     });
-    if (frustrationMsgs.length >= 3 && frustrationMsgs.every(m => m.content.length <= 15)) {
+    if (frustrationMsgs.length >= 3) {
       // Possible frustration — escalate
       // Fix #150: Dedup escalation tasks — check before inserting
       supabase.from('tasks')

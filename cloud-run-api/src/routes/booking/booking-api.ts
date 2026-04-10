@@ -520,9 +520,14 @@ export async function bookingConfirm(c: Context) {
       if (website) updateData.website_url = website;
       if (monthly_budget) updateData.budget_range = monthly_budget;
 
+      // Bug #176 fix: When no prospect_id, only update ONE active prospect (not all with same phone).
+      // Exclude lost/converted prospects and limit to 1 to prevent mass-update.
       const query = prospect_id
         ? supabase.from('wa_prospects').update(updateData).eq('id', prospect_id)
-        : supabase.from('wa_prospects').update(updateData).eq('phone', prospect_phone!.replace(/\+/g, ''));
+        : supabase.from('wa_prospects').update(updateData)
+            .eq('phone', prospect_phone!.replace(/\+/g, ''))
+            .not('stage', 'in', '("lost","converted")')
+            .limit(1);
 
       await query;
     }

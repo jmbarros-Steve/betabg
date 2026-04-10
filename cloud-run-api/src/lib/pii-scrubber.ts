@@ -90,13 +90,17 @@ export function scrubPII(text: string): { scrubbed: string; hadPII: boolean } {
   });
 
   // 6. If financial context exists, scrub any remaining long digit sequences
+  //    Skip numbers preceded by order-related words (pedido, orden, tracking, etc.)
   if (FINANCIAL_CONTEXT_KEYWORDS.test(text)) {
-    result = result.replace(/\b\d{10,19}\b/g, (match) => {
-      // Skip if already redacted
-      if (result.indexOf(match) === -1) return match;
-      hadPII = true;
-      return '[NUMERO-REDACTED]';
-    });
+    result = result.replace(
+      /(?<!(pedido|orden|tracking|seguimiento|código|codigo|order|#)\s{0,3})\b\d{10,19}\b/gi,
+      (match) => {
+        // Skip if already redacted
+        if (result.indexOf(match) === -1) return match;
+        hadPII = true;
+        return '[NUMERO-REDACTED]';
+      },
+    );
   }
 
   return { scrubbed: result, hadPII };

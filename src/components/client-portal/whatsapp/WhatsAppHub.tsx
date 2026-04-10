@@ -19,6 +19,10 @@ export function WhatsAppHub({ clientId }: Props) {
 
   useEffect(() => {
     checkSetup();
+    // Bug #190 fix: Refresh credits balance every 30 seconds so the displayed count
+    // stays current after sending messages, campaigns, or automated replies.
+    const interval = setInterval(checkSetup, 30000);
+    return () => clearInterval(interval);
   }, [clientId]);
 
   async function checkSetup() {

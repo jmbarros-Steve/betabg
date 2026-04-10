@@ -67,15 +67,23 @@ export async function webFormsCrud(c: Context) {
       const { form_id } = body;
       if (!form_id) return c.json({ error: 'form_id required' }, 400);
 
+      // Bug #180 fix: Verify form ownership BEFORE fetching submissions to prevent IDOR.
+      // The parallel Promise.all allowed submissions to be returned even if the form
+      // didn't belong to the user (formRes.error was checked AFTER both queries ran).
       let formQuery = supabase.from('web_forms').select('*').eq('id', form_id);
       if (!isSuperAdmin) formQuery = formQuery.eq('user_id', user.id);
 
-      const [formRes, subsRes] = await Promise.all([
-        formQuery.single(),
-        supabase.from('web_form_submissions').select('*').eq('form_id', form_id).order('created_at', { ascending: false }).limit(50),
-      ]);
+      const formRes = await formQuery.single();
+      if (formRes.error || !formRes.data) return c.json({ error: 'Form not found' }, 404);
 
-      if (formRes.error) return c.json({ error: formRes.error.message }, 500);
+      // Only fetch submissions after confirming ownership
+      const subsRes = await supabase
+        .from('web_form_submissions')
+        .select('*')
+        .eq('form_id', form_id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
       return c.json({ form: formRes.data, submissions: subsRes.data || [] });
     }
 
@@ -101,9 +109,19 @@ export async function webFormsCrud(c: Context) {
     if (action === 'delete') {
       const { form_id } = body;
       if (!form_id) return c.json({ error: 'form_id required' }, 400);
-      let deleteQuery = supabase.from('web_forms').delete().eq('id', form_id);
-      if (!isSuperAdmin) deleteQuery = deleteQuery.eq('user_id', user.id);
-      const { error } = await deleteQuery;
+
+      // Bug #171 fix: Verify ownership first, then cascade delete submissions before the form
+      let ownershipQuery = supabase.from('web_forms').select('id').eq('id', form_id);
+      if (!isSuperAdmin) ownershipQuery = ownershipQuery.eq('user_id', user.id);
+      const { data: formExists, error: ownerErr } = await ownershipQuery.maybeSingle();
+      if (ownerErr) return c.json({ error: ownerErr.message }, 500);
+      if (!formExists) return c.json({ error: 'Form not found' }, 404);
+
+      // Delete submissions first (no FK cascade in DB)
+      await supabase.from('web_form_submissions').delete().eq('form_id', form_id);
+
+      // Then delete the form
+      const { error } = await supabase.from('web_forms').delete().eq('id', form_id);
       if (error) return c.json({ error: error.message }, 500);
       return c.json({ success: true });
     }

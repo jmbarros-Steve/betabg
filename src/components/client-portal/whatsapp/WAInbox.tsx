@@ -115,7 +115,10 @@ export function WAInbox({ clientId }: Props) {
           filter: `contact_phone=eq.${convPhone}`,
         },
         (payload: any) => {
-          const newMsg = payload.new as Message & { contact_phone?: string; channel?: string };
+          const newMsg = payload.new as Message & { contact_phone?: string; channel?: string; client_id?: string };
+          // Bug #185 fix: Cross-tenant guard — Supabase Realtime filter on contact_phone
+          // may match messages from a different client. Validate client_id before rendering.
+          if (newMsg.client_id && newMsg.client_id !== clientId) return;
           if (newMsg.channel === 'merchant_wa' || !newMsg.channel) {
             setMessages(prev => {
               // Deduplicate: don't add if already present (e.g. optimistic insert from sendReply)

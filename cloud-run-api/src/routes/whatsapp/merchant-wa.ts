@@ -81,20 +81,22 @@ async function buildMerchantContext(clientId: string): Promise<string> {
     : '';
 
   // Products (top 20 by price for quick lookup)
+  // Bug #181 fix: shop_id doesn't exist on shopify_products — use client_id (FK to clients.id).
+  // Also fix column name: shopify_products has price_min, not price.
   const products = await safeQueryOrDefault<any>(
     supabase
       .from('shopify_products')
-      .select('title, price, status')
-      .eq('shop_id', clientId)
+      .select('title, price_min, status')
+      .eq('client_id', clientId)
       .eq('status', 'active')
-      .order('price', { ascending: false })
+      .order('price_min', { ascending: false })
       .limit(20),
     [],
     'merchantWa.buildContext.getProducts',
   );
 
   const productList = products.length
-    ? products.map((p: any) => `- ${p.title}: $${p.price}`).join('\n')
+    ? products.map((p: any) => `- ${p.title}: $${p.price_min || 'N/A'}`).join('\n')
     : 'Sin productos cargados.';
 
   return `TIENDA: ${client?.company || client?.name || 'N/A'}
@@ -434,7 +436,8 @@ export async function merchantWAWebhook(c: Context) {
         console.error('[merchant-wa] Claude API error:', aiRes.status);
         // Bug #138 fix: Refund credit on AI failure — customer gets no AI value
         try {
-          await supabase.rpc('refund_wa_credit', { p_client_id: clientId, p_amount: 1, p_reason: 'ai_api_error_refund' });
+          // Bug #182 fix: RPC parameter is p_description, not p_reason
+          await supabase.rpc('refund_wa_credit', { p_client_id: clientId, p_amount: 1, p_description: 'ai_api_error_refund' });
         } catch (refundErr) { console.error('[merchant-wa] Refund after AI error failed:', refundErr); }
         replyText = 'Gracias por tu mensaje, te responderemos pronto.';
       } else {
@@ -447,7 +450,8 @@ export async function merchantWAWebhook(c: Context) {
       // Bug #138 fix: Refund credit on AI exception — customer gets no AI value
       console.error('[merchant-wa] AI call exception:', aiError);
       try {
-        await supabase.rpc('refund_wa_credit', { p_client_id: clientId, p_amount: 1, p_reason: 'ai_failure_refund' });
+        // Bug #182 fix: RPC parameter is p_description, not p_reason
+        await supabase.rpc('refund_wa_credit', { p_client_id: clientId, p_amount: 1, p_description: 'ai_failure_refund' });
       } catch (refundErr) { console.error('[merchant-wa] Refund after AI exception failed:', refundErr); }
       replyText = 'Gracias por tu mensaje, te responderemos pronto.';
     }
@@ -519,11 +523,10 @@ export async function merchantWAWebhook(c: Context) {
     return c.text(`<Response><Message>${escaped}</Message></Response>`, 200, { 'Content-Type': 'text/xml' });
 
   } catch (error: any) {
-    console.error('[merchant-wa] Error:', error?.message, error?.stack);
-    // Return a fallback TwiML response so the customer gets a reply even on error.
-    // Empty <Response></Response> silently drops the customer's message with no reply.
-    const fallback = 'Gracias por tu mensaje, te responderemos pronto.';
-    const escaped = fallback.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    return c.text(`<Response><Message>${escaped}</Message></Response>`, 200, { 'Content-Type': 'text/xml' });
+    console.error('[merchant-wa] Outer error:', error?.message, error?.stack);
+    // Bug #189 fix: Return EMPTY TwiML — do NOT send a message since credits were not deducted.
+    // Sending a <Message> here causes Twilio to deliver a reply that the merchant gets charged for
+    // (via Twilio's per-message pricing) without a corresponding WA credit deduction on our side.
+    return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
   }
 }

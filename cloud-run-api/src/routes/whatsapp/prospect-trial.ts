@@ -45,7 +45,8 @@ export async function prospectTrial(c: Context) {
     }
 
     const userId = newUser.user.id;
-    console.log(`[prospect-trial] User created: ${userId} (${email})`);
+    // Bug #187 fix: Don't log email in plaintext — redact for security
+    console.log(`[prospect-trial] User created: ${userId} (email redacted)`);
 
     // 2. Assign client role
     await supabase.from('user_roles').upsert(
@@ -68,7 +69,7 @@ export async function prospectTrial(c: Context) {
       throw new Error('Failed to create client record');
     }
 
-    console.log(`[prospect-trial] Client created: ${newClient.id}`);
+    console.log(`[prospect-trial] Client created: ${newClient.id} (email redacted)`);
 
     // 4. Mark prospect as converted
     if (prospect_id) {
@@ -98,25 +99,24 @@ export async function prospectTrial(c: Context) {
     // don't return 500 just because Twilio is down (causes 409 on retry)
     // TODO: i18n — welcome message hardcoded in Spanish (es-CL).
     // If expanding to other languages, extract to a config/i18n system.
-    const welcomeMsg = `🎉 ¡Bienvenido a Steve!\n\nTu cuenta está lista. Entra a steve.cl con tu email (${email}) y esta clave temporal:\n\n🔑 ${tempPassword}\n\nCámbiala apenas entres.\n\nPróximo paso: conectar tu Shopify para que empiece la magia 🚀\n\n¿Necesitas ayuda? Solo escríbeme aquí.`;
+    // Bug #187 fix: DO NOT send the plaintext password via WhatsApp — Twilio logs store message
+    // bodies and WA messages are stored in wa_messages. Send password only via email (Resend).
+    // The WA message now directs the user to check their email for login credentials.
+    const welcomeMsg = `Bienvenido a Steve!\n\nTu cuenta esta lista. Te enviamos un email a ${email} con tus credenciales de acceso.\n\nEntra a steve.cl y conecta tu Shopify para empezar.\n\nNecesitas ayuda? Solo escribeme aqui.`;
 
     let waSent = false;
     try {
       await sendWhatsApp(`+${phone}`, welcomeMsg);
       waSent = true;
 
-      // Bug #63 fix: Redact the plaintext password before storing in wa_messages.
-      // The user already received the real password via WA above.
-      const redactedMsg = welcomeMsg.replace(tempPassword, '[REDACTED]');
-
-      // Save welcome message (with password redacted)
+      // Bug #187: Password no longer in WA message, save as-is
       await supabase.from('wa_messages').insert({
         client_id: newClient.id,
         channel: 'steve_chat',
         direction: 'outbound',
         from_number: process.env.STEVE_WA_NUMBER || process.env.TWILIO_PHONE_NUMBER || '',
         to_number: phone,
-        body: redactedMsg,
+        body: welcomeMsg,
         contact_name: name || email,
         contact_phone: phone,
       });
@@ -124,7 +124,8 @@ export async function prospectTrial(c: Context) {
       console.error(`[prospect-trial] WA send failed (user+client already created): ${waErr.message}`);
     }
 
-    console.log(`[prospect-trial] Trial activated: ${email} → client ${newClient.id} (WA: ${waSent ? 'sent' : 'FAILED'})`);
+    // Bug #187 fix: Don't log email in plaintext
+    console.log(`[prospect-trial] Trial activated: client ${newClient.id} (WA: ${waSent ? 'sent' : 'FAILED'})`);
 
     return c.json({
       success: true,

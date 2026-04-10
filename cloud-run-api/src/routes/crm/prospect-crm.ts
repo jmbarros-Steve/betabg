@@ -51,8 +51,20 @@ export async function prospectUpdateDeal(c: Context) {
       if (isNaN(wp) || wp < 0 || wp > 100) return c.json({ error: 'win_probability must be a number 0-100' }, 400);
       update.win_probability = wp;
     }
-    if (expected_close_date && isNaN(new Date(expected_close_date).getTime())) return c.json({ error: 'Invalid expected_close_date' }, 400);
-    if (expected_close_date !== undefined) update.expected_close_date = expected_close_date || null;
+    if (expected_close_date !== undefined && expected_close_date !== null && expected_close_date !== '') {
+      // Bug #174 fix: Validate date format, reject past dates, and cap at +2 years
+      const parsedDate = new Date(expected_close_date);
+      if (isNaN(parsedDate.getTime())) return c.json({ error: 'Invalid expected_close_date' }, 400);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (parsedDate < today) return c.json({ error: 'expected_close_date must be in the future' }, 400);
+      const maxDate = new Date();
+      maxDate.setFullYear(maxDate.getFullYear() + 2);
+      if (parsedDate > maxDate) return c.json({ error: 'expected_close_date too far in future (max 2 years)' }, 400);
+      update.expected_close_date = parsedDate.toISOString();
+    } else if (expected_close_date === null || expected_close_date === '') {
+      update.expected_close_date = null;
+    }
 
     const { error } = await supabase
       .from('wa_prospects')
@@ -251,7 +263,15 @@ export async function prospectChangePriority(c: Context) {
 export async function prospectUpdateTags(c: Context) {
   try {
     const { prospect_id, tags } = await c.req.json();
-    if (!prospect_id || !Array.isArray(tags)) return c.json({ error: 'prospect_id and tags[] required' }, 400);
+    if (!prospect_id) return c.json({ error: 'prospect_id required' }, 400);
+
+    // Bug #173 fix: Validate and sanitize tags — prevent XSS and tag stuffing
+    if (!Array.isArray(tags)) return c.json({ error: 'tags must be array' }, 400);
+    const safeTags = tags
+      .filter((t: any) => typeof t === 'string' && t.trim().length > 0)
+      .map((t: string) => t.trim().slice(0, 50).replace(/[<>]/g, ''))
+      .slice(0, 20);
+    if (safeTags.length === 0) return c.json({ error: 'No valid tags provided' }, 400);
 
     const supabase = getSupabaseAdmin();
     const user = c.get('user');
@@ -263,7 +283,7 @@ export async function prospectUpdateTags(c: Context) {
 
     const { error } = await supabase
       .from('wa_prospects')
-      .update({ tags, updated_at: new Date().toISOString() })
+      .update({ tags: safeTags, updated_at: new Date().toISOString() })
       .eq('id', prospect_id);
 
     if (error) return c.json({ error: error.message }, 500);
@@ -364,11 +384,16 @@ export async function prospectDelete(c: Context) {
     }, `admin:${user?.id || 'unknown'}`);
 
     // Delete related records first (events, tasks, proposals, wa_messages)
-    await Promise.all([
-      supabase.from('wa_prospect_events').delete().eq('prospect_id', prospect_id),
-      supabase.from('sales_tasks').delete().eq('prospect_id', prospect_id),
-      supabase.from('proposals').delete().eq('prospect_id', prospect_id),
-    ]);
+    try {
+      await Promise.all([
+        supabase.from('wa_prospect_events').delete().eq('prospect_id', prospect_id),
+        supabase.from('sales_tasks').delete().eq('prospect_id', prospect_id),
+        supabase.from('proposals').delete().eq('prospect_id', prospect_id),
+      ]);
+    } catch (cascadeErr: any) {
+      console.error('[prospectDelete] Cascade delete failed:', cascadeErr);
+      return c.json({ error: 'Failed to delete related records' }, 500);
+    }
 
     // Bug #118 fix: Also delete orphaned wa_messages by contact_phone
     if (prospectPhone) {
