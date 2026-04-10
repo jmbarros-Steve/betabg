@@ -17,8 +17,15 @@ const POLL_TIMEOUT_MS = 180000; // 3 minutes
 
 function buildLeadsieUrl(baseUrl: string, clientId: string): string {
   if (!baseUrl) return '';
-  const separator = baseUrl.includes('?') ? '&' : '?';
-  return `${baseUrl}${separator}customUserId=${encodeURIComponent(clientId)}`;
+  try {
+    const url = new URL(baseUrl);
+    url.searchParams.delete('customUserId');
+    url.searchParams.set('customUserId', clientId);
+    return url.toString();
+  } catch {
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    return `${baseUrl}${separator}customUserId=${encodeURIComponent(clientId)}`;
+  }
 }
 
 export function GooglePartnerSetup({ clientId, onConnected }: GooglePartnerSetupProps) {
@@ -27,6 +34,13 @@ export function GooglePartnerSetup({ clientId, onConnected }: GooglePartnerSetup
   const [pollElapsed, setPollElapsed] = useState(0);
 
   const leadsieUrl = buildLeadsieUrl(LEADSIE_GOOGLE_URL, clientId);
+
+  // Reset state when clientId changes (admin switching between clients)
+  useEffect(() => {
+    setState('leadsie');
+    setLeadsieOpened(false);
+    setPollElapsed(0);
+  }, [clientId]);
 
   const pollForConnection = useCallback(async () => {
     const { data } = await supabase
@@ -37,7 +51,6 @@ export function GooglePartnerSetup({ clientId, onConnected }: GooglePartnerSetup
       .maybeSingle();
 
     if (
-      data?.connection_type === 'leadsie' &&
       data?.is_active &&
       data?.account_id
     ) {
@@ -46,6 +59,11 @@ export function GooglePartnerSetup({ clientId, onConnected }: GooglePartnerSetup
     }
     return false;
   }, [clientId]);
+
+  // Check on mount / clientId change if already connected
+  useEffect(() => {
+    pollForConnection();
+  }, [pollForConnection]);
 
   useEffect(() => {
     if (state !== 'waiting') return;

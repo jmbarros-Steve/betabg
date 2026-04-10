@@ -22,8 +22,16 @@ const POLL_TIMEOUT_MS = 180000; // 3 minutes
  */
 function buildLeadsieUrl(baseUrl: string, clientId: string): string {
   if (!baseUrl) return '';
-  const separator = baseUrl.includes('?') ? '&' : '?';
-  return `${baseUrl}${separator}customUserId=${encodeURIComponent(clientId)}`;
+  try {
+    const url = new URL(baseUrl);
+    // Strip any baked-in customUserId to avoid duplicate params
+    url.searchParams.delete('customUserId');
+    url.searchParams.set('customUserId', clientId);
+    return url.toString();
+  } catch {
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    return `${baseUrl}${separator}customUserId=${encodeURIComponent(clientId)}`;
+  }
 }
 
 export function MetaPartnerSetup({ clientId, onConnected }: MetaPartnerSetupProps) {
@@ -32,6 +40,13 @@ export function MetaPartnerSetup({ clientId, onConnected }: MetaPartnerSetupProp
   const [pollElapsed, setPollElapsed] = useState(0);
 
   const leadsieUrl = buildLeadsieUrl(LEADSIE_URL, clientId);
+
+  // Reset state when clientId changes (admin switching between clients)
+  useEffect(() => {
+    setState('leadsie');
+    setLeadsieOpened(false);
+    setPollElapsed(0);
+  }, [clientId]);
 
   // Poll DB for the connection created by the webhook.
   // Accept any of account_id / page_id / ig_account_id — merchants that share
@@ -45,7 +60,6 @@ export function MetaPartnerSetup({ clientId, onConnected }: MetaPartnerSetupProp
       .maybeSingle();
 
     if (
-      data?.connection_type === 'leadsie' &&
       data?.is_active &&
       (data?.account_id || data?.page_id || data?.ig_account_id)
     ) {
@@ -54,6 +68,11 @@ export function MetaPartnerSetup({ clientId, onConnected }: MetaPartnerSetupProp
     }
     return false;
   }, [clientId]);
+
+  // Check on mount / clientId change if already connected
+  useEffect(() => {
+    pollForConnection();
+  }, [pollForConnection]);
 
   useEffect(() => {
     if (state !== 'waiting') return;
