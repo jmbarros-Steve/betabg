@@ -82,6 +82,7 @@ export async function emailSendQueue(c: Context) {
       // Build queue entries
       const queueEntries = items.map(item => {
         let scheduledFor = item.scheduled_for ? new Date(item.scheduled_for) : new Date();
+        if (isNaN(scheduledFor.getTime())) scheduledFor = new Date();
 
         // If smart send is enabled and subscriber has a preferred hour, adjust scheduled_for
         if (smartSendEnabled && !item.scheduled_for) {
@@ -150,14 +151,15 @@ export async function emailSendQueue(c: Context) {
 
       // Count emails sent in the last hour for rate limiting
       const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
-      const { count: sentLastHour } = await supabase
+      const { count: sentLastHour, error: countErr } = await supabase
         .from('email_send_queue')
         .select('*', { count: 'exact', head: true })
         .eq('client_id', client_id)
         .eq('status', 'sent')
         .gte('processed_at', oneHourAgo);
+      if (countErr) console.error('[send-queue] Rate limit count query failed:', countErr);
 
-      const remaining = rateLimit - (sentLastHour || 0);
+      const remaining = rateLimit - (sentLastHour ?? 0);
       if (remaining <= 0) {
         return c.json({
           processed: 0,
@@ -275,27 +277,29 @@ export async function emailSendQueue(c: Context) {
 
       // Bulk update successful sends in one query
       if (successIds.length > 0) {
-        await supabase
+        const { error: sentErr } = await supabase
           .from('email_send_queue')
           .update({
             status: 'sent',
             processed_at: new Date().toISOString(),
-            attempts: 1, // All claimed items had attempts=0 before processing
+            attempts: 1,
           })
           .in('id', successIds);
+        if (sentErr) console.error('[send-queue] Bulk sent update failed:', sentErr);
       }
 
       // Bulk update "subscriber not found" failures in one query
       if (notFoundIds.length > 0) {
-        await supabase
+        const { error: notFoundErr } = await supabase
           .from('email_send_queue')
           .update({ status: 'failed', last_error: 'Subscriber not found' })
           .in('id', notFoundIds);
+        if (notFoundErr) console.error('[send-queue] Bulk not-found update failed:', notFoundErr);
       }
 
       // Individual updates for failed items (each has unique error/attempts/status)
       for (const upd of failedUpdates) {
-        await supabase
+        const { error: failUpd } = await supabase
           .from('email_send_queue')
           .update({
             status: upd.status,
@@ -304,6 +308,7 @@ export async function emailSendQueue(c: Context) {
             ...(upd.processed_at && { processed_at: upd.processed_at }),
           })
           .eq('id', upd.id);
+        if (failUpd) console.error(`[send-queue] Failed update for ${upd.id}:`, failUpd);
       }
 
       // Update campaign sent_count and status if applicable.
@@ -311,33 +316,36 @@ export async function emailSendQueue(c: Context) {
       // several campaigns are being processed together).
       const campaignIds = [...new Set(itemsToProcess.map((q: any) => q.campaign_id).filter(Boolean) as string[])];
       for (const campaignId of campaignIds) {
-        const { count: totalSent } = await supabase
+        const { count: totalSent, error: sentCountErr } = await supabase
           .from('email_send_queue')
           .select('*', { count: 'exact', head: true })
           .eq('campaign_id', campaignId)
           .eq('status', 'sent');
+        if (sentCountErr) console.error(`[send-queue] Campaign ${campaignId} sent count failed:`, sentCountErr);
 
         // Check if there are still pending items (queued or processing) for this campaign.
-        const { count: stillPending } = await supabase
+        const { count: stillPending, error: pendingCountErr } = await supabase
           .from('email_send_queue')
           .select('*', { count: 'exact', head: true })
           .eq('campaign_id', campaignId)
           .in('status', ['queued', 'processing']);
+        if (pendingCountErr) console.error(`[send-queue] Campaign ${campaignId} pending count failed:`, pendingCountErr);
 
         const update: Record<string, any> = {
-          sent_count: totalSent || 0,
+          sent_count: totalSent ?? 0,
           updated_at: new Date().toISOString(),
         };
 
         // Only transition to 'sent' when there is nothing left to process.
-        if ((stillPending || 0) === 0) {
+        if ((stillPending ?? 0) === 0) {
           update.status = 'sent';
         }
 
-        await supabase
+        const { error: campErr } = await supabase
           .from('email_campaigns')
           .update(update)
           .eq('id', campaignId);
+        if (campErr) console.error(`[send-queue] Campaign ${campaignId} update failed:`, campErr);
       }
 
       return c.json({ processed: itemsToProcess.length, sent, failed, rate_limit: rateLimit });

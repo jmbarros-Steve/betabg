@@ -36,7 +36,8 @@ export async function smartSendTime(c: Context) {
         return c.json({ updated: 0, message: 'No open events found to analyze' });
       }
 
-      // Group opens by subscriber and compute optimal hour
+      // Group opens by subscriber and compute optimal hour.
+      // send_time_hour is stored and computed as a UTC hour (0-23).
       const subscriberOpens: Record<string, number[]> = {};
       for (const ev of openEvents) {
         const hour = new Date(ev.created_at).getUTCHours();

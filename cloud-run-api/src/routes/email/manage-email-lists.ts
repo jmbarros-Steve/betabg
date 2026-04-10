@@ -14,6 +14,17 @@ export async function manageEmailLists(c: Context) {
 
   const supabase = getSupabaseAdmin();
 
+  const user = c.get('user');
+  if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+  const { data: ownerCheck } = await supabase
+    .from('clients')
+    .select('id')
+    .eq('id', client_id)
+    .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+    .maybeSingle();
+  if (!ownerCheck) return c.json({ error: 'No tienes acceso a este cliente' }, 403);
+
   switch (action) {
     case 'list': {
       const { data, error } = await supabase
@@ -114,6 +125,23 @@ export async function manageEmailLists(c: Context) {
       const { list_id, subscriber_ids } = body;
       if (!list_id || !subscriber_ids?.length) {
         return c.json({ error: 'list_id and subscriber_ids are required' }, 400);
+      }
+
+      const { data: listCheck } = await supabase
+        .from('email_lists')
+        .select('id')
+        .eq('id', list_id)
+        .eq('client_id', client_id)
+        .maybeSingle();
+      if (!listCheck) return c.json({ error: 'List not found or does not belong to this client' }, 403);
+
+      const { count: validCount } = await supabase
+        .from('email_subscribers')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', client_id)
+        .in('id', subscriber_ids);
+      if (validCount !== subscriber_ids.length) {
+        return c.json({ error: 'Some subscriber_ids do not belong to this client' }, 403);
       }
 
       const rows = subscriber_ids.map((sid: string) => ({

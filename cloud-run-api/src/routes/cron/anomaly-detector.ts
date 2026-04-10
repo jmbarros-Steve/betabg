@@ -52,14 +52,17 @@ export async function anomalyDetector(c: Context) {
     const todayByConn: Record<string, { revenue: number; spend: number }> = {};
     for (const m of todayMetrics) {
       if (!todayByConn[m.connection_id]) todayByConn[m.connection_id] = { revenue: 0, spend: 0 };
-      todayByConn[m.connection_id].revenue += Number(m.conversion_value) || 0;
-      todayByConn[m.connection_id].spend += Number(m.spend) || 0;
+      const revVal = Number(m.conversion_value);
+      todayByConn[m.connection_id].revenue += isNaN(revVal) ? 0 : revVal;
+      const spendVal = Number(m.spend);
+      todayByConn[m.connection_id].spend += isNaN(spendVal) ? 0 : spendVal;
     }
 
     const histByConn: Record<string, number[]> = {};
     for (const m of historicalMetrics) {
       if (!histByConn[m.connection_id]) histByConn[m.connection_id] = [];
-      histByConn[m.connection_id].push(Number(m.conversion_value) || 0);
+      const histVal = Number(m.conversion_value);
+      histByConn[m.connection_id].push(isNaN(histVal) ? 0 : histVal);
     }
 
     // Get connection details

@@ -29,9 +29,9 @@ function formatCLP(value: number): string {
 
 function getWeekLabel(): string {
   const now = new Date();
-  const day = now.getDate();
+  const day = now.getUTCDate();
   const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  return `${day} de ${months[now.getMonth()]}`;
+  return `${day} de ${months[now.getUTCMonth()]}`;
 }
 
 // ─── Merchant report HTML ────────────────────────────────────────────────────
@@ -160,7 +160,7 @@ export async function weeklyReport(c: Context) {
 
   const supabase = getSupabaseAdmin();
   const now = new Date();
-  const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
   const twoWeeksAgo = new Date(now.getTime() - 14 * 86400000).toISOString();
   const weekLabel = getWeekLabel();
 

@@ -3,11 +3,16 @@ import { toast } from "sonner";
 
 export function useDraftSaver(key: string, data: unknown, interval = 30000) {
   const timerRef = useRef<ReturnType<typeof setInterval>>();
+  const dataRef = useRef(data);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   useEffect(() => {
     timerRef.current = setInterval(() => {
       try {
-        localStorage.setItem(`steve_draft_${key}`, JSON.stringify(data));
+        localStorage.setItem(`steve_draft_${key}`, JSON.stringify(dataRef.current));
         toast("Borrador guardado", { id: "draft-saved", duration: 2000 });
       } catch {
         // localStorage full — silently ignore
@@ -17,7 +22,7 @@ export function useDraftSaver(key: string, data: unknown, interval = 30000) {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [key, data, interval]);
+  }, [key, interval]);
 
   const clearDraft = useCallback(() => {
     localStorage.removeItem(`steve_draft_${key}`);

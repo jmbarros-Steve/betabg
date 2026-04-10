@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
@@ -67,6 +67,11 @@ export default function MetaConnectionWizard({
   // Step 4: Confirming
   const [connecting, setConnecting] = useState(false);
 
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
+
   // ─── Step 1: Fetch Business Managers ──────────────────────────────────
 
   const fetchHierarchy = useCallback(async () => {
@@ -77,6 +82,8 @@ export default function MetaConnectionWizard({
         'fetch-meta-business-hierarchy',
         { body: { connection_id: connectionId } },
       );
+
+      if (!mountedRef.current) return;
 
       if (fnError) throw new Error(fnError);
       if (data?.error) throw new Error(data.error);
@@ -127,9 +134,13 @@ export default function MetaConnectionWizard({
         setStep(2);
       }
     } catch (err: any) {
-      setError(err?.message || 'Error cargando Business Managers');
+      if (mountedRef.current) {
+        setError(err?.message || 'Error cargando Business Managers');
+      }
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [connectionId]);
 

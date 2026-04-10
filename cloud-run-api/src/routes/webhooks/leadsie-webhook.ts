@@ -192,7 +192,7 @@ export async function leadsieWebhook(c: Context) {
 
     if (isActive) {
       triggerMetaSync(clientId).catch((err) =>
-        console.error('[leadsie-webhook] Meta sync trigger failed:', err),
+        console.error(`[leadsie-webhook] Meta sync trigger failed for client=${clientId}:`, err),
       );
     }
 

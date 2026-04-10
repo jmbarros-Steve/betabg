@@ -218,7 +218,10 @@ export async function syncCampaignMetrics(c: Context) {
 
       if (adsetMetrics.length > 0) {
         // Purge old adset metrics for this connection
-        await supabase.from('adset_metrics').delete().eq('connection_id', connection_id);
+        const { error: delErr } = await supabase.from('adset_metrics').delete().eq('connection_id', connection_id);
+        if (delErr) {
+          console.error('[sync-campaign-metrics] adset_metrics delete error:', delErr);
+        }
 
         for (let i = 0; i < adsetMetrics.length; i += 100) {
           const batch = adsetMetrics.slice(i, i + 100);

@@ -59,6 +59,13 @@ export function ChongaSupport({ clientId }: ChongaSupportProps) {
   const [ticketSubject, setTicketSubject] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const escalationTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    return () => {
+      if (escalationTimerRef.current) clearTimeout(escalationTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -165,7 +172,7 @@ export function ChongaSupport({ clientId }: ChongaSupportProps) {
 
       // If bot suggests escalation, offer ticket
       if (reply.toLowerCase().includes('ticket') || reply.toLowerCase().includes('equipo técnico')) {
-        setTimeout(() => {
+        escalationTimerRef.current = setTimeout(() => {
           setMessages(prev => [...prev, {
             id: crypto.randomUUID(),
             role: 'assistant',

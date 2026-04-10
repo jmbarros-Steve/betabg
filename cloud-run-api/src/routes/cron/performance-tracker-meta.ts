@@ -217,7 +217,7 @@ export async function performanceTrackerMeta(c: Context) {
       }
 
       // Update creative_history with metrics
-      await supabase
+      const { error: updateErr } = await supabase
         .from('creative_history')
         .update({
           meta_ctr: ctr,
@@ -233,6 +233,11 @@ export async function performanceTrackerMeta(c: Context) {
           measured_at: new Date().toISOString(),
         })
         .eq('id', creative.id);
+
+      if (updateErr) {
+        console.error(`[perf-tracker-meta] Failed to update creative_history ${creative.id}:`, updateErr);
+        continue;
+      }
 
       console.log(
         `[perf-tracker-meta] ${creative.meta_campaign_id}: CTR=${ctr}%, ROAS=${roas?.toFixed(2) ?? 'N/A'}, score=${score} (${verdict})`

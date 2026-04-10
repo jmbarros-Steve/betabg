@@ -137,7 +137,8 @@ export async function fatigueDetector(c: Context) {
 
         // Resolve client from join (may be array or object)
         const client = Array.isArray(conn.clients) ? conn.clients[0] : conn.clients;
-        const shopId = client?.id;
+        if (!client?.id) continue;
+        const shopId = client.id;
 
         let suggestedAngle = 'testimonio o beneficio';
         let suggestionDetail = 'mejor score histórico';

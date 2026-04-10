@@ -37,10 +37,14 @@ export async function syncAllMetrics(c: Context) {
   }
 
   // Acquire lock
-  await supabase.from('steve_knowledge').upsert(
+  const { error: lockErr } = await supabase.from('steve_knowledge').upsert(
     { categoria: 'system', titulo: lockKey, contenido: now.toISOString(), activo: true, orden: 0 },
     { onConflict: 'categoria,titulo' },
   );
+  if (lockErr) {
+    console.error('[cron] Failed to acquire sync-all-metrics lock:', lockErr);
+    return c.json({ error: 'Failed to acquire lock' }, 500);
+  }
 
   try {
   const results: Array<{ connection_id: string; platform: string; status: string; error?: string }> = [];

@@ -166,7 +166,7 @@ export async function syncShopifyMetrics(c: Context) {
 
     for (const order of orders || []) {
       // Only count paid/partially-paid orders for revenue (exclude cancelled, refunded, voided, pending)
-      const fs = order.financial_status || '';
+      const fs = String(order.financial_status || '');
       if (fs === 'refunded' || fs === 'voided' || fs === 'cancelled') continue;
 
       const date = order.created_at.split('T')[0];
@@ -177,6 +177,7 @@ export async function syncShopifyMetrics(c: Context) {
       }
 
       const originalAmount = parseFloat(order.total_price);
+      if (isNaN(originalAmount)) continue;
       const amountCLP = await convertToCLP(originalAmount, orderCurrency);
 
       dailyMetrics[date].revenue += amountCLP;

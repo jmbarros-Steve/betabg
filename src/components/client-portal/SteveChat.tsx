@@ -184,6 +184,8 @@ interface SteveChatProps {
 
 export function SteveChat({ clientId }: SteveChatProps) {
   const { user } = useAuth();
+  // NOTE: messages array grows without limit for the session lifetime.
+  // Brief conversations are capped at ~17 Q&A pairs so this is acceptable.
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -210,10 +212,17 @@ export function SteveChat({ clientId }: SteveChatProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const photosInputRef = useRef<HTMLInputElement>(null);
+  const analysisTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Auto-save brief progress as draft
   const draftData = { input, progress, acceptedResponses };
   useDraftSaver(`brief_${clientId}`, draftData, 30000);
+
+  useEffect(() => {
+    return () => {
+      if (analysisTimerRef.current) clearTimeout(analysisTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     initializeConversation();
@@ -620,7 +629,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
       setShowCelebration(true);
       toast.success('Análisis completado');
       // Keep the "done" phase visible for a few seconds, then hide
-      setTimeout(() => {
+      analysisTimerRef.current = setTimeout(() => {
         setIsAnalyzing(false);
         setAnalysisPhase(null);
       }, 5000);

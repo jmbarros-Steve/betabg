@@ -116,7 +116,7 @@ export async function waSendMessage(c: Context) {
     }
 
     // Save message
-    await supabase.from('wa_messages').insert({
+    const { error: msgErr } = await supabase.from('wa_messages').insert({
       client_id,
       channel: 'merchant_wa',
       direction: 'outbound',
@@ -127,6 +127,7 @@ export async function waSendMessage(c: Context) {
       contact_phone: cleanPhone,
       credits_used: 1,
     });
+    if (msgErr) console.error('[send-message] wa_messages insert failed:', msgErr);
 
     // Update conversation
     await supabase.from('wa_conversations')

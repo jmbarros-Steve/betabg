@@ -7,6 +7,18 @@ export async function generateBriefVisual(c: Context) {
 
   const supabase = getSupabaseAdmin();
 
+  const user = c.get('user');
+  if (!user) return c.json({ error: 'Unauthorized' }, 401);
+  if (!clientId) return c.json({ error: 'clientId is required' }, 400);
+
+  const { data: ownerCheck } = await supabase
+    .from('clients')
+    .select('id')
+    .eq('id', clientId)
+    .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+    .maybeSingle();
+  if (!ownerCheck) return c.json({ error: 'No tienes acceso a este cliente' }, 403);
+
   const [briefRes, personaRes, shopifyProductsRes, clientRes] = await Promise.all([
     supabase.from('brand_research').select('research_data').eq('client_id', clientId).eq('research_type', 'brand_brief').maybeSingle(),
     supabase.from('buyer_personas').select('persona_data').eq('client_id', clientId).eq('is_complete', true).maybeSingle(),

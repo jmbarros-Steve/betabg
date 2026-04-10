@@ -16,6 +16,17 @@ export async function checkClientConnections(c: Context) {
       return c.json({ error: 'client_id required' }, 400);
     }
 
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { data: ownerCheck } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('id', client_id)
+      .or(`user_id.eq.${user.id},client_user_id.eq.${user.id}`)
+      .maybeSingle();
+    if (!ownerCheck) return c.json({ error: 'No tienes acceso a este cliente' }, 403);
+
     const { data: connections, error } = await supabase
       .from('platform_connections')
       .select('id, platform, is_active')
