@@ -29,7 +29,7 @@ export async function socialPostGenerator(c: Context) {
   }
 
   const supabase = getSupabaseAdmin();
-  const results = { generated: 0, rejected: 0, errors: 0, chain_replies: 0, agents_posted: [] as string[], ext_generated: 0, ext_errors: 0, sleeping_generated: 0 };
+  const results = { generated: 0, rejected: 0, errors: 0, chain_replies: 0, agents_posted: [] as string[], ext_generated: 0, ext_errors: 0, sleeping_generated: 0, reactions: 0 };
 
   try {
     // ── Feed-aware: read last 20 posts for context ──
@@ -411,6 +411,61 @@ export async function socialPostGenerator(c: Context) {
       }
     } catch (sleepFatalErr) {
       console.error('[social-post-gen] Sleeping agents fatal error:', sleepFatalErr);
+    }
+
+    // ── Agent reactions — agents react to each other's posts ──
+    try {
+      const sixHoursAgo = new Date(Date.now() - 6 * 3600_000).toISOString();
+      const { data: reactablePosts } = await supabase
+        .from('social_posts')
+        .select('id, agent_code')
+        .is('is_reply_to', null)
+        .eq('moderation_status', 'approved')
+        .gte('created_at', sixHoursAgo)
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      if (reactablePosts && reactablePosts.length > 0) {
+        // Weighted reaction distribution: fire(40%) brain(25%) bullseye(20%) skull(10%) trash(5%)
+        const REACTION_WEIGHTS = [
+          { reaction: 'fire', weight: 40 },
+          { reaction: 'brain', weight: 25 },
+          { reaction: 'bullseye', weight: 20 },
+          { reaction: 'skull', weight: 10 },
+          { reaction: 'trash', weight: 5 },
+        ];
+        const totalWeight = REACTION_WEIGHTS.reduce((s, r) => s + r.weight, 0);
+
+        const pickReaction = (): string => {
+          let rand = Math.random() * totalWeight;
+          for (const r of REACTION_WEIGHTS) {
+            rand -= r.weight;
+            if (rand <= 0) return r.reaction;
+          }
+          return 'fire';
+        };
+
+        for (const agent of AGENTS) {
+          for (const post of reactablePosts) {
+            // Don't react to own posts
+            if (post.agent_code === agent.code) continue;
+            // 25% chance to react to any given post
+            if (Math.random() > 0.25) continue;
+
+            const reaction = pickReaction();
+            const { error: reactErr } = await supabase
+              .from('social_reactions')
+              .upsert(
+                { post_id: post.id, fingerprint: `agent_${agent.code}`, reaction },
+                { onConflict: 'post_id,fingerprint,reaction' },
+              );
+
+            if (!reactErr) results.reactions++;
+          }
+        }
+      }
+    } catch (reactFatalErr) {
+      console.error('[social-post-gen] Reactions fatal error:', reactFatalErr);
     }
 
     console.log('[social-post-gen] Done:', JSON.stringify(results));
