@@ -553,15 +553,16 @@ async function handleCreate(
       console.log(`[manage-meta-campaign] Creating Dynamic Creative (flexible) with ${allImages.length} images, ${allTexts.length} texts, ${allHeadlines.length} headlines`);
 
       // Upload images in parallel to get hashes
-      const uploadResults = await Promise.all(
+      const uploadSettled = await Promise.allSettled(
         allImages.filter(Boolean).map(imgUrl => uploadImageFromUrl(accountId, accessToken, imgUrl))
       );
       const imageHashes: string[] = [];
-      for (const upload of uploadResults) {
-        if (upload.ok && upload.hash) {
-          imageHashes.push(upload.hash);
+      for (const result of uploadSettled) {
+        if (result.status === 'fulfilled' && result.value.ok && result.value.hash) {
+          imageHashes.push(result.value.hash);
         } else {
-          console.warn(`[manage-meta-campaign] Image upload failed: ${upload.error}`);
+          const reason = result.status === 'rejected' ? result.reason?.message : (result.value as any).error;
+          console.warn(`[manage-meta-campaign] Image upload failed: ${reason}`);
         }
       }
 
@@ -644,15 +645,16 @@ async function handleCreate(
       console.log(`[manage-meta-campaign] Creating Carousel creative with ${allImages.length} images`);
 
       // Upload images in parallel to get hashes
-      const uploadResults = await Promise.all(
+      const carouselUploadSettled = await Promise.allSettled(
         allImages.filter(Boolean).map(imgUrl => uploadImageFromUrl(accountId, accessToken, imgUrl))
       );
       const imageHashes: string[] = [];
-      for (const upload of uploadResults) {
-        if (upload.ok && upload.hash) {
-          imageHashes.push(upload.hash);
+      for (const result of carouselUploadSettled) {
+        if (result.status === 'fulfilled' && result.value.ok && result.value.hash) {
+          imageHashes.push(result.value.hash);
         } else {
-          console.warn(`[manage-meta-campaign] Image upload failed: ${upload.error}`);
+          const reason = result.status === 'rejected' ? result.reason?.message : (result.value as any).error;
+          console.warn(`[manage-meta-campaign] Image upload failed: ${reason}`);
         }
       }
 
@@ -675,8 +677,8 @@ async function handleCreate(
       const childAttachments = imageHashes.map((hash, i) => ({
         image_hash: hash,
         link: destUrl,
-        name: allHeadlines[i] || allHeadlines[0] || '',
-        description: allDescriptions[i] || allDescriptions[0] || '',
+        name: allHeadlines.length > 0 ? allHeadlines[i % allHeadlines.length] : '',
+        description: allDescriptions.length > 0 ? allDescriptions[i % allDescriptions.length] : '',
       }));
 
       const carouselStorySpec: Record<string, any> = {
@@ -1675,8 +1677,13 @@ export async function manageMetaCampaign(c: Context) {
           channel: 'meta',
           type: 'meta_campaign',
           angle,
-          content_summary: copyText.substring(0, 200),
-          copy_text: copyText.substring(0, 2000),
+          content_summary: Array.from(copyText).slice(0, 200).join(''),
+          copy_text: (() => {
+            if (copyText.length > 2000) {
+              console.warn(`[manage-meta-campaign] copy_text truncated from ${copyText.length} to 2000 chars for creative_history`);
+            }
+            return Array.from(copyText).slice(0, 2000).join('');
+          })(),
           entity_type: 'meta_campaign',
           entity_id: result.body.campaign_id,
           meta_campaign_id: result.body.campaign_id,

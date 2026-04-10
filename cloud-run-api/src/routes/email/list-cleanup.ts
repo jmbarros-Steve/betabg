@@ -81,7 +81,7 @@ export async function emailListCleanup(c: Context) {
         query = query.or(`last_engaged_at.is.null,last_engaged_at.lt.${cutoffDate}`);
       }
 
-      const { data: toSunset, error: fetchErr } = await query;
+      const { data: toSunset, error: fetchErr } = await query.limit(10000);
       if (fetchErr) return c.json({ error: fetchErr.message }, 500);
       if (!toSunset || toSunset.length === 0) {
         return c.json({ updated: 0, message: 'No inactive subscribers found' });

@@ -74,7 +74,7 @@ export async function manageEmailCampaigns(c: Context) {
       const { status, limit = 50, offset = 0 } = body;
       let query = supabase
         .from('email_campaigns')
-        .select('*', { count: 'exact' })
+        .select('id,name,subject,status,from_name,from_email,preview_text,audience_filter,recommendation_config,total_recipients,sent_count,open_count,click_count,bounce_count,unsubscribe_count,scheduled_at,sent_at,created_at,updated_at', { count: 'exact' })
         .eq('client_id', client_id)
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);

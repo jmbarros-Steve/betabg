@@ -46,7 +46,7 @@ export async function productRecommendations(c: Context) {
       const products = await getProductCatalog(supabase, client_id);
       let subscriber = null;
       if (subscriber_id) {
-        const { data, error } = await supabase.from('email_subscribers').select('*').eq('id', subscriber_id).single();
+        const { data, error } = await supabase.from('email_subscribers').select('id,email,first_name,last_name,client_id,status,tags,total_orders,total_spent,last_order_at,metadata').eq('id', subscriber_id).single();
         if (!error) subscriber = data;
       }
 
@@ -568,7 +568,7 @@ export async function replaceProductRecommendations(
 
   let subscriber = null;
   if (subscriberId) {
-    const { data, error } = await supabase.from('email_subscribers').select('*').eq('id', subscriberId).single();
+    const { data, error } = await supabase.from('email_subscribers').select('id,email,first_name,last_name,client_id,status,tags,total_orders,total_spent,last_order_at,metadata').eq('id', subscriberId).single();
     if (!error) subscriber = data;
   }
 

@@ -66,7 +66,7 @@ export async function waActionProcessor(c: Context) {
   // Now SELECT only the actions claimed by this batch
   const { data: actions, error } = await supabase
     .from('wa_pending_actions')
-    .select('*')
+    .select('id,action_type,phone,payload,status,attempts,max_attempts,scheduled_at,started_at,completed_at,error_message')
     .eq('status', 'processing')
     .eq('error_message', `batch:${batchId}`)
     .order('scheduled_at', { ascending: true })
@@ -199,6 +199,12 @@ async function executeAction(action: any, supabase: any): Promise<void> {
 
     case 'send_video_demo':
       await handleSendVideoDemo(phone, payload, supabase);
+      break;
+
+    case 'process_prospect_recovery':
+      // Bug #201 fix: handle recovery action — log and let next inbound message trigger full processing
+      console.log('[action-processor] Recovery for prospect:', payload?.prospect_id);
+      // Mark as handled — the next inbound message will trigger full processing
       break;
 
     default:

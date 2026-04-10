@@ -208,6 +208,7 @@ export async function fetchShopifyProducts(c: Context) {
       const batchSize = 100;
       for (let i = 0; i < inventoryItemIds.length; i += batchSize) {
         const batchIds = inventoryItemIds.slice(i, i + batchSize).join(',');
+        if (!batchIds) continue;
         const invUrl = `https://${cleanStoreUrl}/admin/api/2024-01/inventory_items.json?ids=${batchIds}`;
 
         const invController = new AbortController();

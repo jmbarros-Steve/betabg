@@ -75,7 +75,7 @@ export async function taskCompleted(c: Context) {
   // Fetch the task
   const { data: task, error: taskError } = await supabase
     .from('tasks')
-    .select('*')
+    .select('id,title,description,type,source,assigned_squad,assigned_agent,priority,status,spec,result,completed_at')
     .eq('id', task_id)
     .single();
 

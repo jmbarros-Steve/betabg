@@ -549,16 +549,18 @@ export async function emailCampaignAnalytics(c: Context) {
       // Estimate percentile based on e-commerce benchmarks
       const ecom = industry_avg.ecommerce;
       const estimatePercentile = (clientVal: number, avg: number, top25: number, lowerIsBetter = false) => {
+        let result: number;
         if (lowerIsBetter) {
-          if (clientVal <= top25) return Math.min(95, 75 + ((top25 - clientVal) / top25) * 20);
-          if (clientVal <= avg) return 50 + ((avg - clientVal) / (avg - top25)) * 25;
-          return Math.max(5, 50 - ((clientVal - avg) / avg) * 50);
+          if (clientVal <= top25) result = Math.min(95, 75 + ((top25 - clientVal) / top25) * 20);
+          else if (clientVal <= avg) result = 50 + ((avg - clientVal) / (avg - top25)) * 25;
+          else result = Math.max(5, 50 - ((clientVal - avg) / avg) * 50);
         } else {
-          if (clientVal >= top25) return Math.min(95, 75 + ((clientVal - top25) / top25) * 20);
-          if (clientVal >= avg) return 50 + ((clientVal - avg) / (top25 - avg)) * 25;
-          if (avg === 0) return 50;
-          return Math.max(5, (clientVal / avg) * 50);
+          if (clientVal >= top25) result = Math.min(95, 75 + ((clientVal - top25) / top25) * 20);
+          else if (clientVal >= avg) result = 50 + ((clientVal - avg) / (top25 - avg)) * 25;
+          else if (avg === 0) result = 50;
+          else result = Math.max(5, (clientVal / avg) * 50);
         }
+        return isNaN(result) ? 50 : Math.min(95, result);
       };
 
       const percentile_estimates = {

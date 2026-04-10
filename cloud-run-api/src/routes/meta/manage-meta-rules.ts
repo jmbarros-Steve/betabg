@@ -273,7 +273,8 @@ export async function manageMetaRules(c: Context) {
         .select('*')
         .eq('client_id', client_id)
         .eq('connection_id', connection_id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(500);
 
       if (rulesError) {
         console.error('[manage-meta-rules] List error:', rulesError);
@@ -446,7 +447,8 @@ export async function manageMetaRules(c: Context) {
             .select('*')
             .eq('connection_id', connection_id)
             .gte('metric_date', since)
-            .lte('metric_date', until);
+            .lte('metric_date', until)
+            .limit(50000);
           if (metricsError || !fetched?.length) continue;
           metrics = fetched;
           metricsCache.set(cacheKey, metrics);

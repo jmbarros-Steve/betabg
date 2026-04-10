@@ -76,7 +76,7 @@ export async function errorBudgetCalculator(c: Context) {
       query = query.eq('evaluated_by', queryDef.evaluated_by);
     }
 
-    const { data: checkResults, error: queryError } = await query;
+    const { data: checkResults, error: queryError } = await query.limit(10000);
 
     if (queryError) {
       console.error(`[error-budget] Query error for ${slo.id}:`, queryError);
