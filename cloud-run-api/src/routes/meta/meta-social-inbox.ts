@@ -686,7 +686,7 @@ export async function metaSocialInbox(c: Context) {
       `)
       .eq('id', connection_id)
       .eq('platform', 'meta')
-      .single();
+      .maybeSingle();
 
     if (connError || !connection) {
       return c.json({ error: 'Connection not found' }, 404);

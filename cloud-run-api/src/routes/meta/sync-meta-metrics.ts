@@ -32,7 +32,7 @@ async function validateShopifySessionToken(
       .from('clients')
       .select('id, client_user_id, user_id')
       .eq('shop_domain', shopDomain)
-      .single();
+      .maybeSingle();
 
     if (error || !client) {
       return { valid: false, error: 'Shop not found in database' };

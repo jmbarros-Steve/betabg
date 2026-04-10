@@ -1460,7 +1460,7 @@ export async function manageMetaCampaign(c: Context) {
       `)
       .eq('id', connection_id)
       .eq('platform', 'meta')
-      .single();
+      .maybeSingle();
 
     if (connError || !connection) {
       console.error('[manage-meta-campaign] Connection fetch error:', connError);

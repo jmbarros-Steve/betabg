@@ -96,12 +96,13 @@ async function handleOverview(
   pageInfo: any, dateFrom?: string, dateTo?: string,
 ) {
   const now = new Date();
-  const since = dateFrom
-    ? Math.floor(new Date(dateFrom).getTime() / 1000)
-    : Math.floor(new Date(now.getTime() - 30 * 86400000).getTime() / 1000);
-  const until = dateTo
-    ? Math.floor(new Date(dateTo).getTime() / 1000)
-    : Math.floor(now.getTime() / 1000);
+  const sinceDate = dateFrom ? new Date(dateFrom) : new Date(now.getTime() - 30 * 86400000);
+  const untilDate = dateTo ? new Date(dateTo) : now;
+  if (isNaN(sinceDate.getTime()) || isNaN(untilDate.getTime())) {
+    return c.json({ error: 'Invalid date format' }, 400);
+  }
+  const since = Math.floor(sinceDate.getTime() / 1000);
+  const until = Math.floor(untilDate.getTime() / 1000);
 
   // Page insights (daily) — Graph API v21 valid metrics
   // Deprecated in v21: page_impressions, page_engaged_users, page_fans, page_fan_adds

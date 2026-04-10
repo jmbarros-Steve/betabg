@@ -564,7 +564,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
     const data: Record<string, number> = {};
     if (!isNaN(roas) && roas > 0) data.roas = roas;
     if (!isNaN(cpa) && cpa > 0) data.cpa = cpa;
-    localStorage.setItem(goalsKey, JSON.stringify(data));
+    try { localStorage.setItem(goalsKey, JSON.stringify(data)); } catch { /* storage full or unavailable */ }
     setGoalsOpen(false);
     toast.success('Metas guardadas');
   }

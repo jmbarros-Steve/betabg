@@ -243,7 +243,7 @@ export async function manageMetaRules(c: Context) {
       .select('id, clients!inner(user_id, client_user_id)')
       .eq('id', connection_id)
       .eq('client_id', client_id)
-      .single();
+      .maybeSingle();
 
     if (connCheckErr || !connCheck) {
       return c.json({ error: 'Connection not found' }, 404);
@@ -411,10 +411,14 @@ export async function manageMetaRules(c: Context) {
         .select('id, account_id, access_token_encrypted, connection_type')
         .eq('id', connection_id)
         .eq('platform', 'meta')
-        .single();
+        .maybeSingle();
 
       if (connError || !connection) {
         return c.json({ error: 'Connection not found' }, 404);
+      }
+
+      if (!connection.account_id) {
+        return c.json({ error: 'Connection missing account_id' }, 400);
       }
 
       const decryptedToken = await getTokenForConnection(supabase, connection);
@@ -423,7 +427,7 @@ export async function manageMetaRules(c: Context) {
         return c.json({ error: 'Failed to resolve token' }, 500);
       }
 
-      const accountId = connection.account_id!.replace(/^act_/, '');
+      const accountId = connection.account_id.replace(/^act_/, '');
       let totalExecuted = 0;
       const results: any[] = [];
 

@@ -36,7 +36,7 @@ export async function syncKlaviyoToMetaAudience(c: Context) {
         .select('id, api_key_encrypted, client_id, clients!inner(user_id, client_user_id)')
         .eq('id', klaviyo_connection_id)
         .eq('platform', 'klaviyo')
-        .single(),
+        .maybeSingle(),
       null,
       'syncKlaviyoToMetaAudience.getKlaviyoConnection',
     );
@@ -69,7 +69,7 @@ export async function syncKlaviyoToMetaAudience(c: Context) {
         .select('id, account_id, access_token_encrypted, connection_type, client_id')
         .eq('id', meta_connection_id)
         .eq('platform', 'meta')
-        .single(),
+        .maybeSingle(),
       null,
       'syncKlaviyoToMetaAudience.getMetaConnection',
     );
@@ -107,7 +107,8 @@ export async function syncKlaviyoToMetaAudience(c: Context) {
         break;
       }
 
-      const data: any = await res.json();
+      let data: any;
+      try { data = await res.json(); } catch { break; }
       for (const profile of (data.data || [])) {
         const email = profile.attributes?.email;
         if (email) emails.push(email.toLowerCase().trim());
@@ -150,6 +151,7 @@ export async function syncKlaviyoToMetaAudience(c: Context) {
     // 5. Hash emails and upload to audience in batches of 10000
     const BATCH_SIZE = 10000;
     let totalUploaded = 0;
+    let failedBatches = 0;
 
     for (let i = 0; i < emails.length; i += BATCH_SIZE) {
       const batch = emails.slice(i, i + BATCH_SIZE);
@@ -176,19 +178,23 @@ export async function syncKlaviyoToMetaAudience(c: Context) {
       if (uploadRes.ok) {
         totalUploaded += batch.length;
       } else {
-        const errData: any = await uploadRes.json();
+        let errData: any;
+        try { errData = await uploadRes.json(); } catch { errData = { error: { message: `HTTP ${uploadRes.status}` } }; }
         console.error(`[sync-klaviyo-meta] Upload batch error:`, errData);
+        failedBatches++;
       }
     }
 
-    console.log(`[sync-klaviyo-meta] Uploaded ${totalUploaded}/${emails.length} emails to audience ${audienceId}`);
+    console.log(`[sync-klaviyo-meta] Uploaded ${totalUploaded}/${emails.length} emails to audience ${audienceId} (${failedBatches} batches failed)`);
 
     return c.json({
-      success: true,
+      success: failedBatches === 0,
       audience_id: audienceId,
       audience_name,
       profiles_found: emails.length,
       profiles_uploaded: totalUploaded,
+      failed_batches: failedBatches > 0 ? failedBatches : undefined,
+      warning: failedBatches > 0 ? `${failedBatches} batch(es) failed to upload` : undefined,
     });
 
   } catch (err: any) {

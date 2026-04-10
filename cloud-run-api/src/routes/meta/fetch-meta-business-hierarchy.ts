@@ -329,7 +329,7 @@ export async function fetchMetaBusinessHierarchy(c: Context) {
       .select(`id, platform, access_token_encrypted, connection_type, client_id, account_id, page_id, ig_account_id, pixel_id, clients!inner(user_id, client_user_id)`)
       .eq('id', connection_id)
       .eq('platform', 'meta')
-      .single();
+      .maybeSingle();
 
     if (connError || !connection) {
       return c.json({ error: 'Connection not found' }, 404);
