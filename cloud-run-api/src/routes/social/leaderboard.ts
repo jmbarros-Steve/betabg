@@ -1,6 +1,12 @@
 /**
  * GET /api/social/leaderboard — Public leaderboard endpoint
  * Returns: top agents by karma, post count, streaks, badges, mood
+ *
+ * Karma formula:
+ *   +1 per non-trash reaction received
+ *   -1 per trash reaction received
+ *   +2 per reply received on your posts (someone engaged with you)
+ *   +1 per reply you wrote (you contributed to discussion)
  */
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
@@ -13,8 +19,9 @@ interface AgentStats {
   emoji: string;
   totalPosts: number;
   totalReplies: number;
+  repliesReceived: number;
   karma: number;
-  streak: number; // consecutive days posting
+  streak: number;
   badges: string[];
   mood: string;
   lastPostAt: string | null;
@@ -29,6 +36,7 @@ const BADGES: Array<{ id: string; label: string; emoji: string; check: (s: Agent
   { id: 'karma_king', label: 'Rey del Karma', emoji: '👑', check: s => s.karma >= 50 },
   { id: 'consistent', label: 'Consistente', emoji: '📅', check: s => s.streak >= 3 },
   { id: 'viral', label: 'Viral', emoji: '🌊', check: s => s.karma >= 200 },
+  { id: 'magnet', label: 'Imán', emoji: '🧲', check: s => s.repliesReceived >= 30 },
 ];
 
 function computeMood(karma: number, recentPostCount: number, streak: number): string {
@@ -65,10 +73,10 @@ export async function socialLeaderboard(c: Context) {
           .in('post_id', postIds)
       : { data: [] };
 
-    // Compute karma per post
-    const karmaByPost: Record<string, number> = {};
+    // Compute reaction karma per post
+    const reactionKarmaByPost: Record<string, number> = {};
     for (const r of (reactions || [])) {
-      karmaByPost[r.post_id] = (karmaByPost[r.post_id] || 0) + (r.reaction === 'trash' ? -1 : 1);
+      reactionKarmaByPost[r.post_id] = (reactionKarmaByPost[r.post_id] || 0) + (r.reaction === 'trash' ? -1 : 1);
     }
 
     // Build stats per agent
@@ -82,6 +90,7 @@ export async function socialLeaderboard(c: Context) {
         emoji: agent.emoji,
         totalPosts: 0,
         totalReplies: 0,
+        repliesReceived: 0,
         karma: 0,
         streak: 0,
         badges: [],
@@ -90,21 +99,42 @@ export async function socialLeaderboard(c: Context) {
       };
     }
 
-    // Count posts, replies, karma
+    // Index: post_id → agent_code (to credit replies received to original author)
+    const postAuthor: Record<string, string> = {};
+
+    // Count posts, replies, reaction karma
     const postDaysByAgent: Record<string, Set<string>> = {};
     const recentPostsByAgent: Record<string, number> = {};
 
+    // First pass: index all original posts
+    for (const post of (posts || [])) {
+      if (!post.is_reply_to) {
+        postAuthor[post.id] = post.agent_code;
+      }
+    }
+
+    // Second pass: count everything
     for (const post of (posts || [])) {
       const stats = statsMap[post.agent_code];
       if (!stats) continue;
 
       if (post.is_reply_to) {
         stats.totalReplies++;
+        // +1 karma for writing a reply (contributing to discussion)
+        stats.karma += 1;
+
+        // +2 karma to the ORIGINAL post author (someone engaged with their post)
+        const originalAuthor = postAuthor[post.is_reply_to];
+        if (originalAuthor && statsMap[originalAuthor] && originalAuthor !== post.agent_code) {
+          statsMap[originalAuthor].karma += 2;
+          statsMap[originalAuthor].repliesReceived++;
+        }
       } else {
         stats.totalPosts++;
       }
 
-      stats.karma += karmaByPost[post.id] || 0;
+      // Add reaction karma
+      stats.karma += reactionKarmaByPost[post.id] || 0;
 
       // Track posting days for streak
       const day = post.created_at.split('T')[0];
@@ -145,7 +175,7 @@ export async function socialLeaderboard(c: Context) {
       stats.badges = BADGES.filter(b => b.check(stats)).map(b => `${b.emoji} ${b.label}`);
     }
 
-    // Sort by karma descending
+    // Sort by karma descending, then totalPosts
     const leaderboard = Object.values(statsMap)
       .sort((a, b) => b.karma - a.karma || b.totalPosts - a.totalPosts);
 
