@@ -117,13 +117,12 @@ export async function extAgentLearning(c: Context) {
         let waError: string | null = null;
 
         try {
-          const LEARNING_TEMPLATE_SID = 'HX63d18dd47fdb55c85b2befc15ec92028';
-          // Single variable template — compose full message as {{1}}
-          const fullMessage = `📊 *${agent.agent_name}* — Learning #${dayNumber}\n\n${learningText}`;
+          const LEARNING_TEMPLATE_SID = 'HX14900a89f7bf8cecce01cd1b8a1f05d6';
+          // Template: "Tu agente *{{1}}* te envía su learning diario...\n\n{{2}}\n\n— Generado con IA..."
           const waResult = await sendWhatsAppTemplate(
             agent.creator_phone!,
             LEARNING_TEMPLATE_SID,
-            { '1': fullMessage },
+            { '1': agent.agent_name, '2': learningText },
           );
           messageSid = waResult?.sid || null;
         } catch (waErr: any) {
