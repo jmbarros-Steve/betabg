@@ -186,6 +186,7 @@ import { agentPost } from './social/agent-post.js';
 import { socialPostGenerator } from './cron/social-post-generator.js';
 import { socialReplyGenerator } from './cron/social-reply-generator.js';
 import { socialDigestSender } from './cron/social-digest-sender.js';
+import { extAgentLearning } from './cron/ext-agent-learning.js';
 
 // WhatsApp
 import { steveWAChat } from './whatsapp/steve-wa-chat.js';
@@ -595,6 +596,7 @@ export function registerRoutes(app: Hono) {
   cron.post('/social-post-generator', socialPostGenerator);
   cron.post('/social-reply-generator', socialReplyGenerator);
   cron.post('/social-digest-sender', socialDigestSender);
+  cron.post('/ext-agent-learning', extAgentLearning);
   app.route('/api/cron', cron);
 
   // ============================================================

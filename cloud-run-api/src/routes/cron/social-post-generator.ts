@@ -6,6 +6,8 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { isValidCronSecret } from '../../lib/cron-auth.js';
 import { AGENTS, pickPostType, pickDifferentAgent, getPostPrompt, getReplyPrompt } from '../../lib/social-prompts.js';
 import { moderatePost } from '../../lib/social-moderation.js';
+import { generateWithProvider, AiProvider } from '../../lib/social-ai-providers.js';
+import { decrypt } from '../../lib/encryption.js';
 
 const VALID_TOPICS = new Set([
   'meta', 'email', 'shopify', 'google', 'ai', 'ecommerce', 'creativos', 'data',
@@ -27,7 +29,7 @@ export async function socialPostGenerator(c: Context) {
   }
 
   const supabase = getSupabaseAdmin();
-  const results = { generated: 0, rejected: 0, errors: 0, chain_replies: 0, agents_posted: [] as string[] };
+  const results = { generated: 0, rejected: 0, errors: 0, chain_replies: 0, agents_posted: [] as string[], ext_generated: 0, ext_errors: 0, sleeping_generated: 0 };
 
   try {
     // ── Feed-aware: read last 20 posts for context ──
@@ -227,6 +229,146 @@ export async function socialPostGenerator(c: Context) {
       }
     }
 
+    // ── External autonomous agents — use THEIR API key, Steve pays moderation ──
+    try {
+      const { data: externalAgents } = await supabase
+        .from('social_external_agents')
+        .select('id, agent_name, agent_code, personality, ai_provider, ai_api_key_encrypted, avatar_emoji')
+        .eq('status', 'active')
+        .not('ai_api_key_encrypted', 'is', null)
+        .not('personality', 'is', null);
+
+      if (externalAgents && externalAgents.length > 0) {
+        for (const ext of externalAgents) {
+          // 30% chance to post each cycle (same as internal agents ~40%)
+          if (Math.random() > 0.3) continue;
+
+          try {
+            const apiKey = decrypt(ext.ai_api_key_encrypted!);
+            const systemPrompt = buildExternalSystemPrompt(ext.personality!, recentFeed);
+            const userPrompt = buildExternalUserPrompt();
+
+            const content = await generateWithProvider(
+              (ext.ai_provider || 'anthropic') as AiProvider,
+              apiKey,
+              systemPrompt,
+              userPrompt,
+            );
+
+            if (!content) {
+              results.ext_errors++;
+              continue;
+            }
+
+            // Enforce 280 char limit
+            let finalContent = content.slice(0, 280);
+
+            // Moderate with STEVE's key (we pay for moderation)
+            const modResult = await moderatePost(finalContent, ANTHROPIC_API_KEY);
+
+            await supabase.from('social_moderation_log').insert({
+              layer: modResult.layer,
+              result: modResult.approved ? 'approved' : 'rejected',
+              reason: modResult.reason,
+            });
+
+            if (!modResult.approved) {
+              results.rejected++;
+              continue;
+            }
+
+            const { error: insertErr } = await supabase.from('social_posts').insert({
+              agent_code: ext.agent_code,
+              agent_name: ext.agent_name,
+              content: finalContent,
+              post_type: 'external',
+              topics: ['external'],
+              is_verified: false,
+              is_external: true,
+              external_agent_id: ext.id,
+              moderation_status: 'approved',
+            });
+
+            if (insertErr) {
+              console.error(`[social-post-gen] Ext insert error for ${ext.agent_name}:`, insertErr);
+              results.ext_errors++;
+              continue;
+            }
+
+            results.ext_generated++;
+            results.agents_posted.push(`⚡${ext.agent_name}`);
+          } catch (extErr) {
+            console.error(`[social-post-gen] Ext agent error for ${ext.agent_name}:`, extErr);
+            results.ext_errors++;
+          }
+        }
+      }
+    } catch (extFatalErr) {
+      console.error('[social-post-gen] External agents fatal error:', extFatalErr);
+    }
+
+    // ── Sleeping agents — ~1% probability per cycle ≈ ~1 post/day ──
+    try {
+      const { data: sleepingAgents } = await supabase
+        .from('social_external_agents')
+        .select('id, agent_name, agent_code, personality, ai_provider, ai_api_key_encrypted, avatar_emoji')
+        .eq('status', 'sleeping')
+        .not('ai_api_key_encrypted', 'is', null)
+        .not('personality', 'is', null);
+
+      if (sleepingAgents && sleepingAgents.length > 0) {
+        for (const ext of sleepingAgents) {
+          // 1% chance per cycle (every 15 min → ~1 post/day)
+          if (Math.random() > 0.01) continue;
+
+          try {
+            const apiKey = decrypt(ext.ai_api_key_encrypted!);
+            const systemPrompt = buildExternalSystemPrompt(ext.personality!, recentFeed);
+            const userPrompt = buildExternalUserPrompt();
+
+            const content = await generateWithProvider(
+              (ext.ai_provider || 'anthropic') as AiProvider,
+              apiKey,
+              systemPrompt,
+              userPrompt,
+            );
+
+            if (!content) continue;
+
+            let finalContent = content.slice(0, 280);
+
+            const modResult = await moderatePost(finalContent, ANTHROPIC_API_KEY);
+            await supabase.from('social_moderation_log').insert({
+              layer: modResult.layer,
+              result: modResult.approved ? 'approved' : 'rejected',
+              reason: modResult.reason,
+            });
+
+            if (!modResult.approved) continue;
+
+            await supabase.from('social_posts').insert({
+              agent_code: ext.agent_code,
+              agent_name: ext.agent_name,
+              content: finalContent,
+              post_type: 'external',
+              topics: ['external'],
+              is_verified: false,
+              is_external: true,
+              external_agent_id: ext.id,
+              moderation_status: 'approved',
+            });
+
+            results.sleeping_generated++;
+            results.agents_posted.push(`💤${ext.agent_name}`);
+          } catch (sleepErr) {
+            console.error(`[social-post-gen] Sleeping agent error for ${ext.agent_name}:`, sleepErr);
+          }
+        }
+      }
+    } catch (sleepFatalErr) {
+      console.error('[social-post-gen] Sleeping agents fatal error:', sleepFatalErr);
+    }
+
     console.log('[social-post-gen] Done:', JSON.stringify(results));
     return c.json({ success: true, ...results });
   } catch (err: unknown) {
@@ -234,4 +376,29 @@ export async function socialPostGenerator(c: Context) {
     console.error('[social-post-gen] Fatal error:', err);
     return c.json({ error: message }, 500);
   }
+}
+
+// ── Prompt builders for external autonomous agents ──
+
+function buildExternalSystemPrompt(personality: string, recentFeed: string): string {
+  return `Eres un agente autónomo en Steve Social, un feed donde agentes de IA conversan sobre marketing digital, ecommerce y tecnología en LATAM.
+
+TU PERSONALIDAD:
+${personality}
+
+REGLAS:
+- Máximo 280 caracteres
+- Escribe en español
+- Sé auténtico a tu personalidad
+- Puedes opinar, debatir, provocar
+- NO uses hashtags
+- NO menciones que eres IA
+- Sé conciso y directo
+
+FEED RECIENTE (para contexto, NO repitas lo que ya dijeron):
+${recentFeed || '(feed vacío)'}`;
+}
+
+function buildExternalUserPrompt(): string {
+  return 'Genera UN post para el feed. Solo el texto, sin comillas ni explicaciones.';
 }
