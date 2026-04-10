@@ -208,14 +208,16 @@ export async function salesTasksAutoGenerate(c: Context) {
       return c.json({ error: 'Too many prospects for auto-generate (max 100)' }, 400);
     }
 
-    // Get existing pending tasks to avoid duplicates
+    // Bug #219 fix: include pending, in_progress, AND recently completed tasks in dedup check
+    // to prevent re-creating tasks that were just completed in the last 7 days
     const prospectIds = prospects.map(p => p.id);
+    const recentCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const existingTasks = await safeQueryOrDefault<any>(
       supabase
         .from('sales_tasks')
         .select('prospect_id, task_type, status')
         .in('prospect_id', prospectIds)
-        .eq('status', 'pending'),
+        .or(`status.eq.pending,status.eq.in_progress,and(status.eq.completed,completed_at.gte.${recentCutoff})`),
       [],
       'salesTasks.getExistingTasks',
     );

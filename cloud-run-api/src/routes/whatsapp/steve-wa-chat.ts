@@ -394,7 +394,11 @@ export async function steveWAChat(c: Context) {
         const MAX_AUDIO_BYTES = 5 * 1024 * 1024; // 5MB ≈ 2-3 min
         let okToTranscribe = true;
         try {
-          const headRes = await fetch(mediaUrl, { method: 'HEAD' });
+          // Bug #191 fix: Add Twilio auth header to HEAD request (same as downloadImageForVision)
+          const twilioSidHead = process.env.TWILIO_ACCOUNT_SID || '';
+          const twilioTokenHead = process.env.TWILIO_AUTH_TOKEN || '';
+          const authHeaderHead = 'Basic ' + Buffer.from(`${twilioSidHead}:${twilioTokenHead}`).toString('base64');
+          const headRes = await fetch(mediaUrl, { method: 'HEAD', headers: { Authorization: authHeaderHead } });
           const cl = headRes.headers.get('content-length');
           if (cl && parseInt(cl, 10) > MAX_AUDIO_BYTES) {
             messageBody = messageBody || '[Audio demasiado largo para transcribir (máx ~3 minutos)]';
@@ -725,13 +729,13 @@ async function handleProspect(
         .select()
         .single();
 
-      prospect = newProspect || {
-        id: '',
-        phone,
-        stage: 'discovery',
-        message_count: 1,
-        lead_score: 0,
-      };
+      // Bug #192 fix: If insert fails, return error TwiML immediately instead of creating
+      // a phantom prospect with id='' that causes all downstream DB ops to silently fail
+      if (!newProspect) {
+        console.error('[wa-chat] Failed to insert prospect for phone:', phone);
+        return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
+      }
+      prospect = newProspect;
 
       // Fire Meta CAPI Lead event (fire & forget)
       sendMetaCAPIEvent({
@@ -877,22 +881,21 @@ async function handleProspect(
     if (humanEscalationTriggers.some(t => lowerMsgEarly.includes(t))) {
       replyText = 'Sí, soy un asistente de IA del equipo de Steve. Te conecto con José Manuel — te va a escribir pronto por este mismo chat. Si prefieres agendar directo: www.steve.cl/agendar/steve';
       skipMultiBrain = true;
+      // Bug #200 fix: Await dedup check to prevent race condition (was fire-and-forget)
       // Fix #150: Dedup escalation tasks — check before inserting
-      supabase.from('tasks')
-        .select('id').eq('status', 'pending').ilike('title', `%${phone}%`).maybeSingle()
-        .then(({ data: existingTask }: any) => {
-          if (!existingTask) {
-            return supabase.from('tasks').insert({
-              title: `[ESCALAR] Prospecto ${phone} pidió hablar con humano`,
-              description: `El prospecto solicitó hablar con una persona real. Mensaje: "${messageBody}"`,
-              priority: 'high',
-              status: 'pending',
-              type: 'wa_task',
-              assigned_agent: '3d195082-aa83-48c0-b514-a8052264a1e7',
-              created_at: new Date().toISOString(),
-            });
-          }
-        }).then(() => {}, () => {});
+      const { data: existingHumanTask } = await supabase.from('tasks')
+        .select('id').eq('status', 'pending').ilike('title', `%${phone}%`).maybeSingle();
+      if (!existingHumanTask) {
+        await supabase.from('tasks').insert({
+          title: `[ESCALAR] Prospecto ${phone} pidió hablar con humano`,
+          description: `El prospecto solicitó hablar con una persona real. Mensaje: "${messageBody}"`,
+          priority: 'high',
+          status: 'pending',
+          type: 'wa_task',
+          assigned_agent: '3d195082-aa83-48c0-b514-a8052264a1e7',
+          created_at: new Date().toISOString(),
+        });
+      }
     }
 
     // Cambio 1: Quick intel for first message (Haiku, ~1s)
@@ -989,22 +992,21 @@ async function handleProspect(
     });
     if (frustrationMsgs.length >= 3) {
       // Possible frustration — escalate
+      // Bug #200 fix: Await dedup check to prevent race condition (was fire-and-forget)
       // Fix #150: Dedup escalation tasks — check before inserting
-      supabase.from('tasks')
-        .select('id').eq('status', 'pending').ilike('title', `%${phone}%`).maybeSingle()
-        .then(({ data: existingTask }: any) => {
-          if (!existingTask) {
-            return supabase.from('tasks').insert({
-              title: `[ESCALAR] Prospecto ${phone} posible frustración (mensajes cortos)`,
-              description: `3+ mensajes consecutivos de 1-5 caracteres. Puede estar frustrado.`,
-              priority: 'medium',
-              status: 'pending',
-              type: 'wa_task',
-              assigned_agent: '3d195082-aa83-48c0-b514-a8052264a1e7',
-              created_at: new Date().toISOString(),
-            });
-          }
-        }).then(() => {}, () => {});
+      const { data: existingFrustrationTask } = await supabase.from('tasks')
+        .select('id').eq('status', 'pending').ilike('title', `%${phone}%`).maybeSingle();
+      if (!existingFrustrationTask) {
+        await supabase.from('tasks').insert({
+          title: `[ESCALAR] Prospecto ${phone} posible frustración (mensajes cortos)`,
+          description: `3+ mensajes consecutivos de 5-15 caracteres. Puede estar frustrado.`,
+          priority: 'medium',
+          status: 'pending',
+          type: 'wa_task',
+          assigned_agent: '3d195082-aa83-48c0-b514-a8052264a1e7',
+          created_at: new Date().toISOString(),
+        });
+      }
     }
 
     // R7-#11: no enviar link si el mensaje contiene negación de disponibilidad
@@ -1027,18 +1029,13 @@ async function handleProspect(
     ) {
       // Fix #71: sanitize what_they_sell to prevent stored prompt injection
       const safeWhatTheySell = (prospect.what_they_sell || '').replace(/\[[\w\s:]+\]/g, '').substring(0, 200);
-      // One retry: ask Claude to fix the response
+      // Bug #196 fix: Use anthropicFetch (imported), add system prompt, timeout, and strip injection tags
       try {
-        const fixResponse = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'x-api-key': ANTHROPIC_API_KEY!,
-            'anthropic-version': '2023-06-01',
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
+        const { ok: fixOk, data: fixData } = await anthropicFetch(
+          {
             model: 'claude-sonnet-4-6',
             max_tokens: 800,
+            system: 'Eres un editor de texto. Solo reescribe el mensaje sin preguntar lo que ya sabes. No inventes info.',
             messages: [{
               role: 'user',
               content: `Tu respuesta anterior contiene una pregunta REDUNDANTE. Ya sabemos que el prospecto vende "${safeWhatTheySell}".
@@ -1047,11 +1044,17 @@ Tu respuesta original: "${replyText}"
 
 Reescribe la respuesta SIN preguntar qué vende. Mantén el mismo tono. MÁXIMO 3 oraciones, 1 pregunta NUEVA. Responde SOLO con el texto corregido, nada más.`,
             }],
-          }),
-        });
-        if (fixResponse.ok) {
-          const fixData: any = await fixResponse.json();
-          const fixedText = (fixData.content?.[0]?.text || '').trim();
+          },
+          ANTHROPIC_API_KEY!,
+          { timeoutMs: 15000 },
+        );
+        if (fixOk) {
+          let fixedText = (fixData.content?.[0]?.text || '').trim();
+          // Strip any HTML/injection tags from the response
+          fixedText = fixedText
+            .replace(/<[^>]+>/g, '')
+            .replace(/\[[\w\s:]+\]/g, '')
+            .trim();
           if (fixedText && fixedText.length <= 400) {
             replyText = fixedText;
             console.log(`[prospect ${phone}] reply FIXED: removed redundant question`);
@@ -1471,6 +1474,10 @@ async function processProspectAsync(
     }
 
     // Consolidate pain points if too many (semantic dedup via Haiku)
+    // Bug #198 fix: normalize string pain_points to array before the Array.isArray check
+    if (merged.pain_points && typeof merged.pain_points === 'string') {
+      merged.pain_points = [merged.pain_points];
+    }
     // Fix R6-#8: validar que pain_points sea array antes de consolidar
     if (!Array.isArray(merged.pain_points)) {
       console.warn(`[consolidate] pain_points is not array for ${prospect.phone}:`, typeof merged.pain_points);
@@ -1551,7 +1558,9 @@ async function processProspectAsync(
       .eq('id', prospect.id)
       .eq('updated_at', prospect.updated_at || '')
       .select('id');
-    if ((updatedRows?.length ?? 0) === 0) {
+    // Bug #203 fix: Track whether atomic update succeeded to gate HubSpot push
+    const atomicUpdateSucceeded = (updatedRows?.length ?? 0) > 0;
+    if (!atomicUpdateSucceeded) {
       console.log(`[processProspectAsync] Race condition detected for ${prospect.phone} — skipping stale update`);
     }
 
@@ -1606,7 +1615,10 @@ async function processProspectAsync(
     }
 
     // Push to HubSpot if qualified and not already pushed
-    if (score >= 70 && !prospect.pushed_to_hubspot_at) {
+    // Bug #203 fix: Skip HubSpot push when atomic update was a no-op (stale data)
+    if (!atomicUpdateSucceeded) {
+      console.warn(`[wa-chat] Atomic update was no-op for ${prospect.phone}, skipping HubSpot push`);
+    } else if (score >= 70 && !prospect.pushed_to_hubspot_at) {
       const summary = await generateConversationSummary(history);
       const hubspotResult = await pushToHubSpot(
         { ...prospect, ...updatePayload } as ProspectRecord,
@@ -1636,17 +1648,19 @@ async function processProspectAsync(
       const lastUserMsg = history.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
 
       // R7-#7: validar que el 'sí' era respuesta a pregunta de reunión
+      // Bug #208 fix: Add skipMeetingDetection flag to actually skip (was falling through)
+      let skipMeetingDetection = false;
       const isShortAffirmation = /^(sí|si|ya|ok|dale|bueno|claro|perfecto|va|listo)$/i.test(lastUserMsg.trim());
       if (isShortAffirmation) {
         const lastSteveMsg = history.filter((m: any) => m.role === 'assistant').slice(-1)[0]?.content || '';
         const steveWasAskingMeeting = /reunión|agendar|horario|cuándo podemos|cuando podemos|disponible|llamada|zoom|meet/i.test(lastSteveMsg);
         if (!steveWasAskingMeeting) {
           console.log('[meeting] Short affirmation but Steve was not asking about meeting — skipping meeting detection');
-          // Skip meeting confirmation logic entirely
-          // (fall through — meetingResult won't be used)
+          skipMeetingDetection = true;
         }
       }
 
+      if (!skipMeetingDetection) {
       // R7-#27: detectar si el prospecto propone alternativa de horario vs rechazar
       const proposesAlternativeTime = /mejor (el|la|los|las)|prefiero|¿qué tal|qué tal|en vez|en lugar|podría ser|sería mejor|(lunes|martes|miércoles|jueves|viernes|sábado|domingo)|(\d{1,2})(am|pm|:00)/i.test(lastUserMsg);
       const hasRejection = /no (puedo|quiero|tengo tiempo)|no me viene|no me sale|no es buen|cancelar|no va a ser posible/i.test(lastUserMsg);
@@ -1683,15 +1697,15 @@ async function processProspectAsync(
         // This fallback handles text-based confirmations (no link was used).
         const meetingDate = await parseMeetingTime(meetingResult.proposedTime);
         // Fix R4-#12: CRITICAL — only save meeting if date is in the future
-        // Fix R6-#19: comparar en timezone Chile (UTC-3/UTC-4)
-        const chileNow = new Date(
-          new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' })
-        );
-        if (meetingDate && meetingDate.getTime() <= chileNow.getTime()) {
+        // Bug #204 fix: parseMeetingTime returns a Date parsed from ISO 8601 with Chile offset,
+        // so meetingDate.getTime() is already UTC. Compare directly against Date.now() (also UTC).
+        // The old toLocaleString trick was unreliable across runtimes.
+        const nowUtcMs = Date.now();
+        if (meetingDate && meetingDate.getTime() <= nowUtcMs) {
           console.warn(`[meeting-confirm] Rejected past date: ${meetingDate.toISOString()} for ${prospect.phone}`);
         }
 
-        if (meetingDate && meetingDate.getTime() > chileNow.getTime()) {
+        if (meetingDate && meetingDate.getTime() > nowUtcMs) {
           // Fix Bug#120: if there's a seller, verify availability via booking API BEFORE marking as scheduled
           let bookingSucceeded = true;
           if (prospect.assigned_seller_id) {
@@ -1773,6 +1787,7 @@ async function processProspectAsync(
       }
       // If proposedTime but not confirmed → prospect suggested alternative, Steve handles in next reply
       } // Fix #34: close the else block for non-alternative-time path
+      } // Bug #208: close the if (!skipMeetingDetection) block
     }
   } catch (err) {
     console.error('[steve-wa-chat] processProspectAsync error:', err);

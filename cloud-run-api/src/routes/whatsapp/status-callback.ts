@@ -1,6 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
-import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+
 import { decryptToken } from './setup-merchant.js';
 
 /**
@@ -96,15 +96,16 @@ export async function waStatusCallback(c: Context) {
     // Bug #67 fix: READ the current message BEFORE updating, so we can detect
     // whether the status actually changed (prevents idempotency guard from always
     // matching due to update-then-read race).
-    const existingMsg = await safeQuerySingleOrDefault<any>(
-      supabase
-        .from('wa_messages')
-        .select('metadata, status')
-        .eq('message_sid', messageSid)
-        .single(),
-      null,
-      'statusCallback.getMsg',
-    );
+    // Bug #199 fix: Use .limit(1) instead of .single() to handle duplicate message_sid
+    // gracefully. .single() throws PGRST116 when multiple rows match (e.g. from Twilio
+    // retries that both got inserted before the idempotency check). Using .limit(1)
+    // returns at most one row without throwing on duplicates.
+    const { data: existingMsgRows } = await supabase
+      .from('wa_messages')
+      .select('metadata, status')
+      .eq('message_sid', messageSid)
+      .limit(1);
+    const existingMsg = existingMsgRows?.[0] || null;
 
     const previousStatus = existingMsg?.status;
     const existingMetadata = (existingMsg?.metadata as Record<string, any>) || {};

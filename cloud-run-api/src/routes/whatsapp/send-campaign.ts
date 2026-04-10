@@ -86,14 +86,22 @@ export async function waSendCampaign(c: Context) {
     const segment = (campaign.segment_query as any)?.segment || 'all';
     let recipients: Array<{ phone: string; name: string }> = [];
 
-    // Query contacts from wa_conversations (people who've written before)
+    // Bug #217 fix: Build query with actual segment filtering.
+    // Select metadata + last_message_at so we can filter client-side for segments.
+    let contactQuery = supabase
+      .from('wa_conversations')
+      .select('contact_phone, contact_name, metadata, last_message_at')
+      .eq('client_id', client_id)
+      .eq('channel', 'merchant_wa');
+
+    // Apply server-side filters where possible
+    if (segment === 'inactive') {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      contactQuery = contactQuery.lt('last_message_at', thirtyDaysAgo);
+    }
+
     const contacts = await safeQueryOrDefault<any>(
-      supabase
-        .from('wa_conversations')
-        .select('contact_phone, contact_name')
-        .eq('client_id', client_id)
-        .eq('channel', 'merchant_wa')
-        .limit(500),
+      contactQuery.limit(500),
       [],
       'sendCampaign.getContacts',
     );
@@ -101,23 +109,50 @@ export async function waSendCampaign(c: Context) {
     if (contacts.length > 0) {
       // Bug #50 fix: deduplicate recipients by phone number
       const seen = new Set<string>();
-      recipients = contacts
+      let allContacts = contacts
         .map((c: any) => ({
           phone: c.contact_phone,
           name: c.contact_name || '',
+          metadata: c.metadata || {},
+          last_message_at: c.last_message_at,
         }))
-        .filter((r: { phone: string; name: string }) => {
+        .filter((r: { phone: string }) => {
           if (seen.has(r.phone)) return false;
           seen.add(r.phone);
           return true;
         });
-    }
 
-    // Filter by segment (basic implementation)
-    // In production, this would query Shopify order data for buyers/abandoned/vip
-    if (segment === 'abandoned') {
-      // Would filter by shopify_checkouts where completed_at is null
-      // For now, send to all contacts (placeholder)
+      // Bug #217 fix: Apply client-side segment filtering for metadata-based segments
+      if (segment === 'buyers') {
+        // Filter contacts who have purchase data in metadata
+        const filtered = allContacts.filter((c: any) => c.metadata?.last_purchase_at);
+        if (filtered.length > 0) {
+          allContacts = filtered;
+        } else {
+          console.warn(`[wa-campaign] Segment 'buyers' matched 0 contacts (no metadata.last_purchase_at) — sending to all ${allContacts.length} contacts`);
+        }
+      } else if (segment === 'abandoned') {
+        // Filter contacts with abandoned cart flag
+        const filtered = allContacts.filter((c: any) => c.metadata?.has_abandoned_cart === true || c.metadata?.has_abandoned_cart === 'true');
+        if (filtered.length > 0) {
+          allContacts = filtered;
+        } else {
+          console.warn(`[wa-campaign] Segment 'abandoned' matched 0 contacts (no metadata.has_abandoned_cart) — sending to all ${allContacts.length} contacts`);
+        }
+      } else if (segment === 'vip') {
+        // Filter contacts with 3+ purchases
+        const filtered = allContacts.filter((c: any) => parseInt(c.metadata?.purchase_count || '0', 10) >= 3);
+        if (filtered.length > 0) {
+          allContacts = filtered;
+        } else {
+          console.warn(`[wa-campaign] Segment 'vip' matched 0 contacts (no metadata.purchase_count >= 3) — sending to all ${allContacts.length} contacts`);
+        }
+      } else if (segment !== 'all' && segment !== 'inactive') {
+        // Unknown segment — log warning, proceed with all contacts
+        console.warn(`[wa-campaign] Unknown segment '${segment}' — sending to all ${allContacts.length} contacts`);
+      }
+
+      recipients = allContacts.map((c: any) => ({ phone: c.phone, name: c.name }));
     }
 
     if (recipients.length === 0) {
@@ -181,6 +216,7 @@ export async function waSendCampaign(c: Context) {
     Promise.resolve().then(async () => {
       let sentCount = 0;
       let failedCount = 0;
+      let skippedCount = 0; // Bug #197 fix: track already-sent separately from new sends
       let finalStatus: 'sent' | 'failed' = 'sent';
 
       try {
@@ -240,8 +276,10 @@ export async function waSendCampaign(c: Context) {
             }
 
             // Bug #124 fix: skip if this phone was already sent in a previous run
+            // Bug #197 fix: Don't count already-sent as sentCount — they don't consume
+            // new credits in this run, so they must NOT reduce the refund amount.
             if (alreadySentPhones.has(rawPhone)) {
-              sentCount++; // count as sent (already delivered)
+              skippedCount++;
               continue;
             }
 
@@ -297,7 +335,7 @@ export async function waSendCampaign(c: Context) {
           }
         }
 
-        console.log(`[wa-campaign] Campaign ${campaign_id}: ${sentCount} sent, ${failedCount} failed`);
+        console.log(`[wa-campaign] Campaign ${campaign_id}: ${sentCount} sent, ${failedCount} failed, ${skippedCount} skipped (already-sent)`);
       } catch (bgErr: any) {
         console.error(`[wa-campaign] Background error for campaign ${campaign_id}:`, bgErr);
         finalStatus = 'failed';
@@ -322,14 +360,16 @@ export async function waSendCampaign(c: Context) {
         // Bug #152 fix: Add fallback to refund_wa_credit RPC — if the RPC doesn't exist
         // or fails, use direct balance update so credits are not silently lost.
         try {
+          // Bug #197 fix: unusedCredits includes both failed AND skipped (already-sent) recipients.
+          // Only actual new sentCount consumed credits in this run.
           const unusedCredits = recipients.length - sentCount;
           if (unusedCredits > 0) {
-            console.warn(`[wa-campaign] Campaign ${campaign_id}: ${unusedCredits} unused credits (${failedCount} failed). ` +
+            console.warn(`[wa-campaign] Campaign ${campaign_id}: ${unusedCredits} unused credits (${failedCount} failed, ${skippedCount} already-sent). ` +
               `Pre-deducted ${recipients.length}, sent ${sentCount}. Refunding atomically.`);
             const { error: refundError } = await supabase.rpc('refund_wa_credit', {
               p_client_id: client_id,
               p_amount: unusedCredits,
-              p_description: `Campaña "${campaign.name}": refund ${unusedCredits} créditos no usados (${failedCount} fallidos)`,
+              p_description: `Campaña "${campaign.name}": refund ${unusedCredits} créditos no usados (${failedCount} fallidos, ${skippedCount} ya enviados)`,
             });
             if (refundError) {
               // Bug #152: RPC failed — fallback to direct balance update

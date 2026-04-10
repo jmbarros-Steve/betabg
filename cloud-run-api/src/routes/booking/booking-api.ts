@@ -401,7 +401,16 @@ export async function bookingConfirm(c: Context) {
   if (!sellerWorkDays.includes(slotDay)) {
     return c.json({ error: 'El horario seleccionado no está en un día laboral del vendedor.' }, 400);
   }
-  if (slotHour < sellerWorkStart || slotHour >= sellerWorkEnd) {
+
+  // Bug #216 fix: validate that entire slot (start + duration) fits within working hours,
+  // not just the start hour. Use minutes for precision.
+  const slotMinutes = slotChile.getMinutes();
+  const slotDurationMin = seller.slot_duration_minutes || 30;
+  const slotStartMin = slotHour * 60 + slotMinutes;
+  const slotEndMin = slotStartMin + slotDurationMin;
+  const workStartMin = sellerWorkStart * 60;
+  const workEndMin = sellerWorkEnd * 60;
+  if (slotStartMin < workStartMin || slotEndMin > workEndMin) {
     return c.json({ error: 'El horario seleccionado está fuera del horario laboral del vendedor.' }, 400);
   }
 

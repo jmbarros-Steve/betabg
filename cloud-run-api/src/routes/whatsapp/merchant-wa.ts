@@ -284,24 +284,27 @@ export async function merchantWAWebhook(c: Context) {
 
     // If conversation is assigned to human (escalated), don't auto-reply
     if (existingConv?.assigned_to === 'human') {
-      // Notify merchant via Steve Chat that their customer wrote
-      const { sendWhatsApp } = await import('../../lib/twilio-client.js');
-      const merchant = await safeQuerySingleOrDefault<any>(
-        supabase
-          .from('clients')
-          .select('phone')
-          .eq('id', clientId)
-          .single(),
-        null,
-        'merchantWa.webhook.getMerchantForNotify',
-      );
+      // Bug #193 fix: Don't send WA notification from Steve's master number — it confuses
+      // the merchant (message appears from Steve, not from their store number).
+      // Instead, create a task so the merchant sees it in the dashboard.
+      try {
+        await supabase.from('tasks').insert({
+          title: `[WA] Cliente escribió - ${profileName || phone}`,
+          description: `Cliente envió mensaje a merchant ${clientId}. Requiere atención humana.\nMensaje: "${scrubbedBody.slice(0, 100)}"\nResponde en app.steveads.com/portal (tab WhatsApp)`,
+          priority: 'high',
+          status: 'pending',
+          type: 'wa_task',
+          assigned_agent: '3d195082-aa83-48c0-b514-a8052264a1e7', // JM user_id
+          created_at: new Date().toISOString(),
+        });
+      } catch (err) { console.warn('[merchant-wa] Failed to create escalation task:', err); }
 
-      if (merchant?.phone) {
-        await sendWhatsApp(
-          `whatsapp:+${merchant.phone}`,
-          `${profileName || phone} te escribio: "${scrubbedBody.slice(0, 80)}"\nResponde en app.steveads.com/portal (tab WhatsApp)`,
-        ).catch(() => {}); // Don't fail if notification fails
-      }
+      // Update conversation to mark it needs attention
+      try {
+        await supabase.from('wa_conversations')
+          .update({ status: 'escalated', updated_at: new Date().toISOString() })
+          .eq('id', existingConv.id);
+      } catch (err) { console.warn('[merchant-wa] Failed to update conversation status:', err); }
 
       return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
     }
@@ -468,24 +471,19 @@ export async function merchantWAWebhook(c: Context) {
         .eq('channel', 'merchant_wa')
         .eq('contact_phone', phone);
 
-      // Notify merchant
-      const { sendWhatsApp } = await import('../../lib/twilio-client.js');
-      const merchant = await safeQuerySingleOrDefault<any>(
-        supabase
-          .from('clients')
-          .select('phone, name')
-          .eq('id', clientId)
-          .single(),
-        null,
-        'merchantWa.webhook.getMerchantForEscalate',
-      );
-
-      if (merchant?.phone) {
-        await sendWhatsApp(
-          `whatsapp:+${merchant.phone}`,
-          `${merchant.name}, ${profileName || phone} necesita atencion humana:\n"${scrubbedBody.slice(0, 100)}"\nResponde en app.steveads.com/portal`,
-        ).catch(() => {});
-      }
+      // Bug #193 fix: Don't send WA notification from Steve's master number.
+      // Create a task instead so the merchant sees it in the dashboard.
+      try {
+        await supabase.from('tasks').insert({
+          title: `[ESCALAR] ${profileName || phone} necesita atención humana`,
+          description: `Cliente escribió a merchant ${clientId} y Steve decidió escalar.\nMensaje: "${scrubbedBody.slice(0, 100)}"\nResponde en app.steveads.com/portal (tab WhatsApp)`,
+          priority: 'high',
+          status: 'pending',
+          type: 'wa_task',
+          assigned_agent: '3d195082-aa83-48c0-b514-a8052264a1e7', // JM user_id
+          created_at: new Date().toISOString(),
+        });
+      } catch (err) { console.warn('[merchant-wa] Failed to create escalation task:', err); }
 
       // Send a hold message to the customer
       replyText = 'Gracias por tu mensaje, un momento por favor. Te responderemos enseguida.';

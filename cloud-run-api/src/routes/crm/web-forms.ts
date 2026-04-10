@@ -15,18 +15,13 @@ export async function webFormsCrud(c: Context) {
     const supabase = getSupabaseAdmin();
     const user = c.get('user');
 
-    // Auth check: all actions except public_submit require authentication
-    if (action !== 'public_submit') {
-      if (!user?.id) return c.json({ error: 'Unauthorized' }, 401);
-    }
+    // Bug #213 fix: CRUD endpoint requires auth for ALL actions.
+    // public_submit should only be handled by the dedicated webFormSubmit endpoint.
+    if (!user?.id) return c.json({ error: 'Unauthorized' }, 401);
 
-    // Fix Bug#119: skip getUserClientIds for public_submit (user is null)
-    let isSuperAdmin = false;
-    if (action !== 'public_submit') {
-      // Fix Bug#7: multi-tenant scoping — non-admins only see their own forms
-      const scoping = await getUserClientIds(supabase, user?.id);
-      isSuperAdmin = scoping.isSuperAdmin;
-    }
+    // Fix Bug#7: multi-tenant scoping — non-admins only see their own forms
+    const scoping = await getUserClientIds(supabase, user.id);
+    const isSuperAdmin = scoping.isSuperAdmin;
 
     if (action === 'list') {
       let query = supabase
@@ -220,8 +215,10 @@ export async function webFormSubmit(c: Context) {
 
     // Validate required fields
     const fields = (form.fields || []) as Array<{ name: string; required: boolean }>;
+    // Bug #214 fix: use strict null/undefined/empty check instead of falsy,
+    // so values like 0 and false are accepted as valid
     for (const field of fields) {
-      if (field.required && !data[field.name]) {
+      if (field.required && (data[field.name] === undefined || data[field.name] === null || data[field.name] === '')) {
         return c.json({ error: `Campo requerido: ${field.name}` }, 400);
       }
     }

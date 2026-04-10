@@ -983,9 +983,13 @@ export function getMarketDeadline(seed?: string): string | null {
   const options = deadlines[month] || [];
   if (options.length === 0) return null;
   // Fix #6: use stable seed to avoid deadline changing on each call for same prospect
+  // Bug #209 fix: FNV-1a hash for better distribution on sequential phone numbers
   if (seed) {
-    let hash = 0;
-    for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) & 0x7fffffff;
+    let hash = 0x811c9dc5; // FNV offset basis
+    for (let i = 0; i < seed.length; i++) {
+      hash ^= seed.charCodeAt(i);
+      hash = (hash * 0x01000193) & 0x7fffffff; // FNV prime
+    }
     return options[hash % options.length];
   }
   return options[Math.floor(Math.random() * options.length)];
@@ -1585,16 +1589,35 @@ export async function buildDynamicSalesPrompt(
 
   // R7-#23: detectar budget insuficiente vs mínimo de Steve
   const STEVE_MIN_BUDGET_CLP = 100000; // $100K CLP/mes mínimo (~$100 USD)
+  // Bug #202 fix: handle LATAM decimal notation (dots as thousands, comma as decimal)
   const extractBudgetAmount = (budgetStr: string | null | undefined): number | null => {
     if (!budgetStr) return null;
-    const match = budgetStr.match(/(\d[\d.,]*)\s*(k|K|mil|millón|millones|mm)?/);
+    const match = budgetStr.match(/\$?\s*(\d[\d.,]*)\s*(mm|millones?|mill?|k|mil)?/i);
     if (!match) return null;
-    let amount = parseFloat(match[1].replace(/[.,]/g, ''));
+    let numStr = match[1];
+    // LATAM: dots as thousands separators, comma as decimal
+    // If has both dots and comma: "1.500,50" -> dots are thousands, comma is decimal
+    // If only dots: "1.500.000" -> all dots are thousands (no decimal)
+    // If only comma: "1,5" -> comma is decimal
+    if (numStr.includes(',') && numStr.includes('.')) {
+      numStr = numStr.replace(/\./g, '').replace(',', '.');
+    } else if (numStr.includes(',')) {
+      numStr = numStr.replace(',', '.');
+    } else {
+      // Only dots: "1.500.000" (thousands) or "1.5" (decimal)
+      // Heuristic: if last dot group has 3 digits, it's thousands separator
+      const parts = numStr.split('.');
+      if (parts.length > 1 && parts[parts.length - 1].length === 3) {
+        numStr = numStr.replace(/\./g, ''); // All dots are thousands
+      }
+      // else: "1.5" stays as decimal
+    }
+    const value = parseFloat(numStr);
+    if (isNaN(value)) return null;
     const unit = (match[2] || '').toLowerCase();
-    if (unit === 'k') amount *= 1000;
-    if (unit === 'mil') amount *= 1000;
-    if (['millón', 'millones', 'mm'].includes(unit)) amount *= 1000000;
-    return amount;
+    if (unit.startsWith('mm') || unit.startsWith('millon')) return value * 1000000;
+    if (unit === 'k' || unit === 'mil') return value * 1000;
+    return value;
   };
 
   const budgetAmount = extractBudgetAmount(prospect.budget_range);
@@ -2315,7 +2338,8 @@ export function calculateLeadScore(
   // Fix R4-#17: audit bonus only if findings are positive/neutral (not if findings say store is broken)
   if (prospect.audit_data?.findings?.length) {
     const findingsText = prospect.audit_data.findings.join(' ').toLowerCase();
-    const hasPositive = /\b(bien|bueno|correcto|funciona|organizado|estructura|sólid)\b/.test(findingsText);
+    // Bug #210 fix: use non-word-boundary regex for accented chars (sólido/a never matched with \b)
+    const hasPositive = /(bien|bueno|correcto|funciona|organizado|estructura|sólido|sólida)/i.test(findingsText);
     const hasNegative = /\b(problema|mal|débil|falta|desorganizado|roto|sin estrategia)\b/.test(findingsText);
     if (hasPositive && !hasNegative) {
       breakdown.fit = Math.min(breakdown.fit + 5, 15);
@@ -2324,6 +2348,9 @@ export function calculateLeadScore(
     }
     // Negative findings → no bonus
   }
+
+  // Bug #205 fix: cap fit at 15 after all additions (individual paths can exceed when combined)
+  breakdown.fit = Math.min(breakdown.fit, 15);
 
   let score = Object.values(breakdown).reduce((a, b) => a + b, 0);
 

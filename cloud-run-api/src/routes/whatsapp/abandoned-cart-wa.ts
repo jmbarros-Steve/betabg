@@ -134,9 +134,15 @@ export async function abandonedCartWA(c: Context) {
         decryptToken(waAccount.twilio_auth_token),
       );
 
-      const toNumber = cart.customer_phone.startsWith('+')
-        ? cart.customer_phone
-        : `+${cart.customer_phone}`;
+      // Bug #195 fix: Sanitize phone — strip spaces, dashes, parens before constructing Twilio address
+      const cleanPhone = (cart.customer_phone || '').replace(/[\s\-()]/g, '');
+      const toNumber = cleanPhone.startsWith('+') ? cleanPhone : `+${cleanPhone}`;
+      // Validate format: must be + followed by 8-15 digits
+      if (!/^\+\d{8,15}$/.test(toNumber)) {
+        console.warn('[abandoned-cart-wa] Invalid phone format:', cart.customer_phone);
+        skipped++;
+        continue; // skip this cart — don't burn a credit on an invalid number
+      }
 
       // Fix Bug#8: Deduct credit BEFORE sending message (irreversible)
       const { data: deductResult } = await supabase.rpc('deduct_wa_credit', {

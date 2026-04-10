@@ -158,20 +158,11 @@ export async function prospectAddNote(c: Context) {
     const { allowed } = await verifyProspectOwnership(supabase, prospect_id, user.id);
     if (!allowed) return c.json({ error: 'Forbidden' }, 403);
 
-    // Fix #81: append to existing admin_notes instead of overwriting
-    const { data: current } = await supabase
-      .from('wa_prospects')
-      .select('admin_notes')
-      .eq('id', prospect_id)
-      .single();
-    const existingNotes = current?.admin_notes || '';
-    const updatedNotes = existingNotes
-      ? `${existingNotes}\n\n---\n[${new Date().toISOString()}]\n${note}`
-      : note;
-
+    // Bug #211 fix: frontend sends full textarea content, so REPLACE instead of APPEND
+    // to prevent exponential duplication on each save
     const { error } = await supabase
       .from('wa_prospects')
-      .update({ admin_notes: updatedNotes, updated_at: new Date().toISOString() })
+      .update({ admin_notes: note, updated_at: new Date().toISOString() })
       .eq('id', prospect_id);
 
     if (error) return c.json({ error: error.message }, 500);
@@ -271,7 +262,7 @@ export async function prospectUpdateTags(c: Context) {
       .filter((t: any) => typeof t === 'string' && t.trim().length > 0)
       .map((t: string) => t.trim().slice(0, 50).replace(/[<>]/g, ''))
       .slice(0, 20);
-    if (safeTags.length === 0) return c.json({ error: 'No valid tags provided' }, 400);
+    // Bug #212 fix: allow empty array to clear all tags (don't reject safeTags.length === 0)
 
     const supabase = getSupabaseAdmin();
     const user = c.get('user');

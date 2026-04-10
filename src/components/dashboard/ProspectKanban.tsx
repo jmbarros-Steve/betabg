@@ -123,26 +123,17 @@ export function ProspectKanban() {
 
     if (fromStage === newStage) return;
 
-    // Optimistic update
-    setKanban((prev) => {
-      const updated = { ...prev };
-      const prospect = updated[fromStage]?.find((p) => p.id === prospectId);
-      if (!prospect) return prev;
-
-      updated[fromStage] = updated[fromStage].filter((p) => p.id !== prospectId);
-      updated[newStage] = [{ ...prospect, stage: newStage }, ...(updated[newStage] || [])];
-      return updated;
-    });
-
+    // Bug #218 fix: removed optimistic update that left stageTotals stale.
+    // Instead, call API and refetch full kanban data (including totals) on success.
     try {
       const { error } = await callApi('crm/prospect/move-stage', {
         body: { prospect_id: prospectId, new_stage: newStage },
       });
       if (error) throw new Error(error);
       toast.success(`Movido a ${newStage}`);
+      await fetchKanban();
     } catch (err: any) {
       toast.error(err.message || 'Error moviendo prospecto');
-      fetchKanban(); // Revert on error
     }
   };
 

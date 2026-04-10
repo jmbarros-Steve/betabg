@@ -53,7 +53,9 @@ export async function investigateProspectBackground(
     // ============================================================
     // 1. STORE SCRAPING — if has URL but no store products
     // ============================================================
-    if (!currentInv.store?.product_images?.length) {
+    // Bug #207 fix: filter empty strings so product_images: [""] doesn't block re-investigation
+    const hasValidImages = currentInv.store?.product_images?.filter((img: string) => img && img.trim()).length > 0;
+    if (!hasValidImages) {
       // Check if we have a URL from audit_data or from conversation
       const storeUrl = freshProspect?.audit_data?.url || extractUrl(lastMessage) || extractUrlFromHistory(history);
 

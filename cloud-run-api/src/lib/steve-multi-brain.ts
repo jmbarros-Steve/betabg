@@ -337,9 +337,13 @@ export async function runConversationalist(
     if (strategistBrief.brief) {
       // Fix R5-#23: truncate brief to max 400 chars to prevent system prompt bloat
       // Fix R6-#2: truncar en límite de palabra para no cortar instrucción a mitad
+      // Bug #206 fix: safer truncation — fallback to raw slice if lastIndexOf produces empty string
+      const truncatedRaw = strategistBrief.brief.slice(0, 400);
+      const lastSpace = truncatedRaw.lastIndexOf(' ');
+      const safeTruncated = lastSpace > 50 ? truncatedRaw.slice(0, lastSpace) : truncatedRaw;
       const truncatedBrief = strategistBrief.brief.length <= 400
         ? strategistBrief.brief
-        : strategistBrief.brief.slice(0, 400).replace(/\s\S*$/, '') + '...';
+        : safeTruncated + '...';
       systemPrompt = `🧠 BRIEF DEL ESTRATEGA (SIGUE ESTA DIRECTRIZ):
 ${truncatedBrief}
 Acción sugerida: ${strategistBrief.suggestedAction}

@@ -41,7 +41,7 @@ export async function proposalsCrud(c: Context) {
       }
 
       case 'create': {
-        const { prospect_id, title, content, plan_type, monthly_price } = body;
+        const { prospect_id, title, content, plan_type, monthly_price, status } = body;
         if (!prospect_id || !title || !content) {
           return c.json({ error: 'prospect_id, title, and content required' }, 400);
         }
@@ -54,16 +54,25 @@ export async function proposalsCrud(c: Context) {
           if (!allowed) return c.json({ error: 'Forbidden' }, 403);
         }
 
+        // Bug #215 fix: honor status from request body
+        const validCreateStatuses = ['draft', 'sent', 'accepted', 'rejected'];
+        const insertStatus = validCreateStatuses.includes(status) ? status : 'draft';
+        const insertData: Record<string, any> = {
+          prospect_id,
+          created_by: user.id,
+          title,
+          content,
+          plan_type: plan_type ?? null,
+          monthly_price: monthly_price ?? null,
+          status: insertStatus,
+        };
+        if (insertStatus === 'sent') {
+          insertData.sent_at = new Date().toISOString();
+        }
+
         const { data, error } = await supabase
           .from('proposals')
-          .insert({
-            prospect_id,
-            created_by: user.id,
-            title,
-            content,
-            plan_type: plan_type ?? null,
-            monthly_price: monthly_price ?? null,
-          })
+          .insert(insertData)
           .select()
           .single();
 
@@ -187,7 +196,8 @@ export async function proposalsGenerate(c: Context) {
       .join('\n');
 
     const planLabel = plan_type || 'profesional';
-    const priceLabel = monthly_price ? `$${monthly_price.toLocaleString()} USD/mes` : 'a definir';
+    // Bug #220 fix: use != null instead of falsy check so monthly_price=0 shows "$0 USD/mes"
+    const priceLabel = monthly_price != null ? `$${monthly_price.toLocaleString()} USD/mes` : 'a definir';
 
     const prompt = `Eres un consultor de marketing digital que trabaja para Steve, una agencia de marketing AI.
 Genera una propuesta comercial profesional en español para el siguiente prospecto.
