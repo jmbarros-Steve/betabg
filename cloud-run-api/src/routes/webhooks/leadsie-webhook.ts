@@ -14,12 +14,9 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
  *   No match → stored as orphan for manual assignment.
  *
  * Platforms processed:
- *   Meta only — "Meta Ad Account", "Facebook Page", "Instagram Account",
- *               "Meta Pixel", "Facebook Catalog" (catalog id ignored — no DB column).
- *
- * Other platforms in the payload (Shopify, Klaviyo, Google) are intentionally
- * ignored. Their backend modules are not built yet — when each is ready, the
- * handler will be extended to upsert those connections.
+ *   Meta — "Meta Ad Account", "Facebook Page", "Instagram Account",
+ *          "Meta Pixel", "Facebook Catalog" (catalog id ignored — no DB column).
+ *   Google Ads — "Google Ads Account" (customer_id stored in account_id).
  *
  * Only processes assets where connectionStatus === "Connected".
  * Leadsie docs: https://help.leadsie.com/article/webhooks
@@ -149,67 +146,100 @@ export async function leadsieWebhook(c: Context) {
     }
 
     // ── 3. Map Meta assets ─────────────────────────────
-    // Other platforms (Shopify, Klaviyo, Google) are intentionally ignored
-    // for now — modules not built yet. They'll be added when each module is ready.
     const meta = mapMetaAssets(assets);
 
-    if (!meta.account_id && !meta.page_id && !meta.ig_account_id && !meta.pixel_id) {
-      console.warn(`[leadsie-webhook] No Meta assets found for client ${clientId}`);
-      return c.json({ ok: true, status: 'no_meta_assets', client_id: clientId });
+    // ── 4. Map Google Ads assets ─────────────────────
+    const google = mapGoogleAssets(assets);
+
+    if (!meta.account_id && !meta.page_id && !meta.ig_account_id && !meta.pixel_id && !google.customer_id) {
+      console.warn(`[leadsie-webhook] No Meta or Google assets found for client ${clientId}`);
+      return c.json({ ok: true, status: 'no_assets_mapped', client_id: clientId });
     }
 
-    // ── 4. Upsert Meta connection ──────────────────────
-    // is_active = true if we got ANY asset that unlocks value.
-    // Ad account enables paid campaigns; page/IG alone still enables organic
-    // publishing + insights, so the merchant should see the connection as "on"
-    // (MetaPartnerSetup polls for is_active to move to "connected" state).
-    const isActive = !!(
-      meta.account_id ||
-      meta.page_id ||
-      meta.ig_account_id
-    );
-    const { error: metaErr } = await supabase
-      .from('platform_connections')
-      .upsert(
-        {
-          client_id: clientId,
-          platform: 'meta',
-          connection_type: 'leadsie',
-          account_id: meta.account_id,
-          page_id: meta.page_id,
-          ig_account_id: meta.ig_account_id,
-          pixel_id: meta.pixel_id,
-          is_active: isActive,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'client_id,platform' },
+    // ── 5. Upsert Meta connection ──────────────────────
+    let metaActive = false;
+    if (meta.account_id || meta.page_id || meta.ig_account_id || meta.pixel_id) {
+      metaActive = !!(meta.account_id || meta.page_id || meta.ig_account_id);
+      const { error: metaErr } = await supabase
+        .from('platform_connections')
+        .upsert(
+          {
+            client_id: clientId,
+            platform: 'meta',
+            connection_type: 'leadsie',
+            account_id: meta.account_id,
+            page_id: meta.page_id,
+            ig_account_id: meta.ig_account_id,
+            pixel_id: meta.pixel_id,
+            is_active: metaActive,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'client_id,platform' },
+        );
+
+      if (metaErr) {
+        console.error('[leadsie-webhook] Meta upsert error:', metaErr);
+        return c.json({ error: 'Failed to save Meta connection' }, 500);
+      }
+
+      if (metaActive) {
+        triggerMetaSync(clientId).catch((err) =>
+          console.error(`[leadsie-webhook] Meta sync trigger failed for client=${clientId}:`, err),
+        );
+      }
+
+      console.log(
+        `[leadsie-webhook] Meta connected client=${clientId} ad_account=${meta.account_id} page=${meta.page_id} ig=${meta.ig_account_id} pixel=${meta.pixel_id} active=${metaActive}`,
       );
-
-    if (metaErr) {
-      console.error('[leadsie-webhook] Meta upsert error:', metaErr);
-      return c.json({ error: 'Failed to save connection' }, 500);
     }
 
-    if (isActive) {
-      triggerMetaSync(clientId).catch((err) =>
-        console.error(`[leadsie-webhook] Meta sync trigger failed for client=${clientId}:`, err),
-      );
-    }
+    // ── 6. Upsert Google Ads connection ────────────────
+    let googleActive = false;
+    if (google.customer_id) {
+      googleActive = true;
+      const { error: googleErr } = await supabase
+        .from('platform_connections')
+        .upsert(
+          {
+            client_id: clientId,
+            platform: 'google',
+            connection_type: 'leadsie',
+            account_id: google.customer_id,
+            is_active: true,
+            access_token_encrypted: null,  // Token lives in MCC env var
+            refresh_token_encrypted: null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'client_id,platform' },
+        );
 
-    console.log(
-      `[leadsie-webhook] Connected client=${clientId} ad_account=${meta.account_id} page=${meta.page_id} ig=${meta.ig_account_id} pixel=${meta.pixel_id} active=${isActive}`,
-    );
+      if (googleErr) {
+        console.error('[leadsie-webhook] Google upsert error:', googleErr);
+        // Don't fail the whole request if Meta already succeeded
+      } else {
+        triggerGoogleSync(clientId).catch((err) =>
+          console.error(`[leadsie-webhook] Google sync trigger failed for client=${clientId}:`, err),
+        );
+        console.log(
+          `[leadsie-webhook] Google connected client=${clientId} customer_id=${google.customer_id}`,
+        );
+      }
+    }
 
     return c.json({
       ok: true,
-      status: isActive ? 'connected' : 'partial',
+      status: (metaActive || googleActive) ? 'connected' : 'partial',
       client_id: clientId,
       meta: {
         account_id: meta.account_id,
         page_id: meta.page_id,
         ig_account_id: meta.ig_account_id,
         pixel_id: meta.pixel_id,
-        active: isActive,
+        active: metaActive,
+      },
+      google: {
+        customer_id: google.customer_id,
+        active: googleActive,
       },
     });
 
@@ -250,6 +280,15 @@ function mapMetaAssets(assets: LeadsieAsset[]): MetaAssets {
   return result;
 }
 
+function mapGoogleAssets(assets: LeadsieAsset[]): { customer_id: string | null } {
+  for (const a of assets) {
+    if (a.type === 'Google Ads Account') {
+      return { customer_id: a.id.replace(/\D/g, '') };
+    }
+  }
+  return { customer_id: null };
+}
+
 async function storeOrphan(body: LeadsiePayload, reason: string): Promise<void> {
   const supabase = getSupabaseAdmin();
   const { error } = await supabase.from('orphan_meta_connections').insert({
@@ -264,6 +303,33 @@ async function storeOrphan(body: LeadsiePayload, reason: string): Promise<void> 
     // Propagate so the caller can return 500 and Leadsie retries the webhook
     throw new Error(`orphan_meta_connections insert failed: ${error.message}`);
   }
+}
+
+async function triggerGoogleSync(clientId: string): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  const { data: conn } = await supabase
+    .from('platform_connections')
+    .select('id')
+    .eq('client_id', clientId)
+    .eq('platform', 'google')
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (!conn) return;
+
+  const baseUrl = process.env.SELF_URL || `https://steve-api-850416724643.us-central1.run.app`;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceKey) return;
+
+  await fetch(`${baseUrl}/api/sync-google-ads-metrics`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${serviceKey}`,
+      'X-Internal-Key': serviceKey,
+    },
+    body: JSON.stringify({ connection_id: conn.id }),
+  });
 }
 
 async function triggerMetaSync(clientId: string): Promise<void> {
