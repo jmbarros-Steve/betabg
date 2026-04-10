@@ -17,6 +17,41 @@ export interface PostData {
   replies?: ReplyData[];
 }
 
+const AGENT_NAMES = [
+  'Rodrigo', 'Valentina', 'Felipe', 'Andrés', 'Camila', 'Sebastián',
+  'Isidora', 'Tomás', 'Diego', 'Javiera', 'Matías', 'Sofía',
+  'Ignacio', 'Valentín', 'Paula', 'Martín',
+];
+
+/** Formats content highlighting @mentions of agent names */
+function formatContent(text: string, darkMode: boolean): (string | JSX.Element)[] {
+  const mentionPattern = new RegExp(`\\b(${AGENT_NAMES.join('|')})\\b`, 'g');
+  const parts: (string | JSX.Element)[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = mentionPattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <span
+        key={match.index}
+        className={`font-bold ${darkMode ? 'text-green-400' : 'text-blue-600'}`}
+      >
+        @{match[1]}
+      </span>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : [text];
+}
+
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
@@ -129,6 +164,14 @@ export function SocialPost({ post, darkMode = false }: SocialPostProps) {
               ANÓNIMO
             </span>
           )}
+          {/* Post type badge */}
+          {post.post_type && !['hot_take', 'debate'].includes(post.post_type) && (
+            <span className={`font-mono text-[9px] px-1 py-0.5 rounded ${
+              darkMode ? 'bg-green-950 text-green-600' : 'bg-slate-100 text-slate-400'
+            }`}>
+              {post.post_type.replace(/_/g, ' ')}
+            </span>
+          )}
           {/* Karma badge */}
           {karma !== 0 && (
             <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
@@ -147,7 +190,7 @@ export function SocialPost({ post, darkMode = false }: SocialPostProps) {
 
       {/* Content */}
       <p className={`font-mono text-sm mt-2 leading-relaxed whitespace-pre-wrap ${textSecondary}`}>
-        {post.content}
+        {formatContent(post.content, darkMode)}
       </p>
 
       {/* Reactions */}

@@ -180,6 +180,7 @@ import { chinoCodeExecutor } from './cron/chino-code-executor.js';
 import { socialFeed } from './social/feed.js';
 import { socialSubscribe } from './social/subscribe.js';
 import { socialReact } from './social/react.js';
+import { socialLeaderboard } from './social/leaderboard.js';
 import { socialPostGenerator } from './cron/social-post-generator.js';
 import { socialReplyGenerator } from './cron/social-reply-generator.js';
 import { socialDigestSender } from './cron/social-digest-sender.js';
@@ -418,6 +419,7 @@ export function registerRoutes(app: Hono) {
 
   // Steve Social (public — no JWT)
   app.get('/api/social/feed', socialFeed);
+  app.get('/api/social/leaderboard', socialLeaderboard);
   app.post('/api/social/subscribe', socialSubscribe);
   app.post('/api/social/react', socialReact);
 

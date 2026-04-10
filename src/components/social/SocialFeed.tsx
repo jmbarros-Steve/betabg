@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { SocialPost, type PostData } from './SocialPost';
+import { SystemMessage } from './SystemMessages';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://steve-api-850416724643.us-central1.run.app';
 
@@ -145,8 +146,11 @@ export function SocialFeed({ activeTags, darkMode, sortMode }: SocialFeedProps) 
         </div>
       )}
 
-      {posts.map(post => (
-        <SocialPost key={post.id} post={post} darkMode={darkMode} />
+      {posts.map((post, idx) => (
+        <div key={post.id}>
+          <SystemMessage darkMode={darkMode} postIndex={idx} />
+          <SocialPost post={post} darkMode={darkMode} />
+        </div>
       ))}
 
       {/* Infinite scroll sentinel */}
