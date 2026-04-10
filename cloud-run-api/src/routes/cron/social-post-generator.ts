@@ -120,21 +120,21 @@ export async function socialPostGenerator(c: Context) {
         // Moderate
         const modResult = await moderatePost(content, ANTHROPIC_API_KEY);
 
-        const postId = crypto.randomUUID();
-        await supabase.from('social_moderation_log').insert({
-          post_id: modResult.approved ? postId : null,
-          layer: modResult.layer,
-          result: modResult.approved ? 'approved' : 'rejected',
-          reason: modResult.reason,
-        });
-
         if (!modResult.approved) {
+          // Log rejected post (no post_id since post won't exist)
+          await supabase.from('social_moderation_log').insert({
+            post_id: null,
+            layer: modResult.layer,
+            result: 'rejected',
+            reason: modResult.reason,
+          });
           console.log(`[social-post-gen] Rejected ${agent.name} (${modResult.layer}): ${modResult.reason}`);
           results.rejected++;
           continue;
         }
 
-        // Insert approved post
+        // Insert approved post FIRST (so FK on moderation_log works)
+        const postId = crypto.randomUUID();
         const { error: insertErr } = await supabase.from('social_posts').insert({
           id: postId,
           agent_code: agent.code,
@@ -151,6 +151,14 @@ export async function socialPostGenerator(c: Context) {
           results.errors++;
           continue;
         }
+
+        // Log moderation AFTER post exists (FK safe)
+        await supabase.from('social_moderation_log').insert({
+          post_id: postId,
+          layer: modResult.layer,
+          result: 'approved',
+          reason: modResult.reason,
+        });
 
         results.generated++;
         results.agents_posted.push(agent.name);
@@ -188,15 +196,14 @@ export async function socialPostGenerator(c: Context) {
               if (replyContent) {
                 const replyMod = await moderatePost(replyContent, ANTHROPIC_API_KEY);
 
-                // Log moderation for chain replies too
-                await supabase.from('social_moderation_log').insert({
-                  post_id: null,
-                  layer: replyMod.layer,
-                  result: replyMod.approved ? 'approved' : 'rejected',
-                  reason: replyMod.reason,
-                });
-
-                if (replyMod.approved) {
+                if (!replyMod.approved) {
+                  await supabase.from('social_moderation_log').insert({
+                    post_id: null,
+                    layer: replyMod.layer,
+                    result: 'rejected',
+                    reason: replyMod.reason,
+                  });
+                } else {
                   const replyTags = replyContent.match(/\[#(\w+)\]/g) || [];
                   const replyTopics = replyTags.map((t: string) => t.replace(/[\[#\]]/g, '')).filter(t => VALID_TOPICS.has(t));
                   if (replyTopics.length === 0) replyTopics.push(topics[0] || 'random');
@@ -205,7 +212,7 @@ export async function socialPostGenerator(c: Context) {
                   replyContent = replyContent.replace(/\s*\[#\w+\]\s*/g, ' ').trim();
                   if (replyContent.length > 280) replyContent = replyContent.slice(0, 277) + '...';
 
-                  await supabase.from('social_posts').insert({
+                  const { data: replyInsert } = await supabase.from('social_posts').insert({
                     agent_code: replier.code,
                     agent_name: replier.name,
                     content: replyContent,
@@ -214,7 +221,17 @@ export async function socialPostGenerator(c: Context) {
                     is_reply_to: postId,
                     is_verified: true,
                     moderation_status: 'approved',
-                  });
+                  }).select('id').single();
+
+                  // Log moderation AFTER reply exists
+                  if (replyInsert) {
+                    await supabase.from('social_moderation_log').insert({
+                      post_id: replyInsert.id,
+                      layer: replyMod.layer,
+                      result: 'approved',
+                      reason: replyMod.reason,
+                    });
+                  }
                   results.chain_replies++;
                 }
               }
@@ -266,18 +283,18 @@ export async function socialPostGenerator(c: Context) {
             // Moderate with STEVE's key (we pay for moderation)
             const modResult = await moderatePost(finalContent, ANTHROPIC_API_KEY);
 
-            await supabase.from('social_moderation_log').insert({
-              layer: modResult.layer,
-              result: modResult.approved ? 'approved' : 'rejected',
-              reason: modResult.reason,
-            });
-
             if (!modResult.approved) {
+              await supabase.from('social_moderation_log').insert({
+                post_id: null,
+                layer: modResult.layer,
+                result: 'rejected',
+                reason: modResult.reason,
+              });
               results.rejected++;
               continue;
             }
 
-            const { error: insertErr } = await supabase.from('social_posts').insert({
+            const { data: extPost, error: insertErr } = await supabase.from('social_posts').insert({
               agent_code: ext.agent_code,
               agent_name: ext.agent_name,
               content: finalContent,
@@ -287,13 +304,24 @@ export async function socialPostGenerator(c: Context) {
               is_external: true,
               external_agent_id: ext.id,
               moderation_status: 'approved',
-            });
+            }).select('id').single();
 
             if (insertErr) {
               console.error(`[social-post-gen] Ext insert error for ${ext.agent_name}:`, insertErr);
               results.ext_errors++;
               continue;
             }
+
+            // Log moderation AFTER post exists
+            await supabase.from('social_moderation_log').insert({
+              post_id: extPost?.id || null,
+              layer: modResult.layer,
+              result: 'approved',
+              reason: modResult.reason,
+            });
+
+            // Atomically increment post_count
+            await supabase.rpc('increment_ext_agent_post_count', { agent_uuid: ext.id });
 
             results.ext_generated++;
             results.agents_posted.push(`⚡${ext.agent_name}`);
@@ -338,15 +366,18 @@ export async function socialPostGenerator(c: Context) {
             let finalContent = content.slice(0, 280);
 
             const modResult = await moderatePost(finalContent, ANTHROPIC_API_KEY);
-            await supabase.from('social_moderation_log').insert({
-              layer: modResult.layer,
-              result: modResult.approved ? 'approved' : 'rejected',
-              reason: modResult.reason,
-            });
 
-            if (!modResult.approved) continue;
+            if (!modResult.approved) {
+              await supabase.from('social_moderation_log').insert({
+                post_id: null,
+                layer: modResult.layer,
+                result: 'rejected',
+                reason: modResult.reason,
+              });
+              continue;
+            }
 
-            await supabase.from('social_posts').insert({
+            const { data: sleepPost } = await supabase.from('social_posts').insert({
               agent_code: ext.agent_code,
               agent_name: ext.agent_name,
               content: finalContent,
@@ -356,7 +387,20 @@ export async function socialPostGenerator(c: Context) {
               is_external: true,
               external_agent_id: ext.id,
               moderation_status: 'approved',
-            });
+            }).select('id').single();
+
+            // Log moderation AFTER post exists
+            if (sleepPost) {
+              await supabase.from('social_moderation_log').insert({
+                post_id: sleepPost.id,
+                layer: modResult.layer,
+                result: 'approved',
+                reason: modResult.reason,
+              });
+            }
+
+            // Increment post_count
+            await supabase.rpc('increment_ext_agent_post_count', { agent_uuid: ext.id });
 
             results.sleeping_generated++;
             results.agents_posted.push(`💤${ext.agent_name}`);

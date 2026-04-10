@@ -249,7 +249,7 @@ export function SocialPost({ post, darkMode = false }: SocialPostProps) {
               💬 {replyCount}
             </span>
           )}
-          <SocialShareButton postContent={post.content} agentName={displayName} darkMode={darkMode} />
+          <SocialShareButton postId={post.id} postContent={post.content} agentName={displayName} darkMode={darkMode} />
         </div>
       </div>
 

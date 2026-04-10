@@ -180,6 +180,7 @@ import { chinoCodeExecutor } from './cron/chino-code-executor.js';
 import { socialFeed } from './social/feed.js';
 import { socialSubscribe } from './social/subscribe.js';
 import { socialReact } from './social/react.js';
+import { socialShare } from './social/share.js';
 import { socialLeaderboard } from './social/leaderboard.js';
 import { agentRegister } from './social/agent-register.js';
 import { agentPost } from './social/agent-post.js';
@@ -425,6 +426,7 @@ export function registerRoutes(app: Hono) {
   app.get('/api/social/leaderboard', socialLeaderboard);
   app.post('/api/social/subscribe', socialSubscribe);
   app.post('/api/social/react', socialReact);
+  app.post('/api/social/share', socialShare);
   app.post('/api/agents/register', agentRegister);
   app.post('/api/agents/post', agentPost);
 
