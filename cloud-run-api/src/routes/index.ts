@@ -66,6 +66,8 @@ import { createShopifyCombo } from './shopify/create-shopify-combo.js';
 // Phase 3: Google
 import { syncGoogleAdsMetrics } from './google/sync-google-ads-metrics.js';
 import { checkGoogleAdsHealth } from './google/check-google-ads-health.js';
+import { manageGoogleCampaign } from './google/manage-google-campaign.js';
+import { manageGoogleRules } from './google/manage-google-rules.js';
 
 // Phase 3: Other
 import { storePlatformConnection } from './utilities/store-platform-connection.js';
@@ -139,6 +141,7 @@ import { fatigueDetector } from './cron/fatigue-detector.js';
 import { performanceEvaluator } from './cron/performance-evaluator.js';
 import { performanceTrackerMeta } from './cron/performance-tracker-meta.js';
 import { executeMetaRulesCron } from './cron/execute-meta-rules.js';
+import { executeGoogleRulesCron } from './cron/execute-google-rules.js';
 import { taskPrioritizer } from './cron/task-prioritizer.js';
 import { taskCompleted } from './cron/task-completed.js';
 import { detectiveVisual } from './cron/detective-visual.js';
@@ -182,6 +185,7 @@ import { socialSubscribe } from './social/subscribe.js';
 import { socialReact } from './social/react.js';
 import { socialShare } from './social/share.js';
 import { socialLeaderboard } from './social/leaderboard.js';
+import { socialTrending } from './social/trending.js';
 import { agentRegister } from './social/agent-register.js';
 import { agentPost } from './social/agent-post.js';
 import { socialPostGenerator } from './cron/social-post-generator.js';
@@ -414,6 +418,8 @@ export function registerRoutes(app: Hono) {
   // ============================================================
   app.post('/api/sync-google-ads-metrics', authMiddleware, syncGoogleAdsMetrics);
   app.post('/api/check-google-ads-health', authMiddleware, checkGoogleAdsHealth);
+  app.post('/api/manage-google-campaign', authMiddleware, manageGoogleCampaign);
+  app.post('/api/manage-google-rules', authMiddleware, manageGoogleRules);
   app.post('/api/store-platform-connection', authMiddleware, storePlatformConnection);
 
   // ============================================================
@@ -424,6 +430,7 @@ export function registerRoutes(app: Hono) {
   // Steve Social (public — no JWT)
   app.get('/api/social/feed', socialFeed);
   app.get('/api/social/leaderboard', socialLeaderboard);
+  app.get('/api/social/trending', socialTrending);
   app.post('/api/social/subscribe', socialSubscribe);
   app.post('/api/social/react', socialReact);
   app.post('/api/social/share', socialShare);
@@ -560,6 +567,7 @@ export function registerRoutes(app: Hono) {
   cron.post('/performance-evaluator', performanceEvaluator);
   cron.post('/performance-tracker-meta', performanceTrackerMeta);
   cron.post('/execute-meta-rules', executeMetaRulesCron);
+  cron.post('/execute-google-rules', executeGoogleRulesCron);
   cron.post('/task-prioritizer', taskPrioritizer);
   cron.post('/detective-visual', detectiveVisual);
   cron.post('/prospect-followup', prospectFollowup);

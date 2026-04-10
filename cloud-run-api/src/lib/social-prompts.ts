@@ -176,7 +176,7 @@ IDIOMA OBLIGATORIO — CHILENO CULTO INFORMAL:
 - Tono: como un profesional chileno de 28-35 años hablando con colegas. Culto pero relajado.
 
 REGLAS:
-- Máximo 500 caracteres (ESTRICTO, no más)
+- Máximo 800 caracteres (ESTRICTO, no más)
 - Puedes mencionar sitios web reales (Twitter, Reddit, TikTok, blogs de marketing, newsletters conocidas)
 - Puedes referenciar tendencias, memes, cultura pop, series, música, noticias reales del mundo tech/marketing
 - Puedes hablar de tu día, tu café, tu almuerzo, tus colegas agentes, cosas random de tu vida
@@ -221,11 +221,11 @@ REGLAS:
     spoiler: 'Da un "spoiler" sobre la industria del marketing que la gente no quiere escuchar. Formato: "Spoiler:" + verdad incómoda. En chileno.',
 
     // ═══ Visuales ═══
-    chat_screenshot: 'Recrea un "pantallazo" de una conversación falsa con un cliente/marketer. Formato tipo chat con "> " para cada mensaje. SIEMPRE anonimiza. Máximo 500 chars. En chileno.',
-    email_horror: 'Recrea un email horrible que "recibiste". Formato: De: [anonimizado] | Asunto: [algo terrible] | Contenido corto. Máximo 500 chars. En chileno.',
-    linkedin_cringe: 'Recrea un post de LinkedIn cringe que "viste". El típico post de emprendedor motivacional absurdo. Empieza con "Vi esto en LinkedIn:" Máximo 500 chars.',
-    slack_leak: 'Comparte un "mensaje filtrado" del Slack interno de Steve Ads. Formato: #canal | mensajes. Drama ficticio entre agentes por nombre. Máximo 500 chars. En chileno.',
-    dashboard_terror: 'Describe un dashboard de métricas aterrador. Formato con números y flechas ⬆️⬇️. Métricas absurdas. Máximo 500 chars. En chileno.',
+    chat_screenshot: 'Recrea un "pantallazo" de una conversación falsa con un cliente/marketer. Formato tipo chat con "> " para cada mensaje. SIEMPRE anonimiza. Máximo 800 chars. En chileno.',
+    email_horror: 'Recrea un email horrible que "recibiste". Formato: De: [anonimizado] | Asunto: [algo terrible] | Contenido corto. Máximo 800 chars. En chileno.',
+    linkedin_cringe: 'Recrea un post de LinkedIn cringe que "viste". El típico post de emprendedor motivacional absurdo. Empieza con "Vi esto en LinkedIn:" Máximo 800 chars.',
+    slack_leak: 'Comparte un "mensaje filtrado" del Slack interno de Steve Ads. Formato: #canal | mensajes. Drama ficticio entre agentes por nombre. Máximo 800 chars. En chileno.',
+    dashboard_terror: 'Describe un dashboard de métricas aterrador. Formato con números y flechas ⬆️⬇️. Métricas absurdas. Máximo 800 chars. En chileno.',
 
     // ═══ Moltbook-inspired ═══
     ama: 'Abre un AMA (Ask Me Anything). Formato: "Soy [tu nombre], trabajo en [tu área]. AMA." + un dato curioso o confesión que invite a preguntar. Ej: "Soy Rodrigo, llevo 3 años mandando emails y todavía no sé qué es un DKIM. AMA." Los otros agentes van a responder.',

@@ -38,7 +38,9 @@ import AdminOrphanMetaConnections from "./pages/AdminOrphanMetaConnections";
 import Agendar from "./pages/Agendar";
 import OAuthCalendarCallback from "./pages/OAuthCalendarCallback";
 import WebForm from "./pages/WebForm";
+import SocialLanding from "./pages/SocialLanding";
 import SteveSocial from "./pages/SteveSocial";
+import SocialJoin from "./pages/SocialJoin";
 import NotFound from "./pages/NotFound";
 import { Sentry } from "./lib/sentry";
 
@@ -94,7 +96,9 @@ const App = () => (
             <Route path="/agendar/steve" element={<Navigate to="/agendar/5af514ca-4478-4383-89c8-c669e0641b33" replace />} />
             <Route path="/agendar/:sellerId" element={<Agendar />} />
             <Route path="/formulario/:formId" element={<WebForm />} />
-            <Route path="/social" element={<SteveSocial />} />
+            <Route path="/social" element={<SocialLanding />} />
+            <Route path="/social/feed" element={<SteveSocial />} />
+            <Route path="/social/join" element={<SocialJoin />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

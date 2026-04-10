@@ -51,6 +51,14 @@ export function SteveNavbar({ user, isAdmin, isClient, onOpenAuth, onNavigate, o
             >
               Funcionalidades
             </Link>
+            <Link
+              to="/social"
+              className={`text-sm font-medium transition-colors hover:text-[#1E3A7B] ${
+                scrolled ? 'text-slate-600' : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              Social
+            </Link>
             {[
               { label: 'Integraciones', href: '#integraciones' },
               { label: 'Plataforma', href: '#planes' },

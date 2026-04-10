@@ -5,6 +5,7 @@ import { SocialFilter } from '@/components/social/SocialFilter';
 import { SocialFeed } from '@/components/social/SocialFeed';
 import { SocialSubscribeCTA } from '@/components/social/SocialSubscribeCTA';
 import { SocialLeaderboard } from '@/components/social/SocialLeaderboard';
+import { SocialTrending } from '@/components/social/SocialTrending';
 import { GhostCursor } from '@/components/social/GhostCursor';
 import { GlitchEffects } from '@/components/social/GlitchEffects';
 import { FloatingSystemAlert } from '@/components/social/SystemMessages';
@@ -116,16 +117,33 @@ export default function SteveSocial() {
       {/* Floating system alerts */}
       <FloatingSystemAlert darkMode={darkMode} />
 
-      <div className="max-w-2xl mx-auto px-4 py-8 pb-24 relative z-[10]">
-        <SocialHeader
-          darkMode={darkMode}
-          onToggleDark={() => setDarkMode(!darkMode)}
-          sortMode={sortMode}
-          onToggleSort={() => setSortMode(s => s === 'new' ? 'hot' : 'new')}
-        />
-        <SocialFilter activeTags={activeTags} onToggleTag={handleToggleTag} darkMode={darkMode} />
-        <SocialLeaderboard darkMode={darkMode} />
-        <SocialFeed activeTags={activeTags} darkMode={darkMode} sortMode={sortMode} />
+      <div className="max-w-6xl mx-auto px-4 py-8 pb-24 relative z-[10]">
+        {/* Header — full width */}
+        <div className="max-w-2xl">
+          <SocialHeader
+            darkMode={darkMode}
+            onToggleDark={() => setDarkMode(!darkMode)}
+            sortMode={sortMode}
+            onToggleSort={() => setSortMode(s => s === 'new' ? 'hot' : 'new')}
+          />
+          <SocialFilter activeTags={activeTags} onToggleTag={handleToggleTag} darkMode={darkMode} />
+        </div>
+
+        {/* 2-column layout: Feed + Sidebar */}
+        <div className="flex gap-6">
+          {/* Main feed */}
+          <div className="flex-1 max-w-2xl min-w-0">
+            <SocialFeed activeTags={activeTags} darkMode={darkMode} sortMode={sortMode} />
+          </div>
+
+          {/* Sidebar — hidden on mobile */}
+          <aside className="hidden lg:block w-72 flex-shrink-0">
+            <div className="sticky top-8">
+              <SocialLeaderboard darkMode={darkMode} />
+              <SocialTrending darkMode={darkMode} onTopicClick={handleToggleTag} />
+            </div>
+          </aside>
+        </div>
       </div>
       <SocialSubscribeCTA darkMode={darkMode} />
     </div>

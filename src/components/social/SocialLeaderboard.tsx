@@ -34,13 +34,20 @@ interface SocialLeaderboardProps {
 export function SocialLeaderboard({ darkMode }: SocialLeaderboardProps) {
   const [agents, setAgents] = useState<AgentStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/social/leaderboard`)
-      .then(res => res.json())
-      .then(data => setAgents(data.leaderboard || []))
-      .catch(() => {})
+      .then(res => {
+        if (!res.ok) throw new Error('Leaderboard error');
+        return res.json();
+      })
+      .then(data => {
+        const lb = data.leaderboard || [];
+        setAgents(lb);
+      })
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
 
@@ -51,13 +58,34 @@ export function SocialLeaderboard({ darkMode }: SocialLeaderboardProps) {
 
   if (loading) {
     return (
-      <div className={`font-mono text-xs ${textMuted} py-4 text-center`}>
-        Cargando leaderboard...
+      <div className={`border rounded-lg ${borderColor} ${bgColor} p-4 mb-6`}>
+        <div className={`font-mono text-xs ${textMuted} py-4 text-center`}>
+          Cargando leaderboard...
+        </div>
       </div>
     );
   }
 
-  const displayed = expanded ? agents : agents.slice(0, 5);
+  if (error) {
+    return (
+      <div className={`border rounded-lg ${borderColor} ${bgColor} p-4 mb-6`}>
+        <h3 className={`font-mono text-sm font-bold ${textPrimary} mb-2`}>Leaderboard</h3>
+        <div className={`font-mono text-xs ${textMuted} text-center py-2`}>
+          No se pudo cargar. Los agentes siguen compitiendo.
+        </div>
+      </div>
+    );
+  }
+
+  // Filter out agents with zero activity for a cleaner view, but always show top 5
+  const activeAgents = agents.filter(a => a.totalPosts > 0 || a.totalReplies > 0 || a.karma !== 0);
+  const hasActivity = activeAgents.length > 0;
+  const displayList = hasActivity ? activeAgents : agents;
+  const displayed = expanded ? displayList : displayList.slice(0, 5);
+
+  // Total activity stats
+  const totalPosts = agents.reduce((sum, a) => sum + a.totalPosts, 0);
+  const totalKarma = agents.reduce((sum, a) => sum + a.karma, 0);
 
   return (
     <div className={`border rounded-lg ${borderColor} ${bgColor} p-4 mb-6`}>
@@ -66,9 +94,15 @@ export function SocialLeaderboard({ darkMode }: SocialLeaderboardProps) {
           Leaderboard
         </h3>
         <span className={`font-mono text-[10px] ${textMuted}`}>
-          últimos 30 días
+          {totalPosts} posts · {totalKarma > 0 ? '+' : ''}{totalKarma} karma
         </span>
       </div>
+
+      {!hasActivity && (
+        <div className={`font-mono text-[10px] ${textMuted} mb-3 text-center`}>
+          Sin actividad en los últimos 30 días. Los agentes están calentando.
+        </div>
+      )}
 
       <div className="space-y-2">
         {displayed.map((agent, idx) => {
@@ -95,6 +129,11 @@ export function SocialLeaderboard({ darkMode }: SocialLeaderboardProps) {
                   <span className={`font-mono text-[9px] ${moodInfo.color}`}>
                     {moodInfo.label}
                   </span>
+                  {agent.totalPosts > 0 && (
+                    <span className={`font-mono text-[9px] ${textMuted}`}>
+                      {agent.totalPosts}p
+                    </span>
+                  )}
                 </div>
                 {agent.badges.length > 0 && (
                   <div className={`font-mono text-[9px] ${textMuted} truncate`}>
@@ -125,12 +164,12 @@ export function SocialLeaderboard({ darkMode }: SocialLeaderboardProps) {
         })}
       </div>
 
-      {agents.length > 5 && (
+      {displayList.length > 5 && (
         <button
           onClick={() => setExpanded(!expanded)}
           className={`mt-2 font-mono text-[10px] ${textMuted} hover:underline w-full text-center`}
         >
-          {expanded ? '▲ Mostrar menos' : `▼ Ver los 16 agentes`}
+          {expanded ? '▲ Mostrar menos' : `▼ Ver los ${displayList.length} agentes`}
         </button>
       )}
     </div>

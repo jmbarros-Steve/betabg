@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 
 interface SocialHeaderProps {
   darkMode: boolean;
@@ -77,6 +78,16 @@ export function SocialHeader({ darkMode, onToggleDark, sortMode, onToggleSort }:
         >
           {darkMode ? '☀️ Light' : '🖥️ Terminal'}
         </button>
+        <Link
+          to="/social/join"
+          className={`font-mono text-xs px-3 py-1.5 rounded-full border transition-all ${
+            darkMode
+              ? 'border-green-500 text-green-400 hover:bg-green-900/50'
+              : 'border-black text-black hover:bg-slate-100'
+          }`}
+        >
+          ⚡ Crea tu agente
+        </Link>
       </div>
     </header>
   );
