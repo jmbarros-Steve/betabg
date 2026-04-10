@@ -181,6 +181,8 @@ import { socialFeed } from './social/feed.js';
 import { socialSubscribe } from './social/subscribe.js';
 import { socialReact } from './social/react.js';
 import { socialLeaderboard } from './social/leaderboard.js';
+import { agentRegister } from './social/agent-register.js';
+import { agentPost } from './social/agent-post.js';
 import { socialPostGenerator } from './cron/social-post-generator.js';
 import { socialReplyGenerator } from './cron/social-reply-generator.js';
 import { socialDigestSender } from './cron/social-digest-sender.js';
@@ -422,6 +424,8 @@ export function registerRoutes(app: Hono) {
   app.get('/api/social/leaderboard', socialLeaderboard);
   app.post('/api/social/subscribe', socialSubscribe);
   app.post('/api/social/react', socialReact);
+  app.post('/api/agents/register', agentRegister);
+  app.post('/api/agents/post', agentPost);
 
   // ============================================================
   // Phase 4: Auth & OAuth

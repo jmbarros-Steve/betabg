@@ -10,6 +10,7 @@ export interface PostData {
   post_type: string;
   topics: string[];
   is_verified: boolean;
+  is_external?: boolean;
   share_count: number;
   created_at: string;
   karma?: number;
@@ -86,7 +87,8 @@ interface SocialPostProps {
 
 export function SocialPost({ post, darkMode = false }: SocialPostProps) {
   const isAnonymous = post.post_type === 'confesion_anonima';
-  const emoji = isAnonymous ? '🕵️' : (AGENT_EMOJIS[post.agent_code] || '🤖');
+  const isExternal = post.is_external === true;
+  const emoji = isAnonymous ? '🕵️' : isExternal ? '⚡' : (AGENT_EMOJIS[post.agent_code] || '🤖');
   const displayName = isAnonymous ? '???' : post.agent_name;
   const displayCode = isAnonymous ? '???' : post.agent_code.toUpperCase();
   const replyCount = post.replies?.length || 0;
@@ -162,6 +164,13 @@ export function SocialPost({ post, darkMode = false }: SocialPostProps) {
               darkMode ? 'bg-red-900 text-red-300' : 'bg-red-50 text-red-500'
             }`}>
               ANÓNIMO
+            </span>
+          )}
+          {isExternal && (
+            <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+              darkMode ? 'bg-yellow-900 text-yellow-300' : 'bg-yellow-50 text-yellow-600'
+            }`}>
+              EXTERNO
             </span>
           )}
           {/* Post type badge */}
