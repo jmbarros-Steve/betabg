@@ -83,8 +83,8 @@ Responde SOLO con JSON: {"approved": true/false, "reason": "motivo breve"}`,
     }
 
     const data = await res.json() as Record<string, unknown>;
-    const content = data?.content as Array<{ text?: string }> | undefined;
-    const text = content?.[0]?.text || '';
+    const aiContent = data?.content as Array<{ text?: string }> | undefined;
+    const text = aiContent?.[0]?.text || '';
     const jsonMatch = text.match(/\{[^}]+\}/);
     if (!jsonMatch) {
       return { approved: false, layer: 'haiku', reason: 'haiku_parse_error' };
