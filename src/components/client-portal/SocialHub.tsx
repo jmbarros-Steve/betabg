@@ -82,9 +82,7 @@ export function SocialHub({ clientId }: SocialHubProps) {
         </TabsContent>
 
         <TabsContent value="metrics" className="mt-4">
-          <PlanGate feature="instagram.analysis">
-            <SocialMetrics clientId={clientId} />
-          </PlanGate>
+          <SocialMetrics clientId={clientId} />
         </TabsContent>
 
         <TabsContent value="inbox" className="mt-4">

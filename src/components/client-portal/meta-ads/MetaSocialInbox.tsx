@@ -41,6 +41,7 @@ import {
 import MetaScopeAlert from './MetaScopeAlert';
 import { useMetaBusinessSafe } from './MetaBusinessContext';
 import { supabase } from '@/integrations/supabase/client';
+import { PlanGate } from '@/components/client-portal/PlanGate';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -1002,7 +1003,8 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                   </div>
                 )}
 
-                {/* Reply */}
+                {/* Reply — solo plan Full */}
+                <PlanGate feature="meta_ads.social_inbox_reply" clientId={clientId}>
                 <div className="px-4 py-3 border-t border-border shrink-0 space-y-2">
                   <Textarea
                     value={replyText}
@@ -1047,6 +1049,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                     </Button>
                   </div>
                 </div>
+                </PlanGate>
               </>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground px-4">

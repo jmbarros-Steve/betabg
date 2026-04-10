@@ -106,6 +106,7 @@ export const FEATURE_ACCESS: Record<FeatureKey, PlanSlug> = {
   'meta_ads.rules': 'full',
   'meta_ads.audiences': 'full',
   'meta_ads.social_inbox': 'visual',
+  'meta_ads.social_inbox_reply': 'full',   // Ver bandeja = visual, responder = full
 
   // Klaviyo
   'klaviyo.view': 'visual',
@@ -116,7 +117,7 @@ export const FEATURE_ACCESS: Record<FeatureKey, PlanSlug> = {
 
   // Instagram
   'instagram.view': 'visual',
-  'instagram.analysis': 'estrategia',
+  'instagram.analysis': 'visual',          // Métricas = solo ver
   'instagram.publish': 'full',
 
   // Google Ads
@@ -303,7 +304,8 @@ export const COMPARATIVA: ModuloSection[] = [
       { nombre: 'Editar y optimizar campañas', visual: false, estrategia: false, full: true },
       { nombre: 'Reglas automatizadas', visual: false, estrategia: false, full: true },
       { nombre: 'Crear audiencias', visual: false, estrategia: false, full: true },
-      { nombre: 'Social Inbox', visual: true, estrategia: true, full: true },
+      { nombre: 'Social Inbox (ver)', visual: true, estrategia: true, full: true },
+      { nombre: 'Social Inbox (responder)', visual: false, estrategia: false, full: true },
     ],
   },
   {
@@ -320,7 +322,7 @@ export const COMPARATIVA: ModuloSection[] = [
     modulo: 'Instagram',
     features: [
       { nombre: 'Ver feed y métricas', visual: true, estrategia: true, full: true },
-      { nombre: 'Análisis de contenido IA', visual: false, estrategia: true, full: true },
+      { nombre: 'Análisis de contenido IA', visual: true, estrategia: true, full: true },
       { nombre: 'Publicar contenido', visual: false, estrategia: false, full: true },
     ],
   },

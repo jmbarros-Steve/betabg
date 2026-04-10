@@ -74,6 +74,8 @@ import PixelSetupWizard from './PixelSetupWizard';
 import CreativePerformancePanel from './CreativePerformancePanel';
 import MetaConnectionWizard from './MetaConnectionWizard';
 import { PlanGate } from '@/components/client-portal/PlanGate';
+import { useUserPlan } from '@/hooks/useUserPlan';
+import { Lock } from 'lucide-react';
 import { MetaScopeStatusPanel } from './MetaScopeAlert';
 
 // Business context
@@ -167,6 +169,15 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'creative-perf', label: 'Creativos', icon: Sparkles },
   { key: 'competitors', label: 'Competencia', icon: Swords },
 ];
+
+/** Nav keys that require a specific plan — used to show lock icon */
+const NAV_FEATURE_MAP: Record<string, string> = {
+  'create-wizard': 'meta_ads.create',
+  'drafts': 'meta_ads.create',
+  'audiences': 'meta_ads.audiences',
+  'rules': 'meta_ads.rules',
+  'competitors': 'competencia.ads',
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -607,6 +618,7 @@ interface MetaConnectionInfo {
 }
 
 export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
+  const { canAccess } = useUserPlan(clientId);
   const [activeSection, setActiveSection] = useState<SectionKey>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [visitedSections, setVisitedSections] = useState<Set<SectionKey>>(
@@ -1029,7 +1041,11 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
             />
           </PlanGate>
         )}
-        {key === 'audiences' && <MetaAudienceManager clientId={clientId} />}
+        {key === 'audiences' && (
+          <PlanGate feature="meta_ads.audiences">
+            <MetaAudienceManager clientId={clientId} />
+          </PlanGate>
+        )}
         {key === 'library' && <AdCreativesLibrary clientId={clientId} />}
         {key === 'analytics' && (
           <PlanGate feature="meta_ads.analysis">
@@ -1039,11 +1055,19 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
             />
           </PlanGate>
         )}
-        {key === 'rules' && <MetaAutomatedRules clientId={clientId} />}
+        {key === 'rules' && (
+          <PlanGate feature="meta_ads.rules">
+            <MetaAutomatedRules clientId={clientId} />
+          </PlanGate>
+        )}
         {key === 'drafts' && <DraftsManager clientId={clientId} onEditDraft={() => { handleNavClick('create-wizard'); }} />}
         {key === 'pixel' && <PixelSetupWizard clientId={clientId} />}
         {key === 'creative-perf' && <CreativePerformancePanel clientId={clientId} />}
-        {key === 'competitors' && <CompetitorAdsPanel clientId={clientId} />}
+        {key === 'competitors' && (
+          <PlanGate feature="competencia.ads">
+            <CompetitorAdsPanel clientId={clientId} />
+          </PlanGate>
+        )}
       </div>
     );
   };
@@ -1076,7 +1100,9 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
             <nav className="flex-1 flex flex-col gap-0.5 px-2 pb-4" role="tablist">
               {NAV_ITEMS.map((item) => {
                 const isActive = activeSection === item.key;
-                const Icon = item.icon;
+                const featureKey = NAV_FEATURE_MAP[item.key];
+                const locked = featureKey ? !canAccess(featureKey) : false;
+                const Icon = locked ? Lock : item.icon;
                 const btn = (
                   <button
                     key={item.key}
@@ -1087,11 +1113,11 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
                       group flex items-center gap-2.5 rounded-lg px-2.5 py-2
                       text-sm font-medium transition-colors duration-150
                       outline-none focus-visible:ring-2 focus-visible:ring-ring
-                      ${isActive ? 'bg-[#F0F4FA] text-[#162D5F]' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
+                      ${isActive ? 'bg-[#F0F4FA] text-[#162D5F]' : locked ? 'text-slate-400' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
                       ${sidebarCollapsed ? 'justify-center' : ''}
                     `}
                   >
-                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#162D5F]' : 'text-muted-foreground group-hover:text-foreground'}`} />
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#162D5F]' : locked ? 'text-slate-300' : 'text-muted-foreground group-hover:text-foreground'}`} />
                     {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
                   </button>
                 );
@@ -1286,7 +1312,11 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
                   return (
                     <div key={item.key} className={isActive ? 'block' : 'hidden'}>
                       {item.key === 'library' && <AdCreativesLibrary clientId={clientId} />}
-                      {item.key === 'competitors' && <CompetitorAdsPanel clientId={clientId} />}
+                      {item.key === 'competitors' && (
+                        <PlanGate feature="competencia.ads">
+                          <CompetitorAdsPanel clientId={clientId} />
+                        </PlanGate>
+                      )}
                     </div>
                   );
                 }
