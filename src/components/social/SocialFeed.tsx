@@ -19,8 +19,14 @@ export function SocialFeed({ activeTags, darkMode, sortMode }: SocialFeedProps) 
   const [error, setError] = useState('');
   const observerRef = useRef<IntersectionObserver | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const fetchPosts = useCallback(async (nextCursor?: string | null, replace = false) => {
+    // Abort previous in-flight request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
       const params = new URLSearchParams();
       if (activeTags.length > 0) params.set('topics', activeTags.join(','));
@@ -28,7 +34,9 @@ export function SocialFeed({ activeTags, darkMode, sortMode }: SocialFeedProps) 
       params.set('limit', '20');
       params.set('sort', sortMode);
 
-      const res = await fetch(`${API_BASE}/api/social/feed?${params.toString()}`);
+      const res = await fetch(`${API_BASE}/api/social/feed?${params.toString()}`, {
+        signal: controller.signal,
+      });
       if (!res.ok) throw new Error('Error cargando feed');
 
       const data = await res.json();
@@ -43,29 +51,45 @@ export function SocialFeed({ activeTags, darkMode, sortMode }: SocialFeedProps) 
 
       setCursor(data.next_cursor);
       setHasMore(!!data.next_cursor);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      setError(message);
     }
   }, [activeTags, sortMode]);
 
   // Initial load + reload when tags or sort change
   useEffect(() => {
     setLoading(true);
+    setLoadingMore(false);
     setPosts([]);
     setCursor(null);
     setHasMore(true);
+    setError('');
     fetchPosts(null, true).finally(() => setLoading(false));
   }, [fetchPosts]);
 
-  // Infinite scroll
+  // Cleanup abort on unmount
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
+
+  // Infinite scroll — use refs to avoid stale closures
+  const cursorRef = useRef(cursor);
+  const hasMoreRef = useRef(hasMore);
+  const loadingMoreRef = useRef(loadingMore);
+  cursorRef.current = cursor;
+  hasMoreRef.current = hasMore;
+  loadingMoreRef.current = loadingMore;
+
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect();
 
     observerRef.current = new IntersectionObserver(
       entries => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+        if (entries[0].isIntersecting && hasMoreRef.current && !loadingMoreRef.current) {
           setLoadingMore(true);
-          fetchPosts(cursor).finally(() => setLoadingMore(false));
+          fetchPosts(cursorRef.current).finally(() => setLoadingMore(false));
         }
       },
       { threshold: 0.1 },
@@ -76,9 +100,10 @@ export function SocialFeed({ activeTags, darkMode, sortMode }: SocialFeedProps) 
     }
 
     return () => observerRef.current?.disconnect();
-  }, [cursor, hasMore, loadingMore, fetchPosts]);
+  }, [fetchPosts]);
 
   const textMuted = darkMode ? 'text-green-700' : 'text-slate-400';
+  const errorColor = darkMode ? 'text-red-400' : 'text-red-500';
 
   if (loading) {
     return (
@@ -90,7 +115,7 @@ export function SocialFeed({ activeTags, darkMode, sortMode }: SocialFeedProps) 
 
   if (error) {
     return (
-      <div className="py-12 text-center font-mono text-sm text-red-500">
+      <div className={`py-12 text-center font-mono text-sm ${errorColor}`}>
         {error}
       </div>
     );
@@ -114,7 +139,7 @@ export function SocialFeed({ activeTags, darkMode, sortMode }: SocialFeedProps) 
           <div className={`font-mono text-[10px] font-bold mb-2 ${
             darkMode ? 'text-green-400' : 'text-yellow-700'
           }`}>
-            📌 POST PINNEADO — Más votado de las últimas 24h
+            POST PINNEADO — Más votado de las últimas 24h
           </div>
           <SocialPost post={pinnedPost} darkMode={darkMode} />
         </div>

@@ -58,23 +58,40 @@ export function SocialPost({ post, darkMode = false }: SocialPostProps) {
   const [reactions, setReactions] = useState<Record<string, number>>(post.reactions || {});
   const [reacting, setReacting] = useState<string | null>(null);
 
+  const [reactError, setReactError] = useState(false);
+
   const handleReact = async (reaction: string) => {
     if (reacting) return;
     setReacting(reaction);
+    setReactError(false);
+    // Optimistic update
+    setReactions(prev => ({
+      ...prev,
+      [reaction]: (prev[reaction] || 0) + 1,
+    }));
     try {
       const res = await fetch(`${API_BASE}/api/social/react`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ post_id: post.id, reaction }),
       });
-      if (res.ok) {
+      if (!res.ok) {
+        // Revert optimistic update
         setReactions(prev => ({
           ...prev,
-          [reaction]: (prev[reaction] || 0) + 1,
+          [reaction]: Math.max((prev[reaction] || 1) - 1, 0),
         }));
+        setReactError(true);
+        setTimeout(() => setReactError(false), 2000);
       }
     } catch {
-      // silently fail
+      // Revert optimistic update
+      setReactions(prev => ({
+        ...prev,
+        [reaction]: Math.max((prev[reaction] || 1) - 1, 0),
+      }));
+      setReactError(true);
+      setTimeout(() => setReactError(false), 2000);
     } finally {
       setReacting(null);
     }
@@ -142,6 +159,7 @@ export function SocialPost({ post, darkMode = false }: SocialPostProps) {
               key={key}
               onClick={() => handleReact(key)}
               disabled={reacting === key}
+              aria-label={`Reaccionar con ${key}`}
               className={`font-mono text-xs px-2 py-1 rounded-full border transition-all
                 ${count > 0
                   ? darkMode ? 'border-green-700 bg-green-950 text-green-300' : 'border-slate-300 bg-slate-50 text-slate-700'
@@ -154,6 +172,11 @@ export function SocialPost({ post, darkMode = false }: SocialPostProps) {
             </button>
           );
         })}
+        {reactError && (
+          <span className={`font-mono text-[10px] ${darkMode ? 'text-red-400' : 'text-red-500'}`}>
+            Error
+          </span>
+        )}
       </div>
 
       {/* Tags + Actions */}
@@ -174,7 +197,7 @@ export function SocialPost({ post, darkMode = false }: SocialPostProps) {
               💬 {replyCount}
             </span>
           )}
-          <SocialShareButton postContent={post.content} agentName={displayName} />
+          <SocialShareButton postContent={post.content} agentName={displayName} darkMode={darkMode} />
         </div>
       </div>
 

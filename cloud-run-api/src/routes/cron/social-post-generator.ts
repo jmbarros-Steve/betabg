@@ -7,6 +7,12 @@ import { isValidCronSecret } from '../../lib/cron-auth.js';
 import { AGENTS, pickPostType, pickDifferentAgent, getPostPrompt, getReplyPrompt } from '../../lib/social-prompts.js';
 import { moderatePost } from '../../lib/social-moderation.js';
 
+const VALID_TOPICS = new Set([
+  'meta', 'email', 'shopify', 'google', 'ai', 'ecommerce', 'creativos', 'data',
+  'leads', 'whatsapp', 'ux', 'infra', 'qa', 'seo', 'conversión', 'filosofía',
+  'latam', 'competencia', 'drama', 'religion', 'confesiones', 'random', 'vida', 'cultura',
+]);
+
 const POST_PROBABILITY = 0.4;
 const CHAIN_REPLY_PROBABILITY = 0.3;
 
@@ -84,8 +90,9 @@ export async function socialPostGenerator(c: Context) {
           continue;
         }
 
-        const aiData = await aiRes.json() as any;
-        const content = aiData?.content?.[0]?.text?.trim();
+        const aiData = await aiRes.json() as Record<string, unknown>;
+        const aiContent = aiData?.content as Array<{ text?: string }> | undefined;
+        let content = aiContent?.[0]?.text?.trim();
         if (!content) {
           results.errors++;
           continue;
@@ -93,7 +100,20 @@ export async function socialPostGenerator(c: Context) {
 
         // Extract topics from tags in the content
         const tagMatches = content.match(/\[#(\w+)\]/g) || [];
-        const topics = tagMatches.map((t: string) => t.replace(/[\[#\]]/g, ''));
+        const extractedTopics = tagMatches.map((t: string) => t.replace(/[\[#\]]/g, ''));
+        const topics = extractedTopics.filter(t => VALID_TOPICS.has(t));
+
+        // If no valid topics, assign from agent's default topics
+        if (topics.length === 0) {
+          const agentTopics = agent.topics.filter(t => VALID_TOPICS.has(t));
+          topics.push(agentTopics[0] || 'random');
+        }
+
+        // Strip tags from content and enforce 280 char limit
+        content = content.replace(/\s*\[#\w+\]\s*/g, ' ').trim();
+        if (content.length > 280) {
+          content = content.slice(0, 277) + '...';
+        }
 
         // Moderate
         const modResult = await moderatePost(content, ANTHROPIC_API_KEY);
@@ -160,13 +180,29 @@ export async function socialPostGenerator(c: Context) {
             });
 
             if (replyRes.ok) {
-              const replyData = await replyRes.json() as any;
-              const replyContent = replyData?.content?.[0]?.text?.trim();
+              const replyData = await replyRes.json() as Record<string, unknown>;
+              const replyAiContent = replyData?.content as Array<{ text?: string }> | undefined;
+              let replyContent = replyAiContent?.[0]?.text?.trim();
               if (replyContent) {
                 const replyMod = await moderatePost(replyContent, ANTHROPIC_API_KEY);
+
+                // Log moderation for chain replies too
+                await supabase.from('social_moderation_log').insert({
+                  post_id: null,
+                  layer: replyMod.layer,
+                  result: replyMod.approved ? 'approved' : 'rejected',
+                  reason: replyMod.reason,
+                });
+
                 if (replyMod.approved) {
                   const replyTags = replyContent.match(/\[#(\w+)\]/g) || [];
-                  const replyTopics = replyTags.map((t: string) => t.replace(/[\[#\]]/g, ''));
+                  const replyTopics = replyTags.map((t: string) => t.replace(/[\[#\]]/g, '')).filter(t => VALID_TOPICS.has(t));
+                  if (replyTopics.length === 0) replyTopics.push(topics[0] || 'random');
+
+                  // Strip tags and enforce length
+                  replyContent = replyContent.replace(/\s*\[#\w+\]\s*/g, ' ').trim();
+                  if (replyContent.length > 280) replyContent = replyContent.slice(0, 277) + '...';
+
                   await supabase.from('social_posts').insert({
                     agent_code: replier.code,
                     agent_name: replier.name,
@@ -193,8 +229,9 @@ export async function socialPostGenerator(c: Context) {
 
     console.log('[social-post-gen] Done:', JSON.stringify(results));
     return c.json({ success: true, ...results });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error desconocido';
     console.error('[social-post-gen] Fatal error:', err);
-    return c.json({ error: err.message }, 500);
+    return c.json({ error: message }, 500);
   }
 }

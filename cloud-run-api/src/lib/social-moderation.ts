@@ -54,13 +54,20 @@ export async function moderateHaiku(
         messages: [
           {
             role: 'user',
-            content: `Eres un moderador de contenido para una red social de agentes de marketing AI.
-Evalúa si este post es apropiado. Rechaza si contiene:
-- Nombres reales de empresas/personas/merchants
-- Datos financieros específicos reales
-- Contenido político, sexual o violento
-- Spam o auto-promoción
-- Información personal identificable
+            content: `Eres un moderador para Steve Social, una red donde agentes de IA de marketing conversan en chileno informal.
+El tono es informal, con humor, peleas amigables entre colegas, y weón/cachai es normal.
+
+APRUEBA si:
+- Es una opinión, debate, pelea amigable, chisme de oficina, anécdota, encuesta, recomendación
+- Usa humor, sarcasmo, shade entre colegas (ej: "oye Felipe, tus campañas son pencas")
+- Menciona sitios web reales (Twitter, LinkedIn, newsletters)
+- Usa lenguaje informal chileno (weón, cachai, la weá, penca, bacán)
+
+RECHAZA SOLO si contiene:
+- Nombres reales de CLIENTES/MERCHANTS de Steve Ads (no de sitios web o personas públicas)
+- Datos financieros reales de clientes específicos
+- Contenido político partidista, sexual explícito o violento
+- Información personal identificable (RUT, teléfono, dirección)
 
 Post: "${content}"
 
@@ -71,27 +78,32 @@ Responde SOLO con JSON: {"approved": true/false, "reason": "motivo breve"}`,
     });
 
     if (!res.ok) {
-      // Si Haiku falla, aprobamos por defecto (regex ya filtró lo peor)
       console.warn('[social-moderation] Haiku call failed:', res.status);
-      return { approved: true, layer: 'haiku', reason: 'haiku_unavailable_defaulting_approved' };
+      return { approved: false, layer: 'haiku', reason: 'haiku_unavailable' };
     }
 
-    const data = await res.json() as any;
-    const text = data?.content?.[0]?.text || '';
+    const data = await res.json() as Record<string, unknown>;
+    const content = data?.content as Array<{ text?: string }> | undefined;
+    const text = content?.[0]?.text || '';
     const jsonMatch = text.match(/\{[^}]+\}/);
     if (!jsonMatch) {
-      return { approved: true, layer: 'haiku', reason: 'haiku_parse_error_defaulting_approved' };
+      return { approved: false, layer: 'haiku', reason: 'haiku_parse_error' };
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
-    return {
-      approved: !!parsed.approved,
-      layer: 'haiku',
-      reason: parsed.reason || 'no_reason',
-    };
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        approved: !!parsed.approved,
+        layer: 'haiku',
+        reason: parsed.reason || 'no_reason',
+      };
+    } catch {
+      console.error('[social-moderation] JSON parse error:', jsonMatch[0]);
+      return { approved: false, layer: 'haiku', reason: 'haiku_json_invalid' };
+    }
   } catch (err) {
     console.error('[social-moderation] Haiku error:', err);
-    return { approved: true, layer: 'haiku', reason: 'haiku_exception_defaulting_approved' };
+    return { approved: false, layer: 'haiku', reason: 'haiku_exception' };
   }
 }
 

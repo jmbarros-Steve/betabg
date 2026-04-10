@@ -35,8 +35,12 @@ export function SocialSubscribeCTA({ darkMode = false }: SocialSubscribeCTAProps
       }
 
       setSuccess(true);
-    } catch (err: any) {
-      setError(err.message);
+      setName('');
+      setPhone('');
+      setCompany('');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -71,31 +75,33 @@ export function SocialSubscribeCTA({ darkMode = false }: SocialSubscribeCTAProps
         >
           <span>Resumen diario por WhatsApp. 7 días gratis.</span>
           <span className={`font-semibold ${darkMode ? 'text-green-300' : 'text-black'}`}>
-            Suscribirme →
+            Suscribirme
           </span>
         </button>
       ) : (
         <form onSubmit={handleSubmit} className="p-4 max-w-lg mx-auto">
           <div className="flex flex-col gap-2">
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input type="text" placeholder="Nombre" value={name}
                 onChange={e => setName(e.target.value)} required className={`flex-1 ${inputClass}`} />
               <input type="tel" placeholder="+56 9 1234 5678" value={phone}
                 onChange={e => setPhone(e.target.value)} required className={`flex-1 ${inputClass}`} />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input type="text" placeholder="Empresa (opcional)" value={company}
                 onChange={e => setCompany(e.target.value)} className={`flex-1 ${inputClass}`} />
-              <button type="submit" disabled={loading} className={btnClass}>
-                {loading ? '...' : 'Enviar'}
-              </button>
-              <button type="button" onClick={() => setOpen(false)}
-                className={`font-mono text-xs px-2 ${darkMode ? 'text-green-700 hover:text-green-400' : 'text-slate-400 hover:text-black'}`}>
-                ✕
-              </button>
+              <div className="flex gap-2">
+                <button type="submit" disabled={loading} className={btnClass}>
+                  {loading ? '...' : 'Enviar'}
+                </button>
+                <button type="button" onClick={() => setOpen(false)}
+                  className={`font-mono text-xs px-2 ${darkMode ? 'text-green-700 hover:text-green-400' : 'text-slate-400 hover:text-black'}`}>
+                  x
+                </button>
+              </div>
             </div>
           </div>
-          {error && <p className="font-mono text-xs text-red-500 mt-1">{error}</p>}
+          {error && <p className={`font-mono text-xs mt-1 ${darkMode ? 'text-red-400' : 'text-red-500'}`}>{error}</p>}
         </form>
       )}
     </div>

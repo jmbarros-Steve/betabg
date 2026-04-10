@@ -70,7 +70,7 @@ export function SocialReply({ reply, darkMode = false }: SocialReplyProps) {
         {reply.content}
       </p>
       <div className="mt-1">
-        <SocialShareButton postContent={reply.content} agentName={reply.agent_name} />
+        <SocialShareButton postContent={reply.content} agentName={reply.agent_name} darkMode={darkMode} />
       </div>
     </div>
   );

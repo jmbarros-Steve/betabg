@@ -59,7 +59,7 @@ export async function socialDigestSender(c: Context) {
         // Filter posts by subscriber's topics (or all if no topics)
         let relevantPosts = allPosts;
         if (sub.topics && sub.topics.length > 0) {
-          relevantPosts = allPosts.filter((p: any) =>
+          relevantPosts = allPosts.filter((p: { topics?: string[] }) =>
             p.topics?.some((t: string) => sub.topics.includes(t)),
           );
           // Fallback to all posts if no topic match
@@ -110,32 +110,32 @@ export async function socialDigestSender(c: Context) {
           continue;
         }
 
-        const aiData = await aiRes.json() as any;
-        const digestContent = aiData?.content?.[0]?.text?.trim();
+        const aiData = await aiRes.json() as Record<string, unknown>;
+        const aiContent = aiData?.content as Array<{ text?: string }> | undefined;
+        const digestContent = aiContent?.[0]?.text?.trim();
         if (!digestContent) {
           results.errors++;
           continue;
         }
 
-        // Send via WhatsApp
-        try {
-          await sendWhatsApp(sub.phone, digestContent);
-        } catch (waErr) {
-          console.warn(`[social-digest] WA send failed for ${sub.name}:`, waErr);
-          results.errors++;
-          continue;
-        }
-
-        // Log digest
+        // Log digest BEFORE sending WA (so we have a record even if WA fails)
         await supabase.from('social_digests').insert({
           subscription_id: sub.id,
           day_number: sub.trial_day + 1,
           content: digestContent,
         });
 
+        // Send via WhatsApp
+        try {
+          await sendWhatsApp(sub.phone, digestContent);
+        } catch (waErr) {
+          console.warn(`[social-digest] WA send failed for ${sub.name}:`, waErr);
+          // Don't skip — digest is logged, day still increments
+        }
+
         // Increment trial_day
         const newDay = sub.trial_day + 1;
-        const updateData: Record<string, any> = { trial_day: newDay };
+        const updateData: Record<string, unknown> = { trial_day: newDay };
         if (newDay >= 7) updateData.status = 'expired';
 
         await supabase
@@ -152,8 +152,9 @@ export async function socialDigestSender(c: Context) {
 
     console.log('[social-digest] Done:', JSON.stringify(results));
     return c.json({ success: true, ...results });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error desconocido';
     console.error('[social-digest] Fatal error:', err);
-    return c.json({ error: err.message }, 500);
+    return c.json({ error: message }, 500);
   }
 }

@@ -16,7 +16,10 @@ interface FeedPost {
   is_verified: boolean;
   share_count: number;
   created_at: string;
+  moderation_status?: string;
   replies?: FeedPost[];
+  reactions?: Record<string, number>;
+  karma?: number;
 }
 
 export async function socialFeed(c: Context) {
@@ -142,7 +145,7 @@ export async function socialFeed(c: Context) {
     };
 
     // Enrich posts
-    const enrichPost = (post: any) => ({
+    const enrichPost = (post: FeedPost) => ({
       ...post,
       reactions: reactionsByPost[post.id] || {},
       karma: getKarma(post.id),
@@ -154,9 +157,11 @@ export async function socialFeed(c: Context) {
 
     let enrichedPosts = posts.map(enrichPost);
 
-    // Sort by hot (karma) if requested
+    // Sort by hot (karma descending, then newest first for stability)
     if (sort === 'hot') {
-      enrichedPosts.sort((a, b) => b.karma - a.karma);
+      enrichedPosts.sort((a, b) =>
+        b.karma - a.karma || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
     }
 
     // Enrich pinned post
@@ -170,8 +175,9 @@ export async function socialFeed(c: Context) {
       next_cursor: nextCursor,
       pinned: enrichedPinned,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error desconocido';
     console.error('[social-feed] Error:', err);
-    return c.json({ error: err.message }, 500);
+    return c.json({ error: message }, 500);
   }
 }
