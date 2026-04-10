@@ -1,5 +1,6 @@
 /**
  * GET /api/social/feed — Public feed endpoint (no auth)
+ * Supports: topics filter, cursor pagination, sort=hot|new, pinned post
  */
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
@@ -24,10 +25,48 @@ export async function socialFeed(c: Context) {
     const topicsParam = url.searchParams.get('topics');
     const cursor = url.searchParams.get('cursor');
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10), 50);
+    const sort = url.searchParams.get('sort') || 'new'; // 'new' or 'hot'
 
     const supabase = getSupabaseAdmin();
 
-    // Fetch top-level posts (not replies)
+    // ── Pinned post: top post of last 24h by reaction count ──
+    let pinnedPost = null;
+    if (!cursor) {
+      const oneDayAgo = new Date(Date.now() - 24 * 3600_000).toISOString();
+      const { data: recentPosts } = await supabase
+        .from('social_posts')
+        .select('id')
+        .is('is_reply_to', null)
+        .eq('moderation_status', 'approved')
+        .gte('created_at', oneDayAgo);
+
+      if (recentPosts && recentPosts.length > 0) {
+        const recentIds = recentPosts.map(p => p.id);
+        const { data: allReactions } = await supabase
+          .from('social_reactions')
+          .select('post_id, reaction')
+          .in('post_id', recentIds);
+
+        if (allReactions && allReactions.length > 0) {
+          // Count reactions per post (trash counts as -1)
+          const scores: Record<string, number> = {};
+          for (const r of allReactions) {
+            scores[r.post_id] = (scores[r.post_id] || 0) + (r.reaction === 'trash' ? -1 : 1);
+          }
+          const topId = Object.entries(scores).sort((a, b) => b[1] - a[1])[0]?.[0];
+          if (topId && scores[topId] >= 3) {
+            const { data: pinned } = await supabase
+              .from('social_posts')
+              .select('*')
+              .eq('id', topId)
+              .single();
+            if (pinned) pinnedPost = pinned;
+          }
+        }
+      }
+    }
+
+    // ── Main feed query ──
     let query = supabase
       .from('social_posts')
       .select('*')
@@ -54,11 +93,15 @@ export async function socialFeed(c: Context) {
     }
 
     if (!posts || posts.length === 0) {
-      return c.json({ posts: [], next_cursor: null });
+      return c.json({ posts: [], next_cursor: null, pinned: null });
     }
 
     // Fetch replies for these posts
     const postIds = posts.map(p => p.id);
+    if (pinnedPost && !postIds.includes(pinnedPost.id)) {
+      postIds.push(pinnedPost.id);
+    }
+
     const { data: replies } = await supabase
       .from('social_posts')
       .select('*')
@@ -74,7 +117,7 @@ export async function socialFeed(c: Context) {
       repliesByPost[parentId].push(reply);
     }
 
-    // Fetch reactions for these posts (and their replies)
+    // Fetch reactions for all posts + replies
     const allIds = [...postIds, ...(replies || []).map(r => r.id)];
     const { data: reactions } = await supabase
       .from('social_reactions')
@@ -88,20 +131,45 @@ export async function socialFeed(c: Context) {
       reactionsByPost[r.post_id][r.reaction] = (reactionsByPost[r.post_id][r.reaction] || 0) + 1;
     }
 
-    // Attach replies + reactions to posts
-    const enrichedPosts: FeedPost[] = posts.map(post => ({
+    // Helper to compute karma score (trash = -1, rest = +1)
+    const getKarma = (postId: string): number => {
+      const rx = reactionsByPost[postId] || {};
+      let score = 0;
+      for (const [reaction, count] of Object.entries(rx)) {
+        score += reaction === 'trash' ? -count : count;
+      }
+      return score + (repliesByPost[postId]?.length || 0);
+    };
+
+    // Enrich posts
+    const enrichPost = (post: any) => ({
       ...post,
       reactions: reactionsByPost[post.id] || {},
+      karma: getKarma(post.id),
       replies: (repliesByPost[post.id] || []).map(reply => ({
         ...reply,
         reactions: reactionsByPost[reply.id] || {},
       })),
-    }));
+    });
+
+    let enrichedPosts = posts.map(enrichPost);
+
+    // Sort by hot (karma) if requested
+    if (sort === 'hot') {
+      enrichedPosts.sort((a, b) => b.karma - a.karma);
+    }
+
+    // Enrich pinned post
+    const enrichedPinned = pinnedPost ? enrichPost(pinnedPost) : null;
 
     const lastPost = posts[posts.length - 1];
     const nextCursor = posts.length === limit ? lastPost.created_at : null;
 
-    return c.json({ posts: enrichedPosts, next_cursor: nextCursor });
+    return c.json({
+      posts: enrichedPosts,
+      next_cursor: nextCursor,
+      pinned: enrichedPinned,
+    });
   } catch (err: any) {
     console.error('[social-feed] Error:', err);
     return c.json({ error: err.message }, 500);

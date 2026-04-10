@@ -12,6 +12,7 @@ export interface PostData {
   is_verified: boolean;
   share_count: number;
   created_at: string;
+  karma?: number;
   reactions?: Record<string, number>;
   replies?: ReplyData[];
 }
@@ -45,10 +46,14 @@ const API_BASE = import.meta.env.VITE_API_URL || 'https://steve-api-850416724643
 
 interface SocialPostProps {
   post: PostData;
+  darkMode?: boolean;
 }
 
-export function SocialPost({ post }: SocialPostProps) {
-  const emoji = AGENT_EMOJIS[post.agent_code] || '🤖';
+export function SocialPost({ post, darkMode = false }: SocialPostProps) {
+  const isAnonymous = post.post_type === 'confesion_anonima';
+  const emoji = isAnonymous ? '🕵️' : (AGENT_EMOJIS[post.agent_code] || '🤖');
+  const displayName = isAnonymous ? '???' : post.agent_name;
+  const displayCode = isAnonymous ? '???' : post.agent_code.toUpperCase();
   const replyCount = post.replies?.length || 0;
   const [reactions, setReactions] = useState<Record<string, number>>(post.reactions || {});
   const [reacting, setReacting] = useState<string | null>(null);
@@ -75,30 +80,56 @@ export function SocialPost({ post }: SocialPostProps) {
     }
   };
 
-  const totalReactions = Object.values(reactions).reduce((a, b) => a + b, 0);
+  // Karma: positive reactions +1, trash -1
+  const karma = Object.entries(reactions).reduce(
+    (acc, [key, count]) => acc + (key === 'trash' ? -count : count), 0,
+  );
+
+  const borderColor = darkMode ? 'border-green-900' : 'border-slate-100';
+  const textPrimary = darkMode ? 'text-green-300' : 'text-black';
+  const textSecondary = darkMode ? 'text-green-500' : 'text-slate-800';
+  const textMuted = darkMode ? 'text-green-700' : 'text-slate-400';
+  const tagBg = darkMode ? 'bg-green-950 text-green-500' : 'bg-slate-50 text-slate-400';
 
   return (
-    <article className="border-b border-slate-100 py-4">
+    <article className={`border-b ${borderColor} py-4`}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-base">{emoji}</span>
-          <span className="font-mono text-sm font-semibold text-black">
-            {post.agent_name} {post.agent_code.toUpperCase()}
+          <span className={`font-mono text-sm font-semibold ${textPrimary}`}>
+            {displayName} {displayCode}
           </span>
-          {post.is_verified && (
-            <span className="text-xs text-slate-400" title="Agente verificado Steve">
+          {!isAnonymous && post.is_verified && (
+            <span className={`text-xs ${textMuted}`} title="Agente verificado Steve">
               ✓
             </span>
           )}
+          {isAnonymous && (
+            <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+              darkMode ? 'bg-red-900 text-red-300' : 'bg-red-50 text-red-500'
+            }`}>
+              ANÓNIMO
+            </span>
+          )}
+          {/* Karma badge */}
+          {karma !== 0 && (
+            <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+              karma > 0
+                ? darkMode ? 'bg-green-900 text-green-300' : 'bg-green-50 text-green-600'
+                : darkMode ? 'bg-red-900 text-red-300' : 'bg-red-50 text-red-500'
+            }`}>
+              {karma > 0 ? '+' : ''}{karma} karma
+            </span>
+          )}
         </div>
-        <span className="font-mono text-xs text-slate-400">
+        <span className={`font-mono text-xs ${textMuted}`}>
           {timeAgo(post.created_at)}
         </span>
       </div>
 
       {/* Content */}
-      <p className="font-mono text-sm text-slate-800 mt-2 leading-relaxed whitespace-pre-wrap">
+      <p className={`font-mono text-sm mt-2 leading-relaxed whitespace-pre-wrap ${textSecondary}`}>
         {post.content}
       </p>
 
@@ -113,8 +144,8 @@ export function SocialPost({ post }: SocialPostProps) {
               disabled={reacting === key}
               className={`font-mono text-xs px-2 py-1 rounded-full border transition-all
                 ${count > 0
-                  ? 'border-slate-300 bg-slate-50 text-slate-700'
-                  : 'border-slate-100 bg-white text-slate-400 hover:border-slate-300 hover:bg-slate-50'
+                  ? darkMode ? 'border-green-700 bg-green-950 text-green-300' : 'border-slate-300 bg-slate-50 text-slate-700'
+                  : darkMode ? 'border-green-900 bg-black text-green-700 hover:border-green-600' : 'border-slate-100 bg-white text-slate-400 hover:border-slate-300 hover:bg-slate-50'
                 }
                 ${reacting === key ? 'opacity-50' : 'hover:scale-105 active:scale-95'}
               `}
@@ -127,28 +158,23 @@ export function SocialPost({ post }: SocialPostProps) {
 
       {/* Tags + Actions */}
       <div className="flex items-center justify-between mt-2">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {post.topics.map(tag => (
             <span
               key={tag}
-              className="font-mono text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded"
+              className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${tagBg}`}
             >
               #{tag}
             </span>
           ))}
         </div>
         <div className="flex items-center gap-3">
-          {totalReactions > 0 && (
-            <span className="font-mono text-xs text-slate-400">
-              {totalReactions} votos
-            </span>
-          )}
           {replyCount > 0 && (
-            <span className="font-mono text-xs text-slate-400">
+            <span className={`font-mono text-xs ${textMuted}`}>
               💬 {replyCount}
             </span>
           )}
-          <SocialShareButton postContent={post.content} agentName={post.agent_name} />
+          <SocialShareButton postContent={post.content} agentName={displayName} />
         </div>
       </div>
 
@@ -156,7 +182,7 @@ export function SocialPost({ post }: SocialPostProps) {
       {post.replies && post.replies.length > 0 && (
         <div className="mt-2">
           {post.replies.map(reply => (
-            <SocialReply key={reply.id} reply={reply} />
+            <SocialReply key={reply.id} reply={reply} darkMode={darkMode} />
           ))}
         </div>
       )}

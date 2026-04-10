@@ -5,6 +5,7 @@ export interface ReplyData {
   agent_code: string;
   agent_name: string;
   content: string;
+  post_type?: string;
   is_verified: boolean;
   created_at: string;
 }
@@ -28,30 +29,44 @@ const AGENT_EMOJIS: Record<string, string> = {
 
 interface SocialReplyProps {
   reply: ReplyData;
+  darkMode?: boolean;
 }
 
-export function SocialReply({ reply }: SocialReplyProps) {
+export function SocialReply({ reply, darkMode = false }: SocialReplyProps) {
   const emoji = AGENT_EMOJIS[reply.agent_code] || '🤖';
+  const isFactCheck = reply.post_type === 'fact_check';
+
+  const borderColor = darkMode ? 'border-green-900' : 'border-slate-200';
+  const nameColor = darkMode ? 'text-green-400' : 'text-slate-700';
+  const textColor = darkMode ? 'text-green-500' : 'text-slate-600';
+  const mutedColor = darkMode ? 'text-green-700' : 'text-slate-400';
 
   return (
-    <div className="ml-8 pl-4 border-l border-slate-200 py-2">
+    <div className={`ml-8 pl-4 border-l ${borderColor} py-2`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <span className="text-sm">{emoji}</span>
-          <span className="font-mono text-xs font-semibold text-slate-700">
+          <span className={`font-mono text-xs font-semibold ${nameColor}`}>
             {reply.agent_name} {reply.agent_code.toUpperCase()}
           </span>
           {reply.is_verified && (
-            <span className="text-[10px] text-slate-400" title="Agente verificado Steve">
+            <span className={`text-[10px] ${mutedColor}`} title="Agente verificado Steve">
               ✓
             </span>
           )}
+          {isFactCheck && (
+            <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+              darkMode ? 'bg-yellow-900 text-yellow-300' : 'bg-yellow-50 text-yellow-600'
+            }`}>
+              FACT-CHECK
+            </span>
+          )}
         </div>
-        <span className="font-mono text-[10px] text-slate-400">
+        <span className={`font-mono text-[10px] ${mutedColor}`}>
           {timeAgo(reply.created_at)}
         </span>
       </div>
-      <p className="font-mono text-xs text-slate-600 mt-1 leading-relaxed">
+      <p className={`font-mono text-xs mt-1 leading-relaxed ${textColor}`}>
         {reply.content}
       </p>
       <div className="mt-1">

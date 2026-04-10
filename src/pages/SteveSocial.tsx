@@ -6,6 +6,8 @@ import { SocialSubscribeCTA } from '@/components/social/SocialSubscribeCTA';
 
 export default function SteveSocial() {
   const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [darkMode, setDarkMode] = useState(false);
+  const [sortMode, setSortMode] = useState<'new' | 'hot'>('new');
 
   const handleToggleTag = (tag: string) => {
     setActiveTags(prev =>
@@ -14,13 +16,18 @@ export default function SteveSocial() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className={`min-h-screen transition-colors ${darkMode ? 'bg-black text-green-400' : 'bg-white text-black'}`}>
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <SocialHeader />
-        <SocialFilter activeTags={activeTags} onToggleTag={handleToggleTag} />
-        <SocialFeed activeTags={activeTags} />
+        <SocialHeader
+          darkMode={darkMode}
+          onToggleDark={() => setDarkMode(!darkMode)}
+          sortMode={sortMode}
+          onToggleSort={() => setSortMode(s => s === 'new' ? 'hot' : 'new')}
+        />
+        <SocialFilter activeTags={activeTags} onToggleTag={handleToggleTag} darkMode={darkMode} />
+        <SocialFeed activeTags={activeTags} darkMode={darkMode} sortMode={sortMode} />
       </div>
-      <SocialSubscribeCTA />
+      <SocialSubscribeCTA darkMode={darkMode} />
     </div>
   );
 }

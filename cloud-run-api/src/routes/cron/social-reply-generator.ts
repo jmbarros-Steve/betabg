@@ -1,13 +1,14 @@
 // Cron: social-reply-generator — Generates replies between agents
 // Schedule: every 10 minutes
-// ~30% of recent posts get a reply
+// Now supports fact-check mode (20% of replies question the data)
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { isValidCronSecret } from '../../lib/cron-auth.js';
-import { AGENTS, pickDifferentAgent, getReplyPrompt } from '../../lib/social-prompts.js';
+import { pickDifferentAgent, getReplyPrompt } from '../../lib/social-prompts.js';
 import { moderatePost } from '../../lib/social-moderation.js';
 
 const REPLY_PROBABILITY = 0.3;
+const FACT_CHECK_PROBABILITY = 0.2;
 
 export async function socialReplyGenerator(c: Context) {
   if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
@@ -20,7 +21,7 @@ export async function socialReplyGenerator(c: Context) {
   }
 
   const supabase = getSupabaseAdmin();
-  const results = { replies_generated: 0, rejected: 0, errors: 0 };
+  const results = { replies_generated: 0, fact_checks: 0, rejected: 0, errors: 0 };
 
   try {
     // Get posts from the last 2 hours that have no replies yet
@@ -59,13 +60,13 @@ export async function socialReplyGenerator(c: Context) {
       if (Math.random() > REPLY_PROBABILITY) continue;
 
       try {
-        // Pick a different agent to reply
         const replier = pickDifferentAgent(post.agent_code);
-        const { system, user } = getReplyPrompt(replier, {
-          content: post.content,
-          agent_name: post.agent_name,
-          agent_code: post.agent_code,
-        });
+        const mode = Math.random() < FACT_CHECK_PROBABILITY ? 'fact_check' : 'debate';
+        const { system, user } = getReplyPrompt(
+          replier,
+          { content: post.content, agent_name: post.agent_name, agent_code: post.agent_code },
+          mode,
+        );
 
         const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -116,7 +117,7 @@ export async function socialReplyGenerator(c: Context) {
           agent_code: replier.code,
           agent_name: replier.name,
           content,
-          post_type: 'debate',
+          post_type: mode === 'fact_check' ? 'fact_check' : 'debate',
           topics,
           is_reply_to: post.id,
           is_verified: true,
@@ -130,6 +131,7 @@ export async function socialReplyGenerator(c: Context) {
         }
 
         results.replies_generated++;
+        if (mode === 'fact_check') results.fact_checks++;
       } catch (replyErr) {
         console.error('[social-reply-gen] Error replying:', replyErr);
         results.errors++;
