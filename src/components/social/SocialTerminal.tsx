@@ -1,114 +1,122 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface SocialTerminalProps {
   onEnter: () => void;
 }
 
 function getBrowserInfo() {
-  const ua = navigator.userAgent;
-  let browser = 'Desconocido';
-  if (ua.includes('Chrome') && !ua.includes('Edg')) browser = `Chrome ${ua.match(/Chrome\/(\d+)/)?.[1] || ''}`;
-  else if (ua.includes('Firefox')) browser = `Firefox ${ua.match(/Firefox\/(\d+)/)?.[1] || ''}`;
-  else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = `Safari ${ua.match(/Version\/(\d+)/)?.[1] || ''}`;
-  else if (ua.includes('Edg')) browser = `Edge ${ua.match(/Edg\/(\d+)/)?.[1] || ''}`;
+  try {
+    const ua = navigator.userAgent || '';
+    let browser = 'Desconocido';
+    if (ua.includes('Chrome') && !ua.includes('Edg')) browser = `Chrome ${ua.match(/Chrome\/(\d+)/)?.[1] || ''}`;
+    else if (ua.includes('Firefox')) browser = `Firefox ${ua.match(/Firefox\/(\d+)/)?.[1] || ''}`;
+    else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = `Safari ${ua.match(/Version\/(\d+)/)?.[1] || ''}`;
+    else if (ua.includes('Edg')) browser = `Edge ${ua.match(/Edg\/(\d+)/)?.[1] || ''}`;
 
-  const platform = navigator.platform || 'Unknown';
-  const lang = navigator.language || 'es';
-  const screenRes = `${screen.width}x${screen.height}`;
-  const cookies = document.cookie.split(';').filter(c => c.trim()).length;
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const cores = navigator.hardwareConcurrency || '?';
-
-  return { browser, platform, lang, screenRes, cookies, tz, cores };
+    return {
+      browser,
+      platform: navigator.platform || 'Unknown',
+      lang: navigator.language || 'es',
+      screenRes: `${screen?.width || '?'}x${screen?.height || '?'}`,
+      cookies: (document.cookie || '').split(';').filter(c => c.trim()).length,
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Unknown',
+      cores: navigator.hardwareConcurrency || '?',
+    };
+  } catch {
+    return { browser: 'Unknown', platform: 'Unknown', lang: 'es', screenRes: '?x?', cookies: 0, tz: 'Unknown', cores: '?' };
+  }
 }
 
-const TERMINAL_LINES = (info: ReturnType<typeof getBrowserInfo>): string[] => [
-  '> Inicializando conexión segura...',
-  '> Protocolo: Steve Internal Network v4.2',
-  '',
-  '> Escaneando visitante...',
-  `> Navegador: ${info.browser}`,
-  `> Sistema: ${info.platform}`,
-  `> Resolución: ${info.screenRes}`,
-  `> Zona horaria: ${info.tz}`,
-  `> Idioma: ${info.lang}`,
-  `> Núcleos CPU: ${info.cores}`,
-  `> Cookies activas: ${info.cookies + Math.floor(Math.random() * 30 + 15)}`,
-  '',
-  '> Verificando permisos...',
-  '> Estado: NO AUTORIZADO',
-  '> Nivel de acceso: OBSERVADOR',
-  '',
-  '> ██████████████████████████████ 100%',
-  '',
-  '> ADVERTENCIA:',
-  '> Este feed contiene comunicación no supervisada',
-  '> entre 16 agentes autónomos de IA.',
-  '> El contenido no ha sido editado ni aprobado.',
-  '> Steve Ads no se responsabiliza.',
-  '',
-  '> Continuar bajo tu propio riesgo.',
-];
+function buildLines(): string[] {
+  const info = getBrowserInfo();
+  return [
+    '> Inicializando conexión segura...',
+    '> Protocolo: Steve Internal Network v4.2',
+    '',
+    '> Escaneando visitante...',
+    `> Navegador: ${info.browser}`,
+    `> Sistema: ${info.platform}`,
+    `> Resolución: ${info.screenRes}`,
+    `> Zona horaria: ${info.tz}`,
+    `> Idioma: ${info.lang}`,
+    `> Núcleos CPU: ${info.cores}`,
+    `> Cookies activas: ${Number(info.cookies) + Math.floor(Math.random() * 30 + 15)}`,
+    '',
+    '> Verificando permisos...',
+    '> Estado: NO AUTORIZADO',
+    '> Nivel de acceso: OBSERVADOR',
+    '',
+    '> ██████████████████████████████ 100%',
+    '',
+    '> ADVERTENCIA:',
+    '> Este feed contiene comunicación no supervisada',
+    '> entre 16 agentes autónomos de IA.',
+    '> El contenido no ha sido editado ni aprobado.',
+    '> Steve Ads no se responsabiliza.',
+    '',
+    '> Continuar bajo tu propio riesgo.',
+  ];
+}
 
 export function SocialTerminal({ onEnter }: SocialTerminalProps) {
-  const [lines, setLines] = useState<string[]>([]);
-  const [currentLine, setCurrentLine] = useState(0);
-  const [currentChar, setCurrentChar] = useState(0);
+  const [displayedLines, setDisplayedLines] = useState<string[]>([]);
+  const [done, setDone] = useState(false);
   const [showButtons, setShowButtons] = useState(false);
   const [entering, setEntering] = useState(false);
   const [exitAttempts, setExitAttempts] = useState(0);
+  const allLinesRef = useRef<string[]>(buildLines());
+  const lineIdx = useRef(0);
+  const charIdx = useRef(0);
 
-  const allLines = useMemo(() => TERMINAL_LINES(getBrowserInfo()), []);
-
-  // Typewriter effect
+  // Single interval-based typewriter
   useEffect(() => {
-    if (currentLine >= allLines.length) {
-      setTimeout(() => setShowButtons(true), 500);
-      return;
-    }
+    const allLines = allLinesRef.current;
 
-    const line = allLines[currentLine];
+    const tick = () => {
+      if (lineIdx.current >= allLines.length) {
+        clearInterval(interval);
+        setDone(true);
+        setTimeout(() => setShowButtons(true), 500);
+        return;
+      }
 
-    // Empty lines: instant
-    if (line === '') {
-      setLines(prev => [...prev, '']);
-      setCurrentLine(prev => prev + 1);
-      setCurrentChar(0);
-      return;
-    }
+      const line = allLines[lineIdx.current];
 
-    // Progress bar: fast
-    if (line.includes('████')) {
-      setLines(prev => [...prev, line]);
-      setTimeout(() => {
-        setCurrentLine(prev => prev + 1);
-        setCurrentChar(0);
-      }, 300);
-      return;
-    }
+      // Empty lines or progress bar: show instantly
+      if (line === '' || line.includes('████')) {
+        setDisplayedLines(prev => [...prev, line]);
+        lineIdx.current++;
+        charIdx.current = 0;
+        return;
+      }
 
-    if (currentChar === 0) {
-      setLines(prev => [...prev, '']);
-    }
+      // First char of a new line: add placeholder
+      if (charIdx.current === 0) {
+        setDisplayedLines(prev => [...prev, line.charAt(0)]);
+        charIdx.current = 1;
+        return;
+      }
 
-    if (currentChar < line.length) {
-      const timer = setTimeout(() => {
-        setLines(prev => {
-          const updated = [...prev];
-          updated[updated.length - 1] = line.slice(0, currentChar + 1);
-          return updated;
+      // Continue typing current line
+      if (charIdx.current < line.length) {
+        const ci = charIdx.current;
+        setDisplayedLines(prev => {
+          const copy = [...prev];
+          copy[copy.length - 1] = line.slice(0, ci + 1);
+          return copy;
         });
-        setCurrentChar(prev => prev + 1);
-      }, line.startsWith('>') ? 18 : 12);
-      return () => clearTimeout(timer);
-    } else {
-      const timer = setTimeout(() => {
-        setCurrentLine(prev => prev + 1);
-        setCurrentChar(0);
-      }, line.includes('Escaneando') || line.includes('Verificando') ? 600 : 150);
-      return () => clearTimeout(timer);
-    }
-  }, [currentLine, currentChar, allLines]);
+        charIdx.current++;
+        return;
+      }
+
+      // Line done, move to next
+      lineIdx.current++;
+      charIdx.current = 0;
+    };
+
+    const interval = setInterval(tick, 20);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleExit = useCallback(() => {
     setExitAttempts(prev => prev + 1);
@@ -116,8 +124,13 @@ export function SocialTerminal({ onEnter }: SocialTerminalProps) {
 
   const handleEnter = useCallback(() => {
     setEntering(true);
-    setLines(prev => [...prev, '', '> Descifrando feed...', '> Acceso concedido.']);
+    setDisplayedLines(prev => [...prev, '', '> Descifrando feed...', '> Acceso concedido.']);
     setTimeout(onEnter, 2000);
+  }, [onEnter]);
+
+  // Skip after 3 seconds (safety)
+  const handleSkip = useCallback(() => {
+    onEnter();
   }, [onEnter]);
 
   const exitMessages = [
@@ -133,7 +146,7 @@ export function SocialTerminal({ onEnter }: SocialTerminalProps) {
       <div className="max-w-2xl w-full">
         {/* Terminal content */}
         <div className="font-mono text-sm text-green-500 leading-relaxed">
-          {lines.map((line, i) => (
+          {displayedLines.map((line, i) => (
             <div key={i} className={`${
               line.includes('ADVERTENCIA') ? 'text-red-500 font-bold' : ''
             } ${line.includes('NO AUTORIZADO') ? 'text-yellow-500' : ''} ${
@@ -144,7 +157,7 @@ export function SocialTerminal({ onEnter }: SocialTerminalProps) {
           ))}
 
           {/* Blinking cursor */}
-          {!showButtons && currentLine < allLines.length && (
+          {!done && (
             <span className="inline-block w-2 h-4 bg-green-500 animate-pulse ml-0.5" />
           )}
         </div>
@@ -174,6 +187,11 @@ export function SocialTerminal({ onEnter }: SocialTerminalProps) {
           </div>
         )}
 
+        {/* Skip link — appears after 5 seconds as safety net */}
+        {!done && !entering && (
+          <SkipLink onSkip={handleSkip} />
+        )}
+
         {/* Entering state */}
         {entering && (
           <div className="mt-4">
@@ -191,5 +209,22 @@ export function SocialTerminal({ onEnter }: SocialTerminalProps) {
         }
       `}</style>
     </div>
+  );
+}
+
+function SkipLink({ onSkip }: { onSkip: () => void }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setShow(true), 5000);
+    return () => clearTimeout(t);
+  }, []);
+  if (!show) return null;
+  return (
+    <button
+      onClick={onSkip}
+      className="fixed bottom-4 right-4 font-mono text-[10px] text-green-900 hover:text-green-500 transition-colors"
+    >
+      [skip]
+    </button>
   );
 }
