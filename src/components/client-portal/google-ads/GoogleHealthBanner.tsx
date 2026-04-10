@@ -48,8 +48,11 @@ function buildFormatter(currency: string) {
   return (value: number): string => fmt.format(value);
 }
 
+// #109 fix: spend=0 con campañas activas = warning (no danger) — no hay gasto, no "pierdes dinero"
 function getHealthLevel(roas: number, spend: number, activeCampaigns: number): HealthLevel {
-  if (spend === 0 || activeCampaigns === 0 || roas < 1) return 'danger';
+  if (spend === 0 && activeCampaigns === 0) return 'warning';
+  if (spend === 0) return 'warning';
+  if (roas < 1) return 'danger';
   if (roas >= 2) return 'good';
   return 'warning';
 }
