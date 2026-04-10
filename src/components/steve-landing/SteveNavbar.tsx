@@ -60,8 +60,8 @@ export function SteveNavbar({ user, isAdmin, isClient, onOpenAuth, onNavigate, o
               Social
             </Link>
             {[
-              { label: 'Integraciones', href: '#integraciones' },
-              { label: 'Plataforma', href: '#planes' },
+              { label: 'Integraciones', href: '/#integraciones' },
+              { label: 'Plataforma', href: '/#planes' },
             ].map((link) => (
               <a
                 key={link.href}
