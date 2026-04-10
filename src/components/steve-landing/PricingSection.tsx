@@ -14,9 +14,13 @@ const PLAN_MEETINGS: Record<PlanSlug, string[]> = {
 
 function CellIcon({ value }: { value: boolean }) {
   return value ? (
-    <Check className="h-5 w-5 text-green-600" />
+    <div className="flex justify-center">
+      <Check className="h-5 w-5 text-green-600" />
+    </div>
   ) : (
-    <Minus className="h-4 w-4 text-slate-300" />
+    <div className="flex justify-center">
+      <Minus className="h-4 w-4 text-slate-300" />
+    </div>
   );
 }
 
@@ -52,7 +56,6 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
                     : 'border border-slate-200'
                 }`}
               >
-                {/* Popular badge */}
                 {isPopular && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                     <span className="bg-[#1E3A7B] text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-md">
@@ -61,7 +64,6 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
                   </div>
                 )}
 
-                {/* Header */}
                 <div className="text-center mb-6">
                   <div className={`inline-flex items-center justify-center w-12 h-12 rounded-full ${plan.headerColor} mb-3`}>
                     <plan.icon className="h-6 w-6" />
@@ -72,7 +74,6 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
                   <p className="text-sm text-slate-500 mt-1">{plan.tagline}</p>
                 </div>
 
-                {/* Price */}
                 <div className="text-center mb-6">
                   <span className="inline-block bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-full mb-2">
                     50% OFF Lanzamiento
@@ -86,7 +87,6 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
                   <p className="text-xs text-slate-400 mt-1">CLP / mes + IVA</p>
                 </div>
 
-                {/* Meetings */}
                 <div className="space-y-2 mb-8 bg-slate-50 rounded-lg p-3">
                   {meetings.map((meeting, i) => (
                     <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
@@ -100,7 +100,6 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
                   ))}
                 </div>
 
-                {/* CTA */}
                 <a
                   href="https://meetings.hubspot.com/jose-manuel15"
                   target="_blank"
@@ -125,40 +124,48 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
           </h3>
 
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm border-collapse" style={{ tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: '46%' }} />
+                <col style={{ width: '18%' }} />
+                <col style={{ width: '18%' }} />
+                <col style={{ width: '18%' }} />
+              </colgroup>
               <thead className="sticky top-0 z-10">
-                <tr className="bg-[#1E3A7B] text-white">
-                  <th className="text-left py-3 px-4 font-semibold w-1/2">Feature</th>
+                <tr className="bg-[#1E3A7B]">
+                  <th className="text-left py-3.5 px-5 font-semibold text-white text-sm">
+                    Feature
+                  </th>
                   {PLAN_SLUGS.map((slug) => (
-                    <th key={slug} className="text-center py-3 px-2 font-semibold w-1/6">
-                      {PLAN_INFO[slug].emoji} {PLAN_INFO[slug].nombre}
+                    <th key={slug} className="py-3.5 px-3 font-semibold text-white text-sm text-center">
+                      <span className="hidden sm:inline">{PLAN_INFO[slug].emoji} </span>
+                      {PLAN_INFO[slug].nombre}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody>
-                {/* Modules from COMPARATIVA */}
+              <tbody className="divide-y divide-slate-100">
                 {COMPARATIVA.map((section) => (
                   <ModuloBlock key={section.modulo} section={section} />
                 ))}
 
-                {/* Extra: Reuniones */}
-                <tr className="bg-slate-50">
-                  <td colSpan={4} className="py-2 px-4 font-bold text-slate-700 text-sm">
+                {/* Reuniones */}
+                <tr className="bg-slate-50/80">
+                  <td colSpan={4} className="py-2.5 px-5 font-bold text-slate-700 text-[13px] tracking-wide uppercase">
                     Reuniones
                   </td>
                 </tr>
-                <tr className="border-b border-slate-100 hover:bg-slate-50/50">
-                  <td className="py-2 pl-6 pr-4 text-slate-600">Reunión de implementación</td>
-                  <td className="py-2 px-2 text-center text-xs text-slate-600">1</td>
-                  <td className="py-2 px-2 text-center text-xs text-slate-600">3</td>
-                  <td className="py-2 px-2 text-center text-xs text-slate-600">3</td>
+                <tr className="hover:bg-slate-50/50">
+                  <td className="py-2.5 pl-8 pr-4 text-slate-600">Reunión de implementación</td>
+                  <td className="py-2.5 px-3 text-center text-sm font-medium text-slate-700">1</td>
+                  <td className="py-2.5 px-3 text-center text-sm font-medium text-slate-700">3</td>
+                  <td className="py-2.5 px-3 text-center text-sm font-medium text-slate-700">3</td>
                 </tr>
-                <tr className="border-b border-slate-100 hover:bg-slate-50/50">
-                  <td className="py-2 pl-6 pr-4 text-slate-600">Reunión mensual de resultados con agente</td>
-                  <td className="py-2 px-2 text-center"><Minus className="h-4 w-4 text-slate-300 mx-auto" /></td>
-                  <td className="py-2 px-2 text-center"><Minus className="h-4 w-4 text-slate-300 mx-auto" /></td>
-                  <td className="py-2 px-2 text-center"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                <tr className="hover:bg-slate-50/50">
+                  <td className="py-2.5 pl-8 pr-4 text-slate-600">Reunión mensual con agente</td>
+                  <td className="py-2.5 px-3"><CellIcon value={false} /></td>
+                  <td className="py-2.5 px-3"><CellIcon value={false} /></td>
+                  <td className="py-2.5 px-3"><CellIcon value={true} /></td>
                 </tr>
               </tbody>
             </table>
@@ -187,21 +194,20 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
   );
 }
 
-/** Renders a module header row + its feature rows */
 function ModuloBlock({ section }: { section: { modulo: string; features: { nombre: string; visual: boolean; estrategia: boolean; full: boolean }[] } }) {
   return (
     <>
-      <tr className="bg-slate-50">
-        <td colSpan={4} className="py-2 px-4 font-bold text-slate-700 text-sm">
+      <tr className="bg-slate-50/80">
+        <td colSpan={4} className="py-2.5 px-5 font-bold text-slate-700 text-[13px] tracking-wide uppercase">
           {section.modulo}
         </td>
       </tr>
       {section.features.map((feature) => (
-        <tr key={feature.nombre} className="border-b border-slate-100 hover:bg-slate-50/50">
-          <td className="py-2 pl-6 pr-4 text-slate-600">{feature.nombre}</td>
-          <td className="py-2 px-2 text-center"><CellIcon value={feature.visual} /></td>
-          <td className="py-2 px-2 text-center"><CellIcon value={feature.estrategia} /></td>
-          <td className="py-2 px-2 text-center"><CellIcon value={feature.full} /></td>
+        <tr key={feature.nombre} className="hover:bg-slate-50/50">
+          <td className="py-2.5 pl-8 pr-4 text-slate-600">{feature.nombre}</td>
+          <td className="py-2.5 px-3"><CellIcon value={feature.visual} /></td>
+          <td className="py-2.5 px-3"><CellIcon value={feature.estrategia} /></td>
+          <td className="py-2.5 px-3"><CellIcon value={feature.full} /></td>
         </tr>
       ))}
     </>
