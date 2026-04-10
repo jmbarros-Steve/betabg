@@ -1,50 +1,24 @@
 import { useReveal } from '@/hooks/useReveal';
-import { Check, Minus } from 'lucide-react';
-import { PLAN_SLUGS, PLAN_INFO, formatPriceCLP, type PlanSlug } from '@/lib/plan-features';
+import { Check, Minus, Users, CalendarCheck } from 'lucide-react';
+import { PLAN_SLUGS, PLAN_INFO, COMPARATIVA, formatPriceCLP, type PlanSlug } from '@/lib/plan-features';
 
 interface PricingSectionProps {
   onOpenAuth: () => void;
 }
 
-const planFeatures: Record<PlanSlug, string[]> = {
-  visual: [
-    'Dashboard métricas unificado',
-    'Shopify: productos, órdenes, ventas',
-    'Meta Ads: ver campañas y métricas',
-    'Klaviyo: métricas y flows',
-    'Google Ads: ver campañas',
-    'Instagram: feed y métricas',
-    'Steve Chat básico',
-    'Chonga: soporte IA',
-    'Conectar 4+ plataformas',
-    'Academy: cursos básicos',
-  ],
-  estrategia: [
-    'Todo lo de Visual, más:',
-    'Análisis de rendimiento IA (Meta, Google)',
-    'Steve Estrategia: diagnóstico de marca',
-    'Plan de marketing mensual IA',
-    'Deep Dive: análisis de competencia',
-    'Generador de copies IA',
-    'Reportes avanzados + semanal',
-    'Chonga: asistente de contenido',
-    'Contenido avanzado en Academy',
-    'Gestión de usuarios',
-  ],
-  full: [
-    'Todo lo de Estrategia, más:',
-    'Shopify: editar productos, descuentos',
-    'Crear y editar campañas Meta Ads',
-    'Crear campañas Google Ads',
-    'Klaviyo: crear campañas + editor',
-    'Steve Mail: diseño + envío',
-    'WhatsApp: mensajes + automatizaciones',
-    'Ejecutar acciones desde Steve Chat',
-    'Publicar copies a plataformas',
-    'Generación de imágenes IA',
-    'Widget descuento en tienda',
-  ],
+const PLAN_MEETINGS: Record<PlanSlug, string[]> = {
+  visual: ['1 reunión de implementación'],
+  estrategia: ['3 reuniones de implementación'],
+  full: ['3 reuniones de implementación', '1 reunión mensual de resultados con un agente'],
 };
+
+function CellIcon({ value }: { value: boolean }) {
+  return value ? (
+    <Check className="h-5 w-5 text-green-600" />
+  ) : (
+    <Minus className="h-4 w-4 text-slate-300" />
+  );
+}
 
 export function PricingSection({ onOpenAuth }: PricingSectionProps) {
   const ref = useReveal();
@@ -52,6 +26,7 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
   return (
     <section id="planes" className="bg-slate-50 py-20 md:py-28">
       <div ref={ref} className="reveal max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
             Elige el plan que necesita tu negocio
@@ -65,7 +40,7 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {PLAN_SLUGS.map((slug) => {
             const plan = PLAN_INFO[slug];
-            const features = planFeatures[slug];
+            const meetings = PLAN_MEETINGS[slug];
             const isPopular = slug === 'estrategia';
 
             return (
@@ -111,18 +86,16 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
                   <p className="text-xs text-slate-400 mt-1">CLP / mes + IVA</p>
                 </div>
 
-                {/* Features */}
-                <div className="space-y-3 mb-8">
-                  {features.map((feature, i) => (
-                    <div key={i} className="flex items-start gap-2 text-sm text-slate-600">
-                      {feature.startsWith('Todo lo de') ? (
-                        <Minus className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                {/* Meetings */}
+                <div className="space-y-2 mb-8 bg-slate-50 rounded-lg p-3">
+                  {meetings.map((meeting, i) => (
+                    <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                      {i === 0 ? (
+                        <CalendarCheck className="w-4 h-4 text-[#1E3A7B] mt-0.5 flex-shrink-0" />
                       ) : (
-                        <Check className="w-4 h-4 text-[#1E3A7B] mt-0.5 flex-shrink-0" />
+                        <Users className="w-4 h-4 text-[#1E3A7B] mt-0.5 flex-shrink-0" />
                       )}
-                      <span className={feature.startsWith('Todo lo de') ? 'font-semibold text-slate-800' : ''}>
-                        {feature}
-                      </span>
+                      <span>{meeting}</span>
                     </div>
                   ))}
                 </div>
@@ -145,6 +118,53 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
           })}
         </div>
 
+        {/* Tabla comparativa completa */}
+        <div className="mt-16 max-w-5xl mx-auto">
+          <h3 className="text-2xl font-bold text-slate-900 text-center mb-8">
+            Comparativa completa de features
+          </h3>
+
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-[#1E3A7B] text-white">
+                  <th className="text-left py-3 px-4 font-semibold w-1/2">Feature</th>
+                  {PLAN_SLUGS.map((slug) => (
+                    <th key={slug} className="text-center py-3 px-2 font-semibold w-1/6">
+                      {PLAN_INFO[slug].emoji} {PLAN_INFO[slug].nombre}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {/* Modules from COMPARATIVA */}
+                {COMPARATIVA.map((section) => (
+                  <ModuloBlock key={section.modulo} section={section} />
+                ))}
+
+                {/* Extra: Reuniones */}
+                <tr className="bg-slate-50">
+                  <td colSpan={4} className="py-2 px-4 font-bold text-slate-700 text-sm">
+                    Reuniones
+                  </td>
+                </tr>
+                <tr className="border-b border-slate-100 hover:bg-slate-50/50">
+                  <td className="py-2 pl-6 pr-4 text-slate-600">Reunión de implementación</td>
+                  <td className="py-2 px-2 text-center text-xs text-slate-600">1</td>
+                  <td className="py-2 px-2 text-center text-xs text-slate-600">3</td>
+                  <td className="py-2 px-2 text-center text-xs text-slate-600">3</td>
+                </tr>
+                <tr className="border-b border-slate-100 hover:bg-slate-50/50">
+                  <td className="py-2 pl-6 pr-4 text-slate-600">Reunión mensual de resultados con agente</td>
+                  <td className="py-2 px-2 text-center"><Minus className="h-4 w-4 text-slate-300 mx-auto" /></td>
+                  <td className="py-2 px-2 text-center"><Minus className="h-4 w-4 text-slate-300 mx-auto" /></td>
+                  <td className="py-2 px-2 text-center"><Check className="h-5 w-5 text-green-600 mx-auto" /></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         {/* Footer */}
         <div className="text-center mt-10">
           <p className="text-sm text-slate-400">
@@ -164,5 +184,26 @@ export function PricingSection({ onOpenAuth }: PricingSectionProps) {
         </div>
       </div>
     </section>
+  );
+}
+
+/** Renders a module header row + its feature rows */
+function ModuloBlock({ section }: { section: { modulo: string; features: { nombre: string; visual: boolean; estrategia: boolean; full: boolean }[] } }) {
+  return (
+    <>
+      <tr className="bg-slate-50">
+        <td colSpan={4} className="py-2 px-4 font-bold text-slate-700 text-sm">
+          {section.modulo}
+        </td>
+      </tr>
+      {section.features.map((feature) => (
+        <tr key={feature.nombre} className="border-b border-slate-100 hover:bg-slate-50/50">
+          <td className="py-2 pl-6 pr-4 text-slate-600">{feature.nombre}</td>
+          <td className="py-2 px-2 text-center"><CellIcon value={feature.visual} /></td>
+          <td className="py-2 px-2 text-center"><CellIcon value={feature.estrategia} /></td>
+          <td className="py-2 px-2 text-center"><CellIcon value={feature.full} /></td>
+        </tr>
+      ))}
+    </>
   );
 }

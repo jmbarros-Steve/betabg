@@ -70,7 +70,7 @@ export const FEATURE_ACCESS: Record<FeatureKey, PlanSlug> = {
   'shopify.discounts': 'full',
 
   // Steve Chat (merchant habla con Steve por WhatsApp)
-  'steve_chat.basic': 'visual',            // Preguntar, consultar métricas
+  'steve_chat.basic': 'estrategia',         // Quema API — bloqueado en Visual
   'steve_chat.brand_research': 'estrategia', // Análisis de marca
   'steve_chat.recommendations': 'estrategia', // Recomendaciones estratégicas
   'steve_chat.execute': 'full',            // Ejecutar acciones desde el chat
@@ -89,6 +89,9 @@ export const FEATURE_ACCESS: Record<FeatureKey, PlanSlug> = {
   'brief.view': 'estrategia',
   'brief.generate': 'estrategia',
 
+  // Campaigns
+  'campaigns.recommendations': 'estrategia', // Recomendaciones de Charlie/IA — no Visual
+
   // Copies
   'copies.view': 'visual',
   'copies.generate': 'estrategia',
@@ -100,6 +103,8 @@ export const FEATURE_ACCESS: Record<FeatureKey, PlanSlug> = {
   'meta_ads.analysis': 'estrategia',
   'meta_ads.create': 'full',
   'meta_ads.edit': 'full',
+  'meta_ads.rules': 'full',
+  'meta_ads.audiences': 'full',
   'meta_ads.social_inbox': 'visual',
 
   // Klaviyo
@@ -118,6 +123,7 @@ export const FEATURE_ACCESS: Record<FeatureKey, PlanSlug> = {
   'google_ads.view': 'visual',
   'google_ads.analysis': 'estrategia',
   'google_ads.create': 'full',
+  'google_ads.rules': 'full',
 
   // Steve Mail
   'email.view': 'full',
@@ -150,6 +156,14 @@ export const FEATURE_ACCESS: Record<FeatureKey, PlanSlug> = {
   'chonga.assistant': 'visual',
   'chonga.images': 'full',
 
+  // Competencia
+  'competencia.view': 'estrategia',
+  'competencia.ads': 'estrategia',
+  'competencia.tracking': 'estrategia',
+
+  // Insights
+  'insights.smart': 'estrategia',
+
   // Discount Button
   'discount.widget': 'full',
   'discount.rules': 'full',
@@ -157,7 +171,7 @@ export const FEATURE_ACCESS: Record<FeatureKey, PlanSlug> = {
 
 // ─── Tab → Minimum Plan ─────────────────────────────────────
 export const TAB_MIN_PLAN: Record<string, PlanSlug> = {
-  steve: 'visual',
+  steve: 'estrategia',
   brief: 'estrategia',
   metrics: 'visual',
   connections: 'visual',
@@ -235,7 +249,7 @@ export const COMPARATIVA: ModuloSection[] = [
   {
     modulo: 'Steve Chat (WhatsApp con Steve)',
     features: [
-      { nombre: 'Consultar métricas y preguntas', visual: true, estrategia: true, full: true },
+      { nombre: 'Consultar métricas y preguntas', visual: false, estrategia: true, full: true },
       { nombre: 'Análisis de marca (brand research)', visual: false, estrategia: true, full: true },
       { nombre: 'Recomendaciones estratégicas', visual: false, estrategia: true, full: true },
       { nombre: 'Ejecutar acciones desde WhatsApp', visual: false, estrategia: false, full: true },
@@ -273,12 +287,22 @@ export const COMPARATIVA: ModuloSection[] = [
     ],
   },
   {
+    modulo: 'Competencia',
+    features: [
+      { nombre: 'Ver análisis de competidores', visual: false, estrategia: true, full: true },
+      { nombre: 'Ver ads de competidores', visual: false, estrategia: true, full: true },
+      { nombre: 'Tracking de competidores', visual: false, estrategia: true, full: true },
+    ],
+  },
+  {
     modulo: 'Meta Ads',
     features: [
       { nombre: 'Ver campañas y métricas', visual: true, estrategia: true, full: true },
       { nombre: 'Análisis de rendimiento IA', visual: false, estrategia: true, full: true },
       { nombre: 'Crear campañas', visual: false, estrategia: false, full: true },
       { nombre: 'Editar y optimizar campañas', visual: false, estrategia: false, full: true },
+      { nombre: 'Reglas automatizadas', visual: false, estrategia: false, full: true },
+      { nombre: 'Crear audiencias', visual: false, estrategia: false, full: true },
       { nombre: 'Social Inbox', visual: true, estrategia: true, full: true },
     ],
   },
@@ -306,6 +330,7 @@ export const COMPARATIVA: ModuloSection[] = [
       { nombre: 'Ver campañas y métricas', visual: true, estrategia: true, full: true },
       { nombre: 'Análisis de rendimiento IA', visual: false, estrategia: true, full: true },
       { nombre: 'Crear y editar campañas', visual: false, estrategia: false, full: true },
+      { nombre: 'Reglas automatizadas', visual: false, estrategia: false, full: true },
     ],
   },
   {
@@ -335,6 +360,7 @@ export const COMPARATIVA: ModuloSection[] = [
     modulo: 'Métricas',
     features: [
       { nombre: 'Dashboard de métricas', visual: true, estrategia: true, full: true },
+      { nombre: 'Insights inteligentes', visual: false, estrategia: true, full: true },
       { nombre: 'Reportes avanzados', visual: false, estrategia: true, full: true },
       { nombre: 'Reporte semanal automático', visual: false, estrategia: true, full: true },
     ],
