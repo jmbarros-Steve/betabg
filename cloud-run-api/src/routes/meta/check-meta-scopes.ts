@@ -26,7 +26,7 @@ export async function checkMetaScopes(c: Context) {
       `)
       .eq('id', connection_id)
       .eq('platform', 'meta')
-      .single();
+      .maybeSingle();
 
     if (connError || !connection) {
       return c.json({ error: 'Connection not found' }, 404);
@@ -68,8 +68,11 @@ export async function checkMetaScopes(c: Context) {
     // Check permissions via Meta Graph API (token in header, not URL)
     const permResponse = await fetch('https://graph.facebook.com/v21.0/me/permissions', {
       headers: { Authorization: `Bearer ${decryptedToken}` },
+      signal: AbortSignal.timeout(15_000),
     });
-    const permData: any = await permResponse.json();
+    let permData: any;
+    try { permData = await permResponse.json(); }
+    catch { return c.json({ error: 'Non-JSON response from Meta', granted: [], token_expired: true }, 200); }
 
     if (!permResponse.ok || !permData.data) {
       return c.json({

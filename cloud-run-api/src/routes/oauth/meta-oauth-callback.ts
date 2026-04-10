@@ -77,8 +77,11 @@ export async function metaOauthCallback(c: Context) {
         redirect_uri: redirect_uri,
         code: code,
       }),
+      signal: AbortSignal.timeout(15_000),
     });
-    const tokenData = await tokenResponse.json() as any;
+    let tokenData: any;
+    try { tokenData = await tokenResponse.json(); }
+    catch { return c.json({ error: 'Meta returned non-JSON response during token exchange' }, 502); }
 
     if (tokenData.error) {
       console.error('Meta token error:', tokenData.error);
@@ -97,8 +100,11 @@ export async function metaOauthCallback(c: Context) {
         client_secret: metaAppSecret,
         fb_exchange_token: accessToken,
       }),
+      signal: AbortSignal.timeout(15_000),
     });
-    const longLivedData = await longLivedResponse.json() as any;
+    let longLivedData: any;
+    try { longLivedData = await longLivedResponse.json(); }
+    catch { longLivedData = {}; } // fallback to short-lived token
 
     const finalToken = longLivedData.access_token || accessToken;
     // Meta returns expires_in (seconds) for long-lived tokens (~60 days)

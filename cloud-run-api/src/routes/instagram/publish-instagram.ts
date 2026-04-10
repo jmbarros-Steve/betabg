@@ -34,7 +34,7 @@ async function getMetaToken(supabase: any, clientId: string): Promise<{ token: s
     .eq('client_id', clientId)
     .eq('platform', 'meta')
     .eq('is_active', true)
-    .single();
+    .maybeSingle();
 
   if (!conn) return null;
 

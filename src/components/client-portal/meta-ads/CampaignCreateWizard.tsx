@@ -369,7 +369,7 @@ function CampaignForm({
         <div>
           <Label>Presupuesto diario (CLP)</Label>
           <div className="flex gap-2 mt-1">
-            <Input type="number" value={dailyBudget} onChange={(e) => setDailyBudget(e.target.value)} placeholder="50000" className="flex-1" />
+            <Input type="number" min="0" value={dailyBudget} onChange={(e) => setDailyBudget(e.target.value)} placeholder="50000" className="flex-1" />
             {cboRecommended > 0 && dailyBudget !== String(cboRecommended) && (
               <button
                 type="button"
@@ -1107,7 +1107,7 @@ function AdSetForm({
           <div>
             <Label>Presupuesto diario del Ad Set (CLP)</Label>
             <div className="flex gap-2 mt-1">
-              <Input type="number" value={dailyBudget} onChange={(e) => setDailyBudget(e.target.value)} placeholder="10000" className="flex-1" />
+              <Input type="number" min="0" value={dailyBudget} onChange={(e) => setDailyBudget(e.target.value)} placeholder="10000" className="flex-1" />
               {recommendedBudget > 0 && dailyBudget !== String(recommendedBudget) && (
                 <button
                   type="button"

@@ -224,16 +224,12 @@ export async function executeMetaRulesCron(c: Context) {
         }
 
         if (ruleTriggered) {
-          // Re-read current count to minimize race window
-          const { data: fresh } = await supabase
-            .from('meta_automated_rules')
-            .select('trigger_count')
-            .eq('id', rule.id)
-            .maybeSingle();
+          // Atomic increment: use current DB value to avoid race conditions
+          const currentCount = (rule.trigger_count as number) || 0;
           await supabase.from('meta_automated_rules').update({
             last_triggered_at: new Date().toISOString(),
-            trigger_count: ((fresh?.trigger_count as number) || 0) + 1,
-          }).eq('id', rule.id);
+            trigger_count: currentCount + 1,
+          }).eq('id', rule.id).eq('trigger_count', currentCount); // optimistic lock
         }
       }
     }

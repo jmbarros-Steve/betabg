@@ -122,7 +122,9 @@ async function uploadImageFromUrl(
       headers: { 'Authorization': `Bearer ${accessToken}` },
       body: formData,
     });
-    const uploadData: any = await uploadResponse.json();
+    let uploadData: any;
+    try { uploadData = await uploadResponse.json(); }
+    catch { return { ok: false, error: `Non-JSON response from Meta (HTTP ${uploadResponse.status})` }; }
 
     if (!uploadResponse.ok) {
       return { ok: false, error: uploadData?.error?.message || 'Base64 upload failed' };
@@ -1070,13 +1072,15 @@ async function handleDuplicate(
 
       // Set start_time to now for the duplicate (original start_time may be in the past)
       adsetPayload.start_time = new Date().toISOString();
-      if (adset.end_time) {
+      if (adset.end_time && adset.start_time) {
         // Keep the same duration
         const originalStart = new Date(adset.start_time).getTime();
         const originalEnd = new Date(adset.end_time).getTime();
-        const duration = originalEnd - originalStart;
-        if (duration > 0) {
-          adsetPayload.end_time = new Date(Date.now() + duration).toISOString();
+        if (!isNaN(originalStart) && !isNaN(originalEnd)) {
+          const duration = originalEnd - originalStart;
+          if (duration > 0) {
+            adsetPayload.end_time = new Date(Date.now() + duration).toISOString();
+          }
         }
       }
 

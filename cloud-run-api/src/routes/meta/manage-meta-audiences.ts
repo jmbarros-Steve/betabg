@@ -110,7 +110,11 @@ async function handleCreateCustom(
 
   // For website/engagement/app_activity, set retention_days at top level
   if (source_type === 'website' || source_type === 'engagement' || source_type === 'app_activity') {
-    payload.retention_days = retention_days;
+    const numRetention = Number(retention_days);
+    if (isNaN(numRetention) || numRetention < 1 || numRetention > 180) {
+      return { body: { error: 'retention_days must be between 1 and 180' }, status: 400 };
+    }
+    payload.retention_days = numRetention;
   }
 
   // Build rule for engagement audiences if not already provided
@@ -477,7 +481,7 @@ export async function manageMetaAudiences(c: Context) {
       `)
       .eq('id', connection_id)
       .eq('platform', 'meta')
-      .single();
+      .maybeSingle();
 
     if (connError || !connection) {
       console.error('[manage-meta-audiences] Connection fetch error:', connError);

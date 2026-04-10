@@ -168,6 +168,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
   }
 
   async function handleSync() {
+    if (syncing) return; // prevent double-click
     // Need at least one competitor with FB URL or IG handle
     const validCompetitors = competitors.filter(c => c.fbUrl.trim() || c.igHandle.trim());
     if (validCompetitors.length === 0) {
@@ -444,6 +445,7 @@ export function CompetitorAdsPanel({ clientId }: CompetitorAdsPanelProps) {
                           setCompetitors(updated);
                         }}
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label="Limpiar competidor"
                       >
                         <X className="h-3 w-3" />
                       </button>

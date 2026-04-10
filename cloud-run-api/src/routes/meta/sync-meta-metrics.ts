@@ -243,7 +243,9 @@ export async function syncMetaMetrics(c: Context) {
       const metaResponse = await metaApiFetch(nextUrl, decryptedToken);
 
       if (!metaResponse.ok) {
-        const errorData: any = await metaResponse.json();
+        let errorData: any;
+        try { errorData = await metaResponse.json(); }
+        catch { errorData = { error: { message: `HTTP ${metaResponse.status}` } }; }
         console.error('Meta API error:', errorData);
         return c.json({
           error: 'Meta API error',

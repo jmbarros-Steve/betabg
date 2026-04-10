@@ -339,7 +339,7 @@ function mapApifyAdToRow(
   if (ad.snapshot?.body?.text) {
     adText = ad.snapshot.body.text.trim();
   } else if (ad.snapshot?.body?.markup?.__html) {
-    adText = ad.snapshot.body.markup.__html.replace(/<[^>]*>/g, '').trim();
+    adText = (ad.snapshot.body.markup.__html || '').replace(/<[^>]*>/g, '').trim();
   }
   if (!adText && ad.snapshot?.cards?.[0]?.body) {
     adText = ad.snapshot.cards[0].body;
@@ -663,9 +663,10 @@ export async function syncCompetitorAds(c: Context) {
             for (const row of adsToUpsert) {
               if (row.image_urls && Array.isArray(row.image_urls)) {
                 const urls = (row.image_urls as string[]).slice(0, 3);
-                const persisted = await Promise.all(
+                const results = await Promise.allSettled(
                   urls.map((url, idx) => persistImage(supabase, url, client_id, row.ad_library_id, idx))
                 );
+                const persisted = results.map((r, idx) => r.status === 'fulfilled' ? r.value : urls[idx]);
                 row.image_urls = persisted;
                 row.image_url = persisted[0] || row.image_url;
               }

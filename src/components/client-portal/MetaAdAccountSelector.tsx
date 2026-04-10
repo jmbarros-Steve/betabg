@@ -108,7 +108,7 @@ export function MetaAdAccountSelector({
     try {
       // Find the selected account name for store_name
       const selectedAcc = accounts.find(a => a.account_id === accountId);
-      const storeName = selectedAcc?.name || accountId;
+      const storeName = selectedAcc?.name ?? accountId;
 
       // Update account_id AND store_name in platform_connections
       const { error: updateError } = await supabase

@@ -41,7 +41,7 @@ async function getFBPageToken(supabase: any, clientId: string): Promise<FBTokenR
     .eq('client_id', clientId)
     .eq('platform', 'meta')
     .eq('is_active', true)
-    .single();
+    .maybeSingle();
 
   if (!conn) return null;
 

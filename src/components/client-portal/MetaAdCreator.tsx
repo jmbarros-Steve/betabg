@@ -459,6 +459,8 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
   };
 
   const reset = () => {
+    if (videoPollingTimer.current) { clearTimeout(videoPollingTimer.current); videoPollingTimer.current = null; }
+    setGeneratingVideo(false);
     setStep('strategy'); setProductMode(null); setSelectedProduct(null);
     setSelectedCategory(null); setSelectedCampaign(null); setSelectedAngle(null);
     setCustomAngle(''); setShowCustomAngle(false); setInstrucciones('');
