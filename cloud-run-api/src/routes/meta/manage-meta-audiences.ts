@@ -39,8 +39,10 @@ async function metaApiRequest(
     fetchOptions.body = JSON.stringify(body || {});
   }
 
-  const response = await fetch(url.toString(), fetchOptions);
-  const responseData: any = await response.json();
+  const response = await fetch(url.toString(), { ...fetchOptions, signal: AbortSignal.timeout(15_000) });
+  let responseData: any;
+  try { responseData = await response.json(); }
+  catch { return { ok: false, error: `Non-JSON response (HTTP ${response.status})` }; }
 
   if (!response.ok) {
     const errorMessage = responseData?.error?.message || responseData?.error?.error_user_msg || 'Unknown Meta API error';

@@ -162,8 +162,8 @@ export async function performanceTrackerMeta(c: Context) {
       }
 
       const d = metricsJson.data[0];
-      const impressions = parseInt(d.impressions || '0');
-      const clicks = parseInt(d.clicks || '0');
+      const impressions = parseInt(d.impressions || '0', 10);
+      const clicks = parseInt(d.clicks || '0', 10);
       const spend = parseFloat(d.spend || '0');
       const ctr = parseFloat(d.ctr || '0');
 

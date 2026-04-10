@@ -485,7 +485,7 @@ export async function syncCompetitorAds(c: Context) {
       .from('clients')
       .select('id, user_id, client_user_id')
       .eq('id', client_id)
-      .single();
+      .maybeSingle();
 
     if (clientError || !client) {
       return c.json({ error: 'Client not found' }, 404);
@@ -589,11 +589,11 @@ export async function syncCompetitorAds(c: Context) {
           .from('competitor_tracking')
           .upsert(upsertData, { onConflict: 'client_id,ig_handle' })
           .select('id, meta_page_id, last_sync_at, fb_page_url')
-          .single();
+          .maybeSingle();
 
-        if (trackError) {
+        if (trackError || !tracking) {
           console.error(`Error upserting tracking for ${handle}:`, trackError);
-          results.push({ handle, ads_found: 0, status: 'error: ' + trackError.message });
+          results.push({ handle, ads_found: 0, status: 'error: ' + (trackError?.message || 'tracking upsert returned null') });
           continue;
         }
 

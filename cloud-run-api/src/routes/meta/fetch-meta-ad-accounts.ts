@@ -144,7 +144,7 @@ export async function fetchMetaAdAccounts(c: Context) {
 
     const authHeaders = { Authorization: `Bearer ${decryptedToken}` };
 
-    const permissionsResponse = await fetch(permissionsUrl.toString(), { headers: authHeaders });
+    const permissionsResponse = await fetch(permissionsUrl.toString(), { headers: authHeaders, signal: AbortSignal.timeout(15_000) });
 
     if (!permissionsResponse.ok) {
       const errBody: any = await permissionsResponse.json().catch(() => ({}));
@@ -205,7 +205,7 @@ export async function fetchMetaAdAccounts(c: Context) {
       directUrl.searchParams.set('fields', 'id,name,account_id,account_status,currency,timezone_name');
 
       console.log(`[ad-accounts] SUAT connection — fetching scoped account ${actId} directly`);
-      const directResp = await fetch(directUrl.toString(), { headers: authHeaders });
+      const directResp = await fetch(directUrl.toString(), { headers: authHeaders, signal: AbortSignal.timeout(15_000) });
       if (!directResp.ok) {
         const errBody: any = await directResp.json().catch(() => ({}));
         console.error('[ad-accounts] Direct account fetch failed:', errBody);
@@ -222,10 +222,11 @@ export async function fetchMetaAdAccounts(c: Context) {
 
       console.log('Fetching Meta ad accounts from Graph API (including Business Manager info)');
 
-      const metaResponse = await fetch(accountsUrl.toString(), { headers: authHeaders });
+      const metaResponse = await fetch(accountsUrl.toString(), { headers: authHeaders, signal: AbortSignal.timeout(15_000) });
 
       if (!metaResponse.ok) {
-        const errorData: any = await metaResponse.json();
+        let errorData: any;
+        try { errorData = await metaResponse.json(); } catch { errorData = { error: { message: `HTTP ${metaResponse.status}` } }; }
         console.error('Meta API error:', errorData);
         const metaErrCode = errorData?.error?.code;
 
@@ -253,7 +254,7 @@ export async function fetchMetaAdAccounts(c: Context) {
       businessesUrl.searchParams.set('fields', 'id,name');
       businessesUrl.searchParams.set('limit', '50');
 
-      const businessesResponse = await fetch(businessesUrl.toString(), { headers: authHeaders });
+      const businessesResponse = await fetch(businessesUrl.toString(), { headers: authHeaders, signal: AbortSignal.timeout(15_000) });
       let businessAccounts: MetaAdAccount[] = [];
 
       if (businessesResponse.ok) {
@@ -265,7 +266,7 @@ export async function fetchMetaAdAccounts(c: Context) {
           businessAdAccountsUrl.searchParams.set('fields', 'id,name,account_id,account_status,currency,timezone_name');
           businessAdAccountsUrl.searchParams.set('limit', '100');
 
-          const businessAdAccountsResponse = await fetch(businessAdAccountsUrl.toString(), { headers: authHeaders });
+          const businessAdAccountsResponse = await fetch(businessAdAccountsUrl.toString(), { headers: authHeaders, signal: AbortSignal.timeout(15_000) });
           if (businessAdAccountsResponse.ok) {
             const businessAdAccountsData: any = await businessAdAccountsResponse.json();
             console.log(`Found ${businessAdAccountsData.data?.length || 0} accounts in business: ${business.name}`);

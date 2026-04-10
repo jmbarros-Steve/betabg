@@ -106,6 +106,7 @@ export async function metaTargetingSearch(c: Context) {
 
       const response = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${decryptedToken}` },
+        signal: AbortSignal.timeout(15_000),
       });
       if (!response.ok) {
         const errData: any = await response.json().catch(() => ({}));
@@ -140,6 +141,7 @@ export async function metaTargetingSearch(c: Context) {
 
       const response = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${decryptedToken}` },
+        signal: AbortSignal.timeout(15_000),
       });
       if (!response.ok) {
         const errData: any = await response.json().catch(() => ({}));

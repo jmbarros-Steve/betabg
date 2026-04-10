@@ -42,7 +42,7 @@ export async function metaOauthCallback(c: Context) {
       .from('clients')
       .select('id, client_user_id, user_id')
       .eq('id', client_id)
-      .single();
+      .maybeSingle();
 
     if (clientError || !client) {
       return c.json({ error: 'Client not found' }, 404);
@@ -116,14 +116,25 @@ export async function metaOauthCallback(c: Context) {
     const [accountsResponse, businessesResponse] = await Promise.all([
       fetch('https://graph.facebook.com/v21.0/me/adaccounts?fields=name,account_id,account_status', {
         headers: { Authorization: `Bearer ${finalToken}` },
+        signal: AbortSignal.timeout(15_000),
       }),
       fetch('https://graph.facebook.com/v21.0/me/businesses?fields=id,name', {
         headers: { Authorization: `Bearer ${finalToken}` },
+        signal: AbortSignal.timeout(15_000),
       }),
     ]);
 
-    const accountsData = await accountsResponse.json() as any;
-    const businessesData = await businessesResponse.json() as any;
+    let accountsData: any;
+    let businessesData: any;
+    try { accountsData = await accountsResponse.json(); } catch { accountsData = { data: [] }; }
+    try { businessesData = await businessesResponse.json(); } catch { businessesData = { data: [] }; }
+
+    if (!accountsResponse.ok) {
+      console.error('[meta-oauth] Ad accounts fetch failed:', accountsData);
+    }
+    if (!businessesResponse.ok) {
+      console.error('[meta-oauth] Businesses fetch failed:', businessesData);
+    }
 
     const adAccounts = accountsData.data || [];
     const businesses = businessesData.data || [];
@@ -214,6 +225,7 @@ export async function metaOauthCallback(c: Context) {
             'X-Cron-Secret': cronSecret,
           },
           body: JSON.stringify({ connection_id: connectionResult.data.id }),
+          signal: AbortSignal.timeout(30_000),
         });
         if (!syncRes.ok) {
           console.warn(`[meta-oauth] Auto-sync returned non-OK status: ${syncRes.status}`);

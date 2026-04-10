@@ -67,8 +67,11 @@ export async function metaCatalogs(c: Context) {
 
     const catalogsRes = await fetch(catalogsUrl.toString(), {
       headers: { Authorization: `Bearer ${decryptedToken}` },
+      signal: AbortSignal.timeout(15_000),
     });
-    const catalogsData: any = await catalogsRes.json();
+    let catalogsData: any;
+    try { catalogsData = await catalogsRes.json(); }
+    catch { return c.json({ error: `Non-JSON response from Meta (HTTP ${catalogsRes.status})` }, 502); }
 
     if (!catalogsRes.ok) {
       const errCode = catalogsData?.error?.code;
@@ -92,8 +95,10 @@ export async function metaCatalogs(c: Context) {
 
           const setsRes = await fetch(setsUrl.toString(), {
             headers: { Authorization: `Bearer ${decryptedToken}` },
+            signal: AbortSignal.timeout(15_000),
           });
-          const setsData: any = await setsRes.json();
+          let setsData: any;
+          try { setsData = await setsRes.json(); } catch { setsData = {}; }
 
           return {
             ...catalog,

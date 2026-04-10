@@ -44,7 +44,7 @@ async function metaApiRequest(
     fetchOptions.body = JSON.stringify(body || {});
   }
 
-  const response = await fetch(url.toString(), fetchOptions);
+  const response = await fetch(url.toString(), { ...fetchOptions, signal: AbortSignal.timeout(15_000) });
   const responseText = await response.text();
 
   let responseData: any;
@@ -101,7 +101,7 @@ async function uploadImageFromUrl(
     console.log(`[manage-meta-campaign] URL upload failed, trying base64 fallback for ${imageUrl}`);
     let imgResponse: Response;
     try {
-      imgResponse = await fetch(imageUrl);
+      imgResponse = await fetch(imageUrl, { signal: AbortSignal.timeout(15_000) });
     } catch (fetchErr: any) {
       return { ok: false, error: `Failed to download image (network error): ${fetchErr?.message || 'unknown'}` };
     }
@@ -121,6 +121,7 @@ async function uploadImageFromUrl(
       method: 'POST',
       headers: { 'Authorization': `Bearer ${accessToken}` },
       body: formData,
+      signal: AbortSignal.timeout(30_000),
     });
     let uploadData: any;
     try { uploadData = await uploadResponse.json(); }
@@ -396,14 +397,15 @@ async function handleCreate(
     const result = await metaApiRequest(`act_${accountId}/adcreatives`, accessToken, 'POST', creativePayload);
     if (!result.ok && typeof result.error === 'string' && result.error.includes('instagram_actor_id') && igActorId) {
       console.warn(`[manage-meta-campaign] Creative failed with instagram_actor_id, retrying without it`);
-      // Remove instagram_actor_id from story spec and retry (local copy only, do NOT mutate outer igActorId)
-      const specStr = creativePayload[storySpecKey];
+      // Deep copy payload to avoid mutating the caller's object
+      const retryPayload = { ...creativePayload };
+      const specStr = retryPayload[storySpecKey];
       if (specStr) {
         const spec = JSON.parse(specStr);
         delete spec.instagram_actor_id;
-        creativePayload[storySpecKey] = JSON.stringify(spec);
+        retryPayload[storySpecKey] = JSON.stringify(spec);
       }
-      return metaApiRequest(`act_${accountId}/adcreatives`, accessToken, 'POST', creativePayload);
+      return metaApiRequest(`act_${accountId}/adcreatives`, accessToken, 'POST', retryPayload);
     }
     return result;
   }
@@ -940,13 +942,18 @@ async function handleUpdateBudget(
     return { body: { error: 'Missing required field: daily_budget' }, status: 400 };
   }
 
+  const parsedBudgetValue = Math.round(Number(daily_budget));
+  if (isNaN(parsedBudgetValue) || parsedBudgetValue <= 0) {
+    return { body: { error: 'daily_budget must be a positive number' }, status: 400 };
+  }
+
   // If a specific adset_id is provided, update that one directly
   if (adset_id) {
     console.log(`[manage-meta-campaign] Updating budget for ad set ${adset_id}`);
 
     // CLP has no cents — pass value directly as smallest currency unit
     const result = await metaApiRequest(adset_id, accessToken, 'POST', {
-      daily_budget: Math.round(Number(daily_budget)),
+      daily_budget: parsedBudgetValue,
     });
 
     if (!result.ok) {
@@ -977,7 +984,7 @@ async function handleUpdateBudget(
   for (const adset of adsets) {
     // CLP has no cents — pass value directly as smallest currency unit
     const updateResult = await metaApiRequest(adset.id, accessToken, 'POST', {
-      daily_budget: Math.round(Number(daily_budget)),
+      daily_budget: parsedBudgetValue,
     });
 
     if (updateResult.ok) {
@@ -1254,7 +1261,10 @@ async function handleCreate322(
     };
 
     if (combo.daily_budget) {
-      adsetPayload.daily_budget = Math.round(Number(combo.daily_budget));
+      const comboBudget = Math.round(Number(combo.daily_budget));
+      if (!isNaN(comboBudget) && comboBudget > 0) {
+        adsetPayload.daily_budget = comboBudget;
+      }
     }
 
     const adsetResult = await metaApiRequest(

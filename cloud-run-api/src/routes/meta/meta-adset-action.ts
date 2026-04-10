@@ -72,6 +72,7 @@ export async function metaAdsetAction(c: Context) {
         Authorization: `Bearer ${decryptedToken}`,
       },
       body: JSON.stringify({ status: newStatus }),
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!response.ok) {

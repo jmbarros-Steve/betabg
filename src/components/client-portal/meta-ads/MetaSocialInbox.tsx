@@ -166,7 +166,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
     try {
       const msgContext = messages.slice(-10).map((m) => ({
         role: m.is_page ? 'assistant' : 'user',
-        content: m.text,
+        content: m.message,
       }));
       const { data, error } = await callApi('ai/suggest-inbox-reply', {
         body: {

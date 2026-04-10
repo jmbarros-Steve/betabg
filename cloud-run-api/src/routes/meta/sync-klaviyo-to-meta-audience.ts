@@ -131,6 +131,7 @@ export async function syncKlaviyoToMetaAudience(c: Context) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${metaToken}`,
       },
+      signal: AbortSignal.timeout(15_000),
       body: JSON.stringify({
         name: audience_name,
         subtype: 'CUSTOM',
@@ -173,6 +174,7 @@ export async function syncKlaviyoToMetaAudience(c: Context) {
           'Authorization': `Bearer ${metaToken}`,
         },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(30_000),
       });
 
       if (uploadRes.ok) {

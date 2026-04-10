@@ -34,7 +34,7 @@ async function metaGet(endpoint: string, token: string, params?: Record<string, 
   if (params) {
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   }
-  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000) });
   let data: any;
   try {
     data = await res.json();
@@ -55,6 +55,7 @@ async function metaPost(endpoint: string, token: string, body: Record<string, an
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
   });
   const text = await res.text();
   let data: any;
@@ -643,6 +644,7 @@ async function handleMarkRead(token: string, body: RequestBody): Promise<{ body:
     const res = await fetch(url.toString(), {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${pageToken}` },
+      signal: AbortSignal.timeout(15_000),
     });
     const data: any = await res.json();
     if (!res.ok) {

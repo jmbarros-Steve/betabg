@@ -148,7 +148,7 @@ export async function detectAudienceOverlap(c: Context) {
     return c.json({ overlaps, overlap_map: overlapMap });
   } catch (err: any) {
     console.error('[detect-audience-overlap]', err);
-    return c.json({ error: 'Error analizando overlap' }, 500);
+    return c.json({ error: 'Error analizando overlap', details: err?.message || 'Unknown error' }, 500);
   }
 }
 

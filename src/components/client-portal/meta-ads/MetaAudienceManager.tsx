@@ -1170,7 +1170,7 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
           .from('clients')
           .select('shop_domain')
           .eq('id', clientId)
-          .single(),
+          .maybeSingle(),
         // Fallback: fetch pixel_id from DB if context doesn't have it
         !ctxPixelId
           ? supabase
