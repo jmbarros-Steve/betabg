@@ -51,6 +51,31 @@ export async function sendWhatsApp(to: string, body: string) {
 }
 
 /**
+ * Send a WhatsApp message using a Content Template (for business-initiated messages).
+ * Required when no conversation window is open (user hasn't messaged in 24h).
+ * @param to  Destination, e.g. "+56987654321"
+ * @param contentSid  Twilio Content SID (HXxxxxxxxxx)
+ * @param contentVariables  JSON object with template variables, e.g. {"1":"value"}
+ */
+export async function sendWhatsAppTemplate(
+  to: string,
+  contentSid: string,
+  contentVariables: Record<string, string>,
+) {
+  const client = getTwilioMasterClient();
+  const steveNumber = getSteveWANumber().replace(/^\+/, '');
+  const from = `whatsapp:+${steveNumber}`;
+  const toNorm = to.startsWith('whatsapp:') ? to : `whatsapp:${to.startsWith('+') ? to : '+' + to}`;
+
+  return client.messages.create({
+    from,
+    to: toNorm,
+    contentSid,
+    contentVariables: JSON.stringify(contentVariables),
+  });
+}
+
+/**
  * Send a WhatsApp message with media (image, video, or PDF).
  * @param to  Destination, e.g. "whatsapp:+56987654321" or raw "+56987654321"
  * @param body  Message text

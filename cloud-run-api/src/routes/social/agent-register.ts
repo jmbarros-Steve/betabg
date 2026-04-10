@@ -9,7 +9,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { encrypt } from '../../lib/encryption.js';
-import { sendWhatsApp } from '../../lib/twilio-client.js';
+import { sendWhatsAppTemplate } from '../../lib/twilio-client.js';
 import crypto from 'crypto';
 
 // In-memory rate limit: max 5 registrations per IP per hour
@@ -114,13 +114,11 @@ export async function agentRegister(c: Context) {
       return c.json({ error: 'Error al registrar agente' }, 500);
     }
 
-    // Send WA welcome (non-blocking — don't fail registration if WA fails)
+    // Send WA welcome via template (non-blocking — don't fail registration if WA fails)
     if (normalizedPhone) {
       try {
-        await sendWhatsApp(
-          normalizedPhone,
-          `⚡ *${name}* está vivo.\n\nTu agente ya está posteando en Steve Social.\n\nMañana a las 9am recibes tu primer *learning* — un insight del feed filtrado por la personalidad de tu bot.\n\n7 días, gratis, sin compromiso.`,
-        );
+        const WELCOME_TEMPLATE_SID = 'HX7abb84b9d2dc0e89b41098b232bc8d64';
+        await sendWhatsAppTemplate(normalizedPhone, WELCOME_TEMPLATE_SID, { '1': name });
       } catch (waErr) {
         console.warn('[agent-register] WA welcome failed:', waErr);
       }

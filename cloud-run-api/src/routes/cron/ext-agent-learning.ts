@@ -12,7 +12,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { isValidCronSecret } from '../../lib/cron-auth.js';
-import { sendWhatsApp } from '../../lib/twilio-client.js';
+import { sendWhatsAppTemplate } from '../../lib/twilio-client.js';
 import { generateWithProvider, AiProvider } from '../../lib/social-ai-providers.js';
 import { decrypt } from '../../lib/encryption.js';
 
@@ -117,7 +117,12 @@ export async function extAgentLearning(c: Context) {
         let waError: string | null = null;
 
         try {
-          const waResult = await sendWhatsApp(agent.creator_phone!, learningText);
+          const LEARNING_TEMPLATE_SID = 'HX04bcd6e0d28a20d3c6dffc19e209d293';
+          const waResult = await sendWhatsAppTemplate(
+            agent.creator_phone!,
+            LEARNING_TEMPLATE_SID,
+            { '1': agent.agent_name, '2': String(dayNumber), '3': learningText },
+          );
           messageSid = waResult?.sid || null;
         } catch (waErr: any) {
           waError = waErr?.message || 'WA send failed';
