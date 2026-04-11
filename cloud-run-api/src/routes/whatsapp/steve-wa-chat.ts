@@ -301,7 +301,7 @@ async function quickScrapeUrl(rawUrl: string): Promise<string | null> {
 // Supabase-based rate limiting (adds ~50ms per request). Current tradeoff: latency > strictness
 // since this is a defense-in-depth measure, not a security boundary.
 const lastResponseTime = new Map<string, number>();
-const RATE_LIMIT_MS = 30_000; // 30 seconds (Fix #5: was 5s, causing duplicate responses on slow typing)
+const RATE_LIMIT_MS = 8_000; // 8 seconds — short enough to not lose messages, long enough to debounce rapid typing
 
 // Stage order for "only advance, never go back" rule
 const STAGE_ORDER: Record<string, number> = {
@@ -624,27 +624,25 @@ async function handleProspect(
   imageData?: { base64: string; mediaType: string } | null,
 ) {
   try {
-    // Rate limiting: max 1 response per 30s per phone
+    // Rate limiting + batch debounce: accumulate rapid messages instead of ignoring them
     const lastTime = lastResponseTime.get(phone) || 0;
     const elapsed = Date.now() - lastTime;
     if (elapsed < RATE_LIMIT_MS) {
-      // Still save the message but don't respond (prevents API waste on spam)
+      // Save message to DB (never lose it)
       await supabase.from('wa_messages').insert({
         client_id: null, channel: 'prospect', direction: 'inbound',
         from_number: phone, to_number: STEVE_WA_NUMBER,
         body: storageBody, message_sid: messageSid,
         contact_name: profileName || phone, contact_phone: phone,
+        metadata: { batch: true },
       });
-      // Update message count silently
-      // TODO Fix #49: same non-atomic increment issue — see main upsert block for details
-      const { data: p } = await supabase.from('wa_prospects').select('message_count').eq('phone', phone).maybeSingle();
-      if (p) {
-        await supabase.from('wa_prospects').update({
-          message_count: (p.message_count || 0) + 1,
-          updated_at: new Date().toISOString(),
-        }).eq('phone', phone);
-      }
-      console.log(`[rate-limit] Skipping response to ${phone} (${Math.round(elapsed / 1000)}s < 30s)`);
+      // Update message count atomically
+      await supabase.rpc('increment_message_count', { p_phone: phone });
+
+      // Upsert a batch_respond action — extends delay if one already exists
+      await upsertBatchRespond(supabase, phone, profileName);
+
+      console.log(`[rate-limit-debounce] Msg from ${phone} batched (${Math.round(elapsed / 1000)}s < 8s) — will respond via batch`);
       return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
     }
 
@@ -2017,4 +2015,87 @@ if (!_rateLimitCleanupInterval) {
       if (time < cutoff) lastResponseTime.delete(phone);
     }
   }, 30_000);
+}
+
+// ---------------------------------------------------------------------------
+// Batch debounce helpers — replace silent rate limiter with message accumulation
+// ---------------------------------------------------------------------------
+
+const BATCH_DEBOUNCE_SECONDS = 6; // Wait 6s of silence before processing batch
+
+/**
+ * Upsert a batch_respond action for this phone.
+ * If one already exists (pending), extend its scheduled_at.
+ * If none exists, create a new one and schedule a self-trigger.
+ */
+async function upsertBatchRespond(
+  supabase: any,
+  phone: string,
+  profileName: string,
+): Promise<void> {
+  const scheduledAt = new Date(Date.now() + BATCH_DEBOUNCE_SECONDS * 1000).toISOString();
+
+  // Check if there's already a pending batch_respond for this phone
+  const { data: existing } = await supabase
+    .from('wa_pending_actions')
+    .select('id')
+    .eq('phone', phone)
+    .eq('action_type', 'batch_respond')
+    .eq('status', 'pending')
+    .maybeSingle();
+
+  if (existing) {
+    // Extend the debounce window — push scheduled_at forward
+    await supabase
+      .from('wa_pending_actions')
+      .update({ scheduled_at: scheduledAt })
+      .eq('id', existing.id);
+    console.log(`[batch-debounce] Extended batch for ${phone} → ${scheduledAt}`);
+  } else {
+    // Create new batch_respond action
+    const { error } = await supabase
+      .from('wa_pending_actions')
+      .insert({
+        phone,
+        action_type: 'batch_respond',
+        payload: { profileName: profileName || phone },
+        status: 'pending',
+        scheduled_at: scheduledAt,
+      });
+    if (error) {
+      console.error('[batch-debounce] Failed to create batch_respond:', error.message);
+      return;
+    }
+    console.log(`[batch-debounce] Created batch for ${phone} → ${scheduledAt}`);
+
+    // Self-trigger: schedule a fetch to the batch endpoint after debounce
+    scheduleBatchTrigger(phone);
+  }
+}
+
+/**
+ * Schedule a self-trigger to process the batch after the debounce window.
+ * Uses setTimeout + fetch to the wa-batch-respond endpoint.
+ * If Cloud Run kills the instance, the wa-action-processor cron picks it up as safety net.
+ */
+function scheduleBatchTrigger(phone: string): void {
+  const delayMs = (BATCH_DEBOUNCE_SECONDS + 2) * 1000; // +2s buffer
+  setTimeout(async () => {
+    try {
+      const baseUrl = process.env.CLOUD_RUN_URL || 'https://steve-api-850416724643.us-central1.run.app';
+      const cronSecret = process.env.CRON_SECRET || '';
+      await fetch(`${baseUrl}/api/cron/wa-batch-respond`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Cron-Secret': cronSecret,
+        },
+        body: JSON.stringify({ phone }),
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (err: any) {
+      console.error(`[batch-trigger] Self-trigger failed for ${phone}:`, err.message);
+      // Safety net: wa-action-processor cron will pick it up within ~60s
+    }
+  }, delayMs);
 }

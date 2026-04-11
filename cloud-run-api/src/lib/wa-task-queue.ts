@@ -14,7 +14,8 @@ export type WAActionType =
   | 'send_case_study'
   | 'send_mockup'
   | 'send_deck'
-  | 'send_video_demo';
+  | 'send_video_demo'
+  | 'batch_respond';
 
 export interface WAActionPayload {
   body?: string;

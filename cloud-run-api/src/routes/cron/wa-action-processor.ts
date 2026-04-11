@@ -12,7 +12,12 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp, sendWhatsAppMedia } from '../../lib/twilio-client.js';
-import { loadIndustryCaseStudy } from '../../lib/steve-wa-brain.js';
+import {
+  loadIndustryCaseStudy,
+  getProspectHistory,
+  buildDynamicSalesPrompt,
+} from '../../lib/steve-wa-brain.js';
+import { runInvestigator, runStrategist, runConversationalist } from '../../lib/steve-multi-brain.js';
 import { generateProspectMockup } from '../../lib/steve-mockup-generator.js';
 import { generateAndSendSalesDeck } from '../../lib/steve-sales-deck.js';
 import type { ProspectRecord } from '../../lib/steve-wa-brain.js';
@@ -201,6 +206,11 @@ async function executeAction(action: any, supabase: any): Promise<void> {
       await handleSendVideoDemo(phone, payload, supabase);
       break;
 
+    case 'batch_respond':
+      // Safety net: delegate to wa-batch-respond logic
+      await handleBatchRespond(phone, payload, supabase);
+      break;
+
     case 'process_prospect_recovery':
       // Bug #201 fix: handle recovery action — log and let next inbound message trigger full processing
       console.log('[action-processor] Recovery for prospect:', payload?.prospect_id);
@@ -350,4 +360,88 @@ async function saveOutboundMessage(
   if (insertErr) {
     console.error(`[wa-action-processor] wa_messages insert failed after send:`, insertErr.message);
   }
+}
+
+/**
+ * Handle batch_respond action — safety net when wa-batch-respond endpoint wasn't triggered.
+ * Loads unresponded messages, runs multi-brain pipeline, sends via sendWhatsApp.
+ */
+async function handleBatchRespond(phone: string, payload: any, supabase: any): Promise<void> {
+  const { data: prospect } = await supabase
+    .from('wa_prospects')
+    .select('*')
+    .eq('phone', phone)
+    .maybeSingle();
+
+  if (!prospect) {
+    console.warn(`[batch-respond-safety] No prospect for ${phone}`);
+    return;
+  }
+
+  const history = await getProspectHistory(phone, 20);
+  if (history.length === 0) return;
+
+  const lastUserMsg = history.filter((m: any) => m.role === 'user').slice(-1)[0]?.content || '';
+
+  // Sanitize for Claude
+  const sanitized = sanitizeForPipeline(history);
+
+  let replyText = '';
+  try {
+    const [investigatorResults, promptResult] = await Promise.all([
+      runInvestigator(prospect),
+      buildDynamicSalesPrompt(prospect, lastUserMsg, history),
+    ]);
+
+    const safeInvestigatorResults = (investigatorResults && investigatorResults.investigationContext)
+      ? investigatorResults
+      : { ruleIds: [], investigationContext: '', competitorInsights: '', salesLearnings: '' };
+    const strategistBriefRaw = await runStrategist(prospect, history, safeInvestigatorResults);
+    const strategistBrief = (strategistBriefRaw?.brief?.trim()?.length ?? 0) > 20
+      ? strategistBriefRaw
+      : { ...strategistBriefRaw, brief: '' };
+
+    replyText = await runConversationalist(history, strategistBrief, promptResult.prompt, sanitized);
+  } catch (err) {
+    console.error('[batch-respond-safety] Pipeline failed:', err);
+    replyText = 'Perdón por la demora! Vi tus mensajes. ¿En qué te puedo ayudar?';
+  }
+
+  replyText = replyText
+    .replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '')
+    .replace(/\[[A-Z_]+(?::[^\]]*)?\]/g, '')
+    .trim() || 'Hola! Vi tus mensajes. ¿Me cuentas más?';
+
+  if (replyText.length > 4096) {
+    replyText = replyText.slice(0, 4090) + '...[+]';
+  }
+
+  await sendWhatsApp(`+${phone}`, replyText);
+  await saveOutboundMessage(supabase, phone, payload?.profileName, replyText);
+  console.log(`[batch-respond-safety] Sent to ${phone}: ${replyText.slice(0, 80)}...`);
+}
+
+function sanitizeForPipeline(
+  msgs: Array<{ role: 'user' | 'assistant'; content: string }>
+): Array<{ role: 'user' | 'assistant'; content: string }> {
+  if (msgs.length === 0) return [{ role: 'user', content: 'Hola' }];
+
+  const merged: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+  const validMsgs = msgs.filter(m => m.content != null && String(m.content).trim() !== '');
+  for (const msg of validMsgs) {
+    const content = String(msg.content || '');
+    if (merged.length > 0 && merged[merged.length - 1].role === msg.role) {
+      merged[merged.length - 1].content += '\n' + content;
+    } else {
+      merged.push({ role: msg.role, content });
+    }
+  }
+
+  const result = merged.filter(m => m.content.trim() !== '');
+  while (result.length > 0 && result[0].role !== 'user') result.shift();
+  if (result.length === 0) return [{ role: 'user', content: 'Hola' }];
+  if (result[result.length - 1].role !== 'user') {
+    result.push({ role: 'user', content: '(continúa)' });
+  }
+  return result;
 }

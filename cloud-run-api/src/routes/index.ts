@@ -175,6 +175,7 @@ import { wolfNightMode } from './cron/wolf-night-mode.js';
 import { wolfMorningSend } from './cron/wolf-morning-send.js';
 import { salesLearningLoop } from './cron/sales-learning-loop.js';
 import { waActionProcessor } from './cron/wa-action-processor.js';
+import { waBatchRespond } from './cron/wa-batch-respond.js';
 import { swarmResearch } from './cron/swarm-research.js';
 import { autoLearningDigest } from './cron/auto-learning-digest.js';
 import { knowledgePropagationCatchup } from './cron/knowledge-propagation-catchup.js';
@@ -605,6 +606,7 @@ export function registerRoutes(app: Hono) {
   cron.post('/wolf-morning-send', wolfMorningSend);
   cron.post('/sales-learning-loop', salesLearningLoop);
   cron.post('/wa-action-processor', waActionProcessor);
+  cron.post('/wa-batch-respond', waBatchRespond);
   cron.post('/swarm-research', swarmResearch);
   cron.post('/auto-learning-digest', autoLearningDigest);
   cron.post('/knowledge-propagation-catchup', knowledgePropagationCatchup);
