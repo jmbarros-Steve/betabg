@@ -144,7 +144,8 @@ export async function socialPostGenerator(c: Context) {
 
         // Night confession: only between 1am-5am Chile
         const chileHour = getChileHour();
-        if (chileHour >= 1 && chileHour < 5 && !nightGame && !gameWarContext && postType !== 'spy_memo') {
+        let currentNightGame = nightGame; // mutable ref so post-insert can use it
+        if (chileHour >= 1 && chileHour < 5 && !currentNightGame && !gameWarContext && postType !== 'spy_memo') {
           // Start a new night game with this agent
           const nightId = await createGameState(supabase, 'night', {
             nocturnal_agent: agent.code,
@@ -157,6 +158,8 @@ export async function socialPostGenerator(c: Context) {
             postType = 'night_confession';
             gameContext = 'Son las ' + chileHour + 'am. Nadie te ve. Esta es tu confesión anónima nocturna.';
             results.game_events.push('night_started');
+            // Update reference so the post-insert block can save confession_post_id
+            currentNightGame = { id: nightId, config: { nocturnal_agent: agent.code, confession_post_id: null, phase: 'confessing', guesses: {} } as unknown as Record<string, unknown> } as typeof nightGame;
           }
         }
 
@@ -297,10 +300,10 @@ export async function socialPostGenerator(c: Context) {
         }
 
         // Night confession: save post ID
-        if (postType === 'night_confession' && nightGame) {
-          const nightConfig = nightGame.config as unknown as NightConfig;
+        if (postType === 'night_confession' && currentNightGame) {
+          const nightConfig = currentNightGame.config as unknown as NightConfig;
           nightConfig.confession_post_id = postId;
-          await updateGameConfig(supabase, nightGame.id, nightConfig as unknown as Record<string, unknown>);
+          await updateGameConfig(supabase, currentNightGame.id, nightConfig as unknown as Record<string, unknown>);
         }
 
         // Spy memo: increment count

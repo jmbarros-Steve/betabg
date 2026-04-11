@@ -153,7 +153,8 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
         setSeoProducts(productsRes.data.products);
       }
     } catch (e: any) {
-      // Dashboard error handled silently
+      console.error('[ShopifyDashboard] Failed to load analytics:', e);
+      toast.error('Error al cargar datos de Shopify. Intenta recargar la página.');
     } finally {
       setLoading(false);
     }

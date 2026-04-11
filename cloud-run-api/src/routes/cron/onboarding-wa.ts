@@ -120,6 +120,7 @@ export async function onboardingWA(c: Context) {
             max_tokens: 200,
             messages: [{ role: 'user', content: prompt }],
           }),
+          signal: AbortSignal.timeout(15_000),
         });
 
         if (!aiRes.ok) {
@@ -136,7 +137,7 @@ export async function onboardingWA(c: Context) {
         await sendWhatsApp(`+${phone}`, msg);
 
         // Save message
-        await supabase.from('wa_messages').insert({
+        const { error: insertErr } = await supabase.from('wa_messages').insert({
           client_id: step.client_id,
           channel: 'steve_chat',
           direction: 'outbound',
@@ -146,6 +147,9 @@ export async function onboardingWA(c: Context) {
           contact_name: clientName,
           contact_phone: phone,
         });
+        if (insertErr) {
+          console.error(`[onboarding-wa] wa_messages insert failed after send:`, insertErr.message);
+        }
 
         // Update onboarding step
         // Bug #87 fix: Don't update updated_at — it resets the 24h cooldown timer

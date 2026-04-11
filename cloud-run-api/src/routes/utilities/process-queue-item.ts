@@ -36,6 +36,7 @@ async function extractYouTubeTranscript(videoId: string): Promise<string> {
   try {
     const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (res.ok) {
@@ -51,7 +52,7 @@ async function extractYouTubeTranscript(videoId: string): Promise<string> {
           const preferred = captionTracks.find(t => t.languageCode === 'es')
             || captionTracks.find(t => t.languageCode === 'en')
             || captionTracks[0];
-          const captionRes = await fetch(preferred.baseUrl);
+          const captionRes = await fetch(preferred.baseUrl, { signal: AbortSignal.timeout(10_000) });
           if (captionRes.ok) {
             const xml = await captionRes.text();
             const texts = [...xml.matchAll(/<text[^>]*>(.*?)<\/text>/gs)]
@@ -65,7 +66,9 @@ async function extractYouTubeTranscript(videoId: string): Promise<string> {
         }
       }
     }
-  } catch {}
+  } catch (ytErr: any) {
+    console.warn(`[process-queue-item] YouTube caption extraction failed: ${ytErr?.message}`);
+  }
 
   const APIFY_TOKEN = process.env.APIFY_TOKEN;
   if (APIFY_TOKEN) {
@@ -79,6 +82,7 @@ async function extractYouTubeTranscript(videoId: string): Promise<string> {
           maxCrawlPages: 1,
           outputFormats: ['markdown'],
         }),
+        signal: AbortSignal.timeout(120_000),
       }
     );
 
@@ -105,6 +109,7 @@ async function extractUrlContent(url: string): Promise<string> {
           maxCrawlPages: 1,
           outputFormats: ['markdown'],
         }),
+        signal: AbortSignal.timeout(120_000),
       }
     );
 

@@ -84,6 +84,7 @@ export async function storeShopifyToken(c: Context) {
             'X-Shopify-Access-Token': trimmedToken,
             'Content-Type': 'application/json',
           },
+          signal: AbortSignal.timeout(10_000),
         }
       );
 

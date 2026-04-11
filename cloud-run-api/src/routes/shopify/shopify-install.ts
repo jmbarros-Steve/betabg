@@ -210,11 +210,19 @@ export async function shopifyInstall(c: Context) {
     const nonce = crypto.randomUUID();
 
     const normalizedShop = shopDomain.toLowerCase().trim();
-    await supabaseAdmin.from('oauth_states').insert({
+    const { error: nonceInsertError } = await supabaseAdmin.from('oauth_states').insert({
       nonce,
       shop_domain: normalizedShop,
       client_id: perClientId || null, // Track which client initiated OAuth
     });
+
+    if (nonceInsertError) {
+      console.error('[shopify-install] Failed to save OAuth nonce:', nonceInsertError);
+      return c.html(
+        '<html><body><h1>Error</h1><p>Failed to initialize OAuth flow. Please try again.</p></body></html>',
+        500,
+      );
+    }
 
     // Clean up expired states (fire and forget)
     supabaseAdmin.from('oauth_states')

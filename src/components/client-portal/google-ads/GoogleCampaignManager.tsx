@@ -153,26 +153,27 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     }
 
     setBudgetSaving(true);
+    try {
+      const { error } = await callApi('manage-google-campaign', {
+        body: {
+          action: 'update_budget',
+          connection_id: connectionId,
+          campaign_id: budgetCampaign.id,
+          data: { daily_budget: parsedBudget },
+        },
+      });
 
-    const { error } = await callApi('manage-google-campaign', {
-      body: {
-        action: 'update_budget',
-        connection_id: connectionId,
-        campaign_id: budgetCampaign.id,
-        data: { daily_budget: parsedBudget },
-      },
-    });
+      if (error) {
+        toast.error('Error actualizando presupuesto: ' + error);
+        return;
+      }
 
-    setBudgetSaving(false);
-
-    if (error) {
-      toast.error('Error actualizando presupuesto: ' + error);
-      return;
+      toast.success('Presupuesto actualizado');
+      setBudgetDialogOpen(false);
+      fetchCampaigns();
+    } finally {
+      setBudgetSaving(false);
     }
-
-    toast.success('Presupuesto actualizado');
-    setBudgetDialogOpen(false);
-    fetchCampaigns();
   };
 
   const handleSort = (key: SortKey) => {

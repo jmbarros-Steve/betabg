@@ -37,6 +37,8 @@ export async function metaOauthCallback(c: Context) {
       console.warn('[meta-oauth] Invalid state parameter — possible CSRF');
       return c.json({ error: 'Invalid state parameter — possible CSRF attack' }, 403);
     }
+    // Delete used nonce to prevent replay attacks
+    await supabase.from('oauth_states').delete().eq('id', stateCheck.id);
 
     const { data: client, error: clientError } = await supabase
       .from('clients')

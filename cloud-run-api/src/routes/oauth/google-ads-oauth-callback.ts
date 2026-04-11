@@ -56,7 +56,17 @@ export async function googleAdsOauthCallback(c: Context) {
     }
 
     if (client.client_user_id !== user.id) {
-      return c.json({ error: 'Access denied' }, 403);
+      // Allow super_admin to connect Google Ads on behalf of clients
+      const { data: adminRole } = await supabase
+        .from('user_roles')
+        .select('is_super_admin')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!adminRole?.is_super_admin) {
+        return c.json({ error: 'Access denied' }, 403);
+      }
+      console.log('[google-ads-oauth] Super admin bypass for user:', user.id);
     }
 
     // Get Google OAuth credentials
@@ -83,6 +93,7 @@ export async function googleAdsOauthCallback(c: Context) {
         redirect_uri,
         grant_type: 'authorization_code',
       }),
+      signal: AbortSignal.timeout(15_000),
     });
 
     const tokenData = await tokenResponse.json() as any;
@@ -94,8 +105,12 @@ export async function googleAdsOauthCallback(c: Context) {
 
     const accessToken = tokenData.access_token;
     const refreshToken = tokenData.refresh_token;
-    if (!tokenData.refresh_token) {
-      console.warn('[google-ads-oauth] No refresh_token received — user may have already authorized this app. Re-authorization with prompt=consent may be needed.');
+    if (!refreshToken) {
+      console.error('[google-ads-oauth] No refresh_token received — connection will die after 1 hour. User must re-authorize with prompt=consent.');
+      return c.json({
+        error: 'Google did not return a refresh token. Please disconnect and reconnect your Google Ads account.',
+        hint: 'This usually happens when the app was already authorized. Try revoking access at https://myaccount.google.com/permissions and reconnecting.',
+      }, 400);
     }
     console.log('Access token obtained');
 
@@ -108,6 +123,7 @@ export async function googleAdsOauthCallback(c: Context) {
           'Authorization': `Bearer ${accessToken}`,
           'developer-token': developerToken,
         },
+        signal: AbortSignal.timeout(15_000),
       }
     );
 
@@ -139,6 +155,7 @@ export async function googleAdsOauthCallback(c: Context) {
             'developer-token': developerToken,
             'login-customer-id': firstCustomerId,
           },
+          signal: AbortSignal.timeout(10_000),
         }
       );
 

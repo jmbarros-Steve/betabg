@@ -55,10 +55,18 @@ export async function checkVideoStatus(c: Context) {
     const finalUrl = storageErr ? videoUrl : publicUrl;
 
     if (creativeId) {
-      await supabase.from('ad_creatives').update({
-        asset_url: finalUrl,
-        estado: 'aprobado',
-      }).eq('id', creativeId);
+      if (storageErr) {
+        // Upload failed — keep asset as borrador with the temporary Replicate URL
+        await supabase.from('ad_creatives').update({
+          asset_url: finalUrl,
+          estado: 'borrador',
+        }).eq('id', creativeId);
+      } else {
+        await supabase.from('ad_creatives').update({
+          asset_url: finalUrl,
+          estado: 'aprobado',
+        }).eq('id', creativeId);
+      }
     }
 
     return c.json({ status: 'succeeded', asset_url: finalUrl });

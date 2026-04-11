@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { callApi } from '@/lib/api';
+import { toast } from 'sonner';
 import { ShopifyDiscountDialog } from './ShopifyDiscountDialog';
 import { useUserPlan } from '@/hooks/useUserPlan';
 
@@ -75,7 +76,9 @@ export function ShopifyDiscountsPanel({ clientId, connectionId, discountPerforma
     const { data, error } = await callApi<any>('fetch-shopify-discounts', {
       body: { client_id: clientId, connection_id: connectionId || undefined },
     });
-    if (!error && data?.discounts) {
+    if (error) {
+      toast.error('Error al cargar descuentos de Shopify');
+    } else if (data?.discounts) {
       setDiscounts(data.discounts);
     }
     setLoading(false);

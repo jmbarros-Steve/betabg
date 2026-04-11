@@ -47,7 +47,7 @@ export async function exportAllData(c: Context) {
 
   for (const table of TABLES) {
     try {
-      const { data, error } = await supabase.from(table).select("*");
+      const { data, error } = await supabase.from(table).select("*").limit(10000);
       if (error) {
         dump.tables[table] = { error: error.message, count: 0 };
       } else {

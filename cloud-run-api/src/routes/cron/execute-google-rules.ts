@@ -44,10 +44,14 @@ export async function executeGoogleRulesCron(c: Context) {
   }
 
   // Acquire lock
-  await supabase.from('steve_knowledge').upsert(
+  const { error: lockErr } = await supabase.from('steve_knowledge').upsert(
     { categoria: 'system', titulo: lockKey, contenido: lockNow.toISOString(), activo: true, orden: 0 },
     { onConflict: 'categoria,titulo' },
   );
+  if (lockErr) {
+    console.error('[execute-google-rules] Failed to acquire lock:', lockErr);
+    return c.json({ error: 'Failed to acquire lock' }, 500);
+  }
 
   try {
     // Fetch all active rules with connection data
@@ -257,11 +261,12 @@ export async function executeGoogleRulesCron(c: Context) {
     console.error('[execute-google-rules] Fatal error:', err);
     return c.json({ error: err.message }, 500);
   } finally {
-    await supabase
+    const { error: lockReleaseErr } = await supabase
       .from('steve_knowledge')
       .delete()
       .eq('categoria', 'system')
       .eq('titulo', lockKey);
+    if (lockReleaseErr) console.error('[execute-google-rules] Failed to release mutex lock:', lockReleaseErr);
   }
 }
 

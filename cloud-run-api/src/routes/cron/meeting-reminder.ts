@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
 import { safeQuery } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Meeting Reminder Cron — Mini CRM Pipeline
@@ -15,9 +16,7 @@ import { safeQuery } from '../../lib/safe-supabase.js';
  * Cron: 0,30 * * * * (every 30 min)
  */
 export async function meetingReminder(c: Context) {
-  const cronSecret = c.req.header('X-Cron-Secret')?.trim();
-  const expected = process.env.CRON_SECRET;
-  if (!expected || cronSecret !== expected) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -79,7 +78,7 @@ export async function meetingReminder(c: Context) {
           await sendWhatsApp(`+${p.phone}`, msg);
 
           // Save outbound message
-          await supabase.from('wa_messages').insert({
+          const { error: insertErr1 } = await supabase.from('wa_messages').insert({
             client_id: null,
             channel: 'prospect',
             direction: 'outbound',
@@ -89,10 +88,11 @@ export async function meetingReminder(c: Context) {
             contact_name: prospectName || p.phone,
             contact_phone: p.phone,
           });
+          if (insertErr1) console.error(`[meeting-reminder] wa_messages insert failed:`, insertErr1.message);
 
           // Update prospect: cancel meeting, reduce score, back to qualifying
           const newScore = Math.max(0, (p.lead_score || 0) - 20);
-          await supabase
+          const { error: updateErr1 } = await supabase
             .from('wa_prospects')
             .update({
               meeting_status: 'no_show',
@@ -101,6 +101,7 @@ export async function meetingReminder(c: Context) {
               updated_at: now.toISOString(),
             })
             .eq('id', p.id);
+          if (updateErr1) console.error(`[meeting-reminder] wa_prospects no_show update failed:`, updateErr1.message);
 
           results.no_shows++;
           console.log(`[meeting-reminder] No-show: ${p.phone}, score ${p.lead_score} → ${newScore}`);
@@ -116,7 +117,7 @@ export async function meetingReminder(c: Context) {
 
           await sendWhatsApp(`+${p.phone}`, msg);
 
-          await supabase.from('wa_messages').insert({
+          const { error: insertErr2h } = await supabase.from('wa_messages').insert({
             client_id: null,
             channel: 'prospect',
             direction: 'outbound',
@@ -126,8 +127,9 @@ export async function meetingReminder(c: Context) {
             contact_name: prospectName || p.phone,
             contact_phone: p.phone,
           });
+          if (insertErr2h) console.error(`[meeting-reminder] wa_messages 2h insert failed:`, insertErr2h.message);
 
-          await supabase
+          const { error: updateErr2h } = await supabase
             .from('wa_prospects')
             .update({
               reminder_2h_sent: true,
@@ -135,6 +137,7 @@ export async function meetingReminder(c: Context) {
               updated_at: now.toISOString(),
             })
             .eq('id', p.id);
+          if (updateErr2h) console.error(`[meeting-reminder] wa_prospects 2h update failed:`, updateErr2h.message);
 
           results.reminders_2h++;
           console.log(`[meeting-reminder] 2h reminder sent to ${p.phone}`);
@@ -149,7 +152,7 @@ export async function meetingReminder(c: Context) {
 
           await sendWhatsApp(`+${p.phone}`, msg);
 
-          await supabase.from('wa_messages').insert({
+          const { error: insertErr24h } = await supabase.from('wa_messages').insert({
             client_id: null,
             channel: 'prospect',
             direction: 'outbound',
@@ -159,8 +162,9 @@ export async function meetingReminder(c: Context) {
             contact_name: prospectName || p.phone,
             contact_phone: p.phone,
           });
+          if (insertErr24h) console.error(`[meeting-reminder] wa_messages 24h insert failed:`, insertErr24h.message);
 
-          await supabase
+          const { error: updateErr24h } = await supabase
             .from('wa_prospects')
             .update({
               reminder_24h_sent: true,
@@ -168,6 +172,7 @@ export async function meetingReminder(c: Context) {
               updated_at: now.toISOString(),
             })
             .eq('id', p.id);
+          if (updateErr24h) console.error(`[meeting-reminder] wa_prospects 24h update failed:`, updateErr24h.message);
 
           results.reminders_24h++;
           console.log(`[meeting-reminder] 24h reminder sent to ${p.phone}`);

@@ -242,14 +242,22 @@ export async function syncCampaignMetrics(c: Context) {
       }
     }
 
-    // Clean up stale campaign metrics (e.g. from a previously connected ad account)
-    // Done AFTER upsert so the dashboard never shows /bin/bash during sync
+    // Clean up stale campaign metrics ONLY within the synced date range.
+    // Previously this deleted ALL records for campaign_ids not in the current sync,
+    // which permanently wiped archived campaign history. Now restricted to the
+    // 30-day sync window so historical data from older campaigns is preserved.
     const currentCampaignIds = [...new Set(campaignMetrics.map(m => m.campaign_id))];
-    if (currentCampaignIds.length > 0) {
+    const syncedDates = [...new Set(campaignMetrics.map(m => m.metric_date))].sort();
+    if (currentCampaignIds.length > 0 && syncedDates.length >= 2) {
+      const cleanupSince = syncedDates[0];
+      const cleanupUntil = syncedDates[syncedDates.length - 1];
+
       const { error: cleanupError } = await supabase
         .from('campaign_metrics')
         .delete()
         .eq('connection_id', connection_id)
+        .gte('metric_date', cleanupSince)
+        .lte('metric_date', cleanupUntil)
         .not('campaign_id', 'in', `(${currentCampaignIds.join(',')})`);
       if (cleanupError) {
         console.error('Stale metric cleanup error:', cleanupError);

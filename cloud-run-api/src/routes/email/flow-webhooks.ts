@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 /**
  * Insert an enrollment, silently skipping if a duplicate active enrollment exists.
@@ -727,10 +728,8 @@ async function enrollInFlows(
  * Auth: authMiddleware at router level + cron secret validation below.
  */
 export async function emailFlowCronWinback(c: Context) {
-  // Defense-in-depth: validate cron secret in addition to authMiddleware
-  const cronSecret = c.req.header('X-Cron-Secret');
-  const expected = process.env.CRON_SECRET;
-  if (!expected || cronSecret !== expected) {
+  // Defense-in-depth: validate cron secret with timing-safe comparison
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -822,10 +821,8 @@ export async function emailFlowCronWinback(c: Context) {
  * Auth: authMiddleware at router level + cron secret validation below.
  */
 export async function emailFlowCronBirthday(c: Context) {
-  // Defense-in-depth: validate cron secret in addition to authMiddleware
-  const cronSecret = c.req.header('X-Cron-Secret');
-  const expected = process.env.CRON_SECRET;
-  if (!expected || cronSecret !== expected) {
+  // Defense-in-depth: validate cron secret with timing-safe comparison
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 

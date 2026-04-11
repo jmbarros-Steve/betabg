@@ -60,7 +60,19 @@ export async function waSendCampaign(c: Context) {
       return c.json({ error: 'Esta campaña ya fue enviada y no puede re-enviarse' }, 400);
     }
     if (campaign.status === 'sending') {
-      return c.json({ error: 'Esta campaña ya está en proceso de envío' }, 400);
+      // Bug #99 fix: Detect zombie campaigns stuck in 'sending' for >1 hour and auto-recover
+      const updatedAt = new Date(campaign.updated_at || campaign.created_at);
+      const stuckMinutes = (Date.now() - updatedAt.getTime()) / 60000;
+      if (stuckMinutes > 60) {
+        console.warn(`[wa-campaign] ZOMBIE RECOVERED: Campaign ${campaign_id} stuck in 'sending' for ${Math.round(stuckMinutes)}min — resetting to draft`);
+        await supabase.from('wa_campaigns')
+          .update({ status: 'draft' })
+          .eq('id', campaign_id)
+          .eq('status', 'sending');
+        // Continue execution — campaign is now draft again, allow re-send
+      } else {
+        return c.json({ error: 'Esta campaña ya está en proceso de envío' }, 400);
+      }
     }
     if (campaign.status !== 'draft') {
       return c.json({ error: `Campaña ya está en estado ${campaign.status}` }, 400);
@@ -124,31 +136,27 @@ export async function waSendCampaign(c: Context) {
 
       // Bug #217 fix: Apply client-side segment filtering for metadata-based segments
       if (segment === 'buyers') {
-        // Filter contacts who have purchase data in metadata
         const filtered = allContacts.filter((c: any) => c.metadata?.last_purchase_at);
         if (filtered.length > 0) {
           allContacts = filtered;
         } else {
-          console.warn(`[wa-campaign] Segment 'buyers' matched 0 contacts (no metadata.last_purchase_at) — sending to all ${allContacts.length} contacts`);
+          return c.json({ error: `Segmento 'compradores' no encontró contactos con compras registradas. Verifica que los datos de Shopify estén sincronizados.` }, 400);
         }
       } else if (segment === 'abandoned') {
-        // Filter contacts with abandoned cart flag
         const filtered = allContacts.filter((c: any) => c.metadata?.has_abandoned_cart === true || c.metadata?.has_abandoned_cart === 'true');
         if (filtered.length > 0) {
           allContacts = filtered;
         } else {
-          console.warn(`[wa-campaign] Segment 'abandoned' matched 0 contacts (no metadata.has_abandoned_cart) — sending to all ${allContacts.length} contacts`);
+          return c.json({ error: `Segmento 'carrito abandonado' no encontró contactos. Verifica que los webhooks de Shopify estén activos.` }, 400);
         }
       } else if (segment === 'vip') {
-        // Filter contacts with 3+ purchases
         const filtered = allContacts.filter((c: any) => parseInt(c.metadata?.purchase_count || '0', 10) >= 3);
         if (filtered.length > 0) {
           allContacts = filtered;
         } else {
-          console.warn(`[wa-campaign] Segment 'vip' matched 0 contacts (no metadata.purchase_count >= 3) — sending to all ${allContacts.length} contacts`);
+          return c.json({ error: `Segmento 'VIP' no encontró contactos con 3+ compras. Verifica los datos de compra.` }, 400);
         }
       } else if (segment !== 'all' && segment !== 'inactive') {
-        // Unknown segment — log warning, proceed with all contacts
         console.warn(`[wa-campaign] Unknown segment '${segment}' — sending to all ${allContacts.length} contacts`);
       }
 
@@ -180,13 +188,18 @@ export async function waSendCampaign(c: Context) {
     }
 
     // Mark campaign as sending
-    await supabase.from('wa_campaigns')
+    const { error: statusErr } = await supabase.from('wa_campaigns')
       .update({
         status: 'sending',
         recipient_count: recipients.length,
         sent_at: new Date().toISOString(),
       })
       .eq('id', campaign_id);
+
+    if (statusErr) {
+      console.error(`[wa-campaign] Failed to update campaign status:`, statusErr);
+      return c.json({ error: 'No se pudo actualizar el estado de la campaña' }, 500);
+    }
 
     // Bug #35 fix: deduct credits upfront (atomic RPC) to prevent race conditions
     const { error: deductError } = await supabase.rpc('deduct_wa_credit', {

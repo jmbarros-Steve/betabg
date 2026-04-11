@@ -103,11 +103,12 @@ export function EmailAnalytics({ clientId }: EmailAnalyticsProps) {
     if (!overview?.aggregate) return null;
     const { open_rate, bounce_rate, total_sent } = overview.aggregate;
     if (!total_sent || total_sent === 0) return null;
-    const openScore = Math.min(parseFloat(open_rate) / 25, 1) * 40; // 25%+ open = perfect
-    const bounceScore = Math.max(0, 1 - parseFloat(bounce_rate) / 5) * 30; // <5% bounce = perfect
-    const unsubRate = parseFloat(overview.aggregate.total_unsubscribed || 0) / total_sent * 100;
+    const openScore = Math.min((parseFloat(open_rate) || 0) / 25, 1) * 40; // 25%+ open = perfect
+    const bounceScore = Math.max(0, 1 - (parseFloat(bounce_rate) || 0) / 5) * 30; // <5% bounce = perfect
+    const unsubRate = (parseFloat(overview.aggregate.total_unsubscribed || '0') || 0) / total_sent * 100;
     const unsubScore = Math.max(0, 1 - unsubRate / 2) * 30; // <2% unsub = perfect
-    return Math.round(openScore + bounceScore + unsubScore);
+    const score = Math.round(openScore + bounceScore + unsubScore);
+    return isNaN(score) ? null : score;
   }, [overview]);
 
   // Campaign comparison data for bar chart

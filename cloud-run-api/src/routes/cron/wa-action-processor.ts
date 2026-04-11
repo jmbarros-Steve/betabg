@@ -246,6 +246,7 @@ async function handleGenerateCopy(phone: string, payload: any, supabase: any): P
         content: `Genera un copy de anuncio de Meta Ads para una marca de ${industry}. Descripción: ${copyDesc}. Formato:\n🎯 Headline: ...\n📝 Texto principal: ...\n🔗 Descripción: ...\n📲 CTA: ...\nMáximo 300 caracteres total. Español neutro.`,
       }],
     }),
+    signal: AbortSignal.timeout(15_000),
   });
 
   if (!copyRes.ok) throw new Error(`Claude API error: ${copyRes.status}`);

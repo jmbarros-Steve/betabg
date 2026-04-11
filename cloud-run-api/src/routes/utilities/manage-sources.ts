@@ -29,11 +29,21 @@ export async function manageSources(c: Context) {
     }
     case 'toggle': {
       const { id, enabled } = data;
-      await supabase.from('steve_sources').update({ enabled }).eq('id', id);
+      if (!id) return c.json({ error: 'id required' }, 400);
+      const { error: toggleErr } = await supabase.from('steve_sources').update({ enabled }).eq('id', id);
+      if (toggleErr) {
+        console.error('[manage-sources] Toggle error:', toggleErr);
+        return c.json({ error: toggleErr.message }, 500);
+      }
       return c.json({ success: true });
     }
     case 'delete': {
-      await supabase.from('steve_sources').delete().eq('id', data.id);
+      if (!data.id) return c.json({ error: 'id required' }, 400);
+      const { error: deleteErr } = await supabase.from('steve_sources').delete().eq('id', data.id);
+      if (deleteErr) {
+        console.error('[manage-sources] Delete error:', deleteErr);
+        return c.json({ error: deleteErr.message }, 500);
+      }
       return c.json({ success: true });
     }
     default:

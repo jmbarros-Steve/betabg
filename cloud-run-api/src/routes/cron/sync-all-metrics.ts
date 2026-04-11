@@ -121,6 +121,7 @@ export async function syncAllMetrics(c: Context) {
           'X-Cron-Secret': cronSecret!,
         },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(120_000),
       });
 
       const status = response.ok ? 'success' : 'error';
@@ -139,12 +140,14 @@ export async function syncAllMetrics(c: Context) {
 
   console.log(`[cron] Sync complete: ${succeeded} succeeded, ${failed} failed out of ${connections.length}`);
 
+  // Return 500 if all connections failed (Cloud Scheduler will retry)
+  const allFailed = connections.length > 0 && succeeded === 0 && failed > 0;
   return c.json({
     total: connections.length,
     succeeded,
     failed,
     results,
-  });
+  }, allFailed ? 500 : 200);
   } finally {
     // Release mutex lock
     await supabase

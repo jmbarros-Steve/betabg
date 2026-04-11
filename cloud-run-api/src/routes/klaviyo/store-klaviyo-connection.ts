@@ -43,6 +43,7 @@ export async function storeKlaviyoConnection(c: Context) {
         'Content-Type': 'application/json',
         'revision': '2024-10-15',
       },
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!testResponse.ok) {
@@ -109,16 +110,16 @@ export async function storeKlaviyoConnection(c: Context) {
       return c.json({ error: 'Failed to store connection' }, 500);
     }
 
-    // Complete onboarding step (fire & forget)
-    Promise.resolve(
-      supabase
-        .from('merchant_onboarding')
-        .update({ status: 'completed', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-        .eq('client_id', client_id)
-        .eq('step', 'klaviyo_connected')
-        .eq('status', 'pending')
-    ).then(() => console.log(`[klaviyo] Onboarding step klaviyo_connected completed for client ${client_id}`))
-      .catch(() => {});
+    // Complete onboarding step
+    const { error: onboardErr } = await supabase
+      .from('merchant_onboarding')
+      .update({ status: 'completed', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('client_id', client_id)
+      .eq('step', 'klaviyo_connected')
+      .eq('status', 'pending');
+    if (onboardErr) {
+      console.error(`[klaviyo] Onboarding step update failed for client ${client_id}:`, onboardErr);
+    }
 
     return c.json({
       success: true,

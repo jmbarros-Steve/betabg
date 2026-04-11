@@ -159,6 +159,15 @@ Responde SOLO en JSON válido sin markdown ni backticks:
   ]
 }`;
 
+  // Deduct 1 credit atomically BEFORE making the AI call to prevent free usage on API failure
+  const { data: deductResult, error: deductError } = await supabase
+    .rpc('deduct_credits', { p_client_id: clientId, p_amount: 1 });
+
+  if (deductError || !deductResult?.[0]?.success) {
+    console.error('[generate-copy] Atomic credit deduction failed:', deductError || deductResult);
+    return c.json({ error: 'Error al descontar créditos. Intenta de nuevo.' }, 500);
+  }
+
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -172,6 +181,7 @@ Responde SOLO en JSON válido sin markdown ni backticks:
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
     }),
+    signal: AbortSignal.timeout(60_000),
   });
 
   if (!response.ok) {
@@ -190,14 +200,6 @@ Responde SOLO en JSON válido sin markdown ni backticks:
   } catch {
     console.error('[generate-copy] Failed to parse AI response as JSON');
     return c.json({ error: 'Error procesando la respuesta. Intenta de nuevo.' }, 500);
-  }
-
-  // Deduct 1 credit atomically
-  const { data: deductResult, error: deductError } = await supabase
-    .rpc('deduct_credits', { p_client_id: clientId, p_amount: 1 });
-
-  if (deductError || !deductResult?.[0]?.success) {
-    console.error('[generate-copy] Atomic credit deduction failed:', deductError || deductResult);
   }
 
   // Record transaction

@@ -1164,7 +1164,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div><p className="text-xs text-muted-foreground">Tipo de campaña</p><p className="font-medium">{CAMPAIGN_OPTIONS.find(c => c.id === selectedCampaign)?.label}</p></div>
                   <div><p className="text-xs text-muted-foreground">Estructura</p><p className="font-medium"><JargonTooltip term="CBO" /> activado</p></div>
-                  <div><p className="text-xs text-muted-foreground">Presupuesto diario</p><p className="font-medium">${presupuestoAds ? (parseInt(presupuestoAds) / 30).toLocaleString('es-CL') : '—'} CLP</p></div>
+                  <div><p className="text-xs text-muted-foreground">Presupuesto diario</p><p className="font-medium">${presupuestoAds ? ((parseInt(presupuestoAds) || 0) / 30).toLocaleString('es-CL') : '—'} CLP</p></div>
                   <div><p className="text-xs text-muted-foreground">Formato</p><p className="font-medium">Advantage+ placements</p></div>
                   <div><p className="text-xs text-muted-foreground">Audiencia</p><p className="font-medium">Visitas web 30 días + seguidores IG</p></div>
                   <div><p className="text-xs text-muted-foreground">Segmentación</p><p className="font-medium">Solo edad, género, ubicación</p></div>
@@ -1202,7 +1202,7 @@ export function MetaAdCreator({ clientId, onBack, onGoToLibrary }: MetaAdCreator
                   setPublishedAdSet({
                     name: adSetName,
                     id: simulatedId,
-                    budget: presupuestoAds ? `${(parseInt(presupuestoAds) / 30).toLocaleString('es-CL')} CLP/día` : '—',
+                    budget: presupuestoAds ? `${((parseInt(presupuestoAds) || 0) / 30).toLocaleString('es-CL')} CLP/día` : '—',
                     reviewDate: reviewDate.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' }),
                   });
                   setCharlieRevisionDate(reviewDate.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' }));

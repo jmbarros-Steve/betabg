@@ -37,9 +37,7 @@ function verifyHmacFromRawUrl(url: URL, secret: string): boolean {
   const message = pairs.sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join('&');
   const computed = createHmac('sha256', secretKey).update(message).digest('hex');
 
-  console.log('[HMAC-DEBUG] message:', message);
-  console.log('[HMAC-DEBUG] computed:', computed);
-  console.log('[HMAC-DEBUG] received:', receivedHmac);
+  // HMAC values intentionally NOT logged (security)
 
   // Timing-safe comparison
   const encoder = new TextEncoder();
@@ -287,6 +285,7 @@ export async function shopifyOauthCallback(c: Context) {
         client_secret: shopifyClientSecret,
         code: code,
       }),
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!tokenResponse.ok) {
@@ -305,6 +304,7 @@ export async function shopifyOauthCallback(c: Context) {
     // Get shop info
     const shopInfoResponse = await fetch(`https://${shopDomain}/admin/api/${SHOPIFY_API_VERSION}/shop.json`, {
       headers: { 'X-Shopify-Access-Token': accessToken },
+      signal: AbortSignal.timeout(10_000),
     });
 
     let storeName = shopDomain.replace('.myshopify.com', '');
@@ -347,7 +347,7 @@ export async function shopifyOauthCallback(c: Context) {
       );
 
       if (existingConn) {
-        await supabaseAdmin.from('platform_connections').update({
+        const { error: updateErr } = await supabaseAdmin.from('platform_connections').update({
           store_name: storeName,
           store_url: `https://${normalizedShopDomain}`,
           shop_domain: normalizedShopDomain,
@@ -356,8 +356,13 @@ export async function shopifyOauthCallback(c: Context) {
           connection_mode: 'custom_app',
           updated_at: new Date().toISOString(),
         }).eq('id', existingConn.id);
+        if (updateErr) {
+          console.error('[shopify-oauth] Failed to update connection:', updateErr);
+          if (isDirectRedirect) return c.redirect(`${frontendUrl}/oauth/shopify/callback?error=connection_save_failed`, 302);
+          return c.json({ error: 'Failed to save connection' }, 500);
+        }
       } else {
-        await supabaseAdmin.from('platform_connections').insert({
+        const { error: insertErr } = await supabaseAdmin.from('platform_connections').insert({
           client_id: perClientId,
           platform: 'shopify',
           store_name: storeName,
@@ -367,6 +372,11 @@ export async function shopifyOauthCallback(c: Context) {
           is_active: true,
           connection_mode: 'custom_app',
         });
+        if (insertErr) {
+          console.error('[shopify-oauth] Failed to insert connection:', insertErr);
+          if (isDirectRedirect) return c.redirect(`${frontendUrl}/oauth/shopify/callback?error=connection_save_failed`, 302);
+          return c.json({ error: 'Failed to save connection' }, 500);
+        }
       }
 
       // Update client record with shop info
@@ -557,7 +567,7 @@ export async function shopifyOauthCallback(c: Context) {
     );
 
     if (existingConnection) {
-      await supabaseAdmin.from('platform_connections').update({
+      const { error: updateErr } = await supabaseAdmin.from('platform_connections').update({
         store_name: storeName,
         store_url: `https://${normalizedShopDomain}`,
         shop_domain: normalizedShopDomain,
@@ -565,13 +575,23 @@ export async function shopifyOauthCallback(c: Context) {
         is_active: true,
         updated_at: new Date().toISOString(),
       }).eq('id', existingConnection.id);
+      if (updateErr) {
+        console.error('[shopify-oauth] Failed to update connection (centralized):', updateErr);
+        if (isDirectRedirect) return c.redirect(`${frontendUrl}/oauth/shopify/callback?error=connection_save_failed`, 302);
+        return c.json({ error: 'Failed to save connection' }, 500);
+      }
     } else {
-      await supabaseAdmin.from('platform_connections').insert({
+      const { error: insertErr } = await supabaseAdmin.from('platform_connections').insert({
         client_id: clientId, platform: 'shopify',
         store_name: storeName, store_url: `https://${normalizedShopDomain}`,
         shop_domain: normalizedShopDomain, access_token_encrypted: encryptedToken,
         is_active: true,
       });
+      if (insertErr) {
+        console.error('[shopify-oauth] Failed to insert connection (centralized):', insertErr);
+        if (isDirectRedirect) return c.redirect(`${frontendUrl}/oauth/shopify/callback?error=connection_save_failed`, 302);
+        return c.json({ error: 'Failed to save connection' }, 500);
+      }
     }
 
     // Register webhooks
@@ -671,7 +691,7 @@ async function registerWebhooks(c: Context, shopDomain: string, accessToken: str
   try {
     const listRes = await fetch(
       `https://${shopDomain}/admin/api/${SHOPIFY_API_VERSION}/webhooks.json`,
-      { headers: { 'X-Shopify-Access-Token': accessToken } },
+      { headers: { 'X-Shopify-Access-Token': accessToken }, signal: AbortSignal.timeout(10_000) },
     );
     if (listRes.ok) {
       const listData: any = await listRes.json();
@@ -703,6 +723,7 @@ async function registerWebhooks(c: Context, shopDomain: string, accessToken: str
             'X-Shopify-Access-Token': accessToken,
           },
           body: JSON.stringify({ webhook: { topic: wh.topic, address: wh.address, format: 'json' } }),
+          signal: AbortSignal.timeout(10_000),
         }
       );
       if (webhookRes.ok) {

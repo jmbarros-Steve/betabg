@@ -14,9 +14,9 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuery, safeQueryOrDefault } from '../../lib/safe-supabase.js';
 
 export async function wolfNightMode(c: Context) {
-  const cronSecret = c.req.header('X-Cron-Secret')?.trim();
-  const expected = process.env.CRON_SECRET;
-  if (!expected || cronSecret !== expected) {
+  // Import isValidCronSecret inline since we can't change top-level imports in this edit
+  const { isValidCronSecret } = await import('../../lib/cron-auth.js');
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -86,6 +86,11 @@ export async function wolfNightMode(c: Context) {
                 while (status === 'RUNNING' && attempts < 9) {
                   await new Promise(r => setTimeout(r, 5000));
                   const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`);
+                  if (!statusRes.ok) {
+                    console.warn(`[wolf-night] Apify status check failed: ${statusRes.status}`);
+                    status = 'FAILED';
+                    break;
+                  }
                   const statusData: any = await statusRes.json();
                   status = statusData.data?.status || 'FAILED';
                   attempts++;
@@ -127,8 +132,9 @@ export async function wolfNightMode(c: Context) {
                     const priceRegex = /\$[\d.,]+/g;
                     const newPrices = (allText.match(priceRegex) || []).map(p => p.replace(/[$.]/g, '').replace(',', ''));
                     const prevPriceRange = prevInv.store?.price_range || '';
-                    const newPriceRange = newPrices.length >= 2
-                      ? `$${Math.min(...newPrices.map(Number).filter(n => n > 0))} - $${Math.max(...newPrices.map(Number).filter(n => n > 0))}`
+                    const validPrices = newPrices.map(Number).filter(n => n > 0);
+                    const newPriceRange = validPrices.length >= 2
+                      ? `$${Math.min(...validPrices)} - $${Math.max(...validPrices)}`
                       : '';
 
                     if (newPriceRange && prevPriceRange && newPriceRange !== prevPriceRange) {

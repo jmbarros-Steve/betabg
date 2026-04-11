@@ -164,10 +164,11 @@ export async function syncShopifyMetrics(c: Context) {
     // Calculate daily metrics - ALL CONVERTED TO CLP
     const dailyMetrics: Record<string, { revenue: number; orders: number; originalCurrency: string }> = {};
 
+    const PAID_STATUSES = new Set(['paid', 'partially_paid', 'partially_refunded']);
     for (const order of orders || []) {
-      // Only count paid/partially-paid orders for revenue (exclude cancelled, refunded, voided, pending)
+      // Whitelist only paid statuses — excludes pending, authorized, refunded, voided
       const fs = String(order.financial_status || '');
-      if (fs === 'refunded' || fs === 'voided' || fs === 'cancelled') continue;
+      if (!PAID_STATUSES.has(fs)) continue;
 
       const date = order.created_at.split('T')[0];
       const orderCurrency = order.currency || 'CLP';

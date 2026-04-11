@@ -401,20 +401,23 @@ export async function syncMetaMetrics(c: Context) {
       }
     }
 
-    // Clean up stale metrics from the sync window only (last 90 days).
-    // Without a date range guard this would delete ALL historical metrics
-    // outside the current 30-day sync window, wiping months of data.
+    // Clean up stale metrics ONLY within the actual synced date range.
+    // Previously this used a 90-day window, which could delete valid data
+    // when Meta returns a partial response (e.g. 15 of 30 days).
+    // Now we restrict cleanup to min(synced) → max(synced), so only dates
+    // within the actual API response are affected.
     const syncedDates = [...new Set(metricsToUpsert.map(m => m.metric_date))];
-    if (syncedDates.length > 0) {
-      const ninetyDaysAgo = new Date();
-      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-      const cleanupSince = formatDate(ninetyDaysAgo);
+    if (syncedDates.length >= 2) {
+      const sortedDates = syncedDates.sort();
+      const cleanupSince = sortedDates[0];
+      const cleanupUntil = sortedDates[sortedDates.length - 1];
 
       const { error: cleanupError } = await supabase
         .from('platform_metrics')
         .delete()
         .eq('connection_id', connection_id)
         .gte('metric_date', cleanupSince)
+        .lte('metric_date', cleanupUntil)
         .not('metric_date', 'in', `(${syncedDates.join(',')})`);
       if (cleanupError) console.error('Stale metric cleanup error:', cleanupError);
     }

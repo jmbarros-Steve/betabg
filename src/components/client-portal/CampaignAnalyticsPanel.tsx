@@ -274,18 +274,23 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
         ? connections 
         : connections.filter(c => c.id === selectedConnection);
 
+      let syncErrors = 0;
       for (const conn of connectionsToSync) {
         const { error } = await callApi('sync-campaign-metrics', {
           body: { connection_id: conn.id, platform: conn.platform }
         });
 
         if (error) {
-          // Error handled by toast
           toast.error(`Error sincronizando ${conn.platform}`);
+          syncErrors++;
         }
       }
 
-      toast.success('Campañas sincronizadas');
+      if (syncErrors === 0) {
+        toast.success('Campañas sincronizadas');
+      } else if (syncErrors < connectionsToSync.length) {
+        toast.warning(`Sincronización parcial: ${syncErrors} conexión(es) con error`);
+      }
       await fetchMetrics();
       // Notify other views (e.g., Metrics dashboard) to refresh instantly
       window.dispatchEvent(new CustomEvent('bg:sync-complete'));
@@ -1108,11 +1113,11 @@ export function CampaignAnalyticsPanel({ clientId }: CampaignAnalyticsPanelProps
                                         </div>
                                         <div>
                                           <p className="text-muted-foreground"><JargonTooltip term="CTR" /></p>
-                                          <p className="font-medium">{parseFloat(adSet.ctr).toFixed(2)}%</p>
+                                          <p className="font-medium">{(parseFloat(adSet.ctr) || 0).toFixed(2)}%</p>
                                         </div>
                                         <div>
                                           <p className="text-muted-foreground"><JargonTooltip term="CPM" label="CPM CLP" /></p>
-                                          <p className="font-medium">{formatCurrency(parseFloat(adSet.cpm) * CLP_RATE, 'CLP')}</p>
+                                          <p className="font-medium">{formatCurrency((parseFloat(adSet.cpm) || 0) * CLP_RATE, 'CLP')}</p>
                                         </div>
                                       </div>
 

@@ -103,17 +103,21 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
 
   async function fetchWhatsappPhone() {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('clients')
         .select('whatsapp_phone')
         .eq('id', clientId)
         .maybeSingle();
+      if (error) {
+        console.error('[Connections] Failed to fetch WhatsApp phone:', error);
+        return;
+      }
       if (data?.whatsapp_phone) {
         setWhatsappPhone(data.whatsapp_phone);
         setWhatsappSaved(data.whatsapp_phone);
       }
-    } catch {
-      // WhatsApp phone fetch failed silently
+    } catch (err) {
+      console.error('[Connections] Unexpected error fetching WhatsApp phone:', err);
     }
   }
 

@@ -19,15 +19,22 @@ export function DashboardStats({ userId }: Props) {
   }, [userId]);
 
   const fetchStats = async () => {
-    const [clientsRes, creditsRes] = await Promise.all([
-      supabase.from('clients').select('id').eq('client_user_id', userId),
-      supabase.from('client_credits').select('creditos_disponibles, creditos_usados'),
-    ]);
+    // First fetch user's clients, then fetch credits only for those clients
+    const clientsRes = await supabase.from('clients').select('id').eq('client_user_id', userId);
+    const clientIds = (clientsRes.data || []).map(c => c.id);
+
+    let creditsRes: { data: any[] | null } = { data: [] };
+    if (clientIds.length > 0) {
+      creditsRes = await supabase
+        .from('client_credits')
+        .select('creditos_disponibles, creditos_usados')
+        .in('client_id', clientIds);
+    }
 
     setStats({
       totalClients: clientsRes.data?.length || 0,
-      totalTokensAvailable: creditsRes.data?.reduce((acc, c) => acc + Number(c.creditos_disponibles), 0) || 0,
-      totalTokensUsed: creditsRes.data?.reduce((acc, c) => acc + Number(c.creditos_usados), 0) || 0,
+      totalTokensAvailable: (creditsRes.data || []).reduce((acc, c) => acc + Number(c.creditos_disponibles), 0),
+      totalTokensUsed: (creditsRes.data || []).reduce((acc, c) => acc + Number(c.creditos_usados), 0),
     });
   };
 

@@ -104,7 +104,7 @@ Link válido por 7 días.`;
     console.log(`[digest] Sent WA with ${pending.length} pending insights, token: ${digest.token.slice(0, 8)}...`);
 
     // Log to qa_log
-    await supabase.from('qa_log').insert({
+    const { error: qaLogErr } = await supabase.from('qa_log').insert({
       check_type: 'auto_learning_digest',
       status: 'pass',
       details: {
@@ -114,6 +114,7 @@ Link válido por 7 días.`;
         top_insights: top2.map((i: any) => i.titulo),
       },
     });
+    if (qaLogErr) console.error('[auto-learning-digest] qa_log insert failed:', qaLogErr);
 
     return c.json({
       success: true,

@@ -477,7 +477,7 @@ export async function steveWAChat(c: Context) {
     }
 
     // Save inbound message (PII scrubbed)
-    await supabase.from('wa_messages').insert({
+    const { error: msgInsertErr } = await supabase.from('wa_messages').insert({
       client_id: client.id,
       channel: 'steve_chat',
       direction: 'inbound',
@@ -488,9 +488,10 @@ export async function steveWAChat(c: Context) {
       contact_name: profileName || client.name,
       contact_phone: phone,
     });
+    if (msgInsertErr) console.error(`[steve-wa-chat] wa_messages insert failed:`, msgInsertErr.message);
 
     // Upsert conversation
-    await supabase.from('wa_conversations').upsert({
+    const { error: convUpsertErr } = await supabase.from('wa_conversations').upsert({
       client_id: client.id,
       channel: 'steve_chat',
       contact_phone: phone,
@@ -499,6 +500,7 @@ export async function steveWAChat(c: Context) {
       last_message_at: new Date().toISOString(),
       last_message_preview: storageBody.substring(0, 100),
     }, { onConflict: 'client_id,channel,contact_phone' });
+    if (convUpsertErr) console.error(`[steve-wa-chat] wa_conversations upsert failed:`, convUpsertErr.message);
 
     // Build Steve's context with real business data + relevant knowledge
     const [merchantContext, history] = await Promise.all([
@@ -668,15 +670,11 @@ async function handleProspect(
       // Fix Bug#1: use same timestamp for DB update and in-memory prospect
       // so processProspectAsync's optimistic lock (.eq('updated_at', prospect.updated_at)) matches
       const updatedAtNow = new Date().toISOString();
-      // TODO Fix #49: message_count increment is NOT atomic (read+increment race condition).
-      // Supabase PostgREST doesn't support atomic increment natively.
-      // To fix properly: create an RPC like `increment_message_count(prospect_id uuid)`
-      // that does `UPDATE wa_prospects SET message_count = message_count + 1 WHERE id = $1`.
-      // For now this is acceptable since concurrent messages from the same phone are rate-limited (30s).
+      // Fix #49: Use atomic RPC for message_count increment (prevents TOCTOU race)
+      await supabase.rpc('increment_message_count', { p_phone: phone });
       await supabase
         .from('wa_prospects')
         .update({
-          message_count: (existingProspect.message_count || 0) + 1,
           updated_at: updatedAtNow,
           profile_name: profileName || existingProspect.profile_name,
           ...(isReactivation && {
@@ -943,16 +941,15 @@ async function handleProspect(
           action: strategistBrief.suggestedAction,
           tone: strategistBrief.tone,
         };
-        supabase.from('wa_prospects')
+        const { error: stratErr } = await supabase.from('wa_prospects')
           .update({
             strategist_history: [
               ...(prospect.strategist_history || []).slice(-9),
               briefEntry,
             ],
           })
-          .eq('id', prospect.id)
-          .then(() => {})
-          .catch(() => {});
+          .eq('id', prospect.id);
+        if (stratErr) console.error(`[steve-wa-chat] strategist_history update failed:`, stratErr.message);
       }
     } catch (multiBrainErr) {
       // FALLBACK: If multi-brain fails, use the original single-call approach

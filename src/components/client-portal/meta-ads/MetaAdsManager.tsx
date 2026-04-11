@@ -1225,6 +1225,8 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
                   size="sm"
                   disabled={portfolioSwitching}
                   onClick={async () => {
+                    // Confirmation to prevent accidental data loss
+                    if (!window.confirm('¿Estás seguro? Esto desconectará tu cuenta de Meta Ads actual y tendrás que volver a configurarla.')) return;
                     // Reset account_id in DB to force wizard
                     if (metaConnection) {
                       try {

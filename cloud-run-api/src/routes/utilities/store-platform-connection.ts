@@ -61,6 +61,10 @@ export async function storePlatformConnection(c: Context) {
         console.error('Error encrypting token:', encryptError);
         return c.json({ error: 'Error al encriptar el token' }, 500);
       }
+      if (!encryptResult) {
+        console.error('Encryption returned null for token');
+        return c.json({ error: 'Error al encriptar el token' }, 500);
+      }
       encryptedToken = encryptResult;
     }
 

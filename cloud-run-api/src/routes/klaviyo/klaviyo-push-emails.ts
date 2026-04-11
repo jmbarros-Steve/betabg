@@ -448,13 +448,16 @@ export async function klaviyoPushEmails(c: Context) {
     }
 
     // Update plan status
-    await supabase
+    const { error: planUpdateErr } = await supabase
       .from('klaviyo_email_plans')
       .update({
         status: 'implemented',
         admin_notes: `Pushed to Klaviyo on ${new Date().toISOString()}. ${results.length} campaigns created. IDs: ${results.map(r => r.campaign_id).join(', ')}`,
       })
       .eq('id', plan_id);
+    if (planUpdateErr) {
+      console.error('[klaviyo-push-emails] Failed to update plan status:', planUpdateErr);
+    }
 
     return c.json({
       success: true,

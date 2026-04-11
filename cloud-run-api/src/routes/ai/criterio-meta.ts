@@ -232,8 +232,9 @@ function evaluateMetaRule(
     }
   }
 
-  // Default: pass (rule not yet implemented)
-  return { passed: true, actual: 'Not yet implemented', expected: rule.check_rule, details: `TODO: implement ${rule.name}` };
+  // Default: FAIL unimplemented rules so they don't silently pass quality gates
+  console.warn(`[criterio-meta] Rule "${rule.name}" not implemented — failing by default`);
+  return { passed: false, actual: 'Not yet implemented', expected: rule.check_rule, details: `Rule not yet implemented: ${rule.name}` };
 }
 
 // --- Main criterioMeta function ---

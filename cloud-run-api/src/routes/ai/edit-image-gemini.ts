@@ -77,7 +77,7 @@ export async function editImageGemini(c: Context) {
     // Download source image if provided
     if (imageUrl) {
       try {
-        const imgResp = await fetch(imageUrl);
+        const imgResp = await fetch(imageUrl, { signal: AbortSignal.timeout(15_000) });
         if (imgResp.ok) {
           const contentType = imgResp.headers.get('content-type') || 'image/png';
           imageMimeType = contentType.includes('jpeg') || contentType.includes('jpg') ? 'image/jpeg' : 'image/png';
@@ -158,6 +158,7 @@ export async function editImageGemini(c: Context) {
               responseModalities: ['IMAGE'],
             },
           }),
+          signal: AbortSignal.timeout(60_000),
         }
       );
 
@@ -188,6 +189,7 @@ export async function editImageGemini(c: Context) {
               responseModalities: ['TEXT', 'IMAGE'],
             },
           }),
+          signal: AbortSignal.timeout(60_000),
         }
       );
 
@@ -205,6 +207,7 @@ export async function editImageGemini(c: Context) {
               contents: [{ parts: [{ text: editPrompt }] }],
               generationConfig: { responseModalities: ['IMAGE'] },
             }),
+            signal: AbortSignal.timeout(60_000),
           }
         );
 
@@ -251,6 +254,7 @@ export async function editImageGemini(c: Context) {
                 contents: [{ parts: [{ text: regeneratePrompt }] }],
                 generationConfig: { responseModalities: ['IMAGE'] },
               }),
+              signal: AbortSignal.timeout(60_000),
             }
           );
 
@@ -292,12 +296,15 @@ export async function editImageGemini(c: Context) {
       .from('client-assets')
       .getPublicUrl(storagePath);
 
-    // Deduct credits atomically
+    // Deduct credits atomically — if this fails, do NOT return the image for free
     const { data: deductResult, error: deductError } = await supabase
       .rpc('deduct_credits', { p_client_id: clientId, p_amount: creditCost });
 
     if (deductError || !deductResult?.[0]?.success) {
       console.error('[edit-image-gemini] Atomic credit deduction failed:', deductError || deductResult);
+      // Delete the uploaded image since we can't charge for it
+      await supabase.storage.from('client-assets').remove([storagePath]);
+      return c.json({ error: 'NO_CREDITS', message: 'No se pudieron descontar los créditos. Intenta de nuevo.' }, 402);
     }
 
     await supabase.from('credit_transactions').insert({

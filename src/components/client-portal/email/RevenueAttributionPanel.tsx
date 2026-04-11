@@ -93,7 +93,8 @@ export function RevenueAttributionPanel({ campaignId, clientId }: RevenueAttribu
 
   if (!data) return null;
 
-  const maxRevenue = Math.max(...(data.conversions_by_day.map(d => d.revenue)), 1);
+  const revenueValues = data.conversions_by_day.map(d => d.revenue);
+  const maxRevenue = revenueValues.length > 0 ? Math.max(...revenueValues, 1) : 1;
 
   const kpis = [
     {

@@ -949,6 +949,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     setLoading(true);
     try {
       await Promise.all([fetchBrief(), fetchResearch(), fetchClientInfo(), fetchAssets()]);
+    } catch (err) {
+      console.error('[BrandBriefView] fetchAll error:', err);
+      toast.error('Error al cargar la información del brief. Intenta recargar la página.');
     } finally {
       setLoading(false);
     }

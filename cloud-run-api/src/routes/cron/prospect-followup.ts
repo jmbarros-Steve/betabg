@@ -161,6 +161,7 @@ export async function prospectFollowup(c: Context) {
               max_tokens: 200,
               messages: [{ role: 'user', content: prompts[followupType] }],
             }),
+            signal: AbortSignal.timeout(15_000),
           });
 
           if (!aiRes.ok) {
@@ -319,6 +320,7 @@ export async function prospectFollowup(c: Context) {
                 content: `Genera un mensaje de WhatsApp corto (max 3 líneas) de "resurrección" para "${deadName}" que vende ${deadIndustry}. Dale un dato competitivo interesante de su industria que lo haga repensar. Tono: casual, sin presión, en español neutro. Responde SOLO con el mensaje.`,
               }],
             }),
+            signal: AbortSignal.timeout(15_000),
           });
 
           if (!aiRes.ok) continue;
@@ -333,7 +335,7 @@ export async function prospectFollowup(c: Context) {
 
           await sendWhatsApp(`+${dead.phone}`, msg);
 
-          await supabase.from('wa_messages').insert({
+          const { error: insertErr } = await supabase.from('wa_messages').insert({
             client_id: null,
             channel: 'prospect',
             direction: 'outbound',
@@ -343,6 +345,9 @@ export async function prospectFollowup(c: Context) {
             contact_name: deadName || dead.phone,
             contact_phone: dead.phone,
           });
+          if (insertErr) {
+            console.error(`[prospect-followup] wa_messages resurrection insert failed:`, insertErr.message);
+          }
 
           await supabase
             .from('wa_prospects')

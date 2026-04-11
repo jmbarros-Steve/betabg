@@ -164,6 +164,9 @@ export function PlatformConnectionsPanel() {
   };
 
   const handleDeleteConnection = async (id: string) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar esta conexión? Esta acción no se puede deshacer.')) {
+      return;
+    }
     const { error } = await supabase
       .from('platform_connections')
       .delete()

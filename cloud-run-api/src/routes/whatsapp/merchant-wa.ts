@@ -257,17 +257,12 @@ export async function merchantWAWebhook(c: Context) {
     );
 
     if (existingConv) {
-      // Bug #142 fix: unread_count increment is not atomic (TOCTOU race).
-      // TODO: Create increment_unread_count RPC for atomic increment. For now, accept the race condition.
-      await supabase
-        .from('wa_conversations')
-        .update({
-          last_message_at: new Date().toISOString(),
-          last_message_preview: scrubbedBody.substring(0, 100),
-          unread_count: (existingConv.unread_count || 0) + 1,
-          status: 'open',
-        })
-        .eq('id', existingConv.id);
+      // Fix Bug #142: Use atomic RPC for unread_count increment (prevents TOCTOU race)
+      await supabase.rpc('increment_unread_count', {
+        p_conversation_id: existingConv.id,
+        p_preview: scrubbedBody.substring(0, 100),
+        p_status: 'open',
+      });
     } else {
       await supabase.from('wa_conversations').insert({
         client_id: clientId,
@@ -433,6 +428,7 @@ export async function merchantWAWebhook(c: Context) {
           system: systemPrompt.slice(0, 6000),
           messages,
         }),
+        signal: AbortSignal.timeout(30_000),
       });
 
       if (!aiRes.ok) {
@@ -508,7 +504,7 @@ export async function merchantWAWebhook(c: Context) {
     });
 
     // Update conversation preview
-    await supabase.from('wa_conversations')
+    const { error: convUpdateErr } = await supabase.from('wa_conversations')
       .update({
         last_message_at: new Date().toISOString(),
         last_message_preview: replyText.substring(0, 100),
@@ -516,6 +512,7 @@ export async function merchantWAWebhook(c: Context) {
       .eq('client_id', clientId)
       .eq('channel', 'merchant_wa')
       .eq('contact_phone', phone);
+    if (convUpdateErr) console.error('[merchant-wa] Conversation preview update failed:', convUpdateErr);
 
     const escaped = replyText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return c.text(`<Response><Message>${escaped}</Message></Response>`, 200, { 'Content-Type': 'text/xml' });

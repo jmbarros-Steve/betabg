@@ -71,6 +71,7 @@ async function scrapeChangelog(url: string): Promise<string> {
           maxCrawlPages: 1,
           outputFormats: ['markdown'],
         }),
+        signal: AbortSignal.timeout(120_000),
       }
     );
 

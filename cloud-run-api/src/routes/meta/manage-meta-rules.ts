@@ -495,7 +495,7 @@ export async function manageMetaRules(c: Context) {
             );
 
             // Log execution
-            await supabase.from('meta_rule_execution_log').insert({
+            const { error: logErr } = await supabase.from('meta_rule_execution_log').insert({
               rule_id: rule.id,
               client_id,
               campaign_id: campaignId,
@@ -505,6 +505,7 @@ export async function manageMetaRules(c: Context) {
               metrics_snapshot: { metric: condition.metric, value: metricValue, threshold: condition.value },
               executed_at: new Date().toISOString(),
             });
+            if (logErr) console.error(`[manage-meta-rules] Failed to log execution for rule ${rule.id}:`, logErr);
 
             if (execResult.executed) totalExecuted++;
             results.push({ rule: rule.name, campaign: group.name, ...execResult });

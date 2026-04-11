@@ -226,27 +226,14 @@ export async function abandonedCartWA(c: Context) {
     }
   }
 
-  // Bug #88 fix: Update total_sent once per client after loop to avoid read-then-write race.
-  // TODO Bug #146: This read-then-write pattern is still non-atomic. If two cron instances
-  // run concurrently (e.g. Cloud Scheduler retries), both read the same total_sent value
-  // and one increment is lost. Proper fix requires an RPC like:
-  //   increment_automation_total_sent(p_client_id, p_trigger_type, p_count)
-  //   that does: UPDATE wa_automations SET total_sent = total_sent + p_count WHERE ...
-  // For now, this is acceptable because the cron runs hourly and concurrent runs are rare.
+  // Fix Bug #146: Use atomic RPC for total_sent increment (prevents TOCTOU race)
   for (const [clientId, count] of Object.entries(sentByClient)) {
     try {
-      // Fetch current total_sent, then set to current + count in one update
-      const { data: automationRow } = await supabase
-        .from('wa_automations')
-        .select('total_sent')
-        .eq('client_id', clientId)
-        .eq('trigger_type', 'abandoned_cart')
-        .maybeSingle();
-
-      await supabase.from('wa_automations')
-        .update({ total_sent: ((automationRow as any)?.total_sent || 0) + count })
-        .eq('client_id', clientId)
-        .eq('trigger_type', 'abandoned_cart');
+      await supabase.rpc('increment_automation_total_sent', {
+        p_client_id: clientId,
+        p_trigger_type: 'abandoned_cart',
+        p_count: count,
+      });
     } catch (updateErr) {
       console.warn(`[abandoned-cart-wa] Failed to update total_sent for client ${clientId}:`, updateErr);
     }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare, Home, Share2, GraduationCap, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -67,6 +67,7 @@ export default function ClientPortal() {
   const { isClient, isAdmin, isSuperAdmin, isShopifyUser, loading: roleLoading, clientData } = useUserRole();
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Plan gating: resolve using the effective client's user_id (admin viewing client portal uses urlClientId)
   const planTarget = (isSuperAdmin && urlClientId) ? urlClientId : undefined;
@@ -208,6 +209,16 @@ export default function ClientPortal() {
       try {
         // If user already clicked a tab before this async work finishes, don't override
         if (userNavigatedRef.current) return;
+
+        // Read ?tab= from URL (e.g. after OAuth redirect: /portal?tab=connections)
+        const urlTab = searchParams.get('tab') as TabType | null;
+        const validTabs: Set<string> = new Set(['metrics', 'shopify', 'campaigns', 'connections', 'brief', 'competitors', 'deepdive', 'steve', 'estrategia', 'copies', 'social', 'google', 'klaviyo', 'email', 'config', 'wa_credits', 'academy']);
+        if (urlTab && validTabs.has(urlTab)) {
+          setActiveTab(urlTab);
+          setVisitedTabs(new Set([urlTab]));
+          setDefaultTabResolved(true);
+          return;
+        }
 
         // Check if user has platform connections
         const { data: connections } = await supabase

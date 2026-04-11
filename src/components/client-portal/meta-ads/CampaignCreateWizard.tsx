@@ -2464,6 +2464,12 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         return;
       }
 
+      if (objective === 'TRAFFIC' && !destinationUrl?.trim()) {
+        toast.error('URL de destino es obligatoria para campañas de Tráfico');
+        setSubmitting(false);
+        return;
+      }
+
       const isCatalogSubmit = objective === 'CATALOG' && !!productCatalogId && !!productSetId;
       if (!isCatalogSubmit && !images.some(Boolean)) {
         toast.error('Agrega al menos 1 imagen para el anuncio');

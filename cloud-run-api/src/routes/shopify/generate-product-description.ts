@@ -100,6 +100,7 @@ Responde SOLO con el HTML de la descripción, sin explicaciones.`;
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
       }),
+      signal: AbortSignal.timeout(20_000),
     });
 
     if (!geminiRes.ok) {

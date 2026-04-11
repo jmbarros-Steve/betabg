@@ -346,8 +346,12 @@ Respond ONLY with a JSON array of 10 strings. No explanation.`;
     // Try to extract JSON array from text
     const match = text.match(/\[[\s\S]*\]/);
     if (match) {
-      const parsed = JSON.parse(match[0]);
-      if (Array.isArray(parsed)) return parsed.slice(0, 10);
+      try {
+        const parsed = JSON.parse(match[0]);
+        if (Array.isArray(parsed)) return parsed.slice(0, 10);
+      } catch {
+        // Fallback regex extraction also failed
+      }
     }
   }
 
@@ -495,8 +499,12 @@ REGLAS:
     // Try to extract JSON from markdown code blocks
     const match = text.match(/\[[\s\S]*\]/);
     if (match) {
-      const parsed = JSON.parse(match[0]);
-      if (Array.isArray(parsed)) return parsed.slice(0, 8);
+      try {
+        const parsed = JSON.parse(match[0]);
+        if (Array.isArray(parsed)) return parsed.slice(0, 8);
+      } catch {
+        // Fallback regex extraction also failed
+      }
     }
   }
 

@@ -100,7 +100,7 @@ Responde en JSON:
   }
 
   // Save postmortem to qa_log
-  await supabase.from('qa_log').insert({
+  const { error: qaLogErr } = await supabase.from('qa_log').insert({
     check_type: 'postmortem',
     status: 'info',
     details: {
@@ -109,6 +109,7 @@ Responde en JSON:
       ...postmortem,
     },
   });
+  if (qaLogErr) console.error('[auto-postmortem] qa_log insert failed:', qaLogErr);
 
   // Create prevention task automatically
   let preventionTaskCreated = false;

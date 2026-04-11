@@ -67,7 +67,8 @@ export async function churnDetector(c: Context) {
         } else {
           // Active recently — reset risk
           if (client.churn_risk !== 'none') {
-            await supabase.from('clients').update({ churn_risk: 'none' }).eq('id', client.id);
+            const { error: resetErr } = await supabase.from('clients').update({ churn_risk: 'none' }).eq('id', client.id);
+            if (resetErr) console.error(`[churn-detector] Failed to reset churn_risk for client ${client.id}:`, resetErr);
           }
           continue;
         }
@@ -137,6 +138,7 @@ export async function churnDetector(c: Context) {
               max_tokens: 200,
               messages: [{ role: 'user', content: prompt }],
             }),
+            signal: AbortSignal.timeout(15_000),
           });
 
           if (aiRes.ok) {
@@ -147,7 +149,7 @@ export async function churnDetector(c: Context) {
 
               await sendWhatsApp(`+${phone}`, msg);
 
-              await supabase.from('wa_messages').insert({
+              const { error: insertErr } = await supabase.from('wa_messages').insert({
                 client_id: client.id,
                 channel: 'steve_chat',
                 direction: 'outbound',
@@ -157,6 +159,9 @@ export async function churnDetector(c: Context) {
                 contact_name: clientName,
                 contact_phone: phone,
               });
+              if (insertErr) {
+                console.error(`[churn-detector] wa_messages insert failed after send:`, insertErr.message);
+              }
 
               results.wa_sent++;
               console.log(`[churn-detector] Check-in sent to ${phone} (risk: ${newRisk}, ${Math.round(daysSinceActive)}d inactive)`);

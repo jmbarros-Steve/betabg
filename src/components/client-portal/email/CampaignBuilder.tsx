@@ -155,10 +155,18 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
   useEffect(() => { loadCampaigns(); }, [loadCampaigns]);
 
   const loadSubscriberCount = useCallback(async () => {
-    const { data } = await callApi<any>('query-email-subscribers', {
-      body: { action: 'list', client_id: clientId, limit: 1 },
-    });
-    setSubscriberCount(data?.total || 0);
+    try {
+      const { data, error } = await callApi<any>('query-email-subscribers', {
+        body: { action: 'list', client_id: clientId, limit: 1 },
+      });
+      if (error) {
+        console.error('[CampaignBuilder] Failed to load subscriber count:', error);
+      }
+      setSubscriberCount(data?.total || 0);
+    } catch (err) {
+      console.error('[CampaignBuilder] loadSubscriberCount error:', err);
+      setSubscriberCount(0);
+    }
   }, [clientId]);
 
   useEffect(() => { loadSubscriberCount(); }, [loadSubscriberCount]);

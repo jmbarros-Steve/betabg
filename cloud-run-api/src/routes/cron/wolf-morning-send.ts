@@ -17,13 +17,12 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
 import { safeQuery } from '../../lib/safe-supabase.js';
+import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 
 export async function wolfMorningSend(c: Context) {
-  const cronSecret = c.req.header('X-Cron-Secret')?.trim();
-  const expected = process.env.CRON_SECRET;
-  if (!expected || cronSecret !== expected) {
+  if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
@@ -98,6 +97,7 @@ Responde SOLO con el mensaje, nada más.`;
             max_tokens: 250,
             messages: [{ role: 'user', content: prompt }],
           }),
+          signal: AbortSignal.timeout(15_000),
         });
 
         if (!aiRes.ok) {
@@ -114,7 +114,7 @@ Responde SOLO con el mensaje, nada más.`;
         await sendWhatsApp(`+${prospect.phone}`, msg);
 
         // Save message
-        await supabase.from('wa_messages').insert({
+        const { error: insertErr } = await supabase.from('wa_messages').insert({
           client_id: null,
           channel: 'prospect',
           direction: 'outbound',
@@ -124,6 +124,9 @@ Responde SOLO con el mensaje, nada más.`;
           contact_name: prospectName || prospect.phone,
           contact_phone: prospect.phone,
         });
+        if (insertErr) {
+          console.error(`[wolf-morning] wa_messages insert failed after send:`, insertErr.message);
+        }
 
         // Clear wolf_findings after sending
         await supabase

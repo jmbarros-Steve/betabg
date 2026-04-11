@@ -266,19 +266,17 @@ export async function webFormSubmit(c: Context) {
         existing = byEmail;
       }
 
-      // If an existing prospect was found, verify it was created by the same form owner
-      // by checking if any previous submission from this form owner's forms links to it
+      // If an existing prospect was found, verify it belongs to the same form owner
+      // by checking that prior submissions linking to it come from this owner's forms
       if (existing && form.user_id) {
-        const { data: ownerForms } = await supabase
+        const { data: ownerSubmissions } = await supabase
           .from('web_form_submissions')
-          .select('id')
+          .select('id, web_forms!inner(user_id)')
           .eq('prospect_id', existing.id)
+          .eq('web_forms.user_id', form.user_id)
           .limit(1);
-        // If there are submissions linking to this prospect, check they come from forms owned by same user
-        if (ownerForms && ownerForms.length > 0) {
-          // Prospect exists with submissions — allow linking (same pool)
-        } else {
-          // No prior submissions linking this prospect — could be from different owner, create new
+        if (!ownerSubmissions || ownerSubmissions.length === 0) {
+          // Prospect exists but belongs to a different owner — create new to prevent cross-tenant leak
           existing = null;
         }
       }

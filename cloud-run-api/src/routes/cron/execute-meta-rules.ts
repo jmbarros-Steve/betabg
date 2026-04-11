@@ -38,10 +38,14 @@ export async function executeMetaRulesCron(c: Context) {
   }
 
   // Acquire lock
-  await supabase.from('steve_knowledge').upsert(
+  const { error: lockErr } = await supabase.from('steve_knowledge').upsert(
     { categoria: 'system', titulo: lockKey, contenido: lockNow.toISOString(), activo: true, orden: 0 },
     { onConflict: 'categoria,titulo' },
   );
+  if (lockErr) {
+    console.error('[execute-meta-rules] Failed to acquire lock:', lockErr);
+    return c.json({ error: 'Failed to acquire lock' }, 500);
+  }
 
   try {
     // Fetch all active rules with left join on platform_connections (no !inner)
@@ -249,11 +253,12 @@ export async function executeMetaRulesCron(c: Context) {
     return c.json({ error: err.message }, 500);
   } finally {
     // Release mutex lock
-    await supabase
+    const { error: lockErr } = await supabase
       .from('steve_knowledge')
       .delete()
       .eq('categoria', 'system')
       .eq('titulo', lockKey);
+    if (lockErr) console.error('[execute-meta-rules] Failed to release mutex lock:', lockErr);
   }
 }
 

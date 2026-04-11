@@ -126,7 +126,7 @@ Máximo 500 caracteres. Solo el brief, sin explicaciones.`,
         if (!briefText || briefText.length < 50) continue;
 
         // Save as client-specific knowledge
-        await supabase.from('steve_knowledge').insert({
+        const { error: insertErr } = await supabase.from('steve_knowledge').insert({
           categoria: 'brief',
           titulo: `Brief automático - ${clientName}`.slice(0, 80),
           contenido: briefText,
@@ -136,6 +136,10 @@ Máximo 500 caracteres. Solo el brief, sin explicaciones.`,
           industria: 'general',
         });
 
+        if (insertErr) {
+          console.error(`[auto-brief] Failed to save brief for ${clientName}:`, insertErr);
+          continue;
+        }
         briefsGenerated++;
         console.log(`[auto-brief] Generated brief for ${clientName}`);
       } catch (err) {

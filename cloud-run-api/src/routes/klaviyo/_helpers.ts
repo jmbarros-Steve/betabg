@@ -24,7 +24,7 @@ export function makeKlaviyoPostHeaders(apiKey: string) {
 
 // API wrappers
 export async function klaviyoGet(url: string, apiKey: string): Promise<any> {
-  const res = await fetch(url, { headers: makeKlaviyoGetHeaders(apiKey) });
+  const res = await fetch(url, { headers: makeKlaviyoGetHeaders(apiKey), signal: AbortSignal.timeout(15_000) });
   if (!res.ok) {
     const text = await res.text();
     console.error(`Klaviyo GET error [${res.status}] ${url}:`, text);
@@ -38,6 +38,7 @@ export async function klaviyoPost(url: string, apiKey: string, body: any): Promi
     method: 'POST',
     headers: makeKlaviyoPostHeaders(apiKey),
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
   });
   const text = await res.text();
   if (!res.ok) {
@@ -87,6 +88,7 @@ export async function klaviyoPatch(url: string, apiKey: string, body: any): Prom
     method: 'PATCH',
     headers: makeKlaviyoPostHeaders(apiKey),
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
   });
   const text = await res.text();
   if (!res.ok) {

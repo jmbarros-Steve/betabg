@@ -343,7 +343,7 @@ export async function shopifySessionValidate(c: Context) {
       } catch (authError: any) {
         console.error('[Session Validate] Auth generation error:', authError);
         return c.json({
-          valid: true,
+          valid: false,
           shopDomain,
           installed: true,
           authenticated: false,

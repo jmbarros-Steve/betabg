@@ -104,14 +104,14 @@ Solo incluye patrones claros respaldados por los datos. Sin markdown.`,
       rules = JSON.parse(text.replace(/```json|```/g, '').trim());
     } catch (parseErr) {
       console.error('[cross-client-learning] Failed to parse AI response as JSON:', text.slice(0, 200));
-      return c.json({ success: true, clientsAnalyzed: clients.length, rulesGenerated: 0, parseError: true });
+      return c.json({ success: false, error: 'Failed to parse AI response', clientsAnalyzed: clients.length, rulesGenerated: 0 }, 500);
     }
 
     let saved = 0;
     for (const rule of (Array.isArray(rules) ? rules : [])) {
       if (!rule.titulo || !rule.contenido) continue;
 
-      await supabase.from('steve_knowledge').upsert({
+      const { error: upsertErr } = await supabase.from('steve_knowledge').upsert({
         categoria: 'analisis',
         titulo: `[CROSS-CLIENT] ${rule.titulo}`.slice(0, 80),
         contenido: rule.contenido.slice(0, 600),
@@ -119,6 +119,10 @@ Solo incluye patrones claros respaldados por los datos. Sin markdown.`,
         orden: 99,
         industria: 'general',
       }, { onConflict: 'categoria,titulo' });
+      if (upsertErr) {
+        console.error(`[cross-client] Failed to upsert rule "${rule.titulo}":`, upsertErr);
+        continue;
+      }
       saved++;
     }
 

@@ -247,6 +247,10 @@ export async function sendEmailHandler(c: Context) {
         return c.json({ error: 'Missing required fields: to, subject, html_content, client_id' }, 400);
       }
 
+      if (from_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from_email)) {
+        return c.json({ error: 'Formato de email remitente inválido' }, 400);
+      }
+
       const supabase = getSupabaseAdmin();
 
       // Get or create a test subscriber
