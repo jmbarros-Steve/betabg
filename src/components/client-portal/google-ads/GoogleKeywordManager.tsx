@@ -480,38 +480,43 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
         </TabsContent>
       </Tabs>
 
-      {/* Add Keyword Dialog — modal={false} to allow Select dropdowns to work */}
-      <Dialog modal={false} open={addDialogOpen} onOpenChange={(open) => {
+      {/* Add Keyword Dialog — native selects to avoid Radix portal conflicts */}
+      <Dialog open={addDialogOpen} onOpenChange={(open) => {
         setAddDialogOpen(open);
         if (!open) { setDialogCampaignId(''); setNewKeyword({ text: '', match_type: 'EXACT', ad_group_id: '', cpc_bid: '' }); }
       }}>
         <DialogContent className="sm:max-w-[450px]">
           <DialogHeader><DialogTitle>Agregar Keyword</DialogTitle></DialogHeader>
-          {adGroups.length === 0 && campaigns.length === 0 ? (
+          {campaigns.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground text-sm">
-              No hay ad groups disponibles. Crea una campana con ad groups en Google Ads primero.
+              No hay campanas disponibles. Crea una campana con ad groups en Google Ads primero.
             </div>
           ) : (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Campana ({campaigns.length})</Label>
-                <Select value={dialogCampaignId} onValueChange={v => { setDialogCampaignId(v); setNewKeyword(prev => ({ ...prev, ad_group_id: '' })); }}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar campana" /></SelectTrigger>
-                  <SelectContent className="z-[200]">
-                    {campaigns.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label>Campana</Label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  value={dialogCampaignId}
+                  onChange={e => { setDialogCampaignId(e.target.value); setNewKeyword(prev => ({ ...prev, ad_group_id: '' })); }}
+                >
+                  <option value="">Seleccionar campana</option>
+                  {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
               </div>
               <div className="space-y-2">
                 <Label>Ad Group</Label>
-                <Select value={newKeyword.ad_group_id} onValueChange={v => setNewKeyword(prev => ({ ...prev, ad_group_id: v }))} disabled={!dialogCampaignId}>
-                  <SelectTrigger><SelectValue placeholder={dialogCampaignId ? 'Seleccionar ad group' : 'Selecciona campana primero'} /></SelectTrigger>
-                  <SelectContent className="z-[200]">
-                    {adGroups.filter(ag => String(ag.campaign_id) === dialogCampaignId).map(ag => (
-                      <SelectItem key={ag.id} value={String(ag.id)}>{ag.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={newKeyword.ad_group_id}
+                  onChange={e => setNewKeyword(prev => ({ ...prev, ad_group_id: e.target.value }))}
+                  disabled={!dialogCampaignId}
+                >
+                  <option value="">{dialogCampaignId ? 'Seleccionar ad group' : 'Selecciona campana primero'}</option>
+                  {adGroups.filter(ag => String(ag.campaign_id) === dialogCampaignId).map(ag => (
+                    <option key={ag.id} value={String(ag.id)}>{ag.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
                 <Label>Keyword</Label>
@@ -519,14 +524,15 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
               </div>
               <div className="space-y-2">
                 <Label>Match Type</Label>
-                <Select value={newKeyword.match_type} onValueChange={v => setNewKeyword(prev => ({ ...prev, match_type: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="EXACT">Exact</SelectItem>
-                    <SelectItem value="PHRASE">Phrase</SelectItem>
-                    <SelectItem value="BROAD">Broad</SelectItem>
-                  </SelectContent>
-                </Select>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  value={newKeyword.match_type}
+                  onChange={e => setNewKeyword(prev => ({ ...prev, match_type: e.target.value }))}
+                >
+                  <option value="EXACT">Exact</option>
+                  <option value="PHRASE">Phrase</option>
+                  <option value="BROAD">Broad</option>
+                </select>
               </div>
               <div className="space-y-2">
                 <Label>CPC Bid (opcional, moneda de cuenta)</Label>
@@ -536,7 +542,7 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleAddKeyword} disabled={addingKeyword || adGroups.length === 0}>
+            <Button onClick={handleAddKeyword} disabled={addingKeyword || campaigns.length === 0}>
               {addingKeyword && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} Agregar
             </Button>
           </DialogFooter>
