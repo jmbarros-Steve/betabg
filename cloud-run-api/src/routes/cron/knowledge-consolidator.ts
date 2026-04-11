@@ -53,8 +53,20 @@ export async function knowledgeConsolidator(c: Context) {
   let consolidated = 0;
   const results: Array<{ category: string; before: number; after: number }> = [];
 
+  // PROTECCIÓN: Estas categorías contienen reglas de ventas curadas manualmente
+  // (stages del funnel, pitch, objeciones, valor primero). El consolidador las
+  // fusionó con max 600 chars, perdiendo contenido crítico — ej: 4 respuestas
+  // específicas a objeciones quedaron en una regla genérica de 2 líneas.
+  // Resultado: Steve vendía sin saber manejar "es caro", "no confío en AI", etc.
+  // Detectado 2026-04-11. Ver: commit 4211b6a1
+  const PROTECTED_CATEGORIES = new Set(['prospecting', 'sales_learning']);
+
   for (const [categoria, rules] of Object.entries(byCategory)) {
     if (rules.length <= 15) continue;
+    if (PROTECTED_CATEGORIES.has(categoria)) {
+      console.log(`[knowledge-consolidator] Skipping protected category: ${categoria} (${rules.length} rules)`);
+      continue;
+    }
 
     const rulesSummary = rules
       .map((r, i) => `[${i}] ${r.titulo}: ${r.contenido.substring(0, 300)}`)

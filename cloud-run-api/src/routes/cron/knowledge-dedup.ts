@@ -54,8 +54,20 @@ export async function knowledgeDedup(c: Context) {
   let mergedCount = 0;
   const mergeResults: Array<{ kept: string; removed: string[]; reason: string }> = [];
 
+  // PROTECCIÓN: Estas categorías contienen reglas de ventas curadas manualmente
+  // (stages, pitch, objeciones, valor primero). Haiku con 150 chars de contexto
+  // las confundió como "duplicados semánticos" y desactivó Discovery, Pitch Steve,
+  // Objeciones comunes y Valor primero — causando que Steve vendiera sin estrategia
+  // de primer contacto ni manejo de objeciones. Detectado 2026-04-11.
+  // Ver: commit 4211b6a1 (feat(knowledge): 10 rule quality improvements)
+  const PROTECTED_CATEGORIES = new Set(['prospecting', 'sales_learning']);
+
   for (const [categoria, catRules] of Object.entries(byCategory)) {
     if (catRules.length < 3) continue;
+    if (PROTECTED_CATEGORIES.has(categoria)) {
+      console.log(`[knowledge-dedup] Skipping protected category: ${categoria} (${catRules.length} rules)`);
+      continue;
+    }
 
     const titles = catRules.map((r, i) => `[${i}] ${r.titulo}: ${r.contenido.substring(0, 150)}`).join('\n');
 
