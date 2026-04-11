@@ -113,8 +113,11 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
   const [negMatchType, setNegMatchType] = useState('EXACT');
   const [addingNeg, setAddingNeg] = useState(false);
 
-  const campaigns = Array.from(new Map(adGroups.map(ag => [String(ag.campaign_id), ag.campaign_name])).entries())
-    .map(([id, name]) => ({ id, name }));
+  // Derive campaigns from adGroups + keywords as fallback
+  const campaignMap = new Map<string, string>();
+  adGroups.forEach(ag => { if (ag.campaign_id) campaignMap.set(String(ag.campaign_id), ag.campaign_name); });
+  keywords.forEach(kw => { if (kw.campaign_id && !campaignMap.has(String(kw.campaign_id))) campaignMap.set(String(kw.campaign_id), kw.campaign_name); });
+  const campaigns = Array.from(campaignMap.entries()).map(([id, name]) => ({ id, name }));
 
   const filteredAdGroups = campaignFilter === 'ALL' ? adGroups : adGroups.filter(ag => String(ag.campaign_id) === campaignFilter);
 
@@ -123,7 +126,12 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
       body: { action: 'list_ad_groups', connection_id: connectionId },
     });
     if (error) { toast.error('Error cargando ad groups: ' + error); return; }
-    if (data?.ad_groups) setAdGroups(data.ad_groups);
+    if (data?.ad_groups) {
+      console.log('[KeywordManager] ad_groups loaded:', data.ad_groups.length, data.ad_groups.slice(0, 2));
+      setAdGroups(data.ad_groups);
+    } else {
+      console.warn('[KeywordManager] No ad_groups in response:', data);
+    }
   }, [connectionId]);
 
   const fetchKeywords = useCallback(async () => {
@@ -472,24 +480,24 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
         </TabsContent>
       </Tabs>
 
-      {/* Add Keyword Dialog */}
-      <Dialog open={addDialogOpen} onOpenChange={(open) => {
+      {/* Add Keyword Dialog — modal={false} to allow Select dropdowns to work */}
+      <Dialog modal={false} open={addDialogOpen} onOpenChange={(open) => {
         setAddDialogOpen(open);
         if (!open) { setDialogCampaignId(''); setNewKeyword({ text: '', match_type: 'EXACT', ad_group_id: '', cpc_bid: '' }); }
       }}>
         <DialogContent className="sm:max-w-[450px]">
           <DialogHeader><DialogTitle>Agregar Keyword</DialogTitle></DialogHeader>
-          {adGroups.length === 0 ? (
+          {adGroups.length === 0 && campaigns.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground text-sm">
               No hay ad groups disponibles. Crea una campana con ad groups en Google Ads primero.
             </div>
           ) : (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Campana</Label>
+                <Label>Campana ({campaigns.length})</Label>
                 <Select value={dialogCampaignId} onValueChange={v => { setDialogCampaignId(v); setNewKeyword(prev => ({ ...prev, ad_group_id: '' })); }}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar campana" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[200]">
                     {campaigns.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -498,7 +506,7 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
                 <Label>Ad Group</Label>
                 <Select value={newKeyword.ad_group_id} onValueChange={v => setNewKeyword(prev => ({ ...prev, ad_group_id: v }))} disabled={!dialogCampaignId}>
                   <SelectTrigger><SelectValue placeholder={dialogCampaignId ? 'Seleccionar ad group' : 'Selecciona campana primero'} /></SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[200]">
                     {adGroups.filter(ag => String(ag.campaign_id) === dialogCampaignId).map(ag => (
                       <SelectItem key={ag.id} value={String(ag.id)}>{ag.name}</SelectItem>
                     ))}
