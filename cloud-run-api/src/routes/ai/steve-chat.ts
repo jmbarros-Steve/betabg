@@ -2075,7 +2075,7 @@ REGLAS ABSOLUTAS:
   const implicitAdvance = !isRejection && !assistantMessage.includes('[AVANZAR]') && nextQForDetection && (
     (nextQForDetection.steveIntro && assistantMessage.includes(nextQForDetection.steveIntro.trim().slice(0, 20))) ||
     (nextQForDetection.shortLabel && assistantMessage.toLowerCase().includes(nextQForDetection.shortLabel.toLowerCase())) ||
-    assistantMessage.includes(`Pregunta ${currentQuestionIndex + 2} de 16`)
+    new RegExp(`Pregunta\\s+${currentQuestionIndex + 1}\\b`).test(assistantMessage)
   );
   if (implicitAdvance) {
     console.log(`[steve-chat] Implicit advance detected for Q${currentQuestionIndex} → Q${currentQuestionIndex + 1} (AI forgot [AVANZAR])`);
