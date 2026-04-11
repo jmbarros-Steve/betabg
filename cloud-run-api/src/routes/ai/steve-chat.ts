@@ -2080,8 +2080,7 @@ REGLAS ABSOLUTAS:
   if (implicitAdvance) {
     console.log(`[steve-chat] Implicit advance detected for Q${currentQuestionIndex} → Q${currentQuestionIndex + 1} (AI forgot [AVANZAR])`);
   }
-  // Q0 (URL) always advances — there is no rejection case for the URL question
-  const hasAdvanced = !isRejection && (assistantMessage.includes('[AVANZAR]') || isLastQuestion || implicitAdvance || currentQuestionIndex === 0);
+  const hasAdvanced = !isRejection && (assistantMessage.includes('[AVANZAR]') || isLastQuestion || implicitAdvance);
   // Strip control tags from visible message
   assistantMessage = assistantMessage
     .replace(/\s*\[RECHAZO\]\s*/gi, ' ')
