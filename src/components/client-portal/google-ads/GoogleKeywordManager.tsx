@@ -113,10 +113,10 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
   const [negMatchType, setNegMatchType] = useState('EXACT');
   const [addingNeg, setAddingNeg] = useState(false);
 
-  const campaigns = Array.from(new Map(adGroups.map(ag => [ag.campaign_id, ag.campaign_name])).entries())
+  const campaigns = Array.from(new Map(adGroups.map(ag => [String(ag.campaign_id), ag.campaign_name])).entries())
     .map(([id, name]) => ({ id, name }));
 
-  const filteredAdGroups = campaignFilter === 'ALL' ? adGroups : adGroups.filter(ag => ag.campaign_id === campaignFilter);
+  const filteredAdGroups = campaignFilter === 'ALL' ? adGroups : adGroups.filter(ag => String(ag.campaign_id) === campaignFilter);
 
   const fetchAdGroups = useCallback(async () => {
     const { data, error } = await callApi('manage-google-keywords', {
@@ -308,7 +308,7 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
             <SelectTrigger className="w-[200px]"><SelectValue placeholder="Campana" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Todas las campanas</SelectItem>
-              {campaigns.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              {campaigns.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
             </SelectContent>
           </Select>
           {tab === 'keywords' && (
@@ -317,7 +317,7 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
                 <SelectTrigger className="w-[180px]"><SelectValue placeholder="Ad Group" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">Todos los grupos</SelectItem>
-                  {filteredAdGroups.map(ag => <SelectItem key={ag.id} value={ag.id}>{ag.name}</SelectItem>)}
+                  {filteredAdGroups.map(ag => <SelectItem key={ag.id} value={String(ag.id)}>{ag.name}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -499,8 +499,8 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
                 <Select value={newKeyword.ad_group_id} onValueChange={v => setNewKeyword(prev => ({ ...prev, ad_group_id: v }))} disabled={!dialogCampaignId}>
                   <SelectTrigger><SelectValue placeholder={dialogCampaignId ? 'Seleccionar ad group' : 'Selecciona campana primero'} /></SelectTrigger>
                   <SelectContent>
-                    {adGroups.filter(ag => ag.campaign_id === dialogCampaignId).map(ag => (
-                      <SelectItem key={ag.id} value={ag.id}>{ag.name}</SelectItem>
+                    {adGroups.filter(ag => String(ag.campaign_id) === dialogCampaignId).map(ag => (
+                      <SelectItem key={ag.id} value={String(ag.id)}>{ag.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
