@@ -121,10 +121,10 @@ async function handleListAdGroups(
   customerId: string, accessToken: string, developerToken: string, loginCustomerId: string
 ): Promise<{ body: any; status: number }> {
   const query = `
-    SELECT ad_group.id, ad_group.name, ad_group.status, campaign.id, campaign.name
+    SELECT ad_group.id, ad_group.name, ad_group.status,
+           campaign.id, campaign.name, campaign.advertising_channel_type
     FROM ad_group
-    WHERE campaign.advertising_channel_type = 'SEARCH'
-      AND campaign.status != 'REMOVED'
+    WHERE campaign.status != 'REMOVED'
       AND ad_group.status != 'REMOVED'
     ORDER BY campaign.name, ad_group.name
   `;
@@ -138,6 +138,7 @@ async function handleListAdGroups(
     status: row.adGroup?.status,
     campaign_id: row.campaign?.id,
     campaign_name: row.campaign?.name,
+    campaign_type: row.campaign?.advertisingChannelType,
   }));
 
   return { body: { success: true, ad_groups: adGroups }, status: 200 };

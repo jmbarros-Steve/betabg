@@ -97,6 +97,7 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
 
   // Add keyword dialog
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [dialogCampaignId, setDialogCampaignId] = useState('');
   const [newKeyword, setNewKeyword] = useState({ text: '', match_type: 'EXACT', ad_group_id: '', cpc_bid: '' });
   const [addingKeyword, setAddingKeyword] = useState(false);
 
@@ -351,6 +352,7 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="text-left p-3 font-medium">Keyword</th>
+                    <th className="text-left p-3 font-medium">Ubicacion</th>
                     <th className="text-left p-3 font-medium">Match</th>
                     <th className="text-left p-3 font-medium">Estado</th>
                     <th className="text-right p-3 font-medium">CPC Bid</th>
@@ -370,7 +372,10 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
                       <tr key={key} className="border-b last:border-0 hover:bg-muted/30">
                         <td className="p-3 max-w-[200px]">
                           <div className="font-medium truncate" title={kw.keyword_text}>{kw.keyword_text}</div>
-                          <div className="text-xs text-muted-foreground truncate">{kw.ad_group_name}</div>
+                        </td>
+                        <td className="p-3 max-w-[180px]">
+                          <div className="text-xs text-muted-foreground truncate" title={kw.campaign_name}>{kw.campaign_name}</div>
+                          <div className="text-xs truncate" title={kw.ad_group_name}>{kw.ad_group_name}</div>
                         </td>
                         <td className="p-3">
                           <Badge variant="outline" className={matchTypeColors[kw.match_type] || ''}>{kw.match_type}</Badge>
@@ -468,42 +473,62 @@ export default function GoogleKeywordManager({ connectionId, clientId }: GoogleK
       </Tabs>
 
       {/* Add Keyword Dialog */}
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+      <Dialog open={addDialogOpen} onOpenChange={(open) => {
+        setAddDialogOpen(open);
+        if (!open) { setDialogCampaignId(''); setNewKeyword({ text: '', match_type: 'EXACT', ad_group_id: '', cpc_bid: '' }); }
+      }}>
         <DialogContent className="sm:max-w-[450px]">
           <DialogHeader><DialogTitle>Agregar Keyword</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Ad Group</Label>
-              <Select value={newKeyword.ad_group_id} onValueChange={v => setNewKeyword(prev => ({ ...prev, ad_group_id: v }))}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar ad group" /></SelectTrigger>
-                <SelectContent>
-                  {adGroups.map(ag => <SelectItem key={ag.id} value={ag.id}>{ag.campaign_name} &gt; {ag.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+          {adGroups.length === 0 ? (
+            <div className="py-8 text-center text-muted-foreground text-sm">
+              No hay ad groups disponibles. Crea una campana con ad groups en Google Ads primero.
             </div>
-            <div className="space-y-2">
-              <Label>Keyword</Label>
-              <Input placeholder="Ej: zapatos deportivos" value={newKeyword.text} onChange={e => setNewKeyword(prev => ({ ...prev, text: e.target.value }))} />
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Campana</Label>
+                <Select value={dialogCampaignId} onValueChange={v => { setDialogCampaignId(v); setNewKeyword(prev => ({ ...prev, ad_group_id: '' })); }}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar campana" /></SelectTrigger>
+                  <SelectContent>
+                    {campaigns.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Ad Group</Label>
+                <Select value={newKeyword.ad_group_id} onValueChange={v => setNewKeyword(prev => ({ ...prev, ad_group_id: v }))} disabled={!dialogCampaignId}>
+                  <SelectTrigger><SelectValue placeholder={dialogCampaignId ? 'Seleccionar ad group' : 'Selecciona campana primero'} /></SelectTrigger>
+                  <SelectContent>
+                    {adGroups.filter(ag => ag.campaign_id === dialogCampaignId).map(ag => (
+                      <SelectItem key={ag.id} value={ag.id}>{ag.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Keyword</Label>
+                <Input placeholder="Ej: zapatos deportivos" value={newKeyword.text} onChange={e => setNewKeyword(prev => ({ ...prev, text: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Match Type</Label>
+                <Select value={newKeyword.match_type} onValueChange={v => setNewKeyword(prev => ({ ...prev, match_type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EXACT">Exact</SelectItem>
+                    <SelectItem value="PHRASE">Phrase</SelectItem>
+                    <SelectItem value="BROAD">Broad</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>CPC Bid (opcional, moneda de cuenta)</Label>
+                <Input type="number" min="0" step="any" placeholder="Ej: 500" value={newKeyword.cpc_bid} onChange={e => setNewKeyword(prev => ({ ...prev, cpc_bid: e.target.value }))} />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Match Type</Label>
-              <Select value={newKeyword.match_type} onValueChange={v => setNewKeyword(prev => ({ ...prev, match_type: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="EXACT">Exact</SelectItem>
-                  <SelectItem value="PHRASE">Phrase</SelectItem>
-                  <SelectItem value="BROAD">Broad</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>CPC Bid (opcional, moneda de cuenta)</Label>
-              <Input type="number" min="0" step="any" placeholder="Ej: 500" value={newKeyword.cpc_bid} onChange={e => setNewKeyword(prev => ({ ...prev, cpc_bid: e.target.value }))} />
-            </div>
-          </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleAddKeyword} disabled={addingKeyword}>
+            <Button onClick={handleAddKeyword} disabled={addingKeyword || adGroups.length === 0}>
               {addingKeyword && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} Agregar
             </Button>
           </DialogFooter>
