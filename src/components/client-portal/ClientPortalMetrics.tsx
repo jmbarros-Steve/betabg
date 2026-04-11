@@ -16,7 +16,7 @@ import { CohortAnalysisPanel } from './metrics/CohortAnalysisPanel';
 import { MetricsDateFilter, DateRange, CustomDateRange } from './metrics/MetricsDateFilter';
 import { KPIGridSkeleton, ChartSkeleton, TableSkeleton } from './metrics/MetricsSkeleton';
 import { SmartInsightsPanel } from './metrics/SmartInsightsPanel';
-import { PlanGate } from './PlanGate';
+import { useUserPlan } from '@/hooks/useUserPlan';
 import { BusinessHealthScore } from './metrics/BusinessHealthScore';
 import { DayOfWeekChart } from './metrics/DayOfWeekChart';
 import { ConversionFunnelPanel } from './metrics/ConversionFunnelPanel';
@@ -129,6 +129,7 @@ function getPreviousPeriodDates(range: DateRange, customRange?: CustomDateRange)
 }
 
 export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
+  const { canAccess } = useUserPlan(clientId);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>('30d');
   const [customDateRange, setCustomDateRange] = useState<CustomDateRange | undefined>(undefined);
@@ -396,8 +397,9 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
 
         // Set rawMetrics with DB data + any injected Shopify API data
         setRawMetrics([...dbMetricRows, ...currentCampaignMetrics, ...additionalMetrics]);
-      } catch {
-        // Error handled by toast
+      } catch (err) {
+        console.error('[ClientPortalMetrics] Failed to load metrics:', err);
+        toast.error('Error al cargar métricas. Intenta recargar la página.');
       } finally {
         setLoading(false);
       }
@@ -818,8 +820,8 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
             aov={aov}
           />
 
-          {/* Smart Insights */}
-          <PlanGate feature="insights.smart" clientId={clientId}>
+          {/* Smart Insights — only for Estrategia+ plans (hidden, not overlaid) */}
+          {canAccess('insights.smart') && (
             <SmartInsightsPanel data={{
               totalRevenue: current.totalRevenue,
               totalOrders: current.totalOrders,
@@ -837,7 +839,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
               previousOrders: previous.totalOrders,
               previousSpend: previous.totalSpend,
             }} />
-          </PlanGate>
+          )}
 
           {/* Charts */}
           <MetricsCharts revenueData={chartData} previousRevenueData={previousChartData.length > 0 ? previousChartData : undefined} currency="CLP" />
