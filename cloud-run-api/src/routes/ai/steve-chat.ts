@@ -2081,11 +2081,16 @@ REGLAS ABSOLUTAS:
     console.log(`[steve-chat] Implicit advance detected for Q${currentQuestionIndex} → Q${currentQuestionIndex + 1} (AI forgot [AVANZAR])`);
   }
   // Auto-advance for structured form submissions — the form already validated the data,
-  // so we don't need to rely on the AI remembering to write [AVANZAR]
+  // so we don't need to rely on the AI remembering to write [AVANZAR].
+  // Form submissions also override AI rejections: the form validation is the quality gate.
   const currentQ = BRAND_BRIEF_QUESTIONS[currentQuestionIndex];
   const isFormSubmission = (currentQ?.fields?.length ?? 0) > 0 &&
     currentQ.fields.some((f: { label: string }) => message.includes(f.label));
-  const hasAdvanced = !isRejection && (assistantMessage.includes('[AVANZAR]') || isLastQuestion || implicitAdvance || isFormSubmission);
+  if (isFormSubmission && isRejection) {
+    console.log(`[steve-chat] Form submission overrides AI rejection for Q${currentQuestionIndex}`);
+  }
+  const effectiveRejection = isRejection && !isFormSubmission;
+  const hasAdvanced = !effectiveRejection && (assistantMessage.includes('[AVANZAR]') || isLastQuestion || implicitAdvance || isFormSubmission);
   // Strip control tags from visible message
   assistantMessage = assistantMessage
     .replace(/\s*\[RECHAZO\]\s*/gi, ' ')
@@ -2095,7 +2100,7 @@ REGLAS ABSOLUTAS:
 
   // BUG 6 FIX: newAnsweredCount can only ever be currentQuestionIndex or currentQuestionIndex + 1.
   // Math.min caps it at total questions to prevent any off-by-one from skipping questions.
-  const newAnsweredCount = isRejection
+  const newAnsweredCount = effectiveRejection
     ? currentQuestionIndex
     : (hasAdvanced
         ? Math.min(currentQuestionIndex + 1, BRAND_BRIEF_QUESTIONS.length)
@@ -2106,7 +2111,7 @@ REGLAS ABSOLUTAS:
     ? [...storedRawResponses.slice(0, currentQuestionIndex), message]
     : storedRawResponses.slice(0, currentQuestionIndex);
 
-  if (isRejection) {
+  if (effectiveRejection) {
     const lastUserMsg = await safeQuerySingleOrDefault<{ id: string }>(
       supabase
         .from('steve_messages')
@@ -2129,7 +2134,7 @@ REGLAS ABSOLUTAS:
 
   // BUG 5 FIX 2: Prepend analysis-pending notice before the brief so the client knows
   // the analysis is running and can take 3-5 minutes.
-  if (newAnsweredCount >= BRAND_BRIEF_QUESTIONS.length && !isRejection) {
+  if (newAnsweredCount >= BRAND_BRIEF_QUESTIONS.length && !effectiveRejection) {
     const avisoText = `⏳ *saca termo y se prepara para el análisis profundo* 🐕\n\n¡WOOF! ¡Terminamos las preguntas! Ahora el **equipo de Marketing Steve** está haciendo un **análisis profundo** de tu sitio web, tus competidores, SEO, keywords y estrategia publicitaria.\n\n🕐 **Esto toma entre 5 y 10 minutos** porque nuestro equipo analiza todo a fondo para darte un análisis de calidad consultoría. Anda por un café ☕ y cuando vuelvas tendrás:\n\n- 📊 Análisis competitivo de 6 competidores\n- 🔍 Auditoría SEO completa\n- 🎯 Estrategia de Keywords\n- 📢 Plan de Meta Ads y Google Ads\n- 💰 Presupuesto y proyección de ROAS\n\nTodo en las pestañas correspondientes. **No cierres la sesión.**\n\n---\n\n`;
     assistantMessage = avisoText + assistantMessage;
   }
@@ -2223,7 +2228,7 @@ REGLAS ABSOLUTAS:
   }
 
   const finalAnswered = newAnsweredCount;
-  const isComplete = finalAnswered >= BRAND_BRIEF_QUESTIONS.length && !isRejection;
+  const isComplete = finalAnswered >= BRAND_BRIEF_QUESTIONS.length && !effectiveRejection;
 
   // Persist updated buyer_personas with accurate answered_count
   // For the completion case, save the summary WITHOUT the aviso prefix (keep only the brief)
@@ -2263,7 +2268,7 @@ REGLAS ABSOLUTAS:
     total_questions: BRAND_BRIEF_QUESTIONS.length,
     answered_count: returnAnswered,
     is_complete: isComplete,
-    rejected: isRejection,
+    rejected: effectiveRejection,
     current_question_id: nextQ?.id ?? null,
     current_question_label: nextQ?.shortLabel ?? null,
     examples: dynamicExamples ?? nextQ?.examples ?? [],
