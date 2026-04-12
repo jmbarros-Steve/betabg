@@ -1840,7 +1840,9 @@ ${nextLabel} — INTRO: ${nextQ?.steveIntro || ''} — TEXTO: ${nextQ?.question}
 
 SI EL CLIENTE HIZO UNA PREGUNTA DE ACLARACIÓN (no está respondiendo, solo pregunta algo) → respóndela brevemente, recuérdale la pregunta actual, NO incluyas [AVANZAR] ni [RECHAZO].
 
-${hasFields ? `⚠️ FORMULARIO: La siguiente pregunta tiene formulario. Primero da 1-2 oraciones de contexto (qué necesitas y para qué), luego di "Llena los campos del formulario abajo". NO listes los campos en tu mensaje. Si la pregunta NO es la 16 (archivos visuales), NUNCA digas "sube", "subir" ni pidas logo/fotos.` : ''}
+${hasFields ? `⚠️ FORMULARIO OBLIGATORIO: La siguiente pregunta tiene formulario con ESTOS campos exactos que el cliente verá abajo:
+${nextQ!.fields.map((f: { label: string }) => `  → ${f.label}`).join('\n')}
+Tu mensaje DEBE ser sobre ESTOS campos — NO inventes otras preguntas ni pidas otra información. Da 1-2 oraciones de contexto, luego di "Llena los campos del formulario abajo". NO repitas los campos en tu texto (el cliente ya los ve en el formulario). Si la pregunta NO es la 16, NUNCA digas "sube", "subir" ni pidas logo/fotos.` : ''}
 
 ${nextQ?.examples?.length ? `⚠️ EJEMPLOS DINÁMICOS: La siguiente pregunta tiene ejemplos genéricos predefinidos, pero el cliente ya describió su negocio. GENERA 2-3 ejemplos ESPECÍFICOS para SU INDUSTRIA Y PRODUCTO REAL. NEGOCIO DEL CLIENTE (usa esto para personalizar los ejemplos): "${storedRawResponses[1] || acceptedResponses[1]?.content || 'no disponible aún'}". Al final de tu mensaje (después de todo el texto visible, en una línea separada), escribe EXACTAMENTE: [EJEMPLOS: ejemplo1 || ejemplo2 || ejemplo3]. No menciones al cliente que añadiste esta línea. Solo di: "Puedes usar un ejemplo de abajo o escribir con tus palabras." Los ejemplos genéricos de referencia (para que veas el formato esperado): ${JSON.stringify(nextQ.examples)}.` : 'Da 2-3 ejemplos concretos de SU industria en tu mensaje (no hay botones para esta pregunta).'}
 
