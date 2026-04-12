@@ -2080,7 +2080,12 @@ REGLAS ABSOLUTAS:
   if (implicitAdvance) {
     console.log(`[steve-chat] Implicit advance detected for Q${currentQuestionIndex} → Q${currentQuestionIndex + 1} (AI forgot [AVANZAR])`);
   }
-  const hasAdvanced = !isRejection && (assistantMessage.includes('[AVANZAR]') || isLastQuestion || implicitAdvance);
+  // Auto-advance for structured form submissions — the form already validated the data,
+  // so we don't need to rely on the AI remembering to write [AVANZAR]
+  const currentQ = BRAND_BRIEF_QUESTIONS[currentQuestionIndex];
+  const isFormSubmission = (currentQ?.fields?.length ?? 0) > 0 &&
+    currentQ.fields.some((f: { label: string }) => message.includes(f.label));
+  const hasAdvanced = !isRejection && (assistantMessage.includes('[AVANZAR]') || isLastQuestion || implicitAdvance || isFormSubmission);
   // Strip control tags from visible message
   assistantMessage = assistantMessage
     .replace(/\s*\[RECHAZO\]\s*/gi, ' ')
