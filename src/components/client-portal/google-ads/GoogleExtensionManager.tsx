@@ -12,9 +12,6 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import { RefreshCw, Loader2, Plus, Link2, X, Trash2 } from 'lucide-react';
 
 interface Asset {
@@ -169,12 +166,15 @@ export default function GoogleExtensionManager({ connectionId, clientId }: Googl
           break;
       }
 
+      // Auto-link to campaign if selected
+      if (formData.campaign_id) body.campaign_id = formData.campaign_id;
+
       const { error } = await callApi('manage-google-extensions', {
         body: { action: actionName, connection_id: connectionId, data: body },
       });
 
       if (error) { toast.error('Error: ' + error); return; }
-      toast.success('Extension creada');
+      toast.success(formData.campaign_id ? 'Extension creada y vinculada a campana' : 'Extension creada');
       setCreateType(null);
       setFormData({});
       fetchAll();
@@ -415,6 +415,19 @@ export default function GoogleExtensionManager({ connectionId, clientId }: Googl
             Crear {createType === 'sitelink' ? 'Sitelink' : createType === 'callout' ? 'Callout' : createType === 'snippet' ? 'Structured Snippet' : 'Extension de Llamada'}
           </DialogTitle></DialogHeader>
 
+          {/* Campaign selector — shared across all types */}
+          <div className="space-y-1">
+            <Label>Vincular a campana (opcional)</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              value={formData.campaign_id || ''}
+              onChange={e => setFormData(p => ({ ...p, campaign_id: e.target.value }))}
+            >
+              <option value="">Sin campana (solo crear)</option>
+              {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
           {createType === 'sitelink' && (
             <div className="space-y-3">
               <div className="space-y-1">
@@ -447,12 +460,14 @@ export default function GoogleExtensionManager({ connectionId, clientId }: Googl
             <div className="space-y-3">
               <div className="space-y-1">
                 <Label>Header</Label>
-                <Select value={formData.header || ''} onValueChange={v => setFormData(p => ({ ...p, header: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                  <SelectContent>
-                    {SNIPPET_HEADERS.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  value={formData.header || ''}
+                  onChange={e => setFormData(p => ({ ...p, header: e.target.value }))}
+                >
+                  <option value="">Seleccionar header</option>
+                  {SNIPPET_HEADERS.map(h => <option key={h} value={h}>{h}</option>)}
+                </select>
               </div>
               <div className="space-y-1">
                 <Label>Values (uno por linea)</Label>
@@ -465,17 +480,19 @@ export default function GoogleExtensionManager({ connectionId, clientId }: Googl
             <div className="space-y-3">
               <div className="space-y-1">
                 <Label>Codigo de Pais</Label>
-                <Select value={formData.country_code || ''} onValueChange={v => setFormData(p => ({ ...p, country_code: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CL">CL (+56)</SelectItem>
-                    <SelectItem value="MX">MX (+52)</SelectItem>
-                    <SelectItem value="CO">CO (+57)</SelectItem>
-                    <SelectItem value="AR">AR (+54)</SelectItem>
-                    <SelectItem value="PE">PE (+51)</SelectItem>
-                    <SelectItem value="US">US (+1)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  value={formData.country_code || ''}
+                  onChange={e => setFormData(p => ({ ...p, country_code: e.target.value }))}
+                >
+                  <option value="">Seleccionar pais</option>
+                  <option value="CL">CL (+56)</option>
+                  <option value="MX">MX (+52)</option>
+                  <option value="CO">CO (+57)</option>
+                  <option value="AR">AR (+54)</option>
+                  <option value="PE">PE (+51)</option>
+                  <option value="US">US (+1)</option>
+                </select>
               </div>
               <div className="space-y-1">
                 <Label>Numero de Telefono</Label>
@@ -487,7 +504,7 @@ export default function GoogleExtensionManager({ connectionId, clientId }: Googl
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateType(null)}>Cancelar</Button>
             <Button onClick={handleCreate} disabled={creating}>
-              {creating && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} Crear
+              {creating && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} Crear{formData.campaign_id ? ' y vincular' : ''}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -502,12 +519,14 @@ export default function GoogleExtensionManager({ connectionId, clientId }: Googl
               <p className="text-sm text-muted-foreground">
                 {linkAsset.type}: {linkAsset.link_text || linkAsset.callout_text || linkAsset.header || linkAsset.phone_number}
               </p>
-              <Select value={linkCampaignId} onValueChange={setLinkCampaignId}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar campana" /></SelectTrigger>
-                <SelectContent>
-                  {campaigns.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                value={linkCampaignId}
+                onChange={e => setLinkCampaignId(e.target.value)}
+              >
+                <option value="">Seleccionar campana</option>
+                {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
             </div>
           )}
           <DialogFooter>

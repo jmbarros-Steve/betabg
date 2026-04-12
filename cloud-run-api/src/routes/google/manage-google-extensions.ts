@@ -194,11 +194,41 @@ async function handleListCampaignAssets(
   return { body: { success: true, campaign_assets: campaignAssets }, status: 200 };
 }
 
+// Extract asset ID from mutate response resource name (customers/123/assets/456 → 456)
+function extractAssetId(mutateResult: any): string | null {
+  try {
+    const resourceName = mutateResult?.data?.mutateOperationResponses?.[0]?.assetResult?.resourceName;
+    if (!resourceName) return null;
+    const parts = resourceName.split('/');
+    return parts[parts.length - 1] || null;
+  } catch { return null; }
+}
+
+// Auto-link asset to campaign if campaign_id provided
+async function autoLinkIfNeeded(
+  customerId: string, accessToken: string, developerToken: string,
+  loginCustomerId: string, assetId: string, campaignId: string | undefined, fieldType: string
+): Promise<void> {
+  if (!campaignId || !validateNumericId(campaignId)) return;
+  const linkResult = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, [{
+    campaignAssetOperation: {
+      create: {
+        campaign: `customers/${customerId}/campaigns/${campaignId}`,
+        asset: `customers/${customerId}/assets/${assetId}`,
+        fieldType,
+      },
+    },
+  }]);
+  if (!linkResult.ok) {
+    console.warn(`[manage-google-extensions] Auto-link failed for asset ${assetId} → campaign ${campaignId}:`, linkResult.error);
+  }
+}
+
 async function handleCreateSitelink(
   customerId: string, accessToken: string, developerToken: string,
   loginCustomerId: string, data: Record<string, any>
 ): Promise<{ body: any; status: number }> {
-  const { link_text, description1, description2, final_urls } = data;
+  const { link_text, description1, description2, final_urls, campaign_id } = data;
   if (!link_text || !final_urls?.length) {
     return { body: { error: 'Missing required fields: link_text, final_urls' }, status: 400 };
   }
@@ -220,14 +250,20 @@ async function handleCreateSitelink(
   }]);
 
   if (!result.ok) return { body: { error: 'Failed to create sitelink', details: result.error }, status: 502 };
-  return { body: { success: true, message: 'Sitelink created' }, status: 200 };
+
+  const assetId = extractAssetId(result);
+  if (assetId && campaign_id) {
+    await autoLinkIfNeeded(customerId, accessToken, developerToken, loginCustomerId, assetId, campaign_id, 'SITELINK');
+  }
+
+  return { body: { success: true, message: 'Sitelink created', asset_id: assetId, linked_campaign: campaign_id || null }, status: 200 };
 }
 
 async function handleCreateCallout(
   customerId: string, accessToken: string, developerToken: string,
   loginCustomerId: string, data: Record<string, any>
 ): Promise<{ body: any; status: number }> {
-  const { callout_text } = data;
+  const { callout_text, campaign_id } = data;
   if (!callout_text) return { body: { error: 'Missing callout_text' }, status: 400 };
   if (callout_text.length > 25) return { body: { error: 'callout_text max 25 characters' }, status: 400 };
 
@@ -236,14 +272,20 @@ async function handleCreateCallout(
   }]);
 
   if (!result.ok) return { body: { error: 'Failed to create callout', details: result.error }, status: 502 };
-  return { body: { success: true, message: 'Callout created' }, status: 200 };
+
+  const assetId = extractAssetId(result);
+  if (assetId && campaign_id) {
+    await autoLinkIfNeeded(customerId, accessToken, developerToken, loginCustomerId, assetId, campaign_id, 'CALLOUT');
+  }
+
+  return { body: { success: true, message: 'Callout created', asset_id: assetId, linked_campaign: campaign_id || null }, status: 200 };
 }
 
 async function handleCreateSnippet(
   customerId: string, accessToken: string, developerToken: string,
   loginCustomerId: string, data: Record<string, any>
 ): Promise<{ body: any; status: number }> {
-  const { header, values } = data;
+  const { header, values, campaign_id } = data;
   if (!header || !values?.length) {
     return { body: { error: 'Missing required fields: header, values' }, status: 400 };
   }
@@ -257,14 +299,20 @@ async function handleCreateSnippet(
   }]);
 
   if (!result.ok) return { body: { error: 'Failed to create snippet', details: result.error }, status: 502 };
-  return { body: { success: true, message: 'Structured snippet created' }, status: 200 };
+
+  const assetId = extractAssetId(result);
+  if (assetId && campaign_id) {
+    await autoLinkIfNeeded(customerId, accessToken, developerToken, loginCustomerId, assetId, campaign_id, 'STRUCTURED_SNIPPET');
+  }
+
+  return { body: { success: true, message: 'Structured snippet created', asset_id: assetId, linked_campaign: campaign_id || null }, status: 200 };
 }
 
 async function handleCreateCall(
   customerId: string, accessToken: string, developerToken: string,
   loginCustomerId: string, data: Record<string, any>
 ): Promise<{ body: any; status: number }> {
-  const { country_code, phone_number } = data;
+  const { country_code, phone_number, campaign_id } = data;
   if (!country_code || !phone_number) {
     return { body: { error: 'Missing required fields: country_code, phone_number' }, status: 400 };
   }
@@ -276,7 +324,13 @@ async function handleCreateCall(
   }]);
 
   if (!result.ok) return { body: { error: 'Failed to create call extension', details: result.error }, status: 502 };
-  return { body: { success: true, message: 'Call extension created' }, status: 200 };
+
+  const assetId = extractAssetId(result);
+  if (assetId && campaign_id) {
+    await autoLinkIfNeeded(customerId, accessToken, developerToken, loginCustomerId, assetId, campaign_id, 'CALL');
+  }
+
+  return { body: { success: true, message: 'Call extension created', asset_id: assetId, linked_campaign: campaign_id || null }, status: 200 };
 }
 
 async function handleLinkAsset(
