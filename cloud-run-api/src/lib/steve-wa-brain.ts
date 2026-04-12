@@ -1441,6 +1441,18 @@ export async function buildDynamicSalesPrompt(
   // 0. PRODUCT CATALOG (so Steve knows what he's selling)
   prompt += getProductCatalogPrompt() + '\n\n';
 
+  // 0.1. PRODUCT DEEP KNOWLEDGE — inject "Producto:" entries from prospecting rules
+  // These contain differentiators (El Chino, CRITERIO, Lobo Nocturno, Steve Brain, etc.)
+  // that Steve needs to sell effectively. Loaded from same `rules` query above.
+  const productRules = (rules || []).filter(r => r.titulo?.startsWith('Producto:'));
+  if (productRules.length > 0) {
+    prompt += '🧬 CONOCIMIENTO PROFUNDO DEL PRODUCTO (usa cuando el prospecto pregunte):\n';
+    for (const pr of productRules) {
+      prompt += `### ${pr.titulo}\n${pr.contenido}\n\n`;
+      if (pr.id) collectedRuleIds.push(pr.id);
+    }
+  }
+
   // Fix #20: corrections moved to END of prompt for maximum recency/priority
   // (see bottom of function, before return)
 
