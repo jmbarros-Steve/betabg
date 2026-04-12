@@ -146,7 +146,7 @@ async function handleListRSA(
       ad_group_ad.ad.final_urls,
       ad_group_ad.policy_summary.approval_status,
       ad_group_ad.status,
-      ad_group_ad.ad.strength,
+      ad_group_ad.ad_strength,
       ad_group.id, ad_group.name,
       campaign.id, campaign.name,
       metrics.clicks, metrics.impressions, metrics.ctr
@@ -174,7 +174,7 @@ async function handleListRSA(
     final_urls: row.adGroupAd?.ad?.finalUrls || [],
     approval_status: row.adGroupAd?.policySummary?.approvalStatus || 'UNKNOWN',
     status: row.adGroupAd?.status,
-    ad_strength: row.adGroupAd?.ad?.strength || 'UNSPECIFIED',
+    ad_strength: row.adGroupAd?.adStrength || 'UNSPECIFIED',
     ad_group_id: row.adGroup?.id,
     ad_group_name: row.adGroup?.name,
     campaign_id: row.campaign?.id,
