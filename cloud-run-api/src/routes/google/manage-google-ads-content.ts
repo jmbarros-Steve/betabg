@@ -158,6 +158,28 @@ async function handleListRSA(
   const result = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, query);
   if (!result.ok) return { body: { error: 'Failed to fetch RSA ads', details: result.error }, status: 502 };
 
+  console.log(`[manage-google-ads-content] list_rsa results: ${(result.data || []).length}`);
+
+  // If no RSA found, check what ad types exist for debugging
+  if ((result.data || []).length === 0) {
+    const diagQuery = `
+      SELECT ad_group_ad.ad.type, campaign.name, campaign.advertising_channel_type, ad_group_ad.status
+      FROM ad_group_ad
+      WHERE campaign.status != 'REMOVED'
+      LIMIT 20
+    `;
+    const diagResult = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, diagQuery);
+    if (diagResult.ok) {
+      const types = (diagResult.data || []).map((r: any) => ({
+        type: r.adGroupAd?.ad?.type,
+        campaign: r.campaign?.name,
+        channel: r.campaign?.advertisingChannelType,
+        status: r.adGroupAd?.status,
+      }));
+      console.log(`[manage-google-ads-content] DIAG ad types in account:`, JSON.stringify(types));
+    }
+  }
+
   const ads = (result.data || []).map((row: any) => ({
     resource_name: row.adGroupAd?.resourceName,
     ad_id: row.adGroupAd?.ad?.id,
