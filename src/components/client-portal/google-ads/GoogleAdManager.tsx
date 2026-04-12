@@ -84,6 +84,7 @@ export default function GoogleAdManager({ connectionId, clientId }: GoogleAdMana
   // Create RSA dialog
   const [createOpen, setCreateOpen] = useState(false);
   const [createStep, setCreateStep] = useState(1);
+  const [dialogCampaignId, setDialogCampaignId] = useState('');
   const [selectedAdGroup, setSelectedAdGroup] = useState('');
   const [headlines, setHeadlines] = useState<string[]>(['', '', '']);
   const [descriptions, setDescriptions] = useState<string[]>(['', '']);
@@ -195,6 +196,7 @@ export default function GoogleAdManager({ connectionId, clientId }: GoogleAdMana
 
   const resetCreateForm = () => {
     setCreateStep(1);
+    setDialogCampaignId('');
     setSelectedAdGroup('');
     setHeadlines(['', '', '']);
     setDescriptions(['', '']);
@@ -202,6 +204,10 @@ export default function GoogleAdManager({ connectionId, clientId }: GoogleAdMana
     setPath1('');
     setPath2('');
   };
+
+  const dialogAdGroups = dialogCampaignId
+    ? adGroups.filter(ag => String(ag.campaign_id) === String(dialogCampaignId))
+    : adGroups;
 
   const filteredAds = ads.filter(ad => {
     if (statusFilter !== 'ALL' && ad.status !== statusFilter) return false;
@@ -246,6 +252,9 @@ export default function GoogleAdManager({ connectionId, clientId }: GoogleAdMana
         <Button size="sm" onClick={() => { resetCreateForm(); setCreateOpen(true); }}>
           <Plus className="w-4 h-4 mr-1" /> Crear RSA
         </Button>
+        {adGroups.length === 0 && !loading && (
+          <span className="text-xs text-muted-foreground">Sin ad groups Search disponibles</span>
+        )}
       </div>
 
       {/* Ads list */}
@@ -337,22 +346,46 @@ export default function GoogleAdManager({ connectionId, clientId }: GoogleAdMana
       {/* Create RSA Dialog */}
       <Dialog open={createOpen} onOpenChange={v => { setCreateOpen(v); if (!v) resetCreateForm(); }}>
         <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Crear Anuncio RSA</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Crear RSA (Responsive Search Ad)</DialogTitle></DialogHeader>
 
           {createStep === 1 && (
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Ad Group</Label>
-                <Select value={selectedAdGroup} onValueChange={setSelectedAdGroup}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                  <SelectContent>
-                    {adGroups.map(ag => <SelectItem key={ag.id} value={ag.id}>{ag.campaign_name} &gt; {ag.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+              {adGroups.length === 0 ? (
+                <div className="py-6 text-center text-muted-foreground text-sm">
+                  No hay ad groups de campanas Search disponibles. RSA solo se puede crear en campanas de tipo Search.
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label>Campana</Label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      value={dialogCampaignId}
+                      onChange={e => { setDialogCampaignId(e.target.value); setSelectedAdGroup(''); }}
+                    >
+                      <option value="">Seleccionar campana</option>
+                      {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Ad Group</Label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      value={selectedAdGroup}
+                      onChange={e => setSelectedAdGroup(e.target.value)}
+                    >
+                      <option value="">Seleccionar ad group</option>
+                      {dialogAdGroups.map(ag => <option key={ag.id} value={ag.id}>{ag.name}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
               <DialogFooter>
                 <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-                <Button onClick={() => { if (!selectedAdGroup) { toast.error('Selecciona un ad group'); return; } setCreateStep(2); }}>Siguiente</Button>
+                <Button
+                  onClick={() => { if (!selectedAdGroup) { toast.error('Selecciona un ad group'); return; } setCreateStep(2); }}
+                  disabled={adGroups.length === 0}
+                >Siguiente</Button>
               </DialogFooter>
             </div>
           )}

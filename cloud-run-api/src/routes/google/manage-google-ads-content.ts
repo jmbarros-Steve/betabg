@@ -305,15 +305,43 @@ async function handleListAdGroups(
   customerId: string, accessToken: string, developerToken: string, loginCustomerId: string
 ): Promise<{ body: any; status: number }> {
   const query = `
-    SELECT ad_group.id, ad_group.name, ad_group.status, campaign.id, campaign.name
+    SELECT ad_group.id, ad_group.name, ad_group.status,
+           campaign.id, campaign.name, campaign.advertising_channel_type
     FROM ad_group
-    WHERE campaign.status != 'REMOVED'
+    WHERE campaign.advertising_channel_type = 'SEARCH'
+      AND campaign.status != 'REMOVED'
       AND ad_group.status != 'REMOVED'
     ORDER BY campaign.name, ad_group.name
   `;
 
   const result = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, query);
-  if (!result.ok) return { body: { error: 'Failed to fetch ad groups', details: result.error }, status: 502 };
+  if (!result.ok) {
+    console.error(`[manage-google-ads-content] list_ad_groups FAILED:`, result.error);
+    return { body: { error: 'Failed to fetch ad groups', details: result.error }, status: 502 };
+  }
+
+  console.log(`[manage-google-ads-content] list_ad_groups returned ${(result.data || []).length} ad groups`);
+
+  // If no SEARCH ad groups found, log what campaign types exist
+  if ((result.data || []).length === 0) {
+    const diagQuery = `
+      SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status,
+             ad_group.id, ad_group.name, ad_group.status
+      FROM ad_group
+      WHERE campaign.status != 'REMOVED' AND ad_group.status != 'REMOVED'
+      LIMIT 20
+    `;
+    const diagResult = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, diagQuery);
+    if (diagResult.ok) {
+      const items = (diagResult.data || []).map((r: any) => ({
+        campaign: r.campaign?.name,
+        type: r.campaign?.advertisingChannelType,
+        ag: r.adGroup?.name,
+        agStatus: r.adGroup?.status,
+      }));
+      console.log(`[manage-google-ads-content] DIAG all ad_groups:`, JSON.stringify(items));
+    }
+  }
 
   const adGroups = (result.data || []).map((row: any) => ({
     id: row.adGroup?.id,
@@ -321,6 +349,7 @@ async function handleListAdGroups(
     status: row.adGroup?.status,
     campaign_id: row.campaign?.id,
     campaign_name: row.campaign?.name,
+    campaign_type: row.campaign?.advertisingChannelType,
   }));
 
   return { body: { success: true, ad_groups: adGroups }, status: 200 };
