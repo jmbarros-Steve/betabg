@@ -1809,47 +1809,33 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
     questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══\nEl cliente acaba de responder la última pregunta (archivos visuales). Si dijo que no tiene fotos, acepta y continúa igual.\n\nPRIMERO dile claramente que ya terminaron la conversación, que su brief ESTÁ LISTO ahora y que lo va a tener (generalo en este mensaje). Agradece haber charlado. DESPUÉS genera el brief completo abajo.\n\n${BRIEF_TEMPLATE}`;
   } else {
     // currentQuestionIndex = question being answered right now
-    // nextQuestionIndex    = question Steve should ask AFTER accepting
     const justAnsweredIndex = currentQuestionIndex;
-    const nextQuestionIndex = currentQuestionIndex + 1;
-    const nextQ = BRAND_BRIEF_QUESTIONS[nextQuestionIndex];
     const justAnsweredQ = BRAND_BRIEF_QUESTIONS[justAnsweredIndex];
-    const hasFields = (nextQ?.fields?.length ?? 0) > 0;
     const justAnsweredLabel = justAnsweredIndex === 0 ? 'Pregunta 0 (URL del sitio web)' : `Pregunta ${justAnsweredIndex} de 16 (${justAnsweredQ?.id})`;
-    const nextLabel = nextQuestionIndex === 0 ? 'Pregunta 0 (URL del sitio web)' : `Pregunta ${nextQuestionIndex} de 16`;
 
     const retryBlock = isRetryMode ? `
-🚨 RETRY: La respuesta anterior del cliente a esta pregunta fue RECHAZADA. Su ÚLTIMO mensaje es un NUEVO intento para la MISMA pregunta (${justAnsweredLabel}).
-- EVALÚA ese último mensaje. Si está bien: comenta brevemente, haz la SIGUIENTE pregunta (${nextLabel}) e incluye [AVANZAR] al final.
-- Si sigue incompleto o vago: explica qué falta, repite la MISMA pregunta y escribe [RECHAZO] al final.
-- NO avances a la siguiente pregunta hasta que aceptes su respuesta.` : '';
+🚨 RETRY: La respuesta anterior fue RECHAZADA. Su ÚLTIMO mensaje es un NUEVO intento para la MISMA pregunta (${justAnsweredLabel}).
+- EVALÚA ese último mensaje. Si está bien: comenta brevemente e incluye [AVANZAR] al final.
+- Si sigue incompleto o vago: explica qué falta y escribe [RECHAZO] al final.` : '';
 
     questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══${retryBlock}
-
-⚠️ COINCIDE CON LO QUE VERÁ EL CLIENTE: Debajo el cliente verá el formulario o la caja de respuesta para la pregunta "${nextQ?.shortLabel ?? nextLabel}". Tu mensaje DEBE pedir exactamente eso. Si debajo hay campos de "Competidores" (nombres + URLs), tu texto debe pedir competidores; si hay campo libre, comenta solo la respuesta anterior y haz la siguiente pregunta. NUNCA hables de otro tema (ej. no pidas "más transformación" si la siguiente pregunta del sistema es Competidores).
 
 PREGUNTA QUE EL CLIENTE ESTÁ RESPONDIENDO AHORA: ${justAnsweredLabel}
 GUÍA PARA EVALUAR Y COMENTAR: ${justAnsweredQ?.commentGuide || 'Comenta brevemente la respuesta.'}
 
-VALIDACIÓN DE RELEVANCIA (OBLIGATORIA): Antes de aceptar, verifica que la respuesta del usuario corresponde al tema "${justAnsweredQ?.shortLabel}". Si la respuesta es sobre un tema COMPLETAMENTE distinto (ej: da URLs cuando preguntas dolor, habla de competidores cuando preguntas pitch, responde con datos financieros cuando preguntas transformación), RECHÁZALA con [RECHAZO] y repite la pregunta de forma conversacional: "Eso no es lo que te pregunté. Volvamos a [tema]".
+VALIDACIÓN DE RELEVANCIA: Verifica que la respuesta corresponde al tema "${justAnsweredQ?.shortLabel}". Si es sobre un tema COMPLETAMENTE distinto, RECHÁZALA con [RECHAZO].
 
-SI EL CLIENTE RESPONDIÓ BIEN → incluye [AVANZAR] al final de tu mensaje Y haz esta SIGUIENTE PREGUNTA:
-${nextLabel} — INTRO: ${nextQ?.steveIntro || ''} — TEXTO: ${nextQ?.question}
+⚠️ FORMULARIOS: Si el cliente envió datos de un formulario (campos con labels como "👤", "🎂", "🛒", etc.), eso ES su respuesta completa. Evalúa coherencia y ACEPTA con [AVANZAR]. NUNCA pidas que "llene el formulario" si ya lo llenó.
 
-⚠️ IMPORTANTE FORMULARIOS: Si el cliente envió datos de un formulario (campos con labels como "👤 Nombre:", "🎂 Edad:", "🛒 Shopify:", etc.), eso ES su respuesta completa. Evalúa si los datos son coherentes y ACEPTA con [AVANZAR]. NUNCA le pidas que "llene el formulario" si ya lo llenó — eso genera un loop infinito.
+SI EL CLIENTE HIZO UNA PREGUNTA DE ACLARACIÓN → respóndela brevemente, NO incluyas [AVANZAR] ni [RECHAZO].
 
-SI EL CLIENTE HIZO UNA PREGUNTA DE ACLARACIÓN (no está respondiendo, solo pregunta algo) → respóndela brevemente, recuérdale la pregunta actual, NO incluyas [AVANZAR] ni [RECHAZO].
-
-${hasFields ? `⚠️ FORMULARIO OBLIGATORIO: La siguiente pregunta tiene formulario con ESTOS campos exactos que el cliente verá abajo:
-${nextQ!.fields.map((f: { label: string }) => `  → ${f.label}`).join('\n')}
-Tu mensaje DEBE ser sobre ESTOS campos — NO inventes otras preguntas ni pidas otra información. Da 1-2 oraciones de contexto, luego di "Llena los campos del formulario abajo". NO repitas los campos en tu texto (el cliente ya los ve en el formulario). Si la pregunta NO es la 16, NUNCA digas "sube", "subir" ni pidas logo/fotos.` : ''}
-
-${nextQ?.examples?.length ? `⚠️ EJEMPLOS DINÁMICOS: La siguiente pregunta tiene ejemplos genéricos predefinidos, pero el cliente ya describió su negocio. GENERA 2-3 ejemplos ESPECÍFICOS para SU INDUSTRIA Y PRODUCTO REAL. NEGOCIO DEL CLIENTE (usa esto para personalizar los ejemplos): "${storedRawResponses[1] || acceptedResponses[1]?.content || 'no disponible aún'}". Al final de tu mensaje (después de todo el texto visible, en una línea separada), escribe EXACTAMENTE: [EJEMPLOS: ejemplo1 || ejemplo2 || ejemplo3]. No menciones al cliente que añadiste esta línea. Solo di: "Puedes usar un ejemplo de abajo o escribir con tus palabras." Los ejemplos genéricos de referencia (para que veas el formato esperado): ${JSON.stringify(nextQ.examples)}.` : 'Da 2-3 ejemplos concretos de SU industria en tu mensaje (no hay botones para esta pregunta).'}
-
-REGLA CRÍTICA: 1) Reacción conversacional (1-3 oraciones) a lo que acaba de responder. 2) Si avanzas: la siguiente pregunta (${nextLabel}) con su intro y texto + [AVANZAR] al final. 3) Cierre: al menos 1 de cada 3 veces termina con "¿Alguna duda antes de seguir?" o "¿Te queda claro?". No menciones otras preguntas.${nextQuestionIndex !== 16 ? ' NO pidas subir archivos, logo ni fotos (solo en pregunta 16).' : ''}`;
+TU TRABAJO: Evalúa la respuesta y da tu comentario conversacional (1-3 oraciones).
+- Respuesta BUENA → comenta + [AVANZAR] al final.
+- Respuesta MALA/incompleta → explica qué falta + [RECHAZO] al final.
+⚠️ DESPUÉS de tu comentario y el tag, PARA. NO hagas la siguiente pregunta. NO pidas información adicional fuera de la guía. La siguiente pregunta la agrega el sistema automáticamente.`;
 
     if (!isRetryMode && currentQuestionIndex === 0) {
-      questionContext += '\n\nINSTRUCCIÓN EXTRA Q0: El cliente acaba de dar su URL. Confírmale brevemente que la guardaste y que la usarás para el análisis. Luego arranca con la Pregunta 1. Incluye [AVANZAR] al final.';
+      questionContext += '\n\nINSTRUCCIÓN EXTRA Q0: El cliente acaba de dar su URL. Confírmale brevemente que la guardaste y que la usarás para el análisis. Incluye [AVANZAR] al final.';
     }
     if (!isRetryMode && currentQuestionIndex === 2) {
       questionContext += '\n\nINSTRUCCIÓN EXTRA Q2: El cliente envió datos financieros. CALCULA: Margen bruto = Precio - Costo - Envío. Margen % = Margen/Precio×100. CPA Máximo = Margen × 0.30. Muestra tabla markdown con resultados. Di que guardaste el CPA en configuración financiera.';
@@ -2067,21 +2053,8 @@ REGLAS ABSOLUTAS:
     assistantMessage = assistantMessage.replace(/\n?\[EJEMPLOS:[^\]]*\]/i, '').trim();
   }
 
-  // -- BUG 4: Parse [AVANZAR] -- only increment counter when Steve genuinely advances --
+  // -- Parse [AVANZAR] / [RECHAZO] control tags --
   const isRejection = assistantMessage.includes('[RECHAZO]');
-  // BUG 1 FIX: On the last question (Q16) Steve generates the full brief and never includes [AVANZAR],
-  // so treat any non-rejection on the last question as an implicit advance.
-  // BUG 7 FIX: Implicit advance detection — if the AI forgot [AVANZAR] but is clearly asking
-  // the NEXT question (contains its steveIntro or shortLabel), treat as advance.
-  const nextQForDetection = !isLastQuestion ? BRAND_BRIEF_QUESTIONS[currentQuestionIndex + 1] : null;
-  const implicitAdvance = !isRejection && !assistantMessage.includes('[AVANZAR]') && nextQForDetection && (
-    (nextQForDetection.steveIntro && assistantMessage.includes(nextQForDetection.steveIntro.trim().slice(0, 20))) ||
-    (nextQForDetection.shortLabel && assistantMessage.toLowerCase().includes(nextQForDetection.shortLabel.toLowerCase())) ||
-    new RegExp(`Pregunta\\s+${currentQuestionIndex + 1}\\b`, 'i').test(assistantMessage)
-  );
-  if (implicitAdvance) {
-    console.log(`[steve-chat] Implicit advance detected for Q${currentQuestionIndex} → Q${currentQuestionIndex + 1} (AI forgot [AVANZAR])`);
-  }
   // Auto-advance for structured form submissions — the form already validated the data,
   // so we don't need to rely on the AI remembering to write [AVANZAR].
   // Form submissions also override AI rejections: the form validation is the quality gate.
@@ -2092,13 +2065,21 @@ REGLAS ABSOLUTAS:
     console.log(`[steve-chat] Form submission overrides AI rejection for Q${currentQuestionIndex}`);
   }
   const effectiveRejection = isRejection && !isFormSubmission;
-  const hasAdvanced = !effectiveRejection && (assistantMessage.includes('[AVANZAR]') || isLastQuestion || implicitAdvance || isFormSubmission);
+  const hasAdvanced = !effectiveRejection && (assistantMessage.includes('[AVANZAR]') || isLastQuestion || isFormSubmission);
   // Strip control tags from visible message
   assistantMessage = assistantMessage
     .replace(/\s*\[RECHAZO\]\s*/gi, ' ')
     .replace(/\s*\[AVANZAR\]\s*/gi, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
+
+  // Append next question deterministically when advancing
+  if (hasAdvanced && !isLastQuestion) {
+    const nextBriefQ = BRAND_BRIEF_QUESTIONS[currentQuestionIndex + 1];
+    if (nextBriefQ) {
+      assistantMessage += `\n\n${nextBriefQ.steveIntro || ''}${nextBriefQ.question}`;
+    }
+  }
 
   // BUG 6 FIX: newAnsweredCount can only ever be currentQuestionIndex or currentQuestionIndex + 1.
   // Math.min caps it at total questions to prevent any off-by-one from skipping questions.
