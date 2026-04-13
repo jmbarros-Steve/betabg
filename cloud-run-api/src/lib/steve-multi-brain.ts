@@ -245,6 +245,12 @@ ${investigatorResults.salesLearnings || ''}
 CONVERSACIÓN RECIENTE:
 ${recentHistory}
 
+REGLA CRÍTICA — HESITACIÓN ≠ RECHAZO:
+"necesito pensarlo", "lo voy a pensar", "déjame pensarlo", "no estoy seguro", "tengo que verlo" NO son rechazos.
+Son OPORTUNIDADES para reducir fricción. Para estos → suggestedAction: "validate_emotion", NUNCA "back_off".
+"back_off" es SOLO para rechazos explícitos: "no me interesa", "no quiero", "déjame en paz".
+El vendedor NUNCA debe despedirse de alguien que solo está dudando.
+
 Responde SOLO con un JSON (sin markdown):
 {
   "brief": "Brief táctico en 2-3 oraciones. Estado emocional del prospecto, posición en funnel, qué palanca usar, qué evitar.",

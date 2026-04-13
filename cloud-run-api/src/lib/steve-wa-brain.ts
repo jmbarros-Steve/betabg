@@ -1685,6 +1685,26 @@ export async function buildDynamicSalesPrompt(
   // 3. CONTEXT FOR THIS TURN
   prompt += `\n\n🎯 EN ESTE MENSAJE:\n`;
 
+  // Paso 1.5: Hesitation detection — BEFORE disqualification (never confuse doubt with rejection)
+  // Fix 2026-04-12: "necesito pensarlo" triggaba despedida prematura. El estratega
+  // (Haiku) interpretaba hesitación como back_off y el conversacionalista se despedía.
+  // Ahora detectamos hesitación explícitamente y overrideamos con instrucciones de retención.
+  const hesitationPhrases = [
+    'necesito pensarlo', 'lo voy a pensar', 'déjame pensarlo', 'dejame pensarlo',
+    'tengo que pensarlo', 'me lo pienso', 'lo tengo que pensar', 'lo tengo que ver',
+    'tengo que verlo', 'no estoy seguro', 'no estoy segura', 'no sé si me conviene',
+    'déjame verlo', 'dejame verlo', 'voy a pensarlo', 'necesito tiempo',
+  ];
+  const isHesitating = lastMessage && hesitationPhrases.some(p => lastMessage.toLowerCase().includes(p));
+  if (isHesitating) {
+    prompt += `🟡 HESITACIÓN DETECTADA (NO es rechazo — es indecisión normal):
+El prospecto está DUDANDO, NO rechazando. PROHIBIDO despedirse o cerrar la conversación.
+1. Valida su cautela: "Totalmente, tómate tu tiempo — es una decisión importante."
+2. Reduce fricción: ofrece algo SIN compromiso (demo gratis, caso de éxito similar, diagnóstico de su tienda).
+3. Pregunta qué le genera duda: "¿Qué es lo que más te hace dudar? Así te doy info más precisa."
+NUNCA digas "éxito", "suerte", ni nada que suene a despedida. Mantén la puerta ABIERTA.\n`;
+  }
+
   // Paso 2: Disqualification override
   if (disqResult.disqualified) {
     prompt += `⚠️ El prospecto NO está interesado. Despídete con respeto y cierra la conversación: "Entendido, sin problema. Si en algún momento quieres retomar, aquí estoy. Éxito!"\n`;
