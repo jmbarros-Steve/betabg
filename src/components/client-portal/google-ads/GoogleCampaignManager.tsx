@@ -805,8 +805,8 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       </Dialog>
 
       {/* ─── Settings Dialog ────────────────────────────────────────── */}
-      <Dialog open={!!settingsCampaign} onOpenChange={() => setSettingsCampaign(null)} modal={false}>
-        <DialogContent className="sm:max-w-[500px]" onPointerDownOutside={e => e.preventDefault()}>
+      <Dialog open={!!settingsCampaign} onOpenChange={() => setSettingsCampaign(null)}>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Configuracion de Campana</DialogTitle>
           </DialogHeader>
@@ -821,19 +821,15 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
 
               <div className="space-y-2">
                 <Label>Estrategia de puja</Label>
-                <Select
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   value={settingsData.bidding_strategy_type || ''}
-                  onValueChange={val => setSettingsData((p: any) => ({ ...p, bidding_strategy_type: val }))}
+                  onChange={e => setSettingsData((p: any) => ({ ...p, bidding_strategy_type: e.target.value }))}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {bidStrategies.map(bs => (
-                      <SelectItem key={bs.value} value={bs.value}>{bs.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {bidStrategies.map(bs => (
+                    <option key={bs.value} value={bs.value}>{bs.label}</option>
+                  ))}
+                </select>
               </div>
 
               {settingsData.channel_type === 'SEARCH' && (
@@ -920,8 +916,8 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       </Dialog>
 
       {/* ─── Create Campaign Wizard ─────────────────────────────────── */}
-      <Dialog open={wizardOpen} onOpenChange={(open) => { setWizardOpen(open); if (!open) setWizardStep(1); }} modal={false}>
-        <DialogContent className="sm:max-w-[550px] max-h-[80vh] overflow-y-auto" onPointerDownOutside={e => e.preventDefault()}>
+      <Dialog open={wizardOpen} onOpenChange={(open) => { setWizardOpen(open); if (!open) setWizardStep(1); }}>
+        <DialogContent className="sm:max-w-[550px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               Crear Campana — Paso {wizardStep} de 3
@@ -943,20 +939,16 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
 
               <div className="space-y-2">
                 <Label>Tipo de campana</Label>
-                <Select
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   value={wizardData.channel_type}
-                  onValueChange={val => setWizardData(prev => ({ ...prev, channel_type: val }))}
+                  onChange={e => setWizardData(prev => ({ ...prev, channel_type: e.target.value }))}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SEARCH">Search</SelectItem>
-                    <SelectItem value="PERFORMANCE_MAX">Performance Max</SelectItem>
-                    <SelectItem value="SHOPPING">Shopping</SelectItem>
-                    <SelectItem value="DISPLAY">Display</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <option value="SEARCH">Search</option>
+                  <option value="PERFORMANCE_MAX">Performance Max</option>
+                  <option value="SHOPPING">Shopping</option>
+                  <option value="DISPLAY">Display</option>
+                </select>
               </div>
 
               <div className="space-y-2">
@@ -978,19 +970,15 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Estrategia de puja</Label>
-                <Select
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   value={wizardData.bid_strategy}
-                  onValueChange={val => setWizardData(prev => ({ ...prev, bid_strategy: val }))}
+                  onChange={e => setWizardData(prev => ({ ...prev, bid_strategy: e.target.value }))}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {bidStrategies.map(bs => (
-                      <SelectItem key={bs.value} value={bs.value}>{bs.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {bidStrategies.map(bs => (
+                    <option key={bs.value} value={bs.value}>{bs.label}</option>
+                  ))}
+                </select>
                 <SteveRecommendation
                   connectionId={connectionId}
                   recommendationType="campaign_setup"
