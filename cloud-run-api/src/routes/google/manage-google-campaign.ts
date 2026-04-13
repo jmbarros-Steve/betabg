@@ -614,9 +614,17 @@ async function handleCreateCampaign(
       campaignCreate.maximizeConversionValue = {};
     }
 
+    // Disable Brand Guidelines (requires CampaignAsset logo+name which we add in Phase 2)
+    campaignCreate.brandGuidelinesEnabled = false;
+
     if (!final_urls?.length) {
       return { body: { error: 'final_urls required for PMAX campaigns' }, status: 400 };
     }
+
+    // Ensure URLs have protocol
+    const sanitizedUrls = final_urls.map((u: string) =>
+      /^https?:\/\//i.test(u) ? u : `https://${u}`
+    );
 
     // Asset Group (temp ID -3)
     mutateOps.push({
@@ -625,7 +633,7 @@ async function handleCreateCampaign(
           resourceName: `customers/${customerId}/assetGroups/-3`,
           campaign: `customers/${customerId}/campaigns/-2`,
           name: ad_group_name || 'Asset Group 1',
-          finalUrls: final_urls,
+          finalUrls: sanitizedUrls,
           status: 'ENABLED',
         },
       },
