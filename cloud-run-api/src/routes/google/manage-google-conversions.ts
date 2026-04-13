@@ -111,7 +111,8 @@ async function googleAdsMutate(
 async function handleList(
   customerId: string, accessToken: string, developerToken: string, loginCustomerId: string
 ): Promise<{ body: any; status: number }> {
-  const query = `
+  // Query 1: Config (no date segments needed)
+  const configQuery = `
     SELECT
       conversion_action.id,
       conversion_action.name,
@@ -122,27 +123,66 @@ async function handleList(
       conversion_action.click_through_lookback_window_days,
       conversion_action.view_through_lookback_window_days,
       conversion_action.counting_type,
+      conversion_action.value_settings.default_value,
+      conversion_action.value_settings.always_use_default_value,
       conversion_action.tag_snippets
     FROM conversion_action
     WHERE conversion_action.status != 'REMOVED'
     ORDER BY conversion_action.name
   `;
 
-  const result = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, query);
-  if (!result.ok) return { body: { error: 'Failed to fetch conversion actions', details: result.error }, status: 502 };
+  // Query 2: Metrics (last 30 days, aggregated per conversion action)
+  const metricsQuery = `
+    SELECT
+      conversion_action.id,
+      metrics.all_conversions,
+      metrics.all_conversions_value
+    FROM conversion_action
+    WHERE conversion_action.status != 'REMOVED'
+      AND segments.date DURING LAST_30_DAYS
+  `;
 
-  const conversions = (result.data || []).map((row: any) => ({
-    id: row.conversionAction?.id,
-    name: row.conversionAction?.name,
-    type: row.conversionAction?.type,
-    status: row.conversionAction?.status,
-    category: row.conversionAction?.category,
-    include_in_conversions: row.conversionAction?.includeInConversionsMetric,
-    click_through_lookback_days: row.conversionAction?.clickThroughLookbackWindowDays,
-    view_through_lookback_days: row.conversionAction?.viewThroughLookbackWindowDays,
-    counting_type: row.conversionAction?.countingType,
-    tag_snippets: row.conversionAction?.tagSnippets || [],
-  }));
+  const [configResult, metricsResult] = await Promise.all([
+    googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, configQuery),
+    googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, metricsQuery),
+  ]);
+
+  if (!configResult.ok) return { body: { error: 'Failed to fetch conversion actions', details: configResult.error }, status: 502 };
+
+  // Aggregate metrics by conversion action ID
+  const metricsMap = new Map<string, { conversions: number; value: number }>();
+  if (metricsResult.ok) {
+    for (const row of metricsResult.data || []) {
+      const id = row.conversionAction?.id;
+      if (!id) continue;
+      const existing = metricsMap.get(id) || { conversions: 0, value: 0 };
+      existing.conversions += Number(row.metrics?.allConversions || 0);
+      existing.value += Number(row.metrics?.allConversionsValue || 0);
+      metricsMap.set(id, existing);
+    }
+  }
+
+  const conversions = (configResult.data || []).map((row: any) => {
+    const id = row.conversionAction?.id;
+    const metrics = metricsMap.get(id) || { conversions: 0, value: 0 };
+    return {
+      id,
+      name: row.conversionAction?.name,
+      type: row.conversionAction?.type,
+      status: row.conversionAction?.status,
+      category: row.conversionAction?.category,
+      include_in_conversions: row.conversionAction?.includeInConversionsMetric,
+      click_through_lookback_days: row.conversionAction?.clickThroughLookbackWindowDays,
+      view_through_lookback_days: row.conversionAction?.viewThroughLookbackWindowDays,
+      counting_type: row.conversionAction?.countingType,
+      default_value: row.conversionAction?.valueSettings?.defaultValue || 0,
+      always_use_default_value: row.conversionAction?.valueSettings?.alwaysUseDefaultValue || false,
+      tag_snippets: row.conversionAction?.tagSnippets || [],
+      // Real metrics (last 30 days)
+      conversions_30d: Math.round(metrics.conversions * 100) / 100,
+      value_30d: Math.round(metrics.value * 100) / 100,
+    };
+  });
 
   return { body: { success: true, conversions }, status: 200 };
 }

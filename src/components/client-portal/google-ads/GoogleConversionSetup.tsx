@@ -10,10 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import { RefreshCw, Loader2, Plus, Play, Pause, Target, Zap } from 'lucide-react';
+import { RefreshCw, Loader2, Plus, Play, Pause, Target, Zap, CheckCircle2, XCircle } from 'lucide-react';
 
 interface ConversionAction {
   id: string;
@@ -25,9 +22,11 @@ interface ConversionAction {
   click_through_lookback_days: number;
   view_through_lookback_days: number;
   counting_type: string;
+  default_value: number;
+  always_use_default_value: boolean;
   tag_snippets: any[];
-  conversions: number;
-  conversions_value: number;
+  conversions_30d: number;
+  value_30d: number;
 }
 
 interface GoogleConversionSetupProps {
@@ -50,6 +49,15 @@ const typeLabels: Record<string, string> = {
   STORE_VISIT: 'Visita Tienda',
   STORE_SALE: 'Venta Tienda',
   UPLOAD_CLICKS: 'Upload Clicks',
+  GOOGLE_ANALYTICS_4_CUSTOM: 'GA4 Custom',
+  GOOGLE_ANALYTICS_4_PURCHASE: 'GA4 Purchase',
+  GOOGLE_HOSTED: 'Google Hosted',
+  STORE_VISITS: 'Visitas Tienda',
+  SMART_CAMPAIGN_AD_CLICKS_TO_CALL: 'Smart - Click to Call',
+  SMART_CAMPAIGN_MAP_CLICKS_TO_CALL: 'Smart - Map Call',
+  SMART_CAMPAIGN_MAP_DIRECTIONS: 'Smart - Directions',
+  SMART_CAMPAIGN_TRACKED_CALLS: 'Smart - Tracked Calls',
+  ANDROID_INSTALLS_ALL_OTHER_APPS: 'Android Install',
 };
 
 const categoryLabels: Record<string, string> = {
@@ -61,6 +69,13 @@ const categoryLabels: Record<string, string> = {
   BEGIN_CHECKOUT: 'Checkout',
   PAGE_VIEW: 'Vista Pagina',
   DEFAULT: 'Default',
+  CONTACT: 'Contacto',
+  SUBMIT_LEAD_FORM: 'Formulario',
+  BOOK_APPOINTMENT: 'Cita',
+  GET_DIRECTIONS: 'Direcciones',
+  ENGAGEMENT: 'Engagement',
+  STORE_VISIT: 'Visita Tienda',
+  PHONE_CALL_LEAD: 'Llamada',
 };
 
 const statusColors: Record<string, string> = {
@@ -75,6 +90,8 @@ const PRESETS = [
   { label: 'Registro', type: 'WEBPAGE', category: 'SIGN_UP', counting_type: 'ONE_PER_CLICK', lookback: 30 },
   { label: 'Agregar al Carro', type: 'WEBPAGE', category: 'ADD_TO_CART', counting_type: 'MANY_PER_CLICK', lookback: 7 },
 ];
+
+const selectClass = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2";
 
 export default function GoogleConversionSetup({ connectionId, clientId }: GoogleConversionSetupProps) {
   const [conversions, setConversions] = useState<ConversionAction[]>([]);
@@ -166,6 +183,12 @@ export default function GoogleConversionSetup({ connectionId, clientId }: Google
     setCreateOpen(true);
   };
 
+  // Summary stats
+  const totalConversions = conversions.reduce((sum, c) => sum + (c.conversions_30d || 0), 0);
+  const totalValue = conversions.reduce((sum, c) => sum + (c.value_30d || 0), 0);
+  const activeCount = conversions.filter(c => c.status === 'ENABLED').length;
+  const includedCount = conversions.filter(c => c.include_in_conversions).length;
+
   if (loading && conversions.length === 0) {
     return <div className="space-y-3"><Skeleton className="h-10 w-full" /><Skeleton className="h-64 w-full" /></div>;
   }
@@ -189,6 +212,28 @@ export default function GoogleConversionSetup({ connectionId, clientId }: Google
         </div>
       </div>
 
+      {/* Summary bar */}
+      {conversions.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="border rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold">{totalConversions.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">Conversiones (30d)</p>
+          </div>
+          <div className="border rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold">${totalValue.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">Valor total (30d)</p>
+          </div>
+          <div className="border rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold">{activeCount}/{conversions.length}</p>
+            <p className="text-xs text-muted-foreground">Activas</p>
+          </div>
+          <div className="border rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold">{includedCount}</p>
+            <p className="text-xs text-muted-foreground">En Smart Bidding</p>
+          </div>
+        </div>
+      )}
+
       {/* Quick presets */}
       <div className="flex flex-wrap gap-2">
         {PRESETS.map((preset, i) => (
@@ -206,17 +251,26 @@ export default function GoogleConversionSetup({ connectionId, clientId }: Google
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {conversions.map(conv => (
-            <Card key={conv.id}>
+            <Card key={conv.id} className={conv.conversions_30d > 0 ? 'border-green-500/30' : ''}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate" title={conv.name}>{conv.name}</p>
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       <Badge variant="outline" className={statusColors[conv.status] || ''}>
-                        {conv.status === 'ENABLED' ? 'Activa' : conv.status}
+                        {conv.status === 'ENABLED' ? 'Activa' : conv.status === 'PAUSED' ? 'Pausada' : conv.status}
                       </Badge>
                       <Badge variant="outline">{typeLabels[conv.type] || conv.type}</Badge>
                       {conv.category && <Badge variant="outline">{categoryLabels[conv.category] || conv.category}</Badge>}
+                      {conv.include_in_conversions ? (
+                        <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20">
+                          <CheckCircle2 className="w-3 h-3 mr-0.5" /> Bidding
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-gray-500/10 text-gray-400 border-gray-500/20">
+                          <XCircle className="w-3 h-3 mr-0.5" /> No bidding
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   <Button variant="ghost" size="sm" disabled={actionLoading[conv.id]} onClick={() => handleToggle(conv)}>
@@ -227,8 +281,11 @@ export default function GoogleConversionSetup({ connectionId, clientId }: Google
                 <div className="grid grid-cols-2 gap-2 mt-3 text-xs text-muted-foreground">
                   <div>Conteo: <span className="text-foreground">{conv.counting_type === 'ONE_PER_CLICK' ? '1 por click' : 'Todos'}</span></div>
                   <div>Lookback: <span className="text-foreground">{conv.click_through_lookback_days}d</span></div>
-                  <div>Conversiones: <span className="text-foreground font-medium">{(conv.conversions ?? 0).toLocaleString()}</span></div>
-                  <div>Valor: <span className="text-foreground font-medium">${(conv.conversions_value ?? 0).toLocaleString()}</span></div>
+                  <div>Conversiones (30d): <span className={`font-medium ${conv.conversions_30d > 0 ? 'text-green-500' : 'text-foreground'}`}>{(conv.conversions_30d ?? 0).toLocaleString()}</span></div>
+                  <div>Valor (30d): <span className={`font-medium ${conv.value_30d > 0 ? 'text-green-500' : 'text-foreground'}`}>${(conv.value_30d ?? 0).toLocaleString()}</span></div>
+                  {conv.default_value > 0 && (
+                    <div className="col-span-2">Valor default: <span className="text-foreground">${conv.default_value.toLocaleString()}</span></div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -247,52 +304,40 @@ export default function GoogleConversionSetup({ connectionId, clientId }: Google
             </div>
             <div className="space-y-1">
               <Label>Tipo</Label>
-              <Select value={formData.type} onValueChange={v => setFormData(p => ({ ...p, type: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="WEBPAGE">Pagina Web</SelectItem>
-                  <SelectItem value="UPLOAD_CLICKS">Upload Clicks</SelectItem>
-                </SelectContent>
-              </Select>
+              <select className={selectClass} value={formData.type} onChange={e => setFormData(p => ({ ...p, type: e.target.value }))}>
+                <option value="WEBPAGE">Pagina Web</option>
+                <option value="UPLOAD_CLICKS">Upload Clicks</option>
+              </select>
             </div>
             <div className="space-y-1">
               <Label>Categoria</Label>
-              <Select value={formData.category} onValueChange={v => setFormData(p => ({ ...p, category: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PURCHASE">Compra</SelectItem>
-                  <SelectItem value="LEAD">Lead</SelectItem>
-                  <SelectItem value="SIGN_UP">Registro</SelectItem>
-                  <SelectItem value="ADD_TO_CART">Agregar al Carro</SelectItem>
-                  <SelectItem value="BEGIN_CHECKOUT">Inicio Checkout</SelectItem>
-                  <SelectItem value="PAGE_VIEW">Vista de Pagina</SelectItem>
-                  <SelectItem value="DOWNLOAD">Descarga</SelectItem>
-                  <SelectItem value="DEFAULT">Otro</SelectItem>
-                </SelectContent>
-              </Select>
+              <select className={selectClass} value={formData.category} onChange={e => setFormData(p => ({ ...p, category: e.target.value }))}>
+                <option value="PURCHASE">Compra</option>
+                <option value="LEAD">Lead</option>
+                <option value="SIGN_UP">Registro</option>
+                <option value="ADD_TO_CART">Agregar al Carro</option>
+                <option value="BEGIN_CHECKOUT">Inicio Checkout</option>
+                <option value="PAGE_VIEW">Vista de Pagina</option>
+                <option value="DOWNLOAD">Descarga</option>
+                <option value="DEFAULT">Otro</option>
+              </select>
             </div>
             <div className="space-y-1">
               <Label>Conteo</Label>
-              <Select value={formData.counting_type} onValueChange={v => setFormData(p => ({ ...p, counting_type: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ONE_PER_CLICK">Una por click (leads)</SelectItem>
-                  <SelectItem value="MANY_PER_CLICK">Todas (compras)</SelectItem>
-                </SelectContent>
-              </Select>
+              <select className={selectClass} value={formData.counting_type} onChange={e => setFormData(p => ({ ...p, counting_type: e.target.value }))}>
+                <option value="ONE_PER_CLICK">Una por click (leads)</option>
+                <option value="MANY_PER_CLICK">Todas (compras)</option>
+              </select>
             </div>
             <div className="space-y-1">
               <Label>Ventana de Lookback (dias)</Label>
-              <Select value={formData.lookback} onValueChange={v => setFormData(p => ({ ...p, lookback: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">7 dias</SelectItem>
-                  <SelectItem value="14">14 dias</SelectItem>
-                  <SelectItem value="30">30 dias</SelectItem>
-                  <SelectItem value="60">60 dias</SelectItem>
-                  <SelectItem value="90">90 dias</SelectItem>
-                </SelectContent>
-              </Select>
+              <select className={selectClass} value={formData.lookback} onChange={e => setFormData(p => ({ ...p, lookback: e.target.value }))}>
+                <option value="7">7 dias</option>
+                <option value="14">14 dias</option>
+                <option value="30">30 dias</option>
+                <option value="60">60 dias</option>
+                <option value="90">90 dias</option>
+              </select>
             </div>
             <div className="space-y-1">
               <Label>Valor Default (CLP, opcional)</Label>
