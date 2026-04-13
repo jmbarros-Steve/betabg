@@ -2075,8 +2075,10 @@ REGLAS ABSOLUTAS:
     if (nextBriefQ) {
       const nextQSignature = nextBriefQ.question.substring(0, 50);
       const nextIntroSignature = (nextBriefQ.steveIntro || '').substring(0, 30);
-      const qNumberPattern = `Pregunta ${currentQuestionIndex + 2}`;
-      const qNumberPatternBold = `**Pregunta ${currentQuestionIndex + 2}`;
+      // Display number = index for index >= 1 (Q0 has no number)
+      const nextDisplayNum = currentQuestionIndex + 1;
+      const qNumberPattern = `Pregunta ${nextDisplayNum} de`;
+      const qNumberPatternBold = `**Pregunta ${nextDisplayNum}`;
 
       // Find earliest occurrence of any next-question signal
       const candidates = [
