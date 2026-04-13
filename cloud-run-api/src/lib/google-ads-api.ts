@@ -114,12 +114,24 @@ export async function googleAdsMutate(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`[google-ads-api] Mutate error (${response.status}):`, errorText.slice(0, 500));
+    console.error(`[google-ads-api] Mutate error (${response.status}):`, errorText.slice(0, 2000));
     let errorMessage = `Google Ads API error (${response.status})`;
     try {
       const errJson = JSON.parse(errorText);
       const detail = errJson?.error?.message || errJson?.[0]?.error?.message;
       if (detail) errorMessage = detail;
+      // Extract field violation details
+      const details = errJson?.error?.details || errJson?.[0]?.error?.details;
+      if (details?.length) {
+        for (const d of details) {
+          if (d.errors?.length) {
+            const fieldErrors = d.errors.map((e: any) =>
+              `${e.message} (field: ${e.location?.fieldPathElements?.map((f: any) => f.fieldName).join('.') || 'unknown'})`
+            ).join('; ');
+            if (fieldErrors) errorMessage += ` — ${fieldErrors}`;
+          }
+        }
+      }
     } catch {}
     return { ok: false, error: errorMessage };
   }

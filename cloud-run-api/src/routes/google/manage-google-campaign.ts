@@ -540,7 +540,6 @@ async function handleCreateCampaign(
         resourceName: `customers/${customerId}/campaignBudgets/-1`,
         name: `Budget - ${name}`,
         amountMicros,
-        deliveryMethod: 'STANDARD',
       },
     },
   });
@@ -553,10 +552,14 @@ async function handleCreateCampaign(
     status: 'PAUSED',
     campaignBudget: `customers/${customerId}/campaignBudgets/-1`,
     biddingStrategyType: bidStrategy,
-    geoTargetTypeSetting: {
-      positiveGeoTargetType: 'PRESENCE_OR_INTEREST',
-    },
   };
+
+  // Geo targeting only for non-PMAX (PMAX manages targeting automatically)
+  if (channelType !== 'PERFORMANCE_MAX') {
+    campaignCreate.geoTargetTypeSetting = {
+      positiveGeoTargetType: 'PRESENCE_OR_INTEREST',
+    };
+  }
 
   // Start date (only if explicitly set)
   if (formattedStartDate) {
@@ -600,7 +603,14 @@ async function handleCreateCampaign(
 
   // PMAX: campaign + asset group + assets
   if (channelType === 'PERFORMANCE_MAX') {
-    campaignCreate.biddingStrategyType = bidStrategy || 'MAXIMIZE_CONVERSION_VALUE';
+    // PMAX requires bidding strategy object, not just type
+    const pmaxStrategy = bidStrategy || 'MAXIMIZE_CONVERSION_VALUE';
+    delete campaignCreate.biddingStrategyType;
+    if (pmaxStrategy === 'MAXIMIZE_CONVERSIONS' || pmaxStrategy === 'TARGET_CPA') {
+      campaignCreate.maximizeConversions = {};
+    } else {
+      campaignCreate.maximizeConversionValue = {};
+    }
 
     if (!final_urls?.length) {
       return { body: { error: 'final_urls required for PMAX campaigns' }, status: 400 };
@@ -722,11 +732,12 @@ async function handleCreateCampaign(
   }
 
   console.log(`[manage-google-campaign] Creating ${channelType} campaign "${name}" with ${mutateOps.length} operations`);
+  console.log(`[manage-google-campaign] Payload:`, JSON.stringify(mutateOps, null, 2).slice(0, 2000));
 
   const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, mutateOps);
 
   if (!result.ok) {
-    return { body: { error: 'Failed to create campaign', details: result.error }, status: 502 };
+    return { body: { error: `Failed to create campaign: ${result.error}` }, status: 502 };
   }
 
   return {
