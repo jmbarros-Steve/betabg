@@ -526,10 +526,10 @@ async function handleCreateCampaign(
   const bidStrategy = bid_strategy || 'MAXIMIZE_CONVERSIONS';
   const amountMicros = Math.round(Number(daily_budget) * 1_000_000).toString();
 
-  // Format start date (YYYYMMDD)
-  const today = new Date();
-  const defaultStartDate = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-  const campaignStartDate = start_date || defaultStartDate;
+  // Format start date (YYYY-MM-DD for Google Ads API v23+)
+  const formattedStartDate = start_date
+    ? `${start_date.slice(0, 4)}-${start_date.slice(4, 6)}-${start_date.slice(6, 8)}`
+    : null;
 
   const mutateOps: any[] = [];
 
@@ -553,11 +553,15 @@ async function handleCreateCampaign(
     status: 'PAUSED',
     campaignBudget: `customers/${customerId}/campaignBudgets/-1`,
     biddingStrategyType: bidStrategy,
-    startDate: campaignStartDate,
     geoTargetTypeSetting: {
       positiveGeoTargetType: 'PRESENCE_OR_INTEREST',
     },
   };
+
+  // Start date (only if explicitly set)
+  if (formattedStartDate) {
+    campaignCreate.startDate = formattedStartDate;
+  }
 
   // Network settings for Search campaigns
   if (channelType === 'SEARCH') {
