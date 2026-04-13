@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,8 @@ import {
   AlertCircle,
   Trash2,
   CalendarIcon,
+  Upload,
+  X,
 } from 'lucide-react';
 import SteveRecommendation from './SteveRecommendation';
 
@@ -189,6 +191,222 @@ function AssetLineEditor({
   );
 }
 
+// ─── CTA Options ────────────────────────────────────────────────────
+
+const ctaOptions = [
+  { value: '', label: 'Automatico (Google elige)' },
+  { value: 'LEARN_MORE', label: 'Mas informacion' },
+  { value: 'SHOP_NOW', label: 'Comprar ahora' },
+  { value: 'SIGN_UP', label: 'Registrarse' },
+  { value: 'SUBSCRIBE', label: 'Suscribirse' },
+  { value: 'GET_QUOTE', label: 'Obtener cotizacion' },
+  { value: 'CONTACT_US', label: 'Contactanos' },
+  { value: 'BOOK_NOW', label: 'Reservar ahora' },
+  { value: 'APPLY_NOW', label: 'Solicitar ahora' },
+];
+
+// ─── fileToBase64 ───────────────────────────────────────────────────
+
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+// ─── ImageUploadZone ────────────────────────────────────────────────
+
+function ImageUploadZone({
+  label,
+  files,
+  onChange,
+  maxFiles,
+  minFiles = 0,
+  aspectHint,
+  required = false,
+}: {
+  label: string;
+  files: File[];
+  onChange: (files: File[]) => void;
+  maxFiles: number;
+  minFiles?: number;
+  aspectHint: string;
+  required?: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleFiles = (newFiles: FileList | null) => {
+    if (!newFiles) return;
+    const valid: File[] = [];
+    for (const f of Array.from(newFiles)) {
+      if (!['image/png', 'image/jpeg', 'image/webp'].includes(f.type)) {
+        toast.error(`${f.name}: solo PNG, JPG o WebP`);
+        continue;
+      }
+      if (f.size > 5 * 1024 * 1024) {
+        toast.error(`${f.name}: maximo 5MB`);
+        continue;
+      }
+      valid.push(f);
+    }
+    const combined = [...files, ...valid].slice(0, maxFiles);
+    onChange(combined);
+  };
+
+  const removeFile = (index: number) => {
+    onChange(files.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label>
+          {label} {required && <span className="text-red-500">*</span>}
+          <span className="text-muted-foreground font-normal ml-1">({aspectHint})</span>
+        </Label>
+        <span className={`text-xs ${files.length < minFiles ? 'text-red-500' : 'text-muted-foreground'}`}>
+          {files.length}/{maxFiles}
+        </span>
+      </div>
+
+      {files.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {files.map((file, i) => (
+            <div key={i} className="relative group w-20 h-20 rounded-md border overflow-hidden">
+              <img
+                src={URL.createObjectURL(file)}
+                alt={file.name}
+                className="w-full h-full object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => removeFile(i)}
+                className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="w-3 h-3 text-white" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {files.length < maxFiles && (
+        <div
+          className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+            dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'
+          }`}
+          onClick={() => inputRef.current?.click()}
+          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+        >
+          <Upload className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
+          <p className="text-xs text-muted-foreground">Click o arrastra imagenes</p>
+          <p className="text-[10px] text-muted-foreground/60">PNG, JPG, WebP — max 5MB</p>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            multiple
+            className="hidden"
+            onChange={e => { handleFiles(e.target.files); e.target.value = ''; }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── YouTubeInput ───────────────────────────────────────────────────
+
+function YouTubeInput({
+  urls,
+  onChange,
+  maxItems = 5,
+}: {
+  urls: string[];
+  onChange: (urls: string[]) => void;
+  maxItems?: number;
+}) {
+  const [inputValue, setInputValue] = useState('');
+
+  const parseYouTubeId = (input: string): string | null => {
+    const trimmed = input.trim();
+    const watchMatch = trimmed.match(/youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]{11})/);
+    if (watchMatch) return watchMatch[1];
+    const shortMatch = trimmed.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+    if (shortMatch) return shortMatch[1];
+    const shortsMatch = trimmed.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+    if (shortsMatch) return shortsMatch[1];
+    if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
+    return null;
+  };
+
+  const addVideo = () => {
+    const id = parseYouTubeId(inputValue);
+    if (!id) {
+      toast.error('URL o ID de YouTube no valido');
+      return;
+    }
+    if (urls.includes(id)) {
+      toast.error('Este video ya fue agregado');
+      return;
+    }
+    if (urls.length >= maxItems) return;
+    onChange([...urls, id]);
+    setInputValue('');
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label>Videos de YouTube <span className="text-muted-foreground font-normal">(opcional, max {maxItems})</span></Label>
+        <span className="text-xs text-muted-foreground">{urls.length}/{maxItems}</span>
+      </div>
+
+      {urls.length > 0 && (
+        <div className="space-y-2">
+          {urls.map((id, i) => (
+            <div key={id} className="flex items-center gap-2 p-2 rounded-md border bg-muted/30">
+              <img
+                src={`https://img.youtube.com/vi/${id}/mqdefault.jpg`}
+                alt={`Video ${i + 1}`}
+                className="w-24 h-14 rounded object-cover"
+              />
+              <span className="text-xs text-muted-foreground flex-1 truncate">{id}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
+                onClick={() => onChange(urls.filter((_, j) => j !== i))}
+              >
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {urls.length < maxItems && (
+        <div className="flex gap-2">
+          <Input
+            value={inputValue}
+            onChange={e => setInputValue(e.target.value)}
+            placeholder="URL de YouTube o ID del video"
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addVideo(); } }}
+          />
+          <Button variant="outline" size="sm" onClick={addVideo} disabled={!inputValue.trim()}>
+            <Plus className="w-3 h-3 mr-1" />
+            Agregar
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────
 
 export default function GoogleCampaignManager({ connectionId, clientId }: GoogleCampaignManagerProps) {
@@ -229,6 +447,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [wizardLoading, setWizardLoading] = useState(false);
+  const [wizardProgress, setWizardProgress] = useState('');
   const [wizardData, setWizardData] = useState({
     name: '',
     channel_type: 'SEARCH',
@@ -246,6 +465,17 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     headlines: [''] as string[],
     long_headlines: [''] as string[],
     descriptions: [''] as string[],
+    // Images
+    images_landscape: [] as File[],
+    images_square: [] as File[],
+    images_logo: [] as File[],
+    images_portrait: [] as File[],
+    images_landscape_logo: [] as File[],
+    // Videos + extras
+    youtube_urls: [] as string[],
+    call_to_action: '',
+    display_url_path1: '',
+    display_url_path2: '',
     // Shopping
     merchant_center_id: '',
   });
@@ -497,6 +727,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     }
 
     setWizardLoading(true);
+    setWizardProgress('Creando campana...');
 
     const payload: Record<string, any> = {
       name: wizardData.name,
@@ -521,6 +752,9 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       payload.headlines = wizardData.headlines.filter(h => h.trim());
       payload.long_headlines = wizardData.long_headlines.filter(h => h.trim());
       payload.descriptions = wizardData.descriptions.filter(d => d.trim());
+      if (wizardData.call_to_action) payload.call_to_action = wizardData.call_to_action;
+      if (wizardData.display_url_path1) payload.display_url_path1 = wizardData.display_url_path1;
+      if (wizardData.display_url_path2) payload.display_url_path2 = wizardData.display_url_path2;
     }
 
     // Shopping
@@ -536,21 +770,106 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       },
     });
 
-    setWizardLoading(false);
-
     if (error) {
       toast.error('Error creando campana: ' + error);
+      setWizardLoading(false);
+      setWizardProgress('');
       return;
     }
 
-    toast.success('Campana creada en estado PAUSADA');
+    // Phase 2: Upload images and videos for PMAX
+    if (isPmax) {
+      const allImages = [
+        ...wizardData.images_landscape.map(f => ({ file: f, field_type: 'MARKETING_IMAGE' })),
+        ...wizardData.images_square.map(f => ({ file: f, field_type: 'SQUARE_MARKETING_IMAGE' })),
+        ...wizardData.images_logo.map(f => ({ file: f, field_type: 'LOGO' })),
+        ...wizardData.images_portrait.map(f => ({ file: f, field_type: 'PORTRAIT_MARKETING_IMAGE' })),
+        ...wizardData.images_landscape_logo.map(f => ({ file: f, field_type: 'LANDSCAPE_LOGO' })),
+      ];
+      const allVideos = wizardData.youtube_urls;
+
+      if (allImages.length > 0 || allVideos.length > 0) {
+        setWizardProgress('Obteniendo asset group...');
+        const { data: agData, error: agError } = await callApi('manage-google-pmax', {
+          body: { action: 'list_asset_groups', connection_id: connectionId },
+        });
+
+        if (agError || !agData?.asset_groups?.length) {
+          toast.warning('Campana creada, pero no se pudo subir imagenes (asset group no encontrado)');
+        } else {
+          const assetGroup = agData.asset_groups.find(
+            (ag: any) => ag.campaign_name === wizardData.name
+          );
+
+          if (!assetGroup) {
+            toast.warning('Campana creada, pero no se encontro asset group para subir assets');
+          } else {
+            const assetGroupId = assetGroup.id;
+            const totalAssets = allImages.length + allVideos.length;
+            let uploaded = 0;
+            let errors = 0;
+
+            for (const { file, field_type } of allImages) {
+              uploaded++;
+              setWizardProgress(`Subiendo imagen ${uploaded}/${totalAssets}...`);
+              try {
+                const base64 = await fileToBase64(file);
+                const { error: imgError } = await callApi('manage-google-pmax', {
+                  body: {
+                    action: 'add_asset',
+                    connection_id: connectionId,
+                    asset_group_id: assetGroupId,
+                    data: { field_type, image_data: base64, image_name: file.name },
+                  },
+                });
+                if (imgError) { errors++; toast.error(`Error subiendo ${file.name}: ${imgError}`); }
+              } catch {
+                errors++;
+                toast.error(`Error procesando ${file.name}`);
+              }
+            }
+
+            for (const videoId of allVideos) {
+              uploaded++;
+              setWizardProgress(`Agregando video ${uploaded}/${totalAssets}...`);
+              const { error: vidError } = await callApi('manage-google-pmax', {
+                body: {
+                  action: 'add_asset',
+                  connection_id: connectionId,
+                  asset_group_id: assetGroupId,
+                  data: { field_type: 'YOUTUBE_VIDEO', youtube_video_id: videoId },
+                },
+              });
+              if (vidError) { errors++; toast.error(`Error agregando video: ${vidError}`); }
+            }
+
+            if (errors === 0) {
+              toast.success(`Campana creada con ${totalAssets} assets`);
+            } else {
+              toast.warning(`Campana creada, ${totalAssets - errors}/${totalAssets} assets subidos`);
+            }
+          }
+        }
+      } else {
+        toast.success('Campana creada en estado PAUSADA');
+      }
+    } else {
+      toast.success('Campana creada en estado PAUSADA');
+    }
+
+    setWizardLoading(false);
+    setWizardProgress('');
     setWizardOpen(false);
     setWizardStep(1);
     setWizardData({
       name: '', channel_type: 'SEARCH', daily_budget: '', bid_strategy: 'MAXIMIZE_CONVERSIONS',
       target_google_search: true, target_search_network: true, target_content_network: false,
       start_date: '', ad_group_name: 'Ad Group 1', ad_group_cpc_bid_micros: '',
-      final_urls: '', business_name: '', headlines: [''], long_headlines: [''], descriptions: [''], merchant_center_id: '',
+      final_urls: '', business_name: '', headlines: [''], long_headlines: [''], descriptions: [''],
+      images_landscape: [], images_square: [], images_logo: [],
+      images_portrait: [], images_landscape_logo: [],
+      youtube_urls: [], call_to_action: '', display_url_path1: '', display_url_path2: '',
+      merchant_center_id: '',
     });
     fetchCampaigns();
   };
@@ -580,7 +899,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
 
   // Wizard step helpers
   const isPmax = wizardData.channel_type === 'PERFORMANCE_MAX';
-  const totalSteps = isPmax ? 4 : 3;
+  const totalSteps = isPmax ? 6 : 3;
 
   const isStepValid = (step: number): boolean => {
     switch (step) {
@@ -597,6 +916,12 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           const validDescriptions = wizardData.descriptions.filter(d => d.trim()).length;
           return validHeadlines >= 3 && validLongHeadlines >= 1 && validDescriptions >= 2;
         }
+        return true;
+      case 4: // Images PMAX
+        return wizardData.images_landscape.length >= 1
+          && wizardData.images_square.length >= 1
+          && wizardData.images_logo.length >= 1;
+      case 5: // Videos + extras — todo opcional
         return true;
       default:
         return true;
@@ -1250,6 +1575,109 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
             </div>
           )}
 
+          {/* Step 4 PMAX: Images */}
+          {wizardStep === 4 && isPmax && (
+            <div className="space-y-5">
+              <p className="text-sm text-muted-foreground">
+                Sube las imagenes para tu campana PMAX. Google requiere al menos 1 landscape, 1 cuadrada y 1 logo.
+              </p>
+              <ImageUploadZone
+                label="Landscape"
+                files={wizardData.images_landscape}
+                onChange={files => setWizardData(prev => ({ ...prev, images_landscape: files }))}
+                maxFiles={20}
+                minFiles={1}
+                aspectHint="1.91:1 — rec. 1200x628"
+                required
+              />
+              <ImageUploadZone
+                label="Cuadrada"
+                files={wizardData.images_square}
+                onChange={files => setWizardData(prev => ({ ...prev, images_square: files }))}
+                maxFiles={20}
+                minFiles={1}
+                aspectHint="1:1 — rec. 1200x1200"
+                required
+              />
+              <ImageUploadZone
+                label="Logo"
+                files={wizardData.images_logo}
+                onChange={files => setWizardData(prev => ({ ...prev, images_logo: files }))}
+                maxFiles={5}
+                minFiles={1}
+                aspectHint="1:1 — min 128x128"
+                required
+              />
+              <details className="border rounded-lg">
+                <summary className="p-3 text-sm font-medium cursor-pointer hover:bg-muted/30">
+                  Imagenes opcionales (Portrait + Logo Landscape)
+                </summary>
+                <div className="px-3 pb-3 space-y-4">
+                  <ImageUploadZone
+                    label="Portrait"
+                    files={wizardData.images_portrait}
+                    onChange={files => setWizardData(prev => ({ ...prev, images_portrait: files }))}
+                    maxFiles={20}
+                    aspectHint="4:5 — rec. 960x1200"
+                  />
+                  <ImageUploadZone
+                    label="Logo Landscape"
+                    files={wizardData.images_landscape_logo}
+                    onChange={files => setWizardData(prev => ({ ...prev, images_landscape_logo: files }))}
+                    maxFiles={5}
+                    aspectHint="4:1 — rec. 1200x300"
+                  />
+                </div>
+              </details>
+            </div>
+          )}
+
+          {/* Step 5 PMAX: Videos + Extras */}
+          {wizardStep === 5 && isPmax && (
+            <div className="space-y-5">
+              <YouTubeInput
+                urls={wizardData.youtube_urls}
+                onChange={urls => setWizardData(prev => ({ ...prev, youtube_urls: urls }))}
+              />
+              <div className="space-y-2">
+                <Label>Call to Action <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={wizardData.call_to_action}
+                  onChange={e => setWizardData(prev => ({ ...prev, call_to_action: e.target.value }))}
+                >
+                  {ctaOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Display URL Path <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+                <div className="flex items-center gap-1 text-sm">
+                  <span className="text-muted-foreground whitespace-nowrap truncate max-w-[150px]">
+                    {wizardData.final_urls || 'tudominio.com'} /
+                  </span>
+                  <Input
+                    value={wizardData.display_url_path1}
+                    onChange={e => setWizardData(prev => ({ ...prev, display_url_path1: e.target.value.slice(0, 15) }))}
+                    placeholder="path1"
+                    maxLength={15}
+                    className="w-24"
+                  />
+                  <span className="text-muted-foreground">/</span>
+                  <Input
+                    value={wizardData.display_url_path2}
+                    onChange={e => setWizardData(prev => ({ ...prev, display_url_path2: e.target.value.slice(0, 15) }))}
+                    placeholder="path2"
+                    maxLength={15}
+                    className="w-24"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Max 15 caracteres por segmento</p>
+              </div>
+            </div>
+          )}
+
           {/* Step 3 SEARCH: Ad Group */}
           {wizardStep === 3 && wizardData.channel_type === 'SEARCH' && (
             <div className="space-y-4">
@@ -1299,8 +1727,10 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                   </div>
 
                   {isPmax && (
-                    <div className="border-t pt-3 mt-3 space-y-2">
+                    <div className="border-t pt-3 mt-3 space-y-3">
                       <p className="font-medium">Assets PMAX</p>
+
+                      {/* Text assets */}
                       <div className="space-y-1">
                         <p className="text-xs text-muted-foreground">Headlines ({wizardData.headlines.filter(h => h.trim()).length})</p>
                         <div className="flex flex-wrap gap-1">
@@ -1325,6 +1755,59 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                           ))}
                         </div>
                       </div>
+
+                      {/* Image thumbnails */}
+                      {(wizardData.images_landscape.length > 0 || wizardData.images_square.length > 0 || wizardData.images_logo.length > 0) && (
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground">
+                            Imagenes ({wizardData.images_landscape.length + wizardData.images_square.length + wizardData.images_logo.length + wizardData.images_portrait.length + wizardData.images_landscape_logo.length} total)
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[...wizardData.images_landscape, ...wizardData.images_square, ...wizardData.images_logo, ...wizardData.images_portrait, ...wizardData.images_landscape_logo].map((file, i) => (
+                              <img
+                                key={i}
+                                src={URL.createObjectURL(file)}
+                                alt={file.name}
+                                className="w-12 h-12 rounded border object-cover"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* YouTube videos */}
+                      {wizardData.youtube_urls.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground">Videos ({wizardData.youtube_urls.length})</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {wizardData.youtube_urls.map((id, i) => (
+                              <img
+                                key={i}
+                                src={`https://img.youtube.com/vi/${id}/mqdefault.jpg`}
+                                alt={`Video ${i + 1}`}
+                                className="w-20 h-12 rounded border object-cover"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* CTA + Display URL */}
+                      {(wizardData.call_to_action || wizardData.display_url_path1 || wizardData.display_url_path2) && (
+                        <div className="flex flex-wrap gap-2">
+                          {wizardData.call_to_action && (
+                            <Badge variant="outline" className="text-xs">
+                              CTA: {ctaOptions.find(o => o.value === wizardData.call_to_action)?.label || wizardData.call_to_action}
+                            </Badge>
+                          )}
+                          {(wizardData.display_url_path1 || wizardData.display_url_path2) && (
+                            <Badge variant="outline" className="text-xs">
+                              URL: /{wizardData.display_url_path1}{wizardData.display_url_path2 ? `/${wizardData.display_url_path2}` : ''}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+
                       {wizardData.business_name && (
                         <p className="text-xs">Negocio: <strong>{wizardData.business_name}</strong></p>
                       )}
@@ -1341,12 +1824,16 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           )}
 
           <DialogFooter className="flex gap-2">
-            {wizardStep > 1 && (
+            {wizardStep > 1 && !wizardLoading && (
               <Button variant="outline" onClick={() => setWizardStep(s => s - 1)}>
                 Atras
               </Button>
             )}
-            <div className="flex-1" />
+            <div className="flex-1">
+              {wizardLoading && wizardProgress && (
+                <p className="text-xs text-muted-foreground animate-pulse">{wizardProgress}</p>
+              )}
+            </div>
             {wizardStep < totalSteps ? (
               <Button
                 onClick={() => setWizardStep(s => s + 1)}
