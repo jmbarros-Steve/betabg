@@ -553,7 +553,7 @@ async function handleCreateCampaign(
     status: 'PAUSED',
     campaignBudget: `customers/${customerId}/campaignBudgets/-1`,
     biddingStrategyType: bidStrategy,
-    containsEuPoliticalAdvertising: false,
+    containsEuPoliticalAdvertising: 'DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING',
   };
 
   // Geo targeting only for non-PMAX (PMAX manages targeting automatically)
