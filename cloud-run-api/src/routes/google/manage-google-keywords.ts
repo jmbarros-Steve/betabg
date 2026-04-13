@@ -1,9 +1,6 @@
 import { Context } from 'hono';
-import { getSupabaseAdmin } from '../../lib/supabase.js';
-import { getGoogleTokenForConnection } from '../../lib/resolve-google-token.js';
-import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { googleAdsQuery, googleAdsMutate, resolveConnectionAndToken } from '../../lib/google-ads-api.js';
 import { convertToCLP, fetchGoogleAccountCurrency } from '../../lib/currency.js';
-import { isValidCronSecret } from '../../lib/cron-auth.js';
 
 type Action = 'list_ad_groups' | 'list_keywords' | 'add_keyword' | 'update_keyword' | 'remove_keyword' | 'list_search_terms' | 'add_negative_keyword';
 
@@ -15,104 +12,8 @@ interface RequestBody {
   data?: Record<string, any>;
 }
 
-const GOOGLE_ADS_API = 'https://googleads.googleapis.com/v23';
-
 function validateNumericId(value: string | undefined): boolean {
   return !value || (/^\d+$/.test(value) && value.length <= 20);
-}
-
-async function googleAdsQuery(
-  customerId: string, accessToken: string, developerToken: string,
-  loginCustomerId: string, query: string
-): Promise<{ ok: boolean; data?: any[]; error?: string }> {
-  const makeRequest = async (loginId: string) => {
-    return fetch(`${GOOGLE_ADS_API}/customers/${customerId}/googleAds:searchStream`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'developer-token': developerToken,
-        'login-customer-id': loginId,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ query }),
-      signal: AbortSignal.timeout(15_000),
-    });
-  };
-
-  let response = await makeRequest(loginCustomerId);
-  if (response.status === 403 && loginCustomerId !== customerId) {
-    console.warn(`[manage-google-keywords] MCC login ${loginCustomerId} denied, retrying with ${customerId}`);
-    await response.text().catch(() => {}); // drain body to free socket
-    response = await makeRequest(customerId);
-  }
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`[manage-google-keywords] GAQL error (${response.status}):`, errorText.slice(0, 2000));
-    return { ok: false, error: `Google Ads API error (${response.status})` };
-  }
-
-  const responseText = await response.text();
-  let results: any[] = [];
-  try {
-    const json = JSON.parse(responseText);
-    if (Array.isArray(json)) {
-      for (const batch of json) {
-        if (batch.results) results = results.concat(batch.results);
-      }
-    } else if (json.results) {
-      results = json.results;
-    }
-  } catch {
-    return { ok: false, error: 'Failed to parse Google Ads response' };
-  }
-  return { ok: true, data: results };
-}
-
-async function googleAdsMutate(
-  customerId: string, accessToken: string, developerToken: string,
-  loginCustomerId: string, mutateOperations: any[]
-): Promise<{ ok: boolean; data?: any; error?: string }> {
-  const makeRequest = async (loginId: string) => {
-    return fetch(`${GOOGLE_ADS_API}/customers/${customerId}/googleAds:mutate`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'developer-token': developerToken,
-        'login-customer-id': loginId,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ mutateOperations }),
-      signal: AbortSignal.timeout(15_000),
-    });
-  };
-
-  let response = await makeRequest(loginCustomerId);
-  if (response.status === 403 && loginCustomerId !== customerId) {
-    console.warn(`[manage-google-keywords] MCC mutate ${loginCustomerId} denied, retrying with ${customerId}`);
-    await response.text().catch(() => {}); // drain body to free socket
-    response = await makeRequest(customerId);
-  }
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`[manage-google-keywords] Mutate error (${response.status}):`, errorText.slice(0, 2000));
-    let errorMessage = `Google Ads API error (${response.status})`;
-    try {
-      const errJson = JSON.parse(errorText);
-      const detail = errJson?.error?.message || errJson?.[0]?.error?.message;
-      if (detail) errorMessage = detail;
-    } catch {}
-    return { ok: false, error: errorMessage };
-  }
-
-  let data: any;
-  try {
-    data = await response.json();
-  } catch {
-    return { ok: false, error: 'Failed to parse Google Ads mutate response' };
-  }
-  return { ok: true, data };
 }
 
 // --- Action handlers ---
@@ -429,17 +330,6 @@ async function handleAddNegativeKeyword(
 
 export async function manageGoogleKeywords(c: Context) {
   try {
-    const supabase = getSupabaseAdmin();
-    const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-    if (!developerToken) return c.json({ error: 'Google Ads developer token not configured' }, 500);
-
-    const isCron = isValidCronSecret(c.req.header('X-Cron-Secret'));
-    let user: { id: string } | null = null;
-    if (!isCron) {
-      user = c.get('user');
-      if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    }
-
     const body: RequestBody = await c.req.json();
     const { action, connection_id, campaign_id, ad_group_id, data } = body;
 
@@ -457,40 +347,12 @@ export async function manageGoogleKeywords(c: Context) {
 
     console.log(`[manage-google-keywords] Action: ${action}, Connection: ${connection_id}`);
 
-    // Fetch connection
-    const { data: connection, error: connError } = await supabase
-      .from('platform_connections')
-      .select(`
-        id, platform, account_id, access_token_encrypted, refresh_token_encrypted,
-        connection_type, client_id,
-        clients!inner(user_id, client_user_id)
-      `)
-      .eq('id', connection_id)
-      .eq('platform', 'google')
-      .maybeSingle();
-
-    if (connError || !connection) return c.json({ error: 'Connection not found' }, 404);
-
-    // Verify ownership
-    if (!isCron && user) {
-      const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
-      const isOwner = clientData.user_id === user.id || clientData.client_user_id === user.id;
-      if (!isOwner) {
-        const adminRole = await safeQuerySingleOrDefault<any>(
-          supabase.from('user_roles').select('role').eq('user_id', user.id)
-            .in('role', ['admin', 'super_admin']).limit(1).maybeSingle(),
-          null, 'manageGoogleKeywords.getAdminRole',
-        );
-        if (!adminRole) return c.json({ error: 'Unauthorized' }, 403);
-      }
+    const resolved = await resolveConnectionAndToken(c, connection_id);
+    if ('error' in resolved) {
+      return c.json({ error: resolved.error }, resolved.status as any);
     }
-
-    if (!connection.account_id) return c.json({ error: 'Missing Google Ads account_id' }, 400);
-
-    const tokenResult = await getGoogleTokenForConnection(supabase, connection);
-    const { accessToken } = tokenResult;
-    const customerId = connection.account_id;
-    const loginCustomerId = tokenResult.mccCustomerId || customerId;
+    const { ctx } = resolved;
+    const { customerId, accessToken, developerToken, loginCustomerId } = ctx;
 
     const needsCurrency = ['list_keywords', 'list_search_terms'].includes(action);
     const accountCurrency = needsCurrency

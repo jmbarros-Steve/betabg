@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -29,7 +30,15 @@ import {
   ArrowUpDown,
   RefreshCw,
   Loader2,
+  Plus,
+  Settings,
+  ChevronDown,
+  ChevronRight,
+  AlertCircle,
 } from 'lucide-react';
+import SteveRecommendation from './SteveRecommendation';
+
+// ─── Types ───────────────────────────────────────────────────────────
 
 interface Campaign {
   id: string;
@@ -43,12 +52,26 @@ interface Campaign {
   currency: string;
 }
 
+interface AdGroup {
+  id: string;
+  name: string;
+  status: string;
+  type: string;
+  cpc_bid_micros: number;
+  impressions: number;
+  clicks: number;
+  cost_micros: number;
+  conversions: number;
+}
+
 interface GoogleCampaignManagerProps {
   connectionId: string;
   clientId: string;
 }
 
 type SortKey = 'name' | 'status' | 'channel_type' | 'daily_budget_clp';
+
+// ─── Constants ───────────────────────────────────────────────────────
 
 const channelLabels: Record<string, string> = {
   SEARCH: 'Search',
@@ -68,6 +91,17 @@ const statusColors: Record<string, string> = {
   REMOVED: 'bg-red-500/10 text-red-500 border-red-500/20',
 };
 
+const bidStrategies = [
+  { value: 'MAXIMIZE_CONVERSIONS', label: 'Maximizar conversiones' },
+  { value: 'MAXIMIZE_CLICKS', label: 'Maximizar clics' },
+  { value: 'TARGET_CPA', label: 'CPA objetivo' },
+  { value: 'TARGET_ROAS', label: 'ROAS objetivo' },
+  { value: 'MANUAL_CPC', label: 'CPC manual' },
+  { value: 'MAXIMIZE_CONVERSION_VALUE', label: 'Maximizar valor' },
+];
+
+// ─── Component ───────────────────────────────────────────────────────
+
 export default function GoogleCampaignManager({ connectionId, clientId }: GoogleCampaignManagerProps) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,12 +110,57 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortAsc, setSortAsc] = useState(true);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+  const [hasWriteAccess, setHasWriteAccess] = useState<boolean | null>(null);
 
   // Budget dialog
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [budgetCampaign, setBudgetCampaign] = useState<Campaign | null>(null);
   const [newBudget, setNewBudget] = useState('');
   const [budgetSaving, setBudgetSaving] = useState(false);
+
+  // Settings panel
+  const [settingsCampaign, setSettingsCampaign] = useState<Campaign | null>(null);
+  const [settingsData, setSettingsData] = useState<any>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+
+  // Ad groups
+  const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
+  const [adGroups, setAdGroups] = useState<Record<string, AdGroup[]>>({});
+  const [adGroupsLoading, setAdGroupsLoading] = useState<Record<string, boolean>>({});
+
+  // Create ad group dialog
+  const [createAdGroupOpen, setCreateAdGroupOpen] = useState(false);
+  const [createAdGroupCampaignId, setCreateAdGroupCampaignId] = useState<string | null>(null);
+  const [newAdGroupName, setNewAdGroupName] = useState('');
+  const [newAdGroupBid, setNewAdGroupBid] = useState('');
+  const [createAdGroupLoading, setCreateAdGroupLoading] = useState(false);
+
+  // Create campaign wizard
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
+  const [wizardLoading, setWizardLoading] = useState(false);
+  const [wizardData, setWizardData] = useState({
+    name: '',
+    channel_type: 'SEARCH',
+    daily_budget: '',
+    bid_strategy: 'MAXIMIZE_CONVERSIONS',
+    target_google_search: true,
+    target_search_network: true,
+    target_content_network: false,
+    start_date: '',
+    ad_group_name: 'Ad Group 1',
+    ad_group_cpc_bid_micros: '',
+    // PMAX
+    final_urls: '',
+    business_name: '',
+    headlines: '',
+    descriptions: '',
+    // Shopping
+    merchant_center_id: '',
+  });
+
+  // ─── Fetch campaigns ──────────────────────────────────────────────
 
   const fetchCampaigns = useCallback(async () => {
     setLoading(true);
@@ -101,7 +180,15 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
 
   useEffect(() => {
     fetchCampaigns();
-  }, [fetchCampaigns]);
+    // Check write access
+    callApi('manage-google-campaign', {
+      body: { action: 'check_write_access', connection_id: connectionId },
+    }).then(({ data }) => {
+      setHasWriteAccess(data?.has_write_access ?? true);
+    });
+  }, [fetchCampaigns, connectionId]);
+
+  // ─── Handlers ──────────────────────────────────────────────────────
 
   const handlePauseResume = async (campaign: Campaign) => {
     const action = campaign.status === 'ENABLED' ? 'pause' : 'resume';
@@ -126,7 +213,6 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
 
     if (error) {
       toast.error(`Error ${label.toLowerCase()}: ${error}`);
-      // Revert optimistic update
       setCampaigns(prev =>
         prev.map(c =>
           c.id === campaign.id ? { ...c, status: campaign.status } : c
@@ -176,6 +262,221 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     }
   };
 
+  // Settings
+  const openSettings = async (campaign: Campaign) => {
+    setSettingsCampaign(campaign);
+    setSettingsLoading(true);
+
+    const { data, error } = await callApi('manage-google-campaign', {
+      body: { action: 'get_settings', connection_id: connectionId, campaign_id: campaign.id },
+    });
+
+    setSettingsLoading(false);
+
+    if (error) {
+      toast.error('Error cargando settings: ' + error);
+      setSettingsCampaign(null);
+      return;
+    }
+
+    setSettingsData(data?.settings || {});
+  };
+
+  const handleSaveSettings = async () => {
+    if (!settingsCampaign || !settingsData) return;
+    setSettingsSaving(true);
+
+    const { error } = await callApi('manage-google-campaign', {
+      body: {
+        action: 'update_settings',
+        connection_id: connectionId,
+        campaign_id: settingsCampaign.id,
+        data: {
+          bidding_strategy_type: settingsData.bidding_strategy_type,
+          network_settings: {
+            target_google_search: settingsData.target_google_search,
+            target_search_network: settingsData.target_search_network,
+            target_content_network: settingsData.target_content_network,
+          },
+        },
+      },
+    });
+
+    setSettingsSaving(false);
+
+    if (error) {
+      toast.error('Error guardando settings: ' + error);
+      return;
+    }
+
+    toast.success('Configuracion actualizada');
+    setSettingsCampaign(null);
+    fetchCampaigns();
+  };
+
+  // Ad Groups
+  const toggleAdGroups = async (campaignId: string) => {
+    if (expandedCampaign === campaignId) {
+      setExpandedCampaign(null);
+      return;
+    }
+
+    setExpandedCampaign(campaignId);
+
+    if (!adGroups[campaignId]) {
+      setAdGroupsLoading(prev => ({ ...prev, [campaignId]: true }));
+      const { data, error } = await callApi('manage-google-campaign', {
+        body: { action: 'list_ad_groups', connection_id: connectionId, campaign_id: campaignId },
+      });
+      setAdGroupsLoading(prev => ({ ...prev, [campaignId]: false }));
+
+      if (error) {
+        toast.error('Error cargando ad groups: ' + error);
+        return;
+      }
+      setAdGroups(prev => ({ ...prev, [campaignId]: data?.ad_groups || [] }));
+    }
+  };
+
+  const handleAdGroupPauseResume = async (ag: AdGroup) => {
+    const action = ag.status === 'ENABLED' ? 'pause_ad_group' : 'enable_ad_group';
+
+    const { error } = await callApi('manage-google-campaign', {
+      body: { action, connection_id: connectionId, ad_group_id: ag.id },
+    });
+
+    if (error) {
+      toast.error('Error: ' + error);
+      return;
+    }
+
+    toast.success(`Ad group ${action === 'pause_ad_group' ? 'pausado' : 'activado'}`);
+    // Refresh
+    setAdGroups(prev => {
+      const copy = { ...prev };
+      delete copy[expandedCampaign!];
+      return copy;
+    });
+    if (expandedCampaign) toggleAdGroups(expandedCampaign);
+  };
+
+  const handleCreateAdGroup = async () => {
+    if (!createAdGroupCampaignId || !newAdGroupName) return;
+
+    setCreateAdGroupLoading(true);
+    const { error } = await callApi('manage-google-campaign', {
+      body: {
+        action: 'create_ad_group',
+        connection_id: connectionId,
+        campaign_id: createAdGroupCampaignId,
+        data: {
+          name: newAdGroupName,
+          cpc_bid_micros: newAdGroupBid ? Math.round(Number(newAdGroupBid) * 1_000_000) : undefined,
+        },
+      },
+    });
+
+    setCreateAdGroupLoading(false);
+
+    if (error) {
+      toast.error('Error creando ad group: ' + error);
+      return;
+    }
+
+    toast.success('Ad group creado');
+    setCreateAdGroupOpen(false);
+    setNewAdGroupName('');
+    setNewAdGroupBid('');
+
+    // Refresh
+    setAdGroups(prev => {
+      const copy = { ...prev };
+      delete copy[createAdGroupCampaignId!];
+      return copy;
+    });
+    if (expandedCampaign === createAdGroupCampaignId) {
+      toggleAdGroups(createAdGroupCampaignId);
+    }
+  };
+
+  // Create campaign wizard
+  const handleCreateCampaign = async () => {
+    if (!wizardData.name || !wizardData.daily_budget) {
+      toast.error('Nombre y presupuesto son requeridos');
+      return;
+    }
+
+    setWizardLoading(true);
+
+    const payload: Record<string, any> = {
+      name: wizardData.name,
+      daily_budget: Number(wizardData.daily_budget),
+      channel_type: wizardData.channel_type,
+      bid_strategy: wizardData.bid_strategy,
+      target_google_search: wizardData.target_google_search,
+      target_search_network: wizardData.target_search_network,
+      target_content_network: wizardData.target_content_network,
+      start_date: wizardData.start_date || undefined,
+      ad_group_name: wizardData.ad_group_name || 'Ad Group 1',
+    };
+
+    if (wizardData.ad_group_cpc_bid_micros) {
+      payload.ad_group_cpc_bid_micros = Math.round(Number(wizardData.ad_group_cpc_bid_micros) * 1_000_000);
+    }
+
+    // PMAX-specific
+    if (wizardData.channel_type === 'PERFORMANCE_MAX') {
+      payload.final_urls = wizardData.final_urls ? [wizardData.final_urls] : [];
+      payload.business_name = wizardData.business_name || undefined;
+      payload.headlines = wizardData.headlines ? wizardData.headlines.split('\n').filter(Boolean) : [];
+      payload.descriptions = wizardData.descriptions ? wizardData.descriptions.split('\n').filter(Boolean) : [];
+    }
+
+    // Shopping
+    if (wizardData.channel_type === 'SHOPPING') {
+      payload.merchant_center_id = wizardData.merchant_center_id || undefined;
+    }
+
+    const { error } = await callApi('manage-google-campaign', {
+      body: {
+        action: 'create_campaign',
+        connection_id: connectionId,
+        data: payload,
+      },
+    });
+
+    setWizardLoading(false);
+
+    if (error) {
+      toast.error('Error creando campana: ' + error);
+      return;
+    }
+
+    toast.success('Campana creada en estado PAUSADA');
+    setWizardOpen(false);
+    setWizardStep(1);
+    setWizardData({
+      name: '', channel_type: 'SEARCH', daily_budget: '', bid_strategy: 'MAXIMIZE_CONVERSIONS',
+      target_google_search: true, target_search_network: true, target_content_network: false,
+      start_date: '', ad_group_name: 'Ad Group 1', ad_group_cpc_bid_micros: '',
+      final_urls: '', business_name: '', headlines: '', descriptions: '', merchant_center_id: '',
+    });
+    fetchCampaigns();
+  };
+
+  const handleApplyRecommendation = (rec: any) => {
+    if (rec?.bid_strategy) {
+      setWizardData(prev => ({
+        ...prev,
+        bid_strategy: rec.bid_strategy,
+        daily_budget: rec.daily_budget ? String(rec.daily_budget) : prev.daily_budget,
+      }));
+      toast.success('Sugerencia de Steve aplicada');
+    }
+  };
+
+  // ─── Sorting / Filtering ──────────────────────────────────────────
+
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortAsc(!sortAsc);
@@ -185,7 +486,6 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     }
   };
 
-  // Filter and sort
   const filteredCampaigns = campaigns
     .filter(c => {
       if (statusFilter !== 'ALL' && c.status !== statusFilter) return false;
@@ -201,6 +501,8 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       return sortAsc ? Number(aVal) - Number(bVal) : Number(bVal) - Number(aVal);
     });
 
+  // ─── Render ────────────────────────────────────────────────────────
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -212,6 +514,16 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
 
   return (
     <div className="space-y-4">
+      {/* Write access warning */}
+      {hasWriteAccess === false && (
+        <Card className="border-yellow-300 bg-yellow-50">
+          <CardContent className="py-3 flex items-center gap-2 text-sm text-yellow-700">
+            <AlertCircle className="w-4 h-4" />
+            Esta cuenta tiene acceso de solo lectura. Contacta al administrador para habilitar permisos de escritura.
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-[200px]">
@@ -237,6 +549,12 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           <RefreshCw className="w-4 h-4 mr-1" />
           Refrescar
         </Button>
+        {hasWriteAccess !== false && (
+          <Button size="sm" onClick={() => setWizardOpen(true)}>
+            <Plus className="w-4 h-4 mr-1" />
+            Crear Campana
+          </Button>
+        )}
       </div>
 
       {/* Campaigns table */}
@@ -253,6 +571,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50">
+                <th className="w-8 p-3" />
                 <th className="text-left p-3 font-medium">
                   <button className="flex items-center gap-1 hover:text-primary" onClick={() => handleSort('name')}>
                     Nombre <ArrowUpDown className="w-3 h-3" />
@@ -278,54 +597,164 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
             </thead>
             <tbody>
               {filteredCampaigns.map(campaign => (
-                <tr key={campaign.id} className="border-b last:border-0 hover:bg-muted/30">
-                  <td className="p-3 font-medium max-w-[300px] truncate" title={campaign.name}>
-                    {campaign.name}
-                  </td>
-                  <td className="p-3">
-                    <Badge variant="outline" className={statusColors[campaign.status] || ''}>
-                      {campaign.status === 'ENABLED' ? 'Activa' : campaign.status === 'PAUSED' ? 'Pausada' : campaign.status}
-                    </Badge>
-                  </td>
-                  <td className="p-3 text-muted-foreground">
-                    {channelLabels[campaign.channel_type] || campaign.channel_type}
-                  </td>
-                  <td className="p-3 text-right tabular-nums">
-                    ${campaign.daily_budget_clp.toLocaleString('es-CL')} CLP
-                    {campaign.currency !== 'CLP' && (
-                      <span className="text-xs text-muted-foreground ml-1">
-                        ({campaign.currency} {campaign.daily_budget_currency.toLocaleString()})
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-3 text-right">
-                    <div className="flex items-center gap-1 justify-end">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={actionLoading[campaign.id]}
-                        onClick={() => handlePauseResume(campaign)}
-                        title={campaign.status === 'ENABLED' ? 'Pausar' : 'Reanudar'}
-                      >
-                        {actionLoading[campaign.id] ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : campaign.status === 'ENABLED' ? (
-                          <Pause className="w-4 h-4" />
-                        ) : (
-                          <Play className="w-4 h-4" />
+                <>
+                  <tr key={campaign.id} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="p-3">
+                      {campaign.channel_type !== 'PERFORMANCE_MAX' && (
+                        <button onClick={() => toggleAdGroups(campaign.id)}>
+                          {expandedCampaign === campaign.id
+                            ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            : <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                          }
+                        </button>
+                      )}
+                    </td>
+                    <td className="p-3 font-medium max-w-[300px] truncate" title={campaign.name}>
+                      {campaign.name}
+                    </td>
+                    <td className="p-3">
+                      <Badge variant="outline" className={statusColors[campaign.status] || ''}>
+                        {campaign.status === 'ENABLED' ? 'Activa' : campaign.status === 'PAUSED' ? 'Pausada' : campaign.status}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-muted-foreground">
+                      {channelLabels[campaign.channel_type] || campaign.channel_type}
+                    </td>
+                    <td className="p-3 text-right tabular-nums">
+                      ${campaign.daily_budget_clp.toLocaleString('es-CL')} CLP
+                      {campaign.currency !== 'CLP' && (
+                        <span className="text-xs text-muted-foreground ml-1">
+                          ({campaign.currency} {campaign.daily_budget_currency.toLocaleString()})
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3 text-right">
+                      <div className="flex items-center gap-1 justify-end">
+                        {hasWriteAccess !== false && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={actionLoading[campaign.id]}
+                              onClick={() => handlePauseResume(campaign)}
+                              title={campaign.status === 'ENABLED' ? 'Pausar' : 'Reanudar'}
+                            >
+                              {actionLoading[campaign.id] ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : campaign.status === 'ENABLED' ? (
+                                <Pause className="w-4 h-4" />
+                              ) : (
+                                <Play className="w-4 h-4" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openBudgetDialog(campaign)}
+                              title="Editar presupuesto"
+                            >
+                              <DollarSign className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openSettings(campaign)}
+                              title="Configuracion"
+                            >
+                              <Settings className="w-4 h-4" />
+                            </Button>
+                          </>
                         )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openBudgetDialog(campaign)}
-                        title="Editar presupuesto"
-                      >
-                        <DollarSign className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
+                      </div>
+                    </td>
+                  </tr>
+
+                  {/* Ad Groups sub-row */}
+                  {expandedCampaign === campaign.id && campaign.channel_type !== 'PERFORMANCE_MAX' && (
+                    <tr key={`${campaign.id}-ag`}>
+                      <td colSpan={6} className="bg-muted/20 px-6 py-3">
+                        {adGroupsLoading[campaign.id] ? (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Cargando ad groups...
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-muted-foreground">
+                                Ad Groups ({adGroups[campaign.id]?.length || 0})
+                              </span>
+                              {hasWriteAccess !== false && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => {
+                                    setCreateAdGroupCampaignId(campaign.id);
+                                    setCreateAdGroupOpen(true);
+                                  }}
+                                >
+                                  <Plus className="w-3 h-3 mr-1" />
+                                  Crear Ad Group
+                                </Button>
+                              )}
+                            </div>
+                            {(adGroups[campaign.id] || []).length === 0 ? (
+                              <p className="text-xs text-muted-foreground">Sin ad groups</p>
+                            ) : (
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b">
+                                    <th className="text-left py-1 font-medium">Nombre</th>
+                                    <th className="text-left py-1 font-medium">Estado</th>
+                                    <th className="text-right py-1 font-medium">CPC Bid</th>
+                                    <th className="text-right py-1 font-medium">Impr</th>
+                                    <th className="text-right py-1 font-medium">Clicks</th>
+                                    <th className="text-right py-1 font-medium">Conv</th>
+                                    {hasWriteAccess !== false && (
+                                      <th className="text-right py-1 font-medium">Acc</th>
+                                    )}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(adGroups[campaign.id] || []).map(ag => (
+                                    <tr key={ag.id} className="border-b last:border-0">
+                                      <td className="py-1.5 truncate max-w-[200px]">{ag.name}</td>
+                                      <td className="py-1.5">
+                                        <Badge variant="outline" className={`text-[10px] ${statusColors[ag.status] || ''}`}>
+                                          {ag.status === 'ENABLED' ? 'Activo' : 'Pausado'}
+                                        </Badge>
+                                      </td>
+                                      <td className="py-1.5 text-right tabular-nums">
+                                        {ag.cpc_bid_micros ? `$${(ag.cpc_bid_micros / 1_000_000).toFixed(2)}` : '-'}
+                                      </td>
+                                      <td className="py-1.5 text-right tabular-nums">{ag.impressions.toLocaleString()}</td>
+                                      <td className="py-1.5 text-right tabular-nums">{ag.clicks.toLocaleString()}</td>
+                                      <td className="py-1.5 text-right tabular-nums">{ag.conversions.toFixed(1)}</td>
+                                      {hasWriteAccess !== false && (
+                                        <td className="py-1.5 text-right">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 w-6 p-0"
+                                            onClick={() => handleAdGroupPauseResume(ag)}
+                                            title={ag.status === 'ENABLED' ? 'Pausar' : 'Activar'}
+                                          >
+                                            {ag.status === 'ENABLED' ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                                          </Button>
+                                        </td>
+                                      )}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </>
               ))}
             </tbody>
           </table>
@@ -337,7 +766,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
         {statusFilter !== 'ALL' && ` (${statusFilter === 'ENABLED' ? 'activas' : 'pausadas'})`}
       </p>
 
-      {/* Budget Dialog */}
+      {/* ─── Budget Dialog ──────────────────────────────────────────── */}
       <Dialog open={budgetDialogOpen} onOpenChange={setBudgetDialogOpen}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
@@ -371,6 +800,364 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
               {budgetSaving && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
               Guardar
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Settings Dialog ────────────────────────────────────────── */}
+      <Dialog open={!!settingsCampaign} onOpenChange={() => setSettingsCampaign(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Configuracion de Campana</DialogTitle>
+          </DialogHeader>
+          {settingsLoading ? (
+            <div className="flex items-center gap-2 py-8 justify-center text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Cargando...
+            </div>
+          ) : settingsData ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground truncate">{settingsCampaign?.name}</p>
+
+              <div className="space-y-2">
+                <Label>Estrategia de puja</Label>
+                <Select
+                  value={settingsData.bidding_strategy_type || ''}
+                  onValueChange={val => setSettingsData((p: any) => ({ ...p, bidding_strategy_type: val }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bidStrategies.map(bs => (
+                      <SelectItem key={bs.value} value={bs.value}>{bs.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {settingsData.channel_type === 'SEARCH' && (
+                <div className="space-y-3">
+                  <Label>Redes</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Google Search</span>
+                      <Switch
+                        checked={settingsData.target_google_search ?? true}
+                        onCheckedChange={val => setSettingsData((p: any) => ({ ...p, target_google_search: val }))}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Red de busqueda</span>
+                      <Switch
+                        checked={settingsData.target_search_network ?? true}
+                        onCheckedChange={val => setSettingsData((p: any) => ({ ...p, target_search_network: val }))}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Red de display</span>
+                      <Switch
+                        checked={settingsData.target_content_network ?? false}
+                        onCheckedChange={val => setSettingsData((p: any) => ({ ...p, target_content_network: val }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {settingsData.start_date && (
+                <p className="text-xs text-muted-foreground">
+                  Inicio: {settingsData.start_date} {settingsData.end_date ? `| Fin: ${settingsData.end_date}` : ''}
+                </p>
+              )}
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSettingsCampaign(null)}>Cancelar</Button>
+            <Button onClick={handleSaveSettings} disabled={settingsSaving}>
+              {settingsSaving && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Create Ad Group Dialog ─────────────────────────────────── */}
+      <Dialog open={createAdGroupOpen} onOpenChange={setCreateAdGroupOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Crear Ad Group</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nombre *</Label>
+              <Input
+                value={newAdGroupName}
+                onChange={e => setNewAdGroupName(e.target.value)}
+                placeholder="Mi Ad Group"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>CPC Bid (moneda de la cuenta, opcional)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={newAdGroupBid}
+                onChange={e => setNewAdGroupBid(e.target.value)}
+                placeholder="Ej: 1.50"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateAdGroupOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateAdGroup} disabled={createAdGroupLoading || !newAdGroupName}>
+              {createAdGroupLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Crear
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Create Campaign Wizard ─────────────────────────────────── */}
+      <Dialog open={wizardOpen} onOpenChange={(open) => { setWizardOpen(open); if (!open) setWizardStep(1); }}>
+        <DialogContent className="sm:max-w-[550px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Crear Campana — Paso {wizardStep} de 3
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Step 1: Basic */}
+          {wizardStep === 1 && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nombre de la campana *</Label>
+                <Input
+                  value={wizardData.name}
+                  onChange={e => setWizardData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Mi Campana Search"
+                  maxLength={128}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tipo de campana</Label>
+                <Select
+                  value={wizardData.channel_type}
+                  onValueChange={val => setWizardData(prev => ({ ...prev, channel_type: val }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SEARCH">Search</SelectItem>
+                    <SelectItem value="PERFORMANCE_MAX">Performance Max</SelectItem>
+                    <SelectItem value="SHOPPING">Shopping</SelectItem>
+                    <SelectItem value="DISPLAY">Display</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Presupuesto diario *</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={wizardData.daily_budget}
+                  onChange={e => setWizardData(prev => ({ ...prev, daily_budget: e.target.value }))}
+                  placeholder="Monto en moneda de la cuenta"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Config */}
+          {wizardStep === 2 && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Estrategia de puja</Label>
+                <Select
+                  value={wizardData.bid_strategy}
+                  onValueChange={val => setWizardData(prev => ({ ...prev, bid_strategy: val }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bidStrategies.map(bs => (
+                      <SelectItem key={bs.value} value={bs.value}>{bs.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <SteveRecommendation
+                  connectionId={connectionId}
+                  recommendationType="campaign_setup"
+                  channelType={wizardData.channel_type}
+                  onApply={handleApplyRecommendation}
+                />
+              </div>
+
+              {wizardData.channel_type === 'SEARCH' && (
+                <div className="space-y-3">
+                  <Label>Redes</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Google Search</span>
+                      <Switch
+                        checked={wizardData.target_google_search}
+                        onCheckedChange={val => setWizardData(prev => ({ ...prev, target_google_search: val }))}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Red de busqueda</span>
+                      <Switch
+                        checked={wizardData.target_search_network}
+                        onCheckedChange={val => setWizardData(prev => ({ ...prev, target_search_network: val }))}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Red de display</span>
+                      <Switch
+                        checked={wizardData.target_content_network}
+                        onCheckedChange={val => setWizardData(prev => ({ ...prev, target_content_network: val }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {wizardData.channel_type === 'SHOPPING' && (
+                <div className="space-y-2">
+                  <Label>Merchant Center ID *</Label>
+                  <Input
+                    value={wizardData.merchant_center_id}
+                    onChange={e => setWizardData(prev => ({ ...prev, merchant_center_id: e.target.value }))}
+                    placeholder="123456789"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    El Merchant Center debe estar vinculado a tu cuenta Google Ads.
+                  </p>
+                </div>
+              )}
+
+              {wizardData.channel_type === 'PERFORMANCE_MAX' && (
+                <>
+                  <div className="space-y-2">
+                    <Label>URL Final *</Label>
+                    <Input
+                      value={wizardData.final_urls}
+                      onChange={e => setWizardData(prev => ({ ...prev, final_urls: e.target.value }))}
+                      placeholder="https://mitienda.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nombre del negocio</Label>
+                    <Input
+                      value={wizardData.business_name}
+                      onChange={e => setWizardData(prev => ({ ...prev, business_name: e.target.value }))}
+                      placeholder="Mi Empresa"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="space-y-2">
+                <Label>Fecha de inicio (opcional, formato YYYYMMDD)</Label>
+                <Input
+                  value={wizardData.start_date}
+                  onChange={e => setWizardData(prev => ({ ...prev, start_date: e.target.value }))}
+                  placeholder="20260413"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Ad Group / Assets + Preview */}
+          {wizardStep === 3 && (
+            <div className="space-y-4">
+              {wizardData.channel_type === 'SEARCH' && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Nombre del Ad Group</Label>
+                    <Input
+                      value={wizardData.ad_group_name}
+                      onChange={e => setWizardData(prev => ({ ...prev, ad_group_name: e.target.value }))}
+                      placeholder="Ad Group 1"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>CPC Bid (opcional, moneda de la cuenta)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={wizardData.ad_group_cpc_bid_micros}
+                      onChange={e => setWizardData(prev => ({ ...prev, ad_group_cpc_bid_micros: e.target.value }))}
+                      placeholder="Ej: 1.50"
+                    />
+                  </div>
+                </>
+              )}
+
+              {wizardData.channel_type === 'PERFORMANCE_MAX' && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Headlines (1 por linea, max 30 chars)</Label>
+                    <textarea
+                      className="w-full border rounded-md px-3 py-2 text-sm min-h-[80px]"
+                      value={wizardData.headlines}
+                      onChange={e => setWizardData(prev => ({ ...prev, headlines: e.target.value }))}
+                      placeholder="Headline 1&#10;Headline 2&#10;Headline 3"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Descripciones (1 por linea, max 90 chars)</Label>
+                    <textarea
+                      className="w-full border rounded-md px-3 py-2 text-sm min-h-[60px]"
+                      value={wizardData.descriptions}
+                      onChange={e => setWizardData(prev => ({ ...prev, descriptions: e.target.value }))}
+                      placeholder="Descripcion 1&#10;Descripcion 2"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Preview */}
+              <Card className="bg-muted/30">
+                <CardContent className="py-3 space-y-1 text-sm">
+                  <p className="font-medium">Resumen</p>
+                  <p>Nombre: <strong>{wizardData.name || '-'}</strong></p>
+                  <p>Tipo: <strong>{channelLabels[wizardData.channel_type] || wizardData.channel_type}</strong></p>
+                  <p>Presupuesto: <strong>${wizardData.daily_budget || '0'}/dia</strong></p>
+                  <p>Estrategia: <strong>{bidStrategies.find(b => b.value === wizardData.bid_strategy)?.label || wizardData.bid_strategy}</strong></p>
+                  <p className="text-xs text-muted-foreground mt-1">La campana se creara en estado PAUSADA.</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          <DialogFooter className="flex gap-2">
+            {wizardStep > 1 && (
+              <Button variant="outline" onClick={() => setWizardStep(s => s - 1)}>
+                Atras
+              </Button>
+            )}
+            <div className="flex-1" />
+            {wizardStep < 3 ? (
+              <Button
+                onClick={() => setWizardStep(s => s + 1)}
+                disabled={wizardStep === 1 && (!wizardData.name || !wizardData.daily_budget)}
+              >
+                Siguiente
+              </Button>
+            ) : (
+              <Button onClick={handleCreateCampaign} disabled={wizardLoading}>
+                {wizardLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+                Crear Campana
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
