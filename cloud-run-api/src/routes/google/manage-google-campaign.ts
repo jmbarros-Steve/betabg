@@ -511,6 +511,7 @@ async function handleCreateCampaign(
     start_date, ad_group_name, ad_group_cpc_bid_micros,
     // PMAX-specific
     final_urls, business_name, headlines, descriptions, long_headlines,
+    image_assets, youtube_video_ids,
     // Shopping-specific
     merchant_center_id,
   } = data;
@@ -745,10 +746,60 @@ async function handleCreateCampaign(
         },
       });
     }
+
+    // Image assets (must be in same batch for asset group validation)
+    if (image_assets?.length) {
+      for (const img of image_assets) {
+        const assetTempId = tempId--;
+        mutateOps.push({
+          assetOperation: {
+            create: {
+              resourceName: `customers/${customerId}/assets/${assetTempId}`,
+              type: 'IMAGE',
+              imageAsset: { data: img.data },
+              name: img.name || 'Image',
+            },
+          },
+        });
+        mutateOps.push({
+          assetGroupAssetOperation: {
+            create: {
+              asset: `customers/${customerId}/assets/${assetTempId}`,
+              assetGroup: `customers/${customerId}/assetGroups/-3`,
+              fieldType: img.field_type,
+            },
+          },
+        });
+      }
+    }
+
+    // YouTube video assets
+    if (youtube_video_ids?.length) {
+      for (const videoId of youtube_video_ids) {
+        const assetTempId = tempId--;
+        mutateOps.push({
+          assetOperation: {
+            create: {
+              resourceName: `customers/${customerId}/assets/${assetTempId}`,
+              type: 'YOUTUBE_VIDEO',
+              youtubeVideoAsset: { youtubeVideoId: videoId },
+            },
+          },
+        });
+        mutateOps.push({
+          assetGroupAssetOperation: {
+            create: {
+              asset: `customers/${customerId}/assets/${assetTempId}`,
+              assetGroup: `customers/${customerId}/assetGroups/-3`,
+              fieldType: 'YOUTUBE_VIDEO',
+            },
+          },
+        });
+      }
+    }
   }
 
-  console.log(`[manage-google-campaign] Creating ${channelType} campaign "${name}" with ${mutateOps.length} operations`);
-  console.log(`[manage-google-campaign] Payload:`, JSON.stringify(mutateOps, null, 2).slice(0, 2000));
+  console.log(`[manage-google-campaign] Creating ${channelType} campaign "${name}" with ${mutateOps.length} operations (images: ${image_assets?.length || 0}, videos: ${youtube_video_ids?.length || 0})`);
 
   const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, mutateOps);
 

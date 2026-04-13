@@ -100,7 +100,7 @@ export async function googleAdsMutate(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ mutateOperations }),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(60_000),
     });
   };
 

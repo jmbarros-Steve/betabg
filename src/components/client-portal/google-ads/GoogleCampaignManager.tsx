@@ -755,6 +755,29 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       if (wizardData.call_to_action) payload.call_to_action = wizardData.call_to_action;
       if (wizardData.display_url_path1) payload.display_url_path1 = wizardData.display_url_path1;
       if (wizardData.display_url_path2) payload.display_url_path2 = wizardData.display_url_path2;
+
+      // Convert images to base64 for single-batch creation (Google requires all assets together)
+      setWizardProgress('Procesando imagenes...');
+      const imageAssets: Array<{ data: string; field_type: string; name: string }> = [];
+      const allFiles = [
+        ...wizardData.images_landscape.map(f => ({ file: f, field_type: 'MARKETING_IMAGE' })),
+        ...wizardData.images_square.map(f => ({ file: f, field_type: 'SQUARE_MARKETING_IMAGE' })),
+        ...wizardData.images_logo.map(f => ({ file: f, field_type: 'LOGO' })),
+        ...wizardData.images_portrait.map(f => ({ file: f, field_type: 'PORTRAIT_MARKETING_IMAGE' })),
+        ...wizardData.images_landscape_logo.map(f => ({ file: f, field_type: 'LANDSCAPE_LOGO' })),
+      ];
+      for (const { file, field_type } of allFiles) {
+        try {
+          const data = await fileToBase64(file);
+          imageAssets.push({ data, field_type, name: file.name });
+        } catch {
+          toast.error(`Error procesando ${file.name}`);
+        }
+      }
+      if (imageAssets.length > 0) payload.image_assets = imageAssets;
+      if (wizardData.youtube_urls.length > 0) payload.youtube_video_ids = wizardData.youtube_urls;
+
+      setWizardProgress('Creando campana con assets...');
     }
 
     // Shopping
@@ -777,85 +800,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       return;
     }
 
-    // Phase 2: Upload images and videos for PMAX
-    if (isPmax) {
-      const allImages = [
-        ...wizardData.images_landscape.map(f => ({ file: f, field_type: 'MARKETING_IMAGE' })),
-        ...wizardData.images_square.map(f => ({ file: f, field_type: 'SQUARE_MARKETING_IMAGE' })),
-        ...wizardData.images_logo.map(f => ({ file: f, field_type: 'LOGO' })),
-        ...wizardData.images_portrait.map(f => ({ file: f, field_type: 'PORTRAIT_MARKETING_IMAGE' })),
-        ...wizardData.images_landscape_logo.map(f => ({ file: f, field_type: 'LANDSCAPE_LOGO' })),
-      ];
-      const allVideos = wizardData.youtube_urls;
-
-      if (allImages.length > 0 || allVideos.length > 0) {
-        setWizardProgress('Obteniendo asset group...');
-        const { data: agData, error: agError } = await callApi('manage-google-pmax', {
-          body: { action: 'list_asset_groups', connection_id: connectionId },
-        });
-
-        if (agError || !agData?.asset_groups?.length) {
-          toast.warning('Campana creada, pero no se pudo subir imagenes (asset group no encontrado)');
-        } else {
-          const assetGroup = agData.asset_groups.find(
-            (ag: any) => ag.campaign_name === wizardData.name
-          );
-
-          if (!assetGroup) {
-            toast.warning('Campana creada, pero no se encontro asset group para subir assets');
-          } else {
-            const assetGroupId = assetGroup.id;
-            const totalAssets = allImages.length + allVideos.length;
-            let uploaded = 0;
-            let errors = 0;
-
-            for (const { file, field_type } of allImages) {
-              uploaded++;
-              setWizardProgress(`Subiendo imagen ${uploaded}/${totalAssets}...`);
-              try {
-                const base64 = await fileToBase64(file);
-                const { error: imgError } = await callApi('manage-google-pmax', {
-                  body: {
-                    action: 'add_asset',
-                    connection_id: connectionId,
-                    asset_group_id: assetGroupId,
-                    data: { field_type, image_data: base64, image_name: file.name },
-                  },
-                });
-                if (imgError) { errors++; toast.error(`Error subiendo ${file.name}: ${imgError}`); }
-              } catch {
-                errors++;
-                toast.error(`Error procesando ${file.name}`);
-              }
-            }
-
-            for (const videoId of allVideos) {
-              uploaded++;
-              setWizardProgress(`Agregando video ${uploaded}/${totalAssets}...`);
-              const { error: vidError } = await callApi('manage-google-pmax', {
-                body: {
-                  action: 'add_asset',
-                  connection_id: connectionId,
-                  asset_group_id: assetGroupId,
-                  data: { field_type: 'YOUTUBE_VIDEO', youtube_video_id: videoId },
-                },
-              });
-              if (vidError) { errors++; toast.error(`Error agregando video: ${vidError}`); }
-            }
-
-            if (errors === 0) {
-              toast.success(`Campana creada con ${totalAssets} assets`);
-            } else {
-              toast.warning(`Campana creada, ${totalAssets - errors}/${totalAssets} assets subidos`);
-            }
-          }
-        }
-      } else {
-        toast.success('Campana creada en estado PAUSADA');
-      }
-    } else {
-      toast.success('Campana creada en estado PAUSADA');
-    }
+    toast.success('Campana creada en estado PAUSADA');
 
     setWizardLoading(false);
     setWizardProgress('');
