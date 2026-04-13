@@ -9,11 +9,11 @@ interface GoogleAdsRow {
     impressions?: string;
     clicks?: string;
     costMicros?: string;
-    conversions?: number;
-    conversionsValue?: number;
+    conversions?: string | number;
+    conversionsValue?: string | number;
     averageCpc?: string;
-    ctr?: number;
-    costPerConversion?: number;
+    ctr?: string | number;
+    costPerConversion?: string | number;
   };
   segments: {
     date: string;
@@ -258,14 +258,14 @@ export async function syncGoogleAdsMetrics(c: Context) {
           connection_id,
           metric_date: metricDate,
           metric_type: 'conversions',
-          metric_value: metrics.conversions,
+          metric_value: parseFloat(String(metrics.conversions)) || 0,
           currency: 'CLP'
         });
       }
 
       // Conversion Value → convert to CLP
       if (metrics.conversionsValue !== undefined) {
-        const valueCLP = await convertToCLP(metrics.conversionsValue, accountCurrency);
+        const valueCLP = await convertToCLP(parseFloat(String(metrics.conversionsValue)) || 0, accountCurrency);
         metricsToUpsert.push({
           connection_id,
           metric_date: metricDate,
@@ -294,14 +294,14 @@ export async function syncGoogleAdsMetrics(c: Context) {
           connection_id,
           metric_date: metricDate,
           metric_type: 'ctr',
-          metric_value: metrics.ctr,
+          metric_value: parseFloat(String(metrics.ctr)) || 0,
           currency: 'CLP'
         });
       }
 
       // Cost per Conversion → convert to CLP
       if (metrics.costPerConversion !== undefined) {
-        const cpcRaw = metrics.costPerConversion / 1000000;
+        const cpcRaw = (parseFloat(String(metrics.costPerConversion)) || 0) / 1000000;
         const cpcCLP = await convertToCLP(cpcRaw, accountCurrency);
         metricsToUpsert.push({
           connection_id,

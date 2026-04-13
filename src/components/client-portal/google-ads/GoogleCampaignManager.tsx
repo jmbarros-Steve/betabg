@@ -805,8 +805,8 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       </Dialog>
 
       {/* ─── Settings Dialog ────────────────────────────────────────── */}
-      <Dialog open={!!settingsCampaign} onOpenChange={() => setSettingsCampaign(null)}>
-        <DialogContent className="sm:max-w-[500px]">
+      <Dialog open={!!settingsCampaign} onOpenChange={() => setSettingsCampaign(null)} modal={false}>
+        <DialogContent className="sm:max-w-[500px]" onPointerDownOutside={e => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Configuracion de Campana</DialogTitle>
           </DialogHeader>
@@ -920,8 +920,8 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       </Dialog>
 
       {/* ─── Create Campaign Wizard ─────────────────────────────────── */}
-      <Dialog open={wizardOpen} onOpenChange={(open) => { setWizardOpen(open); if (!open) setWizardStep(1); }}>
-        <DialogContent className="sm:max-w-[550px] max-h-[80vh] overflow-y-auto">
+      <Dialog open={wizardOpen} onOpenChange={(open) => { setWizardOpen(open); if (!open) setWizardStep(1); }} modal={false}>
+        <DialogContent className="sm:max-w-[550px] max-h-[80vh] overflow-y-auto" onPointerDownOutside={e => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>
               Crear Campana — Paso {wizardStep} de 3
