@@ -35,6 +35,8 @@ import {
   ChevronDown,
   ChevronRight,
   AlertCircle,
+  Trash2,
+  CalendarIcon,
 } from 'lucide-react';
 import SteveRecommendation from './SteveRecommendation';
 
@@ -100,6 +102,93 @@ const bidStrategies = [
   { value: 'MAXIMIZE_CONVERSION_VALUE', label: 'Maximizar valor' },
 ];
 
+// ─── AssetLineEditor ─────────────────────────────────────────────────
+
+function AssetLineEditor({
+  label,
+  items,
+  maxLength,
+  maxItems,
+  minItems,
+  onChange,
+}: {
+  label: string;
+  items: string[];
+  maxLength: number;
+  maxItems: number;
+  minItems: number;
+  onChange: (items: string[]) => void;
+}) {
+  const validCount = items.filter(i => i.trim()).length;
+
+  const updateItem = (index: number, value: string) => {
+    const next = [...items];
+    next[index] = value;
+    onChange(next);
+  };
+
+  const removeItem = (index: number) => {
+    if (items.length <= 1) return;
+    onChange(items.filter((_, i) => i !== index));
+  };
+
+  const addItem = () => {
+    if (items.length >= maxItems) return;
+    onChange([...items, '']);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label>{label} <span className="text-muted-foreground font-normal">(min {minItems}, max {maxItems})</span></Label>
+        <span className={`text-xs ${validCount < minItems ? 'text-red-500' : 'text-muted-foreground'}`}>
+          {validCount}/{maxItems}
+        </span>
+      </div>
+      <div className="space-y-1.5">
+        {items.map((item, i) => {
+          const len = item.length;
+          const nearLimit = len > maxLength * 0.8;
+          const overLimit = len > maxLength;
+          return (
+            <div key={i} className="flex items-center gap-1.5">
+              <div className="flex-1 relative">
+                <Input
+                  value={item}
+                  onChange={e => updateItem(i, e.target.value)}
+                  placeholder={`${label} ${i + 1}`}
+                  maxLength={maxLength}
+                  className={overLimit ? 'border-red-300 focus-visible:ring-red-300' : ''}
+                />
+                <span className={`absolute right-2 top-1/2 -translate-y-1/2 text-[10px] pointer-events-none ${
+                  overLimit ? 'text-red-500' : nearLimit ? 'text-yellow-500' : 'text-muted-foreground/50'
+                }`}>
+                  {len}/{maxLength}
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-red-500"
+                onClick={() => removeItem(i)}
+                disabled={items.length <= 1}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+      {items.length < maxItems && (
+        <Button variant="outline" size="sm" className="w-full text-xs" onClick={addItem}>
+          <Plus className="w-3 h-3 mr-1" />
+          Agregar {label.toLowerCase()}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────
 
 export default function GoogleCampaignManager({ connectionId, clientId }: GoogleCampaignManagerProps) {
@@ -154,8 +243,9 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     // PMAX
     final_urls: '',
     business_name: '',
-    headlines: '',
-    descriptions: '',
+    headlines: [''] as string[],
+    long_headlines: [''] as string[],
+    descriptions: [''] as string[],
     // Shopping
     merchant_center_id: '',
   });
@@ -428,8 +518,9 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     if (wizardData.channel_type === 'PERFORMANCE_MAX') {
       payload.final_urls = wizardData.final_urls ? [wizardData.final_urls] : [];
       payload.business_name = wizardData.business_name || undefined;
-      payload.headlines = wizardData.headlines ? wizardData.headlines.split('\n').filter(Boolean) : [];
-      payload.descriptions = wizardData.descriptions ? wizardData.descriptions.split('\n').filter(Boolean) : [];
+      payload.headlines = wizardData.headlines.filter(h => h.trim());
+      payload.long_headlines = wizardData.long_headlines.filter(h => h.trim());
+      payload.descriptions = wizardData.descriptions.filter(d => d.trim());
     }
 
     // Shopping
@@ -459,7 +550,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       name: '', channel_type: 'SEARCH', daily_budget: '', bid_strategy: 'MAXIMIZE_CONVERSIONS',
       target_google_search: true, target_search_network: true, target_content_network: false,
       start_date: '', ad_group_name: 'Ad Group 1', ad_group_cpc_bid_micros: '',
-      final_urls: '', business_name: '', headlines: '', descriptions: '', merchant_center_id: '',
+      final_urls: '', business_name: '', headlines: [''], long_headlines: [''], descriptions: [''], merchant_center_id: '',
     });
     fetchCampaigns();
   };
@@ -472,6 +563,43 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
         daily_budget: rec.daily_budget ? String(rec.daily_budget) : prev.daily_budget,
       }));
       toast.success('Sugerencia de Steve aplicada');
+    }
+  };
+
+  const handleApplyPmaxRecommendation = (rec: any) => {
+    if (rec?.headlines || rec?.long_headlines || rec?.descriptions) {
+      setWizardData(prev => ({
+        ...prev,
+        headlines: rec.headlines?.length ? rec.headlines : prev.headlines,
+        long_headlines: rec.long_headlines?.length ? rec.long_headlines : prev.long_headlines,
+        descriptions: rec.descriptions?.length ? rec.descriptions : prev.descriptions,
+      }));
+      toast.success('Assets de Steve aplicados');
+    }
+  };
+
+  // Wizard step helpers
+  const isPmax = wizardData.channel_type === 'PERFORMANCE_MAX';
+  const totalSteps = isPmax ? 4 : 3;
+
+  const isStepValid = (step: number): boolean => {
+    switch (step) {
+      case 1:
+        return !!wizardData.name.trim() && !!wizardData.daily_budget && Number(wizardData.daily_budget) > 0;
+      case 2:
+        if (isPmax) return !!wizardData.final_urls.trim() && !!wizardData.business_name.trim();
+        if (wizardData.channel_type === 'SHOPPING') return !!wizardData.merchant_center_id.trim();
+        return true;
+      case 3:
+        if (isPmax) {
+          const validHeadlines = wizardData.headlines.filter(h => h.trim()).length;
+          const validLongHeadlines = wizardData.long_headlines.filter(h => h.trim()).length;
+          const validDescriptions = wizardData.descriptions.filter(d => d.trim()).length;
+          return validHeadlines >= 3 && validLongHeadlines >= 1 && validDescriptions >= 2;
+        }
+        return true;
+      default:
+        return true;
     }
   };
 
@@ -917,11 +1045,22 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
 
       {/* ─── Create Campaign Wizard ─────────────────────────────────── */}
       <Dialog open={wizardOpen} onOpenChange={(open) => { setWizardOpen(open); if (!open) setWizardStep(1); }}>
-        <DialogContent className="sm:max-w-[550px] max-h-[80vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Crear Campana — Paso {wizardStep} de 3
+              Crear Campana — Paso {wizardStep} de {totalSteps}
             </DialogTitle>
+            {/* Progress bar */}
+            <div className="flex gap-1 mt-2">
+              {Array.from({ length: totalSteps }, (_, i) => (
+                <div
+                  key={i}
+                  className={`h-1.5 flex-1 rounded-full transition-colors ${
+                    i + 1 <= wizardStep ? 'bg-primary' : 'bg-muted'
+                  }`}
+                />
+              ))}
+            </div>
           </DialogHeader>
 
           {/* Step 1: Basic */}
@@ -1030,7 +1169,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 </div>
               )}
 
-              {wizardData.channel_type === 'PERFORMANCE_MAX' && (
+              {isPmax && (
                 <>
                   <div className="space-y-2">
                     <Label>URL Final *</Label>
@@ -1041,86 +1180,161 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Nombre del negocio</Label>
+                    <Label>Nombre del negocio *</Label>
                     <Input
                       value={wizardData.business_name}
                       onChange={e => setWizardData(prev => ({ ...prev, business_name: e.target.value }))}
                       placeholder="Mi Empresa"
+                      maxLength={25}
                     />
+                    <p className="text-xs text-muted-foreground">{wizardData.business_name.length}/25</p>
                   </div>
                 </>
               )}
 
               <div className="space-y-2">
-                <Label>Fecha de inicio (opcional, formato YYYYMMDD)</Label>
+                <Label className="flex items-center gap-1.5">
+                  <CalendarIcon className="w-3.5 h-3.5" />
+                  Fecha de inicio (opcional)
+                </Label>
                 <Input
-                  value={wizardData.start_date}
-                  onChange={e => setWizardData(prev => ({ ...prev, start_date: e.target.value }))}
-                  placeholder="20260413"
+                  type="date"
+                  value={wizardData.start_date ? `${wizardData.start_date.slice(0,4)}-${wizardData.start_date.slice(4,6)}-${wizardData.start_date.slice(6,8)}` : ''}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setWizardData(prev => ({ ...prev, start_date: val ? val.replace(/-/g, '') : '' }));
+                  }}
                 />
               </div>
             </div>
           )}
 
-          {/* Step 3: Ad Group / Assets + Preview */}
-          {wizardStep === 3 && (
+          {/* Step 3 PMAX: Assets */}
+          {wizardStep === 3 && isPmax && (
+            <div className="space-y-5">
+              {/* Headlines */}
+              <AssetLineEditor
+                label="Headlines"
+                items={wizardData.headlines}
+                maxLength={30}
+                maxItems={15}
+                minItems={3}
+                onChange={headlines => setWizardData(prev => ({ ...prev, headlines }))}
+              />
+              {/* Long Headlines */}
+              <AssetLineEditor
+                label="Long Headlines"
+                items={wizardData.long_headlines}
+                maxLength={90}
+                maxItems={5}
+                minItems={1}
+                onChange={long_headlines => setWizardData(prev => ({ ...prev, long_headlines }))}
+              />
+              {/* Descriptions */}
+              <AssetLineEditor
+                label="Descripciones"
+                items={wizardData.descriptions}
+                maxLength={90}
+                maxItems={4}
+                minItems={2}
+                onChange={descriptions => setWizardData(prev => ({ ...prev, descriptions }))}
+              />
+              <SteveRecommendation
+                connectionId={connectionId}
+                recommendationType="pmax_assets"
+                channelType="PERFORMANCE_MAX"
+                context={`Negocio: ${wizardData.business_name || 'Sin nombre'}, URL: ${wizardData.final_urls || 'Sin URL'}`}
+                onApply={handleApplyPmaxRecommendation}
+              />
+            </div>
+          )}
+
+          {/* Step 3 SEARCH: Ad Group */}
+          {wizardStep === 3 && wizardData.channel_type === 'SEARCH' && (
             <div className="space-y-4">
-              {wizardData.channel_type === 'SEARCH' && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Nombre del Ad Group</Label>
-                    <Input
-                      value={wizardData.ad_group_name}
-                      onChange={e => setWizardData(prev => ({ ...prev, ad_group_name: e.target.value }))}
-                      placeholder="Ad Group 1"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>CPC Bid (opcional, moneda de la cuenta)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={wizardData.ad_group_cpc_bid_micros}
-                      onChange={e => setWizardData(prev => ({ ...prev, ad_group_cpc_bid_micros: e.target.value }))}
-                      placeholder="Ej: 1.50"
-                    />
-                  </div>
-                </>
-              )}
+              <div className="space-y-2">
+                <Label>Nombre del Ad Group</Label>
+                <Input
+                  value={wizardData.ad_group_name}
+                  onChange={e => setWizardData(prev => ({ ...prev, ad_group_name: e.target.value }))}
+                  placeholder="Ad Group 1"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>CPC Bid (opcional, moneda de la cuenta)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={wizardData.ad_group_cpc_bid_micros}
+                  onChange={e => setWizardData(prev => ({ ...prev, ad_group_cpc_bid_micros: e.target.value }))}
+                  placeholder="Ej: 1.50"
+                />
+              </div>
+            </div>
+          )}
 
-              {wizardData.channel_type === 'PERFORMANCE_MAX' && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Headlines (1 por linea, max 30 chars)</Label>
-                    <textarea
-                      className="w-full border rounded-md px-3 py-2 text-sm min-h-[80px]"
-                      value={wizardData.headlines}
-                      onChange={e => setWizardData(prev => ({ ...prev, headlines: e.target.value }))}
-                      placeholder="Headline 1&#10;Headline 2&#10;Headline 3"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Descripciones (1 por linea, max 90 chars)</Label>
-                    <textarea
-                      className="w-full border rounded-md px-3 py-2 text-sm min-h-[60px]"
-                      value={wizardData.descriptions}
-                      onChange={e => setWizardData(prev => ({ ...prev, descriptions: e.target.value }))}
-                      placeholder="Descripcion 1&#10;Descripcion 2"
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* Preview */}
+          {/* Preview step — last step for all types */}
+          {wizardStep === totalSteps && (
+            <div className="space-y-4">
               <Card className="bg-muted/30">
-                <CardContent className="py-3 space-y-1 text-sm">
-                  <p className="font-medium">Resumen</p>
-                  <p>Nombre: <strong>{wizardData.name || '-'}</strong></p>
-                  <p>Tipo: <strong>{channelLabels[wizardData.channel_type] || wizardData.channel_type}</strong></p>
-                  <p>Presupuesto: <strong>${wizardData.daily_budget || '0'}/dia</strong></p>
-                  <p>Estrategia: <strong>{bidStrategies.find(b => b.value === wizardData.bid_strategy)?.label || wizardData.bid_strategy}</strong></p>
-                  <p className="text-xs text-muted-foreground mt-1">La campana se creara en estado PAUSADA.</p>
+                <CardContent className="py-4 space-y-3 text-sm">
+                  <p className="font-medium text-base">Resumen de campana</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <p className="text-muted-foreground">Nombre</p>
+                    <p className="font-medium">{wizardData.name || '-'}</p>
+                    <p className="text-muted-foreground">Tipo</p>
+                    <p><Badge variant="outline">{channelLabels[wizardData.channel_type] || wizardData.channel_type}</Badge></p>
+                    <p className="text-muted-foreground">Presupuesto</p>
+                    <p className="font-medium">${wizardData.daily_budget || '0'}/dia</p>
+                    <p className="text-muted-foreground">Estrategia</p>
+                    <p className="font-medium">{bidStrategies.find(b => b.value === wizardData.bid_strategy)?.label || wizardData.bid_strategy}</p>
+                    {wizardData.start_date && (
+                      <>
+                        <p className="text-muted-foreground">Inicio</p>
+                        <p>{wizardData.start_date.slice(0,4)}-{wizardData.start_date.slice(4,6)}-{wizardData.start_date.slice(6,8)}</p>
+                      </>
+                    )}
+                  </div>
+
+                  {isPmax && (
+                    <div className="border-t pt-3 mt-3 space-y-2">
+                      <p className="font-medium">Assets PMAX</p>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">Headlines ({wizardData.headlines.filter(h => h.trim()).length})</p>
+                        <div className="flex flex-wrap gap-1">
+                          {wizardData.headlines.filter(h => h.trim()).map((h, i) => (
+                            <Badge key={i} variant="secondary" className="text-xs">{h}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">Long Headlines ({wizardData.long_headlines.filter(h => h.trim()).length})</p>
+                        <div className="flex flex-wrap gap-1">
+                          {wizardData.long_headlines.filter(h => h.trim()).map((h, i) => (
+                            <Badge key={i} variant="secondary" className="text-xs">{h}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">Descripciones ({wizardData.descriptions.filter(d => d.trim()).length})</p>
+                        <div className="flex flex-wrap gap-1">
+                          {wizardData.descriptions.filter(d => d.trim()).map((d, i) => (
+                            <Badge key={i} variant="secondary" className="text-xs max-w-[200px] truncate">{d}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                      {wizardData.business_name && (
+                        <p className="text-xs">Negocio: <strong>{wizardData.business_name}</strong></p>
+                      )}
+                      {wizardData.final_urls && (
+                        <p className="text-xs">URL: <strong>{wizardData.final_urls}</strong></p>
+                      )}
+                    </div>
+                  )}
+
+                  <p className="text-xs text-muted-foreground mt-2">La campana se creara en estado PAUSADA.</p>
                 </CardContent>
               </Card>
             </div>
@@ -1133,10 +1347,10 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
               </Button>
             )}
             <div className="flex-1" />
-            {wizardStep < 3 ? (
+            {wizardStep < totalSteps ? (
               <Button
                 onClick={() => setWizardStep(s => s + 1)}
-                disabled={wizardStep === 1 && (!wizardData.name || !wizardData.daily_budget)}
+                disabled={!isStepValid(wizardStep)}
               >
                 Siguiente
               </Button>

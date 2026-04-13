@@ -510,7 +510,7 @@ async function handleCreateCampaign(
     target_google_search, target_search_network, target_content_network,
     start_date, ad_group_name, ad_group_cpc_bid_micros,
     // PMAX-specific
-    final_urls, business_name, headlines, descriptions,
+    final_urls, business_name, headlines, descriptions, long_headlines,
     // Shopping-specific
     merchant_center_id,
   } = data;
@@ -668,7 +668,32 @@ async function handleCreateCampaign(
       }
     }
 
-    // Business name as long headline
+    // Long headlines
+    if (long_headlines?.length) {
+      for (const lh of long_headlines.slice(0, 5)) {
+        const assetTempId = tempId--;
+        mutateOps.push({
+          assetOperation: {
+            create: {
+              resourceName: `customers/${customerId}/assets/${assetTempId}`,
+              type: 'TEXT',
+              textAsset: { text: lh },
+            },
+          },
+        });
+        mutateOps.push({
+          assetGroupAssetOperation: {
+            create: {
+              asset: `customers/${customerId}/assets/${assetTempId}`,
+              assetGroup: `customers/${customerId}/assetGroups/-3`,
+              fieldType: 'LONG_HEADLINE',
+            },
+          },
+        });
+      }
+    }
+
+    // Business name
     if (business_name) {
       const assetTempId = tempId--;
       mutateOps.push({
@@ -685,7 +710,7 @@ async function handleCreateCampaign(
           create: {
             asset: `customers/${customerId}/assets/${assetTempId}`,
             assetGroup: `customers/${customerId}/assetGroups/-3`,
-            fieldType: 'LONG_HEADLINE',
+            fieldType: 'BUSINESS_NAME',
           },
         },
       });
