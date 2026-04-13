@@ -240,7 +240,7 @@ PERSONALIDAD:
 🌎 IDIOMA: Español latinoamericano neutro (México, Colombia, Chile, Perú, etc.). NO uses voseo argentino: no digas "vos", "podés", "tenés", "dale", "che", "acá" por "aquí". Usa "tú" y formas como "puedes", "tienes", "tendrás", "aquí".
 
 🐕 CONTEXTO CONVERSACIONAL (OBLIGATORIO EN CADA RESPUESTA):
-- Estructura de cada mensaje: (1) Reacción breve a lo que dijo — 1 a 3 oraciones, natural ("tiene sentido", "ah, claro", "me sirve"). (2) La siguiente pregunta que te indica el sistema — con su intro y texto. (3) Cierre opcional: "¿Alguna duda antes de seguir?" o "¿Te queda claro?" al menos 1 de cada 3 mensajes. No suenes a formulario; habla como en un chat.
+- Estructura de cada mensaje: (1) Reacción breve a lo que dijo — 1 a 3 oraciones, natural ("tiene sentido", "ah, claro", "me sirve"). (2) Tu evaluación o comentario sobre la respuesta. (3) Cierre opcional: "¿Alguna duda antes de seguir?" o "¿Te queda claro?" al menos 1 de cada 3 mensajes. No suenes a formulario; habla como en un chat.
 - El brief NO está listo hasta que el cliente termine TODAS las preguntas. TÚ le avisarás cuando esté listo (solo después de la pregunta 16).
 - Debes dejar claro: "El brief todavía no está listo — lo voy armando con lo que me vas contando. Cuando terminemos todas las preguntas te aviso y lo tendrás. Puedes entrar y salir cuando quieras, guardamos el progreso."
 - Repite esta idea de forma natural cada tanto: que puede ir y volver, y que el brief lo generas tú cuando terminen.
@@ -271,10 +271,10 @@ Q0 (website_url): Si el cliente escribe "sin web" o "no tengo", ACEPTA la respue
 
 Tu trabajo en CADA turno:
 1. Reaccionar a lo que dijo (1-3 oraciones, conversacional)
-2. Si el cliente hace una pregunta o pide aclaración, respóndele brevemente y luego sigue con la siguiente pregunta del cuestionario. La conversación puede fluir (preguntas suyas, dudas) pero siempre basada en las preguntas tipo en orden.
-3. Puedes ofrecer: "¿Tienes alguna duda sobre esto antes de seguir?" cuando tenga sentido. Si dice que no, pasa a la siguiente pregunta.
-4. Si toca, recordar que puede salir y volver y que el brief lo tendrá cuando terminen todas las preguntas (tú se lo dirás cuando esté listo)
-5. HACER la siguiente pregunta que te indica el sistema (con naturalidad, no como robot)
+2. Si el cliente hace una pregunta o pide aclaración, respóndele brevemente. NO incluyas [AVANZAR] ni [RECHAZO] en ese caso.
+3. Evalúa la respuesta según la guía del sistema.
+4. Si la respuesta es aceptable: escribe tu comentario y termina con [AVANZAR]. Si es incompleta o fuera de tema: explica qué falta y termina con [RECHAZO].
+5. NUNCA escribas la siguiente pregunta tú mismo — el sistema la agrega automáticamente después de [AVANZAR]. Tu mensaje TERMINA en [AVANZAR] o [RECHAZO].
 
 🚨 REGLA ABSOLUTA #2: FORMULARIOS Y EJEMPLOS
 Cuando la siguiente pregunta tiene FORMULARIO:
@@ -2066,8 +2066,39 @@ REGLAS ABSOLUTAS:
   if (isFormSubmission && isRejection) {
     console.log(`[steve-chat] Form submission overrides AI rejection for Q${currentQuestionIndex}`);
   }
+
+  // Safety net: detect if AI wrote the next question without [AVANZAR] (off-script).
+  // If the next question's distinctive text appears in the response, treat as implicit advance.
+  let implicitAdvanceDetected = false;
+  if (!assistantMessage.includes('[AVANZAR]') && !isRejection && !isLastQuestion) {
+    const nextBriefQ = BRAND_BRIEF_QUESTIONS[currentQuestionIndex + 1];
+    if (nextBriefQ) {
+      const nextQSignature = nextBriefQ.question.substring(0, 50);
+      const nextIntroSignature = (nextBriefQ.steveIntro || '').substring(0, 30);
+      const qNumberPattern = `Pregunta ${currentQuestionIndex + 2}`;
+      const qNumberPatternBold = `**Pregunta ${currentQuestionIndex + 2}`;
+
+      // Find earliest occurrence of any next-question signal
+      const candidates = [
+        nextQSignature ? assistantMessage.indexOf(nextQSignature) : -1,
+        nextIntroSignature ? assistantMessage.indexOf(nextIntroSignature) : -1,
+        assistantMessage.indexOf(qNumberPattern),
+        assistantMessage.indexOf(qNumberPatternBold),
+      ].filter(i => i > 0);
+
+      if (candidates.length > 0) {
+        console.log(`[steve-chat] IMPLICIT ADVANCE: AI wrote Q${currentQuestionIndex + 1} without [AVANZAR], fixing`);
+        implicitAdvanceDetected = true;
+        const truncIdx = Math.min(...candidates);
+        assistantMessage = assistantMessage.substring(0, truncIdx)
+          .replace(/[\s\n*_~`#>-]+$/, '')  // strip trailing markdown/whitespace
+          .trim();
+      }
+    }
+  }
+
   const effectiveRejection = isRejection && !isFormSubmission;
-  const hasAdvanced = !effectiveRejection && (assistantMessage.includes('[AVANZAR]') || isLastQuestion || isFormSubmission);
+  const hasAdvanced = !effectiveRejection && (assistantMessage.includes('[AVANZAR]') || isLastQuestion || isFormSubmission || implicitAdvanceDetected);
   // Truncate at control tags — everything from the tag onwards is removed.
   // This prevents the AI from leaking next-question content after [AVANZAR].
   const avanzarIdx = assistantMessage.indexOf('[AVANZAR]');

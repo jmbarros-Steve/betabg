@@ -248,7 +248,30 @@ export function renderBrandIdentity(
 
   helpers.addSectionHeader('A', 'IDENTIDAD DE MARCA');
 
-  // Render ALL keys generically — handles any AI-generated structure
+  // Extract key fields explicitly before generic fallback
+  const pv = brandIdentity.propuesta_valor || brandIdentity.propuesta_valor_actual || brandIdentity.propuesta_de_valor_actual;
+  if (pv) {
+    helpers.addSubTitle('Propuesta de Valor');
+    if (typeof pv === 'string') {
+      helpers.addBody(pv);
+    } else {
+      if (pv.promesa_principal || pv.promesa_central) helpers.addKeyValue('Promesa', pv.promesa_principal || pv.promesa_central);
+      if (pv.diferenciador_clave || pv.diferenciador) helpers.addKeyValue('Diferenciador', pv.diferenciador_clave || pv.diferenciador);
+      if (pv.eslogan || pv.frase_principal) helpers.addKeyValue('Eslogan', pv.eslogan || pv.frase_principal);
+    }
+  }
+  const tono = brandIdentity.tono_voz || brandIdentity.tono_y_voz;
+  if (tono) {
+    helpers.addSubTitle('Tono de Voz');
+    helpers.addBody(typeof tono === 'string' ? tono : JSON.stringify(tono));
+  }
+  const personalidad = brandIdentity.personalidad_marca || brandIdentity.personalidad_de_marca;
+  if (personalidad) {
+    helpers.addSubTitle('Personalidad de Marca');
+    helpers.addBody(typeof personalidad === 'string' ? personalidad : JSON.stringify(personalidad));
+  }
+
+  // Generic fallback for remaining keys
   renderGenericObject(helpers, brandIdentity, 20);
 }
 
@@ -615,9 +638,11 @@ export function renderKeywordPhases(
 
   helpers.addSubTitle('Estrategia de Keywords por Fases');
 
-  const phaseKeys = Object.keys(roadmap).filter(k =>
-    k.toLowerCase().includes('phase') || k.toLowerCase().includes('fase')
-  ).sort();
+  const phaseKeys = Object.keys(roadmap).filter(k => {
+    const kl = k.toLowerCase();
+    return kl.includes('phase') || kl.includes('fase') || kl.includes('etapa')
+      || /^(phase|fase|etapa)[_\s]?\d/i.test(k);
+  }).sort();
 
   const phaseStyles: { label: string; color: [number,number,number]; bg: [number,number,number] }[] = [
     { label: 'FASE 1 — Quick Wins', color: [27, 42, 74], bg: [230, 240, 255] },

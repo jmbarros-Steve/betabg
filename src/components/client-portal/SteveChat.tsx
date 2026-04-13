@@ -602,21 +602,42 @@ export function SteveChat({ clientId }: SteveChatProps) {
         return;
       }
 
+      // Fetch brief data for strategy context
+      const { data: bpData } = await supabase
+        .from('buyer_personas').select('persona_data')
+        .eq('client_id', cId).maybeSingle();
+      const briefData = (bpData?.persona_data as Record<string, any>) || {};
+
       // Phase 2: Strategy (12 parallel Claude Sonnet calls)
       setAnalysisPhase('strategy');
-      const { data: strategyData, error: strategyErr } = await callApi('analyze-brand-strategy', {
-        body: { client_id: cId, research: researchData.research },
+      const strategyBody = {
+        client_id: cId,
+        research: researchData.research,
+        fase_negocio: briefData.fase_negocio || '',
+        presupuesto_ads: briefData.presupuesto_ads || '',
+      };
+      let { data: strategyData, error: strategyErr } = await callApi('analyze-brand-strategy', {
+        body: strategyBody,
+        timeoutMs: 180000,
       });
       if (strategyErr) {
-        // Strategy failed, will report via toast
-        await supabase.from('brand_research').upsert({
-          client_id: cId, research_type: 'analysis_status',
-          research_data: { status: 'error', error: strategyErr?.message || 'Strategy failed' },
-        }, { onConflict: 'client_id,research_type' });
-        setIsAnalyzing(false);
-        setAnalysisPhase(null);
-        toast.error('Error en la estrategia');
-        return;
+        console.log('[analysis-chain] Strategy failed, retrying once...');
+        const retry = await callApi('analyze-brand-strategy', {
+          body: strategyBody,
+          timeoutMs: 180000,
+        });
+        if (retry.error) {
+          await supabase.from('brand_research').upsert({
+            client_id: cId, research_type: 'analysis_status',
+            research_data: { status: 'error', error: retry.error?.message || 'Strategy failed after retry' },
+          }, { onConflict: 'client_id,research_type' });
+          setIsAnalyzing(false);
+          setAnalysisPhase(null);
+          toast.error('Error en la estrategia. Puedes reintentar desde el tab Brief.');
+          return;
+        }
+        strategyData = retry.data;
+        strategyErr = null;
       }
 
       // Mark complete

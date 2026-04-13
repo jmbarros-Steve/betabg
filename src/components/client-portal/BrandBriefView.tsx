@@ -1096,6 +1096,17 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       }
     }
 
+    // ── BRAND IDENTITY: normalize key variants ──
+    if (r.brand_identity && typeof r.brand_identity === 'object') {
+      const bi = r.brand_identity as Record<string, any>;
+      if (!bi.tono_voz && bi.tono_y_voz) bi.tono_voz = bi.tono_y_voz;
+      if (!bi.personalidad_marca && bi.personalidad_de_marca) bi.personalidad_marca = bi.personalidad_de_marca;
+      if (!bi.propuesta_valor && (bi.propuesta_valor_actual || bi.propuesta_de_valor_actual))
+        bi.propuesta_valor = bi.propuesta_valor_actual || bi.propuesta_de_valor_actual;
+      if (!bi.valores_marca && bi.valores_marca_identificados) bi.valores_marca = bi.valores_marca_identificados;
+      if (!bi.valores_marca && bi.valores_de_marca) bi.valores_marca = bi.valores_de_marca;
+    }
+
     // ── COMPETITIVE ANALYSIS: map competitive_analysis → competitor_analysis, then individual_analysis → competitors ──
     // The DB stores research_type='competitive_analysis' but UI expects r.competitor_analysis
     if ((r as any).competitive_analysis && !(r as any).competitor_analysis) {
@@ -2570,6 +2581,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       renderKwGroupStyled('Keywords Principales', kw.primary || [], [238, 242, 249]);
       renderKwGroupStyled('Long-tail (Baja Competencia)', kw.long_tail || [], [237, 247, 240]);
       renderKwGroupStyled('Keywords de Competidores', kw.competitor_keywords || [], [253, 248, 240]);
+      renderKwGroupStyled('Keywords Negativos', kw.negative_keywords || [], [253, 238, 238]);
+      if (kw.recommended_strategy) {
+        pdfHelpers.addSubTitle('Estrategia Recomendada');
+        pdfHelpers.addBody(typeof kw.recommended_strategy === 'string' ? kw.recommended_strategy : JSON.stringify(kw.recommended_strategy));
+      }
       // Keyword phases from roadmap
       if (kw.keyword_strategy_roadmap) { renderKeywordPhases(pdfCtx, pdfHelpers, kw.keyword_strategy_roadmap); }
       else { renderGlossaryBox(pdfCtx, pdfHelpers, 'keywords'); }
@@ -5224,35 +5240,43 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                         </div>
                       )}
 
-                      {/* Mapa Perceptual */}
-                      {(research.positioning_strategy as any).mapa_perceptual && (
-                        <div className="bg-muted/30 rounded-lg p-4 border border-border">
-                          <p className="text-sm font-medium text-primary mb-2">📊 Mapa Perceptual</p>
-                          <div className="grid grid-cols-2 gap-2 mb-3">
-                            <div className="text-xs"><span className="text-muted-foreground">Eje X:</span> <span className="font-medium">{(research.positioning_strategy as any).mapa_perceptual.eje_x}</span></div>
-                            <div className="text-xs"><span className="text-muted-foreground">Eje Y:</span> <span className="font-medium">{(research.positioning_strategy as any).mapa_perceptual.eje_y}</span></div>
+                      {/* Mapa Perceptual — SVG scatter plot */}
+                      {(research.positioning_strategy as any).mapa_perceptual && (() => {
+                        const mp = (research.positioning_strategy as any).mapa_perceptual;
+                        const positions = mp.posiciones ? Object.entries(mp.posiciones) : [];
+                        const W = 360, H = 280, PAD = 45;
+                        const colors = ['#6366f1','#f97316','#22c55e','#ef4444','#eab308','#06b6d4'];
+                        return (
+                          <div className="bg-muted/30 rounded-lg p-4 border border-border">
+                            <p className="text-sm font-medium text-primary mb-2">Mapa Perceptual</p>
+                            <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[500px] mx-auto">
+                              {/* Axes */}
+                              <line x1={PAD} y1={H-PAD} x2={W-10} y2={H-PAD} stroke="#555" strokeWidth="1"/>
+                              <line x1={PAD} y1={H-PAD} x2={PAD} y2={10} stroke="#555" strokeWidth="1"/>
+                              {/* Labels */}
+                              <text x={(W+PAD)/2} y={H-8} textAnchor="middle" fontSize="11" fill="#94a3b8">{mp.eje_x || 'Eje X'}</text>
+                              <text x={12} y={(H-PAD)/2} textAnchor="middle" fontSize="11" fill="#94a3b8" transform={`rotate(-90,12,${(H-PAD)/2})`}>{mp.eje_y || 'Eje Y'}</text>
+                              {/* Grid lines */}
+                              <line x1={PAD} y1={(H-PAD)/2} x2={W-10} y2={(H-PAD)/2} stroke="#333" strokeDasharray="4"/>
+                              <line x1={(W+PAD)/2} y1={10} x2={(W+PAD)/2} y2={H-PAD} stroke="#333" strokeDasharray="4"/>
+                              {/* Brand dots */}
+                              {positions.map(([key, val]: [string, any], i: number) => {
+                                const rawX = parseFloat(val?.x || val?.posicion_x || val?.score_x || 5);
+                                const rawY = parseFloat(val?.y || val?.posicion_y || val?.score_y || 5);
+                                const maxVal = 10;
+                                const cx = PAD + (rawX / maxVal) * (W - PAD - 10);
+                                const cy = (H - PAD) - (rawY / maxVal) * (H - PAD - 10);
+                                return (
+                                  <g key={key}>
+                                    <circle cx={cx} cy={cy} r="6" fill={colors[i % colors.length]} opacity="0.85"/>
+                                    <text x={cx + 9} y={cy + 4} fontSize="9" fill="#e2e8f0">{key.replace(/_/g,' ')}</text>
+                                  </g>
+                                );
+                              })}
+                            </svg>
                           </div>
-                          {(research.positioning_strategy as any).mapa_perceptual.posiciones && (
-                            <div className="space-y-2">
-                              {Object.entries((research.positioning_strategy as any).mapa_perceptual.posiciones).map(([key, val]: [string, any]) => (
-                                <div key={key} className="flex items-center gap-3 text-xs bg-background rounded p-2 border border-border">
-                                  <Badge variant="outline" className="text-[10px] capitalize">{key.replace(/_/g, ' ')}</Badge>
-                                  {typeof val === 'string' ? (
-                                    <span className="flex-1">{val}</span>
-                                  ) : (
-                                    <>
-                                      {(val.x || val.posicion_x || val.score_x) && (val.y || val.posicion_y || val.score_y) ? (
-                                        <span className="text-muted-foreground">({val.x || val.posicion_x || val.score_x}, {val.y || val.posicion_y || val.score_y})</span>
-                                      ) : null}
-                                      <span className="flex-1">{val.descripcion || val.description || (typeof val === 'object' ? Object.entries(val).filter(([,v]) => v != null && String(v).trim()).map(([k,v]) => `${k}: ${v}`).join(' | ') : safeText(val))}</span>
-                                    </>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Posicionamiento de Competidores */}
                       {(research.positioning_strategy as any).posicionamiento_competidores && typeof (research.positioning_strategy as any).posicionamiento_competidores === 'object' && (
