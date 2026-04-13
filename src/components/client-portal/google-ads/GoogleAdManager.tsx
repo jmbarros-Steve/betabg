@@ -209,6 +209,10 @@ export default function GoogleAdManager({ connectionId, clientId }: GoogleAdMana
     ? adGroups.filter(ag => String(ag.campaign_id) === String(dialogCampaignId))
     : adGroups;
 
+  // Count RSA per ad group (Google recommends max 3)
+  const rsaCountByAdGroup = (adGroupId: string) =>
+    ads.filter(a => String(a.ad_group_id) === String(adGroupId)).length;
+
   const filteredAds = ads.filter(ad => {
     if (statusFilter !== 'ALL' && ad.status !== statusFilter) return false;
     if (searchQuery) {
@@ -375,8 +379,18 @@ export default function GoogleAdManager({ connectionId, clientId }: GoogleAdMana
                       onChange={e => setSelectedAdGroup(e.target.value)}
                     >
                       <option value="">Seleccionar ad group</option>
-                      {dialogAdGroups.map(ag => <option key={ag.id} value={ag.id}>{ag.name}</option>)}
+                      {dialogAdGroups.map(ag => {
+                        const count = rsaCountByAdGroup(ag.id);
+                        return (
+                          <option key={ag.id} value={ag.id}>
+                            {ag.name} ({count} RSA{count >= 3 ? ' - MAX' : ''})
+                          </option>
+                        );
+                      })}
                     </select>
+                    {selectedAdGroup && rsaCountByAdGroup(selectedAdGroup) >= 3 && (
+                      <p className="text-xs text-yellow-600">Google recomienda max 3 RSA por ad group. Ya tienes {rsaCountByAdGroup(selectedAdGroup)}.</p>
+                    )}
                   </div>
                 </>
               )}

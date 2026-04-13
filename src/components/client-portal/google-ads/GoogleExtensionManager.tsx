@@ -59,6 +59,21 @@ const SNIPPET_HEADERS = [
   'Shows', 'Styles', 'Types',
 ];
 
+// Google Ads limits per campaign
+const CAMPAIGN_LIMITS: Record<string, number> = {
+  SITELINK: 20,
+  CALLOUT: 20,
+  STRUCTURED_SNIPPET: 2,
+  CALL: 1,
+};
+
+const FIELD_TYPE_MAP: Record<string, string> = {
+  sitelink: 'SITELINK',
+  callout: 'CALLOUT',
+  snippet: 'STRUCTURED_SNIPPET',
+  call: 'CALL',
+};
+
 export default function GoogleExtensionManager({ connectionId, clientId }: GoogleExtensionManagerProps) {
   const [tab, setTab] = useState('sitelinks');
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -121,6 +136,15 @@ export default function GoogleExtensionManager({ connectionId, clientId }: Googl
   const getCampaignAssetResource = (assetId: string, campaignId: string) =>
     campaignAssets.find(ca => ca.asset_id === assetId && ca.campaign_id === campaignId)?.resource_name;
 
+  // Count how many assets of a type are linked to a campaign
+  const countLinked = (campaignId: string, fieldType: string) =>
+    campaignAssets.filter(ca => ca.campaign_id === campaignId && ca.field_type === fieldType).length;
+
+  const getLimit = (fieldType: string) => CAMPAIGN_LIMITS[fieldType] || 20;
+
+  const isAtLimit = (campaignId: string, fieldType: string) =>
+    countLinked(campaignId, fieldType) >= getLimit(fieldType);
+
   const handleCreate = async () => {
     if (!createType) return;
 
@@ -166,8 +190,17 @@ export default function GoogleExtensionManager({ connectionId, clientId }: Googl
           break;
       }
 
-      // Auto-link to campaign if selected
-      if (formData.campaign_id) body.campaign_id = formData.campaign_id;
+      // Auto-link to campaign if selected — check limit first
+      if (formData.campaign_id) {
+        const fieldType = FIELD_TYPE_MAP[createType] || '';
+        const current = countLinked(formData.campaign_id, fieldType);
+        const limit = getLimit(fieldType);
+        if (current >= limit) {
+          toast.error(`Limite alcanzado: ${current}/${limit} ${fieldType.toLowerCase()} en esta campana`);
+          return;
+        }
+        body.campaign_id = formData.campaign_id;
+      }
 
       const { error } = await callApi('manage-google-extensions', {
         body: { action: actionName, connection_id: connectionId, data: body },
@@ -185,6 +218,16 @@ export default function GoogleExtensionManager({ connectionId, clientId }: Googl
 
   const handleLink = async () => {
     if (!linkAsset || !linkCampaignId) return;
+
+    // Check limit before linking
+    const fieldType = linkAsset.type;
+    const current = countLinked(linkCampaignId, fieldType);
+    const limit = getLimit(fieldType);
+    if (current >= limit) {
+      toast.error(`Limite alcanzado: ${current}/${limit} ${fieldType.toLowerCase()} en esta campana`);
+      return;
+    }
+
     setLinking(true);
     try {
       const fieldTypeMap: Record<string, string> = {
@@ -424,8 +467,23 @@ export default function GoogleExtensionManager({ connectionId, clientId }: Googl
               onChange={e => setFormData(p => ({ ...p, campaign_id: e.target.value }))}
             >
               <option value="">Sin campana (solo crear)</option>
-              {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {campaigns.map(c => {
+                const ft = FIELD_TYPE_MAP[createType || ''] || '';
+                const used = countLinked(c.id, ft);
+                const max = getLimit(ft);
+                const full = used >= max;
+                return (
+                  <option key={c.id} value={c.id} disabled={full}>
+                    {c.name} ({used}/{max}){full ? ' - LLENO' : ''}
+                  </option>
+                );
+              })}
             </select>
+            {formData.campaign_id && createType && (
+              <p className="text-xs text-muted-foreground">
+                {countLinked(formData.campaign_id, FIELD_TYPE_MAP[createType] || '')}/{getLimit(FIELD_TYPE_MAP[createType] || '')} usados en esta campana
+              </p>
+            )}
           </div>
 
           {createType === 'sitelink' && (
@@ -525,8 +583,23 @@ export default function GoogleExtensionManager({ connectionId, clientId }: Googl
                 onChange={e => setLinkCampaignId(e.target.value)}
               >
                 <option value="">Seleccionar campana</option>
-                {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {campaigns.map(c => {
+                  const ft = linkAsset?.type || '';
+                  const used = countLinked(c.id, ft);
+                  const max = getLimit(ft);
+                  const full = used >= max;
+                  return (
+                    <option key={c.id} value={c.id} disabled={full}>
+                      {c.name} ({used}/{max}){full ? ' - LLENO' : ''}
+                    </option>
+                  );
+                })}
               </select>
+              {linkCampaignId && linkAsset && (
+                <p className="text-xs text-muted-foreground">
+                  {countLinked(linkCampaignId, linkAsset.type)}/{getLimit(linkAsset.type)} usados
+                </p>
+              )}
             </div>
           )}
           <DialogFooter>
