@@ -637,13 +637,15 @@ async function handleCreateCampaign(
     // Headlines
     if (headlines?.length) {
       for (const hl of headlines.slice(0, 15)) {
+        const text = hl.slice(0, 30); // Google Ads max 30 chars
+        if (!text) continue;
         const assetTempId = tempId--;
         mutateOps.push({
           assetOperation: {
             create: {
               resourceName: `customers/${customerId}/assets/${assetTempId}`,
               type: 'TEXT',
-              textAsset: { text: hl },
+              textAsset: { text },
             },
           },
         });
@@ -662,13 +664,15 @@ async function handleCreateCampaign(
     // Descriptions
     if (descriptions?.length) {
       for (const desc of descriptions.slice(0, 4)) {
+        const text = desc.slice(0, 90); // Google Ads max 90 chars
+        if (!text) continue;
         const assetTempId = tempId--;
         mutateOps.push({
           assetOperation: {
             create: {
               resourceName: `customers/${customerId}/assets/${assetTempId}`,
               type: 'TEXT',
-              textAsset: { text: desc },
+              textAsset: { text },
             },
           },
         });
@@ -687,13 +691,15 @@ async function handleCreateCampaign(
     // Long headlines
     if (long_headlines?.length) {
       for (const lh of long_headlines.slice(0, 5)) {
+        const text = lh.slice(0, 90); // Google Ads max 90 chars
+        if (!text) continue;
         const assetTempId = tempId--;
         mutateOps.push({
           assetOperation: {
             create: {
               resourceName: `customers/${customerId}/assets/${assetTempId}`,
               type: 'TEXT',
-              textAsset: { text: lh },
+              textAsset: { text },
             },
           },
         });

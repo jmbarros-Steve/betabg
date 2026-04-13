@@ -125,7 +125,7 @@ function AssetLineEditor({
 
   const updateItem = (index: number, value: string) => {
     const next = [...items];
-    next[index] = value;
+    next[index] = value.slice(0, maxLength);
     onChange(next);
   };
 
