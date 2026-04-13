@@ -540,6 +540,7 @@ async function handleCreateCampaign(
         resourceName: `customers/${customerId}/campaignBudgets/-1`,
         name: `Budget - ${name}`,
         amountMicros,
+        explicitlyShared: false,
       },
     },
   });
@@ -552,6 +553,7 @@ async function handleCreateCampaign(
     status: 'PAUSED',
     campaignBudget: `customers/${customerId}/campaignBudgets/-1`,
     biddingStrategyType: bidStrategy,
+    containsEuPoliticalAdvertising: false,
   };
 
   // Geo targeting only for non-PMAX (PMAX manages targeting automatically)
