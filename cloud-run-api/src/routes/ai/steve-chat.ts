@@ -1820,6 +1820,8 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
 
     questionContext = `\n\n═══ INSTRUCCIÓN DEL SISTEMA ═══${retryBlock}
 
+🚨 OVERRIDE: Ignora las instrucciones anteriores sobre "HACER la siguiente pregunta" y "Estructura de cada mensaje". En este turno SOLO evalúas. La siguiente pregunta la agrega el sistema automáticamente DESPUÉS de tu mensaje. NO la escribas tú.
+
 PREGUNTA QUE EL CLIENTE ESTÁ RESPONDIENDO AHORA: ${justAnsweredLabel}
 GUÍA PARA EVALUAR Y COMENTAR: ${justAnsweredQ?.commentGuide || 'Comenta brevemente la respuesta.'}
 
@@ -1829,10 +1831,10 @@ VALIDACIÓN DE RELEVANCIA: Verifica que la respuesta corresponde al tema "${just
 
 SI EL CLIENTE HIZO UNA PREGUNTA DE ACLARACIÓN → respóndela brevemente, NO incluyas [AVANZAR] ni [RECHAZO].
 
-TU TRABAJO: Evalúa la respuesta y da tu comentario conversacional (1-3 oraciones).
-- Respuesta BUENA → comenta + [AVANZAR] al final.
-- Respuesta MALA/incompleta → explica qué falta + [RECHAZO] al final.
-⚠️ DESPUÉS de tu comentario y el tag, PARA. NO hagas la siguiente pregunta. NO pidas información adicional fuera de la guía. La siguiente pregunta la agrega el sistema automáticamente.`;
+FORMATO OBLIGATORIO:
+Tu comentario conversacional (1-3 oraciones) + [AVANZAR] o [RECHAZO]
+
+⚠️ CRITICAL: El sistema CORTA tu mensaje en [AVANZAR] o [RECHAZO]. Todo texto que escribas DESPUÉS del tag será ELIMINADO. NO escribas la siguiente pregunta, NO pidas más información, NO agregues nada después del tag.`;
 
     if (!isRetryMode && currentQuestionIndex === 0) {
       questionContext += '\n\nINSTRUCCIÓN EXTRA Q0: El cliente acaba de dar su URL. Confírmale brevemente que la guardaste y que la usarás para el análisis. Incluye [AVANZAR] al final.';
@@ -2066,12 +2068,16 @@ REGLAS ABSOLUTAS:
   }
   const effectiveRejection = isRejection && !isFormSubmission;
   const hasAdvanced = !effectiveRejection && (assistantMessage.includes('[AVANZAR]') || isLastQuestion || isFormSubmission);
-  // Strip control tags from visible message
-  assistantMessage = assistantMessage
-    .replace(/\s*\[RECHAZO\]\s*/gi, ' ')
-    .replace(/\s*\[AVANZAR\]\s*/gi, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
+  // Truncate at control tags — everything from the tag onwards is removed.
+  // This prevents the AI from leaking next-question content after [AVANZAR].
+  const avanzarIdx = assistantMessage.indexOf('[AVANZAR]');
+  if (avanzarIdx !== -1) {
+    assistantMessage = assistantMessage.substring(0, avanzarIdx).trim();
+  }
+  const rechazoIdx = assistantMessage.indexOf('[RECHAZO]');
+  if (rechazoIdx !== -1) {
+    assistantMessage = assistantMessage.substring(0, rechazoIdx).trim();
+  }
 
   // Append next question deterministically when advancing
   if (hasAdvanced && !isLastQuestion) {
