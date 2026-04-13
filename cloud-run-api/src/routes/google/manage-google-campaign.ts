@@ -846,7 +846,10 @@ Responde en JSON: { "bid_strategy": "...", "reasoning": "..." }`;
     });
 
     const result = await response.json() as any;
-    const text = result?.content?.[0]?.text || '{}';
+    let text = result?.content?.[0]?.text || '{}';
+
+    // Strip markdown code fences (```json ... ```)
+    text = text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
 
     let recommendation: any;
     try {
