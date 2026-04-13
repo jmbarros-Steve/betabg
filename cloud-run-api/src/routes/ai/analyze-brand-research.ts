@@ -57,27 +57,51 @@ export async function analyzeBrandResearch(c: Context) {
     );
   }
 
+  const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+
   async function scrapeUrl(url: string): Promise<string> {
-    if (!apifyToken) return '';
-    try {
-      const resp = await fetch(
-        `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${encodeURIComponent(apifyToken)}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            startUrls: [{ url }],
-            maxCrawlPages: 1,
-            outputFormats: ['markdown'],
-          }),
-        }
-      );
-      const items: any = await resp.json();
-      return items?.[0]?.text || items?.[0]?.markdown || '';
-    } catch (e) {
-      console.error('Scrape error for', url, e);
-      return '';
+    // Try Apify first (cheaper)
+    if (apifyToken) {
+      try {
+        const resp = await fetch(
+          `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${encodeURIComponent(apifyToken)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              startUrls: [{ url }],
+              maxCrawlPages: 1,
+              outputFormats: ['markdown'],
+            }),
+          }
+        );
+        const items: any = await resp.json();
+        const content = items?.[0]?.text || items?.[0]?.markdown || '';
+        if (content.length > 500) return content;
+        console.log(`[scrapeUrl] Apify returned only ${content.length} chars for ${url}, trying Firecrawl...`);
+      } catch (e) {
+        console.error('Apify scrape error for', url, e);
+      }
     }
+    // Fallback: Firecrawl (handles JS-heavy sites)
+    if (firecrawlApiKey) {
+      try {
+        const resp = await fetch('https://api.firecrawl.dev/v1/scrape', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${firecrawlApiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, formats: ['markdown'], waitFor: 5000 }),
+        });
+        const data: any = await resp.json();
+        if (data?.success && data?.data?.markdown) {
+          const md = data.data.markdown;
+          console.log(`[scrapeUrl] Firecrawl got ${md.length} chars for ${url}`);
+          return md.length > 15000 ? md.substring(0, 15000) : md;
+        }
+      } catch (e) {
+        console.error('Firecrawl scrape error for', url, e);
+      }
+    }
+    return '';
   }
 
   await updateProgress('inicio', 'Iniciando análisis de marca...', 5);
