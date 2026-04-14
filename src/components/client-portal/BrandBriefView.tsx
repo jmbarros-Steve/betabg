@@ -2626,12 +2626,12 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       renderKwGroupStyled('Long-tail (Baja Competencia)', kw.long_tail || [], [237, 247, 240]);
       renderKwGroupStyled('Keywords de Competidores', kw.competitor_keywords || [], [253, 248, 240]);
       renderKwGroupStyled('Keywords Negativos', kw.negative_keywords || [], [253, 238, 238]);
-      if (kw.recommended_strategy) {
-        pdfHelpers.addSubTitle('Estrategia Recomendada');
-        pdfHelpers.addBody(typeof kw.recommended_strategy === 'string' ? kw.recommended_strategy : JSON.stringify(kw.recommended_strategy));
-      }
-      // Keyword phases from roadmap
+      // Keyword phases from roadmap (structured) — skip recommended_strategy text if roadmap exists
       if (kw.keyword_strategy_roadmap) { renderKeywordPhases(pdfCtx, pdfHelpers, kw.keyword_strategy_roadmap); }
+      else if (kw.recommended_strategy) {
+        pdfHelpers.addSubTitle('Estrategia Recomendada');
+        pdfHelpers.addBody(typeof kw.recommended_strategy === 'string' ? kw.recommended_strategy : safeText(kw.recommended_strategy));
+      }
       else { renderGlossaryBox(pdfCtx, pdfHelpers, 'keywords'); }
     }
 

@@ -256,19 +256,61 @@ export function renderBrandIdentity(
       helpers.addBody(pv);
     } else {
       if (pv.promesa_principal || pv.promesa_central) helpers.addKeyValue('Promesa', pv.promesa_principal || pv.promesa_central);
+      if (pv.descripcion && !pv.promesa_principal && !pv.promesa_central) helpers.addBody(pv.descripcion);
+      if (pv.limitacion) helpers.addKeyValue('Limitacion', pv.limitacion);
       if (pv.diferenciador_clave || pv.diferenciador) helpers.addKeyValue('Diferenciador', pv.diferenciador_clave || pv.diferenciador);
       if (pv.eslogan || pv.frase_principal) helpers.addKeyValue('Eslogan', pv.eslogan || pv.frase_principal);
+      if (Array.isArray(pv.frases_inferidas_por_naming)) {
+        helpers.addKeyValue('Frases Inferidas Por Naming', '');
+        for (const f of pv.frases_inferidas_por_naming) helpers.addArrowBullet(f);
+      }
+      if (Array.isArray(pv.frases_exactas)) {
+        for (const f of pv.frases_exactas) helpers.addArrowBullet(`"${f}"`);
+      }
     }
   }
   const tono = brandIdentity.tono_voz || brandIdentity.tono_y_voz;
   if (tono) {
     helpers.addSubTitle('Tono de Voz');
-    helpers.addBody(typeof tono === 'string' ? tono : JSON.stringify(tono));
+    if (typeof tono === 'string') {
+      helpers.addBody(tono);
+    } else {
+      if (tono.registro) helpers.addKeyValue('Registro', tono.registro);
+      if (tono.evaluacion) helpers.addBody(tono.evaluacion, 0, 3);
+      if (tono.voz_probable) helpers.addKeyValue('Voz Probable', tono.voz_probable);
+      if (tono.tono_inferido) helpers.addKeyValue('Tono Inferido', tono.tono_inferido);
+      if (tono.estilo) helpers.addKeyValue('Estilo', tono.estilo);
+      if (tono.personalidad) helpers.addKeyValue('Personalidad', tono.personalidad);
+      if (tono.comparacion_vs_competidores && typeof tono.comparacion_vs_competidores === 'object') {
+        for (const [comp, desc] of Object.entries(tono.comparacion_vs_competidores)) {
+          helpers.addBody(`${comp.replace(/_/g, ' ')}: ${safeStr(desc)}`, 0, 3);
+        }
+      }
+      if (Array.isArray(tono.caracteristicas)) helpers.addBody(tono.caracteristicas.join('; '));
+    }
   }
   const personalidad = brandIdentity.personalidad_marca || brandIdentity.personalidad_de_marca;
   if (personalidad) {
     helpers.addSubTitle('Personalidad de Marca');
-    helpers.addBody(typeof personalidad === 'string' ? personalidad : JSON.stringify(personalidad));
+    if (typeof personalidad === 'string') {
+      helpers.addBody(personalidad);
+    } else {
+      const arq = personalidad.arquetipo_principal || personalidad.arquetipo_primario;
+      if (arq) {
+        const arqText = typeof arq === 'string' ? arq : (arq.nombre ? `${arq.nombre} — ${arq.descripcion || ''}` : safeStr(arq));
+        helpers.addKeyValue('Arquetipo Primario', arqText);
+        if (arq.manifestacion_practica) helpers.addBody(`manifestacion practica: ${arq.manifestacion_practica}`, 0, 3);
+      }
+      const arqSec = personalidad.arquetipo_secundario;
+      if (arqSec) {
+        const secText = typeof arqSec === 'string' ? arqSec : (arqSec.nombre ? `${arqSec.nombre} — ${arqSec.descripcion || ''}` : safeStr(arqSec));
+        helpers.addKeyValue('Arquetipo Secundario', secText);
+        if (arqSec.manifestacion_practica) helpers.addBody(`manifestacion practica: ${arqSec.manifestacion_practica}`, 0, 3);
+      }
+      if (personalidad.arquetipo_a_evitar) helpers.addKeyValue('Arquetipo A Evitar', safeStr(personalidad.arquetipo_a_evitar));
+      if (Array.isArray(personalidad.caracteristicas)) helpers.addBody(personalidad.caracteristicas.join(', '));
+      if (!arq && !arqSec && !personalidad.arquetipo_a_evitar) helpers.addBody(safeStr(personalidad));
+    }
   }
 
   // Generic fallback for remaining keys
@@ -322,8 +364,9 @@ export function renderPositioningStrategy(
     helpers.addSubTitle('Mapa Perceptual');
     if (mp.eje_x) helpers.addKeyValue('Eje X', String(mp.eje_x));
     if (mp.eje_y) helpers.addKeyValue('Eje Y', String(mp.eje_y));
-    if (mp.posiciones && typeof mp.posiciones === 'object') {
-      for (const [brand, pos] of Object.entries(mp.posiciones as Record<string, any>)) {
+    const positions = mp.posiciones || mp.ubicacion_marcas || mp.brands;
+    if (positions && typeof positions === 'object') {
+      for (const [brand, pos] of Object.entries(positions as Record<string, any>)) {
         const brandLabel = brand.charAt(0).toUpperCase() + brand.slice(1).replace(/_/g, ' ');
         if (typeof pos === 'string') {
           if (pos.trim()) helpers.addKeyValue(brandLabel, pos);
