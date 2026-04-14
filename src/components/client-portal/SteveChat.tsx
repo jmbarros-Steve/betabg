@@ -589,6 +589,7 @@ export function SteveChat({ clientId }: SteveChatProps) {
       // Phase 1: Research (scraping + AI competitor detection)
       const { data: researchData, error: researchErr } = await callApi('analyze-brand-research', {
         body: { client_id: cId, website_url: clientData?.website_url, competitor_urls: competitorUrls },
+        timeoutMs: 300000,
       });
       if (researchErr || !researchData?.research) {
         // Research failed, will report via toast

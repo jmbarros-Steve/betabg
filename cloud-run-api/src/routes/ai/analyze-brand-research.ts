@@ -6,8 +6,6 @@ export async function analyzeBrandResearch(c: Context) {
   try {
   const supabase = getSupabaseAdmin();
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  const apifyToken = process.env.APIFY_TOKEN;
-
   const authHeader = c.req.header('Authorization');
   if (!authHeader) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -60,30 +58,7 @@ export async function analyzeBrandResearch(c: Context) {
   const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
 
   async function scrapeUrl(url: string): Promise<string> {
-    // Try Apify first (cheaper)
-    if (apifyToken) {
-      try {
-        const resp = await fetch(
-          `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${encodeURIComponent(apifyToken)}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              startUrls: [{ url }],
-              maxCrawlPages: 1,
-              outputFormats: ['markdown'],
-            }),
-          }
-        );
-        const items: any = await resp.json();
-        const content = items?.[0]?.text || items?.[0]?.markdown || '';
-        if (content.length > 500) return content;
-        console.log(`[scrapeUrl] Apify returned only ${content.length} chars for ${url}, trying Firecrawl...`);
-      } catch (e) {
-        console.error('Apify scrape error for', url, e);
-      }
-    }
-    // Fallback: Firecrawl (handles JS-heavy sites)
+    // Firecrawl only — handles JS-heavy sites, renders full page
     if (firecrawlApiKey) {
       try {
         const resp = await fetch('https://api.firecrawl.dev/v1/scrape', {
@@ -97,8 +72,9 @@ export async function analyzeBrandResearch(c: Context) {
           console.log(`[scrapeUrl] Firecrawl got ${md.length} chars for ${url}`);
           return md.length > 15000 ? md.substring(0, 15000) : md;
         }
+        console.log(`[scrapeUrl] Firecrawl no content for ${url}:`, data?.error || 'empty');
       } catch (e) {
-        console.error('Firecrawl scrape error for', url, e);
+        console.error('[scrapeUrl] Firecrawl error for', url, e);
       }
     }
     return '';
@@ -174,7 +150,20 @@ export async function analyzeBrandResearch(c: Context) {
   const fillFromBrief = briefCompetitorUrls
     .filter(u => !explicitUrls.some((e: string) => e.includes(u.replace(/https?:\/\//, '').split('/')[0])))
     .slice(0, remainingSlots);
-  let allCompetitorUrls = [...new Set([...explicitUrls, ...fillFromBrief])].slice(0, 6);
+  // Deduplicate www vs non-www before building the final list
+  function normalizeDomain(url: string): string {
+    try {
+      const u = new URL(url.startsWith('http') ? url : `https://${url}`);
+      return u.hostname.replace(/^www\./, '') + u.pathname.replace(/\/$/, '');
+    } catch { return url; }
+  }
+  const seen = new Set<string>();
+  let allCompetitorUrls = [...explicitUrls, ...fillFromBrief].filter(url => {
+    const key = normalizeDomain(url);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 6);
 
   // Track how many are user-provided (before AI detection fills the rest)
   const numUserProvided = allCompetitorUrls.length;
