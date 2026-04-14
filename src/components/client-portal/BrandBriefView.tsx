@@ -2247,6 +2247,18 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       y += 2 * (bH + 8) + 12;
     }
 
+    // ── Safe PDF section renderer — catches errors so one bad section doesn't kill the PDF ──
+    const safePdfRender = (label: string, fn: () => void) => {
+      try {
+        fn();
+      } catch {
+        try {
+          addSubTitle(`Error en seccion: ${label}`);
+          addBody('Esta seccion no pudo generarse correctamente. Los datos pueden estar incompletos.', 0, 5);
+        } catch (_) { /* ignore nested error */ }
+      }
+    };
+
     // ─── SECCIÓN: ADN DE MARCA ───────────────────────────────────────────────────
     addSectionHeader('1', 'ADN DE MARCA');
     const q1 = getResponse('business_pitch');
@@ -2349,6 +2361,10 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       y += 6;
     }
 
+    // AI-generated Brand Identity & Financial Analysis (complement section 1)
+    safePdfRender('Identidad de Marca', () => renderBrandIdentity(pdfCtx, pdfHelpers, (research as any).brand_identity));
+    safePdfRender('Análisis Financiero', () => renderFinancialAnalysis(pdfCtx, pdfHelpers, (research as any).financial_analysis));
+
     // ─── SECCIÓN: BUYER PERSONA ──────────────────────────────────────────────────
     addSectionHeader('2', 'PERFIL DEL CONSUMIDOR OBJETIVO');
     try {
@@ -2390,6 +2406,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     const transResp = getResponse('persona_transformation');
     if (transResp) { addSubTitle('Transformacion Deseada'); addBody(transResp); }
 
+    // AI-generated Consumer Profile (complements section 2)
+    safePdfRender('Perfil del Consumidor', () => renderConsumerProfile(pdfCtx, pdfHelpers, (research as any).consumer_profile));
+
     // (Competitive analysis section consolidated into INTELIGENCIA COMPETITIVA below)
     // Keep advantage response for positioning section
     const advResp = getResponse('your_advantage');
@@ -2402,6 +2421,9 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
     if (villResp) { addSubTitle('Narrativa de Marca y Garantia'); addBody(villResp); }
     const proofResp = getResponse('proof_tone');
     if (proofResp) { addSubTitle('Prueba Social y Tono de Comunicacion'); addBody(proofResp); }
+
+    // AI-generated Positioning Strategy (complements section 4)
+    safePdfRender('Estrategia de Posicionamiento', () => renderPositioningStrategy(pdfCtx, pdfHelpers, (research as any).positioning_strategy));
 
     // ─── SECCIÓN: EVALUACIÓN ESTRATÉGICA — ACCIONABLES (SCR Cards) ─────────────
     // Only render from briefData.summary if it contains actual markdown analysis (not chatbot confirmation)
@@ -2686,36 +2708,11 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       }
     }
 
-    // ── Safe PDF section renderer — catches errors so one bad section doesn't kill the PDF ──
-    const safePdfRender = (label: string, fn: () => void) => {
-      try {
-        fn();
-      } catch {
-        // Error handled by fallback section render below
-        try {
-          addSubTitle(`Error en seccion: ${label}`);
-          addBody('Esta seccion no pudo generarse correctamente. Los datos pueden estar incompletos.', 0, 5);
-        } catch (_) { /* ignore nested error */ }
-      }
-    };
-
     // Enhanced competitor cards with full details (AI-generated)
     const compsForCards = research.competitor_analysis?.competitors || [];
     if (compsForCards.length > 0) {
       safePdfRender('Competidores', () => renderCompetitorCards(pdfCtx, pdfHelpers, compsForCards));
     }
-
-    // Brand Identity
-    safePdfRender('Identidad de Marca', () => renderBrandIdentity(pdfCtx, pdfHelpers, (research as any).brand_identity));
-
-    // Financial Analysis
-    safePdfRender('Análisis Financiero', () => renderFinancialAnalysis(pdfCtx, pdfHelpers, (research as any).financial_analysis));
-
-    // Consumer Profile
-    safePdfRender('Perfil del Consumidor', () => renderConsumerProfile(pdfCtx, pdfHelpers, (research as any).consumer_profile));
-
-    // Positioning Strategy
-    safePdfRender('Estrategia de Posicionamiento', () => renderPositioningStrategy(pdfCtx, pdfHelpers, (research as any).positioning_strategy));
 
     // Action Plan — handle _repair_failed gracefully
     const actionPlanData = (research as any).action_plan;

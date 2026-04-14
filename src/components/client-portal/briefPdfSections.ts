@@ -68,6 +68,10 @@ function renderGenericObject(helpers: PdfHelpers, obj: any, maxEntries = 12) {
       helpers.addKeyValue(label, String(val));
     }
     count++;
+    // Small visual separator between subsections
+    if (typeof val === 'object' && val !== null) {
+      helpers.setY(helpers.getY() + 2);
+    }
   }
 }
 
@@ -355,40 +359,86 @@ export function renderPositioningStrategy(
 
   helpers.addSectionHeader('D', 'ESTRATEGIA DE POSICIONAMIENTO');
 
-  // Render ALL keys generically — handles any AI-generated structure
-  renderGenericObject(helpers, positioningStrategy, 20);
+  // Render keys generically EXCEPT mapa_perceptual (rendered as scatter plot below)
+  const filteredStrategy = { ...positioningStrategy };
+  delete filteredStrategy.mapa_perceptual;
+  renderGenericObject(helpers, filteredStrategy, 20);
 
-  // Perceptual map as text table
+  // Perceptual map as scatter plot
   if (positioningStrategy.mapa_perceptual) {
     const mp = positioningStrategy.mapa_perceptual;
-    helpers.addSubTitle('Mapa Perceptual');
-    if (mp.eje_x) helpers.addKeyValue('Eje X', String(mp.eje_x));
-    if (mp.eje_y) helpers.addKeyValue('Eje Y', String(mp.eje_y));
-    const positions = mp.posiciones || mp.ubicacion_marcas || mp.brands;
-    if (positions && typeof positions === 'object') {
-      for (const [brand, pos] of Object.entries(positions as Record<string, any>)) {
-        const brandLabel = brand.charAt(0).toUpperCase() + brand.slice(1).replace(/_/g, ' ');
-        if (typeof pos === 'string') {
-          if (pos.trim()) helpers.addKeyValue(brandLabel, pos);
-          continue;
-        }
-        if (typeof pos !== 'object' || pos === null) continue;
-        const px = pos.x || pos.posicion_x || pos.score_x || '';
-        const py = pos.y || pos.posicion_y || pos.score_y || '';
-        const desc = pos.descripcion || pos.description || '';
-        const coords = px && py ? `(${px}, ${py})` : '';
-        const value = [coords, desc].filter(Boolean).join(' — ');
-        if (value.trim()) {
-          helpers.addKeyValue(brandLabel, value);
-        } else {
-          // Show all available fields
-          const parts: string[] = [];
-          for (const [k, v] of Object.entries(pos)) {
-            if (v != null && String(v).trim()) parts.push(`${k}: ${String(v)}`);
-          }
-          if (parts.length > 0) helpers.addKeyValue(brandLabel, parts.join(' | '));
-        }
-      }
+    const positions = Object.entries(mp.posiciones || mp.ubicacion_marcas || mp.brands || {});
+
+    if (positions.length > 0) {
+      helpers.addSubTitle('Mapa Perceptual');
+      helpers.checkPage(75);
+
+      const { doc, margin, maxWidth } = ctx;
+      let y = helpers.getY();
+
+      // Chart dimensions
+      const chartW = maxWidth - 20;
+      const chartH = 60;
+      const chartX = margin + 10;
+      const chartY = y;
+      const PAD = 20;
+      const plotX = chartX + PAD;
+      const plotY = chartY;
+      const plotW = chartW - PAD - 5;
+      const plotH = chartH - PAD - 5;
+
+      // Background
+      doc.setFillColor(248, 249, 252);
+      doc.roundedRect(chartX - 5, chartY - 5, chartW + 10, chartH + 15, 2, 2, 'F');
+
+      // Axes
+      doc.setDrawColor(150, 150, 160);
+      doc.setLineWidth(0.4);
+      doc.line(plotX, plotY + plotH, plotX + plotW, plotY + plotH); // X axis
+      doc.line(plotX, plotY, plotX, plotY + plotH); // Y axis
+
+      // Grid lines (dashed)
+      doc.setLineDashPattern([2, 2], 0);
+      doc.setDrawColor(200, 200, 210);
+      doc.setLineWidth(0.2);
+      doc.line(plotX, plotY + plotH / 2, plotX + plotW, plotY + plotH / 2);
+      doc.line(plotX + plotW / 2, plotY, plotX + plotW / 2, plotY + plotH);
+      doc.setLineDashPattern([], 0);
+
+      // Axis labels
+      doc.setFont('NotoSans', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(120, 120, 130);
+      doc.text(mp.eje_x || 'Eje X', plotX + plotW / 2, plotY + plotH + 8, { align: 'center' });
+      doc.text(mp.eje_y || 'Eje Y', plotX - 5, plotY - 2, { align: 'center' });
+
+      // Brand dots + labels
+      const colors: [number, number, number][] = [
+        [99, 102, 241], [249, 115, 22], [34, 197, 94], [239, 68, 68], [234, 179, 8], [6, 182, 212]
+      ];
+      const maxVal = 10;
+
+      positions.forEach(([key, val]: [string, any], i: number) => {
+        const rawX = parseFloat(val?.x || val?.posicion_x || val?.score_x || '5');
+        const rawY = parseFloat(val?.y || val?.posicion_y || val?.score_y || '5');
+        const cx = plotX + (rawX / maxVal) * plotW;
+        const cy = plotY + plotH - (rawY / maxVal) * plotH;
+        const color = colors[i % colors.length];
+
+        // Dot
+        doc.setFillColor(...color);
+        doc.circle(cx, cy, 2, 'F');
+
+        // Label
+        doc.setFont('NotoSans', 'bold');
+        doc.setFontSize(6.5);
+        doc.setTextColor(...color);
+        const label = key.replace(/_/g, ' ');
+        const labelX = i % 2 === 0 ? cx + 3 : cx - doc.getTextWidth(label) - 3;
+        doc.text(label, labelX, cy + 1.5);
+      });
+
+      helpers.setY(chartY + chartH + 14);
     }
   }
 
