@@ -8,7 +8,7 @@ function safeStr(val: any, depth = 0): string {
   if (typeof val === 'number' || typeof val === 'boolean') return String(val);
   if (Array.isArray(val)) return val.map(v => safeStr(v, depth + 1)).filter(Boolean).join(', ');
   if (typeof val === 'object') {
-    if (depth > 2) return JSON.stringify(val);
+    if (depth > 4) return '[...]';
     const parts: string[] = [];
     for (const [k, v] of Object.entries(val)) {
       const sv = safeStr(v, depth + 1);

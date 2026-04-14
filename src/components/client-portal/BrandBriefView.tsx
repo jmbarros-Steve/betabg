@@ -986,7 +986,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
 
   // ─── Normalization layer: maps backend Spanish keys / complex objects to frontend expected format ───
   function normalizeResearchData(r: ResearchData): ResearchData {
-    const s = (v: any): string => (v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v));
+    const s = (v: any): string => (v == null ? '' : typeof v === 'string' ? v : safeText(v));
 
     // ── SEO AUDIT: score_seo → score, problemas_detectados → issues, acciones_prioritarias → recommendations ──
     if (r.seo_audit && typeof r.seo_audit === 'object') {
@@ -1348,7 +1348,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
         if (!bp.barreras_y_objeciones && bp.barreras_objeciones) bp.barreras_y_objeciones = bp.barreras_objeciones;
         // comportamiento_digital from nested object
         if (!bp.comportamiento_digital_desc && bp.comportamiento_digital && typeof bp.comportamiento_digital === 'object') {
-          bp.comportamiento_digital_desc = Object.entries(bp.comportamiento_digital).map(([k, v]) => `${k}: ${typeof v === 'string' ? v : Array.isArray(v) ? v.join(', ') : JSON.stringify(v)}`).join('. ');
+          bp.comportamiento_digital_desc = Object.entries(bp.comportamiento_digital).map(([k, v]) => `${k}: ${typeof v === 'string' ? v : Array.isArray(v) ? v.join(', ') : safeText(v)}`).join('. ');
         }
         // Normalize psicografia.estilo_de_vida from estilo_vida
         if (bp.psicografia && typeof bp.psicografia === 'object') {
@@ -1411,8 +1411,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             title: item.title || '',
             priority: item.priority || '',
             timeline: item.timeline || '',
-            situation: typeof item.situation === 'string' ? item.situation : JSON.stringify(item.situation || ''),
-            resolution: typeof item.resolution === 'string' ? item.resolution : JSON.stringify(item.resolution || ''),
+            situation: typeof item.situation === 'string' ? item.situation : safeText(item.situation || ''),
+            resolution: typeof item.resolution === 'string' ? item.resolution : safeText(item.resolution || ''),
           };
         }
         return String(item ?? '');
@@ -2128,7 +2128,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       const recomendaciones = aiExecSummary.recomendaciones_priorizadas || aiExecSummary.recomendaciones || aiExecSummary.recommendations || aiExecSummary.top_recommendations || [];
       const posicion = aiExecSummary.posicion_competitiva || aiExecSummary.competitive_position || '';
 
-      if (situacion) execSections.push({ title: 'SITUACIÓN ACTUAL', content: typeof situacion === 'string' ? situacion : JSON.stringify(situacion) });
+      if (situacion) execSections.push({ title: 'SITUACIÓN ACTUAL', content: typeof situacion === 'string' ? situacion : safeText(situacion) });
       if (posicion) {
         if (typeof posicion === 'string') {
           execSections.push({ title: 'POSICIÓN COMPETITIVA', content: posicion });
@@ -2144,13 +2144,13 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       }
 
       if (Array.isArray(oportunidades) && oportunidades.length > 0) {
-        execSections.push({ title: 'OPORTUNIDADES', content: oportunidades.slice(0, 3).map((o: any) => typeof o === 'string' ? o : o.oportunidad || o.description || o.titulo || JSON.stringify(o)).join('. ') });
+        execSections.push({ title: 'OPORTUNIDADES', content: oportunidades.slice(0, 3).map((o: any) => typeof o === 'string' ? o : o.oportunidad || o.description || o.titulo || safeText(o)).join('. ') });
       }
       if (Array.isArray(amenazas) && amenazas.length > 0) {
-        execSections.push({ title: 'AMENAZAS', content: amenazas.slice(0, 3).map((a: any) => typeof a === 'string' ? a : a.amenaza || a.description || a.titulo || JSON.stringify(a)).join('. ') });
+        execSections.push({ title: 'AMENAZAS', content: amenazas.slice(0, 3).map((a: any) => typeof a === 'string' ? a : a.amenaza || a.description || a.titulo || safeText(a)).join('. ') });
       }
       if (Array.isArray(recomendaciones) && recomendaciones.length > 0) {
-        execSections.push({ title: 'RECOMENDACIONES TOP', content: recomendaciones.slice(0, 3).map((r: any) => typeof r === 'string' ? r : r.recomendacion || r.description || r.titulo || r.recommendation || JSON.stringify(r)).join('. ') });
+        execSections.push({ title: 'RECOMENDACIONES TOP', content: recomendaciones.slice(0, 3).map((r: any) => typeof r === 'string' ? r : r.recomendacion || r.description || r.titulo || r.recommendation || safeText(r)).join('. ') });
       }
 
       // If no structured sections were extracted, try to render the raw object keys
