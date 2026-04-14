@@ -341,7 +341,7 @@ function KeywordStrategyRoadmap({ roadmap }: { roadmap: any }) {
                       <span className={`text-sm font-medium px-2 py-0.5 rounded-full ${cfg.badge}`}>
                         FASE {phaseNum}
                       </span>
-                      {focus && <span className={`text-xs font-semibold ${cfg.text} truncate max-w-[200px]`} title={focus}>{focus}</span>}
+                      {focus && <span className={`text-xs font-semibold ${cfg.text}`}>{focus}</span>}
                       {timeline && <span className="text-[10px] text-muted-foreground ml-auto">📅 {timeline}</span>}
                     </div>
 
@@ -1009,18 +1009,18 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       if (!seo.competitive_seo_gap && seo.analisis_competidores) {
         if (typeof seo.analisis_competidores === 'string') {
           seo.competitive_seo_gap = seo.analisis_competidores;
+        } else if (Array.isArray(seo.analisis_competidores)) {
+          // Array of {competidor, fortalezas_seo, que_puede_aprender_cliente}
+          seo.analisis_competidores_structured = seo.analisis_competidores;
+          // Don't flatten to string — will render structured in UI
         } else if (typeof seo.analisis_competidores === 'object') {
-          // Summarize the competitor analysis object into a readable string
-          // Can be {decathlon_cl: {ventajas_sobre_cliente: [...], meta_tags_superiores: [...]}, ...}
+          // Object keyed by competitor slug
           const parts: string[] = [];
           for (const [key, val] of Object.entries(seo.analisis_competidores)) {
             const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
             if (typeof val === 'string') {
               parts.push(`${label}: ${val}`);
-            } else if (Array.isArray(val)) {
-              parts.push(`${label}: ${val.map(s).join(', ')}`);
             } else if (typeof val === 'object' && val !== null) {
-              // Nested object per competitor: extract all sub-arrays/strings
               const subParts: string[] = [];
               for (const [subKey, subVal] of Object.entries(val as Record<string, any>)) {
                 const subLabel = subKey.replace(/_/g, ' ');
@@ -1031,7 +1031,6 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
             }
           }
           if (parts.length > 0) seo.competitive_seo_gap = parts.join('\n');
-          // Also store the raw object for structured rendering
           seo.analisis_competidores_structured = seo.analisis_competidores;
         }
       }
@@ -1119,35 +1118,45 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       if (!Array.isArray(ca.competitors) && Array.isArray(indiv)) {
         ca.competitors = indiv.map((comp: any) => ({
           ...comp,
+          name: comp.name || comp.competitor_name || comp.nombre || '',
+          url: comp.url || comp.nombre_url || comp.website || '',
           strengths: comp.strengths || comp.fortalezas || comp.fortalezas_detectadas || [],
           weaknesses: comp.weaknesses || comp.debilidades || comp.debilidades_detectadas || [],
           value_proposition: comp.value_proposition || comp.propuesta_de_valor || comp.propuesta_valor || comp.propuesta_valor_principal || '',
-          ad_strategy_inferred: comp.ad_strategy_inferred || comp.estrategia_contenido_observada || comp.estrategia_contenido || '',
-          positioning: comp.positioning || comp.propuesta_de_valor || comp.propuesta_valor || comp.propuesta_valor_principal || '',
-          attack_vector: comp.attack_vector || comp.que_hace_cliente_mejor || '',
-          que_hacen_mejor: comp.que_hacen_mejor || comp.que_hacen_mejor_que_cliente || '',
-          que_hace_cliente_mejor: comp.que_hace_cliente_mejor || '',
-          estrategia_contenido: comp.estrategia_contenido || comp.estrategia_contenido_observada || '',
-          justificacion_amenaza: comp.justificacion_amenaza || '',
-          nivel_amenaza: comp.nivel_amenaza || '',
-          source: comp.source || (comp.name?.includes('autodetectado') ? 'auto' : 'user'),
+          ad_strategy_inferred: comp.ad_strategy_inferred || comp.estrategia_contenido_observada || comp.estrategia_contenido || comp.content_strategy || '',
+          positioning: comp.positioning || comp.propuesta_de_valor || comp.propuesta_valor || comp.propuesta_valor_principal || comp.value_proposition || '',
+          attack_vector: comp.attack_vector || comp.que_hace_cliente_mejor || comp.what_client_does_better || '',
+          que_hacen_mejor: comp.que_hacen_mejor || comp.que_hacen_mejor_que_cliente || comp.what_they_do_better_than_client || '',
+          que_hace_cliente_mejor: comp.que_hace_cliente_mejor || comp.what_client_does_better || '',
+          estrategia_contenido: comp.estrategia_contenido || comp.estrategia_contenido_observada || comp.content_strategy || '',
+          justificacion_amenaza: comp.justificacion_amenaza || comp.threat_justification || '',
+          nivel_amenaza: comp.nivel_amenaza || comp.threat_level || '',
+          source: comp.source || ((comp.name || comp.competitor_name)?.includes('autodetectado') ? 'auto' : 'user'),
         }));
       }
       // Also enrich existing competitors array with missing fields
       if (Array.isArray(ca.competitors)) {
         ca.competitors = ca.competitors.map((comp: any) => ({
           ...comp,
+          name: comp.name || comp.competitor_name || comp.nombre || '',
+          url: comp.url || comp.nombre_url || comp.website || '',
           strengths: comp.strengths || comp.fortalezas || comp.fortalezas_detectadas || [],
           weaknesses: comp.weaknesses || comp.debilidades || comp.debilidades_detectadas || [],
           value_proposition: comp.value_proposition || comp.propuesta_valor || comp.propuesta_valor_principal || '',
-          que_hacen_mejor: comp.que_hacen_mejor || '',
-          que_hace_cliente_mejor: comp.que_hace_cliente_mejor || '',
-          estrategia_contenido: comp.estrategia_contenido || '',
-          justificacion_amenaza: comp.justificacion_amenaza || '',
-          nivel_amenaza: comp.nivel_amenaza || '',
-          source: comp.source || (comp.name?.includes('autodetectado') ? 'auto' : 'user'),
+          ad_strategy_inferred: comp.ad_strategy_inferred || comp.content_strategy || comp.estrategia_contenido || '',
+          positioning: comp.positioning || comp.value_proposition || comp.propuesta_valor || '',
+          attack_vector: comp.attack_vector || comp.what_client_does_better || comp.que_hace_cliente_mejor || '',
+          que_hacen_mejor: comp.que_hacen_mejor || comp.what_they_do_better_than_client || '',
+          que_hace_cliente_mejor: comp.que_hace_cliente_mejor || comp.what_client_does_better || '',
+          estrategia_contenido: comp.estrategia_contenido || comp.content_strategy || '',
+          justificacion_amenaza: comp.justificacion_amenaza || comp.threat_justification || '',
+          nivel_amenaza: comp.nivel_amenaza || comp.threat_level || '',
+          source: comp.source || ((comp.name || comp.competitor_name)?.includes('autodetectado') ? 'auto' : 'user'),
         }));
       }
+      // Normalize English → Spanish key variants
+      if (!ca.matriz_comparativa && ca.comparative_matrix) ca.matriz_comparativa = ca.comparative_matrix;
+      if (!ca.insights_estrategicos && ca.strategic_insights) ca.insights_estrategicos = ca.strategic_insights;
       // benchmark_summary from matriz_comparativa
       if (!ca.benchmark_summary && ca.matriz_comparativa) {
         const mc = ca.matriz_comparativa;
@@ -1163,6 +1172,8 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
       if (!Array.isArray(ca.market_gaps)) {
         if (Array.isArray(ca.insights_estrategicos?.gaps_de_mercado_sin_cubrir)) {
           ca.market_gaps = ca.insights_estrategicos.gaps_de_mercado_sin_cubrir;
+        } else if (Array.isArray(ca.insights_estrategicos?.market_gaps_no_competitor_covers)) {
+          ca.market_gaps = ca.insights_estrategicos.market_gaps_no_competitor_covers;
         } else if (Array.isArray(ca.insights_estrategicos?.gaps_mercado)) {
           ca.market_gaps = ca.insights_estrategicos.gaps_mercado;
         } else if (ca.competitors?.length > 0) {
@@ -4578,12 +4589,33 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                   <Card className="border-primary/20">
                     <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Trophy className="h-4 w-4 text-primary" /> Análisis SEO Comparativo vs Competencia</CardTitle></CardHeader>
                     <CardContent className="space-y-3">
-                      {research.seo_audit.competitive_seo_gap && (
+                      {Array.isArray(research.seo_audit.analisis_competidores_structured) ? (
+                        <div className="space-y-3">
+                          <p className="text-sm font-medium text-destructive">Gap SEO vs Competencia</p>
+                          {research.seo_audit.analisis_competidores_structured.map((ac: any, i: number) => (
+                            <div key={i} className="bg-destructive/5 border border-destructive/20 rounded-lg p-3 space-y-1.5">
+                              <p className="text-sm font-semibold">{ac.competidor || ac.competitor || `Competidor ${i + 1}`}</p>
+                              {Array.isArray(ac.fortalezas_seo) && ac.fortalezas_seo.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground">Fortalezas SEO:</p>
+                                  <ul className="text-xs space-y-0.5 ml-3">{ac.fortalezas_seo.map((f: string, j: number) => <li key={j}>• {f}</li>)}</ul>
+                                </div>
+                              )}
+                              {ac.que_puede_aprender_cliente && (
+                                <div className="bg-primary/5 rounded p-2 mt-1">
+                                  <p className="text-xs font-medium text-primary">Qué puede aprender el cliente:</p>
+                                  <p className="text-xs leading-relaxed">{ac.que_puede_aprender_cliente}</p>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : research.seo_audit.competitive_seo_gap ? (
                         <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3">
                           <p className="text-sm font-medium text-destructive mb-1">Gap SEO vs Competencia</p>
-                          <p className="text-xs leading-relaxed">{String(research.seo_audit.competitive_seo_gap)}</p>
+                          <p className="text-xs leading-relaxed whitespace-pre-line">{String(research.seo_audit.competitive_seo_gap)}</p>
                         </div>
-                      )}
+                      ) : null}
                       {research.seo_audit.meta_analysis && (
                         <div className="bg-muted/50 rounded-lg p-3">
                           <p className="text-sm font-medium text-primary mb-1">Meta Tags: Cliente vs Competidores</p>
