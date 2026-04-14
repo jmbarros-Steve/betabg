@@ -70,15 +70,16 @@ class BriefErrorBoundary extends React.Component<{ children: React.ReactNode }, 
 // Safe text render — prevents React error #31 (objects rendered as children)
 function safeText(val: any): string {
   if (val == null) return '';
-  let text: string;
-  if (typeof val === 'string') text = val;
-  else if (typeof val === 'number' || typeof val === 'boolean') text = String(val);
-  else text = JSON.stringify(val);
-  // Detect truncated text — add ellipsis if it doesn't end in punctuation
-  if (text.length > 10 && !/[.!?")\]:]$/.test(text.trim())) {
-    text = text.trim() + '...';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (Array.isArray(val)) return val.map(v => safeText(v)).join('; ');
+  if (typeof val === 'object') {
+    return Object.entries(val)
+      .filter(([, v]) => v != null && v !== '')
+      .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${typeof v === 'string' ? v : safeText(v)}`)
+      .join('. ');
   }
-  return text;
+  return String(val);
 }
 
 // Extract JSON objects from truncated raw_text using bracket-counting
@@ -1355,6 +1356,38 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
           if (!bp2.ocupacion && bp2.demografia.ocupacion) bp2.ocupacion = bp2.demografia.ocupacion;
         }
       }
+    }
+
+    // ── EXECUTIVE SUMMARY: normalize key variants ──
+    if (r.executive_summary && typeof r.executive_summary === 'object') {
+      const es = r.executive_summary as Record<string, any>;
+      if (!es.oportunidades_detectadas && es.oportunidades_top3) es.oportunidades_detectadas = es.oportunidades_top3;
+      if (!es.amenazas_identificadas && es.amenazas_top3) es.amenazas_identificadas = es.amenazas_top3;
+      if (!es.recomendaciones_priorizadas && es.recomendaciones_top3) es.recomendaciones_priorizadas = es.recomendaciones_top3;
+      if (!es.oportunidades_detectadas && es.oportunidades) es.oportunidades_detectadas = es.oportunidades;
+      if (!es.amenazas_identificadas && es.amenazas) es.amenazas_identificadas = es.amenazas;
+      if (!es.recomendaciones_priorizadas && es.recomendaciones) es.recomendaciones_priorizadas = es.recomendaciones;
+      // Parse summary JSON string
+      if (es.summary && typeof es.summary === 'string' && es.summary.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(es.summary);
+          if (!es.situacion_actual && parsed.situacion_actual) es.situacion_actual = parsed.situacion_actual;
+          if (!es.oportunidades_detectadas && (parsed.oportunidades_top3 || parsed.oportunidades))
+            es.oportunidades_detectadas = parsed.oportunidades_top3 || parsed.oportunidades;
+          if (!es.amenazas_identificadas && (parsed.amenazas_top3 || parsed.amenazas))
+            es.amenazas_identificadas = parsed.amenazas_top3 || parsed.amenazas;
+          if (!es.recomendaciones_priorizadas && (parsed.recomendaciones_top3 || parsed.recomendaciones))
+            es.recomendaciones_priorizadas = parsed.recomendaciones_top3 || parsed.recomendaciones;
+          if (!es.posicion_competitiva && parsed.posicion_competitiva) es.posicion_competitiva = parsed.posicion_competitiva;
+        } catch { /* ignore parse error */ }
+      }
+    }
+
+    // ── POSITIONING STRATEGY: normalize mapa_perceptual ──
+    if ((r as any).positioning_strategy?.mapa_perceptual) {
+      const mp = (r as any).positioning_strategy.mapa_perceptual;
+      if (!mp.posiciones && mp.ubicacion_marcas) mp.posiciones = mp.ubicacion_marcas;
+      if (!mp.posiciones && mp.brands) mp.posiciones = mp.brands;
     }
 
     // ── ACTION PLAN: array of objects → ensure each item has string fields ──
@@ -3795,19 +3828,38 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                     {phases.map(p => {
                       const d = journey[p.key];
                       if (!d || typeof d !== 'object') return null;
-                      // Extract the main list from the phase
-                      const mainList = d.como_llegan || d.que_evaluan || d.que_los_convence || d.que_esperan_despues || [];
-                      const subtitle = d.triggers || d.fuentes_investigacion || d.momento_critico || d.oportunidad_recompra || '';
+                      // Extract main content and subtitle per phase with multi-key fallbacks
+                      let mainContent: any = '';
+                      let subtitle = '';
+                      if (p.key === 'descubrimiento') {
+                        mainContent = d.como_llegan || d.trigger_de_entrada || d.canales_principales || '';
+                        subtitle = d.triggers || d.canales_principales || '';
+                      } else if (p.key === 'consideracion') {
+                        mainContent = d.que_evaluan || d.contenido_que_reduce_friccion || '';
+                        subtitle = d.fuentes_investigacion || d.contenido_que_reduce_friccion || '';
+                      } else if (p.key === 'decision') {
+                        mainContent = d.que_los_convence || d.factores_de_conversion || d.momento_critico || '';
+                        subtitle = d.momento_critico || '';
+                      } else if (p.key === 'post_compra') {
+                        mainContent = d.que_esperan_despues || d.expectativas || d.palanca_de_recompra || '';
+                        subtitle = d.oportunidad_recompra || d.palanca_de_recompra || '';
+                      } else {
+                        // Generic fallback for unknown phase keys
+                        mainContent = Object.values(d).find(v => Array.isArray(v)) || Object.values(d).find(v => typeof v === 'string' && v.length > 20) || '';
+                      }
                       return (
                         <div key={p.key} className={`rounded-lg p-3 border ${p.color}`}>
                           <p className={`text-xs font-bold ${p.textColor} mb-1.5`}>{p.icon} {p.label}</p>
-                          {subtitle && <p className="text-[11px] text-muted-foreground italic mb-1.5">{typeof subtitle === 'string' ? subtitle : ''}</p>}
-                          {Array.isArray(mainList) && mainList.length > 0 && (
+                          {subtitle && typeof subtitle === 'string' && <p className="text-[11px] text-muted-foreground italic mb-1.5">{subtitle}</p>}
+                          {Array.isArray(mainContent) && mainContent.length > 0 && (
                             <ul className="space-y-0.5">
-                              {mainList.slice(0, 4).map((item: string, j: number) => (
-                                <li key={j} className="text-[11px] flex items-start gap-1"><span className={`${p.textColor} mt-0.5`}>-</span>{item}</li>
+                              {mainContent.slice(0, 4).map((item: any, j: number) => (
+                                <li key={j} className="text-[11px] flex items-start gap-1"><span className={`${p.textColor} mt-0.5`}>-</span>{safeText(item)}</li>
                               ))}
                             </ul>
+                          )}
+                          {typeof mainContent === 'string' && mainContent && (
+                            <p className="text-[11px] leading-relaxed">{mainContent}</p>
                           )}
                         </div>
                       );
@@ -3854,6 +3906,14 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                               <li key={i} className="italic text-muted-foreground">"{f}"</li>
                             ))}</ul>
                           )}
+                          {propuestaValor.descripcion && !propuestaValor.promesa_principal && !propuestaValor.promesa_central && (
+                            <p className="text-sm leading-relaxed">{propuestaValor.descripcion}</p>
+                          )}
+                          {Array.isArray(propuestaValor.frases_inferidas_por_naming) && (
+                            <ul className="text-xs space-y-0.5 mt-1">{propuestaValor.frases_inferidas_por_naming.map((f: string, i: number) => (
+                              <li key={i} className="italic text-muted-foreground">"{f}"</li>
+                            ))}</ul>
+                          )}
                         </div>
                       )}
                     </div>
@@ -3864,13 +3924,21 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                         <p className="text-sm font-medium text-primary mb-1">Personalidad</p>
                         {typeof personalidad === 'string' ? (
                           <p className="text-xs leading-relaxed">{personalidad}</p>
-                        ) : (
+                        ) : (() => {
+                          const arq = personalidad.arquetipo_principal || personalidad.arquetipo_primario;
+                          const arqSec = personalidad.arquetipo_secundario;
+                          const arqEvitar = personalidad.arquetipo_a_evitar;
+                          const caracts = personalidad.caracteristicas;
+                          return (
                           <div className="space-y-1">
-                            {personalidad.arquetipo_principal && <p className="text-xs"><span className="font-medium">Arquetipo:</span> {personalidad.arquetipo_principal}</p>}
-                            {Array.isArray(personalidad.caracteristicas) && <p className="text-xs">{personalidad.caracteristicas.join(', ')}</p>}
-                            {!personalidad.arquetipo_principal && !personalidad.caracteristicas && <p className="text-xs leading-relaxed">{safeText(personalidad)}</p>}
+                            {arq && <p className="text-xs"><span className="font-medium">Arquetipo:</span> {typeof arq === 'string' ? arq : (arq.nombre ? `${arq.nombre} — ${arq.descripcion || ''}` : safeText(arq))}</p>}
+                            {arqSec && <p className="text-xs"><span className="font-medium">Secundario:</span> {typeof arqSec === 'string' ? arqSec : (arqSec.nombre ? `${arqSec.nombre} — ${arqSec.descripcion || ''}` : safeText(arqSec))}</p>}
+                            {arqEvitar && <p className="text-xs text-muted-foreground">Evitar: {safeText(arqEvitar)}</p>}
+                            {Array.isArray(caracts) && <p className="text-xs">{caracts.join(', ')}</p>}
+                            {!arq && !caracts && !arqSec && <p className="text-xs leading-relaxed">{safeText(personalidad)}</p>}
                           </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     )}
                     {tonoVoz && (
@@ -3878,9 +3946,10 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                         <p className="text-sm font-medium text-primary mb-1">Tono de Voz</p>
                         {typeof tonoVoz === 'object' ? (
                           <div className="space-y-1">
-                            {tonoVoz.estilo && <p className="text-xs"><span className="font-medium">Estilo:</span> {tonoVoz.estilo}</p>}
+                            {(tonoVoz.estilo || tonoVoz.tono_inferido) && <p className="text-xs"><span className="font-medium">Estilo:</span> {tonoVoz.estilo || tonoVoz.tono_inferido}</p>}
                             {tonoVoz.registro && <p className="text-xs"><span className="font-medium">Registro:</span> {tonoVoz.registro}</p>}
-                            {tonoVoz.personalidad && <p className="text-xs"><span className="font-medium">Personalidad:</span> {tonoVoz.personalidad}</p>}
+                            {(tonoVoz.personalidad || tonoVoz.voz_probable) && <p className="text-xs"><span className="font-medium">Voz:</span> {tonoVoz.personalidad || tonoVoz.voz_probable}</p>}
+                            {tonoVoz.evaluacion && <p className="text-muted-foreground text-[10px]">{tonoVoz.evaluacion}</p>}
                             {Array.isArray(tonoVoz.caracteristicas) && <p className="text-xs">{tonoVoz.caracteristicas.join('; ')}</p>}
                           </div>
                         ) : <p className="text-xs leading-relaxed">{String(tonoVoz)}</p>}
@@ -5243,7 +5312,7 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       {/* Mapa Perceptual — SVG scatter plot */}
                       {(research.positioning_strategy as any).mapa_perceptual && (() => {
                         const mp = (research.positioning_strategy as any).mapa_perceptual;
-                        const positions = mp.posiciones ? Object.entries(mp.posiciones) : [];
+                        const positions = Object.entries(mp.posiciones || mp.ubicacion_marcas || mp.brands || {});
                         const W = 360, H = 280, PAD = 45;
                         const colors = ['#6366f1','#f97316','#22c55e','#ef4444','#eab308','#06b6d4'];
                         return (
