@@ -3840,20 +3840,29 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                       let mainContent: any = '';
                       let subtitle = '';
                       if (p.key === 'descubrimiento') {
-                        mainContent = d.como_llegan || d.trigger_de_entrada || d.canales_principales || '';
-                        subtitle = d.triggers || d.canales_principales || '';
+                        mainContent = d.como_llegan || d.trigger_de_entrada || d.canales_principales || d.touchpoints_clave || d.descripcion || '';
+                        subtitle = d.triggers || d.canales_principales || (d.descripcion && !d.touchpoints_clave ? '' : d.descripcion) || '';
                       } else if (p.key === 'consideracion') {
-                        mainContent = d.que_evaluan || d.contenido_que_reduce_friccion || '';
-                        subtitle = d.fuentes_investigacion || d.contenido_que_reduce_friccion || '';
+                        mainContent = d.que_evaluan || d.contenido_que_reduce_friccion || d.touchpoints_clave || d.descripcion || '';
+                        subtitle = d.fuentes_investigacion || d.contenido_que_reduce_friccion || (d.descripcion && !d.touchpoints_clave ? '' : d.descripcion) || '';
                       } else if (p.key === 'decision') {
-                        mainContent = d.que_los_convence || d.factores_de_conversion || d.momento_critico || '';
-                        subtitle = d.momento_critico || '';
+                        mainContent = d.que_los_convence || d.factores_de_conversion || d.momento_critico || d.touchpoints_clave || d.descripcion || '';
+                        subtitle = d.momento_critico || (d.descripcion && !d.touchpoints_clave ? '' : d.descripcion) || '';
                       } else if (p.key === 'post_compra') {
-                        mainContent = d.que_esperan_despues || d.expectativas || d.palanca_de_recompra || '';
-                        subtitle = d.oportunidad_recompra || d.palanca_de_recompra || '';
+                        mainContent = d.que_esperan_despues || d.expectativas || d.palanca_de_recompra || d.touchpoints_clave || d.descripcion || '';
+                        subtitle = d.oportunidad_recompra || d.palanca_de_recompra || (d.descripcion && !d.touchpoints_clave ? '' : d.descripcion) || '';
                       } else {
                         // Generic fallback for unknown phase keys
-                        mainContent = Object.values(d).find(v => Array.isArray(v)) || Object.values(d).find(v => typeof v === 'string' && v.length > 20) || '';
+                        mainContent = d.touchpoints_clave || d.descripcion || Object.values(d).find(v => Array.isArray(v)) || Object.values(d).find(v => typeof v === 'string' && v.length > 20) || '';
+                      }
+                      // If we got touchpoints as mainContent and descripcion exists, use descripcion as subtitle
+                      if (Array.isArray(mainContent) && d.descripcion && !subtitle) {
+                        subtitle = d.descripcion;
+                      }
+                      // If mainContent is a string descripcion and touchpoints exist, swap them
+                      if (typeof mainContent === 'string' && mainContent === d.descripcion && d.touchpoints_clave) {
+                        subtitle = mainContent;
+                        mainContent = d.touchpoints_clave;
                       }
                       return (
                         <div key={p.key} className={`rounded-lg p-3 border ${p.color}`}>
