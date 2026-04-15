@@ -647,21 +647,13 @@ async function handleCreateCampaign(
       /^https?:\/\//i.test(u) ? u : `https://${u}`
     );
 
-    // Asset Group (temp ID -3)
-    mutateOps.push({
-      assetGroupOperation: {
-        create: {
-          resourceName: `customers/${customerId}/assetGroups/-3`,
-          campaign: `customers/${customerId}/campaigns/-2`,
-          name: ad_group_name || 'Asset Group 1',
-          finalUrls: sanitizedUrls,
-          status: 'ENABLED',
-        },
-      },
-    });
-
-    // Create text assets and link them
-    let tempId = -4;
+    // Google Ads batch mutate requires correct operation order:
+    // 1. Asset creation operations (all assets first)
+    // 2. Asset group creation (after assets exist)
+    // 3. Asset group asset links (after both assets and group exist)
+    const assetOps: any[] = [];
+    const linkOps: any[] = [];
+    let tempId = -4; // -1=budget, -2=campaign, -3=assetGroup
 
     // Headlines
     if (headlines?.length) {
@@ -669,7 +661,7 @@ async function handleCreateCampaign(
         const text = hl.slice(0, 30); // Google Ads max 30 chars
         if (!text) continue;
         const assetTempId = tempId--;
-        mutateOps.push({
+        assetOps.push({
           assetOperation: {
             create: {
               resourceName: `customers/${customerId}/assets/${assetTempId}`,
@@ -677,7 +669,7 @@ async function handleCreateCampaign(
             },
           },
         });
-        mutateOps.push({
+        linkOps.push({
           assetGroupAssetOperation: {
             create: {
               asset: `customers/${customerId}/assets/${assetTempId}`,
@@ -695,7 +687,7 @@ async function handleCreateCampaign(
         const text = desc.slice(0, 90); // Google Ads max 90 chars
         if (!text) continue;
         const assetTempId = tempId--;
-        mutateOps.push({
+        assetOps.push({
           assetOperation: {
             create: {
               resourceName: `customers/${customerId}/assets/${assetTempId}`,
@@ -703,7 +695,7 @@ async function handleCreateCampaign(
             },
           },
         });
-        mutateOps.push({
+        linkOps.push({
           assetGroupAssetOperation: {
             create: {
               asset: `customers/${customerId}/assets/${assetTempId}`,
@@ -721,7 +713,7 @@ async function handleCreateCampaign(
         const text = lh.slice(0, 90); // Google Ads max 90 chars
         if (!text) continue;
         const assetTempId = tempId--;
-        mutateOps.push({
+        assetOps.push({
           assetOperation: {
             create: {
               resourceName: `customers/${customerId}/assets/${assetTempId}`,
@@ -729,7 +721,7 @@ async function handleCreateCampaign(
             },
           },
         });
-        mutateOps.push({
+        linkOps.push({
           assetGroupAssetOperation: {
             create: {
               asset: `customers/${customerId}/assets/${assetTempId}`,
@@ -744,7 +736,7 @@ async function handleCreateCampaign(
     // Business name
     if (business_name) {
       const assetTempId = tempId--;
-      mutateOps.push({
+      assetOps.push({
         assetOperation: {
           create: {
             resourceName: `customers/${customerId}/assets/${assetTempId}`,
@@ -752,7 +744,7 @@ async function handleCreateCampaign(
           },
         },
       });
-      mutateOps.push({
+      linkOps.push({
         assetGroupAssetOperation: {
           create: {
             asset: `customers/${customerId}/assets/${assetTempId}`,
@@ -763,11 +755,11 @@ async function handleCreateCampaign(
       });
     }
 
-    // Image assets (must be in same batch for asset group validation)
+    // Image assets
     if (image_assets?.length) {
       for (const img of image_assets) {
         const assetTempId = tempId--;
-        mutateOps.push({
+        assetOps.push({
           assetOperation: {
             create: {
               resourceName: `customers/${customerId}/assets/${assetTempId}`,
@@ -776,7 +768,7 @@ async function handleCreateCampaign(
             },
           },
         });
-        mutateOps.push({
+        linkOps.push({
           assetGroupAssetOperation: {
             create: {
               asset: `customers/${customerId}/assets/${assetTempId}`,
@@ -792,7 +784,7 @@ async function handleCreateCampaign(
     if (youtube_video_ids?.length) {
       for (const videoId of youtube_video_ids) {
         const assetTempId = tempId--;
-        mutateOps.push({
+        assetOps.push({
           assetOperation: {
             create: {
               resourceName: `customers/${customerId}/assets/${assetTempId}`,
@@ -800,7 +792,7 @@ async function handleCreateCampaign(
             },
           },
         });
-        mutateOps.push({
+        linkOps.push({
           assetGroupAssetOperation: {
             create: {
               asset: `customers/${customerId}/assets/${assetTempId}`,
@@ -811,6 +803,21 @@ async function handleCreateCampaign(
         });
       }
     }
+
+    // Push in correct order: assets → asset group → links
+    mutateOps.push(...assetOps);
+    mutateOps.push({
+      assetGroupOperation: {
+        create: {
+          resourceName: `customers/${customerId}/assetGroups/-3`,
+          campaign: `customers/${customerId}/campaigns/-2`,
+          name: ad_group_name || 'Asset Group 1',
+          finalUrls: sanitizedUrls,
+          status: 'ENABLED',
+        },
+      },
+    });
+    mutateOps.push(...linkOps);
   }
 
   // Log asset counts for debugging
