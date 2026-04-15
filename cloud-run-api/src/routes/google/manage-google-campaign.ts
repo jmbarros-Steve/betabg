@@ -1002,25 +1002,73 @@ async function handleListMerchantCenters(
 ): Promise<{ body: any; status: number }> {
   console.log(`[manage-google-campaign] Listing merchant centers for ${customerId}`);
 
-  const query = `
-    SELECT merchant_center_link.id, merchant_center_link.merchant_center_account_name,
-           merchant_center_link.status
-    FROM merchant_center_link
+  const merchantCenters: Array<{ id: string; name: string; status: string }> = [];
+
+  // Method 1: GAQL — query shopping_setting from existing campaigns
+  const shoppingQuery = `
+    SELECT campaign.shopping_setting.merchant_id, campaign.name
+    FROM campaign
+    WHERE campaign.shopping_setting.merchant_id IS NOT NULL
+      AND campaign.status != 'REMOVED'
   `;
-
-  const result = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, query);
-
-  if (!result.ok) {
-    // Not all accounts have merchant center links — return empty rather than error
-    return { body: { success: true, merchant_centers: [] }, status: 200 };
+  const shoppingResult = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, shoppingQuery);
+  const seenIds = new Set<string>();
+  if (shoppingResult.ok && shoppingResult.data) {
+    for (const row of shoppingResult.data) {
+      const mid = String(row.campaign?.shoppingSetting?.merchantId || '');
+      if (mid && !seenIds.has(mid)) {
+        seenIds.add(mid);
+        merchantCenters.push({ id: mid, name: `Merchant Center ${mid}`, status: 'ENABLED' });
+      }
+    }
   }
 
-  const merchantCenters = (result.data || []).map((row: any) => ({
-    id: row.merchantCenterLink?.id,
-    name: row.merchantCenterLink?.merchantCenterAccountName || `MC ${row.merchantCenterLink?.id}`,
-    status: row.merchantCenterLink?.status,
-  }));
+  // Method 2: REST — list product links (Google Ads API v18)
+  try {
+    const makeRequest = async (loginId: string) => {
+      return fetch(`https://googleads.googleapis.com/v18/customers/${customerId}/productLinks`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'developer-token': developerToken,
+          'login-customer-id': loginId,
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+    };
 
+    let response = await makeRequest(loginCustomerId);
+    if (response.status === 403 && loginCustomerId !== customerId) {
+      await response.text().catch(() => {});
+      response = await makeRequest(customerId);
+    }
+
+    if (response.ok) {
+      const json = await response.json() as any;
+      const links = json.productLinks || json.results || [];
+      for (const link of links) {
+        const mc = link.merchantCenter || link.productLink?.merchantCenter;
+        if (mc?.merchantCenterId) {
+          const mid = String(mc.merchantCenterId);
+          if (!seenIds.has(mid)) {
+            seenIds.add(mid);
+            merchantCenters.push({
+              id: mid,
+              name: mc.merchantCenterAccountName || `Merchant Center ${mid}`,
+              status: link.status || 'ENABLED',
+            });
+          }
+        }
+      }
+    } else {
+      const errText = await response.text().catch(() => '');
+      console.log(`[manage-google-campaign] productLinks ${response.status}: ${errText.slice(0, 200)}`);
+    }
+  } catch (err: any) {
+    console.log(`[manage-google-campaign] productLinks fetch failed: ${err.message}`);
+  }
+
+  console.log(`[manage-google-campaign] Found ${merchantCenters.length} merchant centers for ${customerId}`);
   return { body: { success: true, merchant_centers: merchantCenters }, status: 200 };
 }
 
