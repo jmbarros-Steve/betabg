@@ -9,6 +9,7 @@ interface SteveRecommendationProps {
   recommendationType: 'campaign_setup' | 'pmax_assets' | 'bid_strategy';
   channelType?: string;
   context?: string;
+  clientId?: string;
   onApply: (recommendation: any) => void;
 }
 
@@ -17,6 +18,7 @@ export default function SteveRecommendation({
   recommendationType,
   channelType,
   context,
+  clientId,
   onApply,
 }: SteveRecommendationProps) {
   const [loading, setLoading] = useState(false);
@@ -36,6 +38,7 @@ export default function SteveRecommendation({
           recommendation_type: recommendationType,
           channel_type: channelType,
           context,
+          client_id: clientId,
         },
       },
     });

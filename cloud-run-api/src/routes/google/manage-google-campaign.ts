@@ -732,7 +732,7 @@ async function handleCreateCampaign(
 
     // Descriptions
     if (descriptions?.length) {
-      for (const desc of descriptions.slice(0, 4)) {
+      for (const desc of descriptions.slice(0, 5)) {
         const text = desc.slice(0, 90); // Google Ads max 90 chars
         if (!text) continue;
         const assetTempId = tempId--;
@@ -1241,10 +1241,69 @@ async function handleGetRecommendations(
   loginCustomerId: string,
   data: Record<string, any>
 ): Promise<{ body: any; status: number }> {
-  const { recommendation_type, channel_type, context: extraContext } = data;
+  const { recommendation_type, channel_type, context: extraContext, client_id } = data;
 
   if (!recommendation_type) {
     return { body: { error: 'Missing recommendation_type' }, status: 400 };
+  }
+
+  // Fetch brand brief from Supabase (if client_id provided)
+  let briefContext = '';
+  if (client_id) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (supabaseUrl && supabaseKey) {
+      try {
+        // Fetch brand_research
+        const brRes = await fetch(
+          `${supabaseUrl}/rest/v1/brand_research?client_id=eq.${client_id}&select=research_type,research_data&order=created_at.desc&limit=5`,
+          { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }, signal: AbortSignal.timeout(5_000) }
+        );
+        if (brRes.ok) {
+          const brData = await brRes.json() as any[];
+          for (const row of brData) {
+            const rd = row.research_data;
+            if (!rd) continue;
+            if (row.research_type === 'brand_strategy' || row.research_type === 'ai_strategy') {
+              // Extract key strategy fields
+              const fields = ['brand_positioning', 'value_proposition', 'target_audience', 'brand_voice',
+                'competitive_advantage', 'key_messages', 'brand_promise', 'brand_personality',
+                'unique_selling_points', 'tone_of_voice', 'industry', 'product_description'];
+              for (const f of fields) {
+                if (rd[f]) briefContext += `${f}: ${typeof rd[f] === 'string' ? rd[f] : JSON.stringify(rd[f])}\n`;
+              }
+            } else if (row.research_type === 'brand_analysis' || row.research_type === 'scraping') {
+              if (rd.summary) briefContext += `Analisis: ${rd.summary}\n`;
+              if (rd.brand_description) briefContext += `Descripcion: ${rd.brand_description}\n`;
+              if (rd.products) briefContext += `Productos: ${typeof rd.products === 'string' ? rd.products : JSON.stringify(rd.products)}\n`;
+            }
+          }
+        }
+
+        // Fetch buyer_personas
+        const bpRes = await fetch(
+          `${supabaseUrl}/rest/v1/buyer_personas?client_id=eq.${client_id}&select=persona_data&limit=3`,
+          { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }, signal: AbortSignal.timeout(5_000) }
+        );
+        if (bpRes.ok) {
+          const bpData = await bpRes.json() as any[];
+          for (const row of bpData) {
+            const pd = row.persona_data;
+            if (!pd) continue;
+            if (pd.name) briefContext += `Persona: ${pd.name}`;
+            if (pd.description) briefContext += ` — ${pd.description}`;
+            if (pd.pain_points) briefContext += ` | Dolores: ${Array.isArray(pd.pain_points) ? pd.pain_points.join(', ') : pd.pain_points}`;
+            briefContext += '\n';
+          }
+        }
+
+        if (briefContext) {
+          console.log(`[manage-google-campaign] Loaded brief context for client ${client_id}: ${briefContext.length} chars`);
+        }
+      } catch (err: any) {
+        console.log(`[manage-google-campaign] Brief fetch failed (non-critical): ${err.message}`);
+      }
+    }
   }
 
   // Fetch account metrics for context
@@ -1301,16 +1360,27 @@ Recomienda para una nueva campaña ${channel_type || 'SEARCH'}:
 
 Responde SOLO en JSON válido, sin markdown.`;
   } else if (recommendation_type === 'pmax_assets') {
-    prompt = `Eres un experto en Google Ads Performance Max. Genera assets para un asset group PMAX.
-${extraContext ? `Contexto del negocio: ${extraContext}` : 'Negocio genérico'}
+    const hasBrief = briefContext.trim().length > 0;
+    prompt = `Eres Steve, un experto en Google Ads Performance Max y copywriting publicitario.
+${hasBrief ? `\n## BRIEF DEL CLIENTE (usa esta informacion como base OBLIGATORIA)\n${briefContext.slice(0, 3000)}` : ''}
+${extraContext ? `\nContexto adicional: ${extraContext}` : ''}
+${!hasBrief && !extraContext ? '\nNo hay brief disponible. Genera assets genéricos pero profesionales.' : ''}
+
+Genera assets para un asset group PMAX. Los textos DEBEN:
+- Reflejar la marca, propuesta de valor y tono del brief${hasBrief ? '' : ' (o del contexto dado)'}
+- Incluir beneficios concretos y llamados a la accion
+- Ser variados (no repetir la misma idea con distintas palabras)
+- Respetar ESTRICTAMENTE los limites de caracteres
 
 Genera:
-1. headlines: array de 5 strings (max 30 chars cada uno)
-2. long_headlines: array de 2 strings (max 90 chars)
-3. descriptions: array de 3 strings (max 90 chars)
-4. reasoning: explicación breve en español
+1. headlines: array de 10 strings (MAXIMO 30 caracteres cada uno, ni uno mas)
+2. long_headlines: array de 4 strings (MAXIMO 90 caracteres cada uno)
+3. descriptions: array de 5 strings (MAXIMO 90 caracteres cada uno)
+4. reasoning: explicacion breve en español de por que elegiste estos textos
 
-Responde SOLO en JSON válido, sin markdown.`;
+IMPORTANTE: Cuenta los caracteres. Si un texto tiene 31+ chars en headline, es INVALIDO.
+
+Responde SOLO en JSON valido, sin markdown.`;
   } else if (recommendation_type === 'bid_strategy') {
     prompt = `Eres un experto en Google Ads. Basado en:
 - Gasto 30d: $${totalSpend.toFixed(0)}

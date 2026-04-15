@@ -966,11 +966,17 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     if (rec?.headlines || rec?.long_headlines || rec?.descriptions) {
       setWizardData(prev => ({
         ...prev,
-        headlines: rec.headlines?.length ? rec.headlines : prev.headlines,
-        long_headlines: rec.long_headlines?.length ? rec.long_headlines : prev.long_headlines,
-        descriptions: rec.descriptions?.length ? rec.descriptions : prev.descriptions,
+        headlines: rec.headlines?.length
+          ? rec.headlines.slice(0, 15).map((h: string) => h.slice(0, 30))
+          : prev.headlines,
+        long_headlines: rec.long_headlines?.length
+          ? rec.long_headlines.slice(0, 5).map((h: string) => h.slice(0, 90))
+          : prev.long_headlines,
+        descriptions: rec.descriptions?.length
+          ? rec.descriptions.slice(0, 5).map((d: string) => d.slice(0, 90))
+          : prev.descriptions,
       }));
-      toast.success('Assets de Steve aplicados');
+      toast.success('Assets de Steve aplicados (basados en tu brief)');
     }
   };
 
@@ -1560,6 +1566,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 </select>
                 <SteveRecommendation
                   connectionId={connectionId}
+                  clientId={clientId}
                   recommendationType="campaign_setup"
                   channelType={wizardData.channel_type}
                   onApply={handleApplyRecommendation}
@@ -1822,7 +1829,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 label="Descripciones"
                 items={wizardData.descriptions}
                 maxLength={90}
-                maxItems={4}
+                maxItems={5}
                 minItems={2}
                 onChange={descriptions => setWizardData(prev => ({ ...prev, descriptions }))}
               />
@@ -1830,6 +1837,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 connectionId={connectionId}
                 recommendationType="pmax_assets"
                 channelType="PERFORMANCE_MAX"
+                clientId={clientId}
                 context={`Negocio: ${wizardData.business_name || 'Sin nombre'}, URL: ${wizardData.final_urls || 'Sin URL'}`}
                 onApply={handleApplyPmaxRecommendation}
               />
