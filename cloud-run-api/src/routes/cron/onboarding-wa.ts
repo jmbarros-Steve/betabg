@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
 import { safeQuery, safeQuerySingle } from '../../lib/safe-supabase.js';
 import { isValidCronSecret } from '../../lib/cron-auth.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 /**
  * Onboarding WA Cron — Steve Post-Venta
@@ -68,6 +69,9 @@ export async function onboardingWA(c: Context) {
       return c.json({ success: true, message: 'No pending steps', ...results });
     }
 
+    // Load Steve Brain knowledge for better onboarding messages
+    const { knowledgeBlock } = await loadKnowledge(['brief', 'shopify'], { limit: 5, label: 'CONTEXTO DE ONBOARDING', audit: { source: 'onboarding-wa' } });
+
     for (const step of pendingSteps) {
       try {
         const client = (step as any).clients;
@@ -105,8 +109,8 @@ export async function onboardingWA(c: Context) {
         const isFirstReminder = !step.wa_message_sent;
 
         const prompt = isFirstReminder
-          ? `Genera un mensaje de WhatsApp corto (max 3 líneas) para un nuevo cliente llamado "${clientName}" que acaba de registrarse en Steve. Su siguiente paso es: ${stepLabel}. Tono: amigable, motivador, en español neutro (usar tú, no vos). Incluye un emoji. Responde SOLO con el mensaje.`
-          : `Genera un mensaje de WhatsApp corto (max 3 líneas) como recordatorio amigable para "${clientName}". Lleva ${Math.round(hoursSinceUpdate)}h sin avanzar en: ${stepLabel}. Este es el recordatorio #${step.reminder_count + 1}. Tono: casual, sin presionar, en español neutro. Ofrece ayuda. Responde SOLO con el mensaje.`;
+          ? `Genera un mensaje de WhatsApp corto (max 3 líneas) para un nuevo cliente llamado "${clientName}" que acaba de registrarse en Steve. Su siguiente paso es: ${stepLabel}. Tono: amigable, motivador, en español neutro (usar tú, no vos). Incluye un emoji. ${knowledgeBlock} Responde SOLO con el mensaje.`
+          : `Genera un mensaje de WhatsApp corto (max 3 líneas) como recordatorio amigable para "${clientName}". Lleva ${Math.round(hoursSinceUpdate)}h sin avanzar en: ${stepLabel}. Este es el recordatorio #${step.reminder_count + 1}. Tono: casual, sin presionar, en español neutro. Ofrece ayuda. ${knowledgeBlock} Responde SOLO con el mensaje.`;
 
         const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',

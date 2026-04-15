@@ -4,6 +4,7 @@ import { anthropicFetch } from '../../lib/anthropic-fetch.js';
 import { logProspectEvent } from '../../lib/prospect-event-logger.js';
 import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
 import { getUserClientIds, verifyProspectOwnership } from '../../lib/user-scoping.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 /** CRUD for proposals: list, create, get */
 export async function proposalsCrud(c: Context) {
@@ -199,7 +200,10 @@ export async function proposalsGenerate(c: Context) {
     // Bug #220 fix: use != null instead of falsy check so monthly_price=0 shows "$0 USD/mes"
     const priceLabel = monthly_price != null ? `$${monthly_price.toLocaleString()} USD/mes` : 'a definir';
 
+    const { knowledgeBlock } = await loadKnowledge(['sales_learning', 'sales_strategy', 'brief'], { limit: 10, label: 'REGLAS DE VENTAS APRENDIDAS', audit: { source: 'proposals-generate' } });
+
     const prompt = `Eres un consultor de marketing digital que trabaja para Steve, una agencia de marketing AI.
+${knowledgeBlock}
 Genera una propuesta comercial profesional en español para el siguiente prospecto.
 
 ## Datos del Prospecto

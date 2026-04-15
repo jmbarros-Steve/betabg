@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuery, safeQueryOrDefault } from '../../lib/safe-supabase.js';
 import { isValidCronSecret } from '../../lib/cron-auth.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 /**
  * Prospect Email Nurture — Steve Perro Lobo Paso 16
@@ -143,6 +144,9 @@ export async function prospectEmailNurture(c: Context) {
       return c.json({ success: true, message: 'No prospects eligible', ...results });
     }
 
+    // Load Steve Brain knowledge for better email content
+    const { knowledgeBlock } = await loadKnowledge(['klaviyo', 'brief', 'buyer_persona'], { limit: 5, label: 'REGLAS APRENDIDAS DE EMAIL MARKETING', audit: { source: 'prospect-email-nurture' } });
+
     for (const prospect of prospects) {
       try {
         const currentStep = prospect.email_sequence_step || 0;
@@ -183,7 +187,7 @@ export async function prospectEmailNurture(c: Context) {
         // Generate email content with Haiku
         const emailPrompts: Record<number, string> = {
           0: `Genera el contenido HTML del cuerpo de un email de nurture para ${prospectName}${company ? ` de ${company}` : ''} que vende ${industry}.
-
+${knowledgeBlock}
 CONTEXTO: Primer email después de conversación WhatsApp.
 
 CONVERSACIÓN PREVIA:
@@ -196,7 +200,7 @@ Largo: 150-200 palabras max.
 ${DESIGN_INSTRUCTIONS}`,
 
           1: `Genera el contenido HTML del cuerpo de un email de nurture (paso 2/3) para ${prospectName}${company ? ` de ${company}` : ''} que vende ${industry}.
-
+${knowledgeBlock}
 OBJETIVO: Caso de éxito de una marca de ${industry} que optimizó su marketing con IA. Números concretos (ROAS, CPA, revenue). Que sienta que se pierde algo.
 Tono: Informativo con datos duros, no vendedor.
 Largo: 180-250 palabras max.
@@ -205,7 +209,7 @@ Usa el highlight box para el dato más impactante.
 ${DESIGN_INSTRUCTIONS}`,
 
           2: `Genera el contenido HTML del cuerpo de un email de nurture FINAL (paso 3/3) para ${prospectName}${company ? ` de ${company}` : ''} que vende ${industry}.
-
+${knowledgeBlock}
 OBJETIVO: Que agende llamada de 15 min. Dile que revisaste su negocio y encontraste oportunidades concretas. Menciona 2-3 cosas específicas que podrías mejorar.
 
 CTA: Incluye este botón después del texto:

@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
 import { safeQuery } from '../../lib/safe-supabase.js';
 import { isValidCronSecret } from '../../lib/cron-auth.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 /**
  * Merchant Upsell — Steve Post-Venta
@@ -47,6 +48,9 @@ export async function merchantUpsell(c: Context) {
     if (clients.length === 0) {
       return c.json({ success: true, message: 'No clients', ...results });
     }
+
+    // Load Steve Brain knowledge for smarter upsell messaging
+    const { knowledgeBlock } = await loadKnowledge(['shopify', 'analisis', 'klaviyo'], { limit: 5, label: 'CONTEXTO DE NEGOCIO APRENDIDO', audit: { source: 'merchant-upsell' } });
 
     for (const client of clients) {
       try {
@@ -138,7 +142,9 @@ export async function merchantUpsell(c: Context) {
 
         // Generate and send WA message
         const clientName = client.name || client.email?.split('@')[0] || '';
-        const prompt = `Genera un mensaje de WhatsApp corto (max 4 líneas) para "${clientName}", un cliente existente de Steve. Oportunidad detectada: ${opportunity.reason}. Tono: consultivo, profesional, en español neutro (usar tú). NO vendas agresivamente, sugiere con datos. Responde SOLO con el mensaje.`;
+        const prompt = `Genera un mensaje de WhatsApp corto (max 4 líneas) para "${clientName}", un cliente existente de Steve. Oportunidad detectada: ${opportunity.reason}. Tono: consultivo, profesional, en español neutro (usar tú). NO vendas agresivamente, sugiere con datos.
+${knowledgeBlock}
+Responde SOLO con el mensaje.`;
 
         const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',

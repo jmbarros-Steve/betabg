@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -87,8 +88,10 @@ async function handleAnalyze(c: Context, body: { content: string; contentType?: 
     return c.json({ error: 'content is required and cannot be empty' }, 400);
   }
 
-  const systemPrompt = `Eres un experto en marketing digital y análisis de contenido. Tu trabajo es analizar contenido en bruto (texto, CSV, JSON, URLs, listas de productos) y extraer items individuales para campañas de email marketing.
+  const { knowledgeBlock } = await loadKnowledge(['klaviyo', 'anuncios', 'meta_ads'], { limit: 10, label: 'REGLAS APRENDIDAS DE CAMPAÑAS', audit: { source: 'steve-bulk-analyze' } });
 
+  const systemPrompt = `Eres un experto en marketing digital y análisis de contenido. Tu trabajo es analizar contenido en bruto (texto, CSV, JSON, URLs, listas de productos) y extraer items individuales para campañas de email marketing.
+${knowledgeBlock}
 REGLAS:
 1. Identifica cada item individual en el contenido (producto, promoción, evento, noticia, etc.)
 2. Clasifica cada item con su tipo, prioridad y ángulo de email recomendado
@@ -174,8 +177,10 @@ async function handleGenerate(c: Context, body: {
     return c.json({ error: 'month and year are required' }, 400);
   }
 
-  const systemPrompt = `Eres un experto en email marketing y planificación de campañas. Tu trabajo es generar contenido de email optimizado y un calendario de envío inteligente.
+  const { knowledgeBlock: genKnowledge } = await loadKnowledge(['klaviyo', 'anuncios'], { limit: 10, label: 'REGLAS APRENDIDAS DE CAMPAÑAS', audit: { source: 'steve-bulk-analyze-generate' } });
 
+  const systemPrompt = `Eres un experto en email marketing y planificación de campañas. Tu trabajo es generar contenido de email optimizado y un calendario de envío inteligente.
+${genKnowledge}
 REGLAS DE COPYWRITING:
 1. Subject lines: máximo 60 caracteres, persuasivos, sin spam words
 2. Preview text: máximo 100 caracteres, complementa el subject

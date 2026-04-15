@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingle } from '../../lib/safe-supabase.js';
 import { isValidCronSecret } from '../../lib/cron-auth.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 /**
  * Auto Postmortem — Paso C.3
@@ -52,6 +53,8 @@ export async function autoPostmortem(c: Context) {
   // Claude generates postmortem
   let postmortem;
   try {
+    // Load Steve Brain knowledge for better analysis
+    const { knowledgeBlock } = await loadKnowledge(['analisis', 'meta_ads'], { limit: 5, label: 'REGLAS APRENDIDAS DE INCIDENTES', audit: { source: 'auto-postmortem' } });
     const pm = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -65,6 +68,7 @@ export async function autoPostmortem(c: Context) {
         messages: [{
           role: 'user',
           content: `Genera un postmortem para este incidente crítico en Steve Ads:
+${knowledgeBlock || ''}
 
 TÍTULO: ${task.title}
 DESCRIPCIÓN: ${(task.description || '').substring(0, 500)}

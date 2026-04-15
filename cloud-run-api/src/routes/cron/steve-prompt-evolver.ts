@@ -109,7 +109,7 @@ Solo incluye instrucciones basadas en los datos. Sin markdown.`,
         contenido: `INSTRUCCIÓN: ${inst.instruccion}. PORQUE: ${inst.razon || 'basado en feedback de usuarios.'}`.slice(0, 600),
         activo: true,
         orden: 99,
-        approval_status: 'approved',
+        approval_status: 'pending',
       }, { onConflict: 'categoria,titulo' });
       saved++;
     }

@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 interface DeepDiveResult {
   tech_stack: {
@@ -438,11 +439,13 @@ async function generateAIInsights(
     return null;
   }
 
+  const { knowledgeBlock } = await loadKnowledge(['competencia', 'analisis'], { limit: 10, label: 'PATRONES DE COMPETENCIA APRENDIDOS', audit: { source: 'deep-dive-competitor' } });
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
 
   try {
-    const analysisContext = `
+    const analysisContext = `${knowledgeBlock}
 URL: ${url}
 Plataforma: ${result.tech_stack.platform || 'No detectada'} (${result.tech_stack.platform_evidence || ''})
 Tracking Scripts: Meta Pixel=${result.tracking_scripts.meta_pixel}, GTM=${result.tracking_scripts.google_tag_manager}, GA=${result.tracking_scripts.google_analytics}, TikTok=${result.tracking_scripts.tiktok_pixel}, Klaviyo=${result.tracking_scripts.klaviyo}, Hotjar=${result.tracking_scripts.hotjar}

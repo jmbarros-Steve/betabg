@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { decryptToken } from './setup-merchant.js';
 import { scrubPII } from '../../lib/pii-scrubber.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 /**
  * Merchant WA Webhook — When a CUSTOMER writes to a merchant's WhatsApp number.
@@ -365,8 +366,11 @@ export async function merchantWAWebhook(c: Context) {
     // send a fallback reply (credit was legitimately used for the response attempt).
     // Build context and generate response
     const [context, history] = await Promise.all([
+    // Build context, knowledge, and history in parallel
+    const [context, history, { knowledgeBlock }] = await Promise.all([
       buildMerchantContext(clientId),
       getConversationHistory(clientId, phone),
+      loadKnowledge(['shopify', 'brief', 'buyer_persona'], { clientId, limit: 10, label: 'REGLAS DE ATENCIÓN AL CLIENTE', audit: { source: 'merchant-wa' } }),
     ]);
 
     // Ensure alternating roles
@@ -412,7 +416,7 @@ export async function merchantWAWebhook(c: Context) {
       return c.text('<Response></Response>', 200, { 'Content-Type': 'text/xml' });
     }
 
-    const systemPrompt = `${MERCHANT_WA_SYSTEM_PROMPT}\n\n${context}`;
+    const systemPrompt = `${MERCHANT_WA_SYSTEM_PROMPT}\n${knowledgeBlock}\n${context}`;
 
     try {
       const aiRes = await fetch('https://api.anthropic.com/v1/messages', {

@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { detectKnowledgeConflicts } from '../../lib/knowledge-conflict-detector.js';
 import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 const CHUNK_SIZE = 50000;
 const SYSTEM_PROMPT = `Eres un experto en performance marketing para e-commerce. Analiza el contenido y extrae TODAS las reglas accionables.
@@ -141,7 +142,11 @@ function splitIntoChunks(text: string, chunkSize: number): string[] {
   return chunks;
 }
 
-async function extractRulesFromChunk(text: string, apiKey: string): Promise<Array<{ titulo: string; contenido: string; categoria: string }>> {
+async function extractRulesFromChunk(text: string, apiKey: string, existingRulesHint: string = ''): Promise<Array<{ titulo: string; contenido: string; categoria: string }>> {
+  const dedupeInstruction = existingRulesHint
+    ? `\n\nIMPORTANTE — REGLAS QUE YA EXISTEN (NO las repitas ni generes variantes):\n${existingRulesHint}\nSi el contenido contiene algo que ya está cubierto por una regla existente, OMÍTELO.`
+    : '';
+
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -152,7 +157,7 @@ async function extractRulesFromChunk(text: string, apiKey: string): Promise<Arra
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 8000,
-      system: SYSTEM_PROMPT,
+      system: SYSTEM_PROMPT + dedupeInstruction,
       messages: [{ role: 'user', content: `Analiza el siguiente contenido y extrae todas las reglas accionables:\n\n${text}` }],
     }),
   });
@@ -216,6 +221,7 @@ export async function processQueueItem(c: Context) {
       case 'document':
       case 'text':
       case 'feedback':
+      case 'competitor':
         extractedText = item.source_content;
         break;
       default:
@@ -224,11 +230,21 @@ export async function processQueueItem(c: Context) {
 
     if (!extractedText?.trim()) throw new Error('No se pudo extraer contenido de la fuente');
 
+    // Load existing knowledge so Claude avoids generating duplicates
+    const { rules: existingKnowledge } = await loadKnowledge(
+      ['meta_ads', 'anuncios', 'klaviyo', 'seo', 'shopify', 'brief', 'buyer_persona', 'analisis', 'competencia', 'google'],
+      { limit: 30, audit: { source: 'process-queue-item' } }
+    );
+    const existingRulesHint = existingKnowledge
+      .map(r => `- [${r.categoria}] ${r.titulo}`)
+      .join('\n')
+      .slice(0, 3000);
+
     const chunks = splitIntoChunks(extractedText, CHUNK_SIZE);
     const allRules: Array<{ titulo: string; contenido: string; categoria: string }> = [];
 
     for (let i = 0; i < chunks.length; i++) {
-      const chunkRules = await extractRulesFromChunk(chunks[i], ANTHROPIC_API_KEY);
+      const chunkRules = await extractRulesFromChunk(chunks[i], ANTHROPIC_API_KEY, existingRulesHint);
       allRules.push(...chunkRules);
       if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 1200));
     }
@@ -286,6 +302,7 @@ export async function processQueueItem(c: Context) {
       activo: true,
       orden: 80,
       source_id: queueId,
+      approval_status: 'pending',
     }));
 
     if (inserts.length > 0) {

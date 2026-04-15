@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuery } from '../../lib/safe-supabase.js';
 import { isValidCronSecret } from '../../lib/cron-auth.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 export async function crossClientLearning(c: Context) {
   if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {
@@ -69,6 +70,13 @@ export async function crossClientLearning(c: Context) {
       campaigns: c.campaigns,
     }));
 
+    // Load existing cross-client rules to avoid duplicates
+    const { rules: existingCrossRules } = await loadKnowledge(['analisis'], { limit: 15, audit: { source: 'cross-client-learning' } });
+    const existingHint = existingCrossRules
+      .map(r => `- ${r.titulo}`)
+      .join('\n')
+      .slice(0, 1500);
+
     // Ask Claude to find patterns
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -83,10 +91,10 @@ export async function crossClientLearning(c: Context) {
         messages: [{
           role: 'user',
           content: `Analiza estos datos ANÓNIMOS de ${clients.length} clientes de e-commerce y encuentra PATRONES accionables.
-
+${existingHint ? `\nREGLAS QUE YA EXISTEN (NO generes duplicados):\n${existingHint}\n` : ''}
 ${JSON.stringify(summary, null, 2)}
 
-Genera 2-3 reglas basadas en patrones reales encontrados en estos datos.
+Genera 2-3 reglas NUEVAS basadas en patrones reales encontrados en estos datos que NO estén ya cubiertas.
 Formato JSON array:
 [{"titulo": "título (max 60 chars)", "contenido": "CUANDO: [condición]. HAZ: [acción]. PORQUE: [dato del análisis]."}]
 

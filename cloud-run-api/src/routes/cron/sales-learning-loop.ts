@@ -18,6 +18,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuery } from '../../lib/safe-supabase.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 export async function salesLearningLoop(c: Context) {
   const cronSecret = c.req.header('X-Cron-Secret')?.trim();
@@ -53,6 +54,13 @@ export async function salesLearningLoop(c: Context) {
       return c.json({ success: true, message: 'No unanalyzed prospects', ...results });
     }
 
+    // Load existing sales knowledge to avoid duplicates
+    const { rules: existingSalesRules } = await loadKnowledge(['sales_learning', 'sales_strategy', 'brief', 'buyer_persona'], { limit: 20, audit: { source: 'sales-learning-loop' } });
+    const existingPatternsHint = existingSalesRules
+      .map(r => `- ${r.titulo}`)
+      .join('\n')
+      .slice(0, 2000);
+
     for (const prospect of prospects) {
       try {
         // STEP 2: Load full conversation
@@ -86,6 +94,9 @@ export async function salesLearningLoop(c: Context) {
 
         // STEP 3: Analyze with Sonnet (worth the cost)
         const analysisPrompt = `Eres un analista de ventas senior. Analiza esta conversación de WhatsApp entre Steve (vendedor AI) y un prospecto.
+
+PATRONES YA CONOCIDOS (NO repitas estos — solo extrae lo NUEVO):
+${existingPatternsHint || '(ninguno aún)'}
 
 RESULTADO: ${outcome}
 INDUSTRIA: ${industry}
@@ -160,12 +171,29 @@ Analiza y responde SOLO con un JSON (sin markdown):
           `⚠️ Evitar: ${analysis.what_to_avoid || 'N/A'}`,
         ].join('\n');
 
+        // Dedup check: skip if very similar title already exists
+        const normalizeTitle = (s: string) => s.toLowerCase().replace(/[✅❌]/g, '').trim().slice(0, 50);
+        const { data: existingMatch } = await supabase
+          .from('steve_knowledge')
+          .select('id')
+          .eq('categoria', 'sales_learning')
+          .ilike('titulo', `%${normalizeTitle(learningTitle).slice(0, 30)}%`)
+          .limit(1);
+
+        if (existingMatch && existingMatch.length > 0) {
+          console.log(`[sales-learning] Skipped duplicate for ${prospect.phone}: ${learningTitle.slice(0, 60)}`);
+          await supabase.from('wa_prospects').update({ learning_extracted: true }).eq('id', prospect.id);
+          results.analyzed++;
+          continue;
+        }
+
         await supabase.from('steve_knowledge').insert({
           categoria: 'sales_learning',
           titulo: learningTitle,
           contenido: learningContent,
           activo: true,
           orden: 0,
+          approval_status: 'pending',
         });
 
         results.learnings_created++;
@@ -222,12 +250,23 @@ Analiza y responde SOLO con un JSON (sin markdown):
             .map((l: any) => `${l.titulo}: ${(l.contenido || '').slice(0, 200)}`)
             .join('\n\n');
 
-          const metaPrompt = `Eres un estratega de ventas senior. Analiza estos ${allLearnings.length} aprendizajes de conversaciones de ventas por WhatsApp y genera META-PATRONES — reglas generales que aplican a múltiples conversaciones.
+          // Load existing meta-patterns to avoid duplicates
+          const { data: existingStrategies } = await supabase
+            .from('steve_knowledge')
+            .select('titulo, contenido')
+            .eq('categoria', 'sales_strategy')
+            .eq('activo', true);
 
+          const existingStrategiesHint = (existingStrategies || [])
+            .map((s: any) => `- ${s.titulo}: ${(s.contenido || '').slice(0, 100)}`)
+            .join('\n');
+
+          const metaPrompt = `Eres un estratega de ventas senior. Analiza estos ${allLearnings.length} aprendizajes de conversaciones de ventas por WhatsApp y genera META-PATRONES — reglas generales que aplican a múltiples conversaciones.
+${existingStrategiesHint ? `\nMETA-PATRONES QUE YA EXISTEN (NO repitas):\n${existingStrategiesHint}\n` : ''}
 APRENDIZAJES:
 ${learningsSummary.slice(0, 6000)}
 
-Genera 3-5 meta-patrones. Cada uno debe ser una regla accionable con evidencia de múltiples conversaciones.
+Genera 3-5 meta-patrones NUEVOS (que no estén ya en los existentes). Cada uno debe ser una regla accionable con evidencia de múltiples conversaciones.
 Formato: una regla por línea, directa y accionable.
 Ejemplo: "Prospectos de moda responden mejor a presión con datos de competencia que a presión de urgencia."
 Ejemplo: "Cuando mencionan 'agencia', validar frustración ANTES de preguntar por BM convierte 80% más."
@@ -259,6 +298,7 @@ Responde SOLO con los patrones, uno por línea. Nada más.`;
                 contenido: patterns,
                 activo: true,
                 orden: 100,
+                approval_status: 'pending',
               });
 
               results.meta_patterns++;

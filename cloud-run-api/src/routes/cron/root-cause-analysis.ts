@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingle } from '../../lib/safe-supabase.js';
 import { isValidCronSecret } from '../../lib/cron-auth.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 /**
  * Root Cause Analysis — Paso C.2
@@ -43,6 +44,14 @@ export async function rootCauseAnalysis(c: Context) {
     return c.json({ message: 'Menos de 3 errores esta semana, no hay patrones', error_count: errors?.length || 0 });
   }
 
+  // Load Steve Brain knowledge for context
+  let knowledgeBlock = '';
+  try {
+    ({ knowledgeBlock } = await loadKnowledge(['analisis'], { limit: 5, label: 'REGLAS APRENDIDAS', audit: { source: 'root-cause-analysis' } }));
+  } catch (e) {
+    console.error('[rca] loadKnowledge failed, continuing without:', e);
+  }
+
   // 2. Claude Sonnet analyzes patterns
   const errorSummary = errors.map(e =>
     `- [${e.check_type || e.error_type || 'unknown'}] ${JSON.stringify(e.details || e.error_detail || '').substring(0, 200)} (status: ${e.status})`
@@ -63,7 +72,7 @@ export async function rootCauseAnalysis(c: Context) {
         messages: [{
           role: 'user',
           content: `Eres un ingeniero de confiabilidad (SRE). Analiza estos ${errors.length} errores de la última semana y encuentra PATRONES.
-
+${knowledgeBlock}
 ERRORES:
 ${errorSummary}
 

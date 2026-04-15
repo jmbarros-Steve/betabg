@@ -127,7 +127,7 @@ Si no hay patrones claros, responde []. Sin markdown.`,
         contenido: pattern.contenido.slice(0, 600),
         activo: true,
         orden: 99, // Discovered from real data = highest confidence
-        approval_status: 'approved',
+        approval_status: 'pending',
         ejemplo_real: pattern.evidence || null,
       }, { onConflict: 'categoria,titulo' });
 

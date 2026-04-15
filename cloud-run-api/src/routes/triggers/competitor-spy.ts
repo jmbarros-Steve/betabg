@@ -52,13 +52,63 @@ interface AdInsight {
   spend?: string;
 }
 
-async function runApifyActor(token: string): Promise<ApifyAd[]> {
+async function getIndustryQueries(supabase: any): Promise<string[]> {
+  const industryQueries: string[] = [];
+
+  // Get industries from active clients' brand_research
+  const { data: clients } = await supabase
+    .from('clients')
+    .select('id, business_name, industry')
+    .eq('active', true)
+    .limit(20);
+
+  if (clients?.length) {
+    for (const client of clients) {
+      // Add industry-based query if available
+      if (client.industry) {
+        industryQueries.push(`${client.industry} chile`);
+      }
+    }
+
+    // Get brand_research for competitor names
+    const clientIds = clients.map((c: any) => c.id);
+    const { data: research } = await supabase
+      .from('brand_research')
+      .select('client_id, research_data')
+      .in('client_id', clientIds);
+
+    if (research?.length) {
+      for (const r of research) {
+        const data = r.research_data;
+        if (!data) continue;
+        // Extract competitors or industry from JSONB
+        const competitors = data.competitors || data.competidores || [];
+        if (Array.isArray(competitors)) {
+          for (const comp of competitors.slice(0, 3)) {
+            const name = typeof comp === 'string' ? comp : comp?.name || comp?.nombre;
+            if (name) industryQueries.push(name);
+          }
+        }
+        const industry = data.industry || data.industria || data.vertical;
+        if (industry && typeof industry === 'string') {
+          industryQueries.push(`${industry} chile`);
+        }
+      }
+    }
+  }
+
+  // Deduplicate
+  return [...new Set(industryQueries)].slice(0, 5);
+}
+
+async function runApifyActor(token: string, extraQueries: string[] = []): Promise<ApifyAd[]> {
   // Use apify~facebook-ads-scraper — official actor with rich metrics
-  const queries = [
+  const baseQueries = [
     'tienda online chile',
     'ofertas ropa chile',
     'ecommerce envio gratis',
   ];
+  const queries = [...baseQueries, ...extraQueries];
   const startUrls = queries.map(q => ({
     url: `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CL&is_targeted_country=false&media_type=all&search_type=keyword_unordered&q=${encodeURIComponent(q)}`,
   }));
@@ -167,7 +217,19 @@ function filterLongRunningAds(ads: ApifyAd[], minDays: number): AdInsight[] {
   return results.sort((a, b) => b.daysActive - a.daysActive);
 }
 
-async function analyzeWithHaiku(ads: AdInsight[]): Promise<string> {
+async function getSteveCopies(supabase: any): Promise<string[]> {
+  // Fetch last 10 copies from creative_history for comparison
+  const { data: copies } = await supabase
+    .from('creative_history')
+    .select('copy_text, platform, created_at')
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (!copies?.length) return [];
+  return copies.map((c: any) => c.copy_text).filter(Boolean);
+}
+
+async function analyzeWithHaiku(ads: AdInsight[], steveCopies: string[] = []): Promise<string> {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
@@ -179,6 +241,14 @@ async function analyzeWithHaiku(ads: AdInsight[]): Promise<string> {
     )
     .join('\n\n');
 
+  const steveSection = steveCopies.length > 0
+    ? `\n\n--- COPIES QUE STEVE GENERA ACTUALMENTE ---\n${steveCopies.map((c, i) => `${i + 1}. ${c.substring(0, 300)}`).join('\n')}\n---`
+    : '';
+
+  const comparisonInstruction = steveCopies.length > 0
+    ? `\n6. **Comparación con Steve**: Compara estos ads de competencia con los copies que Steve genera. ¿Qué ángulos usa la competencia que Steve NO está usando? ¿Qué gaps específicos debe cerrar Steve?`
+    : '';
+
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -188,7 +258,7 @@ async function analyzeWithHaiku(ads: AdInsight[]): Promise<string> {
     },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2048,
+      max_tokens: 3000,
       messages: [
         {
           role: 'user',
@@ -196,14 +266,14 @@ async function analyzeWithHaiku(ads: AdInsight[]): Promise<string> {
 
 Analiza estos ${ads.length} anuncios de Facebook que llevan >14 días activos en Chile (señal de que funcionan bien y son rentables):
 
-${adSummary}
+${adSummary}${steveSection}
 
 Genera un reporte estructurado con:
 1. **Patrones de copy ganador**: ¿Qué estructuras, hooks, y CTAs se repiten en los ads exitosos?
 2. **Ángulos creativos dominantes**: ¿Qué emociones/triggers usan? (urgencia, FOMO, social proof, dolor, aspiración)
 3. **Tendencias de la industria**: ¿Qué productos/servicios están publicitando más agresivamente?
 4. **Oportunidades para Steve**: ¿Qué ángulos podemos replicar o mejorar para los clientes de Steve?
-5. **Top 3 ads más interesantes**: Explica por qué funcionan y qué podemos aprender.
+5. **Top 3 ads más interesantes**: Explica por qué funcionan y qué podemos aprender.${comparisonInstruction}
 
 Sé específico y accionable. El reporte es para media buyers profesionales.`,
         },
@@ -260,9 +330,14 @@ export async function competitorSpy(c: Context) {
   console.log('[competitor-spy] Starting weekly competitor ad scan...');
 
   try {
-    // Step 1: Fetch ads from Apify
+    // Step 1a: Get industry-specific queries from active clients
+    console.log('[competitor-spy] Fetching industry queries from client data...');
+    const industryQueries = await getIndustryQueries(supabase);
+    console.log(`[competitor-spy] ${industryQueries.length} industry queries: ${industryQueries.join(', ')}`);
+
+    // Step 1b: Fetch ads from Apify (base + industry queries)
     console.log('[competitor-spy] Running Apify facebook-ads-scraper actor...');
-    const rawAds = await runApifyActor(apifyToken);
+    const rawAds = await runApifyActor(apifyToken, industryQueries);
     console.log(`[competitor-spy] Got ${rawAds.length} raw ads`);
 
     // Step 2: Filter to long-running ads (>14 days = proven winners)
@@ -278,9 +353,14 @@ export async function competitorSpy(c: Context) {
       return c.json({ status: 'ok', raw_ads: rawAds.length, long_running: 0, insight: 'none' });
     }
 
-    // Step 3: Analyze with Claude Haiku
+    // Step 2b: Fetch Steve's recent copies for comparison
+    console.log('[competitor-spy] Fetching Steve copies for comparison...');
+    const steveCopies = await getSteveCopies(supabase);
+    console.log(`[competitor-spy] Got ${steveCopies.length} Steve copies for comparison`);
+
+    // Step 3: Analyze with Claude Haiku (now includes Steve comparison)
     console.log('[competitor-spy] Analyzing patterns with Claude Haiku...');
-    const analysis = await analyzeWithHaiku(longRunning);
+    const analysis = await analyzeWithHaiku(longRunning, steveCopies);
 
     // Step 4: Save to steve_knowledge
     const titulo = `Espía de competencia — Semana del ${weekStart.toISOString().split('T')[0]}`;
@@ -291,10 +371,35 @@ export async function competitorSpy(c: Context) {
       contenido: `${longRunning.length} ads activos >14 días en Chile (de ${rawAds.length} escaneados).\n\n${analysis}`,
       activo: true,
       orden: 0,
+      approval_status: 'pending',
     });
 
     if (insertError) {
       console.error('[competitor-spy] Failed to save insight:', insertError.message);
+    }
+
+    // Step 4b: Insert into learning_queue for automatic rule extraction
+    const top5Ads = longRunning.slice(0, 5).map(a =>
+      `"${a.pageName}" (${a.daysActive}d): ${a.adText}`
+    ).join('\n\n');
+
+    const sourceContent = `${analysis}\n\n--- TOP 5 ADS TEXTUALES (proven winners >14 días) ---\n${top5Ads}`;
+
+    const { data: queueEntry, error: queueError } = await supabase
+      .from('learning_queue')
+      .insert({
+        source_type: 'competitor',
+        source_content: sourceContent,
+        source_title: titulo,
+        status: 'pending',
+      })
+      .select('id')
+      .single();
+
+    if (queueError) {
+      console.error('[competitor-spy] Failed to insert into learning_queue:', queueError.message);
+    } else {
+      console.log(`[competitor-spy] Inserted into learning_queue: ${queueEntry.id}`);
     }
 
     // Step 5: Log this run
@@ -304,13 +409,16 @@ export async function competitorSpy(c: Context) {
       details: {
         raw_ads: rawAds.length,
         long_running: longRunning.length,
+        industry_queries: industryQueries,
+        steve_copies_compared: steveCopies.length,
         top_advertisers: [...new Set(longRunning.slice(0, 10).map(a => a.pageName))],
         avg_days_active: Math.round(longRunning.reduce((s, a) => s + a.daysActive, 0) / longRunning.length),
         insight_saved: !insertError,
+        learning_queue_id: queueEntry?.id || null,
       },
     });
 
-    console.log(`[competitor-spy] Done. ${longRunning.length} proven ads analyzed, insight saved.`);
+    console.log(`[competitor-spy] Done. ${longRunning.length} proven ads analyzed, insight saved, queued for rule extraction.`);
 
     return c.json({
       status: 'ok',
@@ -318,6 +426,7 @@ export async function competitorSpy(c: Context) {
       long_running: longRunning.length,
       top_advertisers: [...new Set(longRunning.slice(0, 5).map(a => a.pageName))],
       insight_saved: !insertError,
+      learning_queue_id: queueEntry?.id || null,
     });
   } catch (err: any) {
     console.error('[competitor-spy] Error:', err.message);

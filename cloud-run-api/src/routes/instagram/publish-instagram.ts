@@ -21,6 +21,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { metaApiFetch, metaApiJson } from '../../lib/meta-fetch.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -353,8 +354,8 @@ export async function publishInstagram(c: Context) {
       case 'generate_caption': {
         const { topic, tone, product_name } = body;
 
-        // Fetch brand brief from brand_research + buyer_personas + client info
-        const [{ data: brief }, { data: persona }, { data: clientInfo }] = await Promise.all([
+        // Fetch brand brief from brand_research + buyer_personas + client info + Brain
+        const [{ data: brief }, { data: persona }, { data: clientInfo }, { knowledgeBlock }] = await Promise.all([
           supabase
             .from('brand_research')
             .select('brand_name, industry, target_audience, value_proposition, brand_voice, product_details')
@@ -375,6 +376,7 @@ export async function publishInstagram(c: Context) {
             .select('name, company, shop_domain')
             .eq('id', client_id)
             .maybeSingle(),
+          loadKnowledge(['anuncios', 'brief', 'buyer_persona'], { clientId: client_id, limit: 10, label: 'REGLAS DE CONTENIDO APRENDIDAS', audit: { source: 'instagram-generate-caption' } }),
         ]);
 
         const brandName = brief?.brand_name || clientInfo?.company || clientInfo?.name || 'la marca';
@@ -391,6 +393,7 @@ export async function publishInstagram(c: Context) {
           : '';
 
         const prompt = `Genera un caption para Instagram y hashtags para la marca "${brandName}".
+${knowledgeBlock}
 
 BRIEF DE MARCA:
 - Nombre: ${brandName}

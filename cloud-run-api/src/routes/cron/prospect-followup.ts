@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
 import { safeQuery, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { isValidCronSecret } from '../../lib/cron-auth.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 /**
  * Prospect Follow-up — Steve Perro Lobo Paso 14-15
@@ -68,6 +69,10 @@ export async function prospectFollowup(c: Context) {
     );
 
     if (prospects.length > 0) {
+    // Load Steve Brain knowledge for personalized follow-ups
+    const { knowledgeBlock } = await loadKnowledge(['brief', 'buyer_persona', 'analisis'], { limit: 5, label: 'REGLAS APRENDIDAS DE VENTAS', audit: { source: 'prospect-followup' } });
+
+    if (prospects && prospects.length > 0) {
       for (const prospect of prospects) {
         try {
           // Bug #57 fix: Only count INBOUND messages from the prospect for last activity,
@@ -144,8 +149,8 @@ export async function prospectFollowup(c: Context) {
             : '';
 
           const prompts: Record<string, string> = {
-            insight: `Genera un mensaje de WhatsApp corto (max 3 líneas) para hacer follow-up a un prospecto llamado "${prospectName}" que vende ${industry}. ${auditContext || painContext || ''} ${auditContext ? 'Usa los datos de su tienda para dar un insight concreto.' : 'Dale un dato relevante de su industria sobre marketing digital.'} Tono: amigable, profesional, en español neutro (usar tú, no vos). NO uses "Hola" al inicio. Responde SOLO con el mensaje, nada más.`,
-            fomo: `Genera un mensaje de WhatsApp corto (max 4 líneas) para follow-up a "${prospectName}" que vende ${industry}. ${painContext} Incluye un caso de éxito de su industria con un número concreto de mejora + urgencia de cupos limitados. Tono: amigable, en español neutro. Responde SOLO con el mensaje.`,
+            insight: `Genera un mensaje de WhatsApp corto (max 3 líneas) para hacer follow-up a un prospecto llamado "${prospectName}" que vende ${industry}. ${auditContext || painContext || ''} ${auditContext ? 'Usa los datos de su tienda para dar un insight concreto.' : 'Dale un dato relevante de su industria sobre marketing digital.'} Tono: amigable, profesional, en español neutro (usar tú, no vos). NO uses "Hola" al inicio. ${knowledgeBlock} Responde SOLO con el mensaje, nada más.`,
+            fomo: `Genera un mensaje de WhatsApp corto (max 4 líneas) para follow-up a "${prospectName}" que vende ${industry}. ${painContext} Incluye un caso de éxito de su industria con un número concreto de mejora + urgencia de cupos limitados. Tono: amigable, en español neutro. ${knowledgeBlock} Responde SOLO con el mensaje.`,
             goodbye: `Genera un mensaje de WhatsApp corto (max 2 líneas) de despedida respetuosa para "${prospectName}". Déjale la puerta abierta sin presionar. Tono: cálido, en español neutro. Ejemplo: "No quiero ser latero. Si en algún momento quieres retomar, aquí estoy." Responde SOLO con el mensaje.`,
           };
 
@@ -317,7 +322,7 @@ export async function prospectFollowup(c: Context) {
               max_tokens: 200,
               messages: [{
                 role: 'user',
-                content: `Genera un mensaje de WhatsApp corto (max 3 líneas) de "resurrección" para "${deadName}" que vende ${deadIndustry}. Dale un dato competitivo interesante de su industria que lo haga repensar. Tono: casual, sin presión, en español neutro. Responde SOLO con el mensaje.`,
+                content: `Genera un mensaje de WhatsApp corto (max 3 líneas) de "resurrección" para "${deadName}" que vende ${deadIndustry}. Dale un dato competitivo interesante de su industria que lo haga repensar. Tono: casual, sin presión, en español neutro. ${knowledgeBlock} Responde SOLO con el mensaje.`,
               }],
             }),
             signal: AbortSignal.timeout(15_000),

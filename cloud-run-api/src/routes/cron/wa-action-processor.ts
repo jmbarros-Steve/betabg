@@ -18,6 +18,8 @@ import {
   buildDynamicSalesPrompt,
 } from '../../lib/steve-wa-brain.js';
 import { runInvestigator, runStrategist, runConversationalist } from '../../lib/steve-multi-brain.js';
+import { loadIndustryCaseStudy } from '../../lib/steve-wa-brain.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 import { generateProspectMockup } from '../../lib/steve-mockup-generator.js';
 import { generateAndSendSalesDeck } from '../../lib/steve-sales-deck.js';
 import type { ProspectRecord } from '../../lib/steve-wa-brain.js';
@@ -241,6 +243,9 @@ async function handleGenerateCopy(phone: string, payload: any, supabase: any): P
   const industry = payload.whatTheySell || 'e-commerce';
   const copyDesc = payload.copyDescription || 'anuncio genérico';
 
+  // Load Steve Brain knowledge for better ad copy
+  const { knowledgeBlock } = await loadKnowledge(['anuncios', 'meta_ads', 'buyer_persona'], { limit: 5, label: 'REGLAS DE COPY', audit: { source: 'wa-action-processor' } });
+
   const copyRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -253,7 +258,7 @@ async function handleGenerateCopy(phone: string, payload: any, supabase: any): P
       max_tokens: 400,
       messages: [{
         role: 'user',
-        content: `Genera un copy de anuncio de Meta Ads para una marca de ${industry}. Descripción: ${copyDesc}. Formato:\n🎯 Headline: ...\n📝 Texto principal: ...\n🔗 Descripción: ...\n📲 CTA: ...\nMáximo 300 caracteres total. Español neutro.`,
+        content: `Genera un copy de anuncio de Meta Ads para una marca de ${industry}. Descripción: ${copyDesc}. ${knowledgeBlock} Formato:\n🎯 Headline: ...\n📝 Texto principal: ...\n🔗 Descripción: ...\n📲 CTA: ...\nMáximo 300 caracteres total. Español neutro.`,
       }],
     }),
     signal: AbortSignal.timeout(15_000),

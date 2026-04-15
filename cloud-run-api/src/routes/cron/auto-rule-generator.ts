@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuery } from '../../lib/safe-supabase.js';
 import { isValidCronSecret } from '../../lib/cron-auth.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 /**
  * C.5 — Auto-generación de reglas
@@ -43,6 +44,14 @@ export async function autoRuleGenerator(c: Context) {
     return c.json({ error: 'ANTHROPIC_API_KEY not configured' }, 500);
   }
 
+  // Load Steve Brain knowledge to avoid duplicating known patterns
+  let knowledgeBlock = '';
+  try {
+    ({ knowledgeBlock } = await loadKnowledge(['analisis'], { limit: 5, label: 'REGLAS YA APRENDIDAS POR STEVE', audit: { source: 'auto-rule-generator' } }));
+  } catch (e) {
+    console.error('[auto-rule-gen] loadKnowledge failed, continuing without:', e);
+  }
+
   const rulesSnippet = existingRules
     .slice(0, 200) // limit prompt size
     .map((r) => `${r.id}: ${r.name} — ${r.check_rule}`)
@@ -63,7 +72,7 @@ export async function autoRuleGenerator(c: Context) {
         {
           role: 'user',
           content: `Un error ocurrió en Steve Ads que ninguna regla detectó.
-
+${knowledgeBlock}
 ERROR: ${error_detail}
 TIPO: ${error_type || 'unknown'}
 ENTIDAD: ${entity_type || 'unknown'}

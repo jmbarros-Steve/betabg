@@ -1,4 +1,5 @@
 import { Context } from 'hono';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 const BASE_PROMPT = `Eres Chonga, la asistente de soporte técnico de la plataforma Steve.
 
@@ -43,8 +44,14 @@ export async function chongaSupport(c: Context) {
       return c.json({ error: 'Error interno del servidor' }, 500);
     }
 
+    // Load Steve Brain knowledge for better support context
+    const { knowledgeBlock } = await loadKnowledge(['brief', 'analisis'], { limit: 5, label: 'CONTEXTO DE STEVE', audit: { source: 'chonga-support' } });
+
     // Build system prompt: base + knowledge base if provided
     let systemPrompt = BASE_PROMPT;
+    if (knowledgeBlock) {
+      systemPrompt += `\n\n${knowledgeBlock}`;
+    }
     if (knowledge_base) {
       systemPrompt += `\n\n## Base de conocimiento completa de la plataforma\nUsa esta información para responder preguntas con precisión:\n\n${knowledge_base}`;
     }

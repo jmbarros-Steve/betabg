@@ -1,4 +1,5 @@
 import { Context } from 'hono';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 // In-memory rate limit: 5 requests per IP per hour
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -82,8 +83,12 @@ export async function auditStore(c: Context) {
       return c.json({ error: 'No pudimos extraer contenido de esa URL. Intenta con otra.' }, 422);
     }
 
-    // 2. Analyze with Claude Haiku
+    // 2. Load Steve Brain knowledge
+    const { knowledgeBlock } = await loadKnowledge(['shopify', 'seo', 'analisis'], { limit: 10, label: 'BEST PRACTICES APRENDIDAS POR STEVE', audit: { source: 'audit-store' } });
+
+    // 3. Analyze with Claude Haiku
     const prompt = `Eres Steve, experto en marketing para e-commerce. Analiza esta tienda y dame exactamente 3 acciones concretas que haría HOY para mejorar su marketing digital.
+${knowledgeBlock}
 
 Cada acción debe ser:
 - Específica a esta tienda (no genérica)

@@ -18,6 +18,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
 import { safeQuery } from '../../lib/safe-supabase.js';
 import { isValidCronSecret } from '../../lib/cron-auth.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 const STEVE_WA_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.STEVE_WA_NUMBER || '';
 
@@ -62,6 +63,9 @@ export async function wolfMorningSend(c: Context) {
       return c.json({ success: true, message: 'No wolf findings today', ...results });
     }
 
+    // Load Steve Brain knowledge for smarter proactive messages
+    const { knowledgeBlock } = await loadKnowledge(['competencia', 'analisis', 'brief'], { limit: 5, label: 'CONTEXTO DE NEGOCIO', audit: { source: 'wolf-morning-send' } });
+
     for (const prospect of prospects) {
       try {
         const findings = prospect.wolf_findings?.findings;
@@ -82,7 +86,7 @@ El mensaje debe:
 - Sonar como un amigo que descubrió algo útil, NO como un vendedor
 - Español neutro (usar tú, no vos)
 - Terminar con una pregunta que invite a responder
-
+${knowledgeBlock}
 Responde SOLO con el mensaje, nada más.`;
 
         const aiRes = await fetch('https://api.anthropic.com/v1/messages', {

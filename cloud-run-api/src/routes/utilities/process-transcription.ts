@@ -145,6 +145,7 @@ export async function processTranscription(c: Context) {
     activo: true,
     orden: 99,
     source_id: queueId,
+    approval_status: 'pending',
   }));
 
   const { error: insertErr } = await supabase.from('steve_knowledge').insert(inserts);

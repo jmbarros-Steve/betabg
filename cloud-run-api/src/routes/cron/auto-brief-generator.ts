@@ -134,6 +134,7 @@ Máximo 500 caracteres. Solo el brief, sin explicaciones.`,
           activo: true,
           orden: 95,
           industria: 'general',
+          approval_status: 'pending',
         });
 
         if (insertErr) {

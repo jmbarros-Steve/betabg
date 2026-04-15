@@ -1,4 +1,5 @@
 import { Context } from 'hono';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 export async function analyzeAdImage(c: Context) {
   try {
@@ -18,6 +19,8 @@ export async function analyzeAdImage(c: Context) {
     : performance === 'no_funciono'
     ? '❌ ANUNCIO QUE NO FUNCIONÓ'
     : '🤷 RENDIMIENTO DESCONOCIDO';
+
+  const { knowledgeBlock } = await loadKnowledge(['anuncios', 'meta_ads'], { limit: 10, label: 'REGLAS APRENDIDAS DE CREATIVOS', audit: { source: 'analyze-ad-image' } });
 
   const contextBlock = context
     ? `\nMétricas / contexto real proporcionado:\n${context}\n`
@@ -54,7 +57,7 @@ export async function analyzeAdImage(c: Context) {
             {
               type: 'text',
               text: `Eres un experto en performance marketing y creativos de alta conversión.
-
+${knowledgeBlock}
 CONTEXTO: ${perfLabel}
 ${contextBlock}
 ${focusInstruction}

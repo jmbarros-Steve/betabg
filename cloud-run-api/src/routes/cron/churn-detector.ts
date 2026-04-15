@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { sendWhatsApp } from '../../lib/twilio-client.js';
 import { safeQuery } from '../../lib/safe-supabase.js';
 import { isValidCronSecret } from '../../lib/cron-auth.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 /**
  * Churn Detector — Steve Post-Venta
@@ -45,6 +46,9 @@ export async function churnDetector(c: Context) {
     if (clients.length === 0) {
       return c.json({ success: true, message: 'No clients with activity data', ...results });
     }
+
+    // Load Steve Brain knowledge for better check-in messages
+    const { knowledgeBlock } = await loadKnowledge(['analisis', 'shopify'], { limit: 5, label: 'CONTEXTO DE NEGOCIO APRENDIDO', audit: { source: 'churn-detector' } });
 
     for (const client of clients) {
       try {
@@ -124,7 +128,9 @@ export async function churnDetector(c: Context) {
 
           // Generate check-in message
           const severity = newRisk === 'high' ? 'muy importante' : 'amable';
-          const prompt = `Genera un mensaje de WhatsApp ${severity} (max 3 líneas) para "${clientName}", un cliente de Steve que lleva ${Math.round(daysSinceActive)} días sin entrar a la plataforma. ${metricContext} Hazle un check-in genuino. Pregunta cómo va todo. Tono: cálido, preocupado, en español neutro. Responde SOLO con el mensaje.`;
+          const prompt = `Genera un mensaje de WhatsApp ${severity} (max 3 líneas) para "${clientName}", un cliente de Steve que lleva ${Math.round(daysSinceActive)} días sin entrar a la plataforma. ${metricContext} Hazle un check-in genuino. Pregunta cómo va todo. Tono: cálido, preocupado, en español neutro.
+${knowledgeBlock}
+Responde SOLO con el mensaje.`;
 
           const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',

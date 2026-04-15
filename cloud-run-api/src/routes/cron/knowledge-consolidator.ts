@@ -137,6 +137,7 @@ Responde SOLO con un JSON array. Sin markdown.`,
         activo: true,
         orden: 99,
         merged_from: (r.merged_indices || []).map((i: number) => rules[i]?.titulo).filter(Boolean),
+        approval_status: 'pending',
       }));
 
       await supabase.from('steve_knowledge').insert(inserts);

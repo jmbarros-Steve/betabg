@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 const VIDEO_CREDIT_COST = 10;
 const VIDEO_USD_COST = 0.50;
@@ -33,11 +34,15 @@ export async function generateVideo(c: Context) {
       );
     }
 
+    // Enrich prompt with learned visual style rules
+    const { knowledgeBlock } = await loadKnowledge(['anuncios'], { limit: 5, label: 'VISUAL STYLE RULES', audit: { source: 'generate-video' } });
+    const enrichedPrompt = knowledgeBlock ? `${promptGeneracion}. ${knowledgeBlock}` : promptGeneracion;
+
     // Call Replicate Kling
     const replicateBody: Record<string, unknown> = {
       version: "kling-v1.5",
       input: {
-        prompt: promptGeneracion,
+        prompt: enrichedPrompt,
         duration: 5,
         aspect_ratio: "9:16",
         cfg_scale: 0.5,

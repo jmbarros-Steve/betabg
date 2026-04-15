@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 export async function analyzeBrandResearch(c: Context) {
   try {
@@ -181,8 +182,11 @@ export async function analyzeBrandResearch(c: Context) {
       });
       const clientDomain = website_url ? (() => { try { return new URL(website_url.startsWith('http') ? website_url : `https://${website_url}`).hostname.replace('www.', ''); } catch { return ''; } })() : '';
 
+      const { knowledgeBlock } = await loadKnowledge(['competencia', 'analisis', 'brief'], { limit: 10, label: 'CONOCIMIENTO DE STEVE SOBRE COMPETENCIA', audit: { source: 'analyze-brand-research' } });
+
       const aiPrompt = `Eres un experto en e-commerce y marketing digital en Chile/LATAM.
 Basándote en la siguiente información de un negocio, identifica exactamente ${slotsNeeded} competidores directos que vendan productos similares en el mismo mercado.
+${knowledgeBlock}
 
 MARCA: ${client.name || ''} ${client.company || ''}
 WEB: ${website_url || 'no disponible'}

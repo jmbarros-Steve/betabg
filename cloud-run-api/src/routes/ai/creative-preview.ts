@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 const PREVIEW_CREDIT_COST = 1;
 
@@ -118,6 +119,8 @@ export async function creativePreview(c: Context) {
     const brandCtx = brandName ? `Brand: "${brandName}".` : '';
     const colorCtx = brandColors ? `Brand colors: ${brandColors}.` : '';
 
+    const { knowledgeBlock } = await loadKnowledge(['anuncios', 'meta_ads'], { limit: 5, label: 'VISUAL STYLE RULES', audit: { source: 'creative-preview' } });
+
     const adPrompt = [
       `Create a professional advertising creative preview for social media (${fmt.geminiHint}).`,
       `The ad must prominently display this copy text as readable overlay text: "${copyText}".`,
@@ -128,6 +131,7 @@ export async function creativePreview(c: Context) {
       'Include a subtle call-to-action button area at the bottom.',
       'Professional typography, balanced whitespace, high-contrast text over the background.',
       'This should look like a real Meta/Instagram/Facebook ad, not a stock photo.',
+      knowledgeBlock ? `Follow these learned visual guidelines: ${knowledgeBlock}` : '',
     ].filter(Boolean).join(' ');
 
     let imageBytes: Uint8Array | null = null;

@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { loadKnowledge } from '../../lib/knowledge-loader.js';
 
 const KLAVIYO_REVISION = '2024-10-15';
 
@@ -294,8 +295,11 @@ async function getClaudeInsights(
     }
   }
 
+  const { knowledgeBlock } = await loadKnowledge(['klaviyo', 'analisis'], { limit: 10, label: 'REGLAS APRENDIDAS DE EMAIL MARKETING', audit: { source: 'steve-send-time-analysis' } });
+
   const systemPrompt = `Eres Steve, un experto en email marketing. Analiza los datos de rendimiento de envío por hora y día de la semana y proporciona insights accionables en español.
 ${briefContext || ''}
+${knowledgeBlock}
 IMPORTANTE:
 - Los días van de 0 (Lunes) a 6 (Domingo)
 - Las horas son en formato 24h (UTC)
