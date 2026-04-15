@@ -14,24 +14,44 @@ cd ~/steve && git pull
 - Backend: cd ~/steve/cloud-run-api && gcloud run deploy steve-api --source . --project steveapp-agency --region us-central1
 - Base de datos: cd ~/steve && npx supabase db push
 
-## ZONA PROTEGIDA: Brief (requiere aprobación de JM)
-**NINGÚN agente puede modificar estos archivos sin aprobación explícita de JM:**
+## !!!!!!! ZONA PROTEGIDA: Brief — LEER ANTES DE TOCAR CUALQUIER COSA !!!!!!!
+## !!!!!!! VIOLACIÓN = REVERT INMEDIATO + REGISTRO EN qa_log !!!!!!!
 
-| Archivo | Tamaño | Qué hace |
-|---------|--------|----------|
-| `cloud-run-api/src/routes/ai/steve-chat.ts` | 120KB | Lógica brief Q0→Q16, questionContext, truncación |
-| `cloud-run-api/src/routes/ai/analyze-brand-research.ts` | — | Scraping + análisis AI Phase 1 |
-| `cloud-run-api/src/routes/ai/analyze-brand-strategy.ts` | — | Estrategia AI Phase 2 (12 secciones) |
-| `src/components/client-portal/BrandBriefView.tsx` | 287KB | Rendering del brief, normalización, PDF |
-| `src/components/client-portal/SteveChat.tsx` | — | Formularios del brief, timeout Q16 |
-| `src/components/client-portal/StructuredFieldsForm.tsx` | — | Formularios dinámicos por pregunta |
-| `src/lib/briefPdfSections.ts` | — | Secciones del PDF export |
+**NINGÚN AGENTE puede modificar, editar, mover, renombrar, refactorizar, ni tocar UNA SOLA LÍNEA de estos archivos sin aprobación EXPLÍCITA y ESCRITA de JM (José Manuel Barros):**
 
-**Protocolo obligatorio:**
-1. **Solo Bastián W24** puede proponer cambios al Brief. Otros agentes NO tocan estos archivos.
-2. Antes de modificar, el agente DEBE mostrar a JM el cambio exacto (qué líneas, qué cambia, por qué).
-3. JM dice "sí" → se aplica. JM dice "no" o no responde → NO se toca.
-4. **Sin excepción.** Ni hotfix, ni "es un cambio chico", ni "es solo un typo". Todo pasa por JM.
+### Archivos bloqueados (7)
+| Archivo | Qué hace | BLOQUEADO |
+|---------|----------|-----------|
+| `cloud-run-api/src/routes/ai/steve-chat.ts` | Lógica brief Q0→Q16, questionContext, truncación | **SÍ** |
+| `cloud-run-api/src/routes/ai/analyze-brand-research.ts` | Scraping + análisis AI Phase 1 | **SÍ** |
+| `cloud-run-api/src/routes/ai/analyze-brand-strategy.ts` | Estrategia AI Phase 2 (12 secciones) | **SÍ** |
+| `src/components/client-portal/BrandBriefView.tsx` | Rendering del brief, normalización, PDF | **SÍ** |
+| `src/components/client-portal/SteveChat.tsx` | Formularios del brief, timeout Q16 | **SÍ** |
+| `src/components/client-portal/StructuredFieldsForm.tsx` | Formularios dinámicos por pregunta | **SÍ** |
+| `src/lib/briefPdfSections.ts` | Secciones del PDF export | **SÍ** |
+
+### Tablas bloqueadas (escritura)
+| Tabla | Operación bloqueada |
+|-------|-------------------|
+| `buyer_personas` | ALTER TABLE, DROP, modificar columnas. INSERT/UPDATE solo via brief flow. |
+| `brand_research` | ALTER TABLE, DROP, modificar columnas. INSERT/UPDATE solo via analyze-brand-*. |
+
+### Protocolo OBLIGATORIO (sin excepción posible)
+1. **ÚNICO agente autorizado:** Solo **Bastián W24** puede PROPONER cambios al Brief. Todos los demás agentes tienen PROHIBIDO tocar estos archivos. Si otro agente necesita un cambio en Brief, debe pedirlo a Bastián W24.
+2. **Mostrar cambio ANTES de aplicar:** El agente DEBE mostrar a JM el cambio exacto: qué archivo, qué líneas, qué cambia, qué se elimina, y POR QUÉ.
+3. **Esperar respuesta:** JM dice "sí" / "dale" / "aprobado" → se aplica. CUALQUIER OTRA RESPUESTA (incluido silencio) → NO se toca.
+4. **Sin excepción. Sin atajos. Sin emergencias.** Ni hotfix, ni "es un cambio chico", ni "es solo un typo", ni "es un import", ni "es solo un comentario". TODO pasa por JM. Un cambio no aprobado se revierte inmediatamente.
+5. **Registro:** Todo cambio aprobado se registra en el commit message con `[BRIEF-APPROVED-BY-JM]`.
+6. **Si tienes duda, NO toques.** Pregunta primero. Es mejor preguntar 10 veces que romper el brief 1 vez.
+
+### Qué pasa si un agente viola esta regla
+- El cambio se revierte con `git revert` inmediatamente
+- Se registra la violación en `qa_log` con severity: critical
+- Se documenta en el state del agente infractor
+- JM es notificado
+
+### Por qué existe esta protección
+El Brief es el primer contacto del cliente con Steve. Si se rompe, el cliente se va y no vuelve. El brief tiene bugs sutiles (off-by-one, keys variantes de la IA, system prompt vs questionContext) que solo se detectan con test E2E completo. Un cambio "inocente" puede causar loop infinito, preguntas duplicadas, o JSON crudo visible. Esta zona se ganó su protección con sangre.
 
 ## Reglas de Código
 - **NUNCA** tocar `src/integrations/supabase/` (auto-generado por Supabase)
