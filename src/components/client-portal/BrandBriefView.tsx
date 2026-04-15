@@ -3627,7 +3627,12 @@ export function BrandBriefView({ clientId, onEditBrief }: BrandBriefViewProps) {
                 ? (aiPersona.frase_que_lo_define || '')
                 : '';
               const lifestyleText = hasAI
-                ? (typeof aiPersona.psicografia === 'object' ? (aiPersona.psicografia.estilo_de_vida || '') : String(aiPersona.psicografia || ''))
+                ? (typeof aiPersona.psicografia === 'object'
+                  ? (aiPersona.psicografia.estilo_de_vida
+                    || aiPersona.psicografia.estilo_vida
+                    || [aiPersona.psicografia.intereses, aiPersona.psicografia.valores, aiPersona.psicografia.identidad, aiPersona.psicografia.ideologia]
+                        .filter(Boolean).join('. ') || '')
+                  : String(aiPersona.psicografia || ''))
                 : getResponse('persona_lifestyle') || 'Pendiente';
               const transformText = hasAI
                 ? (Array.isArray(aiPersona.motivadores_de_compra) ? aiPersona.motivadores_de_compra.slice(0, 3).join('. ') + '.' : String(aiPersona.motivadores_de_compra || ''))
