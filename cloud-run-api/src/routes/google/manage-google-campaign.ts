@@ -673,7 +673,6 @@ async function handleCreateCampaign(
           assetOperation: {
             create: {
               resourceName: `customers/${customerId}/assets/${assetTempId}`,
-              type: 'TEXT',
               textAsset: { text },
             },
           },
@@ -700,7 +699,6 @@ async function handleCreateCampaign(
           assetOperation: {
             create: {
               resourceName: `customers/${customerId}/assets/${assetTempId}`,
-              type: 'TEXT',
               textAsset: { text },
             },
           },
@@ -727,7 +725,6 @@ async function handleCreateCampaign(
           assetOperation: {
             create: {
               resourceName: `customers/${customerId}/assets/${assetTempId}`,
-              type: 'TEXT',
               textAsset: { text },
             },
           },
@@ -819,7 +816,13 @@ async function handleCreateCampaign(
     }
   }
 
-  console.log(`[manage-google-campaign] Creating ${channelType} campaign "${name}" with ${mutateOps.length} operations (images: ${image_assets?.length || 0}, videos: ${youtube_video_ids?.length || 0})`);
+  // Log asset counts for debugging
+  const headlineCount = mutateOps.filter((op: any) => op.assetGroupAssetOperation?.create?.fieldType === 'HEADLINE').length;
+  const descCount = mutateOps.filter((op: any) => op.assetGroupAssetOperation?.create?.fieldType === 'DESCRIPTION').length;
+  const longHlCount = mutateOps.filter((op: any) => op.assetGroupAssetOperation?.create?.fieldType === 'LONG_HEADLINE').length;
+  const bizNameCount = mutateOps.filter((op: any) => op.assetGroupAssetOperation?.create?.fieldType === 'BUSINESS_NAME').length;
+  const imgCount2 = mutateOps.filter((op: any) => op.assetGroupAssetOperation?.create?.fieldType?.includes('IMAGE') || op.assetGroupAssetOperation?.create?.fieldType === 'LOGO').length;
+  console.log(`[manage-google-campaign] Creating ${channelType} campaign "${name}" with ${mutateOps.length} ops — headlines:${headlineCount} desc:${descCount} longHl:${longHlCount} bizName:${bizNameCount} images:${imgCount2} videos:${youtube_video_ids?.length || 0}`);
 
   const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, mutateOps);
 
