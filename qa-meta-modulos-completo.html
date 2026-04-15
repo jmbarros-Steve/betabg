@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Ads — Módulos Meta / Instagram / Campañas</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+.container{max-width:1400px;margin:0 auto;padding:20px}
+h1{font-size:2rem;background:linear-gradient(135deg,#3b82f6,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.subtitle{color:#94a3b8;font-size:1rem;margin-bottom:30px}
+.nav{position:sticky;top:0;background:#1e293b;border:1px solid #334155;border-radius:12px;padding:12px 20px;margin-bottom:24px;z-index:100;display:flex;flex-wrap:wrap;gap:8px}
+.nav a{color:#93c5fd;text-decoration:none;font-size:.85rem;padding:4px 12px;border-radius:6px;background:#1e3a5f;transition:.2s}
+.nav a:hover{background:#2563eb;color:#fff}
+.section{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:24px;margin-bottom:20px}
+.section h2{font-size:1.4rem;color:#60a5fa;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #334155}
+.section h3{font-size:1.1rem;color:#a78bfa;margin:16px 0 8px}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:.88rem}
+th{background:#334155;color:#93c5fd;text-align:left;padding:10px 12px;font-weight:600}
+td{padding:8px 12px;border-bottom:1px solid #2d3748}
+tr:hover td{background:#2d3748}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75rem;font-weight:600}
+.b-get{background:#065f46;color:#6ee7b7}
+.b-post{background:#92400e;color:#fbbf24}
+.b-del{background:#7f1d1d;color:#fca5a5}
+.b-meta{background:#1e3a5f;color:#60a5fa}
+.b-ig{background:#5b21b6;color:#c4b5fd}
+.b-ok{background:#065f46;color:#6ee7b7}
+.b-warn{background:#78350f;color:#fde68a}
+.b-err{background:#7f1d1d;color:#fca5a5}
+.b-pending{background:#44403c;color:#fbbf24}
+code{background:#0f172a;color:#67e8f9;padding:2px 6px;border-radius:4px;font-size:.82rem;font-family:'Fira Code',monospace}
+pre{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:16px;overflow-x:auto;font-size:.82rem;color:#67e8f9;margin:8px 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.card{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:16px}
+.card h4{color:#f59e0b;margin-bottom:8px;font-size:.95rem}
+.stat{font-size:2rem;font-weight:700;color:#3b82f6}
+.stat-label{font-size:.8rem;color:#94a3b8}
+.checklist{list-style:none;padding:0}
+.checklist li{padding:8px 12px;border-bottom:1px solid #2d3748;display:flex;align-items:flex-start;gap:8px}
+.checklist li::before{content:'☐';color:#f59e0b;font-size:1.1rem;flex-shrink:0;margin-top:1px}
+.checklist li.header{background:#334155;font-weight:700;color:#93c5fd;border-radius:6px;margin:8px 0 4px}
+.checklist li.header::before{content:''}
+.flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}
+.flow .step{background:#1e3a5f;border:1px solid #3b82f6;border-radius:8px;padding:8px 14px;font-size:.82rem;color:#93c5fd}
+.flow .arrow{color:#475569;font-size:1.2rem}
+details{margin:8px 0}
+details summary{cursor:pointer;color:#f59e0b;font-weight:600;padding:8px;background:#1a2332;border-radius:6px}
+details[open] summary{border-radius:6px 6px 0 0}
+details .detail-body{background:#0f172a;border:1px solid #334155;border-top:0;border-radius:0 0 6px 6px;padding:16px}
+@media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Steve Ads — Módulos Meta / Instagram / Campañas</h1>
+<p class="subtitle">Inventario completo + Checklist de pruebas — Generado 3 Abril 2026</p>
+
+<!-- NAV -->
+<div class="nav">
+<a href="#stats">Resumen</a>
+<a href="#frontend">Frontend</a>
+<a href="#cloud-api">Cloud Run API</a>
+<a href="#edge">Edge Functions</a>
+<a href="#db">Base de Datos</a>
+<a href="#oauth">OAuth Flow</a>
+<a href="#graph-api">Graph API</a>
+<a href="#env">Env Vars</a>
+<a href="#tests">Tests Existentes</a>
+<a href="#checklist">Checklist QA</a>
+</div>
+
+<!-- ============================================ -->
+<!-- STATS -->
+<!-- ============================================ -->
+<div class="section" id="stats">
+<h2>Resumen General</h2>
+<div class="grid3">
+<div class="card"><div class="stat">35+</div><div class="stat-label">Archivos relacionados a Meta/IG/Campañas</div></div>
+<div class="card"><div class="stat">~8,900</div><div class="stat-label">Líneas de código total</div></div>
+<div class="card"><div class="stat">15</div><div class="stat-label">Rutas Cloud Run API (Meta)</div></div>
+<div class="card"><div class="stat">4</div><div class="stat-label">Edge Functions Supabase</div></div>
+<div class="card"><div class="stat">9</div><div class="stat-label">Tablas en Base de Datos</div></div>
+<div class="card"><div class="stat">v21.0</div><div class="stat-label">Graph API Version Principal</div></div>
+</div>
+</div>
+
+<!-- ============================================ -->
+<!-- FRONTEND -->
+<!-- ============================================ -->
+<div class="section" id="frontend">
+<h2>Frontend (React/TypeScript)</h2>
+
+<table>
+<tr><th>Archivo</th><th>Función</th><th>Detalles</th></tr>
+<tr>
+<td><code>src/pages/OAuthMetaCallback.tsx</code></td>
+<td>Callback OAuth Meta</td>
+<td>Valida CSRF (nonce), intercambia code por token, redirige a portal. Soporta formato legacy de state.</td>
+</tr>
+<tr>
+<td><code>src/components/dashboard/PlatformConnectionsPanel.tsx</code></td>
+<td>UI Conexiones</td>
+<td>Gestión conexiones Meta/Shopify/Google/Klaviyo. Meta: campos account_id + access_token. Google marcado "en desarrollo".</td>
+</tr>
+<tr>
+<td><code>src/components/dashboard/ClientMetricsPanel.tsx</code></td>
+<td>KPIs Meta</td>
+<td>Cards: Spend, Purchases, ROAS, CPC, CPM, Impressions. Presets: last7days, mtd, last_month, ytd. Todo en CLP.</td>
+</tr>
+<tr>
+<td><code>src/components/dashboard/CreativeReviewFeed.tsx</code></td>
+<td>Feed Creativos</td>
+<td>Badge Meta azul. Muestra creativos con scores CRITERIO/ESPEJO.</td>
+</tr>
+<tr>
+<td><code>src/components/dashboard/SteveKnowledgePanel.tsx</code></td>
+<td>Knowledge Base</td>
+<td>Categoría Meta Ads en base de conocimiento.</td>
+</tr>
+<tr>
+<td><code>src/components/dashboard/SteveTrainingPanel.tsx</code></td>
+<td>Training</td>
+<td>Recomendaciones de entrenamiento por plataforma.</td>
+</tr>
+<tr>
+<td><code>src/App.tsx</code></td>
+<td>Router</td>
+<td>Ruta <code>/oauth/meta/callback</code> registrada.</td>
+</tr>
+<tr>
+<td><code>src/integrations/supabase/types.ts</code></td>
+<td>Tipos DB</td>
+<td>Auto-generado. Incluye platform_type enum, tipos para campaign_metrics, competitor_ads, etc.</td>
+</tr>
+</table>
+</div>
+
+<!-- ============================================ -->
+<!-- CLOUD RUN API -->
+<!-- ============================================ -->
+<div class="section" id="cloud-api">
+<h2>Cloud Run API — Rutas Meta (15 archivos, 7,136 LOC)</h2>
+
+<h3>Librería Compartida</h3>
+<div class="grid2">
+<div class="card">
+<h4>meta-fetch.ts</h4>
+<p>Wrapper Graph API v21.0 con:</p>
+<ul>
+<li>Circuit breaker (previene hammering)</li>
+<li>Retry exponencial: 2s → 4s → 8s (max 3)</li>
+<li>Inter-request delay: 200ms (~300 req/min)</li>
+<li>Timeout: 30s con AbortController</li>
+<li>Retry-After header support</li>
+<li>Rate-limit codes: 4, 32, 80004</li>
+<li>Token en Authorization header (no URL)</li>
+</ul>
+<p><strong>Funciones:</strong> <code>metaApiFetch()</code>, <code>metaApiJson()</code>, <code>metaApiPaginateAll()</code></p>
+</div>
+<div class="card">
+<h4>meta-token-refresh.ts</h4>
+<p>Gestión ciclo de vida tokens:</p>
+<ul>
+<li><code>isTokenExpiredError()</code> — code 190, subcodes 463/467</li>
+<li><code>refreshMetaToken()</code> — fb_exchange_token grant</li>
+<li><code>getValidMetaToken()</code> — refresh proactivo si &lt;7 días</li>
+<li><code>handleTokenExpired()</code> — force refresh, marca inactive si falla</li>
+<li><code>updateConnectionToken()</code> — encrypta y actualiza DB</li>
+</ul>
+</div>
+</div>
+
+<h3>Endpoints</h3>
+<table>
+<tr><th>Archivo</th><th>Endpoint</th><th>LOC</th><th>Acciones</th><th>Descripción</th></tr>
+<tr>
+<td><code>manage-meta-campaign.ts</code></td>
+<td><span class="badge b-post">POST</span> <code>/api/manage-meta-campaign</code></td>
+<td>1,636</td>
+<td>create, create_322, pause, resume, update, update_budget, duplicate, archive, get_ad_details, update_ad</td>
+<td>CRUD completo de campañas. Upload imágenes (URL + base64 fallback). Evaluación CRITERIO/ESPEJO/Angle. Creative history (D.6). Conversión moneda con cache 5min.</td>
+</tr>
+<tr>
+<td><code>sync-meta-metrics.ts</code></td>
+<td><span class="badge b-post">POST</span> <code>/api/sync-meta-metrics</code></td>
+<td>476</td>
+<td>sync</td>
+<td>Sync métricas diarias. Exchange rate API con fallback hardcoded (CLP=950). Shopify session token auth.</td>
+</tr>
+<tr>
+<td><code>manage-meta-rules.ts</code></td>
+<td><span class="badge b-post">POST</span> <code>/api/manage-meta-rules</code></td>
+<td>524</td>
+<td>list, create, update, delete, toggle, execute</td>
+<td>Reglas automatizadas: PAUSE_CAMPAIGN, INCREASE/DECREASE_BUDGET, SCALE_BUDGET. Time windows: 3/7/14/30 días. Operators: GT, LT, EQ, BETWEEN.</td>
+</tr>
+<tr>
+<td><code>manage-meta-audiences.ts</code></td>
+<td><span class="badge b-post">POST</span> <code>/api/manage-meta-audiences</code></td>
+<td>559</td>
+<td>create_custom, create_lookalike, create_retargeting, delete, list</td>
+<td>Custom audiences (website, customer_list, engagement, app_activity). Subtype mapping.</td>
+</tr>
+<tr>
+<td><code>fetch-meta-business-hierarchy.ts</code></td>
+<td><span class="badge b-post">POST</span> <code>/api/fetch-meta-business-hierarchy</code></td>
+<td>478</td>
+<td>fetch</td>
+<td>Business → Ad Accounts → Pages → Pixels. Cache in-memory 5min (max 100 entries).</td>
+</tr>
+<tr>
+<td><code>fetch-meta-ad-accounts.ts</code></td>
+<td><span class="badge b-post">POST</span> <code>/api/fetch-meta-ad-accounts</code></td>
+<td>329</td>
+<td>fetch</td>
+<td>Listar/validar ad accounts. Cache 5min. Incluye currency, timezone, business info, permissions.</td>
+</tr>
+<tr>
+<td><code>meta-social-inbox.ts</code></td>
+<td><span class="badge b-post">POST</span> <code>/api/meta-social-inbox</code></td>
+<td>725</td>
+<td>list_pages, list_conversations, get_messages, list_post_comments, list_ad_comments, get_comment_replies, reply_message, reply_comment, mark_read</td>
+<td>Inbox unificado Facebook Pages + Instagram. Paginación con cursors. Threading.</td>
+</tr>
+<tr>
+<td><code>detect-audience-overlap.ts</code></td>
+<td><span class="badge b-post">POST</span> <code>/api/detect-audience-overlap</code></td>
+<td>243</td>
+<td>detect</td>
+<td>Overlap entre ad sets: edad, género, geo, intereses, custom audiences. Threshold &gt;30%. Mensajes en español.</td>
+</tr>
+<tr>
+<td><code>sync-klaviyo-to-meta-audience.ts</code></td>
+<td><span class="badge b-post">POST</span> <code>/api/sync-klaviyo-to-meta-audience</code></td>
+<td>184</td>
+<td>sync</td>
+<td>Klaviyo → Meta Custom Audiences. Paginated (max 5000 profiles). SHA256 email hashing. Batch upload 10k.</td>
+</tr>
+<tr>
+<td><code>manage-meta-pixel.ts</code></td>
+<td><span class="badge b-post">POST</span> <code>/api/manage-meta-pixel</code></td>
+<td>226</td>
+<td>list, get, stats</td>
+<td>Píxeles de conversión. Event tracking + validación.</td>
+</tr>
+<tr>
+<td><code>meta-adset-action.ts</code></td>
+<td><span class="badge b-post">POST</span> <code>/api/meta-adset-action</code></td>
+<td>86</td>
+<td>pause, resume</td>
+<td>Quick toggle ad set status (ACTIVE/PAUSED). Admin bypass.</td>
+</tr>
+<tr>
+<td><code>meta-catalogs.ts</code></td>
+<td><span class="badge b-post">POST</span> <code>/api/meta-catalogs</code></td>
+<td>117</td>
+<td>fetch</td>
+<td>Product catalogs + product sets. Graceful degradation (error 100/200 → empty array).</td>
+</tr>
+<tr>
+<td><code>check-meta-scopes.ts</code></td>
+<td><span class="badge b-post">POST</span> <code>/api/check-meta-scopes</code></td>
+<td>95</td>
+<td>check</td>
+<td>Verificar scopes OAuth (ads_management, pages_read_engagement, etc.). Flag token_expired.</td>
+</tr>
+<tr>
+<td><code>meta-targeting-search.ts</code></td>
+<td><span class="badge b-post">POST</span> <code>/api/meta-targeting-search</code></td>
+<td>171</td>
+<td>search</td>
+<td>Búsqueda intereses/locations/locales. Min 2 chars. Location types: country, region, city, zip.</td>
+</tr>
+<tr>
+<td><code>meta-data-deletion.ts</code></td>
+<td><span class="badge b-post">POST</span> <code>/api/meta-data-deletion</code></td>
+<td>117</td>
+<td>GDPR delete</td>
+<td>Data deletion requests de Meta. HMAC-SHA256 signature verification. Retorna confirmation_code UUID.</td>
+</tr>
+</table>
+
+<h3>Patrón de Auth (consistente en todos)</h3>
+<pre>const authHeader = c.req.header('Authorization')
+const token = authHeader.replace('Bearer ', '')
+const { data: { user } } = await supabase.auth.getUser(token)
+// Verificación: user_id OR client_user_id matches, fallback admin role check</pre>
+
+<h3>Códigos de Error</h3>
+<table>
+<tr><th>Código</th><th>Significado</th></tr>
+<tr><td><span class="badge b-err">401</span></td><td>Token JWT missing/inválido</td></tr>
+<tr><td><span class="badge b-err">403</span></td><td>Sin permisos (no owner, no admin)</td></tr>
+<tr><td><span class="badge b-warn">404</span></td><td>Recurso no encontrado (connection, pixel, etc.)</td></tr>
+<tr><td><span class="badge b-warn">400</span></td><td>Input inválido / campos faltantes</td></tr>
+<tr><td><span class="badge b-err">502</span></td><td>Error de Meta Graph API</td></tr>
+<tr><td><span class="badge b-err">500</span></td><td>Error interno (decryption, etc.)</td></tr>
+</table>
+</div>
+
+<!-- ============================================ -->
+<!-- EDGE FUNCTIONS -->
+<!-- ============================================ -->
+<div class="section" id="edge">
+<h2>Edge Functions Supabase (4 funciones, 1,297 LOC)</h2>
+
+<table>
+<tr><th>Función</th><th>LOC</th><th>API Version</th><th>Descripción</th></tr>
+<tr>
+<td><code>sync-campaign-metrics</code></td>
+<td>533</td>
+<td>v18.0</td>
+<td>Sync métricas Meta + Google. Purge antes de upsert. Batch 100. Conversión CLP. 30 días rolling window. Busca purchase/omni_purchase en actions.</td>
+</tr>
+<tr>
+<td><code>fetch-campaign-adsets</code></td>
+<td>230</td>
+<td>v18.0</td>
+<td>Ad sets + ads anidados por campaña. Insights agregados 30 días. Creativos: thumbnail, body, title, image. <span class="badge b-warn">Google NO implementado (retorna [])</span></td>
+</tr>
+<tr>
+<td><code>sync-competitor-ads</code></td>
+<td>407</td>
+<td>v21.0</td>
+<td>Instagram competitor tracking via Ad Library. Multi-strategy: cached page_id → Pages Search → search_terms. Países: CL, MX, CO, AR, PE, US. Cache 24h. CTA type inference. User token &gt; app token.</td>
+</tr>
+<tr>
+<td><code>store-platform-connection</code></td>
+<td>167</td>
+<td>N/A</td>
+<td>Almacenar conexiones con tokens encriptados via RPC. Validación ownership. Duplicate handling (23505).</td>
+</tr>
+</table>
+
+<h3>Diferencia de versiones Graph API</h3>
+<div class="card" style="border-left:3px solid #f59e0b">
+<p><strong>Edge Functions</strong> usan <code>v18.0</code> (legacy) para sync-campaign-metrics y fetch-campaign-adsets.</p>
+<p><strong>Cloud Run API</strong> usa <code>v21.0</code> (actual) para todo lo demás.</p>
+<p><strong>sync-competitor-ads</strong> usa <code>v21.0</code> (Ad Library).</p>
+<p style="color:#fbbf24;margin-top:8px">⚠ Considerar migrar Edge Functions a v21.0 para consistencia.</p>
+</div>
+</div>
+
+<!-- ============================================ -->
+<!-- DATABASE -->
+<!-- ============================================ -->
+<div class="section" id="db">
+<h2>Base de Datos — Tablas Meta/Instagram/Campañas</h2>
+
+<details>
+<summary>1. platform_connections — Conexiones OAuth</summary>
+<div class="detail-body">
+<pre>platform_connections
+├── id: UUID (PK)
+├── client_id: UUID (FK → clients) [cascade delete]
+├── platform: ENUM ('shopify','meta','google','klaviyo')
+├── account_id: TEXT (Meta Ad Account ID)
+├── access_token_encrypted: TEXT
+├── refresh_token_encrypted: TEXT
+├── api_key_encrypted: TEXT (Klaviyo)
+├── token_expires_at: TIMESTAMPTZ
+├── is_active: BOOLEAN (default: true)
+├── last_sync_at: TIMESTAMPTZ
+├── store_url, store_name: TEXT (Shopify)
+├── created_at, updated_at: TIMESTAMPTZ
+└── UNIQUE(client_id, platform)</pre>
+<p>Indexes: <code>idx_platform_connections_token_expires</code> (where platform='meta')</p>
+<p>RLS: 4 policies (SELECT/INSERT/UPDATE/DELETE por ownership)</p>
+</div>
+</details>
+
+<details>
+<summary>2. campaign_metrics — Métricas diarias por campaña</summary>
+<div class="detail-body">
+<pre>campaign_metrics
+├── id: UUID (PK)
+├── connection_id: UUID (FK → platform_connections)
+├── campaign_id, campaign_name: TEXT
+├── platform: TEXT CHECK ('meta','google')
+├── metric_date: DATE
+├── impressions, clicks, spend: NUMERIC
+├── conversions, conversion_value: NUMERIC
+├── ctr, cpc, cpm, roas: NUMERIC
+├── currency: TEXT (default: 'USD')
+├── created_at, updated_at: TIMESTAMPTZ
+└── UNIQUE(connection_id, campaign_id, metric_date)</pre>
+</div>
+</details>
+
+<details>
+<summary>3. adset_metrics — Métricas ad set (testing 3:2:2)</summary>
+<div class="detail-body">
+<pre>adset_metrics
+├── id: UUID (PK)
+├── connection_id: UUID (FK)
+├── campaign_id, campaign_name: TEXT
+├── adset_id, adset_name: TEXT
+├── platform: TEXT (default: 'meta')
+├── metric_date: DATE
+├── impressions, clicks: BIGINT
+├── spend, conversions, conversion_value: NUMERIC
+├── ctr, cpc, cpm, roas: NUMERIC
+├── currency: TEXT (default: 'CLP')
+├── shop_domain: TEXT
+├── UNIQUE(connection_id, campaign_id, adset_id, metric_date)</pre>
+<p>4 indexes: connection, campaign, date, shop_domain</p>
+</div>
+</details>
+
+<details>
+<summary>4. meta_automated_rules + execution_log</summary>
+<div class="detail-body">
+<pre>meta_automated_rules
+├── id: UUID (PK)
+├── client_id: UUID (FK)
+├── connection_id: UUID (FK)
+├── name: TEXT
+├── condition: JSONB {metric, operator, threshold}
+├── action: JSONB {type, params}
+├── apply_to: 'ALL_CAMPAIGNS' | 'SPECIFIC_CAMPAIGNS'
+├── specific_campaign_ids: TEXT[]
+├── check_frequency: 'EVERY_15_MIN'|'EVERY_30_MIN'|'EVERY_1_HOUR'|'DAILY'
+├── is_active: BOOLEAN
+├── last_triggered_at, trigger_count
+└── created_at, updated_at
+
+meta_rule_execution_log
+├── id, rule_id (FK), client_id (FK)
+├── campaign_id, campaign_name
+├── action_type: TEXT
+├── details: TEXT
+├── metrics_snapshot: JSONB
+└── executed_at: TIMESTAMPTZ</pre>
+</div>
+</details>
+
+<details>
+<summary>5. competitor_tracking — Handles Instagram monitoreados</summary>
+<div class="detail-body">
+<pre>competitor_tracking
+├── id: UUID (PK)
+├── client_id: UUID (FK)
+├── ig_handle: TEXT
+├── meta_page_id: TEXT (resolved)
+├── fb_page_url: TEXT
+├── display_name, profile_pic_url: TEXT
+├── last_sync_at, is_active
+└── UNIQUE(client_id, ig_handle)</pre>
+</div>
+</details>
+
+<details>
+<summary>6. competitor_ads — Ads del Ad Library</summary>
+<div class="detail-body">
+<pre>competitor_ads
+├── id: UUID (PK)
+├── tracking_id: UUID (FK → competitor_tracking)
+├── client_id: UUID (FK)
+├── ad_library_id: TEXT
+├── ad_text, ad_headline, ad_description: TEXT
+├── image_url, video_url: TEXT
+├── image_urls: TEXT[]
+├── ad_type: 'image'|'video'|'carousel'
+├── cta_type: 'SHOP_NOW'|'LEARN_MORE'|'SIGN_UP'|'DOWNLOAD'|'OTHER'
+├── started_at: TIMESTAMPTZ
+├── is_active: BOOLEAN
+├── days_running: INTEGER
+├── impressions_lower/upper, spend_lower/upper, reach_lower/upper
+├── platforms: TEXT[]
+└── UNIQUE(tracking_id, ad_library_id)</pre>
+</div>
+</details>
+
+<details>
+<summary>7. instagram_scheduled_posts — Posts programados IG</summary>
+<div class="detail-body">
+<pre>instagram_scheduled_posts
+├── id: UUID (PK)
+├── client_id, connection_id: UUID (FK)
+├── ig_user_id: TEXT
+├── media_type: 'IMAGE'|'CAROUSEL'|'REELS'
+├── image_url: TEXT, image_urls: TEXT[]
+├── video_url: TEXT
+├── caption, hashtags: TEXT[]
+├── status: 'draft'|'scheduled'|'publishing'|'published'|'failed'
+├── scheduled_at, published_at: TIMESTAMPTZ
+├── creation_id, media_id, permalink: TEXT
+├── ai_generated: BOOLEAN, ai_prompt: TEXT
+├── error: TEXT
+└── created_at, updated_at</pre>
+</div>
+</details>
+
+<details>
+<summary>8. saved_meta_copies — Copys AI para Meta</summary>
+<div class="detail-body">
+<p>Versiones de copy generadas por IA para anuncios Meta. Vinculada a creative_history.</p>
+</div>
+</details>
+
+<details>
+<summary>9. creative_history — Historial creativo + performance</summary>
+<div class="detail-body">
+<pre>creative_history
+├── id, client_id, channel ('meta'|'email')
+├── type ('copy'|'image'|'video'), angle, theme
+├── content_summary, copy_text: TEXT
+├── cqs_score: INTEGER (Copy Quality Score)
+├── criterio_score, espejo_score: NUMERIC
+├── entity_type: 'meta_copy'|'meta_campaign'|'email_campaign'
+├── entity_id, product_name, image_url
+├── meta_campaign_id, meta_ctr, meta_cpa, meta_roas
+├── meta_spend, meta_impressions, meta_clicks, meta_conversions
+├── performance_score, performance_verdict, performance_reason
+├── measured_at, benchmark_comparison: JSONB
+├── shop_id, sent_count
+└── created_at</pre>
+<p>Indexes: client+channel+date, unmeasured (where measured_at IS NULL), shop+performance</p>
+</div>
+</details>
+</div>
+
+<!-- ============================================ -->
+<!-- OAUTH FLOW -->
+<!-- ============================================ -->
+<div class="section" id="oauth">
+<h2>OAuth Flow Completo</h2>
+
+<div class="flow">
+<div class="step">1. Usuario click "Conectar Meta"</div>
+<div class="arrow">→</div>
+<div class="step">2. Genera nonce CSRF → sessionStorage</div>
+<div class="arrow">→</div>
+<div class="step">3. Redirect a Meta OAuth (scopes: ads_read, ads_management, business_management, pages_manage_metadata)</div>
+<div class="arrow">→</div>
+<div class="step">4. Meta redirect a /oauth/meta/callback?code=...&state=nonce:clientId</div>
+</div>
+<div class="flow">
+<div class="step">5. Frontend valida CSRF</div>
+<div class="arrow">→</div>
+<div class="step">6. Envía code a Cloud Run</div>
+<div class="arrow">→</div>
+<div class="step">7. Code → short-lived token</div>
+<div class="arrow">→</div>
+<div class="step">8. Short → long-lived (~60 días)</div>
+</div>
+<div class="flow">
+<div class="step">9. Fetch businesses + ad accounts (paralelo)</div>
+<div class="arrow">→</div>
+<div class="step">10. Encrypt token via RPC</div>
+<div class="arrow">→</div>
+<div class="step">11. Save platform_connection</div>
+<div class="arrow">→</div>
+<div class="step">12. Auto-sync métricas (fire-and-forget)</div>
+</div>
+
+<h3>Token Lifecycle</h3>
+<table>
+<tr><th>Tipo</th><th>Duración</th><th>Refresh</th></tr>
+<tr><td>Short-lived</td><td>~2 horas</td><td>Se intercambia inmediatamente por long-lived</td></tr>
+<tr><td>Long-lived</td><td>~60 días</td><td>Proactivo si &lt;7 días para expirar. fb_exchange_token grant.</td></tr>
+<tr><td>Expirado</td><td>N/A</td><td>Force refresh → si falla, marca is_active=false</td></tr>
+</table>
+</div>
+
+<!-- ============================================ -->
+<!-- GRAPH API -->
+<!-- ============================================ -->
+<div class="section" id="graph-api">
+<h2>Meta Graph API — Endpoints Utilizados</h2>
+
+<table>
+<tr><th>Método</th><th>Endpoint</th><th>Propósito</th><th>Campos</th></tr>
+<tr><td><span class="badge b-post">POST</span></td><td><code>/oauth/access_token</code></td><td>Token exchange</td><td>client_id, client_secret, code, grant_type</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/me/businesses</code></td><td>Listar businesses</td><td>id, name</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/me/adaccounts</code></td><td>Listar ad accounts</td><td>id, name, status, currency, timezone</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/{businessId}/adaccounts</code></td><td>Ad accounts de business</td><td>id, name, status, currency</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/{accountId}/campaigns</code></td><td>Listar campañas</td><td>id, name, status, objective</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/{campaignId}/insights</code></td><td>Métricas campaña</td><td>spend, impressions, clicks, actions, purchase_roas</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/{campaignId}/adsets</code></td><td>Listar ad sets</td><td>id, name, status, daily_budget</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/{adsetId}/insights</code></td><td>Métricas ad set</td><td>spend, impressions, clicks, conversions</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/{adsetId}/ads</code></td><td>Anuncios con creativos</td><td>id, name, status, creative</td></tr>
+<tr><td><span class="badge b-post">POST</span></td><td><code>/{accountId}/campaigns</code></td><td>Crear campaña</td><td>name, objective, status, budget</td></tr>
+<tr><td><span class="badge b-post">POST</span></td><td><code>/{campaignId}/adsets</code></td><td>Crear ad set</td><td>targeting, budget, optimization_goal</td></tr>
+<tr><td><span class="badge b-post">POST</span></td><td><code>/{adsetId}/adcreatives</code></td><td>Crear creative</td><td>image_hash, body, title, link_url</td></tr>
+<tr><td><span class="badge b-post">POST</span></td><td><code>/{adsetId}/ads</code></td><td>Crear ad</td><td>creative_id, status</td></tr>
+<tr><td><span class="badge b-post">POST</span></td><td><code>/{accountId}/adimages</code></td><td>Upload imágenes</td><td>bytes (base64)</td></tr>
+<tr><td><span class="badge b-post">POST</span></td><td><code>/{adsetId}</code></td><td>Update ad set</td><td>status, daily_budget</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/ads_archive</code></td><td>Ad Library (competidores)</td><td>search_page_ids, search_terms, ad_reached_countries</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/{accountId}/customaudiences</code></td><td>Custom audiences</td><td>id, name, approximate_count, subtype</td></tr>
+<tr><td><span class="badge b-post">POST</span></td><td><code>/{accountId}/customaudiences</code></td><td>Crear audience</td><td>name, customer_file_source, subtype</td></tr>
+<tr><td><span class="badge b-post">POST</span></td><td><code>/{audienceId}/users</code></td><td>Upload users (Klaviyo sync)</td><td>schema: EMAIL_SHA256, data</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/{accountId}/adspixels</code></td><td>Listar píxeles</td><td>id, name, last_fired_time, code</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/act_{accountId}/targetingsearch</code></td><td>Búsqueda intereses</td><td>q, type=adinterest</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/search</code></td><td>Búsqueda locations</td><td>q, type=adgeolocation</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/pages/search</code></td><td>Handle → page_id</td><td>q, fields</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/{pageId}/feed</code></td><td>Social inbox posts</td><td>message, from, created_time</td></tr>
+<tr><td><span class="badge b-get">GET</span></td><td><code>/{catalogId}/products</code></td><td>Product catalog</td><td>id, name, price, image_url</td></tr>
+</table>
+</div>
+
+<!-- ============================================ -->
+<!-- ENV VARS -->
+<!-- ============================================ -->
+<div class="section" id="env">
+<h2>Variables de Entorno Requeridas</h2>
+<div class="grid2">
+<div class="card">
+<h4>Cloud Run API</h4>
+<table>
+<tr><td><code>META_APP_ID</code></td><td>App ID para OAuth</td></tr>
+<tr><td><code>META_APP_SECRET</code></td><td>App Secret para OAuth</td></tr>
+<tr><td><code>SUPABASE_URL</code></td><td>URL del proyecto</td></tr>
+<tr><td><code>SUPABASE_SERVICE_ROLE_KEY</code></td><td>Admin access DB</td></tr>
+<tr><td><code>ENCRYPTION_KEY</code></td><td>Encriptación tokens</td></tr>
+<tr><td><code>SELF_URL</code></td><td>URL propia (auto-sync callback)</td></tr>
+<tr><td><code>CRON_SECRET</code></td><td>Auth para cron jobs</td></tr>
+</table>
+</div>
+<div class="card">
+<h4>Frontend (.env.local)</h4>
+<table>
+<tr><td><code>VITE_SUPABASE_URL</code></td><td>URL Supabase</td></tr>
+<tr><td><code>VITE_SUPABASE_PUBLISHABLE_KEY</code></td><td>Anon key</td></tr>
+<tr><td><code>VITE_API_URL</code></td><td>URL Cloud Run API</td></tr>
+</table>
+</div>
+</div>
+
+<h3>Conversión de Moneda</h3>
+<div class="card">
+<p>API: <code>https://api.exchangerate-api.com/v4/latest/USD</code></p>
+<p>Cache: 5 minutos</p>
+<p><strong>Fallback rates (si API falla):</strong></p>
+<pre>CLP: 950 | MXN: 17.5 | EUR: 0.92 | GBP: 0.79</pre>
+</div>
+</div>
+
+<!-- ============================================ -->
+<!-- TESTS -->
+<!-- ============================================ -->
+<div class="section" id="tests">
+<h2>Tests Existentes</h2>
+
+<h3>Contract Tests (13 suites)</h3>
+<p><code>cloud-run-api/src/test/contracts/meta-api.contract.test.ts</code></p>
+<table>
+<tr><th>Suite</th><th>Qué Valida</th><th>Status</th></tr>
+<tr><td>Campaigns Contract</td><td>id, name, status (ACTIVE/PAUSED/DELETED/ARCHIVED), paging</td><td><span class="badge b-ok">OK</span></td></tr>
+<tr><td>Insights Contract</td><td>spend/impressions/cpm como strings, date format YYYY-MM-DD, actions array, purchase_roas</td><td><span class="badge b-ok">OK</span></td></tr>
+<tr><td>Custom Audiences</td><td>approximate_count_lower/upper_bound (no deprecated count), subtype</td><td><span class="badge b-ok">OK</span></td></tr>
+<tr><td>Account Info</td><td>currency + timezone_name como strings</td><td><span class="badge b-ok">OK</span></td></tr>
+<tr><td>Error Responses</td><td>401 OAuthException (code 190), 429 rate limit (code 4), error shape</td><td><span class="badge b-ok">OK</span></td></tr>
+</table>
+
+<h3>Campaign Tests (11 scenarios)</h3>
+<p><code>cloud-run-api/src/routes/meta/__tests__/manage-meta-campaign.test.ts</code></p>
+<table>
+<tr><th>#</th><th>Scenario</th><th>Expected</th></tr>
+<tr><td>1</td><td>Adset creation fails</td><td>502 + adset_error</td></tr>
+<tr><td>2</td><td>DPA creative fails</td><td>502 + creative_error</td></tr>
+<tr><td>3</td><td>DPA ad fails</td><td>502 + ad_error</td></tr>
+<tr><td>4</td><td>Flexible — all images fail</td><td>502 + "All image uploads failed"</td></tr>
+<tr><td>5</td><td>DCT creative fails</td><td>502 + creative_error</td></tr>
+<tr><td>6</td><td>Carousel &lt;2 images</td><td>502 + "Carousel requires at least 2 images"</td></tr>
+<tr><td>7</td><td>Carousel creative fails</td><td>502 + creative_error</td></tr>
+<tr><td>8</td><td>Single image upload fails</td><td>502 + creative_error</td></tr>
+<tr><td>9</td><td>Single creative fails</td><td>502 + creative_error</td></tr>
+<tr><td>10</td><td>Ad creation fails (creative OK)</td><td>502 + ad_error</td></tr>
+<tr><td>11</td><td>Happy path</td><td>200 + {success, campaign_id, ad_id}</td></tr>
+</table>
+
+<h3>Gaps de Cobertura</h3>
+<table>
+<tr><th>Módulo</th><th>Cobertura</th><th>Missing</th></tr>
+<tr><td>OAuth flow</td><td><span class="badge b-err">0%</span></td><td>Token exchange, refresh, encryption, client validation</td></tr>
+<tr><td>Metrics sync</td><td><span class="badge b-err">0%</span></td><td>Insights parsing, batch upsert, CLP conversion, pagination</td></tr>
+<tr><td>Automated rules</td><td><span class="badge b-err">0%</span></td><td>Condition evaluation, action execution, scheduling, logging</td></tr>
+<tr><td>Audiences</td><td><span class="badge b-err">0%</span></td><td>Create/delete, Klaviyo sync, audience size</td></tr>
+<tr><td>Competitor tracking</td><td><span class="badge b-err">0%</span></td><td>Ad Library extraction, handle resolution, days_running</td></tr>
+<tr><td>Social inbox</td><td><span class="badge b-err">0%</span></td><td>Messages, comments, replies, pagination</td></tr>
+<tr><td>Campaign CRUD</td><td><span class="badge b-warn">~45%</span></td><td>CRITERIO/ESPEJO validation, carousel, DPA catalog</td></tr>
+<tr><td>Token refresh</td><td><span class="badge b-err">0%</span></td><td>Proactive refresh, expiry detection, inactive marking</td></tr>
+</table>
+</div>
+
+<!-- ============================================ -->
+<!-- CHECKLIST QA -->
+<!-- ============================================ -->
+<div class="section" id="checklist">
+<h2>CHECKLIST COMPLETO DE PRUEBAS</h2>
+<p style="color:#fbbf24;margin-bottom:16px">Marca cada item conforme lo vayas probando. Cubre todos los módulos Meta/Instagram/Campañas.</p>
+
+<ul class="checklist">
+
+<!-- OAUTH -->
+<li class="header">A. OAUTH & CONEXIÓN META</li>
+<li>A1. Click "Conectar Meta" genera URL OAuth correcta con scopes (ads_read, ads_management, business_management, pages_manage_metadata)</li>
+<li>A2. State contiene formato nonce:clientId y se guarda en sessionStorage</li>
+<li>A3. Callback recibe code y state, valida CSRF contra sessionStorage</li>
+<li>A4. Fallback a formato legacy de state (solo clientId sin nonce) funciona</li>
+<li>A5. Code se intercambia por short-lived token exitosamente</li>
+<li>A6. Short-lived token se intercambia por long-lived token (~60 días)</li>
+<li>A7. Token se encripta via encrypt_platform_token() RPC antes de guardar</li>
+<li>A8. platform_connection se crea con platform='meta', account_id, token_expires_at</li>
+<li>A9. Businesses y ad accounts se fetchean en paralelo post-auth</li>
+<li>A10. Auto-sync de métricas se dispara (fire-and-forget) después de conexión</li>
+<li>A11. Redirige a /portal?tab=connections después de éxito (1.5s delay)</li>
+<li>A12. Error de Meta muestra mensaje user-friendly en español</li>
+<li>A13. Conexión duplicada retorna 409 y mensaje apropiado</li>
+<li>A14. check-meta-scopes retorna granted[] y declined[] correctamente</li>
+
+<!-- TOKEN LIFECYCLE -->
+<li class="header">B. TOKEN LIFECYCLE</li>
+<li>B1. Token con &lt;7 días para expirar se refreshea proactivamente</li>
+<li>B2. Token expirado (code 190, subcode 463/467) trigger force refresh</li>
+<li>B3. Si refresh falla, connection se marca is_active=false</li>
+<li>B4. Token refresheado se encripta y actualiza en DB con nuevo token_expires_at</li>
+<li>B5. check-meta-scopes retorna flag token_expired si decryption falla</li>
+
+<!-- CAMPAIGN MANAGEMENT -->
+<li class="header">C. GESTIÓN DE CAMPAÑAS</li>
+<li>C1. Crear campaña (action: create) con name, objective, budget, targeting, creative</li>
+<li>C2. Crear campaña 3:2:2 (action: create_322) — variant testing</li>
+<li>C3. Pausar campaña activa → status PAUSED en Meta</li>
+<li>C4. Resumir campaña pausada → status ACTIVE en Meta</li>
+<li>C5. Actualizar campaña (nombre, budget, targeting)</li>
+<li>C6. Actualizar budget específicamente (update_budget)</li>
+<li>C7. Duplicar campaña existente</li>
+<li>C8. Archivar campaña</li>
+<li>C9. Ver detalles de un ad específico (get_ad_details)</li>
+<li>C10. Actualizar ad (copy, creative)</li>
+<li>C11. Upload de imágenes: URL directa funciona</li>
+<li>C12. Upload de imágenes: fallback a base64 funciona</li>
+<li>C13. Evaluación CRITERIO AI se ejecuta y retorna score</li>
+<li>C14. Evaluación ESPEJO visual se ejecuta y retorna score</li>
+<li>C15. Detección de angle funciona</li>
+<li>C16. Creative history (D.6) se guarda post-creación exitosa</li>
+<li>C17. Conversión de moneda usa cache 5min y funciona con CLP</li>
+<li>C18. Error en adset creation retorna 502 + adset_error</li>
+<li>C19. Error en creative retorna 502 + creative_error</li>
+<li>C20. Error en ad creation retorna 502 + ad_error con campaign_id</li>
+<li>C21. Carousel requiere mínimo 2 imágenes (error si &lt;2)</li>
+<li>C22. DPA con product_catalog_id y product_set_id funciona</li>
+<li>C23. Flexible ad set format con múltiples imágenes/textos</li>
+<li>C24. Auth: 401 si JWT missing, 403 si no owner/admin, 404 si connection no existe</li>
+
+<!-- AD SET OPERATIONS -->
+<li class="header">D. OPERACIONES AD SET</li>
+<li>D1. Pausar ad set → status PAUSED, retorna adset_id + status</li>
+<li>D2. Resumir ad set → status ACTIVE</li>
+<li>D3. Admin bypass funciona para ad set actions</li>
+<li>D4. fetch-campaign-adsets retorna ad sets con insights agregados 30 días</li>
+<li>D5. Cada ad set incluye ads anidados con creativos (thumbnail, body, title, image)</li>
+<li>D6. Métricas ad set: spend, impressions, clicks, conversions, roas</li>
+<li>D7. Limit: 100 ad sets, 50 ads por ad set</li>
+
+<!-- METRICS SYNC -->
+<li class="header">E. SYNC DE MÉTRICAS</li>
+<li>E1. sync-campaign-metrics obtiene campañas + insights diarios (últimos 30 días)</li>
+<li>E2. Métricas correctas: spend, impressions, clicks, CTR, CPC, CPM, ROAS</li>
+<li>E3. Conversions: busca purchase y omni_purchase en actions array</li>
+<li>E4. Conversion value extraído de action_values</li>
+<li>E5. purchase_roas extraído correctamente</li>
+<li>E6. Purge de métricas antiguas ANTES de upsert (previene duplicados por cambio de account)</li>
+<li>E7. Batch upsert en chunks de 100 registros</li>
+<li>E8. Conversión a CLP con exchange rate API</li>
+<li>E9. Fallback a rates hardcoded si API falla (CLP=950, MXN=17.5)</li>
+<li>E10. Cache de exchange rates funciona (5min TTL)</li>
+<li>E11. last_sync_at se actualiza en platform_connection</li>
+<li>E12. sync-meta-metrics (Cloud Run) con Shopify session token auth funciona</li>
+<li>E13. Error individual de campaña NO detiene sync completo</li>
+
+<!-- AUTOMATED RULES -->
+<li class="header">F. REGLAS AUTOMATIZADAS</li>
+<li>F1. Listar reglas de un account (action: list)</li>
+<li>F2. Crear regla con condition {metric, operator, threshold}</li>
+<li>F3. Métricas soportadas: SPEND, IMPRESSIONS, CLICKS, CONVERSIONS, CPA, ROAS, CTR, CPM, FREQUENCY</li>
+<li>F4. Operadores: GREATER_THAN, LESS_THAN, EQUALS, BETWEEN</li>
+<li>F5. Time windows: LAST_3_DAYS, LAST_7_DAYS, LAST_14_DAYS, LAST_30_DAYS</li>
+<li>F6. Actions: PAUSE_CAMPAIGN, INCREASE_BUDGET, DECREASE_BUDGET, SCALE_BUDGET</li>
+<li>F7. Frecuencias: EVERY_15_MIN, EVERY_30_MIN, EVERY_1_HOUR, DAILY</li>
+<li>F8. Toggle enable/disable regla</li>
+<li>F9. Ejecutar regla manualmente (action: execute)</li>
+<li>F10. Execution log se crea con metrics_snapshot</li>
+<li>F11. Actualizar regla existente</li>
+<li>F12. Eliminar regla (cascade elimina execution_log)</li>
+<li>F13. apply_to: ALL_CAMPAIGNS vs SPECIFIC_CAMPAIGNS funciona</li>
+<li>F14. trigger_count se incrementa correctamente</li>
+
+<!-- AUDIENCES -->
+<li class="header">G. AUDIENCIAS</li>
+<li>G1. Listar custom audiences del ad account</li>
+<li>G2. Crear custom audience tipo WEBSITE</li>
+<li>G3. Crear custom audience tipo CUSTOM (customer_list)</li>
+<li>G4. Crear audience tipo ENGAGEMENT</li>
+<li>G5. Crear lookalike audience</li>
+<li>G6. Crear retargeting audience</li>
+<li>G7. Eliminar audience</li>
+<li>G8. approximate_count_lower/upper_bound se muestran (no deprecated count)</li>
+<li>G9. detect-audience-overlap compara edad, género, geo, intereses, custom</li>
+<li>G10. Solo reporta overlaps &gt;30%</li>
+<li>G11. Mensajes de overlap en español</li>
+
+<!-- KLAVIYO SYNC -->
+<li class="header">H. SYNC KLAVIYO → META</li>
+<li>H1. Fetch perfiles Klaviyo paginado (max 50 páginas = 5000 perfiles)</li>
+<li>H2. Crear Custom Audience en Meta</li>
+<li>H3. Emails hasheados con SHA256 antes de upload</li>
+<li>H4. Upload en batches de 10,000</li>
+<li>H5. Response incluye profiles_found y profiles_uploaded</li>
+<li>H6. Funciona con klaviyo_list_id específico</li>
+<li>H7. Funciona sin list_id (sync todos los perfiles)</li>
+
+<!-- COMPETITOR TRACKING -->
+<li class="header">I. TRACKING DE COMPETIDORES (INSTAGRAM)</li>
+<li>I1. Agregar handle de Instagram a competitor_tracking</li>
+<li>I2. Resolución handle → meta_page_id via Pages Search API</li>
+<li>I3. Fallback a search_terms si Pages Search falla</li>
+<li>I4. Variaciones de búsqueda: handle directo, underscore→space, camelCase split</li>
+<li>I5. Cache de page_id para syncs posteriores</li>
+<li>I6. Sync Ad Library con search_page_ids si page_id disponible</li>
+<li>I7. Países de búsqueda: CL, MX, CO, AR, PE, US</li>
+<li>I8. Ads extraídos: ad_text, headline, description, image_url, video_url</li>
+<li>I9. ad_type: detección automática (carousel si collation_count &gt;1)</li>
+<li>I10. cta_type: mapping de link titles (SHOP_NOW, LEARN_MORE, etc.)</li>
+<li>I11. days_running calculado desde ad_delivery_start_time</li>
+<li>I12. is_active determinado correctamente</li>
+<li>I13. Cache 24h — no re-sync si sincronizado hace &lt;24h</li>
+<li>I14. Token priority: user token (ads_read) > app token</li>
+<li>I15. Error token_expired manejado correctamente</li>
+<li>I16. Unique constraint (tracking_id, ad_library_id) previene duplicados</li>
+
+<!-- SOCIAL INBOX -->
+<li class="header">J. SOCIAL INBOX</li>
+<li>J1. list_pages retorna Facebook Pages + Instagram accounts</li>
+<li>J2. list_conversations para una page específica</li>
+<li>J3. get_messages de una conversation</li>
+<li>J4. list_post_comments de un post</li>
+<li>J5. list_ad_comments de un ad</li>
+<li>J6. get_comment_replies threading</li>
+<li>J7. reply_message envía respuesta correctamente</li>
+<li>J8. reply_comment responde a comentario</li>
+<li>J9. mark_read marca conversación como leída</li>
+<li>J10. Paginación con cursors funciona (param after)</li>
+<li>J11. Filtro por platform: 'instagram' vs 'facebook'</li>
+
+<!-- PIXEL & CATALOGS -->
+<li class="header">K. PÍXELES & CATÁLOGOS</li>
+<li>K1. Listar píxeles del ad account</li>
+<li>K2. Obtener detalle de píxel específico (id, name, code, last_fired)</li>
+<li>K3. Stats de eventos del píxel</li>
+<li>K4. Listar catálogos de productos</li>
+<li>K5. Cada catálogo incluye product_sets con product_count</li>
+<li>K6. Graceful degradation: cuenta sin catálogos retorna [] (no error)</li>
+
+<!-- TARGETING SEARCH -->
+<li class="header">L. BÚSQUEDA DE TARGETING</li>
+<li>L1. Búsqueda intereses: retorna id, name, audience_size bounds, path, description</li>
+<li>L2. Búsqueda locations: retorna key, name, type, country_code</li>
+<li>L3. Búsqueda locales funciona</li>
+<li>L4. Mínimo 2 caracteres requeridos</li>
+<li>L5. location_types filter funciona (country, region, city, zip)</li>
+
+<!-- BUSINESS HIERARCHY -->
+<li class="header">M. JERARQUÍA BUSINESS</li>
+<li>M1. fetch-meta-business-hierarchy retorna businesses → ad accounts → pages → pixels</li>
+<li>M2. Cache in-memory 5 min funciona (segundo request es rápido)</li>
+<li>M3. Cache eviction: max 100 entries</li>
+<li>M4. fetch-meta-ad-accounts retorna accounts con currency, timezone, permissions</li>
+<li>M5. force_refresh=true bypassa cache</li>
+
+<!-- GDPR -->
+<li class="header">N. GDPR DATA DELETION</li>
+<li>N1. Recibe signed_request de Meta (HMAC-SHA256)</li>
+<li>N2. Firma inválida retorna 403</li>
+<li>N3. Firma válida procesa deletion y retorna confirmation_code UUID</li>
+<li>N4. Response incluye URL de status</li>
+<li>N5. No falla aunque haya error interno (previene retry loops de Meta)</li>
+
+<!-- INSTAGRAM POSTS -->
+<li class="header">O. INSTAGRAM SCHEDULED POSTS</li>
+<li>O1. Crear post draft con media_type IMAGE</li>
+<li>O2. Crear post draft con media_type CAROUSEL</li>
+<li>O3. Crear post draft con media_type REELS</li>
+<li>O4. Programar post (status: scheduled, scheduled_at)</li>
+<li>O5. Publicar post → status cambia a publishing → published</li>
+<li>O6. Post fallido → status: failed + error message</li>
+<li>O7. AI generated flag y ai_prompt se guardan</li>
+<li>O8. Hashtags como array funciona</li>
+<li>O9. Multiple image_urls para carousel</li>
+<li>O10. creation_id, media_id, permalink se populan post-publicación</li>
+
+<!-- FRONTEND UI -->
+<li class="header">P. FRONTEND UI</li>
+<li>P1. PlatformConnectionsPanel muestra conexiones existentes con status</li>
+<li>P2. Botón "Sync" dispara sync de métricas</li>
+<li>P3. Eliminar conexión funciona</li>
+<li>P4. ClientMetricsPanel muestra KPIs: Spend, Purchases, ROAS, CPC, CPM</li>
+<li>P5. Date presets funcionan: last7days, mtd, last_month, ytd</li>
+<li>P6. Valores formateados en CLP</li>
+<li>P7. CreativeReviewFeed muestra badge Meta azul</li>
+<li>P8. Google Ads muestra "en desarrollo" (deshabilitado)</li>
+<li>P9. Loading states mientras cargan datos</li>
+<li>P10. Empty states cuando no hay conexiones/métricas</li>
+
+<!-- CREATIVE HISTORY -->
+<li class="header">Q. CREATIVE HISTORY & AI</li>
+<li>Q1. creative_history se crea al crear campaña exitosamente</li>
+<li>Q2. Campos guardados: copy_text, angle, cqs_score, criterio_score, espejo_score</li>
+<li>Q3. entity_type correcto: meta_copy, meta_campaign</li>
+<li>Q4. Performance columns se populan post-sync: meta_ctr, meta_cpa, meta_roas, etc.</li>
+<li>Q5. Benchmark comparison JSONB funciona</li>
+<li>Q6. Index unmeasured (where measured_at IS NULL) permite queries eficientes</li>
+
+<!-- CIRCUIT BREAKER & RESILIENCE -->
+<li class="header">R. RESILIENCIA & RATE LIMITING</li>
+<li>R1. Circuit breaker se activa tras muchos fallos consecutivos</li>
+<li>R2. Retry exponencial: 2s, 4s, 8s con max 3 intentos</li>
+<li>R3. Inter-request delay 200ms previene rate limiting</li>
+<li>R4. Rate limit codes (4, 32, 80004) trigger backoff</li>
+<li>R5. Timeout 30s con AbortController funciona</li>
+<li>R6. Retry-After header se respeta</li>
+<li>R7. Token en Authorization header (nunca en URL query param)</li>
+<li>R8. FormData requests adjuntan token correctamente</li>
+<li>R9. Pagination strips access_token de cursor URLs</li>
+
+<!-- SECURITY -->
+<li class="header">S. SEGURIDAD</li>
+<li>S1. Tokens encriptados at rest en DB (encrypt_platform_token RPC)</li>
+<li>S2. OAuth CSRF protegido por nonce en sessionStorage</li>
+<li>S3. Backend valida ownership: user_id OR client_user_id</li>
+<li>S4. Fallback a admin role check (user_roles table)</li>
+<li>S5. RLS policies restringen acceso por client ownership</li>
+<li>S6. GDPR signed_request usa HMAC-SHA256 con META_APP_SECRET</li>
+<li>S7. Cascade deletes previenen registros huérfanos</li>
+<li>S8. Unique constraints previenen duplicados</li>
+<li>S9. Service role solo para operaciones administrativas</li>
+<li>S10. Token nunca retornado en plaintext al frontend</li>
+
+<!-- EDGE CASES -->
+<li class="header">T. EDGE CASES & ERRORES</li>
+<li>T1. Conexión con token expirado: refresh automático o marca inactive</li>
+<li>T2. Meta API rate limit: circuit breaker + retry</li>
+<li>T3. Exchange rate API caída: fallback a rates hardcoded</li>
+<li>T4. Ad account sin campañas: retorna array vacío (no error)</li>
+<li>T5. Campaign sin insights: continúa sin detener sync</li>
+<li>T6. Competitor sin resultados en Ad Library: skip (no error)</li>
+<li>T7. Duplicate connection (23505): 409 con mensaje</li>
+<li>T8. JWT inválido: 401 consistente en todos los endpoints</li>
+<li>T9. Usuario no owner ni admin: 403 consistente</li>
+<li>T10. Meta API error genérico: 502 con detalles</li>
+<li>T11. Token decryption falla: 500 o flag token_expired</li>
+<li>T12. Network timeout: AbortController cancela request</li>
+<li>T13. Google Ads en fetch-campaign-adsets retorna [] (no implementado)</li>
+<li>T14. Carousel con &lt;2 imágenes rechazado</li>
+<li>T15. All image uploads fail: error message específico</li>
+
+</ul>
+
+<div style="margin-top:24px;padding:16px;background:#1a2332;border-radius:8px;border:1px solid #334155">
+<h3 style="color:#f59e0b;margin-bottom:8px">Resumen del Checklist</h3>
+<div class="grid3">
+<div class="card"><div class="stat-label">A. OAuth & Conexión</div><div style="color:#60a5fa;font-size:1.2rem">14 items</div></div>
+<div class="card"><div class="stat-label">B. Token Lifecycle</div><div style="color:#60a5fa;font-size:1.2rem">5 items</div></div>
+<div class="card"><div class="stat-label">C. Campañas</div><div style="color:#60a5fa;font-size:1.2rem">24 items</div></div>
+<div class="card"><div class="stat-label">D. Ad Sets</div><div style="color:#60a5fa;font-size:1.2rem">7 items</div></div>
+<div class="card"><div class="stat-label">E. Metrics Sync</div><div style="color:#60a5fa;font-size:1.2rem">13 items</div></div>
+<div class="card"><div class="stat-label">F. Reglas Auto</div><div style="color:#60a5fa;font-size:1.2rem">14 items</div></div>
+<div class="card"><div class="stat-label">G. Audiencias</div><div style="color:#60a5fa;font-size:1.2rem">11 items</div></div>
+<div class="card"><div class="stat-label">H. Klaviyo Sync</div><div style="color:#60a5fa;font-size:1.2rem">7 items</div></div>
+<div class="card"><div class="stat-label">I. Competidores IG</div><div style="color:#60a5fa;font-size:1.2rem">16 items</div></div>
+<div class="card"><div class="stat-label">J. Social Inbox</div><div style="color:#60a5fa;font-size:1.2rem">11 items</div></div>
+<div class="card"><div class="stat-label">K. Pixels & Catálogos</div><div style="color:#60a5fa;font-size:1.2rem">6 items</div></div>
+<div class="card"><div class="stat-label">L. Targeting Search</div><div style="color:#60a5fa;font-size:1.2rem">5 items</div></div>
+<div class="card"><div class="stat-label">M. Business Hierarchy</div><div style="color:#60a5fa;font-size:1.2rem">5 items</div></div>
+<div class="card"><div class="stat-label">N. GDPR</div><div style="color:#60a5fa;font-size:1.2rem">5 items</div></div>
+<div class="card"><div class="stat-label">O. IG Posts</div><div style="color:#60a5fa;font-size:1.2rem">10 items</div></div>
+<div class="card"><div class="stat-label">P. Frontend UI</div><div style="color:#60a5fa;font-size:1.2rem">10 items</div></div>
+<div class="card"><div class="stat-label">Q. Creative History</div><div style="color:#60a5fa;font-size:1.2rem">6 items</div></div>
+<div class="card"><div class="stat-label">R. Resiliencia</div><div style="color:#60a5fa;font-size:1.2rem">9 items</div></div>
+<div class="card"><div class="stat-label">S. Seguridad</div><div style="color:#60a5fa;font-size:1.2rem">10 items</div></div>
+<div class="card"><div class="stat-label">T. Edge Cases</div><div style="color:#60a5fa;font-size:1.2rem">15 items</div></div>
+<div class="card" style="border:2px solid #f59e0b"><div class="stat-label">TOTAL</div><div style="color:#f59e0b;font-size:1.5rem;font-weight:700">186 items</div></div>
+</div>
+</div>
+
+</div>
+
+</div>
+</body>
+</html>

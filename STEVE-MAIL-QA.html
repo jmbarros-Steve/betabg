@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Mail — QA Manual Completo</title>
+<style>
+  :root {
+    --bg:#09090b;--s1:#18181b;--s2:#1e1e23;--s3:#27272a;--border:#2e2e33;
+    --text:#e4e4e7;--muted:#71717a;--dim:#52525b;
+    --purple:#6366f1;--green:#22c55e;--red:#ef4444;--orange:#f59e0b;--blue:#3b82f6;--cyan:#06b6d4;--pink:#ec4899;
+    --green-bg:rgba(34,197,94,.12);--red-bg:rgba(239,68,68,.12);--orange-bg:rgba(245,158,11,.12);--purple-bg:rgba(99,102,241,.1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
+
+  /* Header */
+  .header{background:linear-gradient(135deg,#1e1b4b,#312e81);padding:32px 0;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+  .header-inner{max-width:1100px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+  .header h1{font-size:1.4rem;font-weight:700;display:flex;align-items:center;gap:10px}
+  .header h1 span{font-size:1.6rem}
+  .header-stats{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .hstat{text-align:center;background:rgba(255,255,255,.06);border-radius:10px;padding:8px 16px;min-width:70px}
+  .hstat .n{font-size:1.3rem;font-weight:700}
+  .hstat .l{font-size:.65rem;color:#a5b4fc;text-transform:uppercase;letter-spacing:.5px}
+  .hstat.pass .n{color:var(--green)} .hstat.fail .n{color:var(--red)} .hstat.skip .n{color:var(--orange)} .hstat.pend .n{color:var(--muted)}
+
+  /* Progress */
+  .progress-bar{max-width:1100px;margin:0 auto;padding:16px 24px 0}
+  .pbar{height:8px;background:var(--s2);border-radius:4px;overflow:hidden;display:flex}
+  .pbar-fill{height:100%;transition:width .3s}
+  .pbar-green{background:var(--green)} .pbar-red{background:var(--red)} .pbar-orange{background:var(--orange)}
+  .progress-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:.7rem;color:var(--muted)}
+
+  /* Controls */
+  .controls{max-width:1100px;margin:0 auto;padding:12px 24px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .filter-btn{padding:5px 14px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:.75rem;cursor:pointer;transition:all .15s;font-family:inherit}
+  .filter-btn:hover{color:var(--text);border-color:var(--dim)}
+  .filter-btn.active{background:var(--purple-bg);border-color:var(--purple);color:#a5b4fc}
+  .search-box{background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--text);font-size:.8rem;outline:none;width:200px;font-family:inherit}
+  .search-box:focus{border-color:var(--purple)}
+  .spacer{flex:1}
+  .btn{padding:6px 16px;border-radius:8px;border:none;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .btn-ghost:hover{color:var(--text);border-color:var(--dim)}
+  .btn-primary{background:var(--purple);color:#fff}
+  .btn-primary:hover{background:#818cf8}
+
+  /* Sections */
+  .container{max-width:1100px;margin:0 auto;padding:0 24px 60px}
+  .module{margin-top:32px}
+  .module-header{display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+  .module-icon{font-size:1.4rem}
+  .module-title{font-size:1.1rem;font-weight:700;flex:1}
+  .module-count{font-size:.75rem;color:var(--muted);background:var(--s2);padding:3px 10px;border-radius:12px}
+  .module-progress{font-size:.75rem;font-weight:600}
+
+  /* Test items */
+  .test-item{background:var(--s1);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden;transition:border-color .15s}
+  .test-item:hover{border-color:var(--s3)}
+  .test-item.status-pass{border-left:3px solid var(--green)}
+  .test-item.status-fail{border-left:3px solid var(--red)}
+  .test-item.status-skip{border-left:3px solid var(--orange)}
+  .test-item.status-bug{border-left:3px solid var(--pink)}
+
+  .test-row{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer}
+  .test-num{font-size:.7rem;color:var(--dim);font-family:monospace;min-width:28px}
+  .test-status-btns{display:flex;gap:4px;margin-left:auto;flex-shrink:0}
+  .sbtn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--s2);cursor:pointer;font-size:.8rem;display:flex;align-items:center;justify-content:center;transition:all .15s;color:var(--muted)}
+  .sbtn:hover{border-color:var(--dim);transform:scale(1.1)}
+  .sbtn.active-pass{background:var(--green-bg);border-color:var(--green);color:var(--green)}
+  .sbtn.active-fail{background:var(--red-bg);border-color:var(--red);color:var(--red)}
+  .sbtn.active-skip{background:var(--orange-bg);border-color:var(--orange);color:var(--orange)}
+  .sbtn.active-bug{background:rgba(236,72,153,.12);border-color:var(--pink);color:var(--pink)}
+
+  .test-name{font-size:.85rem;font-weight:500;flex:1}
+  .test-name small{display:block;font-weight:400;font-size:.75rem;color:var(--muted);margin-top:2px}
+  .test-priority{font-size:.6rem;padding:2px 7px;border-radius:8px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0}
+  .p-critical{background:rgba(239,68,68,.15);color:#fca5a5}
+  .p-high{background:rgba(245,158,11,.12);color:#fcd34d}
+  .p-medium{background:rgba(59,130,246,.12);color:#93c5fd}
+  .p-low{background:rgba(113,113,122,.15);color:var(--muted)}
+
+  /* Expandable detail */
+  .test-detail{display:none;padding:0 16px 14px;border-top:1px solid var(--border)}
+  .test-detail.open{display:block}
+  .detail-section{margin-top:10px}
+  .detail-label{font-size:.7rem;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+  .detail-steps{font-size:.8rem;color:var(--muted);line-height:1.7}
+  .detail-steps li{margin-bottom:4px;padding-left:4px}
+  .detail-expected{font-size:.8rem;color:#a5b4fc;background:rgba(99,102,241,.08);padding:8px 12px;border-radius:6px;margin-top:6px}
+  .notes-input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:.8rem;outline:none;font-family:inherit;resize:vertical;min-height:50px;margin-top:6px}
+  .notes-input:focus{border-color:var(--purple)}
+  .screenshot-btn{margin-top:8px;font-size:.7rem;color:var(--muted);cursor:pointer;text-decoration:underline}
+
+  /* Tags */
+  .tag{font-size:.6rem;padding:2px 6px;border-radius:4px;background:var(--s2);color:var(--muted);border:1px solid var(--border)}
+
+  /* Footer */
+  .footer{max-width:1100px;margin:0 auto;padding:24px;text-align:center;color:var(--dim);font-size:.75rem;border-top:1px solid var(--border)}
+
+  /* Print */
+  @media print {
+    .header{position:static;background:#1e1b4b!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .controls{display:none}
+    .test-detail{display:block!important}
+    body{background:#fff;color:#111}
+    .test-item{border:1px solid #ddd;break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <h1><span>&#9997;</span> Steve Mail — QA Manual</h1>
+    <div class="header-stats">
+      <div class="hstat"><div class="n" id="totalCount">0</div><div class="l">Total</div></div>
+      <div class="hstat pass"><div class="n" id="passCount">0</div><div class="l">Pass</div></div>
+      <div class="hstat fail"><div class="n" id="failCount">0</div><div class="l">Fail</div></div>
+      <div class="hstat" style=""><div class="n" id="bugCount" style="color:var(--pink)">0</div><div class="l">Bugs</div></div>
+      <div class="hstat skip"><div class="n" id="skipCount">0</div><div class="l">Skip</div></div>
+      <div class="hstat pend"><div class="n" id="pendCount">0</div><div class="l">Pendiente</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="progress-bar">
+  <div class="pbar" id="progressBar"></div>
+  <div class="progress-labels">
+    <span id="progressPct">0% completado</span>
+    <span id="progressTime"></span>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="filter-btn active" onclick="setFilter('all')">Todos</button>
+  <button class="filter-btn" onclick="setFilter('pending')">&#9711; Pendientes</button>
+  <button class="filter-btn" onclick="setFilter('pass')">&#10004; Pass</button>
+  <button class="filter-btn" onclick="setFilter('fail')">&#10008; Fail</button>
+  <button class="filter-btn" onclick="setFilter('bug')">&#128027; Bugs</button>
+  <button class="filter-btn" onclick="setFilter('skip')">&#9654; Skip</button>
+  <input class="search-box" placeholder="Buscar test..." oninput="setSearch(this.value)">
+  <span class="spacer"></span>
+  <button class="btn btn-ghost" onclick="resetAll()">&#128260; Reset</button>
+  <button class="btn btn-ghost" onclick="exportReport()">&#128196; Exportar</button>
+  <button class="btn btn-primary" onclick="saveProgress()">&#128190; Guardar</button>
+</div>
+
+<div class="container" id="container"></div>
+
+<div class="footer">
+  Steve Mail QA Manual · Generado 3 abril 2026 · Repo: jmbarros-Steve/betabg
+</div>
+
+<script>
+// ===================== TEST DATA =====================
+const TESTS = [
+  // ────────── MÓDULO 1: NAVEGACIÓN ──────────
+  { module: 'Navegación', icon: '&#128204;', id: 'nav-1', name: 'Acceder a Steve Mail desde el portal', priority: 'critical',
+    steps: ['Ir al Client Portal', 'Click en tab "Steve Mail"', 'Verificar que carga el módulo'],
+    expected: 'Se muestra la interfaz de Steve Mail con el header "Steve Mail" y los 5 tabs visibles.' },
+  { module: 'Navegación', icon: '&#128204;', id: 'nav-2', name: 'Navegación entre los 5 tabs principales', priority: 'critical',
+    steps: ['Click en tab "Campañas"', 'Click en tab "Contactos"', 'Click en tab "Automatizaciones"', 'Click en tab "Formularios"', 'Click en tab "Rendimiento"'],
+    expected: 'Cada tab carga su contenido correspondiente sin errores. El tab activo se destaca visualmente.' },
+  { module: 'Navegación', icon: '&#128204;', id: 'nav-3', name: 'Command Palette incluye Steve Mail', priority: 'medium',
+    steps: ['Abrir Command Palette (Ctrl+K)', 'Escribir "Steve Mail" o "email"'],
+    expected: 'Aparece la opción "Steve Mail" y al seleccionarla navega al módulo.' },
+  { module: 'Navegación', icon: '&#128204;', id: 'nav-4', name: 'Steve Mail en página de funcionalidades', priority: 'low',
+    steps: ['Ir a /funcionalidades', 'Buscar sección de Steve Mail'],
+    expected: 'Steve Mail aparece listado como funcionalidad con su descripción.' },
+
+  // ────────── MÓDULO 2: CAMPAÑAS ──────────
+  { module: 'Campañas', icon: '&#128231;', id: 'camp-1', name: 'Listar campañas existentes', priority: 'critical',
+    steps: ['Ir a tab Campañas', 'Verificar que se muestran las campañas existentes'],
+    expected: 'Se muestra una lista/tabla de campañas con nombre, status, fecha y métricas básicas.' },
+  { module: 'Campañas', icon: '&#128231;', id: 'camp-2', name: 'Crear nueva campaña — Paso 1: Setup', priority: 'critical',
+    steps: ['Click "Nueva Campaña"', 'Ingresar nombre de campaña', 'Ingresar asunto del email', 'Ingresar preview text', 'Seleccionar tipo de campaña (Promocional, Newsletter, etc.)', 'Verificar from name/email pre-llenados'],
+    expected: 'El formulario de setup acepta todos los campos. Los 6 tipos de campaña están disponibles en el selector.' },
+  { module: 'Campañas', icon: '&#128231;', id: 'camp-3', name: 'Crear campaña — Paso 2: Diseño (Editor)', priority: 'critical',
+    steps: ['Avanzar al paso de diseño', 'Verificar que el editor GrapeJS carga', 'Seleccionar un template de la galería', 'Verificar que el template se carga en el editor'],
+    expected: 'El editor visual GrapeJS se inicializa correctamente. La galería de templates muestra opciones. El template seleccionado se carga en el editor.' },
+  { module: 'Campañas', icon: '&#128231;', id: 'camp-4', name: 'Crear campaña — Paso 3: Audiencia', priority: 'critical',
+    steps: ['Avanzar al paso de audiencia', 'Probar opción "Todos los suscriptores"', 'Probar opción "Lista específica"', 'Probar opción "Segmento"', 'Verificar conteo de recipients'],
+    expected: 'Las 3 opciones de audiencia funcionan. Se muestra el conteo correcto de destinatarios.' },
+  { module: 'Campañas', icon: '&#128231;', id: 'camp-5', name: 'Crear campaña — Paso 4: Review y envío', priority: 'critical',
+    steps: ['Avanzar al paso de review', 'Verificar vista previa desktop', 'Verificar vista previa mobile', 'Verificar resumen del email (asunto, preview, from, audiencia)'],
+    expected: 'La preview muestra el email renderizado en ambas vistas. El resumen muestra todos los datos correctamente.' },
+  { module: 'Campañas', icon: '&#128231;', id: 'camp-6', name: 'Guardar campaña como borrador', priority: 'high',
+    steps: ['Crear una campaña hasta el paso de diseño', 'Click "Guardar borrador" o cerrar', 'Verificar que aparece en la lista con status "draft"'],
+    expected: 'La campaña se guarda y aparece en la lista con status borrador.' },
+  { module: 'Campañas', icon: '&#128231;', id: 'camp-7', name: 'Editar campaña existente', priority: 'high',
+    steps: ['Click en una campaña borrador existente', 'Modificar el asunto', 'Guardar cambios', 'Verificar que los cambios persisten'],
+    expected: 'La campaña se abre en modo edición con los datos cargados. Los cambios se guardan correctamente.' },
+  { module: 'Campañas', icon: '&#128231;', id: 'camp-8', name: 'Eliminar campaña borrador', priority: 'medium',
+    steps: ['Buscar campaña con status "draft"', 'Click en opción eliminar', 'Confirmar eliminación'],
+    expected: 'La campaña se elimina y desaparece de la lista.' },
+  { module: 'Campañas', icon: '&#128231;', id: 'camp-9', name: 'Enviar campaña de prueba (test send)', priority: 'critical',
+    steps: ['Crear o abrir una campaña', 'Click "Enviar prueba" o "Test send"', 'Ingresar email de destino', 'Verificar recepción del email'],
+    expected: 'Se recibe el email de prueba en la bandeja de entrada con el contenido correcto.' },
+  { module: 'Campañas', icon: '&#128231;', id: 'camp-10', name: 'Programar campaña para envío futuro', priority: 'high',
+    steps: ['Crear campaña completa', 'Seleccionar "Programar"', 'Elegir fecha y hora futura', 'Confirmar programación'],
+    expected: 'La campaña cambia a status "scheduled" con la fecha programada visible.' },
+  { module: 'Campañas', icon: '&#128231;', id: 'camp-11', name: 'Cancelar campaña programada', priority: 'medium',
+    steps: ['Buscar campaña con status "scheduled"', 'Click "Cancelar envío"', 'Confirmar cancelación'],
+    expected: 'La campaña vuelve a status draft o cancelled.' },
+  { module: 'Campañas', icon: '&#128231;', id: 'camp-12', name: 'Warning Gmail clipping (>102KB)', priority: 'medium',
+    steps: ['Crear un email con mucho contenido (>102KB HTML)', 'Verificar que aparece warning de Gmail clipping'],
+    expected: 'Se muestra advertencia visual de que Gmail recortará el email.' },
+  { module: 'Campañas', icon: '&#128231;', id: 'camp-13', name: 'Generar contenido AI para campaña', priority: 'high',
+    steps: ['En el editor de campaña, buscar opción de generación AI', 'Seleccionar tipo de campaña', 'Agregar instrucciones personalizadas', 'Click generar'],
+    expected: 'Claude genera contenido MJML que se carga en el editor. Incluye header, secciones, CTA y footer.' },
+
+  // ────────── MÓDULO 3: A/B TESTING ──────────
+  { module: 'A/B Testing', icon: '&#128300;', id: 'ab-1', name: 'Activar opciones avanzadas de A/B', priority: 'high',
+    steps: ['En el editor de campaña, buscar toggle "Opciones avanzadas"', 'Activar A/B testing'],
+    expected: 'Se muestran los campos de A/B testing: subject B, test percentage, winning metric, duración.' },
+  { module: 'A/B Testing', icon: '&#128300;', id: 'ab-2', name: 'Configurar A/B test', priority: 'high',
+    steps: ['Ingresar subject line B', 'Ajustar porcentaje de test (5-50%)', 'Seleccionar winning metric (open_rate, click_rate, revenue)', 'Configurar duración (1-72 horas)'],
+    expected: 'Todos los campos aceptan los rangos válidos. Los valores default son: 20%, open_rate, 4 horas.' },
+  { module: 'A/B Testing', icon: '&#128300;', id: 'ab-3', name: 'Ver resultados de A/B test', priority: 'medium',
+    steps: ['Buscar campaña con A/B test completado', 'Click en ver resultados', 'Verificar comparación de variantes'],
+    expected: 'Se muestra panel con stats por variante (sent, opens, clicks, revenue, rates) y el ganador destacado.' },
+
+  // ────────── MÓDULO 4: EDITOR VISUAL ──────────
+  { module: 'Editor Visual', icon: '&#127912;', id: 'edit-1', name: 'Editor GrapeJS carga correctamente', priority: 'critical',
+    steps: ['Abrir el editor de email (desde campaña o flow)', 'Esperar que GrapeJS se inicialice'],
+    expected: 'El editor visual se muestra con el canvas central, panel de bloques lateral y toolbar superior.' },
+  { module: 'Editor Visual', icon: '&#127912;', id: 'edit-2', name: 'Drag & drop de bloques', priority: 'critical',
+    steps: ['Arrastrar un bloque de texto al canvas', 'Arrastrar un bloque de imagen', 'Arrastrar un bloque de botón'],
+    expected: 'Los bloques se insertan correctamente en el canvas y son editables.' },
+  { module: 'Editor Visual', icon: '&#127912;', id: 'edit-3', name: 'Editar texto inline', priority: 'high',
+    steps: ['Doble click en un bloque de texto', 'Modificar el contenido', 'Click fuera para confirmar'],
+    expected: 'El texto es editable inline y los cambios se guardan en el canvas.' },
+  { module: 'Editor Visual', icon: '&#127912;', id: 'edit-4', name: 'Galería de templates — 14 categorías', priority: 'high',
+    steps: ['Abrir galería de templates', 'Navegar entre las 14 categorías: Todas, E-commerce, Bienvenida, Promoción, Newsletter, Carrito, Win-back, Post-compra, Reviews, Back in Stock, Cumpleaños, Lanzamiento, Temporada, Mis Plantillas', 'Seleccionar un template'],
+    expected: 'Todas las categorías muestran templates. Al seleccionar uno se carga en el editor.' },
+  { module: 'Editor Visual', icon: '&#127912;', id: 'edit-5', name: 'Buscar templates por keyword', priority: 'medium',
+    steps: ['Abrir galería de templates', 'Escribir en el campo de búsqueda', 'Verificar filtrado de resultados'],
+    expected: 'Los templates se filtran por keyword en tiempo real.' },
+  { module: 'Editor Visual', icon: '&#127912;', id: 'edit-6', name: 'Guardar template personalizado', priority: 'medium',
+    steps: ['Diseñar un email en el editor', 'Buscar opción "Guardar como template"', 'Ingresar nombre y categoría', 'Verificar que aparece en "Mis Plantillas"'],
+    expected: 'El template se guarda y aparece en la categoría "Mis Plantillas".' },
+  { module: 'Editor Visual', icon: '&#127912;', id: 'edit-7', name: 'Insertar bloque de producto', priority: 'high',
+    steps: ['Abrir panel de productos', 'Buscar un producto', 'Insertar en el email'],
+    expected: 'Se inserta un bloque con imagen, nombre, precio y botón de compra del producto Shopify.' },
+  { module: 'Editor Visual', icon: '&#127912;', id: 'edit-8', name: 'Insertar bloque de recomendados dinámico', priority: 'medium',
+    steps: ['Buscar bloque "Recomendados" en los bloques Steve', 'Insertar en el email', 'Verificar atributos data-steve-products'],
+    expected: 'Se inserta un bloque de feed dinámico que mostrará productos recomendados al enviar.' },
+  { module: 'Editor Visual', icon: '&#127912;', id: 'edit-9', name: 'Insertar bloque de cupón', priority: 'medium',
+    steps: ['Buscar bloque "Cupón"', 'Insertarlo en el email', 'Editar código de descuento y descripción'],
+    expected: 'Se inserta un bloque de cupón con código, descripción y CTA editables.' },
+  { module: 'Editor Visual', icon: '&#127912;', id: 'edit-10', name: 'Contenido condicional', priority: 'medium',
+    steps: ['Abrir panel de contenido condicional', 'Crear condición por segmento', 'Crear condición por historial de compras', 'Crear condición por ubicación'],
+    expected: 'Las condiciones se configuran y se serializan como data-steve-condition en el HTML.' },
+  { module: 'Editor Visual', icon: '&#127912;', id: 'edit-11', name: 'Estilos globales de marca', priority: 'medium',
+    steps: ['Abrir panel de estilos globales', 'Cambiar color primario de marca', 'Cambiar fuente de marca', 'Aplicar al editor'],
+    expected: 'Los colores y fuentes se actualizan en el email. 13 fuentes web-safe disponibles.' },
+  { module: 'Editor Visual', icon: '&#127912;', id: 'edit-12', name: 'Bloques universales reutilizables', priority: 'medium',
+    steps: ['Diseñar un bloque en el editor', 'Guardar como bloque universal', 'Abrir panel de bloques universales', 'Insertar el bloque guardado en otro email'],
+    expected: 'El bloque se guarda con nombre y categoría. Se puede reutilizar en otros emails.' },
+  { module: 'Editor Visual', icon: '&#127912;', id: 'edit-13', name: 'Localización en español del editor', priority: 'low',
+    steps: ['Verificar que los botones del editor están en español', 'Verificar menú contextual en español'],
+    expected: 'Todo el UI del editor GrapeJS está traducido al español.' },
+  { module: 'Editor Visual', icon: '&#127912;', id: 'edit-14', name: 'Exportar HTML del editor', priority: 'high',
+    steps: ['Diseñar un email', 'Exportar HTML (getHtml)', 'Verificar que el HTML es válido y responsivo'],
+    expected: 'Se obtiene HTML limpio del email diseñado.' },
+
+  // ────────── MÓDULO 5: CONTACTOS ──────────
+  { module: 'Contactos', icon: '&#128101;', id: 'cont-1', name: 'Ver lista de suscriptores', priority: 'critical',
+    steps: ['Ir a tab Contactos', 'Verificar que se muestra la tabla de contactos', 'Verificar columnas: email, nombre, status, source, fecha'],
+    expected: 'Tabla paginada con 50 items por página mostrando todos los contactos.' },
+  { module: 'Contactos', icon: '&#128101;', id: 'cont-2', name: 'Buscar contactos', priority: 'high',
+    steps: ['Escribir en el campo de búsqueda', 'Buscar por email', 'Buscar por nombre'],
+    expected: 'Los resultados se filtran en tiempo real por email o nombre.' },
+  { module: 'Contactos', icon: '&#128101;', id: 'cont-3', name: 'Filtrar por status', priority: 'high',
+    steps: ['Probar filtro "Todos"', 'Probar filtro "Subscribed"', 'Probar filtro "Unsubscribed"', 'Probar filtro "Bounced"'],
+    expected: 'Cada filtro muestra solo los contactos con ese status. Los contadores se actualizan.' },
+  { module: 'Contactos', icon: '&#128101;', id: 'cont-4', name: 'Agregar contacto manual', priority: 'high',
+    steps: ['Click "Agregar contacto"', 'Ingresar email, nombre y apellido', 'Guardar'],
+    expected: 'El contacto se crea y aparece en la lista con source "manual" y status "subscribed".' },
+  { module: 'Contactos', icon: '&#128101;', id: 'cont-5', name: 'Sync desde Shopify', priority: 'critical',
+    steps: ['Click botón "Sincronizar Shopify"', 'Esperar que termine el sync', 'Verificar conteo actualizado'],
+    expected: 'Se sincronizan los customers de Shopify. El conteo total se actualiza. Source = "shopify_customer".' },
+  { module: 'Contactos', icon: '&#128101;', id: 'cont-6', name: 'Stats bar de contactos', priority: 'medium',
+    steps: ['Verificar que se muestran totales: total, subscribed, unsubscribed, bounced'],
+    expected: 'Los 4 contadores se muestran y coinciden con los datos de la tabla.' },
+  { module: 'Contactos', icon: '&#128101;', id: 'cont-7', name: 'Paginación de contactos', priority: 'medium',
+    steps: ['Navegar a la siguiente página', 'Volver a la página anterior'],
+    expected: 'La paginación funciona con 50 items por página.' },
+  { module: 'Contactos', icon: '&#128101;', id: 'cont-8', name: 'Vista de Listas y Segmentos', priority: 'high',
+    steps: ['Cambiar a vista "Listas"', 'Verificar que se muestran las listas existentes'],
+    expected: 'Se muestra el ListsManager con listas estáticas y segmentos dinámicos.' },
+  { module: 'Contactos', icon: '&#128101;', id: 'cont-9', name: 'Crear lista estática', priority: 'high',
+    steps: ['Click "Nueva lista"', 'Seleccionar tipo "Estática"', 'Ingresar nombre y descripción', 'Guardar'],
+    expected: 'La lista se crea y aparece con conteo 0 de miembros.' },
+  { module: 'Contactos', icon: '&#128101;', id: 'cont-10', name: 'Crear segmento dinámico', priority: 'high',
+    steps: ['Click "Nuevo segmento"', 'Seleccionar tipo "Segmento"', 'Agregar condición (ej: total_orders >= 3)', 'Guardar'],
+    expected: 'El segmento se crea con sus filtros. El conteo de miembros se calcula dinámicamente.' },
+  { module: 'Contactos', icon: '&#128101;', id: 'cont-11', name: 'Usar segmento pre-configurado', priority: 'medium',
+    steps: ['Probar template "Compradores frecuentes"', 'Probar template "Clientes VIP"', 'Probar template "Nuevos clientes"'],
+    expected: 'Los templates pre-configurados crean segmentos con las condiciones correctas.' },
+  { module: 'Contactos', icon: '&#128101;', id: 'cont-12', name: 'Agregar miembros a lista estática', priority: 'medium',
+    steps: ['Abrir una lista estática', 'Click "Agregar miembros"', 'Seleccionar contactos', 'Confirmar'],
+    expected: 'Los contactos se agregan a la lista y el conteo se actualiza.' },
+
+  // ────────── MÓDULO 6: AUTOMATIZACIONES ──────────
+  { module: 'Automatizaciones', icon: '&#9889;', id: 'flow-1', name: 'Listar flows existentes', priority: 'critical',
+    steps: ['Ir a tab Automatizaciones', 'Verificar que se muestran los flows'],
+    expected: 'Lista de flows con nombre, trigger, status (draft/active/paused) y métricas.' },
+  { module: 'Automatizaciones', icon: '&#9889;', id: 'flow-2', name: 'Crear flow — Carrito abandonado', priority: 'critical',
+    steps: ['Click "Nuevo flow"', 'Seleccionar trigger "Carrito abandonado"', 'Verificar 3 pasos default: 1h, 24h, 72h'],
+    expected: 'Se crea flow con 3 emails pre-configurados y delays correctos.' },
+  { module: 'Automatizaciones', icon: '&#9889;', id: 'flow-3', name: 'Crear flow — Bienvenida', priority: 'critical',
+    steps: ['Crear flow con trigger "Bienvenida"', 'Verificar 3 pasos default: inmediato, 48h, 7 días'],
+    expected: 'Flow de bienvenida con 3 emails y delays correctos.' },
+  { module: 'Automatizaciones', icon: '&#9889;', id: 'flow-4', name: 'Crear flow — Post-compra', priority: 'high',
+    steps: ['Crear flow con trigger "Post-compra"', 'Verificar 2 pasos default'],
+    expected: 'Flow post-compra con 2 emails.' },
+  { module: 'Automatizaciones', icon: '&#9889;', id: 'flow-5', name: 'Crear flow — Win-back', priority: 'high',
+    steps: ['Crear flow con trigger "Win-back"', 'Verificar 3 pasos default'],
+    expected: 'Flow win-back con 3 emails de reactivación.' },
+  { module: 'Automatizaciones', icon: '&#9889;', id: 'flow-6', name: 'Canvas visual de flow', priority: 'critical',
+    steps: ['Abrir un flow existente', 'Verificar visualización del canvas', 'Ver nodos de email, delay y condición', 'Verificar conexiones entre nodos'],
+    expected: 'El canvas muestra todos los pasos del flow con sus conexiones visuales.' },
+  { module: 'Automatizaciones', icon: '&#9889;', id: 'flow-7', name: 'Editar paso de email en flow', priority: 'high',
+    steps: ['Click en un nodo de email del canvas', 'Editar subject y contenido', 'Guardar cambios'],
+    expected: 'Se abre el editor para el email del step. Los cambios se guardan en el flow.' },
+  { module: 'Automatizaciones', icon: '&#9889;', id: 'flow-8', name: 'Agregar condición (branching)', priority: 'high',
+    steps: ['Agregar un nodo de condición al flow', 'Configurar campo, operador y valor', 'Verificar ramas yes/no'],
+    expected: 'El nodo de condición se agrega con ramas yes_steps y no_steps visibles en el canvas.' },
+  { module: 'Automatizaciones', icon: '&#9889;', id: 'flow-9', name: 'Activar flow', priority: 'critical',
+    steps: ['Seleccionar un flow en status "draft"', 'Click "Activar"', 'Confirmar activación'],
+    expected: 'El flow cambia a status "active" y está listo para recibir triggers.' },
+  { module: 'Automatizaciones', icon: '&#9889;', id: 'flow-10', name: 'Pausar flow activo', priority: 'high',
+    steps: ['Seleccionar un flow activo', 'Click "Pausar"'],
+    expected: 'El flow cambia a status "paused". No se enrollan nuevos subscribers pero los actuales continúan.' },
+  { module: 'Automatizaciones', icon: '&#9889;', id: 'flow-11', name: 'Generar emails AI para flow', priority: 'medium',
+    steps: ['Al crear un flow, buscar opción "Generar con AI"', 'Verificar que genera secuencia completa'],
+    expected: 'Claude genera emails para cada paso del flow con la estrategia correcta para el trigger type.' },
+
+  // ────────── MÓDULO 7: FORMULARIOS ──────────
+  { module: 'Formularios', icon: '&#128203;', id: 'form-1', name: 'Listar formularios existentes', priority: 'critical',
+    steps: ['Ir a tab Formularios', 'Verificar que se muestran los formularios'],
+    expected: 'Lista de formularios con nombre, tipo, status y métricas (views, submissions, conversion rate).' },
+  { module: 'Formularios', icon: '&#128203;', id: 'form-2', name: 'Crear formulario Popup', priority: 'critical',
+    steps: ['Click "Nuevo formulario"', 'Seleccionar tipo "Popup"', 'Configurar headline y descripción', 'Configurar color de botón', 'Guardar'],
+    expected: 'El formulario popup se crea con el diseño configurado.' },
+  { module: 'Formularios', icon: '&#128203;', id: 'form-3', name: 'Crear formulario Slide-in', priority: 'high',
+    steps: ['Crear formulario tipo "Slide-in"'],
+    expected: 'Formulario slide-in se crea correctamente.' },
+  { module: 'Formularios', icon: '&#128203;', id: 'form-4', name: 'Crear formulario Inline (Barra)', priority: 'high',
+    steps: ['Crear formulario tipo "Inline"'],
+    expected: 'Formulario inline se crea correctamente.' },
+  { module: 'Formularios', icon: '&#128203;', id: 'form-5', name: 'Configurar trigger rules', priority: 'high',
+    steps: ['Editar un formulario', 'Configurar exit intent', 'Configurar scroll depth %', 'Configurar time on page (segundos)', 'Configurar page URL filter', 'Configurar frecuencia (una vez / por sesión / siempre)'],
+    expected: 'Todas las trigger rules se configuran y se guardan correctamente.' },
+  { module: 'Formularios', icon: '&#128203;', id: 'form-6', name: 'Configurar incentivo — Descuento', priority: 'high',
+    steps: ['Editar formulario', 'Seleccionar incentivo "Código de descuento"', 'Ingresar valor del descuento'],
+    expected: 'Se configura el incentivo. Al activar el form, se crea cupón en Shopify automáticamente.' },
+  { module: 'Formularios', icon: '&#128203;', id: 'form-7', name: 'Activar formulario', priority: 'critical',
+    steps: ['Seleccionar formulario en status "draft"', 'Click "Activar"'],
+    expected: 'El formulario cambia a "active". Se instala como ScriptTag en Shopify.' },
+  { module: 'Formularios', icon: '&#128203;', id: 'form-8', name: 'Pausar formulario', priority: 'medium',
+    steps: ['Seleccionar formulario activo', 'Click "Pausar"'],
+    expected: 'El formulario cambia a "paused". Se remueve el ScriptTag de Shopify.' },
+  { module: 'Formularios', icon: '&#128203;', id: 'form-9', name: 'Preview del formulario', priority: 'medium',
+    steps: ['Click en icono de vista previa del formulario'],
+    expected: 'Se muestra preview del formulario con el diseño configurado.' },
+
+  // ────────── MÓDULO 8: ANALÍTICA ──────────
+  { module: 'Analítica', icon: '&#128200;', id: 'anly-1', name: 'Dashboard overview', priority: 'critical',
+    steps: ['Ir a tab Rendimiento', 'Verificar métricas generales', 'Verificar selector de período (últimos N días)'],
+    expected: 'Se muestran métricas agregadas: opens, clicks, bounces, revenue, subscribers. Período configurable.' },
+  { module: 'Analítica', icon: '&#128200;', id: 'anly-2', name: 'Health Score', priority: 'high',
+    steps: ['Verificar que se muestra el health score (0-100)', 'Verificar color según rango'],
+    expected: 'Health score visible con desglose: open rate (40%), bounce rate (30%), unsubscribe rate (30%).' },
+  { module: 'Analítica', icon: '&#128200;', id: 'anly-3', name: 'Gráfico timeline de eventos', priority: 'high',
+    steps: ['Verificar gráfico de línea temporal', 'Hover sobre puntos para ver datos'],
+    expected: 'Gráfico Recharts con opens/clicks over time. Tooltips con datos al hover.' },
+  { module: 'Analítica', icon: '&#128200;', id: 'anly-4', name: 'Stats por campaña individual', priority: 'high',
+    steps: ['Click en una campaña específica', 'Verificar stats detallados'],
+    expected: 'Stats: sent, delivered, opened, clicked, bounced, complained, unsubscribed, converted + rates + top links.' },
+  { module: 'Analítica', icon: '&#128200;', id: 'anly-5', name: 'Click Heatmap', priority: 'medium',
+    steps: ['Abrir heatmap de clicks de una campaña', 'Verificar distribución de clicks por enlace'],
+    expected: 'Heatmap muestra links con clasificación hot/warm/mild/cold y porcentajes.' },
+  { module: 'Analítica', icon: '&#128200;', id: 'anly-6', name: 'Revenue Attribution', priority: 'high',
+    steps: ['Abrir panel de revenue attribution', 'Verificar total_revenue, total_orders, AOV', 'Verificar desglose por día y top productos'],
+    expected: 'Revenue en CLP. Ventana de atribución 7 días. Conversiones por día y productos top.' },
+  { module: 'Analítica', icon: '&#128200;', id: 'anly-7', name: 'Deliverability Dashboard', priority: 'high',
+    steps: ['Acceder al dashboard de deliverability', 'Verificar bounce rate, complaint rate, delivery rate', 'Verificar inbox placement, spam score', 'Verificar health por dominio (SPF/DKIM/DMARC)'],
+    expected: 'Dashboard muestra todas las métricas de entregabilidad con indicadores de status.' },
+  { module: 'Analítica', icon: '&#128200;', id: 'anly-8', name: 'Industry Benchmarks', priority: 'medium',
+    steps: ['Acceder a benchmarks de industria', 'Verificar comparación con E-commerce, Retail, SaaS'],
+    expected: 'Métricas del cliente comparadas con promedios de industria. Percentil estimado visible.' },
+  { module: 'Analítica', icon: '&#128200;', id: 'anly-9', name: 'Comparación de campañas (bar chart)', priority: 'medium',
+    steps: ['Verificar gráfico de barras comparando campañas'],
+    expected: 'BarChart de Recharts comparando campañas enviadas (solo con sent_count > 0).' },
+
+  // ────────── MÓDULO 9: DOMINIO ──────────
+  { module: 'Dominio', icon: '&#128274;', id: 'dom-1', name: 'Abrir setup de dominio', priority: 'critical',
+    steps: ['Click en botón "Dominio" (esquina superior)', 'Verificar que se abre el diálogo'],
+    expected: 'Dialog de DomainSetup se abre mostrando el estado actual del dominio.' },
+  { module: 'Dominio', icon: '&#128274;', id: 'dom-2', name: 'Agregar nuevo dominio', priority: 'critical',
+    steps: ['Ingresar nombre de dominio', 'Click "Verificar"', 'Verificar que se generan DNS records'],
+    expected: 'Se muestran 3 DNS records: SPF (TXT), DKIM (CNAME), DMARC (TXT) con valores para copiar.' },
+  { module: 'Dominio', icon: '&#128274;', id: 'dom-3', name: 'Copiar DNS records', priority: 'high',
+    steps: ['Click en botón "Copiar" de cada DNS record'],
+    expected: 'El valor se copia al clipboard para pegarlo en el proveedor de DNS.' },
+  { module: 'Dominio', icon: '&#128274;', id: 'dom-4', name: 'Verificar status del dominio', priority: 'high',
+    steps: ['Click "Verificar status"', 'Verificar indicadores SPF, DKIM, DMARC'],
+    expected: 'Cada record muestra verified (check verde), pending (reloj) o failed (warning).' },
+
+  // ────────── MÓDULO 10: AI ──────────
+  { module: 'Inteligencia AI', icon: '&#129302;', id: 'ai-1', name: 'Generar subject lines con AI', priority: 'high',
+    steps: ['En el editor de campaña, buscar generación de subjects', 'Generar variantes'],
+    expected: '5 subjects (<50 chars) + 5 preview texts (<90 chars) con estrategias: urgencia, curiosidad, beneficio, social proof.' },
+  { module: 'Inteligencia AI', icon: '&#129302;', id: 'ai-2', name: 'CRITERIO bloquea email de baja calidad', priority: 'critical',
+    steps: ['Crear campaña con subject >50 chars o con spam words', 'Intentar enviar', 'Verificar que CRITERIO bloquea el envío'],
+    expected: 'CRITERIO evalúa 18 reglas. Si falla, muestra las reglas que no pasaron y no permite enviar.' },
+  { module: 'Inteligencia AI', icon: '&#129302;', id: 'ai-3', name: 'ESPEJO evalúa calidad visual', priority: 'critical',
+    steps: ['Enviar una campaña', 'Verificar que ESPEJO evalúa el HTML antes del envío'],
+    expected: 'ESPEJO da score 1-10 en 5 dimensiones (MOBILE, LAYOUT, BRAND, CTA, PRODUCTS). Bloquea si <7.' },
+  { module: 'Inteligencia AI', icon: '&#129302;', id: 'ai-4', name: 'Generar emails para flow con AI', priority: 'medium',
+    steps: ['Al crear un flow, usar generación AI', 'Verificar secuencia generada'],
+    expected: 'Claude genera emails para cada paso con estrategia correcta según el trigger type.' },
+
+  // ────────── MÓDULO 11: ALERTAS DE PRODUCTO ──────────
+  { module: 'Alertas Producto', icon: '&#128276;', id: 'alert-1', name: 'Ver alertas de producto', priority: 'high',
+    steps: ['Acceder a sección de Product Alerts', 'Verificar lista de alertas existentes'],
+    expected: 'Tabla con alertas mostrando producto, tipo (back-in-stock/price-drop), email, status.' },
+  { module: 'Alertas Producto', icon: '&#128276;', id: 'alert-2', name: 'Ver estadísticas de alertas', priority: 'medium',
+    steps: ['Verificar stats de alertas'],
+    expected: 'Conteos agrupados por tipo y status.' },
+  { module: 'Alertas Producto', icon: '&#128276;', id: 'alert-3', name: 'Widget de alertas en tienda', priority: 'medium',
+    steps: ['Verificar endpoint GET /api/email-product-alert-widget', 'Verificar que retorna JavaScript válido'],
+    expected: 'El widget JS se sirve correctamente para embed en tiendas Shopify.' },
+
+  // ────────── MÓDULO 12: TRACKING ──────────
+  { module: 'Tracking', icon: '&#128269;', id: 'track-1', name: 'Open tracking pixel', priority: 'critical',
+    steps: ['Enviar un email de prueba', 'Abrir el email', 'Verificar que se registra el evento "opened"'],
+    expected: 'El pixel 1x1 se carga y registra la apertura. Visible en analytics de la campaña.' },
+  { module: 'Tracking', icon: '&#128269;', id: 'track-2', name: 'Click tracking redirect', priority: 'critical',
+    steps: ['Click en un enlace del email', 'Verificar redirect a la URL destino', 'Verificar que se registra el evento "clicked"'],
+    expected: 'El click se registra y redirige (302) a la URL original. UTM params presentes.' },
+  { module: 'Tracking', icon: '&#128269;', id: 'track-3', name: 'Unsubscribe funciona', priority: 'critical',
+    steps: ['Click en link "Desuscribirse" del footer del email', 'Verificar página de confirmación', 'Verificar que el subscriber cambia a "unsubscribed"'],
+    expected: 'Página de confirmación con branding. El subscriber se marca como unsubscribed. Flows activos se cancelan.' },
+  { module: 'Tracking', icon: '&#128269;', id: 'track-4', name: 'Todos los emails tienen footer unsubscribe', priority: 'critical',
+    steps: ['Enviar varios emails de prueba', 'Verificar que todos tienen link de unsubscribe'],
+    expected: 'Todos los emails enviados incluyen footer con link de desuscripción (requerido legalmente).' },
+
+  // ────────── MÓDULO 13: ENVÍO ──────────
+  { module: 'Envío', icon: '&#128640;', id: 'send-1', name: 'Enviar email individual de prueba', priority: 'critical',
+    steps: ['Usar función de envío de prueba', 'Verificar recepción del email', 'Verificar que el HTML se ve correcto'],
+    expected: 'Email llega a la bandeja de entrada con el contenido, tracking pixel y links wrapped.' },
+  { module: 'Envío', icon: '&#128640;', id: 'send-2', name: 'Verificar cola de envío', priority: 'high',
+    steps: ['Enviar campaña a audiencia grande', 'Verificar status de la cola', 'Verificar rate limiting'],
+    expected: 'Los emails se encolan y envían respetando rate_limit_per_hour (default 500/h).' },
+  { module: 'Envío', icon: '&#128640;', id: 'send-3', name: 'Smart send time ajusta hora', priority: 'medium',
+    steps: ['Activar smart send', 'Enviar campaña', 'Verificar que scheduled_for varía por subscriber'],
+    expected: 'Cada email se programa según la hora óptima del subscriber (basado en historial de opens).' },
+
+  // ────────── MÓDULO 14: RESPONSIVIDAD ──────────
+  { module: 'Responsividad', icon: '&#128241;', id: 'resp-1', name: 'Steve Mail en tablet', priority: 'medium',
+    steps: ['Abrir Steve Mail en viewport tablet (768px)', 'Navegar por los 5 tabs', 'Verificar que todo es usable'],
+    expected: 'La UI se adapta al ancho tablet sin overlaps ni contenido cortado.' },
+  { module: 'Responsividad', icon: '&#128241;', id: 'resp-2', name: 'Steve Mail en mobile', priority: 'medium',
+    steps: ['Abrir Steve Mail en viewport mobile (375px)', 'Navegar por los tabs'],
+    expected: 'Funcionalidad básica accesible en mobile. Tabs scrolleables horizontalmente.' },
+  { module: 'Responsividad', icon: '&#128241;', id: 'resp-3', name: 'Emails renderizados son responsivos', priority: 'high',
+    steps: ['Ver preview mobile de un email en el editor', 'Verificar que el email se adapta a pantalla pequeña'],
+    expected: 'Los emails se ven correctamente en vista mobile del editor.' },
+];
+
+// ===================== STATE =====================
+let state = {};
+let filter = 'all';
+let search = '';
+
+function loadState() {
+  try { state = JSON.parse(localStorage.getItem('steve-mail-qa') || '{}'); } catch { state = {}; }
+}
+function saveState() { localStorage.setItem('steve-mail-qa', JSON.stringify(state)); }
+
+function getTestState(id) { return state[id] || { status: 'pending', notes: '' }; }
+function setTestStatus(id, status) {
+  if (!state[id]) state[id] = { status: 'pending', notes: '' };
+  state[id].status = state[id].status === status ? 'pending' : status;
+  saveState(); render();
+}
+function setTestNotes(id, notes) {
+  if (!state[id]) state[id] = { status: 'pending', notes: '' };
+  state[id].notes = notes;
+  saveState();
+}
+
+// ===================== RENDER =====================
+function render() {
+  const modules = {};
+  TESTS.forEach(t => { if (!modules[t.module]) modules[t.module] = { icon: t.icon, tests: [] }; modules[t.module].tests.push(t); });
+
+  // Stats
+  let total = 0, pass = 0, fail = 0, skip = 0, bug = 0, pend = 0;
+  TESTS.forEach(t => {
+    total++;
+    const s = getTestState(t.id).status;
+    if (s === 'pass') pass++; else if (s === 'fail') fail++; else if (s === 'skip') skip++; else if (s === 'bug') bug++; else pend++;
+  });
+
+  document.getElementById('totalCount').textContent = total;
+  document.getElementById('passCount').textContent = pass;
+  document.getElementById('failCount').textContent = fail;
+  document.getElementById('bugCount').textContent = bug;
+  document.getElementById('skipCount').textContent = skip;
+  document.getElementById('pendCount').textContent = pend;
+
+  const done = pass + fail + skip + bug;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  document.getElementById('progressBar').innerHTML = `
+    <div class="pbar-fill pbar-green" style="width:${total?(pass/total*100):0}%"></div>
+    <div class="pbar-fill pbar-red" style="width:${total?(fail/total*100):0}%"></div>
+    <div class="pbar-fill pbar-orange" style="width:${total?((skip+bug)/total*100):0}%"></div>`;
+  document.getElementById('progressPct').textContent = `${pct}% completado (${done}/${total})`;
+
+  // Render modules
+  const container = document.getElementById('container');
+  let html = '';
+
+  for (const [modName, mod] of Object.entries(modules)) {
+    let tests = mod.tests;
+
+    // Filter
+    if (filter !== 'all') tests = tests.filter(t => getTestState(t.id).status === filter);
+    if (search) tests = tests.filter(t => t.name.toLowerCase().includes(search.toLowerCase()) || t.id.toLowerCase().includes(search.toLowerCase()));
+    if (tests.length === 0) continue;
+
+    const modPass = mod.tests.filter(t => getTestState(t.id).status === 'pass').length;
+    const modTotal = mod.tests.length;
+
+    html += `<div class="module">
+      <div class="module-header">
+        <span class="module-icon">${mod.icon}</span>
+        <span class="module-title">${modName}</span>
+        <span class="module-count">${modTotal} tests</span>
+        <span class="module-progress" style="color:${modPass===modTotal?'var(--green)':'var(--muted)'}">${modPass}/${modTotal}</span>
+      </div>`;
+
+    tests.forEach((t, idx) => {
+      const ts = getTestState(t.id);
+      const statusClass = ts.status !== 'pending' ? `status-${ts.status}` : '';
+
+      html += `<div class="test-item ${statusClass}" id="item-${t.id}">
+        <div class="test-row" onclick="toggleDetail('${t.id}')">
+          <span class="test-num">#${t.id}</span>
+          <span class="test-name">${t.name}<small>${t.steps.length} pasos</small></span>
+          <span class="test-priority p-${t.priority}">${t.priority}</span>
+          <div class="test-status-btns" onclick="event.stopPropagation()">
+            <button class="sbtn ${ts.status==='pass'?'active-pass':''}" onclick="setTestStatus('${t.id}','pass')" title="Pass">&#10004;</button>
+            <button class="sbtn ${ts.status==='fail'?'active-fail':''}" onclick="setTestStatus('${t.id}','fail')" title="Fail">&#10008;</button>
+            <button class="sbtn ${ts.status==='bug'?'active-bug':''}" onclick="setTestStatus('${t.id}','bug')" title="Bug">&#128027;</button>
+            <button class="sbtn ${ts.status==='skip'?'active-skip':''}" onclick="setTestStatus('${t.id}','skip')" title="Skip">&#9654;</button>
+          </div>
+        </div>
+        <div class="test-detail" id="detail-${t.id}">
+          <div class="detail-section">
+            <div class="detail-label">Pasos a seguir</div>
+            <ol class="detail-steps">${t.steps.map(s => `<li>${s}</li>`).join('')}</ol>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">Resultado esperado</div>
+            <div class="detail-expected">${t.expected}</div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-label">Notas / Observaciones</div>
+            <textarea class="notes-input" placeholder="Escribe notas, bugs encontrados, screenshots..." onchange="setTestNotes('${t.id}',this.value)">${ts.notes || ''}</textarea>
+          </div>
+        </div>
+      </div>`;
+    });
+
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+
+  // Update filter buttons
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.filter-btn[onclick="setFilter('${filter}')"]`)?.classList.add('active');
+}
+
+function toggleDetail(id) {
+  const el = document.getElementById(`detail-${id}`);
+  if (el) el.classList.toggle('open');
+}
+
+function setFilter(f) { filter = f; render(); }
+function setSearch(s) { search = s; render(); }
+
+function saveProgress() {
+  saveState();
+  showToast('Progreso guardado en localStorage');
+}
+
+function resetAll() {
+  if (!confirm('¿Resetear todo el progreso del QA? Esta acción no se puede deshacer.')) return;
+  state = {};
+  saveState();
+  render();
+  showToast('QA reseteado');
+}
+
+function exportReport() {
+  const modules = {};
+  TESTS.forEach(t => { if (!modules[t.module]) modules[t.module] = []; modules[t.module].push(t); });
+
+  let md = `# Steve Mail — QA Report\n`;
+  md += `**Fecha:** ${new Date().toLocaleString('es-CL')}\n\n`;
+
+  let total=0, pass=0, fail=0, bug=0, skip=0;
+  TESTS.forEach(t => {
+    total++; const s = getTestState(t.id).status;
+    if(s==='pass')pass++; else if(s==='fail')fail++; else if(s==='bug')bug++; else if(s==='skip')skip++;
+  });
+
+  md += `## Resumen\n| Métrica | Valor |\n|---------|-------|\n`;
+  md += `| Total | ${total} |\n| Pass | ${pass} |\n| Fail | ${fail} |\n| Bugs | ${bug} |\n| Skip | ${skip} |\n| Pendientes | ${total-pass-fail-bug-skip} |\n| % Completado | ${Math.round(((pass+fail+bug+skip)/total)*100)}% |\n\n`;
+
+  for (const [modName, tests] of Object.entries(modules)) {
+    md += `## ${modName}\n\n`;
+    tests.forEach(t => {
+      const ts = getTestState(t.id);
+      const icon = ts.status==='pass'?'✅':ts.status==='fail'?'❌':ts.status==='bug'?'🐛':ts.status==='skip'?'⏭️':'⬜';
+      md += `- ${icon} **${t.name}** [${t.priority}]`;
+      if (ts.notes) md += `\n  > ${ts.notes}`;
+      md += '\n';
+    });
+    md += '\n';
+  }
+
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `steve-mail-qa-${new Date().toISOString().slice(0,10)}.md`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast('Reporte exportado como Markdown');
+}
+
+function showToast(msg) {
+  const el = document.createElement('div');
+  el.textContent = msg;
+  el.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#6366f1;color:#fff;padding:10px 20px;border-radius:8px;font-size:.85rem;z-index:9999';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+// ===================== INIT =====================
+loadState();
+render();
+</script>
+</body>
+</html>

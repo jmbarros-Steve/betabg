@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Ads — Agentes: 5 Áreas por Agente</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; background: #0a0a0f; color: #e0e0e0; line-height: 1.6; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+  h1 { font-size: 2em; text-align: center; margin: 30px 0 5px; color: #fff; }
+  h1 span { color: #ff6b35; }
+  .subtitle { text-align: center; color: #888; font-size: 0.95em; margin-bottom: 40px; }
+
+  /* SQUAD HEADER */
+  .squad-header {
+    display: flex; align-items: center; gap: 12px;
+    margin: 50px 0 20px; padding: 14px 20px;
+    border-radius: 12px;
+    font-size: 1.2em; font-weight: 700; color: #fff;
+  }
+  .squad-header .count { font-size: 0.6em; font-weight: 400; color: #888; }
+  .sh-canales  { background: linear-gradient(135deg, #1a1508, #111118); border-left: 4px solid #f59e0b; }
+  .sh-producto { background: linear-gradient(135deg, #0a1020, #111118); border-left: 4px solid #60a5fa; }
+  .sh-infra    { background: linear-gradient(135deg, #081a10, #111118); border-left: 4px solid #34d399; }
+  .sh-qa       { background: linear-gradient(135deg, #1a0818, #111118); border-left: 4px solid #f472b6; }
+
+  /* AGENT CARD */
+  .agent {
+    background: #111118;
+    border: 1px solid #1e1e2e;
+    border-radius: 16px;
+    margin-bottom: 24px;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .agent:hover { border-color: #333; }
+
+  .agent-top {
+    display: flex; align-items: center; gap: 16px;
+    padding: 20px 24px;
+    border-bottom: 1px solid #1a1a2a;
+  }
+  .agent-avatar {
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4em; font-weight: 800; color: #fff;
+    flex-shrink: 0;
+  }
+  .av-canales  { background: linear-gradient(135deg, #b45309, #78350f); }
+  .av-producto { background: linear-gradient(135deg, #2563eb, #1e3a5f); }
+  .av-infra    { background: linear-gradient(135deg, #059669, #064e3b); }
+  .av-qa       { background: linear-gradient(135deg, #db2777, #831843); }
+
+  .agent-info h2 { font-size: 1.15em; color: #fff; }
+  .agent-info h2 .code { color: #666; font-weight: 400; font-size: 0.8em; margin-left: 4px; }
+  .agent-info .module { font-size: 0.85em; color: #999; margin-top: 2px; }
+
+  .agent-status {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.7em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .st-ok   { background: rgba(52,211,153,0.12); color: #34d399; border: 1px solid rgba(52,211,153,0.25); }
+  .st-warn { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
+  .st-dead { background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); }
+
+  /* 5 AREAS GRID */
+  .areas-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+  }
+  @media (max-width: 1100px) { .areas-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 700px)  { .areas-grid { grid-template-columns: 1fr; } }
+
+  .area {
+    padding: 18px 20px;
+    border-right: 1px solid #1a1a2a;
+    border-bottom: 1px solid #1a1a2a;
+    min-height: 180px;
+  }
+  .area:last-child { border-right: none; }
+  @media (max-width: 1100px) { .area:nth-child(3n) { border-right: none; } }
+  @media (max-width: 700px)  { .area { border-right: none; } }
+
+  .area-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    font-size: 0.7em; font-weight: 800;
+    margin-bottom: 8px;
+  }
+  .an-canales  { background: rgba(245,158,11,0.15); color: #f59e0b; }
+  .an-producto { background: rgba(96,165,250,0.15); color: #60a5fa; }
+  .an-infra    { background: rgba(52,211,153,0.15); color: #34d399; }
+  .an-qa       { background: rgba(244,114,182,0.15); color: #f472b6; }
+
+  .area h4 {
+    font-size: 0.85em; color: #fff; font-weight: 700;
+    margin-bottom: 8px; line-height: 1.3;
+  }
+  .area ul { list-style: none; padding: 0; }
+  .area li {
+    font-size: 0.78em; color: #999;
+    padding: 2px 0;
+    padding-left: 12px;
+    position: relative;
+  }
+  .area li::before {
+    content: "›";
+    position: absolute; left: 0;
+    color: #555; font-weight: 700;
+  }
+  .area li strong { color: #ccc; font-weight: 600; }
+  .area .file { font-family: monospace; font-size: 0.9em; color: #666; }
+
+  /* SUMMARY TABLE */
+  .summary { width: 100%; border-collapse: collapse; margin: 40px 0 20px; font-size: 0.82em; }
+  .summary th { background: #1a1a2a; color: #ff6b35; padding: 10px 12px; text-align: left; font-weight: 700; }
+  .summary td { padding: 8px 12px; border-bottom: 1px solid #1a1a2a; vertical-align: top; }
+  .summary tr:hover { background: rgba(255,255,255,0.02); }
+  .summary .num { text-align: center; font-weight: 700; color: #ff6b35; }
+
+  .footer { text-align: center; color: #444; font-size: 0.8em; margin: 50px 0 30px; padding-top: 20px; border-top: 1px solid #1a1a2a; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Steve Ads — <span>5 Áreas por Agente</span></h1>
+<p class="subtitle">Qué áreas toca cada agente y los archivos/tablas/crons que le pertenecen</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SQUAD CANALES -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="squad-header sh-canales">Squad Canales <span class="count">— 4 agentes · conexiones con plataformas externas de los clientes</span></div>
+
+<!-- FELIPE W2 -->
+<div class="agent">
+  <div class="agent-top">
+    <div class="agent-avatar av-canales">F</div>
+    <div class="agent-info">
+      <h2>Felipe <span class="code">W2</span></h2>
+      <div class="module">Módulo Meta Ads + Instagram</div>
+    </div>
+    <span class="agent-status st-warn">3 de 127 conectados</span>
+  </div>
+  <div class="areas-grid">
+    <div class="area">
+      <div class="area-num an-canales">1</div>
+      <h4>OAuth & Conexiones</h4>
+      <ul>
+        <li><strong>meta-oauth-callback.ts</strong> — code→token, short→long-lived (60 días)</li>
+        <li><strong>meta-token-refresh.ts</strong> — refresh proactivo &lt;7 días</li>
+        <li><strong>check-meta-scopes.ts</strong> — verificar permisos OAuth</li>
+        <li>Tabla: <strong>platform_connections</strong> (platform='meta')</li>
+        <li>Encripta tokens con RPC <span class="file">encrypt_platform_token</span></li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">2</div>
+      <h4>Campañas & Ads</h4>
+      <ul>
+        <li><strong>manage-meta-campaign.ts</strong> (1,636 lín) — crear, pausar, duplicar, DPA Shopify</li>
+        <li><strong>meta-adset-action.ts</strong> — pausar/resumir ad sets</li>
+        <li><strong>manage-meta-rules.ts</strong> (524 lín) — reglas automáticas CPA/ROAS</li>
+        <li><strong>meta-catalogs.ts</strong> — product catalogs</li>
+        <li>Frontend: <span class="file">CampaignCreateWizard</span>, <span class="file">CampaignStudio</span></li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">3</div>
+      <h4>Métricas & Sync</h4>
+      <ul>
+        <li><strong>sync-meta-metrics.ts</strong> (476 lín) — spend, CTR, CPA, ROAS diario</li>
+        <li>Cron: <strong>performance-tracker-meta</strong> 8am — mide ads 48hrs post-creación</li>
+        <li>Cron: <strong>execute-meta-rules</strong> 9am — ejecuta reglas automáticas</li>
+        <li>Tabla: <strong>campaign_metrics</strong>, <strong>meta_rule_execution_log</strong></li>
+        <li>Lib: <span class="file">meta-fetch.ts</span> — circuit breaker + retry exponencial</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">4</div>
+      <h4>Audiences & Targeting</h4>
+      <ul>
+        <li><strong>manage-meta-audiences.ts</strong> (559 lín) — custom, lookalike, retargeting</li>
+        <li><strong>sync-klaviyo-to-meta-audience.ts</strong> — segmentos Klaviyo → Meta</li>
+        <li><strong>detect-audience-overlap.ts</strong> — overlap detection</li>
+        <li><strong>meta-targeting-search.ts</strong> — intereses, behaviors, demographics</li>
+        <li>Frontend: <span class="file">MetaAudienceManager</span></li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">5</div>
+      <h4>Instagram & Social</h4>
+      <ul>
+        <li><strong>publish-instagram.ts</strong> — fotos, carousels, reels + schedule</li>
+        <li><strong>fetch-instagram-insights.ts</strong> — reach, impressions, engagement</li>
+        <li><strong>meta-social-inbox.ts</strong> (725 lín) — comments IG, DMs, replies</li>
+        <li>Tabla: <strong>instagram_scheduled_posts</strong></li>
+        <li>Frontend: <span class="file">InstagramPublisher</span>, <span class="file">InstagramHub</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ANDRÉS W3 -->
+<div class="agent">
+  <div class="agent-top">
+    <div class="agent-avatar av-canales">A</div>
+    <div class="agent-info">
+      <h2>Andrés <span class="code">W3</span></h2>
+      <div class="module">Módulo Google Ads</div>
+    </div>
+    <span class="agent-status st-dead">Desconectado</span>
+  </div>
+  <div class="areas-grid">
+    <div class="area">
+      <div class="area-num an-canales">1</div>
+      <h4>OAuth & Conexión</h4>
+      <ul>
+        <li><strong>google-ads-oauth-callback.ts</strong> — code→token, fetch accounts</li>
+        <li>Edge Function: <span class="file">google-ads-oauth-callback</span></li>
+        <li>Tabla: <strong>platform_connections</strong> (platform='google')</li>
+        <li>CSRF via state parameter</li>
+        <li>Soporte multiple ad accounts</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">2</div>
+      <h4>Sync de Métricas</h4>
+      <ul>
+        <li><strong>sync-google-ads-metrics.ts</strong> — GAQL queries, últimos 30 días</li>
+        <li>Métricas: impressions, clicks, spend, conversions, CPC, CTR</li>
+        <li>Conversión automática a CLP</li>
+        <li>Token refresh automático con refresh_token</li>
+        <li>Tabla: <strong>platform_metrics</strong></li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">3</div>
+      <h4>Frontend</h4>
+      <ul>
+        <li><strong>OAuthGoogleAdsCallback.tsx</strong> ��� página callback</li>
+        <li><strong>PlatformConnectionsPanel.tsx</strong> — conectar Google Ads</li>
+        <li><strong>ClientMetricsPanel.tsx</strong> — mostrar métricas</li>
+        <li>Compara Google vs Meta en un dashboard</li>
+        <li>Sin componentes propios aún</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">4</div>
+      <h4>API Google Ads v18</h4>
+      <ul>
+        <li>Endpoint: <span class="file">googleads.googleapis.com/v18</span></li>
+        <li><span class="file">customers:listAccessibleCustomers</span></li>
+        <li><span class="file">customers/{id}/googleAds:searchStream</span></li>
+        <li><span class="file">oauth2.googleapis.com/token</span></li>
+        <li>GAQL para queries de métricas</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">5</div>
+      <h4>Credenciales Faltantes</h4>
+      <ul>
+        <li><strong style="color:#ef4444;">GOOGLE_CLIENT_ID</strong> — no existe en Cloud Run</li>
+        <li><strong style="color:#ef4444;">GOOGLE_ADS_CLIENT_SECRET</strong> — no existe</li>
+        <li><strong style="color:#ef4444;">GOOGLE_ADS_DEVELOPER_TOKEN</strong> — no existe</li>
+        <li>Sin estas 3 vars, módulo 100% inoperativo</li>
+        <li>Ni lectura de datos funciona</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- RODRIGO W0 -->
+<div class="agent">
+  <div class="agent-top">
+    <div class="agent-avatar av-canales">R</div>
+    <div class="agent-info">
+      <h2>Rodrigo <span class="code">W0</span></h2>
+      <div class="module">Módulo Klaviyo</div>
+    </div>
+    <span class="agent-status st-dead">Pipeline roto</span>
+  </div>
+  <div class="areas-grid">
+    <div class="area">
+      <div class="area-num an-canales">1</div>
+      <h4>Conexión & API Keys</h4>
+      <ul>
+        <li><strong>store-klaviyo-connection.ts</strong> — validar y guardar API key</li>
+        <li>Edge Function: <span class="file">store-klaviyo-connection</span></li>
+        <li>Tabla: <strong>platform_connections</strong> (platform='klaviyo')</li>
+        <li>Encriptación via RPC</li>
+        <li>Validación contra Klaviyo Accounts API</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">2</div>
+      <h4>Flows & Automatizaciones</h4>
+      <ul>
+        <li><strong>klaviyo-manage-flows.ts</strong> (54KB, el más grande) — CRUD flows</li>
+        <li>Triggers, delays, branching, messages</li>
+        <li><strong>preview-flow-emails.ts</strong> — preview con merge tags</li>
+        <li>Tablas: <strong>klaviyo_flows</strong>, <strong>klaviyo_flow_messages</strong></li>
+        <li>API: Klaviyo Flows API v2024-10-15</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">3</div>
+      <h4>Push & Envío</h4>
+      <ul>
+        <li><strong>klaviyo-push-emails.ts</strong> — push emails a listas</li>
+        <li><strong>upload-klaviyo-drafts.ts</strong> — subir drafts como templates</li>
+        <li>Tabla: <strong>email_campaigns</strong>, <strong>email_send_queue</strong></li>
+        <li style="color:#ef4444;"><strong>email_send_queue = 0 filas</strong> (pipeline roto)</li>
+        <li>API: Klaviyo Campaign + Templates API</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">4</div>
+      <h4>Sync de Métricas</h4>
+      <ul>
+        <li><strong>sync-klaviyo-metrics.ts</strong> — open rate, click rate, revenue</li>
+        <li><strong>fetch-klaviyo-top-products.ts</strong> — top productos para recomendar</li>
+        <li>Métricas: placed_order, opened_email, clicked_email</li>
+        <li>Tabla: <strong>email_events</strong>, <strong>campaign_metrics</strong></li>
+        <li>API: Klaviyo Metrics API</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">5</div>
+      <h4>Templates & Formato</h4>
+      <ul>
+        <li><strong>import-klaviyo-templates.ts</strong> — importar templates</li>
+        <li><strong>klaviyo-smart-format.ts</strong> — fix breaks, spacing, links</li>
+        <li>Tabla: <strong>email_templates</strong></li>
+        <li>Frontend: <span class="file">ImportKlaviyoDialog</span>, <span class="file">KlaviyoMetricsPanel</span></li>
+        <li>9 componentes frontend Klaviyo</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- VALENTINA W1 -->
+<div class="agent">
+  <div class="agent-top">
+    <div class="agent-avatar av-canales">V</div>
+    <div class="agent-info">
+      <h2>Valentina <span class="code">W1</span></h2>
+      <div class="module">Módulo Steve Mail</div>
+    </div>
+    <span class="agent-status st-warn">25 rutas backend</span>
+  </div>
+  <div class="areas-grid">
+    <div class="area">
+      <div class="area-num an-canales">1</div>
+      <h4>Editor & Templates</h4>
+      <ul>
+        <li><strong>GrapesEmailEditor.tsx</strong> — GrapeJS Studio SDK (drag-drop)</li>
+        <li><strong>email-templates-api.ts</strong> — CRUD templates</li>
+        <li><strong>grapes-steve-blocks.ts</strong> — bloques custom Steve</li>
+        <li><strong>email-html-processor.ts</strong> (25KB) — parse HTML → bloques</li>
+        <li>Frontend: <span class="file">EmailTemplateGallery</span>, <span class="file">GlobalStylesPanel</span></li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">2</div>
+      <h4>Campañas & Envío</h4>
+      <ul>
+        <li><strong>manage-campaigns.ts</strong> (29KB) — crear, enviar, A/B tests</li>
+        <li><strong>send-email.ts</strong> — core sender: tracking pixel + click wrap + unsub</li>
+        <li><strong>send-queue.ts</strong> — batch/scheduled via cola</li>
+        <li>Tablas: <strong>email_campaigns</strong>, <strong>email_send_queue</strong></li>
+        <li>API: <strong>Resend</strong> (envío transaccional)</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">3</div>
+      <h4>Flows & Automatizaciones</h4>
+      <ul>
+        <li><strong>flow-engine.ts</strong> (31KB) — define, edit, ejecuta workflows</li>
+        <li><strong>flow-webhooks.ts</strong> (32KB) — abandoned cart, birthday, winback, browse</li>
+        <li><strong>generate-email-content.ts</strong> — AI content via Claude</li>
+        <li>Frontend: <span class="file">FlowBuilder</span>, <span class="file">FlowCanvas</span> (React Flow)</li>
+        <li>Tablas: <strong>email_flows</strong>, <strong>flow_steps</strong></li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">4</div>
+      <h4>Subscribers & Listas</h4>
+      <ul>
+        <li><strong>sync-subscribers.ts</strong> — sync desde Shopify, bulk import</li>
+        <li><strong>query-subscribers.ts</strong> — filtros, RFM, engagement</li>
+        <li><strong>manage-email-lists.ts</strong> — listas, segmentos, tags</li>
+        <li><strong>list-cleanup.ts</strong> — cron: remover bounced/unsub</li>
+        <li>Frontend: <span class="file">SubscribersList</span>, <span class="file">SegmentBuilder</span></li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-canales">5</div>
+      <h4>Analytics & A/B</h4>
+      <ul>
+        <li><strong>campaign-analytics.ts</strong> (20KB) — open rate, click, CTR, AOV</li>
+        <li><strong>ab-testing.ts</strong> (12KB) — setup, significancia, winner</li>
+        <li><strong>revenue-attribution.ts</strong> (16KB) — revenue por campaña (UTM)</li>
+        <li><strong>smart-send-time.ts</strong> — mejor hora por subscriber TZ</li>
+        <li>Frontend: <span class="file">ClickHeatmapPanel</span>, <span class="file">ABTestResultsPanel</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SQUAD PRODUCTO -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="squad-header sh-producto">Squad Producto <span class="count">— 4 agentes · features que hacen a Steve inteligente</span></div>
+
+<!-- TOMÁS W7 -->
+<div class="agent">
+  <div class="agent-top">
+    <div class="agent-avatar av-producto">T</div>
+    <div class="agent-info">
+      <h2>Tomás <span class="code">W7</span></h2>
+      <div class="module">Steve AI & Brain</div>
+    </div>
+    <span class="agent-status st-warn">Swarm al 5%</span>
+  </div>
+  <div class="areas-grid">
+    <div class="area">
+      <div class="area-num an-producto">1</div>
+      <h4>Knowledge Base</h4>
+      <ul>
+        <li>Tabla: <strong>steve_knowledge</strong> (487 reglas activas)</li>
+        <li>Cron: <strong>knowledge-quality-score</strong> Dom 5am — puntúa 5 criterios × 20pts</li>
+        <li>Auto-rewrite de reglas scoring &lt;40 via Haiku</li>
+        <li>Auto-desactiva reglas sin uso en 60+ días</li>
+        <li>Lib: <span class="file">knowledge-versioner.ts</span> — snapshots antes de update</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">2</div>
+      <h4>Swarm Research</h4>
+      <ul>
+        <li>Cron: <strong>swarm-research</strong> cada 2h — pipeline 3 cerebros</li>
+        <li>Haiku genera preguntas → o4-mini busca → Opus sintetiza</li>
+        <li>Tabla: <strong>swarm_runs</strong> (16 exitosos de 360 posibles)</li>
+        <li>Tabla: <strong>swarm_sources</strong> (0 filas — vacío)</li>
+        <li style="color:#ef4444;">95% de los runs fallan</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">3</div>
+      <h4>Content Discovery</h4>
+      <ul>
+        <li>Cron: <strong>steve-content-hunter</strong> cada 20min — busca contenido web</li>
+        <li>Cron: <strong>steve-discoverer</strong> Dom 2am — deep industry discovery</li>
+        <li>API: <strong>Firecrawl</strong> para scraping</li>
+        <li>Tabla: <strong>steve_sources</strong> (0 filas — vacío)</li>
+        <li>Evalúa relevancia con Claude antes de guardar</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">4</div>
+      <h4>Agent Loop Autónomo</h4>
+      <ul>
+        <li>Cron: <strong>steve-agent-loop</strong> cada 2h</li>
+        <li>Ciclo: <strong>PERCEIVE</strong> (qa_log, metrics, feedback) → <strong>REASON</strong> (Claude) → <strong>ACT</strong></li>
+        <li>Acciones: search_topic, evaluate_rules, alert_client, improve_knowledge</li>
+        <li>Edge Function: <strong>steve-chat</strong> — chatbot merchant</li>
+        <li>Inyecta: knowledge + creative context + brand brief</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">5</div>
+      <h4>Mantenimiento & Evolución</h4>
+      <ul>
+        <li>Cron: <strong>knowledge-dedup</strong> 1ro mes — duplicados semánticos</li>
+        <li>Cron: <strong>knowledge-decay</strong> 1ro mes — desactiva reglas viejas (120+ días)</li>
+        <li>Cron: <strong>knowledge-consolidator</strong> 1ro mes — merge fragmentadas</li>
+        <li>Cron: <strong>steve-prompt-evolver</strong> Dom 3am — evoluciona prompts</li>
+        <li>Cron: <strong>cross-client-learning</strong> 1ro mes — transfiere entre clientes</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- IGNACIO W17 -->
+<div class="agent">
+  <div class="agent-top">
+    <div class="agent-avatar av-producto">I</div>
+    <div class="agent-info">
+      <h2>Ignacio <span class="code">W17</span></h2>
+      <div class="module">Métricas & Reportes</div>
+    </div>
+    <span class="agent-status st-warn">7 crons</span>
+  </div>
+  <div class="areas-grid">
+    <div class="area">
+      <div class="area-num an-producto">1</div>
+      <h4>Dashboards</h4>
+      <ul>
+        <li>Frontend: <strong>ClientMetricsPanel.tsx</strong> — métricas + CRITERIO alerts</li>
+        <li>Frontend: <strong>CampaignAnalyticsPanel.tsx</strong> — breakdown por campaña</li>
+        <li>Tabla: <strong>campaign_metrics</strong> — spend, CTR, CPA, ROAS por día</li>
+        <li>Tabla: <strong>metric_snapshots</strong> — trending histórico</li>
+        <li>Compara Meta vs Google vs Shopify en un solo lugar</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">2</div>
+      <h4>Reporte Semanal</h4>
+      <ul>
+        <li>Cron: <strong>weekly-report</strong> Lun 11am (8am Chile)</li>
+        <li>Contenido: sales, top campaign, CPA trend, acción recomendada</li>
+        <li>QA Scorecard: errores, MTTR, autofix rate</li>
+        <li>Mejora Continua: creative performance scores</li>
+        <li>Envío: HTML email via <strong>Resend</strong></li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">3</div>
+      <h4>Detección de Anomalías</h4>
+      <ul>
+        <li>Cron: <strong>anomaly-detector</strong> 10pm diario</li>
+        <li>Detecta: &gt;40% desviación de baseline 8 semanas</li>
+        <li>Compara: mismo día de la semana</li>
+        <li>Acción: crea task en anomalía crítica</li>
+        <li>Tabla: <strong>campaign_metrics</strong> como fuente</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">4</div>
+      <h4>Alertas Predictivas</h4>
+      <ul>
+        <li>Cron: <strong>predictive-alerts</strong> cada 6h</li>
+        <li>Métricas: CPM, CTR, ROAS, CPA deteriorándose</li>
+        <li>Compara: últimos 3 días vs últimos 14 días</li>
+        <li>Alerta: vía <strong>WhatsApp</strong> al merchant</li>
+        <li>Cron: <strong>funnel-diagnosis</strong> Lun 5am — diagnostica embudo</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">5</div>
+      <h4>Atribución & SLOs</h4>
+      <ul>
+        <li>Cron: <strong>revenue-attribution</strong> Dom 4am — ROAS de recomendaciones</li>
+        <li>Cron: <strong>error-budget-calculator</strong> cada 4h — presupuesto de error</li>
+        <li>4 CUJs: Login→Dashboard, Steve&lt;30s, Create Meta, Create Email</li>
+        <li>Tabla: <strong>slo_config</strong> — healthy/warning/critical/frozen</li>
+        <li>Tabla: <strong>campaign_recommendations</strong></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- PAULA W19 -->
+<div class="agent">
+  <div class="agent-top">
+    <div class="agent-avatar av-producto">P</div>
+    <div class="agent-info">
+      <h2>Paula <span class="code">W19</span></h2>
+      <div class="module">WA, CRM & Ventas</div>
+    </div>
+    <span class="agent-status st-warn">14 rutas + 7 crons</span>
+  </div>
+  <div class="areas-grid">
+    <div class="area">
+      <div class="area-num an-producto">1</div>
+      <h4>WhatsApp Steve</h4>
+      <ul>
+        <li><strong>steve-wa-chat.ts</strong> — Steve AI ↔ prospectos via WA</li>
+        <li><strong>send-message.ts</strong> — envío individual</li>
+        <li><strong>send-campaign.ts</strong> — envío masivo</li>
+        <li><strong>status-callback.ts</strong> — webhook delivery status</li>
+        <li>API: <strong>Twilio</strong> WhatsApp + <strong>Anthropic</strong> (chat AI)</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">2</div>
+      <h4>Pipeline de Ventas</h4>
+      <ul>
+        <li><strong>prospect-crm.ts</strong> — gestión prospectos: stage, priority, deal value</li>
+        <li><strong>sales-tasks.ts</strong> — tareas de venta por vendedor</li>
+        <li><strong>sellers.ts</strong> — gestión vendedores + calendarios</li>
+        <li>Tablas: <strong>wa_prospects</strong>, <strong>sales_tasks</strong>, <strong>sellers</strong></li>
+        <li>Lib: <span class="file">prospect-event-logger.ts</span> — audit trail</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">3</div>
+      <h4>Carritos Abandonados</h4>
+      <ul>
+        <li>Cron: <strong>abandoned-cart-wa</strong> cada hora — recordatorios WA</li>
+        <li><strong>shopify-checkout-webhook.ts</strong> — captura checkout.created</li>
+        <li>Tabla: <strong>shopify_abandoned_checkouts</strong></li>
+        <li>Depende de: Matías W13 (Shopify conectado)</li>
+        <li>Cada carrito recuperado = venta directa</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">4</div>
+      <h4>Nurture & Followup</h4>
+      <ul>
+        <li>Cron: <strong>prospect-followup</strong> cada 4h — 24h→insight, 72h→FOMO, 7d→bye</li>
+        <li>Cron: <strong>prospect-email-nurture</strong> 1pm — nurture por email</li>
+        <li>Cron: <strong>onboarding-wa</strong> cada 4h — follow-up nuevos clientes</li>
+        <li>Cron: <strong>merchant-upsell</strong> Dom 11am — upsell a existentes</li>
+        <li>Cron: <strong>churn-detector</strong> 2pm — identifica clientes en riesgo</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">5</div>
+      <h4>CRM & Propuestas</h4>
+      <ul>
+        <li><strong>proposals.ts</strong> — generar y trackear propuestas</li>
+        <li><strong>web-forms.ts</strong> — formularios intake → auto-crear prospectos</li>
+        <li><strong>prospect-trial.ts</strong> — activar trial: crear user + WA welcome</li>
+        <li>Tablas: <strong>proposals</strong>, <strong>web_form_submissions</strong></li>
+        <li>Lib: <span class="file">steve-sales-deck.ts</span> — presentación dinámica</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- VALENTÍN W18 -->
+<div class="agent">
+  <div class="agent-top">
+    <div class="agent-avatar av-producto">V</div>
+    <div class="agent-info">
+      <h2>Valentín <span class="code">W18</span></h2>
+      <div class="module">Creativos & Assets</div>
+    </div>
+    <span class="agent-status st-warn">4 crons + 6 rutas AI</span>
+  </div>
+  <div class="areas-grid">
+    <div class="area">
+      <div class="area-num an-producto">1</div>
+      <h4>Generación de Copy</h4>
+      <ul>
+        <li><strong>generate-meta-copy.ts</strong> — metodología Sabri Suby + Russell Brunson</li>
+        <li>4 Preguntas: Who, Where, What, Why</li>
+        <li>Genera 3 variantes por request</li>
+        <li>Inyecta CRITERIO rules + creative context</li>
+        <li>API: <strong>Anthropic</strong> (Haiku/Opus según modo)</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">2</div>
+      <h4>Imágenes & Video</h4>
+      <ul>
+        <li><strong>generate-image.ts</strong> — generación via Replicate/DALL-E</li>
+        <li><strong>generate-video.ts</strong> — video corto via Fal.ai</li>
+        <li><strong>creative-preview.ts</strong> — preview mockup de ad</li>
+        <li>Tabla: <strong>creative_assets</strong> + S3 bucket</li>
+        <li>APIs: <strong>Replicate</strong>, <strong>Fal.ai</strong></li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">3</div>
+      <h4>Fatiga & Performance</h4>
+      <ul>
+        <li>Cron: <strong>fatigue-detector</strong> 11am — CTR drop &gt;20% + frequency &gt;3</li>
+        <li>Cron: <strong>performance-evaluator</strong> 10am — analiza POR QUÉ funcionó (2 líneas)</li>
+        <li>Cron: <strong>performance-tracker-meta</strong> 8am — mide ads 48hrs, score 0-100</li>
+        <li>Verdict: excelente (&gt;80), bueno (60-80), malo (&lt;60)</li>
+        <li>Crea tasks cuando verdict='malo'</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">4</div>
+      <h4>Ángulos & Contexto</h4>
+      <ul>
+        <li>Lib: <strong>angle-detector.ts</strong> — 18 tipos (descuento, testimonio, urgencia...)</li>
+        <li>Lib: <strong>creative-context.ts</strong> — fetch best/worst pasados</li>
+        <li>Ranking ángulos: <strong>[VALIDADO]</strong> (10+ muestras, score≥60)</li>
+        <li>Marca: <strong>[DESCARTADO]</strong> (10+ muestras, score&lt;40)</li>
+        <li>Se inyecta en steve-chat + generate-meta-copy</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-producto">5</div>
+      <h4>Producción Masiva</h4>
+      <ul>
+        <li><strong>generate-mass-campaigns.ts</strong> — bulk con rotación de ángulos</li>
+        <li>Cron: <strong>detective-visual</strong> 7×/día — compara Steve vs plataforma real</li>
+        <li>Tolerancias: spend ±5%, ROAS ±10%, CPA ±10%</li>
+        <li>Tabla: <strong>creative_history</strong> (performance + evaluación)</li>
+        <li>Tabla: <strong>creative_review_feed</strong></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SQUAD INFRA -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="squad-header sh-infra">Squad Infra <span class="count">— 4 agentes · lo que hace que Steve corra</span></div>
+
+<!-- DIEGO W8 -->
+<div class="agent">
+  <div class="agent-top">
+    <div class="agent-avatar av-infra">D</div>
+    <div class="agent-info">
+      <h2>Diego <span class="code">W8</span></h2>
+      <div class="module">Base de Datos</div>
+    </div>
+    <span class="agent-status st-dead">2 tablas críticas vacías</span>
+  </div>
+  <div class="areas-grid">
+    <div class="area">
+      <div class="area-num an-infra">1</div>
+      <h4>Schema & Tablas</h4>
+      <ul>
+        <li><strong>37 tablas</strong> en Supabase</li>
+        <li>Auth, merchants, WA, CRM, knowledge, creative, analytics, email, shopify, tasks</li>
+        <li>Diseño de relaciones y constraints</li>
+        <li>Indexes para performance de queries</li>
+        <li>3 storage buckets (email_images, client_assets, creative_assets)</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">2</div>
+      <h4>Migraciones</h4>
+      <ul>
+        <li><strong>142 archivos SQL</strong> en <span class="file">supabase/migrations/</span></li>
+        <li>Cambios al schema sin romper producción</li>
+        <li>Rollback capability via knowledge_versions</li>
+        <li>Última: <span class="file">20260403600000_agent_sessions.sql</span></li>
+        <li>Comando: <span class="file">npx supabase db push</span></li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">3</div>
+      <h4>RLS & Seguridad</h4>
+      <ul>
+        <li><strong>120+ RLS policies</strong></li>
+        <li>Tenant isolation: cada cliente solo ve SUS datos</li>
+        <li>Admin bypass capabilities</li>
+        <li>Seller scoping para equipos</li>
+        <li>Auth trigger para user creation</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">4</div>
+      <h4>Fuentes del Brain</h4>
+      <ul>
+        <li>Tabla: <strong style="color:#ef4444;">steve_sources = 0 filas</strong></li>
+        <li>Tabla: <strong style="color:#ef4444;">swarm_sources = 0 filas</strong></li>
+        <li>Sin estas tablas el Brain no tiene combustible</li>
+        <li>Tabla: <strong>steve_knowledge</strong> (487 reglas — funciona)</li>
+        <li>Tabla: <strong>swarm_runs</strong> (16 exitosos — parcial)</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">5</div>
+      <h4>Encriptación & RPCs</h4>
+      <ul>
+        <li>RPC: <strong>encrypt_platform_token</strong></li>
+        <li>RPC: <strong>decrypt_platform_token</strong></li>
+        <li>Usado por: Meta, Google, Shopify, Klaviyo tokens</li>
+        <li>Env var: <strong>ENCRYPTION_KEY</strong></li>
+        <li>Sin encriptación, tokens en plaintext = breach</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SEBASTIÁN W5 -->
+<div class="agent">
+  <div class="agent-top">
+    <div class="agent-avatar av-infra">S</div>
+    <div class="agent-info">
+      <h2>Sebastián <span class="code">W5</span></h2>
+      <div class="module">Cloud & Crons</div>
+    </div>
+    <span class="agent-status st-warn">8 env vars faltantes</span>
+  </div>
+  <div class="areas-grid">
+    <div class="area">
+      <div class="area-num an-infra">1</div>
+      <h4>Cloud Run</h4>
+      <ul>
+        <li>Servicio: <strong>steve-api</strong> (us-central1)</li>
+        <li>Proyecto: <strong>steveapp-agency</strong></li>
+        <li>Deploy: <span class="file">gcloud run deploy --source cloud-run-api</span></li>
+        <li>NUNCA <span class="file">--set-env-vars</span> (reemplaza TODAS)</li>
+        <li>SIEMPRE <span class="file">--update-env-vars</span></li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">2</div>
+      <h4>45 Crons</h4>
+      <ul>
+        <li><strong>Google Cloud Scheduler</strong> → Cloud Run</li>
+        <li>Desde cada 1 min (wa-action) hasta mensual (knowledge-dedup)</li>
+        <li>Auth: header <span class="file">X-Cron-Secret</span></li>
+        <li>Cero monitoreo real de outputs</li>
+        <li>Muchos retornan 200 sin hacer nada útil</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">3</div>
+      <h4>65 Edge Functions</h4>
+      <ul>
+        <li><strong>Supabase Edge Functions</strong> (Deno)</li>
+        <li>AI: steve-chat, generate-copy, criterio-*</li>
+        <li>Integración: sync-*, fetch-*, shopify-*, klaviyo-*</li>
+        <li>Admin: export-database, admin-create-*</li>
+        <li>Payments: stripe-webhook, stripe-checkout</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">4</div>
+      <h4>20 Env Vars (+8 faltantes)</h4>
+      <ul>
+        <li><strong>20 obligatorias</strong> presentes (Supabase, Anthropic, Meta, Twilio...)</li>
+        <li style="color:#ef4444;">Faltan 3 Google: CLIENT_ID, SECRET, DEV_TOKEN</li>
+        <li style="color:#ef4444;">Faltan 3 Shopify: CLIENT_ID, SECRET, WEBHOOK_SECRET</li>
+        <li style="color:#ef4444;">Faltan 2 Skyvern: API_KEY, API_URL</li>
+        <li>Verificación: <span class="file">verify-cloud-run-env.sh</span> cada 30min</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">5</div>
+      <h4>Health & Monitoring</h4>
+      <ul>
+        <li>Edge Function: <strong>health-check</strong> (OJOS) — crea tasks on failure</li>
+        <li>Cron: <strong>restart-service</strong> — auto-restart en 2+ failures</li>
+        <li><strong>Sentry</strong> — error tracking backend</li>
+        <li>Solo cubre <strong>10 de 69 endpoints</strong> (14%)</li>
+        <li>Cron: <strong>reconciliation</strong> cada 6h — verificación datos</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- CAMILA W4 -->
+<div class="agent">
+  <div class="agent-top">
+    <div class="agent-avatar av-infra">C</div>
+    <div class="agent-info">
+      <h2>Camila <span class="code">W4</span></h2>
+      <div class="module">Frontend & Portal</div>
+    </div>
+    <span class="agent-status st-warn">130+ componentes</span>
+  </div>
+  <div class="areas-grid">
+    <div class="area">
+      <div class="area-num an-infra">1</div>
+      <h4>Portal del Cliente</h4>
+      <ul>
+        <li><strong>ClientPortal.tsx</strong> — punto de entrada cliente</li>
+        <li>Tabs: Strategy, Campaigns, Email, Klaviyo, Shopify, Metrics</li>
+        <li>Cada tab carga sub-panel del módulo correspondiente</li>
+        <li>Responsive (celular + desktop)</li>
+        <li>Tabla: <strong>clients</strong> (127 clientes)</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">2</div>
+      <h4>Dashboard Admin</h4>
+      <ul>
+        <li><strong>Dashboard.tsx</strong> — vista admin principal</li>
+        <li><strong>AdminCerebro.tsx</strong> — tasks, QA, SLOs</li>
+        <li><strong>AdminSkyvern.tsx</strong> — runs, mismatches</li>
+        <li><strong>AdminOrganigrama.tsx</strong> — equipo + agentes en vivo</li>
+        <li><strong>AdminPlanes.tsx</strong> — planes y suscripciones</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">3</div>
+      <h4>Onboarding</h4>
+      <ul>
+        <li>Flow multi-step: registro → connect platform → brief → dashboard</li>
+        <li>Se rompe en paso 3 si no hay platform_connection</li>
+        <li>Tabla: <strong>merchant_onboarding</strong></li>
+        <li>Primera impresión del cliente con Steve</li>
+        <li>Depende de: OAuth de Felipe/Andrés/Matías</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">4</div>
+      <h4>130+ Componentes</h4>
+      <ul>
+        <li>Stack: <strong>React + TypeScript + Vite</strong></li>
+        <li>UI: <strong>shadcn/ui</strong> (no tocar <span class="file">src/components/ui/</span>)</li>
+        <li>Styles: <strong>Tailwind CSS</strong></li>
+        <li>Sin design system consistente aún</li>
+        <li>Icons: Lucide React</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">5</div>
+      <h4>Auth & Permisos</h4>
+      <ul>
+        <li><strong>Supabase Auth</strong> — login, registro</li>
+        <li>Hook: <span class="file">useAuth.ts</span> — estado de sesión</li>
+        <li>Hook: <span class="file">useUserRole.ts</span> — isSuperAdmin, isClient</li>
+        <li>Deploy: Vercel auto-deploy on push to main</li>
+        <li>No tocar: <span class="file">src/integrations/supabase/</span> (auto-generado)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- MATÍAS W13 -->
+<div class="agent">
+  <div class="agent-top">
+    <div class="agent-avatar av-infra">M</div>
+    <div class="agent-info">
+      <h2>Matías <span class="code">W13</span></h2>
+      <div class="module">Módulo Shopify</div>
+    </div>
+    <span class="agent-status st-dead">Desconectado</span>
+  </div>
+  <div class="areas-grid">
+    <div class="area">
+      <div class="area-num an-infra">1</div>
+      <h4>OAuth & Conexión</h4>
+      <ul>
+        <li><strong>shopify-oauth-callback.ts</strong> — code→token + auto-register 7 webhooks</li>
+        <li><strong>store-shopify-token.ts</strong> — alternativa Custom App</li>
+        <li>HMAC verification + state nonce CSRF</li>
+        <li>Auto-crea user + client en primer install</li>
+        <li style="color:#ef4444;">Faltan 3 credenciales → 100% inoperativo</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">2</div>
+      <h4>Sync Productos</h4>
+      <ul>
+        <li><strong>fetch-shopify-products.ts</strong> — catálogo completo</li>
+        <li>Datos: title, status, variants, price, cost, inventory_quantity</li>
+        <li>Inventory costs en batches de 100</li>
+        <li>Rate limiting: 10 req/min por conexión</li>
+        <li>SEO metadata incluido</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">3</div>
+      <h4>Sync Orders & Revenue</h4>
+      <ul>
+        <li><strong>sync-shopify-metrics.ts</strong> — revenue + orders diarios</li>
+        <li>Rate limiting: 5 min mínimo entre syncs</li>
+        <li>Conversión automática a CLP</li>
+        <li>Tabla: <strong>platform_metrics</strong></li>
+        <li>Paginación para volúmenes grandes</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">4</div>
+      <h4>Analytics Completo</h4>
+      <ul>
+        <li><strong>fetch-shopify-analytics.ts</strong> — el más completo</li>
+        <li>Top SKUs, daily revenue, channel attribution, UTM performance</li>
+        <li>Customer LTV, repeat rate, cohorts (6 meses)</li>
+        <li>Conversion funnel: sessions → add-to-cart → checkout → purchase</li>
+        <li>GraphQL + REST API combinados</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-infra">5</div>
+      <h4>GDPR & Webhooks</h4>
+      <ul>
+        <li><strong>shopify-gdpr-webhooks.ts</strong> — uninstall, data request, erasure</li>
+        <li><strong>shopify-fulfillment-webhooks.ts</strong> — fulfilled, cancelled</li>
+        <li>7 webhooks registrados automáticamente</li>
+        <li>HMAC SHA-256 timing-safe verification</li>
+        <li>Cascading deletion GDPR (48h window)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SQUAD QA -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="squad-header sh-qa">Squad QA <span class="count">— 2 agentes · verifican que todo realmente funciona</span></div>
+
+<!-- ISIDORA W6 -->
+<div class="agent">
+  <div class="agent-top">
+    <div class="agent-avatar av-qa">I</div>
+    <div class="agent-info">
+      <h2>Isidora <span class="code">W6</span></h2>
+      <div class="module">CRITERIO — 493 Reglas de Calidad</div>
+    </div>
+    <span class="agent-status st-ok">493 reglas activas</span>
+  </div>
+  <div class="areas-grid">
+    <div class="area">
+      <div class="area-num an-qa">1</div>
+      <h4>493 Reglas de Calidad</h4>
+      <ul>
+        <li>Tabla: <strong>criterio_rules</strong></li>
+        <li>Categorías Meta: COPY, TARGET, BUDGET, PLACEMENT, CREATIVE</li>
+        <li>Categorías Email: SUBJECT, BODY, TONE, CTA</li>
+        <li>Severity: critical (blocker), high, medium, low</li>
+        <li>Cada regla tiene: name, check_rule, weight, auto flag</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-qa">2</div>
+      <h4>Evaluación Meta</h4>
+      <ul>
+        <li><strong>criterio-meta.ts</strong> — evalúa campaigns contra reglas</li>
+        <li>Usa context de: brand_research + shopify_products</li>
+        <li>Retorna: score, can_publish, failed_rules</li>
+        <li>Si falla → crea task automática</li>
+        <li>Edge Function: <span class="file">evaluate-rules</span></li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-qa">3</div>
+      <h4>Evaluación Email</h4>
+      <ul>
+        <li><strong>criterio-email.ts</strong> — evalúa emails pre-envío</li>
+        <li>Valida: subject length, CTA clarity, tone consistency</li>
+        <li>Usa: brand_research para contexto de marca</li>
+        <li>Si falla blocker → bloquea envío</li>
+        <li>Score alimenta <strong>creative_history</strong></li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-qa">4</div>
+      <h4>Calibración</h4>
+      <ul>
+        <li>Cron: <strong>rule-calibrator</strong> Dom 3am</li>
+        <li>Recalibra pesos según efectividad real</li>
+        <li>Si una regla bloquea buen contenido → reduce peso</li>
+        <li>Si una regla deja pasar malo → aumenta peso</li>
+        <li>Basado en resultados de creative_history</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-qa">5</div>
+      <h4>Generación de Reglas</h4>
+      <ul>
+        <li>Cron: <strong>auto-rule-generator</strong> — on demand</li>
+        <li>Detecta nuevos patrones de fallo → genera regla nueva</li>
+        <li>Cron: <strong>execute-meta-rules</strong> 9am — ejecuta reglas auto=true</li>
+        <li>Edge Function: <span class="file">criterio-setup</span> — seed inicial de reglas</li>
+        <li>Riesgo: reglas auto-generadas sin revisión humana</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- JAVIERA W12 -->
+<div class="agent">
+  <div class="agent-top">
+    <div class="agent-avatar av-qa">J</div>
+    <div class="agent-info">
+      <h2>Javiera <span class="code">W12</span></h2>
+      <div class="module">El Chino — QA & Reconciliación</div>
+    </div>
+    <span class="agent-status st-warn">550+ registros qa_log</span>
+  </div>
+  <div class="areas-grid">
+    <div class="area">
+      <div class="area-num an-qa">1</div>
+      <h4>7 Tipos de Checks</h4>
+      <ul>
+        <li><strong>api-compare</strong> — Steve vs datos reales (Meta, Shopify, Klaviyo)</li>
+        <li><strong>token-health</strong> — tokens OAuth frescos y válidos</li>
+        <li><strong>performance</strong> — response times de endpoints</li>
+        <li><strong>functional</strong> — workflows end-to-end</li>
+        <li><strong>data-quality</strong> + <strong>security</strong> + <strong>visual</strong></li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-qa">2</div>
+      <h4>Patrullaje Continuo</h4>
+      <ul>
+        <li>Cron: <strong>chino-patrol</strong> cada 30min — corre TODOS los checks</li>
+        <li><strong>runner.ts</strong> — orquestador master</li>
+        <li>Checks por merchant: api_compare, token, data_quality, security</li>
+        <li>~800 checks al día</li>
+        <li>Tabla: <strong>chino_reports</strong> — resultado de cada check</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-qa">3</div>
+      <h4>Auto-Fix</h4>
+      <ul>
+        <li>Cron: <strong>chino-fixer</strong> cada 10min</li>
+        <li><strong>fixer.ts</strong> — genera fix con Claude, testea, aplica</li>
+        <li><strong>fix-generator.ts</strong> — instrucciones de fix</li>
+        <li><strong>instruction-handler.ts</strong> — ejecuta en plataforma live</li>
+        <li>Re-test automático después de aplicar fix</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-qa">4</div>
+      <h4>Reportes</h4>
+      <ul>
+        <li>Cron: <strong>chino-report</strong> 4×/día (0h, 6h, 12h, 18h)</li>
+        <li>Tabla: <strong>qa_log</strong> (550+ registros)</li>
+        <li><strong>whatsapp.ts</strong> — alertas críticas vía WA a admins</li>
+        <li>Resumen: failures, fixes aplicados, pendientes</li>
+        <li>Muchos registros sin revisar</li>
+      </ul>
+    </div>
+    <div class="area">
+      <div class="area-num an-qa">5</div>
+      <h4>Reconciliación & Nocturnos</h4>
+      <ul>
+        <li>Cron: <strong>reconciliation</strong> cada 6h �� datos consistentes entre tablas</li>
+        <li>Edge Function: <strong>juez-nocturno</strong> — golden question tests de noche</li>
+        <li>Edge Function: <strong>health-check</strong> (OJOS) — endpoints status</li>
+        <li>Detecta: discrepancias, datos huérfanos, tablas desincronizadas</li>
+        <li>Cobertura actual: 10 de 69 endpoints (14%)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- RESUMEN NUMÉRICO -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2 style="color:#ff6b35; margin: 50px 0 20px; font-size: 1.3em;">Resumen Numérico</h2>
+
+<table class="summary">
+<thead>
+  <tr>
+    <th>Agente</th>
+    <th>Rutas Backend</th>
+    <th>Edge Functions</th>
+    <th>Crons</th>
+    <th>Componentes Frontend</th>
+    <th>Tablas Principales</th>
+    <th>APIs Externas</th>
+  </tr>
+</thead>
+<tbody>
+  <tr><td>Felipe W2</td><td class="num">17</td><td class="num">2</td><td class="num">3</td><td class="num">~20</td><td class="num">6</td><td>Meta Graph API, exchangerate</td></tr>
+  <tr><td>Andrés W3</td><td class="num">2</td><td class="num">2</td><td class="num">0</td><td class="num">3</td><td class="num">2</td><td>Google Ads API v18</td></tr>
+  <tr><td>Rodrigo W0</td><td class="num">9</td><td class="num">8</td><td class="num">0</td><td class="num">9</td><td class="num">5</td><td>Klaviyo API</td></tr>
+  <tr><td>Valentina W1</td><td class="num">25</td><td class="num">3</td><td class="num">2</td><td class="num">~20</td><td class="num">11</td><td>Resend, Anthropic, Shopify</td></tr>
+  <tr><td>Tomás W7</td><td class="num">4</td><td class="num">4</td><td class="num">11</td><td class="num">2</td><td class="num">8</td><td>Anthropic, Firecrawl, Apify</td></tr>
+  <tr><td>Ignacio W17</td><td class="num">3</td><td class="num">0</td><td class="num">7</td><td class="num">2</td><td class="num">4</td><td>Resend, Twilio (alerts)</td></tr>
+  <tr><td>Paula W19</td><td class="num">14</td><td class="num">0</td><td class="num">7</td><td class="num">5</td><td class="num">14</td><td>Twilio, Resend, Anthropic</td></tr>
+  <tr><td>Valentín W18</td><td class="num">6</td><td class="num">5</td><td class="num">4</td><td class="num">3</td><td class="num">3</td><td>Anthropic, Replicate, Fal.ai</td></tr>
+  <tr><td>Diego W8</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">37</td><td>—</td></tr>
+  <tr><td>Sebastián W5</td><td class="num">0</td><td class="num">65</td><td class="num">45</td><td class="num">0</td><td class="num">—</td><td>GCP, Sentry</td></tr>
+  <tr><td>Camila W4</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">130+</td><td class="num">3</td><td>Vercel</td></tr>
+  <tr><td>Matías W13</td><td class="num">10+</td><td class="num">8</td><td class="num">0</td><td class="num">2</td><td class="num">4</td><td>Shopify REST + GraphQL</td></tr>
+  <tr><td>Isidora W6</td><td class="num">2</td><td class="num">2</td><td class="num">3</td><td class="num">1</td><td class="num">2</td><td>Anthropic (eval)</td></tr>
+  <tr><td>Javiera W12</td><td class="num">8</td><td class="num">2</td><td class="num">3</td><td class="num">0</td><td class="num">2</td><td>Meta, Shopify, Klaviyo, Anthropic</td></tr>
+</tbody>
+</table>
+
+<div class="footer">
+  Steve Ads — 5 Áreas por Agente · 3 abril 2026 · 14 agentes · 4 squads · Investigación línea por línea del codebase
+</div>
+
+</div>
+</body>
+</html>

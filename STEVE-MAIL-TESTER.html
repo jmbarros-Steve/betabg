@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Mail — Tester de Funciones</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root {
+    --bg: #09090b; --surface: #18181b; --surface2: #1e1e23; --surface3: #27272a;
+    --border: #2e2e33; --text: #e4e4e7; --muted: #71717a; --primary: #6366f1;
+    --primary-hover: #818cf8; --green: #22c55e; --green-bg: rgba(34,197,94,0.15);
+    --red: #ef4444; --red-bg: rgba(239,68,68,0.15); --orange: #f59e0b;
+    --orange-bg: rgba(245,158,11,0.15); --blue: #3b82f6; --blue-bg: rgba(59,130,246,0.15);
+    --cyan: #06b6d4; --pink: #ec4899;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height:1.5; }
+
+  /* Layout */
+  .app { display: flex; height: 100vh; }
+  .sidebar { width: 300px; min-width: 300px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .main { flex:1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Sidebar */
+  .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); }
+  .sidebar-header h1 { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .sidebar-header h1 span { color: var(--primary); }
+  .sidebar-search { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .sidebar-search input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.82rem; outline: none; }
+  .sidebar-search input:focus { border-color: var(--primary); }
+  .sidebar-nav { flex:1; overflow-y: auto; padding: 8px 0; }
+  .nav-group { margin-bottom: 4px; }
+  .nav-group-title { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); padding: 8px 16px 4px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+  .nav-group-title:hover { color: var(--text); }
+  .nav-group-title .count { background: var(--surface3); padding: 1px 6px; border-radius: 8px; font-size: 0.65rem; }
+  .nav-item { font-size: 0.8rem; padding: 6px 16px 6px 24px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.15s; border-left: 2px solid transparent; }
+  .nav-item:hover { background: var(--surface2); }
+  .nav-item.active { background: rgba(99,102,241,0.1); border-left-color: var(--primary); color: var(--primary-hover); }
+  .nav-item .method-tag { font-family: monospace; font-size: 0.65rem; font-weight: 700; padding: 1px 5px; border-radius: 3px; min-width: 32px; text-align: center; }
+  .method-POST { background: var(--green-bg); color: var(--green); }
+  .method-GET { background: var(--blue-bg); color: var(--blue); }
+  .nav-item .status-dot { width: 6px; height: 6px; border-radius: 50%; margin-left: auto; flex-shrink: 0; }
+  .dot-success { background: var(--green); }
+  .dot-error { background: var(--red); }
+  .dot-pending { background: var(--orange); }
+
+  /* Auth bar */
+  .auth-bar { padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; gap: 12px; }
+  .auth-status { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; }
+  .auth-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .auth-dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .auth-dot.offline { background: var(--red); }
+  .auth-bar input { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text); font-size: 0.8rem; outline: none; flex: 1; }
+  .auth-bar input:focus { border-color: var(--primary); }
+  .btn { padding: 6px 14px; border-radius: 6px; border: none; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-sm { padding: 4px 10px; font-size: 0.75rem; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+  .btn-danger { background: var(--red-bg); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+  .btn-success { background: var(--green-bg); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+
+  /* Content */
+  .content { flex:1; overflow-y: auto; padding: 24px 32px; }
+  .content-header { margin-bottom: 24px; }
+  .content-header h2 { font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .content-header .path { font-family: monospace; font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+  .content-header .desc { color: var(--muted); font-size: 0.9rem; margin-top: 8px; }
+
+  /* Test panel */
+  .test-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .panel-header { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; justify-content: space-between; background: var(--surface2); }
+  .panel-body { padding: 16px; }
+  .panel-body.scroll { max-height: 500px; overflow-y: auto; }
+
+  /* Form */
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 0.75rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; display: block; text-transform: uppercase; letter-spacing: 0.3px; }
+  .form-input, .form-select, .form-textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.85rem; outline: none; font-family: inherit; }
+  .form-textarea { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; resize: vertical; min-height: 120px; }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); }
+  .form-select { cursor: pointer; }
+  .form-hint { font-size: 0.7rem; color: var(--muted); margin-top: 3px; }
+  .form-row { display: flex; gap: 12px; }
+  .form-row > * { flex: 1; }
+
+  /* JSON output */
+  .json-output { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; max-height: 500px; overflow-y: auto; color: var(--text); }
+  .json-output .key { color: #93c5fd; }
+  .json-output .string { color: #86efac; }
+  .json-output .number { color: #fcd34d; }
+  .json-output .boolean { color: #f9a8d4; }
+  .json-output .null { color: var(--muted); }
+
+  /* Response meta */
+  .response-meta { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .response-badge { font-size: 0.75rem; padding: 3px 10px; border-radius: 12px; font-weight: 600; }
+  .status-2xx { background: var(--green-bg); color: var(--green); }
+  .status-4xx { background: var(--orange-bg); color: var(--orange); }
+  .status-5xx { background: var(--red-bg); color: var(--red); }
+
+  /* Actions toolbar */
+  .actions-bar { display: flex; gap: 8px; margin-top: 16px; align-items: center; }
+  .actions-bar .timer { font-size: 0.75rem; color: var(--muted); margin-left: auto; }
+
+  /* Welcome */
+  .welcome { text-align: center; padding: 80px 40px; }
+  .welcome h2 { font-size: 1.8rem; font-weight: 700; margin-bottom: 12px; }
+  .welcome p { color: var(--muted); max-width: 500px; margin: 0 auto 30px; }
+  .welcome .stats { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
+  .welcome .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 24px; text-align: center; }
+  .welcome .stat .num { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+  .welcome .stat .label { font-size: 0.75rem; color: var(--muted); }
+
+  /* Login overlay */
+  .login-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+  .login-box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 32px; width: 400px; max-width: 90%; }
+  .login-box h2 { font-size: 1.2rem; margin-bottom: 4px; }
+  .login-box .sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
+  .login-box .error { background: var(--red-bg); color: var(--red); padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; margin-bottom: 12px; }
+
+  /* Quick actions */
+  .quick-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .quick-action { font-size: 0.7rem; padding: 3px 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; color: var(--muted); transition: all 0.15s; }
+  .quick-action:hover { color: var(--text); border-color: var(--primary); }
+
+  /* Loading */
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* Run all */
+  .run-all-bar { padding: 8px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
+  .run-all-bar .progress { flex:1; height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+  .run-all-bar .progress-fill { height: 100%; background: var(--primary); transition: width 0.3s; border-radius: 2px; }
+
+  /* Tab system */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+  .tab { padding: 8px 16px; font-size: 0.8rem; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+  @media (max-width: 900px) {
+    .test-panel { grid-template-columns: 1fr; }
+    .sidebar { width: 240px; min-width: 240px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1><span>&#9993;</span> Steve Mail Tester</h1>
+    </div>
+    <div class="sidebar-search">
+      <input type="text" id="searchInput" placeholder="Buscar endpoint..." oninput="filterEndpoints(this.value)">
+    </div>
+    <nav class="sidebar-nav" id="sidebarNav"></nav>
+    <div class="run-all-bar">
+      <button class="btn btn-ghost btn-sm" onclick="runAllTests()" id="runAllBtn">&#9654; Run All</button>
+      <div class="progress"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      <span style="font-size:0.7rem;color:var(--muted)" id="runAllStatus"></span>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Auth bar -->
+    <div class="auth-bar">
+      <div class="auth-status">
+        <div class="auth-dot" id="authDot"></div>
+        <span id="authLabel">No autenticado</span>
+      </div>
+      <span style="flex:1"></span>
+      <span style="font-size:0.7rem;color:var(--muted)" id="userEmail"></span>
+      <button class="btn btn-sm btn-ghost" onclick="showLogin()" id="loginBtn">Login</button>
+      <button class="btn btn-sm btn-danger" onclick="logout()" id="logoutBtn" style="display:none">Logout</button>
+    </div>
+
+    <!-- Content -->
+    <div class="content" id="mainContent">
+      <div class="welcome">
+        <h2>&#128295; Steve Mail API Tester</h2>
+        <p>Selecciona un endpoint del sidebar para probar. Necesitas autenticarte primero con tu cuenta de Supabase.</p>
+        <div class="stats">
+          <div class="stat"><div class="num">46</div><div class="label">Endpoints</div></div>
+          <div class="stat"><div class="num">85+</div><div class="label">Acciones</div></div>
+          <div class="stat"><div class="num">15</div><div class="label">Tablas</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Login overlay -->
+<div class="login-overlay" id="loginOverlay" style="display:none">
+  <div class="login-box">
+    <h2>&#128274; Autenticación</h2>
+    <p class="sub">Inicia sesión con tu cuenta de Supabase para obtener un JWT.</p>
+    <div id="loginError" style="display:none" class="error"></div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" class="form-input" id="loginEmail" placeholder="tu@email.com">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input type="password" class="form-input" id="loginPassword" placeholder="********" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button class="btn btn-primary" onclick="doLogin()" id="loginSubmitBtn" style="flex:1">Iniciar Sesión</button>
+      <button class="btn btn-ghost" onclick="hideLogin()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== CONFIG =====================
+const SUPABASE_URL = 'https://zpswjccsxjtnhetkkqde.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpwc3dqY2NzeGp0bmhldGtrcWRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2MzM2NjgsImV4cCI6MjA4NzIwOTY2OH0.PRkFg5sdmu8kXdL9xtpZFREKgohF9cGrNjWVVwZ7IXw';
+const API_URL = 'https://steve-api-850416724643.us-central1.run.app';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let accessToken = null;
+let currentUser = null;
+let testResults = {};
+
+// ===================== ENDPOINTS =====================
+const ENDPOINTS = [
+  // --- Campañas ---
+  { group: 'Campañas', id: 'campaigns-list', name: 'Listar Campañas', method: 'POST', path: '/api/manage-email-campaigns',
+    defaultBody: { action: 'list' },
+    actions: [
+      { label: 'list', body: { action: 'list' } },
+      { label: 'create', body: { action: 'create', name: 'Test Campaign', subject: 'Hola {{ nombre }}', preview_text: 'Preview de prueba', campaign_type: 'promotional' } },
+      { label: 'get_client_brand', body: { action: 'get_client_brand' } },
+    ],
+    desc: 'CRUD completo de campañas: list, get, create, update, delete, send, schedule, cancel, get_client_brand' },
+
+  { group: 'Campañas', id: 'campaign-analytics', name: 'Analytics de Campañas', method: 'POST', path: '/api/email-campaign-analytics',
+    defaultBody: { action: 'overview', days: 30 },
+    actions: [
+      { label: 'overview', body: { action: 'overview', days: 30 } },
+      { label: 'timeline', body: { action: 'timeline', days: 30 } },
+      { label: 'deliverability', body: { action: 'deliverability_dashboard', days: 30 } },
+      { label: 'benchmarks', body: { action: 'industry_benchmarks', days: 30 } },
+    ],
+    desc: 'Analytics: overview, campaign-stats, timeline, click_heatmap, deliverability_dashboard, industry_benchmarks' },
+
+  { group: 'Campañas', id: 'ab-testing', name: 'A/B Testing', method: 'POST', path: '/api/email-ab-testing',
+    defaultBody: { action: 'get_test', campaign_id: '' },
+    actions: [
+      { label: 'get_test', body: { action: 'get_test', campaign_id: '' } },
+    ],
+    desc: 'A/B testing: create_test, get_test, get_results, delete_test' },
+
+  { group: 'Campañas', id: 'revenue-attribution', name: 'Revenue Attribution', method: 'POST', path: '/api/email-revenue-attribution',
+    defaultBody: { action: 'revenue_summary' },
+    actions: [
+      { label: 'revenue_summary', body: { action: 'revenue_summary' } },
+    ],
+    desc: 'Atribución de revenue: campaign_revenue, revenue_summary' },
+
+  // --- Contactos ---
+  { group: 'Contactos', id: 'sync-subscribers', name: 'Sync Subscribers', method: 'POST', path: '/api/sync-email-subscribers',
+    defaultBody: { action: 'stats' },
+    actions: [
+      { label: 'stats', body: { action: 'stats' } },
+      { label: 'add', body: { action: 'add', email: 'test@example.com', first_name: 'Test', last_name: 'User' } },
+    ],
+    desc: 'Sync de Shopify, add manual, update, delete, stats' },
+
+  { group: 'Contactos', id: 'query-subscribers', name: 'Query Subscribers', method: 'POST', path: '/api/query-email-subscribers',
+    defaultBody: { action: 'list', limit: 20, offset: 0 },
+    actions: [
+      { label: 'list', body: { action: 'list', limit: 20, offset: 0 } },
+      { label: 'segment', body: { action: 'segment', filters: [{ field: 'status', operator: 'equals', value: 'subscribed' }], count_only: true } },
+      { label: 'export', body: { action: 'export' } },
+    ],
+    desc: 'Query: list, segment, get, export con filtros y paginación' },
+
+  { group: 'Contactos', id: 'manage-lists', name: 'Listas y Segmentos', method: 'POST', path: '/api/manage-email-lists',
+    defaultBody: { action: 'list' },
+    actions: [
+      { label: 'list', body: { action: 'list' } },
+      { label: 'create static', body: { action: 'create', name: 'Lista Test', type: 'static', description: 'Lista de prueba' } },
+      { label: 'create segment', body: { action: 'create', name: 'Segment Test', type: 'segment', filters: [{ field: 'total_orders', operator: 'gte', value: 3 }] } },
+    ],
+    desc: 'CRUD listas: list, create, update, delete, add_members, remove_members, get_members' },
+
+  { group: 'Contactos', id: 'list-cleanup', name: 'List Cleanup / Sunset', method: 'POST', path: '/api/email-list-cleanup',
+    defaultBody: { action: 'preview', days: 90 },
+    actions: [
+      { label: 'preview', body: { action: 'preview', days: 90 } },
+      { label: 'stats', body: { action: 'stats' } },
+    ],
+    desc: 'Limpieza: detect/preview, sunset, reactivate, stats' },
+
+  // --- Automatizaciones ---
+  { group: 'Automatizaciones', id: 'manage-flows', name: 'Gestión de Flows', method: 'POST', path: '/api/manage-email-flows',
+    defaultBody: { action: 'list' },
+    actions: [
+      { label: 'list', body: { action: 'list' } },
+    ],
+    desc: 'CRUD flows automatizados: list, get, create, update, delete, activate, pause' },
+
+  // --- Formularios ---
+  { group: 'Formularios', id: 'signup-forms', name: 'Signup Forms', method: 'POST', path: '/api/email-signup-forms',
+    defaultBody: { action: 'list' },
+    actions: [
+      { label: 'list', body: { action: 'list' } },
+      { label: 'create', body: { action: 'create', name: 'Form Test', form_type: 'popup', design: { headline: 'Suscríbete', description: '10% descuento', button_text: 'Suscribir', button_color: '#6366f1' }, incentive_type: 'none' } },
+    ],
+    desc: 'CRUD forms: list, create, update, delete, activate, pause' },
+
+  // --- Dominio ---
+  { group: 'Dominio', id: 'verify-domain', name: 'Verificar Dominio', method: 'POST', path: '/api/verify-email-domain',
+    defaultBody: { action: 'list' },
+    actions: [
+      { label: 'list', body: { action: 'list' } },
+      { label: 'initiate', body: { action: 'initiate', domain: 'example.com' } },
+    ],
+    desc: 'Verificación: initiate, check, list, delete' },
+
+  // --- Templates ---
+  { group: 'Templates', id: 'email-templates', name: 'Templates Gallery', method: 'POST', path: '/api/email-templates',
+    defaultBody: { action: 'list' },
+    actions: [
+      { label: 'list', body: { action: 'list' } },
+      { label: 'list by category', body: { action: 'list', category: 'e-commerce' } },
+    ],
+    desc: 'Gallery: list, get, create, delete' },
+
+  { group: 'Templates', id: 'universal-blocks', name: 'Universal Blocks', method: 'POST', path: '/api/universal-blocks',
+    defaultBody: { action: 'list' },
+    actions: [
+      { label: 'list', body: { action: 'list' } },
+    ],
+    desc: 'Bloques reutilizables: list, save, update, delete, increment_usage' },
+
+  // --- AI ---
+  { group: 'AI', id: 'generate-content', name: 'Generar Contenido AI', method: 'POST', path: '/api/generate-steve-mail-content',
+    defaultBody: { action: 'generate_subjects', campaign_type: 'promotional', campaign_name: 'Promo Verano', custom_instructions: 'Tienda de ropa deportiva' },
+    actions: [
+      { label: 'generate_subjects', body: { action: 'generate_subjects', campaign_type: 'promotional', campaign_name: 'Promo Verano', custom_instructions: 'Tienda de ropa deportiva' } },
+      { label: 'generate_campaign_html', body: { action: 'generate_campaign_html', campaign_type: 'promotional', campaign_name: 'Promo Test', custom_instructions: 'Descuento 20% en toda la tienda' } },
+      { label: 'generate_flow_emails', body: { action: 'generate_flow_emails', flow_type: 'welcome' } },
+    ],
+    desc: 'AI Claude: generate_campaign_html, generate_flow_emails, generate_subjects' },
+
+  { group: 'AI', id: 'criterio-email', name: 'CRITERIO Quality Gate', method: 'POST', path: '/api/criterio-email',
+    defaultBody: { subject: 'Oferta especial para ti', preview_text: 'No te pierdas esta oportunidad única de ahorrar', html_content: '<html><body><h1>Hola</h1><p>Contenido de prueba</p><a href="https://tienda.com?utm_source=email">Ver oferta</a><p><a href="{{ unsubscribe_url }}">Desuscribirse</a></p></body></html>', send_hour: 10, segment_size: 500, segment_excludes_unsubscribed: true },
+    actions: [],
+    desc: 'Evaluación de calidad: 18 reglas en 4 categorías (subject, body, timing, segment)' },
+
+  { group: 'AI', id: 'smart-send-time', name: 'Smart Send Time', method: 'POST', path: '/api/email-smart-send-time',
+    defaultBody: { action: 'get_distribution' },
+    actions: [
+      { label: 'get_distribution', body: { action: 'get_distribution' } },
+      { label: 'get_settings', body: { action: 'get_settings' } },
+      { label: 'analyze', body: { action: 'analyze' } },
+    ],
+    desc: 'Optimización de hora: analyze, get_distribution, get_settings, update_settings' },
+
+  // --- Productos ---
+  { group: 'Productos', id: 'product-recommendations', name: 'Product Recommendations', method: 'POST', path: '/api/email-product-recommendations',
+    defaultBody: { action: 'list_products' },
+    actions: [
+      { label: 'list_products', body: { action: 'list_products' } },
+      { label: 'search_products', body: { action: 'search_products', query: 'camiseta' } },
+    ],
+    desc: 'Recomendaciones: list_products, search_products, generate, preview, clear_cache' },
+
+  { group: 'Productos', id: 'product-alerts', name: 'Product Alerts', method: 'POST', path: '/api/email-product-alerts',
+    defaultBody: { action: 'get_stats' },
+    actions: [
+      { label: 'get_stats', body: { action: 'get_stats' } },
+      { label: 'list', body: { action: 'list', limit: 20 } },
+    ],
+    desc: 'Alertas: subscribe (público), list, get_stats, delete, trigger_check' },
+
+  // --- Envío ---
+  { group: 'Envío', id: 'send-queue', name: 'Cola de Envío', method: 'POST', path: '/api/email-send-queue',
+    defaultBody: { action: 'status' },
+    actions: [
+      { label: 'status', body: { action: 'status' } },
+    ],
+    desc: 'Cola throttled: enqueue, process, status, cancel' },
+
+  { group: 'Envío', id: 'send-email', name: 'Send Email (test)', method: 'POST', path: '/api/send-email',
+    defaultBody: { to: '', subject: 'Test desde Steve Mail Tester', html: '<h1>Hola!</h1><p>Este es un email de prueba desde Steve Mail.</p>' },
+    actions: [],
+    desc: 'Enviar email individual de prueba via Resend' },
+
+  { group: 'Envío', id: 'upload-image', name: 'Upload Imagen', method: 'POST', path: '/api/upload-email-image',
+    defaultBody: { note: 'Este endpoint requiere multipart/form-data con un archivo de imagen' },
+    actions: [],
+    desc: 'Upload de imágenes para el editor de emails' },
+
+  // --- Tracking (públicos) ---
+  { group: 'Tracking', id: 'track-open', name: 'Open Tracking', method: 'GET', path: '/api/email-track/open',
+    defaultBody: null, params: { eid: '' },
+    actions: [],
+    desc: 'Tracking pixel: registra apertura de email (1x1 GIF)' },
+
+  { group: 'Tracking', id: 'track-click', name: 'Click Tracking', method: 'GET', path: '/api/email-track/click',
+    defaultBody: null, params: { eid: '', url: 'https://example.com' },
+    actions: [],
+    desc: 'Click redirect: registra click y redirige (302)' },
+
+  { group: 'Tracking', id: 'unsubscribe', name: 'Unsubscribe', method: 'GET', path: '/api/email-unsubscribe',
+    defaultBody: null, params: { token: '' },
+    actions: [],
+    desc: 'Unsubscribe con token HMAC-signed' },
+
+  // --- Webhooks ---
+  { group: 'Webhooks', id: 'ses-webhooks', name: 'SES Webhooks', method: 'POST', path: '/api/email-ses-webhooks',
+    defaultBody: { Type: 'Notification', Message: '{}' },
+    actions: [],
+    desc: 'Bounces/complaints de Amazon SES via SNS' },
+
+  { group: 'Webhooks', id: 'flow-webhooks', name: 'Flow Webhooks (Shopify)', method: 'POST', path: '/api/email-flow-webhooks',
+    defaultBody: { note: 'Requiere headers X-Shopify-Hmac-Sha256 y X-Shopify-Topic' },
+    actions: [],
+    desc: 'Triggers de flows desde Shopify: checkouts/create, customers/create, orders/create' },
+
+  // --- Widgets ---
+  { group: 'Widgets', id: 'form-widget', name: 'Form Widget JS', method: 'GET', path: '/api/email-form-widget',
+    defaultBody: null, params: { form_id: '' },
+    actions: [],
+    desc: 'JavaScript embebible para formularios de signup' },
+
+  { group: 'Widgets', id: 'alert-widget', name: 'Alert Widget JS', method: 'GET', path: '/api/email-product-alert-widget',
+    defaultBody: null, params: { client_id: '' },
+    actions: [],
+    desc: 'JavaScript embebible para alertas de producto' },
+
+  // --- Cron ---
+  { group: 'Cron', id: 'cron-winback', name: 'Cron Winback', method: 'POST', path: '/api/email-flow-cron-winback',
+    defaultBody: {}, isCron: true,
+    actions: [],
+    desc: 'Trigger cron para flows de winback' },
+
+  { group: 'Cron', id: 'cron-birthday', name: 'Cron Birthday', method: 'POST', path: '/api/email-flow-cron-birthday',
+    defaultBody: {}, isCron: true,
+    actions: [],
+    desc: 'Trigger cron para flows de cumpleaños' },
+
+  { group: 'Cron', id: 'cron-nurture', name: 'Cron Prospect Nurture', method: 'POST', path: '/api/cron/prospect-email-nurture',
+    defaultBody: {}, isCron: true,
+    actions: [],
+    desc: 'Nurture diario de prospectos (10am Chile)' },
+
+  // --- Klaviyo Legacy ---
+  { group: 'Klaviyo', id: 'klaviyo-push', name: 'Push a Klaviyo', method: 'POST', path: '/api/klaviyo-push-emails',
+    defaultBody: { plan_id: '' },
+    actions: [],
+    desc: 'Push de campañas a Klaviyo' },
+
+  { group: 'Klaviyo', id: 'import-templates', name: 'Import Templates Klaviyo', method: 'POST', path: '/api/import-klaviyo-templates',
+    defaultBody: {},
+    actions: [],
+    desc: 'Importar templates desde Klaviyo' },
+
+  { group: 'Klaviyo', id: 'parse-html', name: 'Parse Email HTML', method: 'POST', path: '/api/parse-email-html',
+    defaultBody: { html: '<table><tr><td><h1>Hola</h1></td></tr><tr><td><p>Texto de ejemplo</p></td></tr><tr><td><a href="#" style="background-color:#6366f1;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none">Comprar</a></td></tr></table>' },
+    actions: [],
+    desc: 'AI parser: convierte HTML raw a bloques JSON estructurados' },
+];
+
+// ===================== STATE =====================
+let activeEndpoint = null;
+
+// ===================== RENDER SIDEBAR =====================
+function renderSidebar(filter = '') {
+  const nav = document.getElementById('sidebarNav');
+  const groups = {};
+
+  ENDPOINTS.forEach(ep => {
+    if (filter && !ep.name.toLowerCase().includes(filter.toLowerCase()) && !ep.path.toLowerCase().includes(filter.toLowerCase()) && !ep.group.toLowerCase().includes(filter.toLowerCase())) return;
+    if (!groups[ep.group]) groups[ep.group] = [];
+    groups[ep.group].push(ep);
+  });
+
+  let html = '';
+  for (const [group, items] of Object.entries(groups)) {
+    html += `<div class="nav-group">
+      <div class="nav-group-title">${group} <span class="count">${items.length}</span></div>`;
+    items.forEach(ep => {
+      const result = testResults[ep.id];
+      const dotClass = result ? (result.ok ? 'dot-success' : 'dot-error') : '';
+      html += `<div class="nav-item ${activeEndpoint?.id === ep.id ? 'active' : ''}" onclick="selectEndpoint('${ep.id}')">
+        <span class="method-tag method-${ep.method}">${ep.method}</span>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ep.name}</span>
+        ${dotClass ? `<div class="status-dot ${dotClass}"></div>` : ''}
+      </div>`;
+    });
+    html += '</div>';
+  }
+  nav.innerHTML = html;
+}
+
+function filterEndpoints(val) { renderSidebar(val); }
+
+// ===================== SELECT ENDPOINT =====================
+function selectEndpoint(id) {
+  const ep = ENDPOINTS.find(e => e.id === id);
+  if (!ep) return;
+  activeEndpoint = ep;
+  renderSidebar(document.getElementById('searchInput').value);
+  renderEndpoint(ep);
+}
+
+function renderEndpoint(ep) {
+  const content = document.getElementById('mainContent');
+  const isGet = ep.method === 'GET';
+  const result = testResults[ep.id];
+
+  let paramsHtml = '';
+  if (isGet && ep.params) {
+    paramsHtml = Object.entries(ep.params).map(([k,v]) => `
+      <div class="form-group">
+        <label class="form-label">${k}</label>
+        <input type="text" class="form-input" id="param-${k}" value="${v}" placeholder="${k}">
+      </div>`).join('');
+  }
+
+  let quickActionsHtml = '';
+  if (ep.actions && ep.actions.length > 0) {
+    quickActionsHtml = '<div class="quick-actions">' +
+      ep.actions.map((a, i) => `<div class="quick-action" onclick="setAction('${ep.id}', ${i})">${a.label}</div>`).join('') +
+      '</div>';
+  }
+
+  content.innerHTML = `
+    <div class="content-header">
+      <h2><span class="method-tag method-${ep.method}" style="font-size:0.8rem;padding:4px 10px">${ep.method}</span> ${ep.name}</h2>
+      <div class="path">${API_URL}${ep.path}</div>
+      <div class="desc">${ep.desc}</div>
+    </div>
+
+    <div class="test-panel">
+      <div class="panel">
+        <div class="panel-header">
+          <span>&#128228; Request</span>
+          ${ep.isCron ? '<span style="font-size:0.7rem;color:var(--orange)">&#128274; Cron Secret</span>' : ''}
+        </div>
+        <div class="panel-body">
+          ${quickActionsHtml}
+          ${isGet ? paramsHtml : `
+            <div class="form-group">
+              <label class="form-label">Body (JSON)</label>
+              <textarea class="form-textarea" id="requestBody" rows="12">${JSON.stringify(ep.defaultBody || {}, null, 2)}</textarea>
+            </div>
+          `}
+          <div class="actions-bar">
+            <button class="btn btn-primary" onclick="executeTest('${ep.id}')" id="execBtn-${ep.id}">
+              &#9654; Ejecutar
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="copyAsCurl('${ep.id}')">cURL</button>
+            ${!isGet ? `<button class="btn btn-ghost btn-sm" onclick="formatJson()">Format</button>` : ''}
+            <span class="timer" id="timer-${ep.id}">${result ? result.time + 'ms' : ''}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span>&#128229; Response</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            ${result ? `<span class="response-badge ${result.status < 300 ? 'status-2xx' : result.status < 500 ? 'status-4xx' : 'status-5xx'}">${result.status}</span>` : ''}
+            ${result ? `<button class="btn btn-ghost btn-sm" onclick="copyResponse()">Copy</button>` : ''}
+          </div>
+        </div>
+        <div class="panel-body scroll">
+          <div id="responseOutput-${ep.id}">
+            ${result ? formatJsonHtml(result.data) : '<div style="color:var(--muted);text-align:center;padding:40px">Presiona Ejecutar para probar este endpoint</div>'}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ===================== EXECUTE TEST =====================
+async function executeTest(id) {
+  const ep = ENDPOINTS.find(e => e.id === id);
+  if (!ep) return;
+
+  const btn = document.getElementById(`execBtn-${id}`);
+  const timerEl = document.getElementById(`timer-${id}`);
+  const outputEl = document.getElementById(`responseOutput-${id}`);
+
+  if (btn) btn.innerHTML = '<span class="spinner"></span> Ejecutando...';
+  if (btn) btn.disabled = true;
+  if (outputEl) outputEl.innerHTML = '<div style="text-align:center;padding:40px"><span class="spinner"></span><br><br><span style="color:var(--muted);font-size:0.8rem">Esperando respuesta...</span></div>';
+
+  const start = performance.now();
+
+  try {
+    let response;
+
+    if (ep.method === 'GET') {
+      let url = API_URL + ep.path;
+      if (ep.params) {
+        const params = {};
+        Object.keys(ep.params).forEach(k => {
+          const el = document.getElementById(`param-${k}`);
+          if (el && el.value) params[k] = el.value;
+        });
+        const qs = new URLSearchParams(params).toString();
+        if (qs) url += '?' + qs;
+      }
+      const headers = {};
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+      response = await fetch(url, { headers });
+    } else {
+      let body = {};
+      const bodyEl = document.getElementById('requestBody');
+      if (bodyEl) {
+        try { body = JSON.parse(bodyEl.value); } catch(e) { body = { _parse_error: bodyEl.value }; }
+      }
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (ep.isCron) {
+        headers['X-Cron-Secret'] = 'steve-cron-secret-2024';
+      } else if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+
+      response = await fetch(API_URL + ep.path, { method: 'POST', headers, body: JSON.stringify(body) });
+    }
+
+    const elapsed = Math.round(performance.now() - start);
+
+    let data;
+    const ct = response.headers.get('content-type') || '';
+    if (ct.includes('json')) {
+      data = await response.json();
+    } else if (ct.includes('javascript') || ct.includes('text')) {
+      data = await response.text();
+    } else {
+      data = `[Binary response: ${ct}, ${response.headers.get('content-length') || '?'} bytes]`;
+    }
+
+    testResults[id] = { ok: response.ok, status: response.status, data, time: elapsed };
+
+    if (timerEl) timerEl.textContent = elapsed + 'ms';
+    if (outputEl) {
+      const statusClass = response.status < 300 ? 'status-2xx' : response.status < 500 ? 'status-4xx' : 'status-5xx';
+      outputEl.innerHTML = `
+        <div class="response-meta">
+          <span class="response-badge ${statusClass}">${response.status} ${response.statusText}</span>
+          <span style="font-size:0.75rem;color:var(--muted)">${elapsed}ms</span>
+          <span style="font-size:0.75rem;color:var(--muted)">${ct}</span>
+        </div>
+        ${typeof data === 'string' ? `<div class="json-output">${escapeHtml(data)}</div>` : `<div class="json-output">${formatJsonHtml(data)}</div>`}
+      `;
+    }
+  } catch (err) {
+    const elapsed = Math.round(performance.now() - start);
+    testResults[id] = { ok: false, status: 0, data: { error: err.message }, time: elapsed };
+    if (outputEl) outputEl.innerHTML = `
+      <div class="response-meta"><span class="response-badge status-5xx">ERROR</span><span style="font-size:0.75rem;color:var(--muted)">${elapsed}ms</span></div>
+      <div class="json-output" style="color:var(--red)">${escapeHtml(err.message)}\n\n${escapeHtml(err.stack || '')}</div>`;
+  }
+
+  if (btn) { btn.innerHTML = '&#9654; Ejecutar'; btn.disabled = false; }
+  renderSidebar(document.getElementById('searchInput').value);
+}
+
+// ===================== SET ACTION =====================
+function setAction(epId, actionIdx) {
+  const ep = ENDPOINTS.find(e => e.id === epId);
+  if (!ep || !ep.actions[actionIdx]) return;
+  const bodyEl = document.getElementById('requestBody');
+  if (bodyEl) bodyEl.value = JSON.stringify(ep.actions[actionIdx].body, null, 2);
+}
+
+// ===================== FORMAT JSON =====================
+function formatJson() {
+  const el = document.getElementById('requestBody');
+  if (!el) return;
+  try {
+    const parsed = JSON.parse(el.value);
+    el.value = JSON.stringify(parsed, null, 2);
+  } catch(e) {}
+}
+
+function formatJsonHtml(obj) {
+  if (typeof obj !== 'object' || obj === null) return escapeHtml(String(obj));
+  const json = JSON.stringify(obj, null, 2);
+  return json.replace(/(".*?")(\s*:\s*)/g, '<span class="key">$1</span>$2')
+    .replace(/:\s*(".*?")/g, ': <span class="string">$1</span>')
+    .replace(/:\s*(\d+\.?\d*)/g, ': <span class="number">$1</span>')
+    .replace(/:\s*(true|false)/g, ': <span class="boolean">$1</span>')
+    .replace(/:\s*(null)/g, ': <span class="null">$1</span>');
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ===================== COPY =====================
+function copyAsCurl(id) {
+  const ep = ENDPOINTS.find(e => e.id === id);
+  if (!ep) return;
+  let curl = `curl -X ${ep.method} '${API_URL}${ep.path}'`;
+  if (ep.method === 'POST') {
+    curl += ` \\\n  -H 'Content-Type: application/json'`;
+    if (ep.isCron) {
+      curl += ` \\\n  -H 'X-Cron-Secret: steve-cron-secret-2024'`;
+    } else if (accessToken) {
+      curl += ` \\\n  -H 'Authorization: Bearer ${accessToken}'`;
+    }
+    const bodyEl = document.getElementById('requestBody');
+    if (bodyEl) curl += ` \\\n  -d '${bodyEl.value.replace(/\n/g,'')}'`;
+  }
+  navigator.clipboard.writeText(curl);
+  showToast('cURL copiado al clipboard');
+}
+
+function copyResponse() {
+  if (!activeEndpoint || !testResults[activeEndpoint.id]) return;
+  const data = testResults[activeEndpoint.id].data;
+  navigator.clipboard.writeText(typeof data === 'string' ? data : JSON.stringify(data, null, 2));
+  showToast('Response copiado al clipboard');
+}
+
+function showToast(msg) {
+  const el = document.createElement('div');
+  el.textContent = msg;
+  el.style.cssText = 'position:fixed;bottom:20px;right:20px;background:var(--primary);color:#fff;padding:10px 20px;border-radius:8px;font-size:0.85rem;z-index:9999;animation:fadeIn 0.2s';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
+
+// ===================== RUN ALL =====================
+async function runAllTests() {
+  const btn = document.getElementById('runAllBtn');
+  const fill = document.getElementById('progressFill');
+  const status = document.getElementById('runAllStatus');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Running...';
+
+  const testable = ENDPOINTS.filter(ep => ep.method === 'POST' && !ep.isCron && ep.defaultBody);
+  let done = 0;
+
+  for (const ep of testable) {
+    status.textContent = `${done}/${testable.length}`;
+    fill.style.width = ((done / testable.length) * 100) + '%';
+
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+      const start = performance.now();
+      const res = await fetch(API_URL + ep.path, { method: 'POST', headers, body: JSON.stringify(ep.defaultBody) });
+      const elapsed = Math.round(performance.now() - start);
+      let data;
+      try { data = await res.json(); } catch { data = await res.text(); }
+      testResults[ep.id] = { ok: res.ok, status: res.status, data, time: elapsed };
+    } catch(err) {
+      testResults[ep.id] = { ok: false, status: 0, data: { error: err.message }, time: 0 };
+    }
+    done++;
+  }
+
+  fill.style.width = '100%';
+  const passed = Object.values(testResults).filter(r => r.ok).length;
+  const failed = Object.values(testResults).filter(r => !r.ok).length;
+  status.textContent = `✓${passed} ✗${failed}`;
+  btn.disabled = false;
+  btn.textContent = '▶ Run All';
+  renderSidebar(document.getElementById('searchInput').value);
+
+  if (activeEndpoint) renderEndpoint(activeEndpoint);
+}
+
+// ===================== AUTH =====================
+function showLogin() { document.getElementById('loginOverlay').style.display = 'flex'; document.getElementById('loginEmail').focus(); }
+function hideLogin() { document.getElementById('loginOverlay').style.display = 'none'; }
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginSubmitBtn');
+
+  errEl.style.display = 'none';
+  btn.textContent = 'Autenticando...';
+  btn.disabled = true;
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+    btn.textContent = 'Iniciar Sesión';
+    btn.disabled = false;
+    return;
+  }
+
+  accessToken = data.session.access_token;
+  currentUser = data.user;
+  updateAuthUI(true);
+  hideLogin();
+  btn.textContent = 'Iniciar Sesión';
+  btn.disabled = false;
+}
+
+async function logout() {
+  await supabase.auth.signOut();
+  accessToken = null;
+  currentUser = null;
+  updateAuthUI(false);
+}
+
+function updateAuthUI(isLoggedIn) {
+  const dot = document.getElementById('authDot');
+  const label = document.getElementById('authLabel');
+  const emailSpan = document.getElementById('userEmail');
+  const loginBtn = document.getElementById('loginBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+
+  if (isLoggedIn) {
+    dot.className = 'auth-dot online';
+    label.textContent = 'Autenticado';
+    emailSpan.textContent = currentUser?.email || '';
+    loginBtn.style.display = 'none';
+    logoutBtn.style.display = '';
+  } else {
+    dot.className = 'auth-dot offline';
+    label.textContent = 'No autenticado';
+    emailSpan.textContent = '';
+    loginBtn.style.display = '';
+    logoutBtn.style.display = 'none';
+  }
+}
+
+// ===================== INIT =====================
+async function init() {
+  // Check existing session
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    accessToken = session.access_token;
+    currentUser = session.user;
+    updateAuthUI(true);
+  } else {
+    updateAuthUI(false);
+  }
+
+  // Auto-refresh token
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      accessToken = session.access_token;
+      currentUser = session.user;
+      updateAuthUI(true);
+    } else {
+      accessToken = null;
+      currentUser = null;
+      updateAuthUI(false);
+    }
+  });
+
+  renderSidebar();
+}
+
+init();
+</script>
+</body>
+</html>

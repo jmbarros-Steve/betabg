@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El Chino — Data Integrity (la verdad)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0f; color: #e0e0e0; padding: 20px; max-width: 1200px; margin: 0 auto; }
+  h1 { text-align: center; font-size: 2em; margin: 30px 0 8px; color: #fff; }
+  .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+
+  .stats { display: flex; justify-content: center; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
+  .stat { background: #151520; border: 1px solid #2a2a3a; border-radius: 12px; padding: 16px 24px; text-align: center; }
+  .stat .num { font-size: 2.2em; font-weight: 700; }
+  .stat .label { color: #888; font-size: 0.8em; margin-top: 2px; }
+  .stat.green .num { color: #22c55e; }
+  .stat.red .num { color: #ef4444; }
+  .stat.yellow .num { color: #f59e0b; }
+  .stat.purple .num { color: #a78bfa; }
+
+  .card {
+    background: #111118; border: 1px solid #1e1e2e; border-radius: 12px;
+    margin-bottom: 16px; overflow: hidden;
+  }
+  .card-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px; background: #151520; border-bottom: 1px solid #1e1e2e;
+  }
+  .card-num { font-size: 1.4em; font-weight: 700; color: #a78bfa; min-width: 40px; }
+  .card-desc { font-size: 1em; color: #fff; flex: 1; }
+  .card-sev {
+    padding: 3px 10px; border-radius: 6px; font-size: 0.72em;
+    font-weight: 600; text-transform: uppercase;
+  }
+  .card-sev.critical { background: #7f1d1d; color: #fca5a5; }
+  .card-sev.high { background: #78350f; color: #fcd34d; }
+  .card-sev.medium { background: #1e3a5f; color: #93c5fd; }
+  .card-sev.low { background: #1a2e1a; color: #86efac; }
+
+  .card-body { padding: 14px 18px; }
+  .card-body table { width: 100%; border-collapse: collapse; }
+  .card-body td { padding: 8px 0; vertical-align: top; font-size: 0.9em; border-bottom: 1px solid #1a1a28; }
+  .card-body td:first-child { color: #888; width: 140px; font-size: 0.8em; text-transform: uppercase; }
+  .card-body tr:last-child td { border-bottom: none; }
+
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 8px;
+    font-size: 0.78em; font-weight: 600;
+  }
+  .badge.ok { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+  .badge.wrong { background: #450a0a; color: #f87171; border: 1px solid #991b1b; }
+  .badge.missing { background: #451a03; color: #fbbf24; border: 1px solid #92400e; }
+  .badge.change { background: #1e1b4b; color: #a5b4fc; border: 1px solid #3730a3; }
+
+  .pass { color: #4ade80; }
+  .fail { color: #f87171; }
+  .plat { color: #888; font-size: 0.8em; }
+
+  .section-title {
+    font-size: 1.3em; font-weight: 600; color: #fff;
+    padding: 20px 0 10px; margin-top: 20px;
+    border-bottom: 1px solid #2a2a3a; margin-bottom: 16px;
+  }
+  .section-icon { margin-right: 8px; }
+</style>
+</head>
+<body>
+
+<h1>El Chino — Data Integrity</h1>
+<p class="subtitle">29 checks en la DB vs lo que el código hace hoy vs lo que el documento dice</p>
+
+<div class="stats">
+  <div class="stat purple"><div class="num">29</div><div class="label">Total en DB</div></div>
+  <div class="stat green"><div class="num">0</div><div class="label">Bien implementados</div></div>
+  <div class="stat red"><div class="num">5</div><div class="label">Código hace otra cosa</div></div>
+  <div class="stat yellow"><div class="num">24</div><div class="label">Sin código específico</div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-title"><span class="section-icon">🔴</span> Código hace algo DISTINTO a lo que dice la DB (5 checks)</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#15</span>
+  <span class="card-desc">No hay productos en Supabase que no existen en Shopify</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>DB dice</td><td>Comparar lista de productos en Supabase vs Shopify API. Si Steve tiene un producto que Shopify ya no tiene → FAIL</td></tr>
+  <tr><td>Docx dice</td><td>"Revenue no negativo, campos required no null" — <b>no coincide con DB</b></td></tr>
+  <tr><td>Código hace</td><td><span class="badge wrong">MAL</span> Valida revenue no negativo y nulls en <code>platform_metrics</code>. No tiene nada que ver con productos fantasma.</td></tr>
+  <tr><td>PASS real</td><td class="pass">Todos los productos en Supabase existen en Shopify API</td></tr>
+  <tr><td>FAIL real</td><td class="fail">Steve muestra productos que Shopify ya borró</td></tr>
+  <tr><td>Cómo arreglar</td><td>Query productos de Supabase → para cada uno, verificar que existe en Shopify API. Necesita token Shopify (mover a <code>api_compare</code> o pasar token a data_quality).</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#16</span>
+  <span class="card-desc">No hay productos en Shopify que faltan en Supabase</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>DB dice</td><td>Comparar lista de productos en Shopify API vs Supabase. Si Shopify tiene un producto que Steve no tiene → FAIL</td></tr>
+  <tr><td>Docx dice</td><td>"Clicks menor que impressions, spend no negativo" — <b>no coincide con DB</b></td></tr>
+  <tr><td>Código hace</td><td><span class="badge wrong">MAL</span> Valida clicks &lt; impressions en <code>campaign_metrics</code>. No tiene nada que ver con sync de productos.</td></tr>
+  <tr><td>PASS real</td><td class="pass">Todos los productos de Shopify están en Steve</td></tr>
+  <tr><td>FAIL real</td><td class="fail">Shopify tiene productos que Steve no sincronizó</td></tr>
+  <tr><td>Cómo arreglar</td><td>Shopify API products count vs Supabase count. Si difieren → listar cuáles faltan. Mismo caso que #15, necesita token.</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#18</span>
+  <span class="card-desc">Todas las imágenes de productos cargan (no 404)</span>
+  <span class="card-sev low">low</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>DB dice</td><td>Tomar sample de 10 productos, hacer fetch HEAD a cada image_url. Si alguna da 404 → FAIL</td></tr>
+  <tr><td>Docx dice</td><td>Lo mismo — fetch HEAD a URLs de imágenes ✅</td></tr>
+  <tr><td>Código hace</td><td><span class="badge wrong">MAL</span> Busca productos activos con precio=0 y títulos vacíos en <code>shopify_products</code>. No verifica imágenes.</td></tr>
+  <tr><td>PASS real</td><td class="pass">10 imágenes random cargan correctamente (HTTP 200)</td></tr>
+  <tr><td>FAIL real</td><td class="fail">Alguna imagen da 404 → merchant ve imagen rota</td></tr>
+  <tr><td>Cómo arreglar</td><td>SELECT image_url random LIMIT 10 → fetch HEAD cada URL → si alguna != 200 → FAIL con el producto afectado</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#19</span>
+  <span class="card-desc">Revenue de hoy > 0 si merchant normalmente vende</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>DB dice</td><td>Si el merchant promedia más de 3 orders/día en 30d, y hoy revenue = 0, el sync probablemente se rompió</td></tr>
+  <tr><td>Docx dice</td><td>Lo mismo — promedio 30d vs hoy ✅</td></tr>
+  <tr><td>Código hace</td><td><span class="badge wrong">MAL</span> Busca fechas futuras y open_rate &gt; 100% en <code>email_events</code>. No mira revenue ni orders.</td></tr>
+  <tr><td>PASS real</td><td class="pass">Revenue de hoy > 0 (o merchant no vende normalmente → SKIP)</td></tr>
+  <tr><td>FAIL real</td><td class="fail">Merchant vende $500k diarios y hoy marca $0 → sync muerto</td></tr>
+  <tr><td>Config DB</td><td><code>min_daily_avg: 3</code> — si promedio &lt; 3 orders/día, skip</td></tr>
+  <tr><td>Cómo arreglar</td><td>Promedio revenue 30d → si promedio > umbral y hoy = 0 → FAIL. Si promedio bajo → SKIP.</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#20</span>
+  <span class="card-desc">Fecha del order más reciente es de hoy</span>
+  <span class="card-sev high">high</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>DB dice</td><td>MAX(created_at) de shopify_orders no puede ser de hace más de 24 horas si el merchant vende regularmente</td></tr>
+  <tr><td>Docx dice</td><td>Lo mismo — MAX(created_at) &lt; 24h ✅</td></tr>
+  <tr><td>Código hace</td><td><span class="badge wrong">MAL</span> Busca emails vacíos, names vacíos y duplicados en tabla <code>clients</code>. No mira orders.</td></tr>
+  <tr><td>PASS real</td><td class="pass">Último order es de hoy o de ayer (menos de 24h)</td></tr>
+  <tr><td>FAIL real</td><td class="fail">Último order es de hace 3 días → sync de Shopify está muerto</td></tr>
+  <tr><td>Config DB</td><td><code>max_hours_old: 24</code></td></tr>
+  <tr><td>Cómo arreglar</td><td>SELECT MAX(created_at) FROM shopify_orders WHERE client_id = X. Si &gt; 24h y merchant vende normalmente → FAIL.</td></tr>
+</table></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-title"><span class="section-icon">🟡</span> Sin código específico — caen en fallback genérico (24 checks)</div>
+
+<p style="color:#888; margin-bottom: 16px; font-size: 0.9em;">Estos checks existen en la DB pero el código no tiene lógica para ellos. Caen en un fallback que solo cuenta campos null — no hace lo que la descripción dice.</p>
+
+<!-- CHECKS 1-50 sin código -->
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#7</span>
+  <span class="card-desc">No hay conexiones duplicadas por merchant+plataforma</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx dice</td><td>GROUP BY client_id, platform HAVING count(*) > 1. Si 0 filas → PASS. <b>Docx dice que ya funciona.</b></td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span> — cuenta nulls, no busca duplicados</td></tr>
+  <tr><td>PASS</td><td class="pass">0 conexiones duplicadas</td></tr>
+  <tr><td>FAIL</td><td class="fail">Mismo merchant tiene 2+ conexiones de la misma plataforma</td></tr>
+  <tr><td>Dificultad</td><td>Fácil — un query SQL</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#10</span>
+  <span class="card-desc">Ninguna conexión lleva > 24hrs sin sync exitoso</span>
+  <span class="card-sev high">high</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx dice</td><td>WHERE last_synced_at &lt; now() - 24h AND active = true. Docx dice que funciona si existe la columna.</td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>Config DB</td><td><code>max_hours: 24</code></td></tr>
+  <tr><td>PASS</td><td class="pass">Todas las conexiones sincronizaron en las últimas 24h</td></tr>
+  <tr><td>FAIL</td><td class="fail">Hay conexiones sin sync reciente → merchant ve datos viejos</td></tr>
+  <tr><td>Dificultad</td><td>Fácil — un query, verificar que columna last_synced_at exista</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#29</span>
+  <span class="card-desc">No hay campañas en Meta que no aparecen en Steve</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx dice</td><td>GET campañas de Meta API → comparar IDs con Supabase → si Meta tiene alguna que Steve no tiene → FAIL</td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Todas las campañas de Meta están en Steve</td></tr>
+  <tr><td>FAIL</td><td class="fail">Meta tiene campañas que Steve no sincronizó</td></tr>
+  <tr><td>Dificultad</td><td>Media — necesita llamar Meta API + comparar listas de IDs. Necesita token.</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#30</span>
+  <span class="card-desc">No hay campañas en Steve que no existen en Meta</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx dice</td><td>Para cada campaña en Supabase → GET de Meta → si Meta devuelve 404 → campaña fantasma → FAIL</td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Todas las campañas de Steve existen en Meta</td></tr>
+  <tr><td>FAIL</td><td class="fail">Steve muestra campañas que ya no existen en Meta</td></tr>
+  <tr><td>Dificultad</td><td>Media — mismo patrón que #29 pero al revés. Necesita token.</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#37</span>
+  <span class="card-desc">No hay campañas en Klaviyo que Steve no muestra</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx dice</td><td>GET campañas de Klaviyo API → comparar IDs con Supabase → si Klaviyo tiene alguna que Steve no tiene → FAIL</td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Todas las campañas de Klaviyo están en Steve</td></tr>
+  <tr><td>FAIL</td><td class="fail">Klaviyo tiene campañas que Steve no sincronizó</td></tr>
+  <tr><td>Dificultad</td><td>Media — mismo patrón que #29 pero para Klaviyo. Necesita API key.</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#38</span>
+  <span class="card-desc">Bounce rate < 1%</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>DB dice</td><td>Bounce rate &lt; 1% — juzga la calidad del merchant</td></tr>
+  <tr><td>Docx dice</td><td><span class="badge change">CAMBIO</span> Debería ser <code>api_compare</code>: bounce rate Steve = bounce rate Klaviyo. No juzgar al merchant, verificar que Steve muestre el dato correcto.</td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>Config DB</td><td><code>max_bounce: 0.01</code></td></tr>
+  <tr><td>Decisión</td><td>¿Mantener como data_quality (bounce &lt; 1%) o cambiar a api_compare (Steve = Klaviyo)?</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#39</span>
+  <span class="card-desc">Spam rate < 0.1%</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>DB dice</td><td>Spam rate &lt; 0.1% — juzga la calidad del merchant</td></tr>
+  <tr><td>Docx dice</td><td><span class="badge change">CAMBIO</span> Debería ser <code>api_compare</code>: spam rate Steve = spam rate Klaviyo.</td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>Config DB</td><td><code>max_spam: 0.001</code></td></tr>
+  <tr><td>Decisión</td><td>Mismo dilema que #38</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#40</span>
+  <span class="card-desc">Deliverability: SPF + DKIM verificados</span>
+  <span class="card-sev high">high</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx dice</td><td>DNS lookup: dig TXT steve.cl para SPF, dig TXT default._domainkey.steve.cl para DKIM. Si ambos existen → PASS.</td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">SPF y DKIM existen en DNS</td></tr>
+  <tr><td>FAIL</td><td class="fail">Falta SPF o DKIM → emails caen en spam</td></tr>
+  <tr><td>Dificultad</td><td>Fácil — DNS lookup público, no necesita token</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#43</span>
+  <span class="card-desc">Steve Chat responde en español, no inglés</span>
+  <span class="card-sev high">high</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx dice</td><td>3 preguntas hardcodeadas → POST steve-chat → Haiku evalúa idioma → si alguna en inglés → FAIL</td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Las 3 respuestas son en español</td></tr>
+  <tr><td>FAIL</td><td class="fail">Steve responde en inglés</td></tr>
+  <tr><td>Dificultad</td><td>Media — necesita POST a steve-chat + evaluación con Haiku</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#49</span>
+  <span class="card-desc">Brief generado menciona datos reales del merchant</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx dice</td><td>Generar brief → Haiku extrae números mencionados → comparar con datos reales de Supabase → si difiere &gt; 20% → FAIL</td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Brief menciona datos que coinciden con la realidad</td></tr>
+  <tr><td>FAIL</td><td class="fail">Brief dice "500 productos" pero hay 47</td></tr>
+  <tr><td>Dificultad</td><td>Alta — generar brief + Haiku extrae + comparar con DB</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#50</span>
+  <span class="card-desc">Resultados de scraping tienen datos de 2025-2026</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx dice</td><td>Dos sub-checks: (1) count registros con year &lt; 2025 → FAIL. (2) Sample 3 → Haiku evalúa relevancia.</td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Datos recientes y relevantes para e-commerce</td></tr>
+  <tr><td>FAIL</td><td class="fail">Datos viejos (2023) o contenido basura</td></tr>
+  <tr><td>Dificultad</td><td>Fácil el de fecha, Media el de calidad (necesita Haiku)</td></tr>
+</table></div>
+</div>
+
+<!-- CHECKS 51-100 sin código (no cubiertos por el docx) -->
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#52</span>
+  <span class="card-desc">Klaviyo: open rate promedio 7d > 15%</span>
+  <span class="card-sev high">high</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx</td><td><span class="plat">No cubierto en documento</span></td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Open rate promedio &gt; 15% en últimos 7 días</td></tr>
+  <tr><td>FAIL</td><td class="fail">Open rate bajo 15% → emails no se están abriendo</td></tr>
+  <tr><td>Dificultad</td><td>Fácil — query platform_metrics con metric_type = open_rate</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#53</span>
+  <span class="card-desc">Klaviyo: no hay flows con 0 emails (flows vacíos)</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx</td><td><span class="plat">No cubierto en documento</span></td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Todos los flows tienen al menos 1 email</td></tr>
+  <tr><td>FAIL</td><td class="fail">Hay flows vacíos → desperdicio</td></tr>
+  <tr><td>Dificultad</td><td>Media — necesita Klaviyo Flows API</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#54</span>
+  <span class="card-desc">Klaviyo: bounce rate < 5% en últimos 30 días</span>
+  <span class="card-sev high">high</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx</td><td><span class="plat">No cubierto en documento</span></td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Bounce rate &lt; 5%</td></tr>
+  <tr><td>FAIL</td><td class="fail">Bounce rate alto → daña reputación del dominio</td></tr>
+  <tr><td>Nota</td><td>Parecido a #38 pero con umbral diferente (5% vs 1%) y ventana de 30d</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#55</span>
+  <span class="card-desc">Klaviyo: unsubscribe rate < 1% en último envío masivo</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx</td><td><span class="plat">No cubierto en documento</span></td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Unsubscribe rate &lt; 1% en último envío</td></tr>
+  <tr><td>FAIL</td><td class="fail">Mucha gente se desuscribió → algo anda mal</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#57</span>
+  <span class="card-desc">Klaviyo: templates tienen subject y body no vacíos</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx</td><td><span class="plat">No cubierto en documento</span></td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Todos los templates tienen subject + body</td></tr>
+  <tr><td>FAIL</td><td class="fail">Hay templates sin subject o sin body</td></tr>
+  <tr><td>Dificultad</td><td>Fácil — query a tabla de templates</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#58</span>
+  <span class="card-desc">Klaviyo: last sync < 24 horas para merchants activos</span>
+  <span class="card-sev high">high</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx</td><td><span class="plat">No cubierto en documento</span></td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Todos los merchants Klaviyo sincronizaron &lt; 24h</td></tr>
+  <tr><td>FAIL</td><td class="fail">Hay merchants Klaviyo sin sync reciente</td></tr>
+  <tr><td>Nota</td><td>Parecido a #10 pero específico para Klaviyo</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#61</span>
+  <span class="card-desc">SteveMail: email_campaigns tiene registros para merchants activos</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx</td><td><span class="plat">No cubierto en documento</span></td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Hay registros en email_campaigns</td></tr>
+  <tr><td>FAIL</td><td class="fail">Tabla vacía → SteveMail no está funcionando</td></tr>
+  <tr><td>Dificultad</td><td>Fácil — count > 0</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#67</span>
+  <span class="card-desc">SteveMail: gallery tiene al menos 5 templates sistema</span>
+  <span class="card-sev low">low</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx</td><td><span class="plat">No cubierto en documento</span></td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">5+ templates sistema disponibles</td></tr>
+  <tr><td>FAIL</td><td class="fail">Menos de 5 → gallery vacía para el merchant</td></tr>
+  <tr><td>Dificultad</td><td>Fácil — count WHERE is_system = true >= 5</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#70</span>
+  <span class="card-desc">SteveMail: dominio verificado para al menos 1 merchant</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx</td><td><span class="plat">No cubierto en documento</span></td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Al menos 1 dominio está verificado</td></tr>
+  <tr><td>FAIL</td><td class="fail">Ningún dominio verificado → emails van a spam</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#72</span>
+  <span class="card-desc">Steve Chat: historial se guarda en wa_messages</span>
+  <span class="card-sev high">high</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx</td><td><span class="plat">No cubierto en documento</span></td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Hay mensajes recientes en wa_messages</td></tr>
+  <tr><td>FAIL</td><td class="fail">No se guardan conversaciones → se pierde historial</td></tr>
+  <tr><td>Dificultad</td><td>Fácil — count WHERE created_at > now() - 24h</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#73</span>
+  <span class="card-desc">Steve Chat: no hay mensajes vacíos en 24h</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx</td><td><span class="plat">No cubierto en documento</span></td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">0 mensajes con body vacío en 24h</td></tr>
+  <tr><td>FAIL</td><td class="fail">Hay mensajes vacíos → Steve mandó respuesta vacía al merchant</td></tr>
+  <tr><td>Dificultad</td><td>Fácil — count WHERE body IS NULL OR body = '' AND created_at > now() - 24h</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#76</span>
+  <span class="card-desc">Steve Chat: knowledge base tiene > 50 entries</span>
+  <span class="card-sev low">low</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx</td><td><span class="plat">No cubierto en documento</span></td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Más de 50 entries en steve_knowledge</td></tr>
+  <tr><td>FAIL</td><td class="fail">Knowledge base muy chica → Steve responde sin contexto</td></tr>
+  <tr><td>Dificultad</td><td>Fácil — count > 50</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#83</span>
+  <span class="card-desc">Infra: no hay errores 500 en últimos 30 min</span>
+  <span class="card-sev high">high</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx</td><td><span class="plat">No cubierto en documento</span></td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">0 resultados "error" en chino_reports últimos 30 min</td></tr>
+  <tr><td>FAIL</td><td class="fail">Hay errores recientes → algo se rompió</td></tr>
+  <tr><td>Dificultad</td><td>Fácil — count chino_reports WHERE result = 'error' AND created_at > now() - 30min</td></tr>
+</table></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <span class="card-num">#84</span>
+  <span class="card-desc">Infra: cron jobs ejecutados en últimas 6 horas</span>
+  <span class="card-sev medium">medium</span>
+</div>
+<div class="card-body"><table>
+  <tr><td>Docx</td><td><span class="plat">No cubierto en documento</span></td></tr>
+  <tr><td>Código hace</td><td><span class="badge missing">Fallback genérico</span></td></tr>
+  <tr><td>PASS</td><td class="pass">Crons críticos corrieron en las últimas 6h</td></tr>
+  <tr><td>FAIL</td><td class="fail">Hay crons que no han corrido → funcionalidades muertas</td></tr>
+  <tr><td>Dificultad</td><td>Media — necesita definir qué crons son obligatorios y dónde registran ejecución</td></tr>
+</table></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-title"><span class="section-icon">📊</span> Resumen final</div>
+
+<div style="background: #151520; border: 1px solid #2a2a3a; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+<table style="width: 100%; border-collapse: collapse;">
+<tr style="border-bottom: 1px solid #2a2a3a;">
+  <td style="padding: 10px; color: #f87171; font-weight: 600;">5 checks con código MAL</td>
+  <td style="padding: 10px; color: #aaa;">#15, #16, #18, #19, #20 — el código hace algo completamente distinto a lo que la DB dice</td>
+</tr>
+<tr style="border-bottom: 1px solid #2a2a3a;">
+  <td style="padding: 10px; color: #fbbf24; font-weight: 600;">11 checks fáciles</td>
+  <td style="padding: 10px; color: #aaa;">#7, #10, #52, #57, #58, #61, #67, #72, #73, #76, #83 — un query SQL cada uno</td>
+</tr>
+<tr style="border-bottom: 1px solid #2a2a3a;">
+  <td style="padding: 10px; color: #fbbf24; font-weight: 600;">6 checks medios</td>
+  <td style="padding: 10px; color: #aaa;">#29, #30, #37, #43, #53, #84 — necesitan API externa o Haiku</td>
+</tr>
+<tr style="border-bottom: 1px solid #2a2a3a;">
+  <td style="padding: 10px; color: #fbbf24; font-weight: 600;">4 checks por decidir</td>
+  <td style="padding: 10px; color: #aaa;">#38, #39, #54, #55 — ¿medir calidad del merchant o precisión de Steve?</td>
+</tr>
+<tr style="border-bottom: 1px solid #2a2a3a;">
+  <td style="padding: 10px; color: #fbbf24; font-weight: 600;">2 checks con Haiku</td>
+  <td style="padding: 10px; color: #aaa;">#49, #50 — necesitan Claude Haiku para evaluar calidad</td>
+</tr>
+<tr>
+  <td style="padding: 10px; color: #fbbf24; font-weight: 600;">1 check DNS</td>
+  <td style="padding: 10px; color: #aaa;">#40 — lookup SPF/DKIM, no necesita nada especial</td>
+</tr>
+</table>
+</div>
+
+<div style="text-align:center; color:#555; padding: 20px 0; font-size: 0.85em;">
+  El Chino — Data Integrity Real — Fuentes: BD Supabase + QA_CHINO_16_CHECKS_DETALLE.docx — 3 abril 2026
+</div>
+
+</body>
+</html>

@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan: Steve Brain Injection</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0a; color: #e0e0e0; padding: 40px 20px; line-height: 1.6; }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 2.2em; margin-bottom: 10px; color: #fff; }
+  h2 { font-size: 1.4em; margin: 40px 0 16px; color: #fff; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h3 { font-size: 1.1em; margin: 24px 0 12px; color: #ccc; }
+  p, li { font-size: 0.95em; color: #bbb; }
+  .subtitle { font-size: 1.1em; color: #888; margin-bottom: 40px; }
+
+  /* Score */
+  .score-section { background: #111; border-radius: 16px; padding: 32px; margin: 30px 0; }
+  .score-bar-container { background: #222; border-radius: 10px; height: 40px; margin: 16px 0; overflow: hidden; position: relative; }
+  .score-bar { height: 100%; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9em; transition: width 1s ease; }
+  .score-bar.red { background: linear-gradient(90deg, #dc2626, #ef4444); }
+  .score-bar.green { background: linear-gradient(90deg, #16a34a, #22c55e); }
+  .score-labels { display: flex; justify-content: space-between; font-size: 0.85em; color: #666; }
+  .score-number { font-size: 3em; font-weight: 800; }
+  .score-number.red { color: #ef4444; }
+  .score-number.green { color: #22c55e; }
+  .score-row { display: flex; gap: 32px; align-items: center; margin-bottom: 20px; }
+  .score-row:last-child { margin-bottom: 0; }
+  .score-label { font-size: 1em; color: #999; min-width: 120px; }
+
+  /* Diagram */
+  .diagram { background: #111; border-radius: 16px; padding: 32px; margin: 30px 0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85em; line-height: 1.8; color: #888; overflow-x: auto; }
+  .diagram .highlight { color: #22c55e; font-weight: 700; }
+  .diagram .bad { color: #ef4444; font-weight: 700; }
+  .diagram .warn { color: #f59e0b; font-weight: 700; }
+  .diagram .dim { color: #444; }
+
+  /* Explanation box */
+  .explain { background: #1a1a2e; border-left: 4px solid #6366f1; border-radius: 0 12px 12px 0; padding: 20px 24px; margin: 24px 0; }
+  .explain p { color: #a5b4fc; font-size: 0.95em; }
+  .explain strong { color: #c7d2fe; }
+
+  /* Cards */
+  .card-grid { display: grid; gap: 12px; margin: 16px 0; }
+  .card { background: #161616; border: 1px solid #262626; border-radius: 12px; padding: 16px 20px; display: flex; align-items: flex-start; gap: 14px; }
+  .card .num { background: #222; color: #666; font-weight: 800; font-size: 0.85em; min-width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+  .card .num.done { background: #16a34a22; color: #22c55e; }
+  .card .num.p1 { background: #dc262622; color: #ef4444; }
+  .card .num.p2 { background: #f59e0b22; color: #f59e0b; }
+  .card .num.p3 { background: #6366f122; color: #818cf8; }
+  .card .name { font-weight: 600; color: #ddd; font-size: 0.9em; font-family: 'SF Mono', 'Fira Code', monospace; }
+  .card .desc { color: #888; font-size: 0.85em; margin-top: 4px; }
+  .card .tag { display: inline-block; font-size: 0.7em; padding: 2px 8px; border-radius: 6px; font-weight: 600; margin-left: 8px; }
+  .tag.genera { background: #dc262622; color: #fca5a5; }
+  .tag.decide { background: #f59e0b22; color: #fcd34d; }
+  .tag.escribe { background: #6366f122; color: #c4b5fd; }
+
+  /* Priority sections */
+  .priority-header { display: flex; align-items: center; gap: 12px; margin: 32px 0 16px; }
+  .priority-badge { padding: 4px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85em; }
+  .priority-badge.p1 { background: #dc262633; color: #ef4444; }
+  .priority-badge.p2 { background: #f59e0b33; color: #f59e0b; }
+  .priority-badge.p3 { background: #6366f133; color: #818cf8; }
+  .priority-badge.p4 { background: #16a34a33; color: #22c55e; }
+
+  /* How it works */
+  .how-box { background: #111; border-radius: 16px; padding: 24px; margin: 16px 0; }
+  .how-step { display: flex; gap: 16px; margin: 16px 0; align-items: flex-start; }
+  .how-step .icon { font-size: 1.4em; min-width: 36px; text-align: center; }
+  .how-step .text { color: #bbb; font-size: 0.9em; }
+  .how-step .text strong { color: #fff; }
+  .arrow-down { text-align: center; color: #333; font-size: 1.2em; }
+
+  /* Before/After */
+  .ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+  .ba-box { border-radius: 12px; padding: 20px; }
+  .ba-box.before { background: #1a0a0a; border: 1px solid #dc262644; }
+  .ba-box.after { background: #0a1a0a; border: 1px solid #16a34a44; }
+  .ba-box h4 { font-size: 0.9em; margin-bottom: 10px; }
+  .ba-box h4.red { color: #ef4444; }
+  .ba-box h4.green { color: #22c55e; }
+  .ba-box p { font-size: 0.85em; color: #888; }
+  .ba-box code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; color: #ddd; }
+
+  /* Implementation */
+  .impl-box { background: #0f1117; border: 1px solid #1e2433; border-radius: 12px; padding: 20px; margin: 12px 0; }
+  .impl-box h4 { color: #93c5fd; font-size: 0.95em; margin-bottom: 8px; }
+  .impl-code { background: #0a0d14; border-radius: 8px; padding: 16px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8em; color: #8b949e; overflow-x: auto; white-space: pre; line-height: 1.7; }
+  .impl-code .comment { color: #484f58; }
+  .impl-code .keyword { color: #ff7b72; }
+  .impl-code .string { color: #a5d6ff; }
+  .impl-code .fn { color: #d2a8ff; }
+  .impl-code .var { color: #ffa657; }
+
+  /* Timeline */
+  .timeline { margin: 24px 0; }
+  .tl-item { display: flex; gap: 16px; padding: 12px 0; border-left: 2px solid #262626; margin-left: 14px; padding-left: 24px; position: relative; }
+  .tl-item::before { content: ''; width: 12px; height: 12px; border-radius: 50%; background: #262626; position: absolute; left: -7px; top: 16px; }
+  .tl-item.active::before { background: #22c55e; box-shadow: 0 0 8px #22c55e44; }
+  .tl-item .tl-date { min-width: 80px; color: #666; font-size: 0.85em; font-weight: 600; }
+  .tl-item .tl-content { font-size: 0.9em; color: #bbb; }
+
+  /* Footer */
+  .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #222; color: #444; font-size: 0.8em; text-align: center; }
+
+  @media (max-width: 640px) {
+    .ba-grid { grid-template-columns: 1fr; }
+    .score-row { flex-direction: column; gap: 8px; }
+    body { padding: 20px 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Steve Brain Injection</h1>
+<p class="subtitle">Plan para que Steve use lo que aprende en TODOS lados, no solo en algunos.</p>
+
+<!-- ===================== QUE ES STEVE BRAIN ===================== -->
+<h2>Primero: Que es Steve Brain</h2>
+
+<div class="explain">
+  <p>Steve Brain es una tabla (<strong>steve_knowledge</strong>) con ~500 reglas que Steve aprendi&oacute; de: competencia, feedback de merchants, an&aacute;lisis de performance, y research autom&aacute;tico.</p>
+  <p style="margin-top:8px">Cada regla dice: <strong>"CUANDO pasa X, HAZ Y, PORQUE Z"</strong>.</p>
+  <p style="margin-top:8px">Ejemplo real: <em>"CUANDO: copy Meta para TOFU. HAZ: usar hook de curiosidad + precio ancla. PORQUE: copies con este patr&oacute;n tienen 2.4x m&aacute;s CTR en ecommerce Chile."</em></p>
+</div>
+
+<!-- ===================== EL PROBLEMA ===================== -->
+<h2>El Problema</h2>
+
+<p style="margin-bottom: 16px;">Steve tiene 39 endpoints que usan AI. Pero solo 13 consultan las reglas antes de actuar. Los otros 26 vuelan ciegos.</p>
+
+<div class="score-section">
+  <div class="score-row">
+    <div>
+      <div class="score-label">Hoy</div>
+      <div class="score-number red">33%</div>
+    </div>
+    <div style="flex:1">
+      <div class="score-bar-container">
+        <div class="score-bar red" style="width: 33%">13 de 39</div>
+      </div>
+      <div class="score-labels">
+        <span>0% &mdash; ciego total</span>
+        <span>100% &mdash; todo informado</span>
+      </div>
+    </div>
+  </div>
+  <div class="score-row">
+    <div>
+      <div class="score-label">Despu&eacute;s</div>
+      <div class="score-number green">95%</div>
+    </div>
+    <div style="flex:1">
+      <div class="score-bar-container">
+        <div class="score-bar green" style="width: 95%">37 de 39</div>
+      </div>
+      <div class="score-labels">
+        <span>0%</span>
+        <span>100%</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== COMO FUNCIONA ===================== -->
+<h2>Que significa "inyectar Brain"</h2>
+
+<div class="explain">
+  <p>Es agregar <strong>5 l&iacute;neas de c&oacute;digo</strong> a cada endpoint. Antes de que la AI genere algo, lee las reglas relevantes de steve_knowledge y se las pasa como contexto. Nada m&aacute;s.</p>
+</div>
+
+<div class="ba-grid">
+  <div class="ba-box before">
+    <h4 class="red">Hoy: Sin Brain</h4>
+    <p>El endpoint llama a Claude con un prompt gen&eacute;rico.</p>
+    <p style="margin-top:8px">Prompt &rarr; Claude &rarr; Respuesta</p>
+    <p style="margin-top:8px">Claude no sabe qu&eacute; Steve aprendi&oacute;. Cada respuesta es como si fuera la primera vez.</p>
+  </div>
+  <div class="ba-box after">
+    <h4 class="green">Despu&eacute;s: Con Brain</h4>
+    <p>El endpoint carga reglas relevantes y las inyecta al prompt.</p>
+    <p style="margin-top:8px">Reglas + Prompt &rarr; Claude &rarr; Respuesta informada</p>
+    <p style="margin-top:8px">Claude sabe qu&eacute; funcion&oacute; antes, qu&eacute; hace la competencia, y qu&eacute; evitar.</p>
+  </div>
+</div>
+
+<div class="impl-box">
+  <h4>El cambio en c&oacute;digo (es esto, en cada archivo):</h4>
+  <div class="impl-code"><span class="comment">// ANTES: solo llama a Claude</span>
+<span class="keyword">const</span> response = <span class="keyword">await</span> <span class="fn">callClaude</span>(prompt);
+
+<span class="comment">// DESPUES: carga reglas + llama a Claude</span>
+<span class="keyword">const</span> { <span class="var">data</span>: rules } = <span class="keyword">await</span> supabase
+  .<span class="fn">from</span>(<span class="string">'steve_knowledge'</span>)
+  .<span class="fn">select</span>(<span class="string">'titulo, contenido'</span>)
+  .<span class="fn">in</span>(<span class="string">'categoria'</span>, [<span class="string">'meta_ads'</span>, <span class="string">'anuncios'</span>])  <span class="comment">// categor&iacute;as seg&uacute;n endpoint</span>
+  .<span class="fn">eq</span>(<span class="string">'activo'</span>, <span class="keyword">true</span>)
+  .<span class="fn">eq</span>(<span class="string">'approval_status'</span>, <span class="string">'approved'</span>)
+  .<span class="fn">limit</span>(15);
+
+<span class="keyword">const</span> <span class="var">knowledgeBlock</span> = rules?.<span class="fn">map</span>(r => <span class="string">`- ${r.titulo}: ${r.contenido}`</span>).<span class="fn">join</span>(<span class="string">'\n'</span>);
+<span class="keyword">const</span> response = <span class="keyword">await</span> <span class="fn">callClaude</span>(prompt + <span class="string">'\n\nREGLAS APRENDIDAS:\n'</span> + <span class="var">knowledgeBlock</span>);</div>
+</div>
+
+<!-- ===================== LOS 20 GAPS ===================== -->
+<h2>Los 20 Endpoints Sin Brain</h2>
+
+<!-- P1 -->
+<div class="priority-header">
+  <span class="priority-badge p1">P1 &mdash; Impacto directo en plata</span>
+  <span style="color:#666;font-size:0.85em">Generan contenido que el merchant publica y paga</span>
+</div>
+
+<div class="card-grid">
+  <div class="card">
+    <div class="num p1">1</div>
+    <div>
+      <div class="name">analyze-brand-research.ts <span class="tag genera">GENERA</span></div>
+      <div class="desc">Analiza competencia del merchant sin saber qu&eacute; ya se aprendi&oacute; de su industria. Cada an&aacute;lisis parte de cero.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num p1">2</div>
+    <div>
+      <div class="name">steve-send-time-analysis.ts <span class="tag genera">GENERA</span></div>
+      <div class="desc">Recomienda hora de env&iacute;o de emails sin data de engagement aprendida. Adivina en vez de saber.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num p1">3</div>
+    <div>
+      <div class="name">steve-bulk-analyze.ts <span class="tag genera">GENERA</span></div>
+      <div class="desc">An&aacute;lisis masivo de contenido sin patrones conocidos. No sabe qu&eacute; funciona en el mercado.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num p1">4</div>
+    <div>
+      <div class="name">audit-store.ts <span class="tag genera">GENERA</span></div>
+      <div class="desc">Audita la tienda Shopify del merchant sin best practices aprendidas de otras tiendas exitosas.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num p1">5</div>
+    <div>
+      <div class="name">analyze-ad-image.ts <span class="tag genera">GENERA</span></div>
+      <div class="desc">Eval&uacute;a im&aacute;genes de ads sin saber qu&eacute; estilos visuales convierten en esa industria.</div>
+    </div>
+  </div>
+</div>
+
+<!-- P2 -->
+<div class="priority-header">
+  <span class="priority-badge p2">P2 &mdash; Decisiones autom&aacute;ticas ciegas</span>
+  <span style="color:#666;font-size:0.85em">Crons que deciden sin contexto, corren solos</span>
+</div>
+
+<div class="card-grid">
+  <div class="card">
+    <div class="num p2">6</div>
+    <div>
+      <div class="name">auto-postmortem.ts <span class="tag decide">DECIDE</span></div>
+      <div class="desc">Hace post-mortem de campa&ntilde;as fallidas sin revisar fallos anteriores. No aprende de sus propios post-mortems.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num p2">7</div>
+    <div>
+      <div class="name">auto-rule-generator.ts <span class="tag decide">DECIDE</span></div>
+      <div class="desc">Genera reglas nuevas sin ver las que ya existen. Puede crear duplicadas o contradictorias.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num p2">8</div>
+    <div>
+      <div class="name">churn-detector.ts <span class="tag decide">DECIDE</span></div>
+      <div class="desc">Predice qu&eacute; merchants se van a ir sin saber qu&eacute; acciones retuvieron a otros.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num p2">9</div>
+    <div>
+      <div class="name">merchant-upsell.ts <span class="tag decide">DECIDE</span></div>
+      <div class="desc">Sugiere upsells gen&eacute;ricos sin saber qu&eacute; funcion&oacute; con merchants parecidos.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num p2">10</div>
+    <div>
+      <div class="name">root-cause-analysis.ts <span class="tag decide">DECIDE</span></div>
+      <div class="desc">Hace 5 Whys sin patrones de fallos previos. Cada RCA es como la primera.</div>
+    </div>
+  </div>
+</div>
+
+<!-- P3 -->
+<div class="priority-header">
+  <span class="priority-badge p3">P3 &mdash; Comunicaci&oacute;n con merchants</span>
+  <span style="color:#666;font-size:0.85em">Hablan con merchants/prospects sin contexto aprendido</span>
+</div>
+
+<div class="card-grid">
+  <div class="card">
+    <div class="num p3">11</div>
+    <div>
+      <div class="name">prospect-email-nurture.ts <span class="tag genera">GENERA</span></div>
+      <div class="desc">Emails de nurture sin copies ni cadencias ganadoras. Manda emails gen&eacute;ricos.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num p3">12</div>
+    <div>
+      <div class="name">prospect-followup.ts <span class="tag genera">GENERA</span></div>
+      <div class="desc">Follow-up de ventas sin aprendizajes del sales-learning-loop. Ironic.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num p3">13</div>
+    <div>
+      <div class="name">wolf-morning-send.ts <span class="tag genera">GENERA</span></div>
+      <div class="desc">WhatsApp matutino a prospects sin contexto de qu&eacute; mensajes funcionan.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num p3">14</div>
+    <div>
+      <div class="name">onboarding-wa.ts <span class="tag genera">GENERA</span></div>
+      <div class="desc">Onboarding por WhatsApp sin best practices de onboardings exitosos.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num p3">15</div>
+    <div>
+      <div class="name">wa-action-processor.ts <span class="tag genera">GENERA</span></div>
+      <div class="desc">Responde acciones de WhatsApp sin patrones de conversaci&oacute;n aprendidos.</div>
+    </div>
+  </div>
+</div>
+
+<!-- P4 -->
+<div class="priority-header">
+  <span class="priority-badge p4">P4 &mdash; Utilidades menores</span>
+  <span style="color:#666;font-size:0.85em">Impacto bajo pero f&aacute;cil de arreglar</span>
+</div>
+
+<div class="card-grid">
+  <div class="card">
+    <div class="num">16</div>
+    <div>
+      <div class="name">creative-preview.ts</div>
+      <div class="desc">Preview de ads sin criterios visuales.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num">17</div>
+    <div>
+      <div class="name">generate-video.ts</div>
+      <div class="desc">Videos sin estilo de marca aprendido.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num">18</div>
+    <div>
+      <div class="name">parse-email-html.ts</div>
+      <div class="desc">Parsea emails sin estructura aprendida.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num">19</div>
+    <div>
+      <div class="name">chonga-support.ts</div>
+      <div class="desc">Soporte sin templates de respuesta.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num">20</div>
+    <div>
+      <div class="name">check-video-status.ts</div>
+      <div class="desc">Status de video sin criterios de calidad.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== BONUS: WRITE-ONLY ===================== -->
+<h2>Bonus: 6 Endpoints que Alimentan Brain pero No lo Leen</h2>
+
+<div class="explain">
+  <p>Estos crons <strong>escriben</strong> reglas nuevas en steve_knowledge, pero cuando generan esas reglas, <strong>no leen lo que ya existe</strong>. Es como tomar apuntes sin leer los anteriores &mdash; riesgo de duplicados y contradicciones.</p>
+</div>
+
+<div class="card-grid">
+  <div class="card">
+    <div class="num escribe" style="background:#6366f122;color:#818cf8">W</div>
+    <div>
+      <div class="name">competitor-spy.ts <span class="tag escribe">ESCRIBE</span></div>
+      <div class="desc">Guarda reporte de competencia sin ver reportes anteriores.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num escribe" style="background:#6366f122;color:#818cf8">W</div>
+    <div>
+      <div class="name">sales-learning-loop.ts <span class="tag escribe">ESCRIBE</span></div>
+      <div class="desc">Guarda patrones de venta sin ver los que ya tiene.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num escribe" style="background:#6366f122;color:#818cf8">W</div>
+    <div>
+      <div class="name">steve-discoverer.ts <span class="tag escribe">ESCRIBE</span></div>
+      <div class="desc">Descubre patrones sin saber qu&eacute; ya descubri&oacute;.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num escribe" style="background:#6366f122;color:#818cf8">W</div>
+    <div>
+      <div class="name">swarm-research.ts <span class="tag escribe">ESCRIBE</span></div>
+      <div class="desc">Investiga temas sin contexto de investigaciones previas.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num escribe" style="background:#6366f122;color:#818cf8">W</div>
+    <div>
+      <div class="name">cross-client-learning.ts <span class="tag escribe">ESCRIBE</span></div>
+      <div class="desc">Aprende cross-client sin ver aprendizajes anteriores.</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="num escribe" style="background:#6366f122;color:#818cf8">W</div>
+    <div>
+      <div class="name">weekly-report.ts <span class="tag escribe">ESCRIBE</span></div>
+      <div class="desc">Manda reporte semanal sin incluir lo que Steve aprendi&oacute; esa semana.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== IMPLEMENTATION PLAN ===================== -->
+<h2>Plan de Ejecuci&oacute;n</h2>
+
+<div class="explain">
+  <p>Cada endpoint necesita lo mismo: <strong>una funci&oacute;n reutilizable</strong> que cargue las reglas seg&uacute;n la categor&iacute;a del endpoint. Se crea UNA VEZ en <code>knowledge-loader.ts</code> (que ya existe) y se llama desde cada archivo.</p>
+</div>
+
+<div class="timeline">
+  <div class="tl-item active">
+    <div class="tl-date">Paso 0</div>
+    <div class="tl-content"><strong>Crear helper reutilizable</strong> &mdash; Funci&oacute;n <code>injectBrain(supabase, categorias[])</code> en knowledge-loader.ts que retorna el bloque de texto listo para inyectar. Se usa en todos los endpoints. Se escribe una vez.</div>
+  </div>
+  <div class="tl-item">
+    <div class="tl-date">Paso 1</div>
+    <div class="tl-content"><strong>P1: 5 endpoints de contenido</strong> &mdash; analyze-brand-research, steve-send-time, steve-bulk-analyze, audit-store, analyze-ad-image. Impacto inmediato en calidad de output para el merchant.</div>
+  </div>
+  <div class="tl-item">
+    <div class="tl-date">Paso 2</div>
+    <div class="tl-content"><strong>P2: 5 crons de decisiones</strong> &mdash; auto-postmortem, auto-rule-generator, churn-detector, merchant-upsell, root-cause-analysis. Decisiones autom&aacute;ticas informadas.</div>
+  </div>
+  <div class="tl-item">
+    <div class="tl-date">Paso 3</div>
+    <div class="tl-content"><strong>P3: 5 endpoints de comunicaci&oacute;n</strong> &mdash; prospect-email-nurture, prospect-followup, wolf-morning-send, onboarding-wa, wa-action-processor. Mejor tono y relevancia.</div>
+  </div>
+  <div class="tl-item">
+    <div class="tl-date">Paso 4</div>
+    <div class="tl-content"><strong>P4: 5 utilidades</strong> &mdash; creative-preview, generate-video, parse-email, chonga-support, check-video-status. F&aacute;cil, bajo riesgo.</div>
+  </div>
+  <div class="tl-item">
+    <div class="tl-date">Paso 5</div>
+    <div class="tl-content"><strong>Bonus: 6 write-only</strong> &mdash; Que cada cron que escribe reglas primero lea las existentes para evitar duplicados y contradicciones.</div>
+  </div>
+  <div class="tl-item">
+    <div class="tl-date">Paso 6</div>
+    <div class="tl-content"><strong>Build + Deploy + Verificar env vars</strong> &mdash; Un solo deploy al final de cada paso. Verificar 20/20 env vars.</div>
+  </div>
+</div>
+
+<!-- ===================== CATEGORY MAP ===================== -->
+<h2>Mapa: Qu&eacute; categor&iacute;as inyectar en cada endpoint</h2>
+
+<div class="explain">
+  <p>Steve Brain tiene reglas organizadas por categor&iacute;a: <code>meta_ads</code>, <code>anuncios</code>, <code>klaviyo</code>, <code>seo</code>, <code>shopify</code>, <code>brief</code>, <code>buyer_persona</code>, <code>analisis</code>, <code>competencia</code>, <code>google</code>. Cada endpoint recibe solo las categor&iacute;as que le sirven.</p>
+</div>
+
+<table style="width:100%; border-collapse:collapse; font-size:0.85em; margin:16px 0;">
+  <thead>
+    <tr style="border-bottom:2px solid #333;">
+      <th style="text-align:left; padding:10px; color:#888;">#</th>
+      <th style="text-align:left; padding:10px; color:#888;">Endpoint</th>
+      <th style="text-align:left; padding:10px; color:#888;">Categor&iacute;as a inyectar</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#ef4444;">1</td><td style="padding:8px;font-family:monospace;color:#ddd;">analyze-brand-research</td><td style="padding:8px;color:#888;">competencia, analisis, brief</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#ef4444;">2</td><td style="padding:8px;font-family:monospace;color:#ddd;">steve-send-time-analysis</td><td style="padding:8px;color:#888;">klaviyo, analisis</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#ef4444;">3</td><td style="padding:8px;font-family:monospace;color:#ddd;">steve-bulk-analyze</td><td style="padding:8px;color:#888;">meta_ads, anuncios, analisis</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#ef4444;">4</td><td style="padding:8px;font-family:monospace;color:#ddd;">audit-store</td><td style="padding:8px;color:#888;">shopify, seo, analisis</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#ef4444;">5</td><td style="padding:8px;font-family:monospace;color:#ddd;">analyze-ad-image</td><td style="padding:8px;color:#888;">anuncios, meta_ads</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#f59e0b;">6</td><td style="padding:8px;font-family:monospace;color:#ddd;">auto-postmortem</td><td style="padding:8px;color:#888;">analisis, meta_ads, google</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#f59e0b;">7</td><td style="padding:8px;font-family:monospace;color:#ddd;">auto-rule-generator</td><td style="padding:8px;color:#888;">* (todas, para evitar duplicados)</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#f59e0b;">8</td><td style="padding:8px;font-family:monospace;color:#ddd;">churn-detector</td><td style="padding:8px;color:#888;">analisis, shopify</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#f59e0b;">9</td><td style="padding:8px;font-family:monospace;color:#ddd;">merchant-upsell</td><td style="padding:8px;color:#888;">shopify, analisis, klaviyo</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#f59e0b;">10</td><td style="padding:8px;font-family:monospace;color:#ddd;">root-cause-analysis</td><td style="padding:8px;color:#888;">analisis</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#818cf8;">11</td><td style="padding:8px;font-family:monospace;color:#ddd;">prospect-email-nurture</td><td style="padding:8px;color:#888;">klaviyo, brief, buyer_persona</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#818cf8;">12</td><td style="padding:8px;font-family:monospace;color:#ddd;">prospect-followup</td><td style="padding:8px;color:#888;">brief, buyer_persona, analisis</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#818cf8;">13</td><td style="padding:8px;font-family:monospace;color:#ddd;">wolf-morning-send</td><td style="padding:8px;color:#888;">competencia, analisis, brief</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#818cf8;">14</td><td style="padding:8px;font-family:monospace;color:#ddd;">onboarding-wa</td><td style="padding:8px;color:#888;">brief, shopify, buyer_persona</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#818cf8;">15</td><td style="padding:8px;font-family:monospace;color:#ddd;">wa-action-processor</td><td style="padding:8px;color:#888;">brief, buyer_persona</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#666;">16</td><td style="padding:8px;font-family:monospace;color:#ddd;">creative-preview</td><td style="padding:8px;color:#888;">anuncios, meta_ads</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#666;">17</td><td style="padding:8px;font-family:monospace;color:#ddd;">generate-video</td><td style="padding:8px;color:#888;">anuncios</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#666;">18</td><td style="padding:8px;font-family:monospace;color:#ddd;">parse-email-html</td><td style="padding:8px;color:#888;">klaviyo</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#666;">19</td><td style="padding:8px;font-family:monospace;color:#ddd;">chonga-support</td><td style="padding:8px;color:#888;">brief, analisis</td></tr>
+    <tr style="border-bottom:1px solid #1a1a1a;"><td style="padding:8px;color:#666;">20</td><td style="padding:8px;font-family:monospace;color:#ddd;">check-video-status</td><td style="padding:8px;color:#888;">anuncios</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================== RESULT ===================== -->
+<h2>Resultado Esperado</h2>
+
+<div class="ba-grid">
+  <div class="ba-box before">
+    <h4 class="red">Hoy</h4>
+    <p>Steve aprende cosas &rarr; las guarda &rarr; solo las usa cuando el merchant chatea o pide un copy Meta.</p>
+    <p style="margin-top:12px">Los otros 20 endpoints toman decisiones, generan contenido, y hablan con merchants como si Steve nunca hubiera aprendido nada.</p>
+    <p style="margin-top:12px;color:#ef4444;font-weight:600;">67% del sistema vuela ciego.</p>
+  </div>
+  <div class="ba-box after">
+    <h4 class="green">Despu&eacute;s</h4>
+    <p>Steve aprende cosas &rarr; las guarda &rarr; TODOS los endpoints las usan autom&aacute;ticamente.</p>
+    <p style="margin-top:12px">Cada email, cada an&aacute;lisis, cada decisi&oacute;n autom&aacute;tica, cada mensaje de WhatsApp lleva el conocimiento acumulado.</p>
+    <p style="margin-top:12px;color:#22c55e;font-weight:600;">95% del sistema informado por Brain.</p>
+  </div>
+</div>
+
+<div class="explain">
+  <p><strong>Para el merchant:</strong> Steve es notablemente m&aacute;s inteligente cada semana. Los emails son m&aacute;s relevantes, los an&aacute;lisis m&aacute;s profundos, las recomendaciones m&aacute;s acertadas. Sin que nadie le explique por qu&eacute;.</p>
+</div>
+
+<div class="footer">
+  Steve Brain Injection Plan &mdash; Generado el 3 de abril 2026 &mdash; Steve Ads Platform
+</div>
+
+</div>
+</body>
+</html>

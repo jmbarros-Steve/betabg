@@ -1,13 +1,37 @@
 # Andrés W3 — Google Ads — Estado
 
-## Bugs resueltos
+## Última sesión: 13/04/2026
 
-### Bug 1: Métricas Google Ads sin parseFloat defensivo ✅ (2026-04-13)
-**Archivo:** `cloud-run-api/src/routes/google/sync-google-ads-metrics.ts`
-**Fix:** Interface actualizado a `string | number`, `parseFloat(String(...)) || 0` aplicado en `conversions`, `conversionsValue`, `ctr`, `costPerConversion`.
+### Resumen de sesiones
+| Fecha | Sesión | Commits | Deploys |
+|-------|--------|---------|---------|
+| 09/04 | Dashboard 7 features + 30 fixes + 1 bug fix | — | — |
+| 10/04 AM | Fix Pipeline: sync-campaign-metrics, health check, currency, MCC fallback | — | rev 00478 |
+| 10/04 PM | Tier 2: Keywords, RSA, Extensions, Conversions, Search Terms | `12b642f0` | Supabase+CR+Vercel+Scheduler |
+| 12/04 | Tier 3: Shared lib, 13 actions, PMAX, Steve AI recs (+2979/-785) | `5b3c60bb` | rev 00513-489 |
+| 13/04 | Wizard PMAX 6 pasos + 10 fixes API v23 + single-batch arch | 7 commits | 6 deploys CR |
 
-### Bug 2: Cron secret comparado con `===` (timing attack) ✅ (ya estaba arreglado)
-**Fix:** Ya migrado a `isValidCronSecret()` de `cloud-run-api/src/lib/cron-auth.ts` que usa `timingSafeEqual`.
+### Tiers completados
+- [x] **Tier 1:** Pause/resume, budget, reglas automáticas (2 tablas + RLS + cron)
+- [x] **Tier 2:** Keywords, RSA Ads, Extensions, Conversions, Search Terms (8 archivos)
+- [x] **Tier 3:** Shared lib ~465 líneas, 13 actions campaign, 6 actions PMAX, Steve AI
+- [x] **Tier 3.5:** Wizard PMAX 6 pasos, 10 fixes API v23, single-batch architecture
+
+### Bugs resueltos
+- [x] Métricas sin parseFloat defensivo → `parseFloat(String(...)) || 0` (2026-04-13)
+- [x] Cron secret timing attack → ya migrado a `isValidCronSecret()` con `timingSafeEqual`
+- [x] Goals no se reseteaban al cambiar de cliente en dashboard (2026-04-09)
+- [x] API v23: startDate, deliveryMethod, bidding strategy, explicitlyShared, EU political, brandGuidelines, URL protocol, asset batch, text truncation, error details (2026-04-13)
 
 ## Tareas pendientes
-- Ninguna asignada actualmente
+- [ ] Verificar PMAX end-to-end con imágenes reales
+- [ ] Validación aspect ratio client-side
+- [ ] Edición de assets post-creación
+- [x] Implementar flujo Leadsie+MCC para onboarding merchants Google (funcionando, 1 cuenta activa synceando)
+- [x] LEADSIE_WEBHOOK_SECRET seteada en Cloud Run (rev 00531-jns, 2026-04-15)
+- [x] Leadsie Connect Profile configurado para Google Ads por JM
+- [ ] Conversion Tracking Setup wizard (Feature #20 del roadmap — prioridad CRÍTICA)
+
+## Blockers
+- Sin credenciales Google en Cloud Run → módulo funciona en código pero no en producción
+- Plan Leadsie+MCC documentado pero requiere: crear MCC, solicitar developer token (5-14 días), configurar Leadsie Connect Profile

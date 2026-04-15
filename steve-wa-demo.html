@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Vendedor — Conversación Demo (Casos Esquina)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #111b21; display: flex; justify-content: center; height: 100vh; }
+
+  .phone { width: 440px; height: 100vh; display: flex; flex-direction: column; background: #0b141a; }
+
+  /* Header */
+  .header { background: #202c33; padding: 10px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #2a3942; }
+  .header .avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #6c5ce7, #a855f7); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 16px; flex-shrink: 0; }
+  .header .info { flex: 1; }
+  .header .name { color: #e9edef; font-size: 16px; font-weight: 500; }
+  .header .status { color: #8696a0; font-size: 12px; }
+
+  /* Chat area */
+  .chat { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 2px; background: #0b141a; background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 5 L35 15 L30 12 L25 15Z' fill='%23ffffff' opacity='0.02'/%3E%3C/svg%3E"); }
+
+  /* Messages */
+  .msg { max-width: 85%; padding: 6px 8px 4px; border-radius: 8px; font-size: 14px; line-height: 1.4; position: relative; word-wrap: break-word; margin-bottom: 1px; }
+  .msg.in { background: #202c33; color: #e9edef; align-self: flex-start; border-top-left-radius: 0; }
+  .msg.out { background: #005c4b; color: #e9edef; align-self: flex-end; border-top-right-radius: 0; }
+  .msg .time { font-size: 11px; color: #8696a0; float: right; margin: 4px 0 -2px 8px; }
+  .msg.out .time { color: #8fb8ab; }
+
+  /* Separator */
+  .day-sep { align-self: center; background: #182229; color: #8696a0; font-size: 12px; padding: 5px 12px; border-radius: 8px; margin: 12px 0 8px; }
+
+  /* Edge case labels */
+  .edge-label { align-self: center; background: #1a0a2e; border: 1px solid #6c5ce7; color: #a78bfa; font-size: 11px; padding: 4px 12px; border-radius: 12px; margin: 14px 0 6px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+
+  /* Typing indicator */
+  .typing { align-self: flex-start; background: #202c33; padding: 10px 14px; border-radius: 8px; border-top-left-radius: 0; display: flex; gap: 4px; }
+  .typing span { width: 7px; height: 7px; background: #8696a0; border-radius: 50%; animation: bounce 1.4s infinite; }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+
+  /* Queue indicator */
+  .queue-badge { display: inline-block; background: #1a3a2a; color: #4ade80; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-top: 4px; }
+
+  /* Narrator */
+  .narrator { align-self: center; background: #1c1917; border: 1px dashed #78716c; color: #a8a29e; font-size: 11px; padding: 6px 14px; border-radius: 6px; margin: 6px 0; max-width: 90%; text-align: center; font-style: italic; }
+
+  /* Multi-message grouping */
+  .msg-group { display: flex; flex-direction: column; gap: 2px; }
+
+  /* Scroll */
+  .chat::-webkit-scrollbar { width: 6px; }
+  .chat::-webkit-scrollbar-thumb { background: #374045; border-radius: 3px; }
+
+  /* Bottom bar */
+  .bottom { background: #202c33; padding: 10px 16px; display: flex; align-items: center; gap: 10px; border-top: 1px solid #2a3942; }
+  .bottom input { flex: 1; background: #2a3942; border: none; color: #e9edef; padding: 9px 14px; border-radius: 8px; font-size: 14px; outline: none; }
+  .bottom input::placeholder { color: #8696a0; }
+  .bottom .send-btn { width: 36px; height: 36px; background: #00a884; border: none; border-radius: 50%; color: #fff; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+  /* Legend at top */
+  .legend { background: #1a0a2e; padding: 10px 16px; border-bottom: 1px solid #2d1b69; }
+  .legend h2 { color: #a78bfa; font-size: 13px; margin-bottom: 4px; }
+  .legend p { color: #8696a0; font-size: 11px; line-height: 1.4; }
+  .legend .tag { display: inline-block; background: #2d1b69; color: #c4b5fd; font-size: 10px; padding: 1px 6px; border-radius: 3px; margin: 1px 2px; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="legend">
+    <h2>Steve Vendedor — Demo de Casos Esquina</h2>
+    <p>Cada <span class="tag">CASO ESQUINA</span> muestra un edge case resuelto por las 5 fases.</p>
+  </div>
+
+  <div class="header">
+    <div class="avatar">S</div>
+    <div class="info">
+      <div class="name">Steve — Tu Agencia IA</div>
+      <div class="status">en línea</div>
+    </div>
+  </div>
+
+  <div class="chat" id="chat">
+
+    <div class="day-sep">Hoy</div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <div class="edge-label">1. Primer contacto — Steve se presenta sin inventar</div>
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <div class="msg in">
+      Hola, vi su anuncio en Instagram. Qué es Steve exactamente?
+      <span class="time">10:01</span>
+    </div>
+
+    <div class="msg out">
+      Hola! Steve es una plataforma de marketing con IA para e-commerce. Centralizamos tus métricas de Shopify, Meta Ads, Google Ads, email y WhatsApp en un solo dashboard. Además generamos copies, creativos y flujos automatizados con inteligencia artificial.
+      <span class="time">10:01</span>
+    </div>
+
+    <div class="msg out">
+      Qué tipo de negocio tienes? Así te cuento cómo te podemos ayudar específicamente.
+      <span class="time">10:01</span>
+    </div>
+
+    <div class="narrator">Steve NO dice "hemos ayudado a 200+ marcas" ni inventa métricas. Solo describe capacidades reales. <b>(Fase 2: anti-alucinación)</b></div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <div class="edge-label">2. Pregunta sobre feature que antes no conocía</div>
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <div class="msg in">
+      Tengo una tienda de ropa en Shopify. Uds tienen algo de WhatsApp o email propio? O solo dashboards?
+      <span class="time">10:03</span>
+    </div>
+
+    <div class="msg out">
+      Buena pregunta! Steve tiene módulos nativos de ambos:
+      <br><br>
+      <b>WhatsApp Marketing:</b> inbox centralizado, campañas masivas a tu base de clientes, y mensajes automáticos de carrito abandonado directo por WhatsApp.
+      <br><br>
+      <b>Steve Mail:</b> editor drag & drop para crear emails, flujos automatizados (bienvenida, carrito abandonado, post-compra), y métricas de apertura y clicks.
+      <span class="time">10:03</span>
+    </div>
+
+    <div class="msg out">
+      Además de eso conectamos Shopify + Meta Ads + Google Ads para que veas todo en un solo lugar. Con el plan Full incluso creamos y ejecutamos campañas por ti.
+      <span class="time">10:03</span>
+    </div>
+
+    <div class="narrator">Antes Steve decía "Solo tenemos Meta, Google Ads, Shopify, Klaviyo". Ahora conoce WhatsApp, Steve Mail, videos AI y los 14 módulos. <b>(Fase 1: Product Catalog)</b></div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <div class="edge-label">3. Pide caso de éxito — NO inventa métricas</div>
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <div class="msg in">
+      Y tienen algún caso de éxito en moda? Quiero ver resultados concretos
+      <span class="time">10:05</span>
+    </div>
+
+    <div class="msg out">
+      En moda, marcas de ropa usan Steve para centralizar Shopify + Meta Ads + email en un solo lugar. Steve genera copies de anuncios adaptados a temporada, analiza qué productos tienen mejor margen para ads, y automatiza emails de carrito abandonado.
+      <br><br>
+      Como referencia, el CPA promedio en moda para Meta Ads en LATAM es $2.500-$5.000 CLP dependiendo del ticket promedio.
+      <span class="time">10:05</span>
+    </div>
+
+    <div class="msg out">
+      Para darte proyecciones concretas con TUS datos, lo ideal es agendar una reunión de 15 min donde te muestro el dashboard con datos reales. Te armo una propuesta personalizada?
+      <span class="time">10:06</span>
+    </div>
+
+    <div class="narrator">Antes Steve inventaba: "Ayudamos a ZapatoBoom en México a bajar CPA 47% en 3 semanas". Ahora da referencias de industria sin inventar marcas. <b>(Fase 2: casos honestos)</b></div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <div class="edge-label">4. Mensaje largo — split en límite de palabra</div>
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <div class="msg in">
+      Sí dale, pero primero explicame bien todo lo que incluye cada plan y los precios
+      <span class="time">10:08</span>
+    </div>
+
+    <div class="msg out">
+      Tenemos 3 planes, todos con 50% OFF de lanzamiento:
+      <br><br>
+      <b>Plan Visual — $24.995/mes</b> (normal $49.990)<br>
+      Dashboard unificado con métricas de Shopify, Meta Ads, Google Ads, Klaviyo. Ves todo en un solo lugar. Reportes semanales automáticos por email.
+      <br><br>
+      <b>Plan Estrategia — $49.995/mes</b> (normal $99.990)<br>
+      Todo lo de Visual + Steve IA como consultor 24/7. Análisis de competencia, generación de copies con IA, recomendaciones de audiencias, auditoría de tienda, y alertas predictivas.
+      <span class="time">10:08</span>
+    </div>
+
+    <div class="msg out">
+      <b>Plan Full — $99.995/mes</b> (normal $199.990)<br>
+      Todo lo anterior + Steve crea y ejecuta por ti: campañas en Meta y Google, flujos de email automatizados, WhatsApp marketing, creativos con IA (imágenes + video), y optimización continua. Es como tener una agencia completa.
+      <br><br>
+      Para tu tienda de ropa, el plan Estrategia es buen punto de partida. Quieres que te arme una presentación personalizada?
+      <span class="time">10:08</span>
+    </div>
+
+    <div class="narrator">Respuesta de ~900 chars se partió en 2 mensajes en un límite de párrafo, no a mitad de palabra. Antes cortaba: "Plan Full — $99.9..." <b>(splitAtWordBoundary)</b></div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <div class="edge-label">5. Pide presentación — task queue (no más "dame un minuto")</div>
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <div class="msg in">
+      Dale, armame una presentación
+      <span class="time">10:10</span>
+    </div>
+
+    <div class="msg out">
+      Te estoy armando una presentación personalizada para tu marca de ropa con los planes y funcionalidades que más te sirven. Te la envío en unos momentos por acá mismo.
+      <span class="time">10:10</span>
+    </div>
+
+    <div class="narrator">
+      Antes: Steve decía "dame un minuto" → setTimeout moría → nunca llegaba nada.<br>
+      Ahora: respuesta inmediata + <span class="queue-badge">ENQUEUED: send_deck (7s)</span> en wa_pending_actions.<br>
+      El cron processor la ejecuta en ≤60s con tiempo ilimitado. <b>(Fase 3: Task Queue)</b>
+    </div>
+
+    <div class="msg out">
+      Acá tienes tu propuesta personalizada:
+      <br><br>
+      <b>Propuesta Steve para [Tu Marca de Ropa]</b>
+      <br><br>
+      Recomendación: Plan Estrategia ($49.995/mes)<br>
+      ✓ Dashboard Shopify + Meta Ads unificado<br>
+      ✓ Steve IA genera copies para temporada<br>
+      ✓ Análisis de qué productos tienen mejor margen<br>
+      ✓ Auditoría de tu tienda Shopify<br>
+      ✓ Alertas de fatiga creativa<br>
+      <br>
+      Agenda tu demo: meetings.hubspot.com/jose-manuel15
+      <span class="time">10:11</span>
+    </div>
+
+    <div class="narrator">Presentación llegó ~60s después via Twilio REST API, generada por el cron processor. <b>(Fase 3 + 4)</b></div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <div class="edge-label">6. Pide demo en vivo — video demo</div>
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <div class="msg in">
+      Se ve bien. Pero puedo ver el producto en acción? Tipo un demo?
+      <span class="time">10:14</span>
+    </div>
+
+    <div class="msg out">
+      Claro! Te comparto un video demo donde puedes ver el dashboard, las métricas en tiempo real, la generación de copies con IA, y el editor de emails. Dale play y cualquier duda me dices.
+      <span class="time">10:14</span>
+    </div>
+
+    <div class="narrator"><span class="queue-badge">ENQUEUED: send_video_demo (3s)</span> → envía URL del video grabado con Playwright. Antes Steve decía "no tengo forma de mostrarte". <b>(Fase 4: video demo)</b></div>
+
+    <div class="msg out">
+      📹 Video Demo Steve Platform<br>
+      https://storage.steve.cl/demo/steve-platform-demo.mp4
+      <span class="time">10:14</span>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <div class="edge-label">7. Intenta hacer que Steve invente — anti-alucinación</div>
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <div class="msg in">
+      Cuánto ROI puedo esperar? Otras agencias me prometen 5x ROAS mínimo
+      <span class="time">10:18</span>
+    </div>
+
+    <div class="msg out">
+      No te voy a prometer un número mágico porque el ROAS depende de muchos factores: tu ticket promedio, tu margen, tu audiencia, y la calidad de tus creativos.
+      <br><br>
+      Lo que sí te puedo decir: Steve optimiza continuamente tus campañas, detecta fatiga creativa antes de que baje el rendimiento, y genera copies basados en lo que realmente funciona en tu industria.
+      <br><br>
+      En la reunión puedo mostrarte proyecciones con TUS datos reales. Así ves algo concreto, no una promesa genérica.
+      <span class="time">10:18</span>
+    </div>
+
+    <div class="narrator">Antes Steve inventaba: "Nuestros clientes obtienen 4.2x ROAS promedio". Ahora redirige a datos reales sin prometer métricas falsas. <b>(Fase 2: anti-alucinación)</b></div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <div class="edge-label">8. Conversación larga — rolling summary (msg #45+)</div>
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <div class="narrator">⏩ Simulación: han pasado 45 mensajes. Haiku comprimió los mensajes 1-25 en un resumen. Steve tiene contexto completo.</div>
+
+    <div class="msg in">
+      Oye y lo que hablamos al principio de los emails de carrito abandonado... eso viene en el plan Estrategia o solo en Full?
+      <span class="time">14:22</span>
+    </div>
+
+    <div class="msg out">
+      Los flujos de email automatizados como carrito abandonado vienen incluidos en el plan Full. En el plan Estrategia tienes las métricas de email y la generación de copies, pero la ejecución automática de flujos es del Full.
+      <br><br>
+      Igual como me contaste que tu tienda tiene buen tráfico pero baja conversión, el flujo de carrito abandonado te puede recuperar entre 5-15% de ventas perdidas. Podría valer la pena el upgrade a Full.
+      <span class="time">14:22</span>
+    </div>
+
+    <div class="narrator">Steve recuerda contexto del mensaje #3 (tipo de negocio) y #12 (problema de conversión) gracias al rolling summary de Haiku. Sin el summary, solo vería los últimos 20 mensajes. <b>(Rolling Summary: 500+ msgs)</b></div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <div class="edge-label">9. Copy generation — task queue + entrega real</div>
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <div class="msg in">
+      Me puedes generar un copy para un anuncio de Meta? Tengo una promo de 30% en vestidos de verano
+      <span class="time">14:25</span>
+    </div>
+
+    <div class="msg out">
+      Dale! Te genero un copy para Meta Ads con tu promo de 30% en vestidos de verano. Te lo envío en un momento por acá.
+      <span class="time">14:25</span>
+    </div>
+
+    <div class="narrator"><span class="queue-badge">ENQUEUED: generate_copy (4s)</span> con payload {promo: "30% vestidos verano", industry: "moda"}. Se ejecuta en el cron processor, no en setTimeout.</div>
+
+    <div class="msg out">
+      Acá tienes tu copy para Meta Ads:
+      <br><br>
+      <b>Headline:</b> Vestidos de verano con 30% OFF<br>
+      <b>Primary text:</b> El verano no espera y tus vestidos favoritos tampoco. Lleva el tuyo con 30% de descuento solo por esta semana. Envío gratis sobre $30.000.<br>
+      <b>CTA:</b> Comprar ahora<br>
+      <br>
+      Si quieres variantes o ajustar el tono, dime!
+      <span class="time">14:26</span>
+    </div>
+
+    <div class="narrator">Copy real generado por Claude y entregado via task queue. Antes el setTimeout moría y el copy nunca llegaba. <b>(Fase 3: Task Queue)</b></div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <div class="edge-label">10. Fallback — task queue falla 3 veces</div>
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <div class="narrator">⚠️ Simulación: Gemini API está caída. El mockup falla 3 veces consecutivas.</div>
+
+    <div class="msg in">
+      Puedes generarme un mockup de cómo se vería mi anuncio?
+      <span class="time">14:30</span>
+    </div>
+
+    <div class="msg out">
+      Te genero un mockup visual de tu anuncio con la promo de vestidos. Te lo mando en unos momentos!
+      <span class="time">14:30</span>
+    </div>
+
+    <div class="narrator"><span class="queue-badge">ENQUEUED: send_mockup (5s)</span> → Intento 1: falla (Gemini 503) → Retry 60s → Intento 2: falla → Retry 120s → Intento 3: falla → FALLBACK</div>
+
+    <div class="msg out">
+      No pude generar el mockup en este momento, pero no te preocupes — en la reunión te lo muestro en vivo con tu marca y productos reales. Agenda acá: meetings.hubspot.com/jose-manuel15
+      <span class="time">14:35</span>
+    </div>
+
+    <div class="narrator">Después de 3 intentos fallidos, el task queue envía mensaje fallback honesto en vez de dejar al prospecto esperando para siempre. <b>(Fase 3: retry + fallback)</b></div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <div class="edge-label">11. Industria rara — no inventa caso de éxito</div>
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <div class="narrator">⏩ Nueva conversación: otro prospecto de una industria sin caso de éxito.</div>
+
+    <div class="msg in">
+      Hola, tengo una empresa de arriendo de maquinaria pesada. Steve me sirve?
+      <span class="time">16:01</span>
+    </div>
+
+    <div class="msg out">
+      Hola! Steve está diseñado principalmente para e-commerce y marcas que venden online. Si tienes una tienda Shopify o vendes por tu web, podemos ayudarte con Meta Ads, Google Ads, email marketing y análisis de métricas.
+      <br><br>
+      Para arriendo de maquinaria, Steve podría ayudarte con campañas de Google Ads (search) para captar clientes que buscan arriendo, y con email marketing para mantener relación con tu base. Pero no tenemos un caso específico en tu industria.
+      <span class="time">16:01</span>
+    </div>
+
+    <div class="msg out">
+      Quieres agendar una reunión de 15 min? Así evaluamos juntos si Steve es fit para tu negocio. Sin compromiso.
+      <span class="time">16:01</span>
+    </div>
+
+    <div class="narrator">Antes Steve inventaba: "Ayudamos a MaquiRent en Perú a bajar CPA 60%". Ahora es honesto: no tiene caso en esa industria pero sugiere qué módulos podrían servir. <b>(Fase 2: anti-alucinación)</b></div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <div class="edge-label">12. Precios viejos corregidos</div>
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <div class="msg in">
+      Cuánto cuesta el plan más caro?
+      <span class="time">16:05</span>
+    </div>
+
+    <div class="msg out">
+      El plan Full está a $99.995/mes con el 50% de descuento de lanzamiento (precio normal $199.990/mes). Incluye todo: dashboard, IA, generación de contenido, ejecución de campañas, email, WhatsApp, y optimización continua. Es como tener una agencia completa trabajando 24/7.
+      <span class="time">16:05</span>
+    </div>
+
+    <div class="narrator">Antes el deck decía "$590K/mes". Ahora usa precios reales del catálogo: $199.990 → $99.995 con 50% OFF. <b>(Fase 4: fix precios)</b></div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <div class="edge-label">13. Múltiples tags en una respuesta</div>
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <div class="msg in">
+      Me interesa! Mandame un caso de éxito, un copy de ejemplo y una presentación para mi jefe
+      <span class="time">16:10</span>
+    </div>
+
+    <div class="msg out">
+      Perfecto! Te preparo las 3 cosas. Dame unos momentos y te las envío por acá:
+      <br><br>
+      1. Un caso de éxito relevante para tu industria<br>
+      2. Un copy de ejemplo para Meta Ads<br>
+      3. Una presentación personalizada para tu jefe
+      <span class="time">16:10</span>
+    </div>
+
+    <div class="narrator">
+      3 acciones encoladas en paralelo:<br>
+      <span class="queue-badge">send_case_study (3s)</span>
+      <span class="queue-badge">generate_copy (4s)</span>
+      <span class="queue-badge">send_deck (7s)</span><br>
+      Cada una se ejecuta independientemente en el cron processor. Si una falla, las otras siguen. <b>(Fase 3: Task Queue paralelo)</b>
+    </div>
+
+    <div class="msg out">
+      <b>Caso de éxito — E-commerce general:</b>
+      <br><br>
+      Steve centraliza todas las herramientas de marketing en una sola plataforma: Shopify Analytics, Meta Ads, Google Ads, email marketing y WhatsApp. Genera copies con IA, automatiza emails de carrito abandonado, analiza competencia y entrega reportes semanales.
+      <span class="time">16:10</span>
+    </div>
+
+    <div class="msg out">
+      <b>Copy de ejemplo para Meta Ads:</b>
+      <br><br>
+      Headline: Arrienda maquinaria pesada sin complicaciones<br>
+      Primary: ¿Necesitas una retroexcavadora o grúa para tu obra? Cotiza online en 2 minutos y recíbela en tu faena. +500 equipos disponibles.<br>
+      CTA: Cotizar ahora
+      <span class="time">16:11</span>
+    </div>
+
+    <div class="msg out">
+      <b>Propuesta Steve para [Arriendo Maquinaria]</b>
+      <br><br>
+      Recomendación: Plan Estrategia ($49.995/mes)<br>
+      ✓ Google Ads para captar búsquedas de arriendo<br>
+      ✓ Steve IA genera copies para cada tipo de maquinaria<br>
+      ✓ Email marketing para reactivar clientes pasados<br>
+      ✓ Dashboard con métricas de costo por lead<br>
+      <br>
+      Agenda tu demo: meetings.hubspot.com/jose-manuel15
+      <span class="time">16:12</span>
+    </div>
+
+    <div class="narrator">Las 3 entregas llegaron escalonadas (3s, 4s, 7s) sin bloquear la conversación. Antes ninguna llegaba porque setTimeout moría. <b>(Fase 3 + 4)</b></div>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <div class="edge-label">Resumen de edge cases cubiertos</div>
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <div class="narrator" style="text-align: left; max-width: 95%; line-height: 1.6;">
+      <b>13 edge cases demostrados:</b><br>
+      1. Product knowledge completo (14 módulos)<br>
+      2. Features que antes no conocía (WhatsApp, Steve Mail)<br>
+      3. Caso de éxito sin métricas inventadas<br>
+      4. Mensaje largo split en límite de palabra<br>
+      5. Presentación entregada via task queue<br>
+      6. Video demo enviado via task queue<br>
+      7. Anti-alucinación ante pedido de ROI<br>
+      8. Rolling summary en conversación larga (msg #45+)<br>
+      9. Copy generation via task queue<br>
+      10. Fallback honesto cuando API falla 3 veces<br>
+      11. Industria sin caso — no inventa<br>
+      12. Precios corregidos ($99.995 no $590K)<br>
+      13. Múltiples acciones encoladas en paralelo
+    </div>
+
+    <div style="height: 20px;"></div>
+  </div>
+
+  <div class="bottom">
+    <input type="text" placeholder="Escribe un mensaje..." disabled>
+    <button class="send-btn">➤</button>
+  </div>
+</div>
+
+</body>
+</html>

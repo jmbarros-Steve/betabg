@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>El Chino — Functional Checks #1-100</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 24px; margin-bottom: 6px; }
+  .sub { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
+
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  .card { background: #1e293b; border-radius: 10px; padding: 16px; text-align: center; border: 1px solid #334155; }
+  .card .n { font-size: 36px; font-weight: 800; }
+  .card .l { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .red { color: #f87171; } .green { color: #4ade80; } .orange { color: #fb923c; } .blue { color: #60a5fa; } .gray { color: #64748b; }
+
+  .check-row { background: #1e293b; border-radius: 10px; padding: 18px 20px; margin-bottom: 10px; border-left: 4px solid #334155; }
+  .check-row.has-code { border-left-color: #60a5fa; }
+  .check-row.fail { border-left-color: #f87171; }
+  .check-row.error { border-left-color: #fb923c; }
+  .check-row.skip { border-left-color: #475569; }
+
+  .check-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .check-num { font-size: 20px; font-weight: 800; }
+  .badges { display: flex; gap: 6px; }
+  .badge { padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+  .b-critical { background: #7f1d1d; color: #fca5a5; }
+  .b-high { background: #78350f; color: #fcd34d; }
+  .b-medium { background: #1e3a5f; color: #93c5fd; }
+  .b-skip { background: #334155; color: #94a3b8; }
+  .b-fail { background: #991b1b; color: #fca5a5; }
+  .b-error { background: #92400e; color: #fcd34d; }
+  .b-platform { background: #1e293b; color: #94a3b8; border: 1px solid #475569; }
+
+  .desc { font-size: 15px; margin-bottom: 10px; }
+  .config { font-size: 12px; color: #64748b; font-family: monospace; background: #0f172a; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; }
+
+  .code-status { font-size: 13px; padding: 10px 14px; border-radius: 8px; }
+  .code-yes { background: #172554; border: 1px solid #1d4ed8; }
+  .code-no { background: #1c1917; border: 1px solid #44403c; }
+  .code-idea { background: #0c1a0f; border: 1px solid #166534; color: #86efac; font-size: 13px; margin-top: 8px; padding: 8px 12px; border-radius: 6px; }
+
+  .section-title { font-size: 18px; font-weight: 700; margin: 28px 0 14px; padding-bottom: 8px; border-bottom: 1px solid #334155; }
+</style>
+</head>
+<body>
+
+<h1>Functional Checks #1-100: Crear, Verificar, Borrar</h1>
+<p class="sub">14 checks funcionales dentro de los primeros 100 &mdash; 3 Abril 2026</p>
+
+<div class="summary">
+  <div class="card"><div class="n blue">14</div><div class="l">Checks funcionales</div></div>
+  <div class="card"><div class="n red">12</div><div class="l">En SKIP (sin codigo)</div></div>
+  <div class="card"><div class="n orange">2</div><div class="l">Con codigo pero fallan</div></div>
+  <div class="card"><div class="n green">0</div><div class="l">Funcionando</div></div>
+</div>
+
+<!-- ==================== GRUPO 1: Tienen codigo ==================== -->
+<div class="section-title">Con codigo implementado (2 checks) &mdash; pero fallan</div>
+
+<!-- #36 -->
+<div class="check-row fail">
+  <div class="check-header">
+    <span class="check-num">#36</span>
+    <div class="badges">
+      <span class="badge b-platform">klaviyo</span>
+      <span class="badge b-critical">critical</span>
+      <span class="badge b-fail">FAIL</span>
+    </div>
+  </div>
+  <div class="desc">Push email test a Klaviyo &rarr; existe &rarr; borrar</div>
+  <div class="config">check_config: { action: "push_test_email", verify: "get_campaign", cleanup: true }</div>
+  <div class="code-status code-yes">
+    <b>El codigo SI lo maneja:</b> Crea campana test en Klaviyo API &rarr; espera 5s &rarr; verifica que existe &rarr; la borra.<br>
+    <b>Por que falla:</b> Posible API key invalida, o Klaviyo rechazo la creacion (permisos, plan, o formato de payload).
+  </div>
+  <div class="code-idea">Para arreglar: revisar logs de Chino, verificar que la API key de Klaviyo tenga permisos de write en campaigns.</div>
+</div>
+
+<!-- #47 -->
+<div class="check-row error">
+  <div class="check-header">
+    <span class="check-num">#47</span>
+    <div class="badges">
+      <span class="badge b-platform">shopify</span>
+      <span class="badge b-high">high</span>
+      <span class="badge b-error">ERROR</span>
+    </div>
+  </div>
+  <div class="desc">Crear descuento test &rarr; existe en Shopify &rarr; borrar</div>
+  <div class="config">check_config: { code: "QA_TEST_CHINO", action: "create_discount", cleanup: true }</div>
+  <div class="code-status code-yes">
+    <b>El codigo SI lo maneja:</b> Crea price rule en Shopify API &rarr; espera 5s &rarr; verifica que existe &rarr; la borra.<br>
+    <b>Por que da error:</b> Posible token expirado, store_url incorrecto, o error de permisos en el scope del token.
+  </div>
+  <div class="code-idea">Para arreglar: revisar que merchant tenga store_url y token valido. Verificar scope "write_price_rules" en el token Shopify.</div>
+</div>
+
+<!-- ==================== GRUPO 2: Steve Chat ==================== -->
+<div class="section-title">Steve Chat (5 checks) &mdash; sin codigo</div>
+
+<!-- #41 -->
+<div class="check-row skip">
+  <div class="check-header">
+    <span class="check-num">#41</span>
+    <div class="badges">
+      <span class="badge b-platform">steve_chat</span>
+      <span class="badge b-critical">critical</span>
+      <span class="badge b-skip">SKIP</span>
+    </div>
+  </div>
+  <div class="desc">Steve Chat responde a "cuanto vendi esta semana"</div>
+  <div class="config">check_config: { test_message: "cuanto vendi esta semana", expect_contains_number: true }</div>
+  <div class="code-status code-no">
+    <b>No tiene codigo.</b> Cae al fallback "check_config missing action" y retorna skip.
+  </div>
+  <div class="code-idea">
+    <b>Como implementar:</b> POST a /api/steve-chat con el test_message. Verificar que la respuesta contiene al menos un numero ($, cifra). Si responde con datos reales &rarr; pass. Si dice "no tengo datos" o no responde &rarr; fail.
+  </div>
+</div>
+
+<!-- #42 -->
+<div class="check-row skip">
+  <div class="check-header">
+    <span class="check-num">#42</span>
+    <div class="badges">
+      <span class="badge b-platform">steve_chat</span>
+      <span class="badge b-high">high</span>
+      <span class="badge b-skip">SKIP</span>
+    </div>
+  </div>
+  <div class="desc">Steve Chat responde en &lt; 10 segundos</div>
+  <div class="config">check_config: { max_ms: 10000 }</div>
+  <div class="code-status code-no">
+    <b>No tiene codigo.</b> La config tiene max_ms pero no tiene action, asi que se salta.
+  </div>
+  <div class="code-idea">
+    <b>Como implementar:</b> POST a /api/steve-chat con "hola", medir tiempo. Si elapsed &lt; 10000ms &rarr; pass.
+  </div>
+</div>
+
+<!-- #75 -->
+<div class="check-row skip">
+  <div class="check-header">
+    <span class="check-num">#75</span>
+    <div class="badges">
+      <span class="badge b-platform">steve_chat</span>
+      <span class="badge b-medium">medium</span>
+      <span class="badge b-skip">SKIP</span>
+    </div>
+  </div>
+  <div class="desc">Steve Chat: context builder incluye datos de Shopify/Meta/Klaviyo</div>
+  <div class="config">check_config: {}</div>
+  <div class="code-status code-no"><b>No tiene codigo.</b></div>
+  <div class="code-idea">
+    <b>Como implementar:</b> POST a /api/steve-chat con "dame un resumen de mis metricas". Verificar que la respuesta menciona al menos 2 de: Shopify, Meta, Klaviyo, ventas, campanas, emails.
+  </div>
+</div>
+
+<!-- #77 -->
+<div class="check-row skip">
+  <div class="check-header">
+    <span class="check-num">#77</span>
+    <div class="badges">
+      <span class="badge b-platform">steve_chat</span>
+      <span class="badge b-medium">medium</span>
+      <span class="badge b-skip">SKIP</span>
+    </div>
+  </div>
+  <div class="desc">Steve Chat: prospect flow detecta URLs y hace scraping</div>
+  <div class="config">check_config: {}</div>
+  <div class="code-status code-no"><b>No tiene codigo.</b></div>
+  <div class="code-idea">
+    <b>Como implementar:</b> POST a /api/steve-chat con "analiza https://www.example.com". Verificar que responde con info del sitio (no un error generico). Dificil de testear sin un prospect real.
+  </div>
+</div>
+
+<!-- #78 -->
+<div class="check-row skip">
+  <div class="check-header">
+    <span class="check-num">#78</span>
+    <div class="badges">
+      <span class="badge b-platform">steve_chat</span>
+      <span class="badge b-medium">medium</span>
+      <span class="badge b-skip">SKIP</span>
+    </div>
+  </div>
+  <div class="desc">Steve Chat: multi-brain (investigator, strategist, conversationalist) responde</div>
+  <div class="config">check_config: {}</div>
+  <div class="code-status code-no"><b>No tiene codigo.</b></div>
+  <div class="code-idea">
+    <b>Como implementar:</b> POST a /api/steve-chat con mensaje que active multiples brains. Verificar que responde sin error. Dificil validar que usa multi-brain internamente.
+  </div>
+</div>
+
+<!-- #79 -->
+<div class="check-row skip">
+  <div class="check-header">
+    <span class="check-num">#79</span>
+    <div class="badges">
+      <span class="badge b-platform">steve_chat</span>
+      <span class="badge b-medium">medium</span>
+      <span class="badge b-skip">SKIP</span>
+    </div>
+  </div>
+  <div class="desc">Steve Chat: audio transcription funciona para audios WhatsApp</div>
+  <div class="config">check_config: {}</div>
+  <div class="code-status code-no"><b>No tiene codigo.</b></div>
+  <div class="code-idea">
+    <b>Dificil de testear automaticamente.</b> Requiere enviar un audio real via WhatsApp y verificar transcripcion. Puede quedar como skip o test manual.
+  </div>
+</div>
+
+<!-- #80 -->
+<div class="check-row skip">
+  <div class="check-header">
+    <span class="check-num">#80</span>
+    <div class="badges">
+      <span class="badge b-platform">steve_chat</span>
+      <span class="badge b-medium">medium</span>
+      <span class="badge b-skip">SKIP</span>
+    </div>
+  </div>
+  <div class="desc">Steve Chat: image vision funciona para imagenes WhatsApp</div>
+  <div class="config">check_config: {}</div>
+  <div class="code-status code-no"><b>No tiene codigo.</b></div>
+  <div class="code-idea">
+    <b>Dificil de testear automaticamente.</b> Requiere enviar una imagen via WhatsApp y verificar vision. Puede quedar como skip o test manual.
+  </div>
+</div>
+
+<!-- ==================== GRUPO 3: SteveMail ==================== -->
+<div class="section-title">SteveMail (4 checks) &mdash; sin codigo</div>
+
+<!-- #45 -->
+<div class="check-row skip">
+  <div class="check-header">
+    <span class="check-num">#45</span>
+    <div class="badges">
+      <span class="badge b-platform">stevemail</span>
+      <span class="badge b-high">high</span>
+      <span class="badge b-skip">SKIP</span>
+    </div>
+  </div>
+  <div class="desc">Crear template de test &rarr; se guarda en email_templates</div>
+  <div class="config">check_config: { cleanup: true }</div>
+  <div class="code-status code-no"><b>No tiene codigo.</b> Tiene cleanup:true pero no tiene action.</div>
+  <div class="code-idea">
+    <b>Como implementar:</b> INSERT en tabla email_templates con datos de test &rarr; verificar que se guardo &rarr; DELETE. Es una prueba directa contra Supabase, no necesita API externa.
+  </div>
+</div>
+
+<!-- #64 -->
+<div class="check-row skip">
+  <div class="check-header">
+    <span class="check-num">#64</span>
+    <div class="badges">
+      <span class="badge b-platform">stevemail</span>
+      <span class="badge b-high">high</span>
+      <span class="badge b-skip">SKIP</span>
+    </div>
+  </div>
+  <div class="desc">SteveMail: click tracking /email-track/click redirige correctamente</div>
+  <div class="config">check_config: {}</div>
+  <div class="code-status code-no"><b>No tiene codigo.</b></div>
+  <div class="code-idea">
+    <b>Como implementar:</b> GET a /api/email-track/click?url=https://example.com&id=test. Verificar que retorna redirect (302) o la URL destino. Si da 404 o error &rarr; fail.
+  </div>
+</div>
+
+<!-- #65 -->
+<div class="check-row skip">
+  <div class="check-header">
+    <span class="check-num">#65</span>
+    <div class="badges">
+      <span class="badge b-platform">stevemail</span>
+      <span class="badge b-critical">critical</span>
+      <span class="badge b-skip">SKIP</span>
+    </div>
+  </div>
+  <div class="desc">SteveMail: unsubscribe link funciona y actualiza estado en DB</div>
+  <div class="config">check_config: {}</div>
+  <div class="code-status code-no"><b>No tiene codigo.</b></div>
+  <div class="code-idea">
+    <b>Como implementar:</b> Crear subscriber test en DB &rarr; llamar endpoint /api/email-unsubscribe?id=test &rarr; verificar que subscriber quedo unsubscribed en DB &rarr; cleanup. CAN-SPAM requiere que esto funcione.
+  </div>
+</div>
+
+<!-- #68 -->
+<div class="check-row skip">
+  <div class="check-header">
+    <span class="check-num">#68</span>
+    <div class="badges">
+      <span class="badge b-platform">stevemail</span>
+      <span class="badge b-medium">medium</span>
+      <span class="badge b-skip">SKIP</span>
+    </div>
+  </div>
+  <div class="desc">SteveMail: AB testing crea variantes correctamente</div>
+  <div class="config">check_config: {}</div>
+  <div class="code-status code-no"><b>No tiene codigo.</b></div>
+  <div class="code-idea">
+    <b>Como implementar:</b> POST a endpoint de crear campana con AB test &rarr; verificar que se crearon 2 variantes en DB &rarr; cleanup.
+  </div>
+</div>
+
+<!-- #69 -->
+<div class="check-row skip">
+  <div class="check-header">
+    <span class="check-num">#69</span>
+    <div class="badges">
+      <span class="badge b-platform">stevemail</span>
+      <span class="badge b-high">high</span>
+      <span class="badge b-skip">SKIP</span>
+    </div>
+  </div>
+  <div class="desc">SteveMail: flow engine ejecuta pasos en orden correcto</div>
+  <div class="config">check_config: {}</div>
+  <div class="code-status code-no"><b>No tiene codigo.</b></div>
+  <div class="code-idea">
+    <b>Como implementar:</b> Verificar que existe al menos 1 flow activo en DB con steps ordenados. Validar que step_order es secuencial y no tiene gaps. No requiere ejecutar el flow.
+  </div>
+</div>
+
+<!-- ==================== RESUMEN ==================== -->
+<div style="background:#1e293b;border-radius:12px;padding:24px;margin-top:30px;border:2px solid #3b82f6;">
+  <h2 style="margin-bottom:14px;">Resumen: 14 functional checks (#1-100)</h2>
+  <table style="width:100%;font-size:14px;border-collapse:collapse;">
+    <tr style="background:#334155;"><th style="padding:10px;text-align:left;">#</th><th style="padding:10px;text-align:left;">Que hace</th><th style="padding:10px;text-align:left;">Plataforma</th><th style="padding:10px;text-align:left;">Sev</th><th style="padding:10px;text-align:left;">Hoy</th><th style="padding:10px;text-align:left;">Tiene codigo?</th></tr>
+    <tr style="border-bottom:1px solid #334155;"><td style="padding:8px;font-weight:700;">36</td><td style="padding:8px;">Crear email test en Klaviyo</td><td style="padding:8px;">Klaviyo</td><td style="padding:8px;"><span class="badge b-critical">critical</span></td><td style="padding:8px;"><span class="badge b-fail">FAIL</span></td><td style="padding:8px;color:#60a5fa;">Si, pero falla</td></tr>
+    <tr style="border-bottom:1px solid #334155;background:#1e293b44;"><td style="padding:8px;font-weight:700;">41</td><td style="padding:8px;">Chat responde "cuanto vendi"</td><td style="padding:8px;">Steve Chat</td><td style="padding:8px;"><span class="badge b-critical">critical</span></td><td style="padding:8px;"><span class="badge b-skip">SKIP</span></td><td style="padding:8px;color:#f87171;">No</td></tr>
+    <tr style="border-bottom:1px solid #334155;"><td style="padding:8px;font-weight:700;">42</td><td style="padding:8px;">Chat responde en &lt;10s</td><td style="padding:8px;">Steve Chat</td><td style="padding:8px;"><span class="badge b-high">high</span></td><td style="padding:8px;"><span class="badge b-skip">SKIP</span></td><td style="padding:8px;color:#f87171;">No</td></tr>
+    <tr style="border-bottom:1px solid #334155;background:#1e293b44;"><td style="padding:8px;font-weight:700;">45</td><td style="padding:8px;">Crear template en email_templates</td><td style="padding:8px;">SteveMail</td><td style="padding:8px;"><span class="badge b-high">high</span></td><td style="padding:8px;"><span class="badge b-skip">SKIP</span></td><td style="padding:8px;color:#f87171;">No</td></tr>
+    <tr style="border-bottom:1px solid #334155;"><td style="padding:8px;font-weight:700;">47</td><td style="padding:8px;">Crear descuento en Shopify</td><td style="padding:8px;">Shopify</td><td style="padding:8px;"><span class="badge b-high">high</span></td><td style="padding:8px;"><span class="badge b-error">ERROR</span></td><td style="padding:8px;color:#fb923c;">Si, pero error</td></tr>
+    <tr style="border-bottom:1px solid #334155;background:#1e293b44;"><td style="padding:8px;font-weight:700;">64</td><td style="padding:8px;">Click tracking redirige</td><td style="padding:8px;">SteveMail</td><td style="padding:8px;"><span class="badge b-high">high</span></td><td style="padding:8px;"><span class="badge b-skip">SKIP</span></td><td style="padding:8px;color:#f87171;">No</td></tr>
+    <tr style="border-bottom:1px solid #334155;"><td style="padding:8px;font-weight:700;">65</td><td style="padding:8px;">Unsubscribe funciona y actualiza DB</td><td style="padding:8px;">SteveMail</td><td style="padding:8px;"><span class="badge b-critical">critical</span></td><td style="padding:8px;"><span class="badge b-skip">SKIP</span></td><td style="padding:8px;color:#f87171;">No</td></tr>
+    <tr style="border-bottom:1px solid #334155;background:#1e293b44;"><td style="padding:8px;font-weight:700;">68</td><td style="padding:8px;">AB testing crea variantes</td><td style="padding:8px;">SteveMail</td><td style="padding:8px;"><span class="badge b-medium">medium</span></td><td style="padding:8px;"><span class="badge b-skip">SKIP</span></td><td style="padding:8px;color:#f87171;">No</td></tr>
+    <tr style="border-bottom:1px solid #334155;"><td style="padding:8px;font-weight:700;">69</td><td style="padding:8px;">Flow engine ejecuta pasos en orden</td><td style="padding:8px;">SteveMail</td><td style="padding:8px;"><span class="badge b-high">high</span></td><td style="padding:8px;"><span class="badge b-skip">SKIP</span></td><td style="padding:8px;color:#f87171;">No</td></tr>
+    <tr style="border-bottom:1px solid #334155;background:#1e293b44;"><td style="padding:8px;font-weight:700;">75</td><td style="padding:8px;">Context builder con datos multi-plat</td><td style="padding:8px;">Steve Chat</td><td style="padding:8px;"><span class="badge b-medium">medium</span></td><td style="padding:8px;"><span class="badge b-skip">SKIP</span></td><td style="padding:8px;color:#f87171;">No</td></tr>
+    <tr style="border-bottom:1px solid #334155;"><td style="padding:8px;font-weight:700;">77</td><td style="padding:8px;">Prospect flow detecta URLs</td><td style="padding:8px;">Steve Chat</td><td style="padding:8px;"><span class="badge b-medium">medium</span></td><td style="padding:8px;"><span class="badge b-skip">SKIP</span></td><td style="padding:8px;color:#f87171;">No</td></tr>
+    <tr style="border-bottom:1px solid #334155;background:#1e293b44;"><td style="padding:8px;font-weight:700;">78</td><td style="padding:8px;">Multi-brain responde</td><td style="padding:8px;">Steve Chat</td><td style="padding:8px;"><span class="badge b-medium">medium</span></td><td style="padding:8px;"><span class="badge b-skip">SKIP</span></td><td style="padding:8px;color:#f87171;">No</td></tr>
+    <tr style="border-bottom:1px solid #334155;"><td style="padding:8px;font-weight:700;">79</td><td style="padding:8px;">Audio transcription WhatsApp</td><td style="padding:8px;">Steve Chat</td><td style="padding:8px;"><span class="badge b-medium">medium</span></td><td style="padding:8px;"><span class="badge b-skip">SKIP</span></td><td style="padding:8px;color:#f87171;">No</td></tr>
+    <tr><td style="padding:8px;font-weight:700;">80</td><td style="padding:8px;">Image vision WhatsApp</td><td style="padding:8px;">Steve Chat</td><td style="padding:8px;"><span class="badge b-medium">medium</span></td><td style="padding:8px;"><span class="badge b-skip">SKIP</span></td><td style="padding:8px;color:#f87171;">No</td></tr>
+  </table>
+
+  <div style="margin-top:20px;padding:16px;background:#0f172a;border-radius:8px;">
+    <p style="font-size:14px;margin-bottom:12px;"><b>Implementables ahora (sin features nuevas):</b></p>
+    <ul style="padding-left:20px;font-size:13px;color:#94a3b8;line-height:1.8;">
+      <li><b class="green">#36</b> &mdash; Arreglar: debug por que falla la creacion en Klaviyo (ya tiene codigo)</li>
+      <li><b class="green">#47</b> &mdash; Arreglar: debug por que da error en Shopify (ya tiene codigo)</li>
+      <li><b class="green">#41</b> &mdash; Nuevo: POST a steve-chat + verificar que responde con numeros</li>
+      <li><b class="green">#42</b> &mdash; Nuevo: POST a steve-chat + medir tiempo &lt; 10s</li>
+      <li><b class="green">#45</b> &mdash; Nuevo: INSERT en email_templates + verificar + DELETE</li>
+      <li><b class="green">#64</b> &mdash; Nuevo: GET a /email-track/click + verificar redirect</li>
+      <li><b class="green">#65</b> &mdash; Nuevo: crear subscriber test + unsubscribe + verificar DB</li>
+      <li><b class="green">#69</b> &mdash; Nuevo: query flows en DB + verificar steps ordenados</li>
+      <li><b class="green">#75</b> &mdash; Nuevo: POST a steve-chat preguntando metricas + verificar menciona plataformas</li>
+    </ul>
+    <p style="font-size:14px;margin-top:16px;margin-bottom:8px;"><b>Dificiles de automatizar (pueden quedar como skip):</b></p>
+    <ul style="padding-left:20px;font-size:13px;color:#64748b;line-height:1.8;">
+      <li><b>#68</b> &mdash; AB testing: necesita endpoint especifico que puede no existir</li>
+      <li><b>#77</b> &mdash; Prospect flow con URLs: depende de scraping externo</li>
+      <li><b>#78</b> &mdash; Multi-brain: dificil verificar que usa multiples brains internamente</li>
+      <li><b>#79</b> &mdash; Audio transcription: requiere enviar audio real via WhatsApp</li>
+      <li><b>#80</b> &mdash; Image vision: requiere enviar imagen real via WhatsApp</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

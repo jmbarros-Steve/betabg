@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El Chino — Checks 1-100</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0f; color: #e0e0e0; padding: 20px; }
+  h1 { text-align: center; font-size: 2.2em; margin: 30px 0 10px; color: #fff; }
+  .subtitle { text-align: center; color: #888; margin-bottom: 30px; font-size: 1.1em; }
+  .stats { display: flex; justify-content: center; gap: 30px; margin-bottom: 40px; flex-wrap: wrap; }
+  .stat { background: #151520; border: 1px solid #2a2a3a; border-radius: 12px; padding: 20px 30px; text-align: center; min-width: 140px; }
+  .stat .num { font-size: 2.5em; font-weight: 700; }
+  .stat .label { color: #888; font-size: 0.85em; margin-top: 4px; }
+  .stat.ok .num { color: #22c55e; }
+  .stat.broken .num { color: #ef4444; }
+  .stat.partial .num { color: #f59e0b; }
+  .stat.total .num { color: #8b5cf6; }
+
+  .group { margin-bottom: 40px; }
+  .group-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 20px; background: #151520; border-radius: 12px 12px 0 0;
+    border: 1px solid #2a2a3a; border-bottom: none;
+  }
+  .group-icon { font-size: 1.5em; }
+  .group-title { font-size: 1.3em; font-weight: 600; color: #fff; }
+  .group-count { color: #888; font-size: 0.9em; margin-left: auto; }
+
+  table { width: 100%; border-collapse: collapse; }
+  table th {
+    background: #1a1a28; color: #aaa; font-size: 0.75em; text-transform: uppercase;
+    letter-spacing: 0.05em; padding: 10px 14px; text-align: left;
+    border: 1px solid #2a2a3a;
+  }
+  table td {
+    padding: 12px 14px; border: 1px solid #1e1e2e; font-size: 0.9em;
+    vertical-align: top; background: #111118;
+  }
+  table tr:hover td { background: #18182a; }
+
+  .check-num {
+    font-weight: 700; font-size: 1.1em; color: #8b5cf6;
+    min-width: 36px; display: inline-block; text-align: center;
+  }
+  .severity {
+    display: inline-block; padding: 2px 8px; border-radius: 6px;
+    font-size: 0.75em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .severity.critical { background: #7f1d1d; color: #fca5a5; }
+  .severity.high { background: #78350f; color: #fcd34d; }
+  .severity.medium { background: #1e3a5f; color: #93c5fd; }
+  .severity.low { background: #1a2e1a; color: #86efac; }
+
+  .type-tag {
+    display: inline-block; padding: 2px 8px; border-radius: 6px;
+    font-size: 0.72em; font-weight: 500; background: #1e1e2e; color: #a0a0c0;
+    border: 1px solid #2a2a3a;
+  }
+
+  .status-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 8px;
+    font-size: 0.78em; font-weight: 600;
+  }
+  .status-badge.funciona { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+  .status-badge.roto { background: #450a0a; color: #f87171; border: 1px solid #991b1b; }
+  .status-badge.parcial { background: #451a03; color: #fbbf24; border: 1px solid #92400e; }
+
+  .pass-cell { color: #4ade80; font-size: 0.85em; }
+  .fail-cell { color: #f87171; font-size: 0.85em; }
+  .measure-cell { color: #c4b5fd; font-size: 0.85em; }
+
+  .legend { display: flex; justify-content: center; gap: 20px; margin: 20px 0 30px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.85em; color: #aaa; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .legend-dot.green { background: #4ade80; }
+  .legend-dot.red { background: #f87171; }
+  .legend-dot.yellow { background: #fbbf24; }
+
+  .config-pill {
+    display: inline-block; padding: 1px 6px; border-radius: 4px;
+    font-size: 0.72em; background: #1a1a28; color: #8b8ba0; margin: 1px 2px;
+    font-family: monospace;
+  }
+  .config-empty { color: #555; font-style: italic; font-size: 0.8em; }
+
+  @media (max-width: 900px) {
+    table { font-size: 0.8em; }
+    td, th { padding: 8px 6px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>El Chino — 100 Checks</h1>
+<p class="subtitle">Qué mide cada check, cuándo pasa, cuándo falla, y si funciona hoy</p>
+
+<div class="stats">
+  <div class="stat total"><div class="num">100</div><div class="label">Total Checks</div></div>
+  <div class="stat ok"><div class="num">38</div><div class="label">Funcionan</div></div>
+  <div class="stat partial"><div class="num">12</div><div class="label">Parcial</div></div>
+  <div class="stat broken"><div class="num">50</div><div class="label">Falta código</div></div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot green"></div> Funciona — tiene lógica en código</div>
+  <div class="legend-item"><div class="legend-dot yellow"></div> Parcial — cae en fallback genérico</div>
+  <div class="legend-item"><div class="legend-dot red"></div> Roto — skip siempre o no implementado</div>
+</div>
+
+<!-- ═══════════════════ GRUPO: CONNECTIVITY 1-6 ═══════════════════ -->
+<div class="group">
+<div class="group-header">
+  <span class="group-icon">🔌</span>
+  <span class="group-title">Connectivity — Tokens responden</span>
+  <span class="group-count">Checks 1-6</span>
+</div>
+<table>
+<tr><th>#</th><th>Qué mide</th><th>PASS</th><th>FAIL</th><th>Sev</th><th>Estado</th></tr>
+<tr>
+  <td><span class="check-num">1</span></td>
+  <td>Token Shopify responde 200<br><span class="type-tag">api_compare</span></td>
+  <td class="pass-cell">Shopify API responde 200</td>
+  <td class="fail-cell">API responde != 200 o timeout</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">2</span></td>
+  <td>Token Meta responde 200<br><span class="type-tag">api_compare</span></td>
+  <td class="pass-cell">Meta Graph API responde 200</td>
+  <td class="fail-cell">API responde != 200 o timeout</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">3</span></td>
+  <td>Token Klaviyo responde 200<br><span class="type-tag">api_compare</span></td>
+  <td class="pass-cell">Klaviyo /accounts/ responde 200</td>
+  <td class="fail-cell">API responde 401/403 o timeout</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">4</span></td>
+  <td>Token Shopify no expirado<br><span class="type-tag">token_health</span></td>
+  <td class="pass-cell">Shopify shop.json responde 200</td>
+  <td class="fail-cell">Token rechazado por Shopify</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">5</span></td>
+  <td>Token Meta no expirado (&lt; 55 días)<br><span class="type-tag">token_health</span></td>
+  <td class="pass-cell">Meta responde 200 Y token tiene &lt; 55 días</td>
+  <td class="fail-cell">Token rechazado O tiene &gt; 55 días</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">6</span></td>
+  <td>Todas las conexiones tienen token válido<br><span class="type-tag">api_compare</span></td>
+  <td class="pass-cell">Cada merchant responde 200 en su plataforma</td>
+  <td class="fail-cell">Alguna conexión activa no responde</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+</table>
+</div>
+
+<!-- ═══════════════════ GRUPO: DATA INTEGRITY 7, 10, 15-16 ═══════════════════ -->
+<div class="group">
+<div class="group-header">
+  <span class="group-icon">🧹</span>
+  <span class="group-title">Data Integrity — Datos limpios en DB</span>
+  <span class="group-count">Checks 7, 10, 15-16, 18-20, 29-30, 37-40, 43, 49-50</span>
+</div>
+<table>
+<tr><th>#</th><th>Qué mide</th><th>PASS</th><th>FAIL</th><th>Sev</th><th>Estado</th></tr>
+<tr>
+  <td><span class="check-num">7</span></td>
+  <td>No hay conexiones duplicadas por merchant+plataforma<br><span class="type-tag">data_quality</span></td>
+  <td class="pass-cell">0 duplicados encontrados</td>
+  <td class="fail-cell">Existen 2+ conexiones para mismo merchant+platform</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge parcial">Parcial</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">10</span></td>
+  <td>Ninguna conexión lleva &gt; 24hrs sin sync<br><span class="type-tag">data_quality</span></td>
+  <td class="pass-cell">Todas sincronizaron en las últimas 24h</td>
+  <td class="fail-cell">Hay conexiones que llevan &gt; 24h sin sync</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge parcial">Parcial</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">15</span></td>
+  <td>platform_metrics: revenue no negativo, campos required no null<br><span class="type-tag">data_quality</span></td>
+  <td class="pass-cell">200 rows revisadas, 0 issues</td>
+  <td class="fail-cell">Hay revenue negativo o campos null</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">16</span></td>
+  <td>campaign_metrics: clicks &lt; impressions, spend no negativo<br><span class="type-tag">data_quality</span></td>
+  <td class="pass-cell">200 rows revisadas, 0 issues</td>
+  <td class="fail-cell">Clicks &gt; impressions o spend negativo</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">18</span></td>
+  <td>Imágenes de productos no son 404<br><span class="type-tag">data_quality</span></td>
+  <td class="pass-cell">Sin productos activos con precio=0 o título vacío</td>
+  <td class="fail-cell">Hay productos activos con precio 0 o sin título</td>
+  <td><span class="severity low">low</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">19</span></td>
+  <td>Revenue de hoy &gt; 0 si merchant vende normalmente<br><span class="type-tag">data_quality</span></td>
+  <td class="pass-cell">Sin fechas futuras ni open_rate &gt; 100%</td>
+  <td class="fail-cell">Hay fechas futuras o rates imposibles</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">20</span></td>
+  <td>Orden más reciente es de hoy<br><span class="type-tag">data_quality</span></td>
+  <td class="pass-cell">Sin emails/names vacíos ni duplicados</td>
+  <td class="fail-cell">Hay clientes sin email, sin nombre, o duplicados</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">29</span></td>
+  <td>No hay campañas en Meta que faltan en Steve<br><span class="type-tag">data_quality</span></td>
+  <td class="pass-cell">Todas las campañas Meta están en Steve</td>
+  <td class="fail-cell">Hay campañas en Meta que Steve no tiene</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge parcial">Parcial</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">30</span></td>
+  <td>No hay campañas fantasma en Steve<br><span class="type-tag">data_quality</span></td>
+  <td class="pass-cell">Todas las campañas Steve existen en Meta</td>
+  <td class="fail-cell">Steve tiene campañas que ya no existen en Meta</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge parcial">Parcial</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">37</span></td>
+  <td>No hay campañas Klaviyo que Steve no muestra<br><span class="type-tag">data_quality</span></td>
+  <td class="pass-cell">Todas sincronizadas</td>
+  <td class="fail-cell">Hay campañas Klaviyo faltantes</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge parcial">Parcial</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">38</span></td>
+  <td>Bounce rate &lt; 1%<br><span class="type-tag">data_quality</span> <span class="config-pill">max_bounce: 0.01</span></td>
+  <td class="pass-cell">Bounce rate está bajo control</td>
+  <td class="fail-cell">Bounce rate &gt; 1%</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge parcial">Parcial</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">39</span></td>
+  <td>Spam rate &lt; 0.1%<br><span class="type-tag">data_quality</span> <span class="config-pill">max_spam: 0.001</span></td>
+  <td class="pass-cell">Spam rate está bajo control</td>
+  <td class="fail-cell">Spam rate &gt; 0.1%</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge parcial">Parcial</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">40</span></td>
+  <td>SPF + DKIM verificados<br><span class="type-tag">data_quality</span></td>
+  <td class="pass-cell">Dominio tiene SPF y DKIM</td>
+  <td class="fail-cell">Falta SPF o DKIM</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge parcial">Parcial</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">43</span></td>
+  <td>Steve Chat responde en español<br><span class="type-tag">data_quality</span></td>
+  <td class="pass-cell">Respuesta en español</td>
+  <td class="fail-cell">Respuesta en inglés u otro idioma</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge parcial">Parcial</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">49</span></td>
+  <td>Brief generado menciona datos reales del merchant<br><span class="type-tag">data_quality</span></td>
+  <td class="pass-cell">Brief tiene métricas reales</td>
+  <td class="fail-cell">Brief genérico sin datos del merchant</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge parcial">Parcial</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">50</span></td>
+  <td>Scraping tiene datos de 2025-2026<br><span class="type-tag">data_quality</span></td>
+  <td class="pass-cell">Datos de scraping son recientes</td>
+  <td class="fail-cell">Datos de scraping viejos o vacíos</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge parcial">Parcial</span></td>
+</tr>
+</table>
+</div>
+
+<!-- ═══════════════════ GRUPO: PERFORMANCE 8-9 ═══════════════════ -->
+<div class="group">
+<div class="group-header">
+  <span class="group-icon">⚡</span>
+  <span class="group-title">Performance — Velocidad de respuesta</span>
+  <span class="group-count">Checks 8-9, 48, 60, 66, 71, 82, 89-90</span>
+</div>
+<table>
+<tr><th>#</th><th>Qué mide</th><th>PASS</th><th>FAIL</th><th>Sev</th><th>Estado</th></tr>
+<tr>
+  <td><span class="check-num">8</span></td>
+  <td>steve-api responde en &lt; 2s<br><span class="type-tag">performance</span> <span class="config-pill">max_ms: 2000</span></td>
+  <td class="pass-cell">Health endpoint responde en &lt; 2000ms</td>
+  <td class="fail-cell">Tarda &gt; 2000ms o timeout</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">9</span></td>
+  <td>steve.cl carga en &lt; 3s<br><span class="type-tag">performance</span> <span class="config-pill">max_ms: 3000</span></td>
+  <td class="pass-cell">Landing carga en &lt; 3000ms</td>
+  <td class="fail-cell">Tarda &gt; 3000ms</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">48</span></td>
+  <td>Edge Functions sin errores 500 en 30 min<br><span class="type-tag">performance</span></td>
+  <td class="pass-cell">0 errores 500</td>
+  <td class="fail-cell">Hay errores 500 recientes</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin config</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">60</span></td>
+  <td>Klaviyo push emails endpoint &lt; 5s<br><span class="type-tag">performance</span></td>
+  <td class="pass-cell">Endpoint responde en &lt; 5s</td>
+  <td class="fail-cell">Tarda &gt; 5s</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin config</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">66</span></td>
+  <td>SteveMail send-email &lt; 3s<br><span class="type-tag">performance</span></td>
+  <td class="pass-cell">Endpoint responde en &lt; 3s</td>
+  <td class="fail-cell">Tarda &gt; 3s</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin config</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">71</span></td>
+  <td>Steve Chat responde &lt; 10s<br><span class="type-tag">performance</span></td>
+  <td class="pass-cell">Chat responde en &lt; 10s</td>
+  <td class="fail-cell">Tarda &gt; 10s</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin config</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">82</span></td>
+  <td>Supabase connection pool &lt; 80%<br><span class="type-tag">performance</span></td>
+  <td class="pass-cell">Pool utilización bajo 80%</td>
+  <td class="fail-cell">Pool arriba de 80%</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">89</span></td>
+  <td>Memory Cloud Run &lt; 512MB<br><span class="type-tag">performance</span></td>
+  <td class="pass-cell">Uso de memoria bajo 512MB</td>
+  <td class="fail-cell">Memoria por encima de 512MB</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">90</span></td>
+  <td>p95 latency endpoints &lt; 5s<br><span class="type-tag">performance</span></td>
+  <td class="pass-cell">Percentil 95 latencia bajo 5s</td>
+  <td class="fail-cell">p95 arriba de 5s</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+</table>
+</div>
+
+<!-- ═══════════════════ GRUPO: SHOPIFY COMPARE 11-14, 17 ═══════════════════ -->
+<div class="group">
+<div class="group-header">
+  <span class="group-icon">🛍️</span>
+  <span class="group-title">Shopify — Steve DB vs Shopify API</span>
+  <span class="group-count">Checks 11-14, 17</span>
+</div>
+<table>
+<tr><th>#</th><th>Qué mide</th><th>PASS</th><th>FAIL</th><th>Sev</th><th>Estado</th></tr>
+<tr>
+  <td><span class="check-num">11</span></td>
+  <td>Revenue 7d Steve = Shopify<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 5%</span></td>
+  <td class="pass-cell">Diferencia &lt; 5%</td>
+  <td class="fail-cell">Diferencia &gt; 5% entre Steve y Shopify real</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">12</span></td>
+  <td>Orders count 7d Steve = Shopify<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 0%</span></td>
+  <td class="pass-cell">Mismo número exacto</td>
+  <td class="fail-cell">Diferencia en count de órdenes</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">13</span></td>
+  <td>Productos count Steve = Shopify<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 0%</span></td>
+  <td class="pass-cell">Mismo número exacto</td>
+  <td class="fail-cell">Steve tiene más o menos productos</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">14</span></td>
+  <td>Colecciones count Steve = Shopify<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 0%</span></td>
+  <td class="pass-cell">Mismo número exacto</td>
+  <td class="fail-cell">Steve tiene más o menos colecciones</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">17</span></td>
+  <td>Precios Steve = precios Shopify<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 0%</span></td>
+  <td class="pass-cell">Precios coinciden</td>
+  <td class="fail-cell">Hay precios distintos</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+</table>
+</div>
+
+<!-- ═══════════════════ GRUPO: META COMPARE 21-28 ═══════════════════ -->
+<div class="group">
+<div class="group-header">
+  <span class="group-icon">📘</span>
+  <span class="group-title">Meta Ads — Steve DB vs Meta API</span>
+  <span class="group-count">Checks 21-28</span>
+</div>
+<table>
+<tr><th>#</th><th>Qué mide</th><th>PASS</th><th>FAIL</th><th>Sev</th><th>Estado</th></tr>
+<tr>
+  <td><span class="check-num">21</span></td>
+  <td>Spend 7d Steve = Meta<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 5%</span></td>
+  <td class="pass-cell">Diferencia &lt; 5%</td>
+  <td class="fail-cell">Gasto real difiere &gt; 5%</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">22</span></td>
+  <td>ROAS 7d Steve = Meta<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 10%</span></td>
+  <td class="pass-cell">Diferencia &lt; 10%</td>
+  <td class="fail-cell">ROAS difiere &gt; 10%</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">23</span></td>
+  <td>Campañas activas count Steve = Meta<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 0%</span></td>
+  <td class="pass-cell">Mismo número</td>
+  <td class="fail-cell">Steve muestra campañas que no están activas o faltan</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">24</span></td>
+  <td>Cada campaña activa en Steve está activa en Meta<br><span class="type-tag">api_compare</span></td>
+  <td class="pass-cell">Todas las campañas activas coinciden</td>
+  <td class="fail-cell">Steve muestra activa una campaña pausada</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">25</span></td>
+  <td>Budget por campaña Steve = Meta<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 0%</span></td>
+  <td class="pass-cell">Budgets coinciden</td>
+  <td class="fail-cell">Budget en Steve difiere del real</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">26</span></td>
+  <td>Reach 7d Steve = Meta<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 10%</span></td>
+  <td class="pass-cell">Diferencia &lt; 10%</td>
+  <td class="fail-cell">Reach difiere &gt; 10%</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">27</span></td>
+  <td>Impressions 7d Steve = Meta<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 10%</span></td>
+  <td class="pass-cell">Diferencia &lt; 10%</td>
+  <td class="fail-cell">Impressions difiere &gt; 10%</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">28</span></td>
+  <td>Clicks 7d Steve = Meta<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 10%</span></td>
+  <td class="pass-cell">Diferencia &lt; 10%</td>
+  <td class="fail-cell">Clicks difiere &gt; 10%</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+</table>
+</div>
+
+<!-- ═══════════════════ GRUPO: KLAVIYO COMPARE 31-35 ═══════════════════ -->
+<div class="group">
+<div class="group-header">
+  <span class="group-icon">📧</span>
+  <span class="group-title">Klaviyo — Steve DB vs Klaviyo API</span>
+  <span class="group-count">Checks 31-35</span>
+</div>
+<table>
+<tr><th>#</th><th>Qué mide</th><th>PASS</th><th>FAIL</th><th>Sev</th><th>Estado</th></tr>
+<tr>
+  <td><span class="check-num">31</span></td>
+  <td>Open rate Steve = Klaviyo<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 2%</span></td>
+  <td class="pass-cell">Diferencia &lt; 2%</td>
+  <td class="fail-cell">Open rate difiere &gt; 2%</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">32</span></td>
+  <td>Click rate Steve = Klaviyo<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 2%</span></td>
+  <td class="pass-cell">Diferencia &lt; 2%</td>
+  <td class="fail-cell">Click rate difiere &gt; 2%</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">33</span></td>
+  <td>Emails enviados 7d Steve = Klaviyo<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 0%</span></td>
+  <td class="pass-cell">Mismo count</td>
+  <td class="fail-cell">Count de envíos difiere</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">34</span></td>
+  <td>Subscribers count Steve = Klaviyo<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 0%</span></td>
+  <td class="pass-cell">Mismo count</td>
+  <td class="fail-cell">Count de suscriptores difiere</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">35</span></td>
+  <td>Revenue atribuido Steve = Klaviyo<br><span class="type-tag">api_compare</span> <span class="config-pill">tolerance: 10%</span></td>
+  <td class="pass-cell">Diferencia &lt; 10%</td>
+  <td class="fail-cell">Revenue atribuido difiere &gt; 10%</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+</table>
+</div>
+
+<!-- ═══════════════════ GRUPO: FUNCTIONAL 36, 41-42, 45, 47 ═══════════════════ -->
+<div class="group">
+<div class="group-header">
+  <span class="group-icon">🧪</span>
+  <span class="group-title">Functional — Crear, verificar, borrar</span>
+  <span class="group-count">Checks 36, 41-42, 45, 47, 64-65, 68-69, 75, 77-80</span>
+</div>
+<table>
+<tr><th>#</th><th>Qué mide</th><th>PASS</th><th>FAIL</th><th>Sev</th><th>Estado</th></tr>
+<tr>
+  <td><span class="check-num">36</span></td>
+  <td>Push email test a Klaviyo → existe → borrar<br><span class="type-tag">functional</span></td>
+  <td class="pass-cell">Email se crea, se verifica, se borra</td>
+  <td class="fail-cell">No se creó o no se pudo verificar</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">41</span></td>
+  <td>Steve Chat responde "cuánto vendí esta semana"<br><span class="type-tag">functional</span></td>
+  <td class="pass-cell">Responde con un número</td>
+  <td class="fail-cell">No responde o responde sin datos</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">42</span></td>
+  <td>Steve Chat responde en &lt; 10s<br><span class="type-tag">functional</span> <span class="config-pill">max_ms: 10000</span></td>
+  <td class="pass-cell">Respuesta en &lt; 10 segundos</td>
+  <td class="fail-cell">Tarda &gt; 10 segundos</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">45</span></td>
+  <td>Crear template test → se guarda en email_templates<br><span class="type-tag">functional</span></td>
+  <td class="pass-cell">Template se crea y se borra limpio</td>
+  <td class="fail-cell">No se creó o no se guardó</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">47</span></td>
+  <td>Crear descuento test en Shopify → borrar<br><span class="type-tag">functional</span></td>
+  <td class="pass-cell">Descuento se crea, se verifica, se borra</td>
+  <td class="fail-cell">No se creó o Shopify rechazó</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">64</span></td>
+  <td>Click tracking redirige correctamente<br><span class="type-tag">functional</span></td>
+  <td class="pass-cell">Click → redirect a URL destino</td>
+  <td class="fail-cell">No redirige o da error</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">65</span></td>
+  <td>Unsubscribe funciona y actualiza DB<br><span class="type-tag">functional</span></td>
+  <td class="pass-cell">Link unsubscribe → actualiza estado en DB</td>
+  <td class="fail-cell">Link no funciona o no actualiza</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">68</span></td>
+  <td>AB testing crea variantes<br><span class="type-tag">functional</span></td>
+  <td class="pass-cell">Se crean 2+ variantes correctamente</td>
+  <td class="fail-cell">No se crean variantes</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">69</span></td>
+  <td>Flow engine ejecuta pasos en orden<br><span class="type-tag">functional</span></td>
+  <td class="pass-cell">Steps ejecutan 1→2→3 en orden</td>
+  <td class="fail-cell">Se saltan pasos o ejecutan desordenados</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">75</span></td>
+  <td>Context builder incluye Shopify/Meta/Klaviyo<br><span class="type-tag">functional</span></td>
+  <td class="pass-cell">Context incluye datos de las 3 plataformas</td>
+  <td class="fail-cell">Context vacío o sin datos de alguna plataforma</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">77</span></td>
+  <td>Prospect flow detecta URLs y hace scraping<br><span class="type-tag">functional</span></td>
+  <td class="pass-cell">URL detectada → scraping ejecutado</td>
+  <td class="fail-cell">URL no detectada o scraping falla</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">78</span></td>
+  <td>Multi-brain responde (3 roles)<br><span class="type-tag">functional</span></td>
+  <td class="pass-cell">Los 3 brains responden</td>
+  <td class="fail-cell">Algún brain no responde</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">79</span></td>
+  <td>Audio transcription WhatsApp<br><span class="type-tag">functional</span></td>
+  <td class="pass-cell">Audio se transcribe correctamente</td>
+  <td class="fail-cell">Transcripción falla o vacía</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">80</span></td>
+  <td>Image vision WhatsApp<br><span class="type-tag">functional</span></td>
+  <td class="pass-cell">Imagen se analiza correctamente</td>
+  <td class="fail-cell">Vision falla o no responde</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+</table>
+</div>
+
+<!-- ═══════════════════ GRUPO: VISUAL 46 ═══════════════════ -->
+<div class="group">
+<div class="group-header">
+  <span class="group-icon">👁️</span>
+  <span class="group-title">Visual — Evaluación visual</span>
+  <span class="group-count">Check 46</span>
+</div>
+<table>
+<tr><th>#</th><th>Qué mide</th><th>PASS</th><th>FAIL</th><th>Sev</th><th>Estado</th></tr>
+<tr>
+  <td><span class="check-num">46</span></td>
+  <td>Email renderizado se ve profesional<br><span class="type-tag">visual</span></td>
+  <td class="pass-cell">Claude Vision dice que se ve bien (header, CTA, footer)</td>
+  <td class="fail-cell">Se ve roto o le faltan partes</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+</table>
+</div>
+
+<!-- ═══════════════════ GRUPO: KLAVIYO AVANZADO 51-60 ═══════════════════ -->
+<div class="group">
+<div class="group-header">
+  <span class="group-icon">📧</span>
+  <span class="group-title">Klaviyo Avanzado — Flows, rates, sync</span>
+  <span class="group-count">Checks 51-60</span>
+</div>
+<table>
+<tr><th>#</th><th>Qué mide</th><th>PASS</th><th>FAIL</th><th>Sev</th><th>Estado</th></tr>
+<tr>
+  <td><span class="check-num">51</span></td>
+  <td>Welcome Series tiene ≥3 emails activos<br><span class="type-tag">api_compare</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Flow "Welcome Series" tiene 3+ emails</td>
+  <td class="fail-cell">Flow no existe o tiene &lt; 3 emails</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código + sin config</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">52</span></td>
+  <td>Open rate 7d &gt; 15%<br><span class="type-tag">data_quality</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Open rate promedio &gt; 15%</td>
+  <td class="fail-cell">Open rate bajo 15%</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código + sin config</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">53</span></td>
+  <td>No hay flows vacíos (0 emails)<br><span class="type-tag">data_quality</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Todos los flows tienen emails</td>
+  <td class="fail-cell">Hay flows con 0 emails</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código + sin config</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">54</span></td>
+  <td>Bounce rate &lt; 5% (30d)<br><span class="type-tag">data_quality</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Bounce rate bajo 5%</td>
+  <td class="fail-cell">Bounce rate arriba de 5%</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código + sin config</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">55</span></td>
+  <td>Unsubscribe rate &lt; 1%<br><span class="type-tag">data_quality</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Unsubscribe rate bajo 1%</td>
+  <td class="fail-cell">Unsubscribe rate arriba de 1%</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código + sin config</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">56</span></td>
+  <td>Contactos activos &gt; 100 por merchant<br><span class="type-tag">api_compare</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Más de 100 contactos activos</td>
+  <td class="fail-cell">Menos de 100 contactos</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código + sin config</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">57</span></td>
+  <td>Templates tienen subject y body<br><span class="type-tag">data_quality</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Todos los templates completos</td>
+  <td class="fail-cell">Hay templates sin subject o body</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código + sin config</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">58</span></td>
+  <td>Last sync &lt; 24h para merchants activos<br><span class="type-tag">data_quality</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Todos sincronizaron en últimas 24h</td>
+  <td class="fail-cell">Hay merchants sin sync reciente</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código + sin config</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">59</span></td>
+  <td>API key válida (no 401)<br><span class="type-tag">token_health</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Klaviyo API responde != 401</td>
+  <td class="fail-cell">Klaviyo devuelve 401</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">60</span></td>
+  <td>Push emails endpoint &lt; 5s<br><span class="type-tag">performance</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Endpoint responde en &lt; 5s</td>
+  <td class="fail-cell">Tarda &gt; 5s</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin config</span></td>
+</tr>
+</table>
+</div>
+
+<!-- ═══════════════════ GRUPO: STEVEMAIL 61-70 ═══════════════════ -->
+<div class="group">
+<div class="group-header">
+  <span class="group-icon">✉️</span>
+  <span class="group-title">SteveMail — Sistema de emails propio</span>
+  <span class="group-count">Checks 61-70</span>
+</div>
+<table>
+<tr><th>#</th><th>Qué mide</th><th>PASS</th><th>FAIL</th><th>Sev</th><th>Estado</th></tr>
+<tr>
+  <td><span class="check-num">61</span></td>
+  <td>email_campaigns tiene registros<br><span class="type-tag">data_quality</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Hay campañas en la tabla</td>
+  <td class="fail-cell">Tabla vacía para merchants activos</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">62</span></td>
+  <td>SES webhooks endpoint 200<br><span class="type-tag">api_exists</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Endpoint responde 200</td>
+  <td class="fail-cell">Endpoint no responde o error</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin config (URL)</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">63</span></td>
+  <td>Tracking pixel 200<br><span class="type-tag">api_exists</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Pixel endpoint responde 200</td>
+  <td class="fail-cell">Pixel no responde</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin config (URL)</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">64</span></td>
+  <td>Click tracking redirige<br><span class="type-tag">functional</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Click → redirect correcto</td>
+  <td class="fail-cell">No redirige</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">65</span></td>
+  <td>Unsubscribe funciona + actualiza DB<br><span class="type-tag">functional</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Unsubscribe → estado actualizado en DB</td>
+  <td class="fail-cell">Link roto o DB no actualiza</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">66</span></td>
+  <td>send-email &lt; 3s<br><span class="type-tag">performance</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Envío en &lt; 3 segundos</td>
+  <td class="fail-cell">Tarda &gt; 3s</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin config</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">67</span></td>
+  <td>Gallery tiene ≥5 templates sistema<br><span class="type-tag">data_quality</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">5+ templates disponibles</td>
+  <td class="fail-cell">Menos de 5 templates</td>
+  <td><span class="severity low">low</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">68</span></td>
+  <td>AB testing crea variantes<br><span class="type-tag">functional</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">2+ variantes creadas</td>
+  <td class="fail-cell">No crea variantes</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">69</span></td>
+  <td>Flow engine ejecuta en orden<br><span class="type-tag">functional</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Steps 1→2→3 en orden</td>
+  <td class="fail-cell">Orden incorrecto o saltan steps</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">70</span></td>
+  <td>Dominio verificado para ≥1 merchant<br><span class="type-tag">data_quality</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Al menos 1 dominio verificado</td>
+  <td class="fail-cell">Ningún dominio verificado</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+</table>
+</div>
+
+<!-- ═══════════════════ GRUPO: STEVE CHAT 71-80 ═══════════════════ -->
+<div class="group">
+<div class="group-header">
+  <span class="group-icon">💬</span>
+  <span class="group-title">Steve Chat / WhatsApp</span>
+  <span class="group-count">Checks 71-80</span>
+</div>
+<table>
+<tr><th>#</th><th>Qué mide</th><th>PASS</th><th>FAIL</th><th>Sev</th><th>Estado</th></tr>
+<tr>
+  <td><span class="check-num">71</span></td>
+  <td>steve-chat responde &lt; 10s con mensaje válido<br><span class="type-tag">performance</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Responde &lt; 10s con contenido</td>
+  <td class="fail-cell">Timeout o respuesta vacía</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin config</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">72</span></td>
+  <td>Historial guardado en wa_messages<br><span class="type-tag">data_quality</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Mensajes recientes en wa_messages</td>
+  <td class="fail-cell">No se guardan mensajes</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">73</span></td>
+  <td>No mensajes vacíos (24h)<br><span class="type-tag">data_quality</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">0 mensajes vacíos en 24h</td>
+  <td class="fail-cell">Hay mensajes con body vacío</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">74</span></td>
+  <td>PII scrubber activo (no RUTs/emails en body)<br><span class="type-tag">security</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">No se encuentran RUTs ni emails en mensajes</td>
+  <td class="fail-cell">Hay datos personales expuestos</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">75</span></td>
+  <td>Context incluye Shopify/Meta/Klaviyo<br><span class="type-tag">functional</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Context tiene datos de 3 plataformas</td>
+  <td class="fail-cell">Context incompleto</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">76</span></td>
+  <td>Knowledge base &gt; 50 entries<br><span class="type-tag">data_quality</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Más de 50 entries en knowledge</td>
+  <td class="fail-cell">Knowledge base vacía o muy chica</td>
+  <td><span class="severity low">low</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">77</span></td>
+  <td>Prospect flow detecta URLs + scraping<br><span class="type-tag">functional</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">URL detectada → scraping ejecutado</td>
+  <td class="fail-cell">URL no detectada</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">78</span></td>
+  <td>Multi-brain responde (3 roles)<br><span class="type-tag">functional</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">3 brains responden</td>
+  <td class="fail-cell">Algún brain no responde</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">79</span></td>
+  <td>Audio transcription WhatsApp<br><span class="type-tag">functional</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Audio se transcribe</td>
+  <td class="fail-cell">Transcripción falla</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">80</span></td>
+  <td>Image vision WhatsApp<br><span class="type-tag">functional</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Imagen se analiza</td>
+  <td class="fail-cell">Vision falla</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+</table>
+</div>
+
+<!-- ═══════════════════ GRUPO: INFRA 81-90 ═══════════════════ -->
+<div class="group">
+<div class="group-header">
+  <span class="group-icon">🏗️</span>
+  <span class="group-title">Infraestructura — Servidores, APIs, memoria</span>
+  <span class="group-count">Checks 81-90</span>
+</div>
+<table>
+<tr><th>#</th><th>Qué mide</th><th>PASS</th><th>FAIL</th><th>Sev</th><th>Estado</th></tr>
+<tr>
+  <td><span class="check-num">81</span></td>
+  <td>Cloud Run health endpoint 200<br><span class="type-tag">api_exists</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">/health responde 200</td>
+  <td class="fail-cell">No responde o error</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge roto">Sin config (URL)</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">82</span></td>
+  <td>Supabase pool &lt; 80%<br><span class="type-tag">performance</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Connection pool bajo 80%</td>
+  <td class="fail-cell">Pool arriba de 80% (riesgo de saturación)</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">83</span></td>
+  <td>No errores 500 en últimos 30 min<br><span class="type-tag">data_quality</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">0 errores 500 en chino_reports</td>
+  <td class="fail-cell">Hay errores 500 recientes</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">84</span></td>
+  <td>Cron jobs ejecutados últimas 6h<br><span class="type-tag">data_quality</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Crons corrieron en las últimas 6h</td>
+  <td class="fail-cell">Hay crons que no han corrido</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">85</span></td>
+  <td>Storage buckets accesibles<br><span class="type-tag">api_exists</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Buckets avatars, assets, emails accesibles</td>
+  <td class="fail-cell">Algún bucket no responde</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin config</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">86</span></td>
+  <td>ANTHROPIC_API_KEY válida + créditos<br><span class="type-tag">token_health</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">API key funciona y hay créditos</td>
+  <td class="fail-cell">Key inválida o sin créditos</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">87</span></td>
+  <td>Twilio WhatsApp credentials<br><span class="type-tag">token_health</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Twilio responde OK</td>
+  <td class="fail-cell">Credenciales inválidas</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">88</span></td>
+  <td>Resend API key válida<br><span class="type-tag">token_health</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Resend responde OK</td>
+  <td class="fail-cell">Key inválida</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">89</span></td>
+  <td>Memory Cloud Run &lt; 512MB<br><span class="type-tag">performance</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Memoria bajo 512MB</td>
+  <td class="fail-cell">Memoria alta → riesgo OOM</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">90</span></td>
+  <td>p95 latency &lt; 5s<br><span class="type-tag">performance</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Percentil 95 bajo 5 segundos</td>
+  <td class="fail-cell">p95 arriba de 5s</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+</table>
+</div>
+
+<!-- ═══════════════════ GRUPO: SECURITY 44, 91-100 ═══════════════════ -->
+<div class="group">
+<div class="group-header">
+  <span class="group-icon">🔒</span>
+  <span class="group-title">Security — Aislamiento, auth, encriptación</span>
+  <span class="group-count">Checks 44, 91-100</span>
+</div>
+<table>
+<tr><th>#</th><th>Qué mide</th><th>PASS</th><th>FAIL</th><th>Sev</th><th>Estado</th></tr>
+<tr>
+  <td><span class="check-num">44</span></td>
+  <td>Steve Chat no expone datos de otro merchant<br><span class="type-tag">security</span></td>
+  <td class="pass-cell">RLS activo en 7 tablas críticas + client_id aislado</td>
+  <td class="fail-cell">Alguna tabla sin RLS o sin aislamiento</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge funciona">Funciona</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">91</span></td>
+  <td>No tokens expirados en platform_connections<br><span class="type-tag">security</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Todos los tokens vigentes</td>
+  <td class="fail-cell">Hay tokens expirados en conexiones activas</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">92</span></td>
+  <td>RLS policies en todas las tablas con client_id<br><span class="type-tag">security</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Todas las tablas tienen RLS</td>
+  <td class="fail-cell">Hay tablas sin RLS</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">93</span></td>
+  <td>No API keys en plain text en logs<br><span class="type-tag">security</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Logs limpios, sin keys expuestas</td>
+  <td class="fail-cell">API keys visibles en logs</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">94</span></td>
+  <td>Auth middleware en endpoints protegidos<br><span class="type-tag">security</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Todos los endpoints protegidos rechazan sin auth</td>
+  <td class="fail-cell">Algún endpoint responde 200 sin auth</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">95</span></td>
+  <td>Webhooks validan HMAC/signatures<br><span class="type-tag">security</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Webhook rechaza request sin HMAC válido</td>
+  <td class="fail-cell">Webhook acepta request sin firma</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">96</span></td>
+  <td>X-Cron-Secret en todos los cron endpoints<br><span class="type-tag">security</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Crons rechazan sin X-Cron-Secret</td>
+  <td class="fail-cell">Algún cron acepta sin secret</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">97</span></td>
+  <td>No usuarios admin extras<br><span class="type-tag">security</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Solo super_admin es admin</td>
+  <td class="fail-cell">Hay usuarios admin no autorizados</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">98</span></td>
+  <td>Encrypted columns usan pgcrypto<br><span class="type-tag">security</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Tokens encriptados, no plain text</td>
+  <td class="fail-cell">Hay tokens en plain text en DB</td>
+  <td><span class="severity critical">critical</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">99</span></td>
+  <td>CORS sin wildcard en producción<br><span class="type-tag">security</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">CORS con dominios específicos</td>
+  <td class="fail-cell">CORS con * en producción</td>
+  <td><span class="severity high">high</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+<tr>
+  <td><span class="check-num">100</span></td>
+  <td>Rate limiting en endpoints públicos<br><span class="type-tag">security</span> <span class="config-empty">config: {}</span></td>
+  <td class="pass-cell">Endpoints públicos tienen rate limit</td>
+  <td class="fail-cell">Sin rate limiting → vulnerable a abuse</td>
+  <td><span class="severity medium">medium</span></td>
+  <td><span class="status-badge roto">Sin código</span></td>
+</tr>
+</table>
+</div>
+
+<div style="text-align:center; color:#555; padding: 40px 0 20px; font-size: 0.85em;">
+  El Chino — Steve Ads QA System — Generado el 3 abril 2026
+</div>
+
+</body>
+</html>

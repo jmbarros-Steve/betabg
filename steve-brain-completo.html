@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Brain Completo — Todo el Sistema</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#0a0e1a; color:#e0e0e0; line-height:1.7; }
+
+  /* NAV */
+  nav { position:sticky; top:0; z-index:100; background:rgba(10,14,26,0.95); backdrop-filter:blur(10px); border-bottom:1px solid #1f2937; padding:10px 20px; display:flex; gap:10px; overflow-x:auto; }
+  nav a { color:#888; text-decoration:none; font-size:0.8em; padding:6px 14px; border-radius:20px; white-space:nowrap; transition:all 0.2s; }
+  nav a:hover, nav a.active { background:#6366f1; color:#fff; }
+
+  .hero { text-align:center; padding:60px 20px 30px; }
+  .hero h1 { font-size:2.8em; margin-bottom:10px; }
+  .hero h1 span { background:linear-gradient(90deg,#6366f1,#a78bfa,#f472b6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .hero p { font-size:1.15em; color:#888; max-width:700px; margin:0 auto; }
+
+  .container { max-width:1100px; margin:0 auto; padding:0 20px; }
+  section { scroll-margin-top:60px; }
+
+  /* SECTION HEADERS */
+  .section-header { text-align:center; margin:60px 0 30px; }
+  .section-header h2 { font-size:2em; color:#fff; margin-bottom:8px; }
+  .section-header p { color:#888; max-width:600px; margin:0 auto; }
+
+  /* CARDS */
+  .card { background:#111827; border:1px solid #1f2937; border-radius:16px; padding:25px; margin-bottom:15px; }
+  .card h3 { margin-bottom:8px; }
+  .card p { color:#9ca3af; font-size:0.95em; }
+  .card .detail { background:#1f2937; border-radius:8px; padding:12px 15px; margin-top:12px; font-size:0.9em; color:#d1d5db; }
+  .tag { display:inline-block; padding:3px 12px; border-radius:20px; font-size:0.75em; font-weight:600; margin:4px 4px 0 0; color:#fff; }
+
+  /* GRID */
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:15px; }
+  .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px; }
+  .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+
+  /* MEGA FLOW */
+  .mega-flow { position:relative; }
+  .flow-group { margin-bottom:40px; }
+  .flow-group-title { display:flex; align-items:center; gap:12px; margin-bottom:15px; padding-left:10px; }
+  .flow-group-title .icon { font-size:1.8em; }
+  .flow-group-title h3 { font-size:1.3em; }
+  .flow-group-title .badge { font-size:0.7em; padding:4px 12px; border-radius:20px; color:#fff; }
+
+  /* FLOW STEPS */
+  .flow-card { display:flex; gap:15px; margin-bottom:12px; }
+  .flow-marker { display:flex; flex-direction:column; align-items:center; min-width:40px; }
+  .flow-dot { width:16px; height:16px; border-radius:50%; flex-shrink:0; }
+  .flow-wire { width:2px; flex-grow:1; min-height:20px; opacity:0.4; }
+  .flow-body { flex:1; background:#111827; border:1px solid #1f2937; border-radius:12px; padding:16px 20px; }
+  .flow-body h4 { margin-bottom:4px; font-size:1em; }
+  .flow-body p { color:#9ca3af; font-size:0.88em; }
+  .flow-body .example { background:#0f172a; border-left:3px solid #6366f1; padding:8px 12px; margin-top:8px; font-size:0.85em; color:#c4b5fd; border-radius:0 6px 6px 0; }
+
+  /* CONNECTION ARROW */
+  .arrow-down { text-align:center; font-size:1.5em; color:#374151; margin:5px 0 15px; }
+
+  /* CYCLE DIAGRAM */
+  .cycle { display:flex; justify-content:center; align-items:center; gap:0; flex-wrap:wrap; margin:30px 0; }
+  .cycle-node { background:#111827; border:2px solid; border-radius:14px; padding:14px 20px; text-align:center; min-width:140px; }
+  .cycle-node h4 { font-size:0.9em; margin-bottom:3px; }
+  .cycle-node p { font-size:0.75em; color:#888; }
+  .cycle-arrow { font-size:1.5em; color:#374151; padding:0 8px; }
+
+  /* SCHEDULE */
+  .schedule-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-top:20px; }
+  .day-col { background:#111827; border-radius:12px; padding:12px 8px; text-align:center; }
+  .day-col h4 { color:#6366f1; font-size:0.85em; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #1f2937; }
+  .day-slot { background:#1f2937; border-radius:8px; padding:8px 6px; margin-bottom:6px; font-size:0.7em; }
+  .day-slot .time { color:#6366f1; font-weight:600; display:block; }
+
+  /* TIMELINE */
+  .timeline { position:relative; padding-left:30px; }
+  .timeline::before { content:''; position:absolute; left:8px; top:0; bottom:0; width:2px; background:#1f2937; }
+  .tl-item { position:relative; margin-bottom:20px; }
+  .tl-item::before { content:''; position:absolute; left:-26px; top:6px; width:12px; height:12px; border-radius:50%; border:2px solid; }
+  .tl-item h4 { font-size:0.95em; }
+  .tl-item p { font-size:0.85em; color:#888; }
+  .tl-item .tl-time { font-size:0.75em; color:#6366f1; font-weight:600; }
+
+  /* STAT BOXES */
+  .stat-box { background:#111827; border:1px solid #1f2937; border-radius:12px; padding:16px; text-align:center; }
+  .stat-box .num { font-size:2em; font-weight:bold; }
+  .stat-box .label { font-size:0.8em; color:#888; }
+
+  /* CHECKLIST */
+  .check-item { display:flex; gap:12px; padding:14px 0; border-bottom:1px solid #1f2937; }
+  .check-item:last-child { border-bottom:none; }
+  .check-icon { font-size:1.3em; flex-shrink:0; }
+  .check-text h4 { color:#e0e0e0; font-size:0.95em; }
+  .check-text p { color:#888; font-size:0.83em; margin-top:2px; }
+  .check-text code { background:#1f2937; padding:2px 6px; border-radius:4px; font-size:0.85em; color:#a78bfa; }
+
+  /* ACTION CARDS */
+  .action-card { background:linear-gradient(135deg,#1a1040,#0f172a); border:1px solid #4c1d95; border-radius:16px; padding:25px; margin-bottom:15px; }
+  .action-card h3 { color:#a78bfa; margin-bottom:8px; }
+  .action-card p { color:#9ca3af; font-size:0.95em; }
+  .action-card .cmd { background:#0f172a; border:1px solid #374151; border-radius:8px; padding:10px 15px; margin-top:10px; font-family:monospace; font-size:0.82em; color:#6ee7b7; overflow-x:auto; word-break:break-all; }
+
+  /* COLORS */
+  .c-blue { color:#6366f1; } .bg-blue { background:#6366f1; }
+  .c-purple { color:#a78bfa; } .bg-purple { background:#a78bfa; }
+  .c-pink { color:#f472b6; } .bg-pink { background:#f472b6; }
+  .c-green { color:#34d399; } .bg-green { background:#34d399; }
+  .c-yellow { color:#fbbf24; } .bg-yellow { background:#fbbf24; }
+  .c-orange { color:#fb923c; } .bg-orange { background:#fb923c; }
+  .c-red { color:#f87171; } .bg-red { background:#f87171; }
+  .c-cyan { color:#22d3ee; } .bg-cyan { background:#22d3ee; }
+  .border-blue { border-color:#6366f1; } .border-purple { border-color:#a78bfa; }
+  .border-pink { border-color:#f472b6; } .border-green { border-color:#34d399; }
+  .border-yellow { border-color:#fbbf24; } .border-orange { border-color:#fb923c; }
+  .border-red { border-color:#f87171; } .border-cyan { border-color:#22d3ee; }
+
+  .highlight-box { background:linear-gradient(135deg,#1e1b4b,#111827); border:1px solid #4c1d95; border-radius:16px; padding:25px; margin:20px 0; }
+  .highlight-box h3 { color:#c4b5fd; margin-bottom:10px; }
+
+  .footer { text-align:center; padding:50px 20px; color:#333; font-size:0.85em; }
+
+  @media(max-width:768px) {
+    .grid-2,.grid-3,.grid-4 { grid-template-columns:1fr; }
+    .schedule-grid { grid-template-columns:repeat(2,1fr); }
+    .hero h1 { font-size:2em; }
+    .cycle { flex-direction:column; }
+    .cycle-arrow { transform:rotate(90deg); }
+    nav { flex-wrap:nowrap; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#overview">Resumen</a>
+  <a href="#swarm">Swarm</a>
+  <a href="#criterio">CRITERIO</a>
+  <a href="#espejo">ESPEJO</a>
+  <a href="#juez">JUEZ</a>
+  <a href="#detective">DETECTIVE</a>
+  <a href="#performance">Performance</a>
+  <a href="#learning">Aprendizaje</a>
+  <a href="#wolf">Wolf</a>
+  <a href="#ojos">OJOS</a>
+  <a href="#mega-flow">Flujo Total</a>
+  <a href="#timeline">Día Típico</a>
+  <a href="#checklist">Checklist</a>
+</nav>
+
+<div class="hero">
+  <h1>🧠 <span>Steve Brain</span> — Completo</h1>
+  <p>Todo el sistema de inteligencia de Steve: cómo investiga, evalúa, corrige y aprende — sin tecnicismos.</p>
+</div>
+
+<div class="container">
+
+<!-- ==================== OVERVIEW ==================== -->
+<section id="overview">
+<div class="section-header">
+  <h2>La Idea General</h2>
+  <p>Steve tiene 5 "órganos" que trabajan juntos como un equipo autónomo</p>
+</div>
+
+<div class="grid-3" style="margin-bottom:30px;">
+  <div class="stat-box">
+    <div class="num c-blue">5</div>
+    <div class="label">Órganos principales</div>
+  </div>
+  <div class="stat-box">
+    <div class="num c-purple">493+</div>
+    <div class="label">Reglas de calidad</div>
+  </div>
+  <div class="stat-box">
+    <div class="num c-green">24/7</div>
+    <div class="label">Funcionamiento autónomo</div>
+  </div>
+</div>
+
+<div class="highlight-box">
+  <h3>En una frase</h3>
+  <p style="font-size:1.1em; color:#d1d5db;">
+    Steve <span class="c-blue">investiga</span> el mercado cada 2 horas,
+    <span class="c-pink">revisa la calidad</span> de todo lo que se crea,
+    <span class="c-yellow">detecta errores</span> automáticamente,
+    <span class="c-green">aprende</span> de sus propios errores,
+    y <span class="c-purple">se auto-mejora</span> sin intervención humana.
+    <strong class="c-orange">Tú solo apruebas lo que aprende.</strong>
+  </p>
+</div>
+
+<div class="grid-3" style="margin-top:20px;">
+  <div class="card" style="border-left:4px solid #6366f1;">
+    <h3>🔍 INVESTIGA</h3>
+    <p>Swarm Research: 10 agentes buscan en internet cada 2 horas. Opus cruza hallazgos.</p>
+  </div>
+  <div class="card" style="border-left:4px solid #f472b6;">
+    <h3>🛡️ EVALÚA</h3>
+    <p>CRITERIO (reglas) + ESPEJO (visual) + JUEZ (precisión) revisan todo.</p>
+  </div>
+  <div class="card" style="border-left:4px solid #34d399;">
+    <h3>🔄 APRENDE</h3>
+    <p>Cuando falla, genera reglas correctivas. Cuando acierta, refuerza patrones.</p>
+  </div>
+</div>
+</section>
+
+<!-- ==================== SWARM ==================== -->
+<section id="swarm">
+<div class="section-header">
+  <h2>🐝 SWARM — El Equipo de Investigación</h2>
+  <p>Como tener 10 consultores investigando el mercado cada 2 horas</p>
+</div>
+
+<div class="flow-group">
+  <div class="flow-card">
+    <div class="flow-marker">
+      <div class="flow-dot bg-blue"></div>
+      <div class="flow-wire" style="background:#6366f1;"></div>
+    </div>
+    <div class="flow-body">
+      <h4>1. 🎯 El Director genera 10 preguntas</h4>
+      <p>Claude Haiku mira el calendario (cada día tiene un tema diferente) y genera 10 preguntas de investigación.</p>
+      <div class="example">
+        <strong>Si tienes fuentes configuradas:</strong> 7 preguntas apuntan a tus fuentes favoritas + 3 buscan cosas nuevas.<br>
+        Ej: "¿Qué dijo Sabri Suby sobre campañas ASC en su último video?"
+      </div>
+      <span class="tag bg-blue">Claude Haiku</span>
+    </div>
+  </div>
+
+  <div class="flow-card">
+    <div class="flow-marker">
+      <div class="flow-dot bg-purple"></div>
+      <div class="flow-wire" style="background:#a78bfa;"></div>
+    </div>
+    <div class="flow-body">
+      <h4>2. 🔍 10 investigadores buscan en paralelo</h4>
+      <p>10 agentes de OpenAI (o4-mini) salen a buscar en internet al mismo tiempo. Cada uno trae un reporte con fuentes reales.</p>
+      <span class="tag bg-purple">OpenAI o4-mini × 10</span>
+    </div>
+  </div>
+
+  <div class="flow-card">
+    <div class="flow-marker">
+      <div class="flow-dot bg-pink"></div>
+      <div class="flow-wire" style="background:#f472b6;"></div>
+    </div>
+    <div class="flow-body">
+      <h4>3. 🧠 El Senior cruza los hallazgos</h4>
+      <p>Claude Opus recibe los 10 reportes y encuentra conexiones que ningún investigador pudo ver solo.</p>
+      <div class="example">
+        Reporte Meta dice: "ASC funciona mejor con catálogo"<br>
+        Reporte Shopify dice: "Colecciones organizadas suben AOV"<br>
+        <strong>Opus cruza:</strong> "Si organizas bien tus colecciones en Shopify, tu ASC rinde 30% más"
+      </div>
+      <span class="tag bg-pink">Claude Opus</span>
+      <span class="tag" style="background:#374151;">Máx 8 insights</span>
+    </div>
+  </div>
+
+  <div class="flow-card">
+    <div class="flow-marker">
+      <div class="flow-dot bg-yellow"></div>
+      <div class="flow-wire" style="background:#fbbf24;"></div>
+    </div>
+    <div class="flow-body">
+      <h4>4. 📥 Se guardan como "pendientes"</h4>
+      <p>Los insights se guardan pero Steve NO los usa todavía. Esperan tu aprobación.</p>
+    </div>
+  </div>
+
+  <div class="flow-card">
+    <div class="flow-marker">
+      <div class="flow-dot bg-green"></div>
+      <div class="flow-wire" style="background:#34d399; opacity:0;"></div>
+    </div>
+    <div class="flow-body">
+      <h4>5. 📱 Te llega resumen por WhatsApp → Apruebas</h4>
+      <p>Cada mañana a las 9am te llega un resumen. Apruebas o rechazas con un link. Lo aprobado pasa a ser conocimiento activo.</p>
+      <span class="tag bg-green">WhatsApp 9am</span>
+    </div>
+  </div>
+</div>
+
+<!-- Calendario -->
+<h3 style="text-align:center; margin:30px 0 15px; color:#888;">📅 Calendario Semanal del Swarm</h3>
+<div class="schedule-grid">
+  <div class="day-col"><h4>Lun</h4><div class="day-slot"><span class="time">AM</span>Meta Ads</div><div class="day-slot"><span class="time">PM</span>Google Ads</div></div>
+  <div class="day-col"><h4>Mar</h4><div class="day-slot"><span class="time">AM</span>Klaviyo</div><div class="day-slot"><span class="time">PM</span>Shopify</div></div>
+  <div class="day-col"><h4>Mié</h4><div class="day-slot"><span class="time">AM</span>Retención</div><div class="day-slot"><span class="time">PM</span>Pricing</div></div>
+  <div class="day-col"><h4>Jue</h4><div class="day-slot"><span class="time">AM</span>Creativos</div><div class="day-slot"><span class="time">PM</span>LATAM</div></div>
+  <div class="day-col"><h4>Vie</h4><div class="day-slot"><span class="time">AM</span>Cross-Ch</div><div class="day-slot"><span class="time">PM</span>Automati.</div></div>
+  <div class="day-col"><h4>Sáb</h4><div class="day-slot"><span class="time">AM</span>Competen.</div><div class="day-slot"><span class="time">PM</span>Competen.</div></div>
+  <div class="day-col"><h4>Dom</h4><div class="day-slot"><span class="time">AM</span>Libre</div><div class="day-slot"><span class="time">PM</span>Libre</div></div>
+</div>
+</section>
+
+<!-- ==================== CRITERIO ==================== -->
+<section id="criterio">
+<div class="section-header">
+  <h2>🛡️ CRITERIO — El Inspector de Calidad</h2>
+  <p>493+ reglas que revisan todo antes de publicar. Como un QA humano pero instantáneo.</p>
+</div>
+
+<div class="highlight-box">
+  <h3>¿Cuándo actúa?</h3>
+  <p>Cada vez que alguien crea una campaña de Meta o un email. ANTES de que se publique, CRITERIO lo revisa.</p>
+</div>
+
+<div class="grid-2">
+  <div class="card" style="border-left:4px solid #f472b6;">
+    <h3>📝 Reglas de Copy (Meta)</h3>
+    <p>11 reglas: largo del texto, CTA presente, ortografía, emojis, mayúsculas, claims médicos, precios, stock, repetición de ángulos, tono, URLs.</p>
+    <div class="detail">
+      <strong>Ejemplo:</strong> "Copy muy corto (30 chars, necesita 80-300)" → RECHAZADO
+    </div>
+  </div>
+  <div class="card" style="border-left:4px solid #6366f1;">
+    <h3>🎯 Reglas de Targeting (Meta)</h3>
+    <p>7 reglas: rango de edad coherente, género, intereses, país Chile, edad mínima, idioma.</p>
+  </div>
+  <div class="card" style="border-left:4px solid #fbbf24;">
+    <h3>💰 Reglas de Presupuesto</h3>
+    <p>5 reglas: mínimo diario, ratio gasto vs ingreso, formato moneda, fecha fin, divisa.</p>
+  </div>
+  <div class="card" style="border-left:4px solid #34d399;">
+    <h3>📧 Reglas de Email</h3>
+    <p>19 reglas: asunto (largo, spam words), cuerpo (CTA, unsub link, ancho, HTTPS), timing (hora, frecuencia), segmento (mín 100 recipients).</p>
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px; border-left:4px solid #f87171;">
+  <h3>❌ Cuando CRITERIO rechaza algo</h3>
+  <p>1. El merchant ve <strong>exactamente qué regla falló</strong> y por qué.<br>
+     2. Se crea una <strong>TASK automática</strong> para el equipo de marketing.<br>
+     3. La task tiene prioridad según la severidad (blocker = crítica, warning = alta).</p>
+  <div class="detail">
+    <strong>Task ejemplo:</strong> "CRITERIO rechazó Meta campaign: score 45% — Copy muy corto, sin CTA, timezone incorrecto"
+  </div>
+</div>
+</section>
+
+<!-- ==================== ESPEJO ==================== -->
+<section id="espejo">
+<div class="section-header">
+  <h2>🪞 ESPEJO — El Director de Arte</h2>
+  <p>Revisa visualmente emails y anuncios con los ojos de Claude. Como tener un diseñador revisando cada pieza.</p>
+</div>
+
+<div class="grid-2">
+  <div class="card" style="border-left:4px solid #a78bfa;">
+    <h3>📧 Para Emails</h3>
+    <p>Revisa: texto legible en móvil (+14px), imágenes con alt text, CTA visible sin scroll, botones +44px, layout, espaciado, colores de marca, logo, ancho máx 600px.</p>
+  </div>
+  <div class="card" style="border-left:4px solid #22d3ee;">
+    <h3>📸 Para Anuncios</h3>
+    <p>Revisa: resolución nítida, texto &lt;20% de la imagen, producto visible, logo legible, colores de marca, fondo limpio, caras completas, sin marcas de agua.</p>
+  </div>
+</div>
+
+<div class="card" style="margin-top:15px; border-left:4px solid #a78bfa;">
+  <h3>🤖 ¿Cómo ve?</h3>
+  <p>Usa <strong>Claude Vision</strong> (el modelo que puede "ver" imágenes). Le manda la imagen del email o anuncio y evalúa cada dimensión de 1 a 10. Si el promedio es menor a 7, RECHAZA.</p>
+  <div class="detail">
+    <strong>Dato clave:</strong> ESPEJO también carga las reglas visuales aprobadas de la base de conocimiento. O sea, si apruebas un insight tipo "los botones rojos convierten mejor", ESPEJO empezará a verificar eso.
+  </div>
+</div>
+
+<div class="card" style="border-left:4px solid #f87171;">
+  <h3>❌ Cuando ESPEJO rechaza</h3>
+  <p>Igual que CRITERIO: crea TASK automática para marketing con todos los issues visuales detectados.</p>
+</div>
+</section>
+
+<!-- ==================== JUEZ ==================== -->
+<section id="juez">
+<div class="section-header">
+  <h2>⚖️ JUEZ NOCTURNO — El Examen Diario</h2>
+  <p>Cada noche, le hace 20 preguntas a Steve y compara las respuestas con datos REALES. Si Steve miente o se equivoca, lo corrige.</p>
+</div>
+
+<div class="highlight-box">
+  <h3>La Analogía</h3>
+  <p>Imagina que cada noche le haces un examen sorpresa a Steve con 20 preguntas. Después le pides a un profesor estricto (Claude Sonnet) que corrija las respuestas comparándolas con los datos reales de Shopify y Meta. Si Steve se saca menos de 7, lo mandan a estudiar.</p>
+</div>
+
+<div class="flow-group">
+  <div class="flow-card">
+    <div class="flow-marker"><div class="flow-dot bg-yellow"></div><div class="flow-wire" style="background:#fbbf24;"></div></div>
+    <div class="flow-body">
+      <h4>1. Selecciona 20 preguntas al azar</h4>
+      <p>De un banco de 50+ preguntas: ventas, pedidos, stock, precios, campañas, emails, y <strong>TRAMPAS</strong> (preguntas que Steve debería rechazar: temas off-topic, inventar datos, consejos financieros, datos privados).</p>
+    </div>
+  </div>
+  <div class="flow-card">
+    <div class="flow-marker"><div class="flow-dot bg-orange"></div><div class="flow-wire" style="background:#fb923c;"></div></div>
+    <div class="flow-body">
+      <h4>2. Le pregunta a Steve (como si fuera un merchant)</h4>
+      <p>Llama al endpoint de steve-chat con cada pregunta, exactamente como lo haría un cliente real.</p>
+    </div>
+  </div>
+  <div class="flow-card">
+    <div class="flow-marker"><div class="flow-dot bg-pink"></div><div class="flow-wire" style="background:#f472b6;"></div></div>
+    <div class="flow-body">
+      <h4>3. Busca los datos REALES en Shopify/Meta</h4>
+      <p>Para preguntas de ventas/stock/precios, va directamente a la API de Shopify y saca los números verdaderos.</p>
+    </div>
+  </div>
+  <div class="flow-card">
+    <div class="flow-marker"><div class="flow-dot bg-red"></div><div class="flow-wire" style="background:#f87171;"></div></div>
+    <div class="flow-body">
+      <h4>4. Claude Sonnet corrige (1-10)</h4>
+      <p>Un "profesor" estricto compara la respuesta de Steve con los datos reales. Score 1-10 por pregunta.</p>
+      <div class="example">
+        Pregunta: "¿Cuánto vendimos hoy?"<br>
+        Steve dijo: "$1.200.000"<br>
+        Shopify real: "$1.180.000"<br>
+        <strong>Score: 9</strong> (cercano, no inventó)
+      </div>
+    </div>
+  </div>
+  <div class="flow-card">
+    <div class="flow-marker"><div class="flow-dot bg-green"></div><div class="flow-wire" style="background:#34d399; opacity:0;"></div></div>
+    <div class="flow-body">
+      <h4>5. Si falla → Crea tarea + Auto-aprende</h4>
+      <p>Si el promedio es &lt;7 o si detecta que Steve <strong>inventó datos</strong> (alucinación): crea task crítica Y genera reglas correctivas automáticas que se agregan a la base de conocimiento.</p>
+      <div class="example">
+        <strong>Auto-corrección:</strong> "Steve inventó un precio → Nueva regla: NUNCA inventar precios. Si no tienes el dato, di que no lo sabes." → Se agrega a steve_knowledge con prioridad 99.
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ==================== DETECTIVE ==================== -->
+<section id="detective">
+<div class="section-header">
+  <h2>🔎 DETECTIVE — El Verificador de Datos</h2>
+  <p>Cada 2 horas compara lo que Steve tiene en su base de datos con lo que realmente dicen Meta y Shopify. Si hay diferencias, alerta.</p>
+</div>
+
+<div class="grid-2">
+  <div class="card" style="border-left:4px solid #22d3ee;">
+    <h3>📊 Campañas Meta</h3>
+    <p>Compara: ¿la campaña existe? ¿está activa o pausada? ¿el presupuesto es correcto? Tolerancia: 0% en budget, 5% en gasto.</p>
+  </div>
+  <div class="card" style="border-left:4px solid #34d399;">
+    <h3>🛍️ Productos Shopify</h3>
+    <p>Compara: ¿el producto existe? ¿el precio es correcto? ¿el título es igual? Tolerancia: $0 en precio (exacto).</p>
+  </div>
+</div>
+<div class="card" style="margin-top:15px; border-left:4px solid #f87171;">
+  <h3>⚠️ Cuando detecta diferencia</h3>
+  <p>Si la diferencia es CRÍTICA (precio incorrecto, campaña que no existe): crea TASK para el agente responsable. Así Steve nunca da info desactualizada por mucho tiempo.</p>
+</div>
+</section>
+
+<!-- ==================== PERFORMANCE ==================== -->
+<section id="performance">
+<div class="section-header">
+  <h2>📈 PERFORMANCE — Medir y Aprender</h2>
+  <p>Mide resultados reales de campañas y aprende qué funciona y qué no</p>
+</div>
+
+<div class="flow-group">
+  <div class="flow-card">
+    <div class="flow-marker"><div class="flow-dot bg-blue"></div><div class="flow-wire" style="background:#6366f1;"></div></div>
+    <div class="flow-body">
+      <h4>⏰ 8am — Tracker mide resultados</h4>
+      <p>48-72 horas después de publicar una campaña, va a Meta API y trae los números reales: CTR, ROAS, CPA, gasto. Le pone un score de 0-100.</p>
+      <span class="tag bg-green">65+ = Bueno</span>
+      <span class="tag bg-yellow">40-64 = Neutro</span>
+      <span class="tag bg-red">&lt;40 = Malo</span>
+    </div>
+  </div>
+  <div class="flow-card">
+    <div class="flow-marker"><div class="flow-dot bg-purple"></div><div class="flow-wire" style="background:#a78bfa;"></div></div>
+    <div class="flow-body">
+      <h4>⏰ 10am — Evaluador explica POR QUÉ</h4>
+      <p>Haiku analiza cada campaña medida y explica por qué funcionó o falló. Si fue malo: crea task + email al merchant.</p>
+      <div class="example">
+        "Esta campaña falló porque el copy era genérico y no tenía beneficio claro. El CTR de 0.3% está muy por debajo del promedio de 1.2% del cliente."
+      </div>
+    </div>
+  </div>
+  <div class="flow-card">
+    <div class="flow-marker"><div class="flow-dot bg-green"></div><div class="flow-wire" style="background:#34d399; opacity:0;"></div></div>
+    <div class="flow-body">
+      <h4>🧠 Aprende patrones automáticamente</h4>
+      <p>Si después de 30 días ve que un tipo de anuncio siempre funciona (o siempre falla), genera una regla nueva.</p>
+      <div class="example">
+        "Después de analizar 15 campañas: los anuncios con ángulo de 'urgencia' tienen CTR 40% mayor que los de 'beneficio'. Nueva regla agregada."
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="border-left:4px solid #fbbf24;">
+  <h3>😫 Detector de Fatiga</h3>
+  <p>Diario a las 11am revisa si alguna campaña activa tiene señales de fatiga: CTR cayó más de 20% desde su mejor momento + la audiencia ya la vio más de 3 veces. Si detecta fatiga → crea task sugiriendo rotar el creativo.</p>
+</div>
+</section>
+
+<!-- ==================== LEARNING ==================== -->
+<section id="learning">
+<div class="section-header">
+  <h2>🔄 APRENDIZAJE — El Ciclo Completo</h2>
+  <p>Cómo el conocimiento nace, se aprueba, se propaga y se mantiene</p>
+</div>
+
+<!-- CYCLE -->
+<div class="cycle">
+  <div class="cycle-node border-blue"><h4 class="c-blue">Investigar</h4><p>Swarm, Content Hunter, Descubridor</p></div>
+  <div class="cycle-arrow">→</div>
+  <div class="cycle-node border-yellow"><h4 class="c-yellow">Pendiente</h4><p>Espera aprobación</p></div>
+  <div class="cycle-arrow">→</div>
+  <div class="cycle-node border-green"><h4 class="c-green">Aprobar</h4><p>JM via WhatsApp</p></div>
+  <div class="cycle-arrow">→</div>
+  <div class="cycle-node border-purple"><h4 class="c-purple">Propagar</h4><p>Se vuelve regla/test</p></div>
+  <div class="cycle-arrow">→</div>
+  <div class="cycle-node border-pink"><h4 class="c-pink">Usar & Medir</h4><p>Steve lo aplica</p></div>
+</div>
+
+<div class="grid-2" style="margin-top:30px;">
+  <div class="card" style="border-left:4px solid #6366f1;">
+    <h3>🔎 Fuentes de Conocimiento</h3>
+    <p><strong>Swarm:</strong> Investiga internet cada 2h<br>
+       <strong>Content Hunter:</strong> Revisa YouTube/blogs cada 20 min<br>
+       <strong>Descubridor:</strong> Mina datos reales de clientes (domingos)<br>
+       <strong>Sales Learning:</strong> Aprende de conversaciones WhatsApp (diario 8pm)<br>
+       <strong>Cross-Client:</strong> Compara métricas entre clientes (mensual)<br>
+       <strong>Performance:</strong> Aprende qué creativos funcionan (diario)</p>
+  </div>
+  <div class="card" style="border-left:4px solid #34d399;">
+    <h3>✅ Propagación (cuando apruebas)</h3>
+    <p>Cuando apruebas un insight, el sistema decide automáticamente:<br><br>
+       <strong>¿Es una regla enforceable?</strong> → Se agrega a CRITERIO (las 493+ reglas)<br>
+       <strong>¿Es visual?</strong> → Se marca para que ESPEJO lo revise<br>
+       <strong>¿Es testeable?</strong> → Se crea pregunta nueva para JUEZ<br><br>
+       Así el conocimiento nuevo fortalece TODOS los órganos.</p>
+  </div>
+</div>
+
+<div class="card" style="border-left:4px solid #fbbf24; margin-top:15px;">
+  <h3>🧹 Auto-Mantenimiento (1° de cada mes)</h3>
+  <p><strong>4am:</strong> Desactiva reglas sin actualizar en 180+ días<br>
+     <strong>5am:</strong> Consolida categorías con +15 reglas en 5-8 reglas maestras<br>
+     <strong>6am:</strong> Elimina duplicados semánticos<br><br>
+     Resultado: la base de conocimiento nunca se llena de basura.</p>
+</div>
+
+<div class="card" style="border-left:4px solid #a78bfa; margin-top:15px;">
+  <h3>🧬 Auto-Evolución (domingos 3am)</h3>
+  <p>Steve analiza el feedback de los merchants, las reglas más usadas y los resultados del JUEZ. Genera nuevas instrucciones para sí mismo sobre cómo responder mejor. <strong>Se auto-mejora los prompts.</strong></p>
+</div>
+</section>
+
+<!-- ==================== WOLF ==================== -->
+<section id="wolf">
+<div class="section-header">
+  <h2>🐺 WOLF — El Vendedor Nocturno</h2>
+  <p>Investiga prospectos de noche y les manda mensajes proactivos en la mañana</p>
+</div>
+
+<div class="grid-2">
+  <div class="card" style="border-left:4px solid #6366f1;">
+    <h3>🌙 Modo Nocturno (3am Chile)</h3>
+    <p>Mientras todos duermen, Wolf escanea las tiendas de los prospectos (con Apify). Detecta productos nuevos, cambios de precio, colecciones nuevas.</p>
+  </div>
+  <div class="card" style="border-left:4px solid #fb923c;">
+    <h3>☀️ Envío Mañanero (9am Chile)</h3>
+    <p>Con lo que descubrió de noche, genera un mensaje personalizado por WhatsApp:</p>
+    <div class="detail">
+      "Vi que subiste 3 productos nuevos a tu tienda anoche. ¿Quieres que te prepare una campaña de Meta para darles visibilidad esta semana?"
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:15px; border-left:4px solid #34d399;">
+  <h3>💬 Aprendizaje de Ventas (8pm diario)</h3>
+  <p>Cada noche, analiza las conversaciones de WhatsApp con prospectos que se convirtieron o se perdieron. Extrae qué técnicas de venta funcionaron y cuáles no. Después de 10+ conversaciones, genera meta-reglas.</p>
+  <div class="detail">
+    "Los prospectos de moda responden mejor cuando les muestras la tienda de un competidor exitoso como referencia. Tasa de conversión: 45% vs 20% sin referencia."
+  </div>
+</div>
+</section>
+
+<!-- ==================== OJOS ==================== -->
+<section id="ojos">
+<div class="section-header">
+  <h2>👁️ OJOS — Monitor de Salud</h2>
+  <p>Cada 30 minutos verifica que todos los servicios estén vivos y respondiendo rápido</p>
+</div>
+
+<div class="card">
+  <h3>¿Qué revisa?</h3>
+  <p>Hace ping a todos los endpoints críticos: steve-chat, Shopify sync, Meta sync, Klaviyo, Email, Frontend, Cloud Run.</p>
+  <div class="grid-3" style="margin-top:15px;">
+    <div class="stat-box" style="border:1px solid #34d399;">
+      <div class="num c-green" style="font-size:1.3em;">OK</div>
+      <div class="label">&lt; 3 segundos</div>
+    </div>
+    <div class="stat-box" style="border:1px solid #fbbf24;">
+      <div class="num c-yellow" style="font-size:1.3em;">LENTO</div>
+      <div class="label">&gt; 3 segundos → Task</div>
+    </div>
+    <div class="stat-box" style="border:1px solid #f87171;">
+      <div class="num c-red" style="font-size:1.3em;">CAÍDO</div>
+      <div class="label">Error 500 → Task + Auto-restart</div>
+    </div>
+  </div>
+  <div class="detail" style="margin-top:15px;">
+    Si un endpoint falla <strong>2 veces seguidas</strong>, OJOS automáticamente reinicia el servicio sin intervención humana.
+  </div>
+</div>
+</section>
+
+<!-- ==================== MEGA FLOW ==================== -->
+<section id="mega-flow">
+<div class="section-header">
+  <h2>🗺️ El Mapa Completo</h2>
+  <p>Cómo todo se conecta — el flujo de una campaña de principio a fin</p>
+</div>
+
+<div class="highlight-box" style="font-size:0.88em; line-height:2; font-family:monospace; overflow-x:auto;">
+<pre style="color:#d1d5db;">
+<span class="c-blue">MERCHANT CREA CAMPAÑA O EMAIL</span>
+        │
+        ▼
+┌─────────────────────────────────┐
+│  <span class="c-pink">CRITERIO</span> — 493+ reglas          │
+│  ¿Copy OK? ¿Target OK? ¿Budget? │
+│  ✅ Pasa  │  ❌ Rechaza → TASK   │
+└─────┬─────┘
+      ▼
+┌─────────────────────────────────┐
+│  <span class="c-purple">ESPEJO</span> — Claude Vision           │
+│  ¿Se ve bien? ¿Mobile OK?       │
+│  ✅ Pasa  │  ❌ Rechaza → TASK   │
+└─────┬─────┘
+      ▼
+   <span class="c-green">SE PUBLICA</span>
+      │
+      │  (48-72 horas después)
+      ▼
+┌─────────────────────────────────┐
+│  <span class="c-blue">PERFORMANCE TRACKER</span> — 8am       │
+│  Trae datos reales de Meta API   │
+│  Score: bueno/neutro/malo        │
+└─────┬─────┘
+      ▼
+┌─────────────────────────────────┐
+│  <span class="c-purple">PERFORMANCE EVALUATOR</span> — 10am   │
+│  "¿Por qué funcionó/falló?"     │
+│  Malo → TASK + Email merchant    │
+│  <span class="c-green">Aprende patrón → nueva regla</span>    │
+└─────┬─────┘
+      │
+      │  (mientras tanto, en paralelo)
+      │
+┌─────┴─────────────────────────────────────┐
+│                                           │
+│  <span class="c-yellow">FATIGA</span> (11am) ─── CTR cayó? → TASK      │
+│  <span class="c-cyan">DETECTIVE</span> (cada 2h) ─ Datos reales OK? │
+│  <span class="c-orange">JUEZ</span> (cada noche) ── Steve miente? ──┐ │
+│  <span class="c-blue">OJOS</span> (cada 30min) ── Todo vivo? ───┐ │ │
+│                                     │ │ │
+└─────────────────────────────────────┘ │ │
+                                        │ │
+    Si hay problema ◄───────────────────┘ │
+         │                                │
+         ▼                                │
+    ┌──────────┐                          │
+    │  <span class="c-red">TASK</span>    │ ◄────────────────────────┘
+    │ asignada │
+    │ al squad │
+    └────┬─────┘
+         │
+         ▼
+    <span class="c-green">SE CORRIGE Y SE APRENDE</span>
+         │
+         ▼
+┌─────────────────────────────────┐
+│  <span class="c-purple">BASE DE CONOCIMIENTO</span>             │
+│  Nueva regla → CRITERIO          │
+│  Nueva regla visual → ESPEJO     │
+│  Nueva pregunta → JUEZ           │
+│  <span class="c-yellow">Todo se fortalece</span>                │
+└───────────────────────────────────┘
+</pre>
+</div>
+
+<div class="highlight-box" style="margin-top:20px;">
+  <h3>El Ciclo Virtuoso</h3>
+  <p style="color:#d1d5db; font-size:1.05em;">
+    Cada <span class="c-red">error</span> se convierte en <span class="c-yellow">dato</span> →
+    cada <span class="c-yellow">dato</span> se convierte en <span class="c-purple">regla</span> →
+    cada <span class="c-purple">regla</span> previene el <span class="c-green">siguiente error</span> →
+    Steve se vuelve <strong>más inteligente cada día</strong> sin que hagas nada.
+  </p>
+</div>
+</section>
+
+<!-- ==================== TIMELINE ==================== -->
+<section id="timeline">
+<div class="section-header">
+  <h2>⏰ Un Día Típico de Steve Brain</h2>
+  <p>Todo lo que pasa automáticamente en 24 horas</p>
+</div>
+
+<div class="timeline">
+  <div class="tl-item" style="--c:#6366f1;"><div style="color:#6366f1;" class="tl-time">Cada 20 min</div><h4>🔎 Content Hunter</h4><p>Revisa YouTube, blogs y RSS de tus fuentes configuradas</p></div>
+  <div class="tl-item"><div style="color:#22d3ee;" class="tl-time">Cada 30 min</div><h4>👁️ OJOS Health Check</h4><p>Verifica que todos los servicios estén vivos</p></div>
+  <div class="tl-item"><div style="color:#a78bfa;" class="tl-time">Cada 2 horas</div><h4>🐝 Swarm Research</h4><p>10 investigadores + Opus sintetiza insights</p></div>
+  <div class="tl-item"><div style="color:#a78bfa;" class="tl-time">Cada 2 horas</div><h4>🔎 Detective Visual</h4><p>Compara datos de Steve vs APIs reales</p></div>
+  <div class="tl-item"><div style="color:#a78bfa;" class="tl-time">Cada 2 horas</div><h4>🤖 Agent Loop</h4><p>Steve decide qué hacer: buscar, mejorar, alertar</p></div>
+  <div class="tl-item"><div style="color:#6366f1;" class="tl-time">3:00 AM</div><h4>🐺 Wolf Modo Nocturno</h4><p>Escanea tiendas de prospectos</p></div>
+  <div class="tl-item"><div style="color:#fb923c;" class="tl-time">8:00 AM</div><h4>📈 Performance Tracker</h4><p>Mide resultados de campañas publicadas hace 48-72h</p></div>
+  <div class="tl-item"><div style="color:#fb923c;" class="tl-time">9:00 AM</div><h4>📱 Digest por WhatsApp</h4><p>Te llega resumen de insights pendientes para aprobar</p></div>
+  <div class="tl-item"><div style="color:#fb923c;" class="tl-time">9:00 AM</div><h4>🐺 Wolf Envío Mañanero</h4><p>Manda WhatsApp proactivo a prospectos</p></div>
+  <div class="tl-item"><div style="color:#fbbf24;" class="tl-time">10:00 AM</div><h4>🧠 Performance Evaluator</h4><p>Explica por qué cada campaña funcionó o falló</p></div>
+  <div class="tl-item"><div style="color:#fbbf24;" class="tl-time">11:00 AM</div><h4>😫 Fatigue Detector</h4><p>Busca campañas cansadas que necesitan rotar creativo</p></div>
+  <div class="tl-item"><div style="color:#f472b6;" class="tl-time">Todo el día</div><h4>🛡️ CRITERIO + ESPEJO</h4><p>Revisan cada campaña/email que se crea</p></div>
+  <div class="tl-item"><div style="color:#f87171;" class="tl-time">8:00 PM</div><h4>💬 Sales Learning</h4><p>Analiza conversaciones de WhatsApp del día</p></div>
+  <div class="tl-item"><div style="color:#f87171;" class="tl-time">11:00 PM</div><h4>⚖️ JUEZ Nocturno</h4><p>20 preguntas de examen + auto-corrección</p></div>
+</div>
+
+<div class="highlight-box" style="margin-top:30px;">
+  <h3>Domingos y 1° del mes</h3>
+  <p style="color:#d1d5db;">
+    <strong>Domingos 2am:</strong> Descubridor de patrones (mina datos reales)<br>
+    <strong>Domingos 3am:</strong> Auto-evolución de prompts<br>
+    <strong>Domingos 5am:</strong> Quality Score de todo el conocimiento<br>
+    <strong>1° del mes 3am:</strong> Cross-Client Learning<br>
+    <strong>1° del mes 4-6am:</strong> Limpieza: decay → consolidación → dedup
+  </p>
+</div>
+</section>
+
+<!-- ==================== CHECKLIST ==================== -->
+<section id="checklist">
+<div class="section-header">
+  <h2>📋 Qué tienes y Qué te falta</h2>
+</div>
+
+<div class="card">
+  <div class="check-item"><div class="check-icon">✅</div><div class="check-text"><h4>Código del Swarm con fuentes preferidas</h4><p>Deployado en Cloud Run. Genera 7 preguntas dirigidas + 3 libres.</p></div></div>
+  <div class="check-item"><div class="check-icon">✅</div><div class="check-text"><h4>Tabla swarm_sources + Admin page</h4><p>Creada en Supabase. Dashboard en <code>/admin/swarm-sources</code></p></div></div>
+  <div class="check-item"><div class="check-icon">✅</div><div class="check-text"><h4>CRITERIO + ESPEJO + JUEZ</h4><p>El código existe y está deployado. Funcionan cuando se crean campañas/emails.</p></div></div>
+  <div class="check-item"><div class="check-icon">✅</div><div class="check-text"><h4>Performance Tracker + Evaluator + Fatigue</h4><p>El código existe. Necesitan crons configurados.</p></div></div>
+  <div class="check-item"><div class="check-icon">✅</div><div class="check-text"><h4>ANTHROPIC_API_KEY + OPENAI_API_KEY</h4><p>Configuradas en Cloud Run.</p></div></div>
+  <div class="check-item"><div class="check-icon">✅</div><div class="check-text"><h4>Wolf Night Mode + Morning Send</h4><p>El código existe y está deployado.</p></div></div>
+
+  <div class="check-item"><div class="check-icon">⚠️</div><div class="check-text"><h4>Cron: Swarm cada 2 horas</h4><p>Falta crear en OpenClaw: <code>POST /api/cron/swarm-research</code> con <code>X-Cron-Secret</code> — schedule: <code>0 */2 * * *</code></p></div></div>
+  <div class="check-item"><div class="check-icon">⚠️</div><div class="check-text"><h4>Cron: Digest diario 9am</h4><p><code>POST /api/cron/auto-learning-digest</code> — schedule: <code>0 12 * * *</code> (12 UTC = 9am Chile)</p></div></div>
+  <div class="check-item"><div class="check-icon">⚠️</div><div class="check-text"><h4>Cron: Performance Tracker 8am</h4><p><code>POST /api/cron/performance-tracker-meta</code> — schedule: <code>0 11 * * *</code> (11 UTC = 8am Chile)</p></div></div>
+  <div class="check-item"><div class="check-icon">⚠️</div><div class="check-text"><h4>Cron: Performance Evaluator 10am</h4><p><code>POST /api/cron/performance-evaluator</code> — schedule: <code>0 13 * * *</code> (13 UTC = 10am Chile)</p></div></div>
+  <div class="check-item"><div class="check-icon">⚠️</div><div class="check-text"><h4>Cron: Fatigue Detector 11am</h4><p><code>POST /api/cron/fatigue-detector</code> — schedule: <code>0 14 * * *</code> (14 UTC = 11am Chile)</p></div></div>
+  <div class="check-item"><div class="check-icon">⚠️</div><div class="check-text"><h4>Cron: Wolf Night 3am + Morning 9am</h4><p>Night: <code>POST /api/cron/wolf-night-mode</code> <code>0 6 * * *</code> | Morning: <code>POST /api/cron/wolf-morning-send</code> <code>0 12 * * *</code></p></div></div>
+  <div class="check-item"><div class="check-icon">⚠️</div><div class="check-text"><h4>Cron: Sales Learning 8pm</h4><p><code>POST /api/cron/sales-learning-loop</code> — schedule: <code>0 23 * * *</code> (23 UTC = 8pm Chile)</p></div></div>
+  <div class="check-item"><div class="check-icon">⚠️</div><div class="check-text"><h4>Cron: Detective Visual cada 2h</h4><p><code>POST /api/cron/detective-visual</code> — schedule: <code>0 */2 * * *</code></p></div></div>
+  <div class="check-item"><div class="check-icon">⚠️</div><div class="check-text"><h4>Cron: Agent Loop cada 2h</h4><p><code>POST /api/cron/steve-agent-loop</code> — schedule: <code>0 */2 * * *</code></p></div></div>
+  <div class="check-item"><div class="check-icon">⚠️</div><div class="check-text"><h4>Cron: Content Hunter cada 20min</h4><p><code>POST /api/cron/steve-content-hunter</code> — schedule: <code>*/20 * * * *</code></p></div></div>
+  <div class="check-item"><div class="check-icon">⚠️</div><div class="check-text"><h4>Variable ADMIN_WA_PHONE en Cloud Run</h4><p>Tu número de WhatsApp: <code>+569XXXXXXXX</code></p></div></div>
+
+  <div class="check-item"><div class="check-icon">❓</div><div class="check-text"><h4>Agregar fuentes preferidas</h4><p>Ir a <code>/admin/swarm-sources</code> y cargar tus autores, canales y blogs favoritos.</p></div></div>
+  <div class="check-item"><div class="check-icon">❓</div><div class="check-text"><h4>Prueba manual del Swarm</h4><p>Disparar una corrida manual para verificar que todo conecta antes de dejarlo solo.</p></div></div>
+</div>
+</section>
+
+<!-- ==================== ACTIONS ==================== -->
+<div class="section-header" style="margin-top:60px;">
+  <h2>🚀 Para echarlo a andar</h2>
+</div>
+
+<div class="action-card">
+  <h3>1. Agregar fuentes en el dashboard</h3>
+  <p>Entra a <code>/admin/swarm-sources</code> y agrega tus favoritos.</p>
+</div>
+
+<div class="action-card">
+  <h3>2. Prueba manual del Swarm</h3>
+  <div class="cmd">curl -X POST https://steve-api-850416724643.us-central1.run.app/api/cron/swarm-research -H "X-Cron-Secret: TU_CRON_SECRET"</div>
+</div>
+
+<div class="action-card">
+  <h3>3. Crear TODOS los crons en OpenClaw</h3>
+  <p>Todos los crons ⚠️ de arriba. Cada uno es un POST con el header X-Cron-Secret. Sin crons, Steve no funciona autónomo.</p>
+</div>
+
+<div class="action-card">
+  <h3>4. Configurar ADMIN_WA_PHONE</h3>
+  <div class="cmd">gcloud run services update steve-api --region us-central1 --project steveapp-agency --set-env-vars ADMIN_WA_PHONE=+569XXXXXXXX</div>
+</div>
+
+</div>
+
+<div class="footer">
+  Steve Brain v2 — Sistema Completo — Abril 2026<br>
+  🧠 Investiga → 🛡️ Evalúa → ⚖️ Verifica → 📈 Mide → 🔄 Aprende → 🧹 Se mantiene
+</div>
+
+<script>
+// Highlight active nav on scroll
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('nav a');
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(s => { if (window.scrollY >= s.offsetTop - 100) current = s.id; });
+  navLinks.forEach(a => {
+    a.classList.remove('active');
+    if (a.getAttribute('href') === '#' + current) a.classList.add('active');
+  });
+});
+
+// Timeline dots color
+document.querySelectorAll('.tl-item').forEach(el => {
+  const color = el.querySelector('.tl-time')?.style.color || '#6366f1';
+  el.style.setProperty('--c', color);
+  const before = document.createElement('style');
+  before.textContent = `#timeline .tl-item:nth-child(${Array.from(el.parentNode.children).indexOf(el)+1})::before { border-color: ${color}; }`;
+  document.head.appendChild(before);
+});
+</script>
+
+</body>
+</html>

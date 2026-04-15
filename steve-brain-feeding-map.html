@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Brain — Mapa de Alimentacion</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; background: #0a0a0f; color: #e0e0e0; line-height: 1.6; }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+  h1 { font-size: 2.2em; text-align: center; margin: 30px 0 10px; color: #fff; }
+  h1 span { color: #ff6b35; }
+  .subtitle { text-align: center; color: #888; font-size: 1em; margin-bottom: 40px; }
+
+  h2 { font-size: 1.4em; margin: 40px 0 20px; padding: 10px 15px; border-left: 4px solid; border-radius: 0 8px 8px 0; }
+
+  /* Status Banner */
+  .status-banner {
+    background: linear-gradient(135deg, #1a0000, #2a0a0a);
+    border: 2px solid #ff3333;
+    border-radius: 12px;
+    padding: 25px;
+    margin: 30px 0;
+    text-align: center;
+  }
+  .status-banner h3 { color: #ff3333; font-size: 1.3em; margin-bottom: 15px; }
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 15px;
+  }
+  .status-item {
+    background: rgba(0,0,0,0.4);
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid #333;
+  }
+  .status-item .label { color: #888; font-size: 0.8em; }
+  .status-item .value { font-size: 1.4em; font-weight: bold; margin-top: 4px; }
+  .status-item .value.red { color: #ff4444; }
+  .status-item .value.yellow { color: #ffaa00; }
+  .status-item .value.green { color: #44ff44; }
+
+  /* Flow Diagram */
+  .mega-flow {
+    background: #111118;
+    border: 1px solid #2a2a3a;
+    border-radius: 16px;
+    padding: 30px;
+    margin: 30px 0;
+    overflow-x: auto;
+  }
+  .mega-flow pre {
+    font-size: 0.85em;
+    color: #ccc;
+    white-space: pre;
+    line-height: 1.4;
+  }
+  .mega-flow pre .highlight { color: #ff6b35; font-weight: bold; }
+  .mega-flow pre .green { color: #4ade80; }
+  .mega-flow pre .red { color: #ff4444; }
+  .mega-flow pre .blue { color: #60a5fa; }
+  .mega-flow pre .yellow { color: #fbbf24; }
+  .mega-flow pre .dim { color: #555; }
+  .mega-flow pre .purple { color: #c084fc; }
+
+  /* Source Cards */
+  .source-card {
+    background: #111118;
+    border: 1px solid #2a2a3a;
+    border-radius: 12px;
+    margin: 20px 0;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .source-card:hover { border-color: #ff6b35; }
+
+  .source-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 20px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .source-header:hover { background: rgba(255,107,53,0.05); }
+
+  .source-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .source-num {
+    background: #ff6b35;
+    color: #000;
+    font-weight: bold;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9em;
+    flex-shrink: 0;
+  }
+  .source-name { font-size: 1.1em; font-weight: bold; color: #fff; }
+  .source-schedule { color: #888; font-size: 0.85em; }
+
+  .source-badges {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75em;
+    font-weight: bold;
+  }
+  .badge.working { background: #0a2e0a; color: #4ade80; border: 1px solid #166534; }
+  .badge.broken { background: #2e0a0a; color: #ff4444; border: 1px solid #7f1d1d; }
+  .badge.partial { background: #2e2a0a; color: #fbbf24; border: 1px solid #78350f; }
+  .badge.model { background: #1a1a2e; color: #60a5fa; border: 1px solid #1e3a5f; }
+
+  .source-body {
+    display: none;
+    padding: 0 20px 20px;
+    border-top: 1px solid #1a1a2a;
+  }
+  .source-card.open .source-body { display: block; }
+  .source-card.open .arrow { transform: rotate(180deg); }
+  .arrow { color: #666; transition: transform 0.3s; font-size: 0.8em; }
+
+  /* Detail Sections */
+  .detail-section {
+    margin: 15px 0;
+  }
+  .detail-section h4 {
+    color: #ff6b35;
+    font-size: 0.9em;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .flow-steps {
+    background: #0a0a12;
+    border-radius: 8px;
+    padding: 15px;
+    border-left: 3px solid #ff6b35;
+  }
+  .flow-step {
+    padding: 8px 0;
+    border-bottom: 1px solid #1a1a2a;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .flow-step:last-child { border-bottom: none; }
+  .step-num {
+    color: #ff6b35;
+    font-weight: bold;
+    min-width: 24px;
+    flex-shrink: 0;
+  }
+  .step-text { color: #ccc; }
+  .step-text code {
+    background: #1a1a2e;
+    color: #60a5fa;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+  }
+  .step-text strong { color: #fff; }
+  .step-text .warn { color: #ff4444; font-weight: bold; }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+    font-size: 0.85em;
+  }
+  .data-table th {
+    background: #1a1a2a;
+    color: #ff6b35;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .data-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #1a1a2a;
+    color: #ccc;
+  }
+  .data-table tr:hover td { background: rgba(255,107,53,0.03); }
+
+  /* Problem box */
+  .problem-box {
+    background: #1a0505;
+    border: 1px solid #7f1d1d;
+    border-radius: 8px;
+    padding: 12px 15px;
+    margin: 10px 0;
+    color: #fca5a5;
+    font-size: 0.9em;
+  }
+  .problem-box strong { color: #ff4444; }
+
+  /* Success box */
+  .ok-box {
+    background: #051a05;
+    border: 1px solid #166534;
+    border-radius: 8px;
+    padding: 12px 15px;
+    margin: 10px 0;
+    color: #86efac;
+    font-size: 0.9em;
+  }
+
+  /* Maintenance section */
+  .maint-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+  }
+  .maint-card {
+    background: #111118;
+    border: 1px solid #2a2a3a;
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .maint-card h4 { color: #c084fc; margin-bottom: 8px; }
+  .maint-card .schedule { color: #666; font-size: 0.8em; margin-bottom: 10px; }
+  .maint-card p { color: #aaa; font-size: 0.85em; margin: 5px 0; }
+  .maint-card .threshold {
+    background: #1a1a2e;
+    border-radius: 4px;
+    padding: 6px 10px;
+    margin: 4px 0;
+    font-size: 0.8em;
+    color: #60a5fa;
+  }
+
+  /* Output section */
+  .output-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+  }
+  .output-card {
+    background: #111118;
+    border: 1px solid #2a2a3a;
+    border-radius: 10px;
+    padding: 18px;
+    text-align: center;
+  }
+  .output-card .icon { font-size: 2em; margin-bottom: 8px; }
+  .output-card h4 { color: #4ade80; margin-bottom: 6px; }
+  .output-card p { color: #888; font-size: 0.85em; }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 20px 0;
+    padding: 15px;
+    background: #111118;
+    border-radius: 10px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8em;
+    color: #888;
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    color: #444;
+    font-size: 0.8em;
+    margin: 50px 0 20px;
+    padding-top: 20px;
+    border-top: 1px solid #1a1a2a;
+  }
+
+  /* Toggle all */
+  .toggle-all {
+    text-align: center;
+    margin: 15px 0;
+  }
+  .toggle-all button {
+    background: #1a1a2e;
+    color: #60a5fa;
+    border: 1px solid #2a2a4a;
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  .toggle-all button:hover { background: #2a2a4e; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>Steve <span>Brain</span> — Mapa de Alimentacion</h1>
+<p class="subtitle">Como Steve aprende, linea por linea. Investigacion profunda del codigo real. Abril 2026.</p>
+
+<!-- ============================================ -->
+<!-- STATUS BANNER -->
+<!-- ============================================ -->
+<div class="status-banner">
+  <h3>ESTADO REAL DE LAS FUENTES (verificado 3 abril 2026)</h3>
+  <div class="status-grid">
+    <div class="status-item">
+      <div class="label">steve_sources (Content Hunter)</div>
+      <div class="value red">0 rows</div>
+    </div>
+    <div class="status-item">
+      <div class="label">swarm_sources (Swarm Research)</div>
+      <div class="value red">0 rows</div>
+    </div>
+    <div class="status-item">
+      <div class="label">swarm_runs (ejecuciones)</div>
+      <div class="value yellow">16 de ~360</div>
+    </div>
+    <div class="status-item">
+      <div class="label">steve_knowledge (reglas)</div>
+      <div class="value green">487</div>
+    </div>
+    <div class="status-item">
+      <div class="label">campaign_metrics</div>
+      <div class="value red">25 rows</div>
+    </div>
+    <div class="status-item">
+      <div class="label">creative_history</div>
+      <div class="value yellow">53 rows</div>
+    </div>
+    <div class="status-item">
+      <div class="label">wa_prospects</div>
+      <div class="value red">4</div>
+    </div>
+    <div class="status-item">
+      <div class="label">learning_queue</div>
+      <div class="value yellow">9</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- MEGA FLOW -->
+<!-- ============================================ -->
+<h2 style="border-color: #ff6b35; background: rgba(255,107,53,0.05);">El flujo completo: como entra la comida al cerebro</h2>
+
+<div class="mega-flow">
+<pre>
+<span class="dim">MUNDO EXTERIOR                          PROCESAMIENTO                         CEREBRO DE STEVE</span>
+<span class="dim">==============                          =============                         ================</span>
+
+<span class="blue">Blogs, YouTube,</span>                     <span class="yellow">1. CONTENT HUNTER</span>                       <span class="green">steve_knowledge</span>
+<span class="blue">RSS, Newsletters</span>  ----cada 20min---->  Haiku extrae reglas  ------->  <span class="green">(approval: pending)</span>
+<span class="red">     VACIO                            lee: steve_sources (0 rows)</span>
+<span class="red">     No tiene nada que comer</span>
+
+<span class="blue">Web completa</span>                         <span class="yellow">2. SWARM RESEARCH</span>                       <span class="green">steve_knowledge</span>
+<span class="blue">(busqueda AI)</span>     ----cada 2h------->  Haiku pregunta (10 Q)         <span class="green">(approval: pending)</span>
+                                       o4-mini busca (10 parallel)
+                                       Opus sintetiza (8 insights)  ------->  <span class="green">+ insight_group_id</span>
+<span class="red">     swarm_sources = 0 rows                                              (multi-categoria)</span>
+<span class="red">     Solo 16 runs de ~360 esperados</span>
+
+<span class="blue">Metricas reales</span>                      <span class="yellow">3. DISCOVERER</span>                           <span class="green">steve_knowledge</span>
+<span class="blue">(Meta, Shopify,</span>   ----dom 2am------->  Haiku analiza 30 dias  ------->  <span class="green">(approval: approved)</span>
+<span class="blue"> email campaigns)</span>                     patrones por dia/angulo          <span class="green">titulo: [DESCUBIERTO]</span>
+<span class="red">     campaign_metrics = 25 rows</span>
+<span class="red">     Necesita minimo 20 para correr</span>
+
+<span class="blue">Conversaciones</span>                       <span class="yellow">4. SALES LEARNING</span>                       <span class="green">steve_knowledge</span>
+<span class="blue">WhatsApp</span>          ----diario 8pm----->  Sonnet analiza converted/lost  <span class="green">(cat: sales_learning)</span>
+<span class="blue">(prospectos)</span>                           turning point, personalidad ------->  <span class="green">+ meta-patrones</span>
+<span class="red">     wa_prospects = 4 (need converted/lost)</span>                            <span class="green">(cat: sales_strategy)</span>
+
+<span class="blue">Metricas todos</span>                       <span class="yellow">5. CROSS-CLIENT</span>                         <span class="green">steve_knowledge</span>
+<span class="blue">los clientes</span>     ----mensual 3am---->  Haiku compara anonimizado ------->  <span class="green">(cat: analisis)</span>
+<span class="blue">(anonimizado)</span>                         patrones entre merchants         <span class="green">titulo: [CROSS-CLIENT]</span>
+<span class="red">     Necesita 50+ metrics Y 3+ clientes con spend > $50</span>
+
+<span class="blue">Performance</span>                          <span class="yellow">6. PERF EVALUATOR</span>                       <span class="green">steve_knowledge</span>
+<span class="blue">de creativos</span>     ----diario 10am---->  Haiku explica WHY  ----------->  <span class="green">(angulos validados)</span>
+<span class="blue">(48-72h despues)</span>                      patrones por angulo+canal        <span class="green">+ effectiveness_score</span>
+<span class="yellow">     creative_history = 53 (necesita 5+ por angulo)</span>
+
+<span class="blue">Errores sin</span>                          <span class="yellow">7. AUTO-RULE GEN</span>                        <span class="green">criterio_rules</span>
+<span class="blue">regla existente</span>  ----on-demand------>  Haiku genera nueva regla ------->  <span class="green">(auto=true)</span>
+<span class="green">     Funciona cuando hay errores (reactivo)</span>
+
+<span class="blue">Todo: alertas,</span>                       <span class="yellow">8. STEVE AGENT LOOP</span>                     <span class="green">learning_queue</span>
+<span class="blue">stats, feedback</span>  ----cada 2h-------->  Haiku percibe + razona  ------->  <span class="green">+ mejora reglas</span>
+                                       decide: buscar/mejorar/nada     <span class="green">quality_score < 40</span>
+<span class="yellow">     13 episodic_memory (funciona parcial)</span>
+
+<span class="blue">Contenido</span>                            <span class="yellow">9. TRAIN-STEVE</span>                          <span class="green">steve_knowledge</span>
+<span class="blue">manual (JM)</span>      ----manual--------->  Sonnet extrae conceptos  ------->  <span class="green">+ steve_bugs</span>
+<span class="green">     Funciona (edge function activa)</span>
+
+<span class="blue">Tiendas de</span>                           <span class="yellow">10. WOLF SYSTEM</span>                         <span class="green">wa_prospects</span>
+<span class="blue">prospectos +</span>     ----3am + 9am------>  Apify scrape + Haiku msg ------->  <span class="green">.wolf_findings</span>
+<span class="blue">competencia</span>                           proactivo por WhatsApp           <span class="green">+ wa_messages</span>
+<span class="red">     wa_prospects = 4 (casi vacio)</span>
+
+
+<span class="dim">                                         APROBACION</span>
+<span class="dim">                                         ==========</span>
+
+<span class="green">steve_knowledge</span>                      <span class="yellow">AUTO-LEARNING DIGEST</span>
+<span class="green">(pending)</span>         ----diario 9am----->  WhatsApp a JM con link  ------->  <span class="purple">JM aprueba/rechaza</span>
+                                       token seguro 7 dias              en portal admin
+                                       top 2 insights por confianza     <span class="purple">approval_status = approved</span>
+
+
+<span class="dim">                                         PROPAGACION</span>
+<span class="dim">                                         ===========</span>
+
+<span class="green">steve_knowledge</span>                      <span class="yellow">PROPAGATION CATCHUP</span>
+<span class="green">(approved)</span>       ----on-demand------->  Convierte regla en:
+                                       <span class="blue">CRITERIO</span> (check de calidad)
+                                       <span class="blue">ESPEJO</span> (flag visual)
+                                       <span class="blue">JUEZ</span> (pregunta golden)
+</pre>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#ff4444"></div> ROTO — no tiene datos</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fbbf24"></div> PARCIAL — funciona pero con poca data</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div> OK — operativo</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#60a5fa"></div> FUENTE EXTERNA</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div> ACCION HUMANA</div>
+</div>
+
+<!-- ============================================ -->
+<!-- SOURCES DETAIL -->
+<!-- ============================================ -->
+<h2 style="border-color: #fbbf24; background: rgba(251,191,36,0.05);">Las 10 fuentes, linea por linea</h2>
+<p class="subtitle">Click en cada una para ver el detalle profundo</p>
+
+<div class="toggle-all">
+  <button onclick="toggleAll()">Abrir / Cerrar todas</button>
+</div>
+
+<!-- SOURCE 1: CONTENT HUNTER -->
+<div class="source-card" id="s1">
+  <div class="source-header" onclick="toggle('s1')">
+    <div class="source-title">
+      <div class="source-num">1</div>
+      <div>
+        <div class="source-name">CONTENT HUNTER</div>
+        <div class="source-schedule">Cada 20 minutos &mdash; steve-content-hunter.ts</div>
+      </div>
+    </div>
+    <div class="source-badges">
+      <span class="badge broken">ROTO</span>
+      <span class="badge model">Haiku</span>
+      <span class="arrow">&#9660;</span>
+    </div>
+  </div>
+  <div class="source-body">
+    <div class="problem-box">
+      <strong>Problema:</strong> La tabla <code>steve_sources</code> tiene 0 rows. El Content Hunter corre cada 20 minutos pero no tiene URLs que escanear. Es como un cartero sin direcciones.
+    </div>
+
+    <div class="detail-section">
+      <h4>Que hace paso a paso</h4>
+      <div class="flow-steps">
+        <div class="flow-step"><span class="step-num">1.</span><span class="step-text">Lee <code>steve_sources</code> WHERE enabled=true, max 5 fuentes, ordenadas por <code>last_checked_at ASC</code> (la mas vieja primero)</span></div>
+        <div class="flow-step"><span class="step-num">2.</span><span class="step-text">Para cada fuente, segun <code>source_type</code>:<br><strong>youtube_channel</strong>: Extrae channel_id, baja RSS, parsea 3 videos mas recientes<br><strong>rss/blog</strong>: Baja URL, extrae 3 items mas recientes<br><strong>website</strong>: Encola la URL directamente</span></div>
+        <div class="flow-step"><span class="step-num">3.</span><span class="step-text">Para cada contenido nuevo:<br>- <strong>YouTube</strong>: Extrae subtitulos del video (captions XML)<br>- <strong>Otros</strong>: Intenta Apify primero, si falla hace fetch raw + limpia HTML<br>- Salta si texto &lt; 200 caracteres</span></div>
+        <div class="flow-step"><span class="step-num">4.</span><span class="step-text">Manda a <strong>Claude Haiku</strong> (max 3,000 tokens): "Extrae reglas accionables de este contenido". Formato: titulo + contenido + categoria. Max 600 chars por regla.</span></div>
+        <div class="flow-step"><span class="step-num">5.</span><span class="step-text">Inserta en <code>steve_knowledge</code> con <code>approval_status='pending'</code>, <code>orden=2</code>. Las reglas NO se activan hasta que JM las apruebe.</span></div>
+        <div class="flow-step"><span class="step-num">6.</span><span class="step-text">Actualiza <code>steve_sources</code>: last_checked_at, last_content_id, total_rules_extracted++</span></div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Tablas que toca</h4>
+      <table class="data-table">
+        <tr><th>Tabla</th><th>Lee/Escribe</th><th>Que hace</th></tr>
+        <tr><td><code>steve_sources</code></td><td>Lee + Escribe</td><td>Lee fuentes activas, actualiza last_checked</td></tr>
+        <tr><td><code>steve_knowledge</code></td><td>Escribe</td><td>Inserta reglas nuevas (pending)</td></tr>
+        <tr><td><code>qa_log</code></td><td>Escribe</td><td>Registro de ejecucion</td></tr>
+      </table>
+    </div>
+
+    <div class="detail-section">
+      <h4>Fallas silenciosas (corre pero no hace nada)</h4>
+      <table class="data-table">
+        <tr><th>Situacion</th><th>Que pasa</th></tr>
+        <tr><td>0 fuentes habilitadas</td><td>Retorna success=true con "No sources to check"</td></tr>
+        <tr><td>Contenido &lt; 200 chars</td><td>Se salta sin log</td></tr>
+        <tr><td>YouTube transcript falla</td><td>try/catch, salta al siguiente</td></tr>
+        <tr><td>AI no retorna JSON valido</td><td>Se salta sin log</td></tr>
+        <tr><td>Regla &lt; 50 chars</td><td>Se salta sin log</td></tr>
+        <tr><td>Apify falla</td><td>Fallback a HTML raw (silencioso)</td></tr>
+      </table>
+    </div>
+
+    <div class="detail-section">
+      <h4>Para que funcione necesitas</h4>
+      <div class="ok-box">
+        Insertar filas en <code>steve_sources</code> con URLs reales. Ejemplo: HubSpot Blog, Neil Patel, Shopify Blog, Klaviyo Blog, Meta Business Help, canales YouTube de marketing digital. Minimo 10-20 fuentes para que el hunter tenga trabajo.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SOURCE 2: SWARM RESEARCH -->
+<div class="source-card" id="s2">
+  <div class="source-header" onclick="toggle('s2')">
+    <div class="source-title">
+      <div class="source-num">2</div>
+      <div>
+        <div class="source-name">SWARM RESEARCH</div>
+        <div class="source-schedule">Cada 2 horas &mdash; swarm-research.ts</div>
+      </div>
+    </div>
+    <div class="source-badges">
+      <span class="badge partial">PARCIAL</span>
+      <span class="badge model">Haiku + o4-mini + Opus</span>
+      <span class="arrow">&#9660;</span>
+    </div>
+  </div>
+  <div class="source-body">
+    <div class="problem-box">
+      <strong>Problema:</strong> Solo 16 swarm_runs cuando deberia haber ~360 (12/dia x 30 dias). Las <code>swarm_sources</code> estan vacias (0 rows), asi que Haiku no puede priorizar fuentes. El swarm corre pero sin guia.
+    </div>
+
+    <div class="detail-section">
+      <h4>Que hace paso a paso (3 cerebros en cascada)</h4>
+      <div class="flow-steps">
+        <div class="flow-step"><span class="step-num">1.</span><span class="step-text"><strong>DIRECTOR (Haiku)</strong> — Genera 10 preguntas de investigacion<br>- Obtiene el tema del dia segun rotacion tematica (14 temas, AM/PM)<br>- Carga los 50 titulos mas recientes de <code>steve_knowledge</code> para no repetir<br>- Carga fuentes preferidas de <code>swarm_sources</code> (0 rows = sin preferencia)<br>- 7 de 10 preguntas deben referenciar fuentes preferidas, 3 son libres<br>- Modelo: <code>claude-haiku-4-5-20251001</code>, 1,000 tokens</span></div>
+        <div class="flow-step"><span class="step-num">2.</span><span class="step-text"><strong>10 McKINSEYS (o4-mini)</strong> — Buscan en la web en paralelo<br>- 10 llamadas simultaneas a <code>api.openai.com/v1/responses</code><br>- Cada uno usa <code>web_search_preview</code> tool (busqueda web + analisis)<br>- Retornan: texto + URLs citadas<br>- Si una falla, continua con las otras (no bloquea)</span></div>
+        <div class="flow-step"><span class="step-num">3.</span><span class="step-text"><strong>SENIOR PARTNER (Opus)</strong> — Sintetiza insights cruzados<br>- Recibe los 10 reportes concatenados<br>- Modelo: <code>claude-opus-4-6</code>, 4,000 tokens<br>- Cruza hallazgos entre disciplinas (ej: insight de Meta + Klaviyo)<br>- Retorna max 8 insights con:<br>&nbsp;&nbsp;titulo (max 80 chars), contenido (CUANDO/HAZ/PORQUE),<br>&nbsp;&nbsp;categorias (1-3), confidence (1-10), sources (URLs)<br>- Confidence: 8+ = dato duro, 5-7 = tendencia, &lt;5 = hipotesis</span></div>
+        <div class="flow-step"><span class="step-num">4.</span><span class="step-text"><strong>GUARDAR</strong> — Por cada insight, por cada categoria:<br>- INSERT en <code>steve_knowledge</code> con <code>approval_status='pending'</code><br>- Comparte <code>insight_group_id</code> (UUID) para agrupar multi-categoria<br>- Cuando JM aprueba UNA fila del grupo, se aprueban TODAS las hermanas automaticamente</span></div>
+        <div class="flow-step"><span class="step-num">5.</span><span class="step-text"><strong>TRACKING</strong> — Actualiza <code>swarm_sources</code>: hits++ y last_used_at para las fuentes que aparecieron en la investigacion</span></div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Rotacion tematica semanal</h4>
+      <table class="data-table">
+        <tr><th>Dia</th><th>AM (mañana)</th><th>PM (tarde)</th></tr>
+        <tr><td>Lunes</td><td>Meta Ads</td><td>Google Ads</td></tr>
+        <tr><td>Martes</td><td>Klaviyo & Email</td><td>Shopify & Checkout</td></tr>
+        <tr><td>Miercoles</td><td>Retencion de clientes</td><td>Pricing & Promociones</td></tr>
+        <tr><td>Jueves</td><td>Creativos & Copywriting</td><td>Tendencias LATAM</td></tr>
+        <tr><td>Viernes</td><td>Estrategia Cross-Channel</td><td>Automatizacion</td></tr>
+        <tr><td>Sabado</td><td>Analisis Competencia</td><td>Analisis Competencia</td></tr>
+        <tr><td>Domingo</td><td>Tema Libre (Haiku decide)</td><td>Tema Libre</td></tr>
+      </table>
+    </div>
+
+    <div class="detail-section">
+      <h4>Costo por ejecucion (~12x al dia)</h4>
+      <table class="data-table">
+        <tr><th>API</th><th>Llamadas/run</th><th>Llamadas/dia</th><th>Modelo</th></tr>
+        <tr><td>Anthropic</td><td>1 (Haiku) + 1 (Opus)</td><td>~24</td><td>Haiku + Opus</td></tr>
+        <tr><td>OpenAI</td><td>10 (o4-mini parallel)</td><td>~120</td><td>o4-mini con web search</td></tr>
+        <tr><td>Supabase</td><td>~30 queries</td><td>~360</td><td>PostgreSQL</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- SOURCE 3: DISCOVERER -->
+<div class="source-card" id="s3">
+  <div class="source-header" onclick="toggle('s3')">
+    <div class="source-title">
+      <div class="source-num">3</div>
+      <div>
+        <div class="source-name">STEVE DISCOVERER</div>
+        <div class="source-schedule">Domingos 2am &mdash; steve-discoverer.ts</div>
+      </div>
+    </div>
+    <div class="source-badges">
+      <span class="badge partial">PARCIAL</span>
+      <span class="badge model">Haiku</span>
+      <span class="arrow">&#9660;</span>
+    </div>
+  </div>
+  <div class="source-body">
+    <div class="problem-box">
+      <strong>Problema:</strong> Necesita minimo 20 rows en <code>campaign_metrics</code> para correr. Hoy hay 25 — apenas pasa el umbral pero con muy poca data para descubrir patrones reales.
+    </div>
+
+    <div class="detail-section">
+      <h4>Que hace paso a paso</h4>
+      <div class="flow-steps">
+        <div class="flow-step"><span class="step-num">1.</span><span class="step-text">Lee ultimos 30 dias de: <code>campaign_metrics</code> (spend, clicks, conversions), <code>creative_history</code> (angulo, verdict, score), <code>email_campaigns</code> (subject, opens, clicks)</span></div>
+        <div class="flow-step"><span class="step-num">2.</span><span class="step-text">Si &lt; 20 metricas: <span class="warn">EXIT SILENCIOSO</span> — retorna "Not enough data"</span></div>
+        <div class="flow-step"><span class="step-num">3.</span><span class="step-text">Agrega metricas por dia-de-semana (ej: lunes = $X spend, $Y revenue)</span></div>
+        <div class="flow-step"><span class="step-num">4.</span><span class="step-text">Agrega performance de creativos por angulo (total, buenos, malos)</span></div>
+        <div class="flow-step"><span class="step-num">5.</span><span class="step-text">Extrae features de emails (largo subject, tiene emoji, tiene numero, open_rate, click_rate)</span></div>
+        <div class="flow-step"><span class="step-num">6.</span><span class="step-text">Manda todo a <strong>Claude Haiku</strong>: "Encuentra correlaciones y patrones inesperados"</span></div>
+        <div class="flow-step"><span class="step-num">7.</span><span class="step-text">Inserta en <code>steve_knowledge</code> con titulo <code>[DESCUBIERTO]</code> y <strong>approval_status='approved'</strong> — se auto-aprueba porque viene de datos reales, no de internet</span></div>
+      </div>
+    </div>
+
+    <div class="ok-box">
+      <strong>Diferencia clave:</strong> El Discoverer AUTO-APRUEBA sus insights (no necesitan aprobacion de JM) porque se basan en datos medidos, no en busquedas web. Es el unico que hace esto.
+    </div>
+  </div>
+</div>
+
+<!-- SOURCE 4: SALES LEARNING -->
+<div class="source-card" id="s4">
+  <div class="source-header" onclick="toggle('s4')">
+    <div class="source-title">
+      <div class="source-num">4</div>
+      <div>
+        <div class="source-name">SALES LEARNING LOOP</div>
+        <div class="source-schedule">Diario 8pm &mdash; sales-learning-loop.ts</div>
+      </div>
+    </div>
+    <div class="source-badges">
+      <span class="badge broken">ROTO</span>
+      <span class="badge model">Sonnet</span>
+      <span class="arrow">&#9660;</span>
+    </div>
+  </div>
+  <div class="source-body">
+    <div class="problem-box">
+      <strong>Problema:</strong> Solo 4 prospectos en <code>wa_prospects</code> y necesita prospectos con stage='converted' o 'lost' que NO hayan sido analizados. Probablemente 0 cumplen ese filtro.
+    </div>
+
+    <div class="detail-section">
+      <h4>Que hace paso a paso</h4>
+      <div class="flow-steps">
+        <div class="flow-step"><span class="step-num">1.</span><span class="step-text">Busca en <code>wa_prospects</code> WHERE stage IN ('converted','lost') AND learning_extracted=false, limit 10</span></div>
+        <div class="flow-step"><span class="step-num">2.</span><span class="step-text">Para cada prospecto, carga sus mensajes de <code>wa_messages</code> (channel='prospect', max 100 msgs)</span></div>
+        <div class="flow-step"><span class="step-num">3.</span><span class="step-text">Si tiene &lt; 4 mensajes: marca learning_extracted=true y salta (silencioso)</span></div>
+        <div class="flow-step"><span class="step-num">4.</span><span class="step-text">Manda conversacion completa a <strong>Claude Sonnet</strong> (8,000 chars max, 800 tokens). Pregunta: tecnicas que funcionaron, tecnicas que fallaron, punto de quiebre, personalidad, key learning</span></div>
+        <div class="flow-step"><span class="step-num">5.</span><span class="step-text">Inserta en <code>steve_knowledge</code> con categoria='sales_learning'. Titulo: "checkmark/X {industria} — {key_learning}"</span></div>
+        <div class="flow-step"><span class="step-num">6.</span><span class="step-text"><strong>META-PATRONES:</strong> Si hay 10+ sales_learnings, Sonnet genera 3-5 meta-patrones cruzados y los guarda como categoria='sales_strategy'</span></div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Modelo de AI</h4>
+      <div class="ok-box">
+        Usa <strong>Claude Sonnet</strong> (no Haiku) porque el analisis de conversaciones requiere mas inteligencia. Es el unico cron de learning que usa Sonnet — mas caro pero mejor calidad.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SOURCE 5: CROSS-CLIENT -->
+<div class="source-card" id="s5">
+  <div class="source-header" onclick="toggle('s5')">
+    <div class="source-title">
+      <div class="source-num">5</div>
+      <div>
+        <div class="source-name">CROSS-CLIENT LEARNING</div>
+        <div class="source-schedule">Mensual (dia 1, 3am) &mdash; cross-client-learning.ts</div>
+      </div>
+    </div>
+    <div class="source-badges">
+      <span class="badge broken">ROTO</span>
+      <span class="badge model">Haiku</span>
+      <span class="arrow">&#9660;</span>
+    </div>
+  </div>
+  <div class="source-body">
+    <div class="problem-box">
+      <strong>Problema:</strong> Necesita 50+ rows en <code>campaign_metrics</code> (hay 25) Y 3+ clientes con spend > $50 (probablemente 0-1). No puede correr.
+    </div>
+
+    <div class="detail-section">
+      <h4>Que hace paso a paso</h4>
+      <div class="flow-steps">
+        <div class="flow-step"><span class="step-num">1.</span><span class="step-text">Lee TODOS los <code>campaign_metrics</code> de los ultimos 30 dias (todos los clientes)</span></div>
+        <div class="flow-step"><span class="step-num">2.</span><span class="step-text">Si &lt; 50 registros: <span class="warn">EXIT SILENCIOSO</span></span></div>
+        <div class="flow-step"><span class="step-num">3.</span><span class="step-text">Agrupa por connection_id (proxy de cliente). Calcula: spend, CTR, conversion_rate, ROAS</span></div>
+        <div class="flow-step"><span class="step-num">4.</span><span class="step-text">Filtra clientes con spend &gt; $50. Si &lt; 3 clientes: <span class="warn">EXIT SILENCIOSO</span></span></div>
+        <div class="flow-step"><span class="step-num">5.</span><span class="step-text"><strong>Anonimiza:</strong> Client_1, Client_2... (nunca revela nombres)</span></div>
+        <div class="flow-step"><span class="step-num">6.</span><span class="step-text">Haiku analiza patrones cruzados: "Que tienen en comun los que mejor ROAS tienen?"</span></div>
+        <div class="flow-step"><span class="step-num">7.</span><span class="step-text">Upsert en <code>steve_knowledge</code> con titulo <code>[CROSS-CLIENT]</code>, auto-aprobado</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SOURCE 6: PERFORMANCE EVALUATOR -->
+<div class="source-card" id="s6">
+  <div class="source-header" onclick="toggle('s6')">
+    <div class="source-title">
+      <div class="source-num">6</div>
+      <div>
+        <div class="source-name">PERFORMANCE EVALUATOR</div>
+        <div class="source-schedule">Diario 10am &mdash; performance-evaluator.ts</div>
+      </div>
+    </div>
+    <div class="source-badges">
+      <span class="badge partial">PARCIAL</span>
+      <span class="badge model">Haiku</span>
+      <span class="arrow">&#9660;</span>
+    </div>
+  </div>
+  <div class="source-body">
+    <div class="problem-box">
+      <strong>Problema:</strong> Necesita creativos medidos (con performance_score) para evaluar. Depende de que Performance Tracker Meta (8am) haya corrido primero. Con 53 creative_history, tiene algo pero poco.
+    </div>
+
+    <div class="detail-section">
+      <h4>Que hace paso a paso</h4>
+      <div class="flow-steps">
+        <div class="flow-step"><span class="step-num">1.</span><span class="step-text">Lee <code>creative_history</code> medidos HOY que no tienen <code>performance_reason</code></span></div>
+        <div class="flow-step"><span class="step-num">2.</span><span class="step-text">Para cada creativo, Haiku analiza: CTR + CPA + ROAS + angulo + tema + benchmarks. Responde en 2 lineas max: POR QUE funciono o fallo.</span></div>
+        <div class="flow-step"><span class="step-num">3.</span><span class="step-text">Si verdict = 'malo': crea task de mejora + email al merchant</span></div>
+        <div class="flow-step"><span class="step-num">4.</span><span class="step-text"><strong>GENERALIZACION DE ANGULOS</strong> (el paso clave):<br>- Lee ultimos 30 dias de creativos con angulo + verdict<br>- Agrupa por angulo + canal<br>- Si un grupo tiene 5+ mediciones Y (bueno >=60% O malo >=60%): CREA REGLA<br>- Ejemplo: <em>"meta: angulo 'descuento' FUNCIONA — score promedio 78/100, 85% tasa exito (12 mediciones)"</em></span></div>
+        <div class="flow-step"><span class="step-num">5.</span><span class="step-text"><strong>EFFECTIVENESS SCORING:</strong> Para cada regla que fue aplicada en un creativo, actualiza <code>steve_knowledge.effectiveness_score</code> = promedio de los scores de los creativos donde se uso</span></div>
+      </div>
+    </div>
+
+    <div class="ok-box">
+      <strong>Este es el loop mas importante:</strong> Es el unico que conecta "que angulo usamos" con "como le fue en la realidad" y lo convierte en regla. Sin esto, Steve repite los mismos errores.
+    </div>
+  </div>
+</div>
+
+<!-- SOURCE 7: AUTO-RULE GENERATOR -->
+<div class="source-card" id="s7">
+  <div class="source-header" onclick="toggle('s7')">
+    <div class="source-title">
+      <div class="source-num">7</div>
+      <div>
+        <div class="source-name">AUTO-RULE GENERATOR</div>
+        <div class="source-schedule">On-demand &mdash; auto-rule-generator.ts</div>
+      </div>
+    </div>
+    <div class="source-badges">
+      <span class="badge working">OK</span>
+      <span class="badge model">Haiku</span>
+      <span class="arrow">&#9660;</span>
+    </div>
+  </div>
+  <div class="source-body">
+    <div class="detail-section">
+      <h4>Que hace paso a paso</h4>
+      <div class="flow-steps">
+        <div class="flow-step"><span class="step-num">1.</span><span class="step-text">Recibe un <code>error_detail</code> (ej: "Email sin link de unsubscribe")</span></div>
+        <div class="flow-step"><span class="step-num">2.</span><span class="step-text">Lee las primeras 200 <code>criterio_rules</code> activas</span></div>
+        <div class="flow-step"><span class="step-num">3.</span><span class="step-text">Haiku decide: ya existe una regla que cubra esto? Si = retorna la existente, no crea nada</span></div>
+        <div class="flow-step"><span class="step-num">4.</span><span class="step-text">Si NO existe: genera nueva regla con category, name, check_rule, pass_example, fail_example, severity, weight</span></div>
+        <div class="flow-step"><span class="step-num">5.</span><span class="step-text">Inserta en <code>criterio_rules</code> con ID secuencial (R-494, R-495...) y <code>auto=true</code></span></div>
+      </div>
+    </div>
+    <div class="ok-box">
+      <strong>Este SI funciona</strong> porque es reactivo (no necesita data previa). Cada vez que algun sistema encuentra un error sin regla, este genera una. Es como un sistema inmunologico.
+    </div>
+  </div>
+</div>
+
+<!-- SOURCE 8: STEVE AGENT LOOP -->
+<div class="source-card" id="s8">
+  <div class="source-header" onclick="toggle('s8')">
+    <div class="source-title">
+      <div class="source-num">8</div>
+      <div>
+        <div class="source-name">STEVE AGENT LOOP</div>
+        <div class="source-schedule">Cada 2 horas &mdash; steve-agent-loop.ts</div>
+      </div>
+    </div>
+    <div class="source-badges">
+      <span class="badge partial">PARCIAL</span>
+      <span class="badge model">Haiku</span>
+      <span class="arrow">&#9660;</span>
+    </div>
+  </div>
+  <div class="source-body">
+    <div class="detail-section">
+      <h4>Que hace paso a paso (PERCEIVE - REASON - ACT)</h4>
+      <div class="flow-steps">
+        <div class="flow-step"><span class="step-num">P</span><span class="step-text"><strong>PERCIBIR:</strong> Lee alertas recientes de <code>qa_log</code> (ultimas 4h), stats de knowledge (pending vs approved), feedback reciente (positivo vs negativo, 24h), resumen de metricas de clientes (ultimos 3 dias: spend, revenue, ROAS)</span></div>
+        <div class="flow-step"><span class="step-num">R</span><span class="step-text"><strong>RAZONAR:</strong> Haiku recibe el worldState completo y decide 2-3 acciones a tomar. Opciones: <code>search_topic</code>, <code>evaluate_rules</code>, <code>improve_knowledge</code>, <code>alert_client</code>, <code>nothing</code></span></div>
+        <div class="flow-step"><span class="step-num">A</span><span class="step-text"><strong>ACTUAR:</strong><br>
+        - <code>search_topic</code>: Busca en YouTube, extrae video IDs, inserta en <code>learning_queue</code> como pending<br>
+        - <code>improve_knowledge</code>: Busca reglas con quality_score &lt; 40, Haiku las reescribe en formato CUANDO/HAZ/PORQUE, actualiza score a 60<br>
+        - <code>nothing</code>: Todo bien, no hace nada</span></div>
+        <div class="flow-step"><span class="step-num">E</span><span class="step-text"><strong>EVALUAR:</strong> Revisa <code>steve_commitments</code> por follow-ups vencidos. Si tiene &gt; 30 dias, lo marca como "expired"</span></div>
+      </div>
+    </div>
+    <div class="detail-section">
+      <h4>Memoria</h4>
+      <div class="ok-box">
+        Cada ejecucion se guarda en <code>steve_episodic_memory</code> (event_type: agent_loop). Esto es la "memoria autobiografica" de Steve — sabe que hizo y cuando. Hoy tiene 13 recuerdos.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SOURCE 9: TRAIN-STEVE -->
+<div class="source-card" id="s9">
+  <div class="source-header" onclick="toggle('s9')">
+    <div class="source-title">
+      <div class="source-num">9</div>
+      <div>
+        <div class="source-name">TRAIN-STEVE (Manual)</div>
+        <div class="source-schedule">Manual &mdash; Edge Function</div>
+      </div>
+    </div>
+    <div class="source-badges">
+      <span class="badge working">OK</span>
+      <span class="badge model">Sonnet</span>
+      <span class="arrow">&#9660;</span>
+    </div>
+  </div>
+  <div class="source-body">
+    <div class="detail-section">
+      <h4>Que hace</h4>
+      <div class="flow-steps">
+        <div class="flow-step"><span class="step-num">1.</span><span class="step-text">JM o un admin pega contenido (articulo, apunte, estrategia) en la interfaz</span></div>
+        <div class="flow-step"><span class="step-num">2.</span><span class="step-text"><strong>Claude Sonnet</strong> extrae conceptos estructurados: titulo, contenido (lista numerada), categoria, y bugs (errores a evitar con ejemplo bueno/malo)</span></div>
+        <div class="flow-step"><span class="step-num">3.</span><span class="step-text">Inserta en <code>steve_knowledge</code> (orden=99, activo=true) y <code>steve_bugs</code></span></div>
+      </div>
+    </div>
+    <div class="ok-box">
+      <strong>Esta es la unica fuente 100% manual.</strong> Edge function deployada y activa. Funciona cuando JM quiere enseñarle algo especifico a Steve.
+    </div>
+  </div>
+</div>
+
+<!-- SOURCE 10: WOLF SYSTEM -->
+<div class="source-card" id="s10">
+  <div class="source-header" onclick="toggle('s10')">
+    <div class="source-title">
+      <div class="source-num">10</div>
+      <div>
+        <div class="source-name">WOLF SYSTEM (Prospect Intelligence)</div>
+        <div class="source-schedule">3am scrape + 9am send &mdash; wolf-night-mode.ts / wolf-morning-send.ts</div>
+      </div>
+    </div>
+    <div class="source-badges">
+      <span class="badge broken">ROTO</span>
+      <span class="badge model">Apify + Haiku</span>
+      <span class="arrow">&#9660;</span>
+    </div>
+  </div>
+  <div class="source-body">
+    <div class="problem-box">
+      <strong>Problema:</strong> Solo 4 prospectos en <code>wa_prospects</code>. Wolf necesita prospectos con URL de tienda para scrapear. Probablemente ninguno tiene los campos necesarios.
+    </div>
+
+    <div class="detail-section">
+      <h4>Que hace paso a paso</h4>
+      <div class="flow-steps">
+        <div class="flow-step"><span class="step-num">3am</span><span class="step-text"><strong>WOLF NIGHT:</strong> Para cada prospecto activo con URL de tienda:<br>- Apify scrapea la tienda (productos, imagenes, precios)<br>- Compara con scrape anterior: "Subio X producto nuevo", "Cambio de precios"<br>- Busca anuncios de competencia en <code>competitor_ads</code><br>- Guarda findings en <code>wa_prospects.wolf_findings</code></span></div>
+        <div class="flow-step"><span class="step-num">9am</span><span class="step-text"><strong>WOLF MORNING:</strong> Para prospectos con findings de hoy:<br>- Haiku genera mensaje WhatsApp natural (4 lineas, tono amigable)<br>- Envia via Twilio<br>- Guarda en <code>wa_messages</code><br>- Limpia wolf_findings (null)</span></div>
+      </div>
+    </div>
+    <div class="detail-section">
+      <h4>Que NO alimenta</h4>
+      <div class="problem-box">
+        Wolf NO alimenta <code>steve_knowledge</code> directamente. Alimenta la relacion con prospectos via WhatsApp. El learning viene despues, cuando un prospecto se convierte (o se pierde) y lo procesa Sales Learning Loop (#4).
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- MAINTENANCE SYSTEMS -->
+<!-- ============================================ -->
+<h2 style="border-color: #c084fc; background: rgba(192,132,252,0.05);">Mantenimiento: como el cerebro se limpia solo</h2>
+<p class="subtitle">7 sistemas que mantienen las 487 reglas sanas</p>
+
+<div class="maint-grid">
+  <div class="maint-card">
+    <h4>Quality Score</h4>
+    <div class="schedule">Domingos 5am</div>
+    <p>Calcula score 0-100 para cada regla:</p>
+    <div class="threshold">Formato CUANDO/HAZ/PORQUE: +20pts</div>
+    <div class="threshold">Tiene numeros/umbrales: +10pts</div>
+    <div class="threshold">Usada frecuentemente: +4pts por uso (max 20)</div>
+    <div class="threshold">Creada hace &lt;30 dias: +20pts</div>
+    <div class="threshold">Tiene ejemplo real: +20pts</div>
+    <p style="margin-top:10px"><strong>Score &lt; 40:</strong> Haiku la reescribe automaticamente</p>
+    <p><strong>Score &lt; 20 + sin usar 60 dias:</strong> Se desactiva</p>
+  </div>
+
+  <div class="maint-card">
+    <h4>Consolidador</h4>
+    <div class="schedule">Mensual (dia 1, 5am)</div>
+    <p>Si una categoria tiene &gt; 15 reglas:</p>
+    <p>Haiku las consolida en 5-8 reglas maestras.</p>
+    <p>Las viejas se desactivan, las nuevas entran con titulo <code>[CONSOLIDADA]</code> y orden=99.</p>
+    <div class="threshold">Umbral: &gt;15 reglas por categoria</div>
+    <div class="threshold">Output: 3-10 reglas consolidadas</div>
+  </div>
+
+  <div class="maint-card">
+    <h4>Deduplicador</h4>
+    <div class="schedule">Mensual (dia 1, 6am)</div>
+    <p>Haiku busca duplicados semanticos (no exactos).</p>
+    <p>Ej: "Usar CTAs claros" y "Los CTAs deben ser directos" = duplicado.</p>
+    <p>Mantiene la mejor, desactiva las demas, hereda el orden mas alto.</p>
+    <div class="threshold">Minimo: 3 reglas por categoria</div>
+    <div class="threshold">Minimo total: 5 reglas para correr</div>
+  </div>
+
+  <div class="maint-card">
+    <h4>Decay (Envejecimiento)</h4>
+    <div class="schedule">Mensual (dia 1, 4am)</div>
+    <p>Reglas viejas pierden prioridad o se desactivan. Sin AI — pura logica.</p>
+    <div class="threshold">&gt;90 dias sin update + orden &gt;50: baja a orden=50</div>
+    <div class="threshold">&gt;180 dias sin update: se desactiva completamente</div>
+  </div>
+
+  <div class="maint-card">
+    <h4>Rule Calibrator</h4>
+    <div class="schedule">Domingos 3am</div>
+    <p>Analiza las 493 reglas de CRITERIO contra datos reales:</p>
+    <div class="threshold">Reject rate &gt;80% = "Muy estricta" (si persiste 2+ semanas: auto-disable)</div>
+    <div class="threshold">Reject rate &lt;1% con 50+ evals = "Inutil" (candidata a borrar)</div>
+    <div class="threshold">Minimo 10 evaluaciones para juzgar</div>
+  </div>
+
+  <div class="maint-card">
+    <h4>Prompt Evolver</h4>
+    <div class="schedule">Domingos 3am</div>
+    <p>Lee feedback de entrenamiento (positivo/negativo) + resultados de JUEZ nocturno.</p>
+    <p>Genera 3-5 nuevas instrucciones de prompt que se insertan como reglas AUTO-APROBADAS en categoria 'brief'.</p>
+    <div class="threshold">Necesita 3+ datos de feedback para correr</div>
+    <div class="threshold">Titulo: [AUTO-PROMPT] ...</div>
+  </div>
+
+  <div class="maint-card">
+    <h4>Propagation Catchup</h4>
+    <div class="schedule">On-demand</div>
+    <p>Cuando una regla se aprueba, se propaga a:</p>
+    <p><strong>CRITERIO</strong> = nueva regla de evaluacion</p>
+    <p><strong>ESPEJO</strong> = flag de relevancia visual</p>
+    <p><strong>JUEZ</strong> = nueva pregunta golden para test nocturno</p>
+    <div class="threshold">Procesa max 50 reglas aprobadas sin propagar</div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- OUTPUT: WHERE KNOWLEDGE GOES -->
+<!-- ============================================ -->
+<h2 style="border-color: #4ade80; background: rgba(74,222,128,0.05);">Salida: donde se usa el conocimiento</h2>
+
+<div class="output-grid">
+  <div class="output-card">
+    <div class="icon">&#128172;</div>
+    <h4>Steve Chat</h4>
+    <p>Carga reglas aprobadas como contexto. Steve responde usando el conocimiento acumulado.</p>
+  </div>
+  <div class="output-card">
+    <div class="icon">&#127912;</div>
+    <h4>Generate Meta Copy</h4>
+    <p>Inyecta creative context (angulos validados/descartados) + reglas de la categoria meta_ads.</p>
+  </div>
+  <div class="output-card">
+    <div class="icon">&#128231;</div>
+    <h4>Generate Email Content</h4>
+    <p>Usa reglas de klaviyo + brief para generar copys de email informados.</p>
+  </div>
+  <div class="output-card">
+    <div class="icon">&#9989;</div>
+    <h4>CRITERIO (493 reglas)</h4>
+    <p>Evalua campañas/emails ANTES de publicar. Bloquea si score &lt; 60.</p>
+  </div>
+  <div class="output-card">
+    <div class="icon">&#128065;</div>
+    <h4>ESPEJO (Visual)</h4>
+    <p>Evalua diseño con vision AI. Usa flags visual_relevant de knowledge.</p>
+  </div>
+  <div class="output-card">
+    <div class="icon">&#9878;</div>
+    <h4>JUEZ (50 preguntas)</h4>
+    <p>Cada noche prueba a Steve Chat contra golden questions generadas del knowledge.</p>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- SUMMARY -->
+<!-- ============================================ -->
+<h2 style="border-color: #ff3333; background: rgba(255,51,51,0.05);">Resumen: que hay que arreglar</h2>
+
+<div class="mega-flow">
+<pre>
+<span class="red">ROTO (no puede funcionar):</span>
+  1. Content Hunter    — <code>steve_sources</code> = 0 rows (no tiene URLs que leer)
+  4. Sales Learning    — <code>wa_prospects</code> = 4 (necesita converted/lost con mensajes)
+  5. Cross-Client      — <code>campaign_metrics</code> = 25 (necesita 50+ y 3+ clientes)
+  10. Wolf System      — <code>wa_prospects</code> = 4 (necesita URLs de tiendas)
+
+<span class="yellow">PARCIAL (corre pero con poca data):</span>
+  2. Swarm Research    — 16 de ~360 runs, <code>swarm_sources</code> = 0 (sin preferencias)
+  3. Discoverer        — 25 metrics (apenas pasa el minimo de 20)
+  6. Perf Evaluator    — 53 creativos (necesita 5+ por angulo para generalizar)
+  8. Agent Loop        — 13 memorias, funciona pero percibe poco
+
+<span class="green">FUNCIONA:</span>
+  7. Auto-Rule Gen     — reactivo, no necesita data previa
+  9. Train-Steve       — manual, edge function activa
+
+<span class="highlight">ORDEN DE PRIORIDAD PARA ARREGLAR:</span>
+  <span class="green">1ro.</span> Poblar <code>steve_sources</code> con 20+ URLs        → desbloquea Content Hunter
+  <span class="green">2do.</span> Poblar <code>swarm_sources</code> con fuentes preferidas → mejora Swarm Research
+  <span class="green">3ro.</span> Conectar 1 cliente con Meta OAuth              → desbloquea campaign_metrics
+  <span class="green">4to.</span> Esperar datos (7-14 dias)                      → desbloquea Discoverer, Cross-Client, Perf Evaluator
+  <span class="green">5to.</span> Prospectos reales en WhatsApp                   → desbloquea Sales Learning, Wolf
+</pre>
+</div>
+
+<div class="footer">
+  Steve Brain Feeding Map — Generado por investigacion profunda del codigo real<br>
+  Archivos analizados: swarm-research.ts, steve-content-hunter.ts, steve-discoverer.ts, sales-learning-loop.ts, cross-client-learning.ts, auto-rule-generator.ts, auto-learning-digest.ts, performance-evaluator.ts, steve-agent-loop.ts, wolf-night-mode.ts, wolf-morning-send.ts, knowledge-quality-score.ts, knowledge-consolidator.ts, knowledge-dedup.ts, knowledge-decay.ts, rule-calibrator.ts, steve-prompt-evolver.ts, knowledge-propagation-catchup.ts, train-steve/index.ts, evaluate-rules/index.ts, creative-context.ts, angle-detector.ts<br>
+  3 abril 2026
+</div>
+
+</div>
+
+<script>
+function toggle(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+function toggleAll() {
+  const cards = document.querySelectorAll('.source-card');
+  const anyOpen = Array.from(cards).some(c => c.classList.contains('open'));
+  cards.forEach(c => {
+    if (anyOpen) c.classList.remove('open');
+    else c.classList.add('open');
+  });
+}
+</script>
+
+</body>
+</html>

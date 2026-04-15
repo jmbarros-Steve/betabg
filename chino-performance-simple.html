@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El Chino — Performance Checks (Explicado Simple)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f0f14; color: #e0e0e0; line-height: 1.7; }
+  .c { max-width: 900px; margin: 0 auto; padding: 28px 20px; }
+
+  h1 { font-size: 1.8rem; color: #fff; margin-bottom: 6px; }
+  h2 { font-size: 1.35rem; color: #60a5fa; margin: 48px 0 12px; }
+  .sub { color: #9ca3af; font-size: 0.95rem; margin-bottom: 36px; }
+  p { margin-bottom: 14px; font-size: 0.95rem; }
+  strong { color: #fff; }
+
+  /* analogy boxes */
+  .analogy { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 14px; padding: 24px; margin: 20px 0; }
+  .analogy-title { font-size: 1.1rem; font-weight: 700; color: #fcd34d; margin-bottom: 10px; }
+  .analogy p { color: #d1d5db; }
+  .analogy .emoji { font-size: 1.6rem; margin-right: 8px; vertical-align: middle; }
+
+  /* example cards */
+  .ex { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 22px; margin: 16px 0; }
+  .ex-title { font-weight: 700; color: #93c5fd; font-size: 0.95rem; margin-bottom: 10px; }
+  .ex-steps { list-style: none; padding: 0; }
+  .ex-steps li { padding: 6px 0 6px 24px; position: relative; font-size: 0.9rem; color: #d1d5db; }
+  .ex-steps li::before { content: attr(data-n); position: absolute; left: 0; color: #60a5fa; font-weight: 700; }
+  .result { display: inline-block; padding: 3px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 700; margin-top: 4px; }
+  .result.pass { background: #064e3b; color: #34d399; }
+  .result.fail { background: #7f1d1d; color: #fca5a5; }
+
+  /* status table */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 24px; }
+  th { background: #1f2937; color: #93c5fd; text-align: left; padding: 10px 14px; font-size: 0.78rem; text-transform: uppercase; }
+  td { padding: 10px 14px; border-bottom: 1px solid #1f2937; font-size: 0.88rem; }
+  tr:hover { background: #111827; }
+
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; }
+  .tag-ok { background: #064e3b; color: #34d399; }
+  .tag-bad { background: #7f1d1d; color: #fca5a5; }
+  .tag-a { background: #1e3a5f; color: #93c5fd; }
+  .tag-b { background: #4c1d95; color: #c4b5fd; }
+  .tag-c { background: #78350f; color: #fcd34d; }
+
+  hr { border: 0; height: 1px; background: #2a2a3a; margin: 44px 0; }
+
+  .big-number { font-size: 3.5rem; font-weight: 800; text-align: center; margin: 20px 0 8px; }
+  .big-label { text-align: center; color: #9ca3af; font-size: 0.9rem; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+<div class="c">
+
+<h1>El Chino &mdash; Performance Checks</h1>
+<p class="sub">Explicado simple, con ejemplos de la vida real</p>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- QUE ES -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>Qu&eacute; es un "Performance Check"</h2>
+
+<div class="analogy">
+  <div class="analogy-title"><span class="emoji">&#x23F1;</span> Es un cron&oacute;metro</div>
+  <p>Imagina que le pides algo a Steve (generar un copy, buscar productos, mandar un email). El Chino mide <strong>cu&aacute;nto se demor&oacute;</strong> en responder y si fue <strong>demasiado lento</strong>, levanta alerta.</p>
+  <p style="margin-top:10px;">Es como si en un restaurante midieran cu&aacute;nto se demora cada plato en salir de la cocina. Si la pizza deb&iacute;a salir en 10 minutos y se demor&oacute; 25, algo anda mal.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- SITUACION ACTUAL -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>Situaci&oacute;n actual</h2>
+
+<div class="big-number" style="color: #fca5a5;">27 de 29</div>
+<div class="big-label">checks de performance no hacen nada (retornan "skip")</div>
+
+<p>Hoy El Chino tiene <strong>29 checks de velocidad</strong> en la base de datos. Pero el c&oacute;digo solo sabe hacer UNA cosa: abrir una p&aacute;gina web y medir cu&aacute;nto tarda.</p>
+
+<div class="ex">
+  <div class="ex-title">Los 2 que funcionan hoy:</div>
+  <table style="margin:0;">
+    <tr><td><strong>#8</strong></td><td>Abrir <code>steve-api/health</code> y ver si responde en menos de 2 segundos</td><td><span class="tag tag-ok">FUNCIONA</span></td></tr>
+    <tr><td><strong>#9</strong></td><td>Abrir <code>steve.cl</code> y ver si carga en menos de 3 segundos</td><td><span class="tag tag-ok">FUNCIONA</span></td></tr>
+  </table>
+</div>
+
+<p>Los otros 27 est&aacute;n vac&iacute;os &mdash; no tienen instrucciones de <strong>qu&eacute; medir</strong>, as&iacute; que El Chino los ignora.</p>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- LOS 3 GRUPOS -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>Los 3 tipos de checks que faltan</h2>
+
+<p>Los 27 checks se dividen en 3 grupos seg&uacute;n <strong>c&oacute;mo se miden</strong>:</p>
+
+<!-- GRUPO A -->
+<div class="analogy" style="border-color: #1e3a5f;">
+  <div class="analogy-title"><span class="emoji">&#x1F3D3;</span> Grupo A &mdash; "Ping a los endpoints" (12 checks)</div>
+  <p><strong>Qu&eacute; hace:</strong> Le manda un mensaje de prueba a cada servicio de Steve y mide cu&aacute;nto tarda en responder.</p>
+  <p style="margin-top:8px;"><strong>Analog&iacute;a:</strong> Es como llamar al mesero, pedirle un vaso de agua, y cronometrar cu&aacute;nto se demora en traerlo. Si tarda m&aacute;s de lo aceptable, algo anda mal en la cocina.</p>
+</div>
+
+<div class="ex">
+  <div class="ex-title">Ejemplo: Check #71 &mdash; "Steve Chat responde en menos de 10 segundos"</div>
+  <ul class="ex-steps">
+    <li data-n="1.">El Chino le manda a Steve Chat: <strong>"ping"</strong> (un mensaje de prueba)</li>
+    <li data-n="2.">Prende el cron&oacute;metro</li>
+    <li data-n="3.">Steve Chat responde algo</li>
+    <li data-n="4.">Para el cron&oacute;metro: <strong>3.2 segundos</strong></li>
+    <li data-n="5.">3.2s &lt; 10s? S&iacute; &rarr; <span class="result pass">PASS</span></li>
+  </ul>
+  <p style="margin-top:12px; font-size:0.85rem; color:#9ca3af;">Si hubiera tardado 14 segundos: 14s &gt; 10s &rarr; <span class="result fail">FAIL</span> "Steve Chat tard&oacute; 14s, m&aacute;ximo permitido 10s"</p>
+</div>
+
+<div class="ex">
+  <div class="ex-title">Ejemplo: Check #187 &mdash; "Generar imagen en menos de 20 segundos"</div>
+  <ul class="ex-steps">
+    <li data-n="1.">El Chino le pide a Steve: <strong>"genera una imagen de prueba"</strong></li>
+    <li data-n="2.">Prende el cron&oacute;metro</li>
+    <li data-n="3.">Steve genera la imagen con Replicate/Fal.ai</li>
+    <li data-n="4.">Para el cron&oacute;metro: <strong>8.5 segundos</strong></li>
+    <li data-n="5.">8.5s &lt; 20s? S&iacute; &rarr; <span class="result pass">PASS</span></li>
+  </ul>
+</div>
+
+<p><strong>Los 12 checks del Grupo A:</strong></p>
+<table>
+  <tr><td>#60</td><td>Klaviyo sync emails</td><td>M&aacute;ximo <strong>5 segundos</strong></td></tr>
+  <tr><td>#66</td><td>SteveMail enviar email</td><td>M&aacute;ximo <strong>3 segundos</strong></td></tr>
+  <tr><td>#71</td><td>Steve Chat responder</td><td>M&aacute;ximo <strong>10 segundos</strong></td></tr>
+  <tr><td>#181</td><td>Steve Chat (p95)</td><td>M&aacute;ximo <strong>10 segundos</strong></td></tr>
+  <tr><td>#182</td><td>Buscar productos Shopify</td><td>M&aacute;ximo <strong>5 segundos</strong></td></tr>
+  <tr><td>#183</td><td>Sync m&eacute;tricas Meta</td><td>M&aacute;ximo <strong>15 segundos</strong></td></tr>
+  <tr><td>#184</td><td>Generar copy para Meta</td><td>M&aacute;ximo <strong>8 segundos</strong></td></tr>
+  <tr><td>#185</td><td>Manejar campa&ntilde;a Meta</td><td>M&aacute;ximo <strong>5 segundos</strong></td></tr>
+  <tr><td>#186</td><td>Enviar email</td><td>M&aacute;ximo <strong>3 segundos</strong></td></tr>
+  <tr><td>#187</td><td>Generar imagen AI</td><td>M&aacute;ximo <strong>20 segundos</strong></td></tr>
+  <tr><td>#188</td><td>Steve estrategia</td><td>M&aacute;ximo <strong>12 segundos</strong></td></tr>
+  <tr><td>#195</td><td>Anthropic API (Claude)</td><td>M&aacute;ximo <strong>5 segundos</strong></td></tr>
+</table>
+
+<hr>
+
+<!-- GRUPO B -->
+<div class="analogy" style="border-color: #4c1d95;">
+  <div class="analogy-title"><span class="emoji">&#x1F3ED;</span> Grupo B &mdash; "Revisar la f&aacute;brica" (10 checks)</div>
+  <p><strong>Qu&eacute; hace:</strong> En vez de probar los endpoints, revisa el <strong>estado interno del servidor</strong>: cu&aacute;nta memoria usa, cu&aacute;ntas conexiones a la base de datos hay, si hay queries lentos.</p>
+  <p style="margin-top:8px;"><strong>Analog&iacute;a:</strong> Es como revisar que la cocina del restaurante est&eacute; bien: que no se est&eacute; llenando de humo (memoria), que no haya 50 pedidos atascados (conexiones), que ning&uacute;n plato lleve 20 minutos en preparaci&oacute;n (queries lentos).</p>
+</div>
+
+<div class="ex">
+  <div class="ex-title">Ejemplo: Check #89 &mdash; "Memoria del servidor menor a 512MB"</div>
+  <ul class="ex-steps">
+    <li data-n="1.">El Chino le pregunta a Google Cloud: "cu&aacute;nta memoria est&aacute; usando steve-api?"</li>
+    <li data-n="2.">Google responde: <strong>358 MB</strong></li>
+    <li data-n="3.">358 &lt; 512? S&iacute; &rarr; <span class="result pass">PASS</span></li>
+  </ul>
+  <p style="margin-top:12px; font-size:0.85rem; color:#9ca3af;">Si estuviera usando 623MB: 623 &gt; 512 &rarr; <span class="result fail">FAIL</span> "Servidor usando 623MB, l&iacute;mite 512MB &mdash; posible memory leak"</p>
+</div>
+
+<div class="ex">
+  <div class="ex-title">Ejemplo: Check #190 &mdash; "No hay queries a la base de datos que tarden m&aacute;s de 5 segundos"</div>
+  <ul class="ex-steps">
+    <li data-n="1.">El Chino le pregunta a Supabase: "cu&aacute;l es el query m&aacute;s lento que has ejecutado?"</li>
+    <li data-n="2.">Supabase responde: <strong>"SELECT * FROM steve_knowledge... tard&oacute; 8.2 segundos"</strong></li>
+    <li data-n="3.">8.2s &gt; 5s? S&iacute; &rarr; <span class="result fail">FAIL</span> "Hay un query lento de 8.2s que hay que optimizar"</li>
+  </ul>
+</div>
+
+<p><strong>Los 10 checks del Grupo B:</strong></p>
+<table>
+  <tr><td>#48</td><td>Edge Functions sin errores 500 en 30 min</td><td>Revisa logs de Supabase</td></tr>
+  <tr><td>#82</td><td>Conexiones a la DB &lt; 80% del m&aacute;ximo</td><td>Pregunta a Postgres cu&aacute;ntas hay</td></tr>
+  <tr><td>#89</td><td>Memoria del servidor &lt; 512MB</td><td>Pregunta a Google Cloud</td></tr>
+  <tr><td>#90</td><td>El 95% de las requests tardan &lt; 5s</td><td>Pregunta a Google Cloud</td></tr>
+  <tr><td>#189</td><td>Queries a la DB promedian &lt; 100ms</td><td>Lee estad&iacute;sticas de Postgres</td></tr>
+  <tr><td>#190</td><td>Ning&uacute;n query tarda m&aacute;s de 5 segundos</td><td>Lee estad&iacute;sticas de Postgres</td></tr>
+  <tr><td>#191</td><td>Subscripciones realtime &lt; 100</td><td>Cuenta conexiones en Postgres</td></tr>
+  <tr><td>#192</td><td>Arranque en fr&iacute;o &lt; 3 segundos</td><td>Pregunta a Google Cloud</td></tr>
+  <tr><td>#193</td><td>Instancias activas &lt; 10</td><td>Pregunta a Google Cloud</td></tr>
+  <tr><td>#194</td><td>Requests por minuto &lt; 1000</td><td>Pregunta a Google Cloud</td></tr>
+</table>
+
+<hr>
+
+<!-- GRUPO C -->
+<div class="analogy" style="border-color: #78350f;">
+  <div class="analogy-title"><span class="emoji">&#x1F6A6;</span> Grupo C &mdash; "Sem&aacute;foros de las APIs externas" (5 checks)</div>
+  <p><strong>Qu&eacute; hace:</strong> Verifica que no estemos a punto de ser <strong>bloqueados</strong> por Meta, Shopify, Klaviyo o Twilio por hacer demasiadas llamadas.</p>
+  <p style="margin-top:8px;"><strong>Analog&iacute;a:</strong> Cada API tiene un l&iacute;mite de llamadas por minuto (como un sem&aacute;foro). Si nos pasamos, nos bloquean y todo deja de funcionar. El Chino revisa "cu&aacute;ntas llamadas nos quedan antes de que nos corten".</p>
+</div>
+
+<div class="ex">
+  <div class="ex-title">Ejemplo: Check #197 &mdash; "Shopify rate limit: nos queda m&aacute;s del 20%"</div>
+  <ul class="ex-steps">
+    <li data-n="1.">El Chino hace una llamada simple a Shopify (pedir info de la tienda)</li>
+    <li data-n="2.">Shopify responde y en el header dice: <strong>"Usaste 32 de 40 llamadas"</strong></li>
+    <li data-n="3.">Quedan 8 de 40 = 20%</li>
+    <li data-n="4.">20% &ge; 20%? Justo &rarr; <span class="result pass">PASS</span></li>
+  </ul>
+  <p style="margin-top:12px; font-size:0.85rem; color:#9ca3af;">Si dijera "38 de 40": quedan 2 de 40 = 5% &rarr; <span class="result fail">FAIL</span> "Solo queda 5% de rate limit, estamos a punto de ser bloqueados"</p>
+</div>
+
+<div class="ex">
+  <div class="ex-title">Ejemplo: Check #199 &mdash; "WhatsApp: m&aacute;s del 95% de mensajes llegan"</div>
+  <ul class="ex-steps">
+    <li data-n="1.">El Chino le pregunta a Twilio: "de los mensajes que mandamos hoy, cu&aacute;ntos llegaron?"</li>
+    <li data-n="2.">Twilio responde: <strong>87 de 90 entregados</strong></li>
+    <li data-n="3.">87/90 = 96.7%</li>
+    <li data-n="4.">96.7% &gt; 95%? S&iacute; &rarr; <span class="result pass">PASS</span></li>
+  </ul>
+</div>
+
+<p><strong>Los 5 checks del Grupo C:</strong></p>
+<table>
+  <tr><td>#196</td><td>Meta API: no hemos usado m&aacute;s del 80% de llamadas</td><td>Lee headers de Meta</td></tr>
+  <tr><td>#197</td><td>Shopify API: nos queda m&aacute;s del 20% de llamadas</td><td>Lee headers de Shopify</td></tr>
+  <tr><td>#198</td><td>Klaviyo API: no nos est&aacute;n bloqueando (429)</td><td>Hace una llamada y ve si pasa</td></tr>
+  <tr><td>#199</td><td>WhatsApp: m&aacute;s del 95% de mensajes llegan</td><td>Pregunta a Twilio</td></tr>
+  <tr><td>#200</td><td>Menos del 2% de requests tienen error en 6 horas</td><td>Pregunta a Google Cloud</td></tr>
+</table>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- RESUMEN VISUAL -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>Resumen: qu&eacute; vamos a hacer</h2>
+
+<table>
+  <thead><tr><th>Grupo</th><th>Cu&aacute;ntos</th><th>Qu&eacute; mide</th><th>C&oacute;mo</th><th>Dificultad</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="tag tag-a">A</span></td>
+      <td><strong>12</strong></td>
+      <td>Velocidad de cada servicio de Steve</td>
+      <td>Le manda un mensaje de prueba y mide cu&aacute;nto tarda</td>
+      <td>F&aacute;cil &mdash; todo lo que necesitamos ya existe</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-b">B</span></td>
+      <td><strong>10</strong></td>
+      <td>Salud interna del servidor (memoria, DB, instancias)</td>
+      <td>Le pregunta a Google Cloud y a Postgres</td>
+      <td>Medio &mdash; hay que conectarse a Google Monitoring y crear funciones SQL</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-c">C</span></td>
+      <td><strong>5</strong></td>
+      <td>Cu&aacute;ntas llamadas nos quedan en APIs externas</td>
+      <td>Hace una llamada liviana y lee los headers de l&iacute;mite</td>
+      <td>Medio &mdash; cada API tiene su formato distinto</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="analogy">
+  <div class="analogy-title"><span class="emoji">&#x1F4CB;</span> Orden recomendado</div>
+  <p><strong>Primero Grupo A</strong> (12 checks) &mdash; porque son los m&aacute;s &uacute;tiles y los m&aacute;s f&aacute;ciles. Con esto ya sabes si Steve Chat anda lento, si generar im&aacute;genes tarda mucho, etc.</p>
+  <p style="margin-top:8px;"><strong>Despu&eacute;s Grupo C</strong> (5 checks) &mdash; para saber si estamos a punto de ser bloqueados por Meta/Shopify/Klaviyo.</p>
+  <p style="margin-top:8px;"><strong>Al final Grupo B</strong> (10 checks) &mdash; porque necesita configurar Google Monitoring y crear funciones en la base de datos.</p>
+</div>
+
+<p style="margin-top: 50px; text-align: center; color: #4b5563; font-size: 0.8rem;">El Chino &mdash; Performance Checks &mdash; Abril 2026</p>
+
+</div>
+</body>
+</html>

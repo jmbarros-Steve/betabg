@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shopify Module — QA Checklist</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
+  .container { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 28px; margin-bottom: 4px; color: #fff; }
+  .subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 32px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; margin-left: 8px; }
+  .badge-pending { background: #fbbf24; color: #000; }
+  .badge-blocker { background: #ef4444; color: #fff; }
+  .badge-ok { background: #22c55e; color: #fff; }
+  .badge-manual { background: #8b5cf6; color: #fff; }
+  .badge-auto { background: #3b82f6; color: #fff; }
+
+  .section { background: #1e293b; border-radius: 12px; padding: 24px; margin-bottom: 20px; border: 1px solid #334155; }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; cursor: pointer; }
+  .section-header h2 { font-size: 18px; color: #f1f5f9; }
+  .section-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+
+  .blocker-box { background: #450a0a; border: 1px solid #dc2626; border-radius: 10px; padding: 20px; margin-bottom: 24px; }
+  .blocker-box h3 { color: #fca5a5; font-size: 16px; margin-bottom: 12px; }
+  .blocker-box ul { list-style: none; padding: 0; }
+  .blocker-box li { padding: 8px 0; border-bottom: 1px solid #7f1d1d; color: #fecaca; font-size: 14px; }
+  .blocker-box li:last-child { border: none; }
+  .blocker-box code { background: #7f1d1d; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #fef2f2; }
+
+  .test-group { margin-bottom: 16px; }
+  .test-group h3 { font-size: 14px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #334155; }
+
+  .test-item { display: flex; align-items: flex-start; gap: 12px; padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; transition: background 0.15s; }
+  .test-item:hover { background: #334155; }
+  .checkbox { width: 20px; height: 20px; border: 2px solid #475569; border-radius: 4px; cursor: pointer; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+  .checkbox.checked { background: #22c55e; border-color: #22c55e; }
+  .checkbox.checked::after { content: '✓'; color: #fff; font-size: 13px; font-weight: bold; }
+  .checkbox.failed { background: #ef4444; border-color: #ef4444; }
+  .checkbox.failed::after { content: '✗'; color: #fff; font-size: 13px; font-weight: bold; }
+  .test-content { flex: 1; }
+  .test-title { font-size: 14px; color: #e2e8f0; font-weight: 500; }
+  .test-detail { font-size: 12px; color: #64748b; margin-top: 3px; }
+  .test-file { font-size: 11px; color: #475569; font-family: monospace; margin-top: 2px; }
+
+  .progress-bar { background: #334155; height: 8px; border-radius: 4px; margin-bottom: 8px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; transition: width 0.3s; background: linear-gradient(90deg, #22c55e, #4ade80); }
+  .progress-text { font-size: 13px; color: #94a3b8; margin-bottom: 20px; }
+
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .summary-card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 16px; text-align: center; }
+  .summary-card .number { font-size: 32px; font-weight: 700; }
+  .summary-card .label { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+  .file-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .file-tag { background: #334155; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-family: monospace; color: #94a3b8; }
+
+  .env-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  .env-table th { text-align: left; padding: 8px 12px; font-size: 12px; color: #64748b; border-bottom: 1px solid #334155; }
+  .env-table td { padding: 8px 12px; font-size: 13px; border-bottom: 1px solid #1e293b; }
+  .env-table td code { background: #334155; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+
+  .how-to { background: #1a2332; border: 1px dashed #334155; border-radius: 8px; padding: 14px; margin-top: 10px; font-size: 13px; color: #94a3b8; line-height: 1.6; }
+  .how-to strong { color: #e2e8f0; }
+
+  .tab-bar { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+  .tab-btn { padding: 8px 16px; border-radius: 20px; border: 1px solid #334155; background: transparent; color: #94a3b8; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+  .tab-btn.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  @media (max-width: 640px) {
+    body { padding: 12px; }
+    .summary-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Shopify Module — QA Checklist</h1>
+  <p class="subtitle">Steve Ads &bull; Generado 3 Abril 2026 &bull; Click en cada checkbox para marcar pass/fail</p>
+
+  <!-- Progress -->
+  <div class="progress-bar"><div class="progress-fill" id="progressBar" style="width: 0%"></div></div>
+  <p class="progress-text" id="progressText">0 de 52 tests completados</p>
+
+  <!-- Summary -->
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="number" style="color:#ef4444" id="blockerCount">3</div>
+      <div class="label">BLOCKERS (env vars)</div>
+    </div>
+    <div class="summary-card">
+      <div class="number" style="color:#fbbf24">52</div>
+      <div class="label">Tests totales</div>
+    </div>
+    <div class="summary-card">
+      <div class="number" style="color:#22c55e" id="passCount">0</div>
+      <div class="label">Pasados</div>
+    </div>
+    <div class="summary-card">
+      <div class="number" style="color:#ef4444" id="failCount">0</div>
+      <div class="label">Fallados</div>
+    </div>
+  </div>
+
+  <!-- BLOCKER -->
+  <div class="blocker-box">
+    <h3>BLOCKER: 3 env vars faltantes en Cloud Run</h3>
+    <ul>
+      <li><code>SHOPIFY_CLIENT_ID</code> — API Key del Partner Dashboard de Shopify</li>
+      <li><code>SHOPIFY_CLIENT_SECRET</code> — API Secret del Partner Dashboard</li>
+      <li><code>SHOPIFY_WEBHOOK_SECRET</code> — Secret para verificar HMAC de webhooks</li>
+    </ul>
+    <div class="how-to" style="margin-top: 14px;">
+      <strong>Sin estas variables, OAuth y webhooks NO funcionan.</strong><br>
+      Obtenerlas en: <strong>partners.shopify.com</strong> → Apps → tu app → API credentials<br>
+      Aplicarlas:<br>
+      <code style="display:block; margin-top:6px; background:#7f1d1d; padding:8px; border-radius:6px; font-size:12px;">
+        gcloud run services update steve-api --region us-central1 --project steveapp-agency \<br>
+        &nbsp;&nbsp;--update-env-vars SHOPIFY_CLIENT_ID=xxx,SHOPIFY_CLIENT_SECRET=yyy,SHOPIFY_WEBHOOK_SECRET=zzz
+      </code>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('prereqs')">Pre-requisitos</button>
+    <button class="tab-btn" onclick="showTab('oauth')">OAuth Flow</button>
+    <button class="tab-btn" onclick="showTab('products')">Productos</button>
+    <button class="tab-btn" onclick="showTab('orders')">Pedidos</button>
+    <button class="tab-btn" onclick="showTab('customers')">Clientes</button>
+    <button class="tab-btn" onclick="showTab('discounts')">Descuentos</button>
+    <button class="tab-btn" onclick="showTab('metrics')">Metricas</button>
+    <button class="tab-btn" onclick="showTab('webhooks')">Webhooks</button>
+    <button class="tab-btn" onclick="showTab('security')">Seguridad</button>
+    <button class="tab-btn" onclick="showTab('ui')">UI / Frontend</button>
+  </div>
+
+  <!-- ===================== PRE-REQUISITOS ===================== -->
+  <div class="tab-content active" id="tab-prereqs">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon" style="background:#dc2626">🔑</div>
+        <h2>Pre-requisitos <span class="badge badge-blocker">BLOCKER</span></h2>
+      </div>
+
+      <div class="test-group">
+        <h3>Env vars en Cloud Run</h3>
+        <div class="test-item" data-id="pre-1">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">SHOPIFY_CLIENT_ID configurada en Cloud Run</div>
+            <div class="test-detail">Verificar: gcloud run services describe steve-api ... | grep SHOPIFY</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="pre-2">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">SHOPIFY_CLIENT_SECRET configurada en Cloud Run</div>
+            <div class="test-detail">Necesaria para OAuth token exchange y HMAC webhook verification</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="pre-3">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">SHOPIFY_WEBHOOK_SECRET configurada en Cloud Run</div>
+            <div class="test-detail">Necesaria para verificar firma HMAC de webhooks entrantes</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-group">
+        <h3>Shopify Partner Dashboard</h3>
+        <div class="test-item" data-id="pre-4">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">App creada en Shopify Partners</div>
+            <div class="test-detail">partners.shopify.com → Apps → verificar que existe la app Steve Ads</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="pre-5">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Redirect URL configurada correctamente</div>
+            <div class="test-detail">Debe ser: https://steve-api-850416724643.us-central1.run.app/api/shopify-oauth-callback</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="pre-6">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Scopes correctos en la app</div>
+            <div class="test-detail">read_orders, read_analytics, write_discounts, read_discounts, read_checkouts, read_products, read_customers, write_script_tags</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-group">
+        <h3>Tienda de desarrollo</h3>
+        <div class="test-item" data-id="pre-7">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Tienda de desarrollo creada para testing</div>
+            <div class="test-detail">partners.shopify.com → Stores → Development store con datos de prueba</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="pre-8">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Tienda tiene productos, pedidos y clientes de prueba</div>
+            <div class="test-detail">Al menos 5 productos, 3 pedidos y 3 clientes para verificar sync</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== OAUTH ===================== -->
+  <div class="tab-content" id="tab-oauth">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon" style="background:#3b82f6">🔐</div>
+        <h2>OAuth Flow <span class="badge badge-manual">Manual</span></h2>
+      </div>
+
+      <div class="test-group">
+        <h3>Instalacion</h3>
+        <div class="test-item" data-id="oauth-1">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Pagina /shopify-app carga correctamente</div>
+            <div class="test-detail">Debe mostrar ShopifyInstallScreen con campo para ingresar dominio .myshopify.com</div>
+            <div class="test-file">src/pages/ShopifyApp.tsx</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="oauth-2">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Boton "Conectar con Shopify" redirige a Shopify OAuth</div>
+            <div class="test-detail">Debe ir a: https://TIENDA.myshopify.com/admin/oauth/authorize?client_id=...&scope=...&redirect_uri=...&state=...</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="oauth-3">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">OAuth callback procesa correctamente</div>
+            <div class="test-detail">Shopify redirige a /api/shopify-oauth-callback con code, shop, hmac, state → intercambia por access token</div>
+            <div class="test-file">cloud-run-api/src/routes/shopify/shopify-oauth-callback.ts</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="oauth-4">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Token se guarda encriptado en platform_connections</div>
+            <div class="test-detail">Verificar en Supabase: SELECT id, shop_domain, is_active FROM platform_connections WHERE platform='shopify'</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="oauth-5">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">ShopifyWelcomeScreen muestra credenciales temporales</div>
+            <div class="test-detail">Para usuarios nuevos: muestra email + password temporal + boton copiar</div>
+            <div class="test-file">src/components/shopify/ShopifyWelcomeScreen.tsx</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-group">
+        <h3>Reconexion y per-client</h3>
+        <div class="test-item" data-id="oauth-6">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Reconexion: no crea usuario duplicado</div>
+            <div class="test-detail">Si el email ya existe, debe linkear al usuario existente</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="oauth-7">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Per-client credentials (ShopifyCustomAppWizard)</div>
+            <div class="test-detail">Wizard para configurar credenciales por cliente funciona y guarda en platform_connections</div>
+            <div class="test-file">src/components/client-portal/ShopifyCustomAppWizard.tsx</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PRODUCTOS ===================== -->
+  <div class="tab-content" id="tab-products">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon" style="background:#8b5cf6">📦</div>
+        <h2>Productos</h2>
+      </div>
+
+      <div class="test-group">
+        <h3>Fetch y visualizacion</h3>
+        <div class="test-item" data-id="prod-1">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">ShopifyProductsPanel carga y muestra productos</div>
+            <div class="test-detail">Portal cliente → tab Shopify → Productos: lista con imagenes, titulo, precio, variantes</div>
+            <div class="test-file">src/components/client-portal/ShopifyProductsPanel.tsx</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="prod-2">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Variantes muestran precio + costo (inventory items)</div>
+            <div class="test-detail">Cada variante debe mostrar: SKU, precio, costo si disponible</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="prod-3">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Paginacion funciona (+250 productos)</div>
+            <div class="test-detail">Backend usa Link header de Shopify para paginar. Probar con tienda con muchos productos</div>
+            <div class="test-file">cloud-run-api/src/routes/shopify/fetch-shopify-products.ts</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="prod-4">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Colecciones de productos cargan correctamente</div>
+            <div class="test-detail">API /api/shopify/collections devuelve colecciones con IDs</div>
+            <div class="test-file">cloud-run-api/src/routes/shopify/fetch-shopify-collections.ts</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-group">
+        <h3>AI Features</h3>
+        <div class="test-item" data-id="prod-5">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Generacion AI de descripcion de producto</div>
+            <div class="test-detail">Seleccionar producto → generar descripcion → texto coherente generado</div>
+            <div class="test-file">cloud-run-api/src/routes/shopify/generate-product-description.ts</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="prod-6">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Photo Studio funciona</div>
+            <div class="test-detail">Subir/gestionar fotos de productos desde el portal</div>
+            <div class="test-file">src/components/client-portal/ShopifyPhotoStudio.tsx</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PEDIDOS ===================== -->
+  <div class="tab-content" id="tab-orders">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon" style="background:#f59e0b">🛒</div>
+        <h2>Pedidos</h2>
+      </div>
+
+      <div class="test-group">
+        <h3>Listado de ordenes</h3>
+        <div class="test-item" data-id="ord-1">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">ShopifyOrdersPanel muestra pedidos recientes</div>
+            <div class="test-detail">Ultimos 90 dias. Mostrar: numero, fecha, total, estado financiero, estado fulfillment</div>
+            <div class="test-file">src/components/client-portal/ShopifyOrdersPanel.tsx</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="ord-2">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Estados financieros correctos</div>
+            <div class="test-detail">paid, pending, refunded, voided se muestran con colores/badges diferenciados</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="ord-3">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Line items visibles en detalle de orden</div>
+            <div class="test-detail">Click en orden → ver productos, cantidades, precios de cada linea</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-group">
+        <h3>Carritos abandonados</h3>
+        <div class="test-item" data-id="ord-4">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Carritos abandonados se guardan en DB</div>
+            <div class="test-detail">Tabla shopify_abandoned_checkouts: checkout_id, customer_phone, line_items, total_price</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="ord-5">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">WhatsApp reminder se envia para carritos abandonados</div>
+            <div class="test-detail">Cron abandoned-cart-wa-hourly envia recordatorio si wa_reminder_sent=false y tiene telefono</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== CLIENTES ===================== -->
+  <div class="tab-content" id="tab-customers">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon" style="background:#06b6d4">👥</div>
+        <h2>Clientes Shopify</h2>
+      </div>
+
+      <div class="test-group">
+        <h3>Listado</h3>
+        <div class="test-item" data-id="cust-1">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">ShopifyCustomersPanel muestra clientes</div>
+            <div class="test-detail">Lista con: nombre, email, total_spent, orders_count, ultimo pedido</div>
+            <div class="test-file">src/components/client-portal/ShopifyCustomersPanel.tsx</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="cust-2">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Ordenados por ultimo pedido (mas reciente primero)</div>
+            <div class="test-detail">El backend ordena por last_order_date DESC</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="cust-3">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Ver pedidos de un cliente especifico</div>
+            <div class="test-detail">Click en cliente → muestra sus ordenes asociadas</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-group">
+        <h3>Cross-sell</h3>
+        <div class="test-item" data-id="cust-4">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Recomendaciones cross-sell se calculan</div>
+            <div class="test-detail">API compute-cross-sell devuelve productos recomendados basados en historial de compras</div>
+            <div class="test-file">cloud-run-api/src/routes/shopify/compute-cross-sell.ts</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== DESCUENTOS ===================== -->
+  <div class="tab-content" id="tab-discounts">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon" style="background:#ec4899">🏷️</div>
+        <h2>Descuentos</h2>
+      </div>
+
+      <div class="test-group">
+        <h3>Listado</h3>
+        <div class="test-item" data-id="disc-1">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">ShopifyDiscountsPanel muestra descuentos existentes</div>
+            <div class="test-detail">Lista: codigo, tipo (%, fijo, envio gratis), usos, estado (activo/expirado/programado), ROI</div>
+            <div class="test-file">src/components/client-portal/ShopifyDiscountsPanel.tsx</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="disc-2">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Metricas ROI en descuentos</div>
+            <div class="test-detail">Cada descuento muestra: revenue generado, monto descontado, ROI %</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-group">
+        <h3>Creacion</h3>
+        <div class="test-item" data-id="disc-3">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Crear descuento porcentaje</div>
+            <div class="test-detail">Dialog → tipo porcentaje → codigo → valor % → guardar → aparece en Shopify Admin</div>
+            <div class="test-file">src/components/client-portal/ShopifyDiscountDialog.tsx</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="disc-4">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Crear descuento monto fijo</div>
+            <div class="test-detail">Dialog → tipo fixed_amount → codigo → valor → guardar</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="disc-5">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Crear descuento envio gratis</div>
+            <div class="test-detail">Dialog → tipo free_shipping → codigo → guardar</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="disc-6">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Crear combo/bundle</div>
+            <div class="test-detail">API create-shopify-combo crea oferta tipo BxGy correctamente</div>
+            <div class="test-file">cloud-run-api/src/routes/shopify/create-shopify-combo.ts</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== METRICAS ===================== -->
+  <div class="tab-content" id="tab-metrics">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon" style="background:#10b981">📊</div>
+        <h2>Metricas y Sync</h2>
+      </div>
+
+      <div class="test-group">
+        <h3>Sincronizacion</h3>
+        <div class="test-item" data-id="met-1">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Sync metricas funciona (ultimos 90 dias)</div>
+            <div class="test-detail">API sync-shopify-metrics procesa ordenes y guarda revenue + order count diario en platform_metrics</div>
+            <div class="test-file">cloud-run-api/src/routes/shopify/sync-shopify-metrics.ts</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="met-2">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Conversion de moneda a CLP funciona</div>
+            <div class="test-detail">Ordenes en USD/otras monedas se convierten a CLP via exchangerate-api.com (con fallback rates)</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="met-3">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Rate limiting: no permite sync mas de 1 vez cada 5 minutos</div>
+            <div class="test-detail">Llamar sync 2 veces seguidas → la segunda debe retornar "Rate limited"</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-group">
+        <h3>Dashboards</h3>
+        <div class="test-item" data-id="met-4">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">ShopifyDashboard muestra metricas agregadas</div>
+            <div class="test-detail">Revenue total, ordenes, ticket promedio, tendencias</div>
+            <div class="test-file">src/components/client-portal/ShopifyDashboard.tsx</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="met-5">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Funnel de conversion Shopify</div>
+            <div class="test-detail">ShopifyFunnelPanel muestra: visitas → carrito → checkout → compra con % conversion</div>
+            <div class="test-file">src/components/client-portal/metrics/ShopifyFunnelPanel.tsx</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="met-6">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Revenue por coleccion</div>
+            <div class="test-detail">API collection-revenue devuelve revenue desglosado por coleccion de productos</div>
+            <div class="test-file">cloud-run-api/src/routes/shopify/collection-revenue.ts</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== WEBHOOKS ===================== -->
+  <div class="tab-content" id="tab-webhooks">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon" style="background:#f97316">🔔</div>
+        <h2>Webhooks</h2>
+      </div>
+
+      <div class="test-group">
+        <h3>GDPR (obligatorio para Shopify App Store)</h3>
+        <div class="test-item" data-id="wh-1">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">app/uninstalled: desactiva conexion</div>
+            <div class="test-detail">Cuando merchant desinstala → platform_connections.is_active=false, access_token limpiado</div>
+            <div class="test-file">cloud-run-api/src/routes/shopify/shopify-gdpr-webhooks.ts</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="wh-2">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">customers/data_request: responde correctamente</div>
+            <div class="test-detail">Retorna que solo se almacenan metricas agregadas, no datos personales</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="wh-3">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">customers/redact: responde correctamente</div>
+            <div class="test-detail">Confirma que no hay datos personales que eliminar</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="wh-4">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">shop/redact: elimina todos los datos del merchant</div>
+            <div class="test-detail">Cascading delete: campaign_recommendations, campaign_metrics, platform_metrics, platform_connections, clients</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-group">
+        <h3>Fulfillment</h3>
+        <div class="test-item" data-id="wh-5">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">orders/fulfilled: se procesa correctamente</div>
+            <div class="test-detail">Webhook recibido → incrementa fulfilled_orders metric → trigger background job</div>
+            <div class="test-file">cloud-run-api/src/routes/shopify/shopify-fulfillment-webhooks.ts</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="wh-6">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">orders/cancelled: se procesa correctamente</div>
+            <div class="test-detail">Webhook recibido → enqueues background processing</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-group">
+        <h3>Registro automatico</h3>
+        <div class="test-item" data-id="wh-7">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Webhooks se registran automaticamente al instalar</div>
+            <div class="test-detail">OAuth callback registra: app/uninstalled, orders/fulfilled, orders/partially_fulfilled, orders/cancelled, checkouts/create</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="wh-8">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">No crea webhooks duplicados en reconexion</div>
+            <div class="test-detail">Si el merchant reconecta, no debe duplicar webhooks en Shopify</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== SEGURIDAD ===================== -->
+  <div class="tab-content" id="tab-security">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon" style="background:#ef4444">🛡️</div>
+        <h2>Seguridad</h2>
+      </div>
+
+      <div class="test-group">
+        <h3>HMAC y autenticacion</h3>
+        <div class="test-item" data-id="sec-1">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">HMAC verification en OAuth callback</div>
+            <div class="test-detail">Enviar request con HMAC invalido → debe retornar 401</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="sec-2">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">HMAC verification en webhooks (timing-safe)</div>
+            <div class="test-detail">Middleware shopify-hmac.ts usa comparacion timing-safe para prevenir timing attacks</div>
+            <div class="test-file">cloud-run-api/src/routes/shopify/middleware/shopify-hmac.ts</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="sec-3">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Session token validation funciona</div>
+            <div class="test-detail">Token JWT de Shopify se valida: firma HMAC-SHA256, expiracion, shop domain</div>
+            <div class="test-file">cloud-run-api/src/lib/shopify-session.ts</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-group">
+        <h3>Tokens y datos</h3>
+        <div class="test-item" data-id="sec-4">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Access tokens encriptados at rest</div>
+            <div class="test-detail">Verificar en DB que access_token_encrypted NO es legible como texto plano</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="sec-5">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">OAuth state nonce es de un solo uso</div>
+            <div class="test-detail">Usar el mismo nonce 2 veces → la segunda debe fallar (replay protection)</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="sec-6">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">OAuth state expira en 10 minutos</div>
+            <div class="test-detail">Esperar 10+ min despues de iniciar install → callback debe fallar</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="sec-7">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">RLS: usuario solo ve sus propias conexiones</div>
+            <div class="test-detail">Usuario A no puede ver datos Shopify de usuario B. Probar con 2 cuentas diferentes</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== UI / FRONTEND ===================== -->
+  <div class="tab-content" id="tab-ui">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon" style="background:#6366f1">🖥️</div>
+        <h2>UI / Frontend</h2>
+      </div>
+
+      <div class="test-group">
+        <h3>Paginas publicas</h3>
+        <div class="test-item" data-id="ui-1">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">/shopify-app carga sin errores JS</div>
+            <div class="test-detail">Abrir consola del browser → no hay errores rojos</div>
+            <div class="test-file">src/pages/ShopifyApp.tsx</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="ui-2">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">/connect-shopify carga sin errores JS</div>
+            <div class="test-file">src/pages/ConnectShopify.tsx</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="ui-3">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">/oauth/shopify/callback maneja success y error</div>
+            <div class="test-detail">Con ?success=true muestra welcome. Sin params muestra error apropiado</div>
+            <div class="test-file">src/pages/OAuthShopifyCallback.tsx</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-group">
+        <h3>Portal cliente — Shopify Dashboard</h3>
+        <div class="test-item" data-id="ui-4">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">ShopifyDashboard integra todos los paneles correctamente</div>
+            <div class="test-detail">Tabs o secciones: Productos, Pedidos, Clientes, Descuentos, Metricas, Funnel</div>
+            <div class="test-file">src/components/client-portal/ShopifyDashboard.tsx</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="ui-5">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Responsive: funciona en mobile</div>
+            <div class="test-detail">Todas las tablas y paneles son usables en pantalla de 375px de ancho</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="ui-6">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Loading states: skeleton/spinner mientras carga datos</div>
+            <div class="test-detail">No mostrar pantalla blanca mientras se cargan productos/ordenes/etc</div>
+          </div>
+        </div>
+        <div class="test-item" data-id="ui-7">
+          <div class="checkbox" onclick="toggle(this)"></div>
+          <div class="test-content">
+            <div class="test-title">Error states: mensajes claros si Shopify no esta conectado</div>
+            <div class="test-detail">Si no hay conexion activa, mostrar CTA para conectar en vez de error generico</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function toggle(el) {
+    if (el.classList.contains('checked')) {
+      el.classList.remove('checked');
+      el.classList.add('failed');
+    } else if (el.classList.contains('failed')) {
+      el.classList.remove('failed');
+    } else {
+      el.classList.add('checked');
+    }
+    updateProgress();
+  }
+
+  function showTab(id) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + id).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  function updateProgress() {
+    const all = document.querySelectorAll('.checkbox');
+    const passed = document.querySelectorAll('.checkbox.checked').length;
+    const failed = document.querySelectorAll('.checkbox.failed').length;
+    const total = all.length;
+    const done = passed + failed;
+    const pct = Math.round((done / total) * 100);
+
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressText').textContent = done + ' de ' + total + ' tests completados';
+    document.getElementById('passCount').textContent = passed;
+    document.getElementById('failCount').textContent = failed;
+
+    if (failed > 0) {
+      document.getElementById('progressBar').style.background = 'linear-gradient(90deg, #22c55e ' + (passed/(passed+failed)*100) + '%, #ef4444 ' + (passed/(passed+failed)*100) + '%)';
+    }
+  }
+</script>
+</body>
+</html>

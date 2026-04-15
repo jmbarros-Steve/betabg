@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Knowledge Manager - Insights Multi-Categoria</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a25;
+    --surface3: #22222f;
+    --border: #2a2a3a;
+    --text: #e4e4ef;
+    --text2: #8888a0;
+    --accent: #6c5ce7;
+    --accent2: #a29bfe;
+    --green: #00b894;
+    --green-bg: rgba(0,184,148,0.1);
+    --red: #e17055;
+    --red-bg: rgba(225,112,85,0.1);
+    --yellow: #fdcb6e;
+    --yellow-bg: rgba(253,203,110,0.1);
+    --blue: #74b9ff;
+    --blue-bg: rgba(116,185,255,0.1);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  /* ─── Header ─── */
+  .header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(20px);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .header-logo {
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, var(--accent), #a29bfe);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    color: white;
+    box-shadow: 0 4px 16px rgba(108,92,231,0.3);
+  }
+
+  .header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+
+  .header h1 span { color: var(--accent2); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .connection-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+    transition: background 0.3s;
+  }
+
+  .connection-dot.connected { background: var(--green); box-shadow: 0 0 8px rgba(0,184,148,0.5); }
+
+  .conn-status { font-size: 13px; color: var(--text2); }
+
+  /* ─── Config Panel ─── */
+  .config-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin: 24px 32px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .config-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .config-group label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text2);
+  }
+
+  .config-group input, .config-group select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .config-group input:focus, .config-group select:focus {
+    border-color: var(--accent);
+  }
+
+  .btn {
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  .btn:active { transform: scale(0.97); }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #a29bfe);
+    color: white;
+    box-shadow: 0 2px 12px rgba(108,92,231,0.3);
+  }
+
+  .btn-primary:hover { box-shadow: 0 4px 20px rgba(108,92,231,0.5); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-success {
+    background: var(--green);
+    color: white;
+  }
+
+  .btn-danger {
+    background: var(--red);
+    color: white;
+  }
+
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text2);
+  }
+
+  .btn-outline:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .btn-sm {
+    padding: 6px 14px;
+    font-size: 12px;
+  }
+
+  /* ─── Stats Bar ─── */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin: 0 32px 24px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    transition: border-color 0.2s;
+  }
+
+  .stat-card:hover { border-color: var(--accent); }
+
+  .stat-value {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1.1;
+  }
+
+  .stat-value.green { color: var(--green); }
+  .stat-value.yellow { color: var(--yellow); }
+  .stat-value.red { color: var(--red); }
+  .stat-value.blue { color: var(--blue); }
+  .stat-value.accent { color: var(--accent2); }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--text2);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+
+  /* ─── Tabs ─── */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin: 0 32px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0;
+  }
+
+  .tab {
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text2);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+  }
+
+  .tab:hover { color: var(--text); }
+
+  .tab.active {
+    color: var(--accent2);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab .badge {
+    background: var(--surface3);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    margin-left: 6px;
+  }
+
+  .tab.active .badge {
+    background: rgba(108,92,231,0.2);
+    color: var(--accent2);
+  }
+
+  /* ─── Content ─── */
+  .content {
+    padding: 24px 32px;
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ─── Bulk Actions ─── */
+  .bulk-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .bulk-actions .select-info {
+    font-size: 13px;
+    color: var(--text2);
+    flex: 1;
+  }
+
+  .bulk-actions .select-info strong {
+    color: var(--accent2);
+  }
+
+  /* ─── Insight Cards ─── */
+  .insight-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .insight-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .insight-card:hover {
+    border-color: var(--accent);
+    box-shadow: var(--shadow);
+  }
+
+  .insight-card.selected {
+    border-color: var(--accent);
+    background: rgba(108,92,231,0.05);
+  }
+
+  .insight-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .insight-checkbox {
+    margin-top: 4px;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .insight-title {
+    font-size: 15px;
+    font-weight: 700;
+    flex: 1;
+    line-height: 1.4;
+  }
+
+  .insight-confidence {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .confidence-bar {
+    width: 60px;
+    height: 6px;
+    background: var(--surface3);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .confidence-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s;
+  }
+
+  .confidence-text {
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 24px;
+    text-align: right;
+  }
+
+  .insight-body {
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 12px;
+    line-height: 1.6;
+    padding-left: 30px;
+  }
+
+  .insight-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-left: 30px;
+  }
+
+  .category-tag {
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .cat-meta_ads { background: #0984e320; color: #74b9ff; border: 1px solid #0984e340; }
+  .cat-google_ads { background: #e1705520; color: #fab1a0; border: 1px solid #e1705540; }
+  .cat-klaviyo { background: #6c5ce720; color: #a29bfe; border: 1px solid #6c5ce740; }
+  .cat-shopify { background: #00b89420; color: #55efc4; border: 1px solid #00b89440; }
+  .cat-anuncios { background: #fdcb6e20; color: #ffeaa7; border: 1px solid #fdcb6e40; }
+  .cat-analisis { background: #636e7220; color: #b2bec3; border: 1px solid #636e7240; }
+  .cat-cross_channel { background: #e84393e0; color: #fd79a8; border: 1px solid #e8439340; }
+  .cat-sales_learning { background: #00cec920; color: #81ecec; border: 1px solid #00cec940; }
+
+  .group-badge {
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(108,92,231,0.15);
+    color: var(--accent2);
+    border: 1px solid rgba(108,92,231,0.3);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .group-badge::before { content: ""; }
+
+  .status-badge {
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .status-pending { background: var(--yellow-bg); color: var(--yellow); border: 1px solid rgba(253,203,110,0.3); }
+  .status-approved { background: var(--green-bg); color: var(--green); border: 1px solid rgba(0,184,148,0.3); }
+  .status-rejected { background: var(--red-bg); color: var(--red); border: 1px solid rgba(225,112,85,0.3); }
+
+  .insight-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+    padding-left: 16px;
+  }
+
+  .insight-explanation {
+    font-size: 12px;
+    color: var(--text2);
+    font-style: italic;
+    padding-left: 30px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+
+  .insight-sources {
+    padding-left: 30px;
+    margin-top: 6px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .source-link {
+    font-size: 11px;
+    color: var(--blue);
+    text-decoration: none;
+    padding: 2px 8px;
+    background: var(--blue-bg);
+    border-radius: 4px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+  }
+
+  .source-link:hover { text-decoration: underline; }
+
+  .insight-date {
+    font-size: 11px;
+    color: var(--text2);
+  }
+
+  /* ─── Swarm History ─── */
+  .swarm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .swarm-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .swarm-card:hover { border-color: var(--accent); }
+
+  .swarm-status-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .swarm-status-icon.completed { background: var(--green-bg); }
+  .swarm-status-icon.running { background: var(--yellow-bg); }
+  .swarm-status-icon.error { background: var(--red-bg); }
+
+  .swarm-info { flex: 1; }
+
+  .swarm-info h3 { font-size: 14px; font-weight: 600; }
+  .swarm-info p { font-size: 12px; color: var(--text2); }
+
+  .swarm-stats {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--text2);
+  }
+
+  .swarm-stats strong { color: var(--text); }
+
+  /* ─── Empty State ─── */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text2);
+  }
+
+  .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+  .empty-state h3 { font-size: 16px; color: var(--text); margin-bottom: 8px; }
+  .empty-state p { font-size: 13px; }
+
+  /* ─── Toast ─── */
+  .toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .toast {
+    padding: 12px 20px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: var(--shadow);
+    animation: slideIn 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 400px;
+  }
+
+  .toast.success { background: var(--green); color: white; }
+  .toast.error { background: var(--red); color: white; }
+  .toast.info { background: var(--accent); color: white; }
+
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  /* ─── Loading ─── */
+  .spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: inline-block;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px;
+    color: var(--text2);
+    font-size: 14px;
+  }
+
+  /* ─── Filter Pills ─── */
+  .filter-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .filter-pill {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text2);
+    transition: all 0.2s;
+  }
+
+  .filter-pill:hover { border-color: var(--accent); color: var(--text); }
+
+  .filter-pill.active {
+    background: rgba(108,92,231,0.15);
+    border-color: var(--accent);
+    color: var(--accent2);
+  }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 768px) {
+    .header { padding: 16px; }
+    .config-panel, .stats-bar, .content, .tabs { margin-left: 16px; margin-right: 16px; }
+    .config-panel { flex-direction: column; }
+    .insight-meta { flex-direction: column; align-items: flex-start; }
+    .insight-actions { margin-left: 0; padding-left: 30px; margin-top: 8px; }
+  }
+
+  /* ─── Scrollbar ─── */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border); }
+
+  /* ─── Modal ─── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+
+  .modal h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
+  }
+
+  .modal .field { margin-bottom: 14px; }
+
+  .modal .field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text2);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .modal .field input, .modal .field textarea, .modal .field select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+  }
+
+  .modal .field textarea { min-height: 80px; resize: vertical; }
+
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 20px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── Header ─── -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-logo">S</div>
+    <h1>Steve <span>Knowledge Manager</span></h1>
+  </div>
+  <div class="header-right">
+    <div class="connection-dot" id="connDot"></div>
+    <span class="conn-status" id="connStatus">Desconectado</span>
+    <button class="btn btn-outline btn-sm" onclick="triggerSwarm()">Trigger Swarm</button>
+  </div>
+</div>
+
+<!-- ─── Config ─── -->
+<div class="config-panel">
+  <div class="config-group" style="flex: 2;">
+    <label>Supabase URL</label>
+    <input id="supabaseUrl" value="https://zpswjccsxjtnhetkkqde.supabase.co" />
+  </div>
+  <div class="config-group" style="flex: 3;">
+    <label>Service Key</label>
+    <input id="serviceKey" type="password" value="" placeholder="eyJhbGciOi..." />
+  </div>
+  <button class="btn btn-primary" onclick="connect()">Conectar</button>
+</div>
+
+<!-- ─── Stats ─── -->
+<div class="stats-bar">
+  <div class="stat-card">
+    <div class="stat-value accent" id="statTotal">-</div>
+    <div class="stat-label">Total Knowledge</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value yellow" id="statPending">-</div>
+    <div class="stat-label">Pendientes</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value green" id="statApproved">-</div>
+    <div class="stat-label">Aprobados</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value red" id="statRejected">-</div>
+    <div class="stat-label">Rechazados</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value blue" id="statGroups">-</div>
+    <div class="stat-label">Grupos Multi-Cat</div>
+  </div>
+</div>
+
+<!-- ─── Tabs ─── -->
+<div class="tabs">
+  <button class="tab active" data-tab="pending" onclick="switchTab('pending')">
+    Pendientes <span class="badge" id="tabPendingCount">0</span>
+  </button>
+  <button class="tab" data-tab="approved" onclick="switchTab('approved')">
+    Aprobados <span class="badge" id="tabApprovedCount">0</span>
+  </button>
+  <button class="tab" data-tab="rejected" onclick="switchTab('rejected')">
+    Rechazados <span class="badge" id="tabRejectedCount">0</span>
+  </button>
+  <button class="tab" data-tab="groups" onclick="switchTab('groups')">
+    Grupos <span class="badge" id="tabGroupCount">0</span>
+  </button>
+  <button class="tab" data-tab="swarms" onclick="switchTab('swarms')">
+    Swarm Runs
+  </button>
+</div>
+
+<!-- ─── Content ─── -->
+<div class="content">
+
+  <!-- Pending Tab -->
+  <div class="tab-panel active" id="panel-pending">
+    <div class="filter-row" id="filterRowPending"></div>
+    <div class="bulk-actions" id="bulkPending" style="display:none;">
+      <span class="select-info"><strong id="selectedCount">0</strong> seleccionados</span>
+      <button class="btn btn-success btn-sm" onclick="bulkApprove()">Aprobar Seleccionados</button>
+      <button class="btn btn-danger btn-sm" onclick="bulkReject()">Rechazar Seleccionados</button>
+      <button class="btn btn-outline btn-sm" onclick="clearSelection()">Limpiar</button>
+    </div>
+    <div class="insight-list" id="listPending">
+      <div class="loading-overlay"><div class="spinner"></div> Conecta para ver insights...</div>
+    </div>
+  </div>
+
+  <!-- Approved Tab -->
+  <div class="tab-panel" id="panel-approved">
+    <div class="filter-row" id="filterRowApproved"></div>
+    <div class="insight-list" id="listApproved">
+      <div class="loading-overlay"><div class="spinner"></div> Cargando...</div>
+    </div>
+  </div>
+
+  <!-- Rejected Tab -->
+  <div class="tab-panel" id="panel-rejected">
+    <div class="insight-list" id="listRejected">
+      <div class="loading-overlay"><div class="spinner"></div> Cargando...</div>
+    </div>
+  </div>
+
+  <!-- Groups Tab -->
+  <div class="tab-panel" id="panel-groups">
+    <div class="insight-list" id="listGroups">
+      <div class="loading-overlay"><div class="spinner"></div> Cargando...</div>
+    </div>
+  </div>
+
+  <!-- Swarms Tab -->
+  <div class="tab-panel" id="panel-swarms">
+    <div class="swarm-list" id="listSwarms">
+      <div class="loading-overlay"><div class="spinner"></div> Cargando...</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ─── Toast Container ─── -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ─── State ───
+let supabaseUrl = '';
+let serviceKey = '';
+let allKnowledge = [];
+let swarmRuns = [];
+let selectedIds = new Set();
+let activeTab = 'pending';
+let activeFilter = 'all';
+
+// ─── Supabase REST helpers ───
+async function supabaseQuery(table, params = '') {
+  const res = await fetch(`${supabaseUrl}/rest/v1/${table}?${params}`, {
+    headers: {
+      'apikey': serviceKey,
+      'Authorization': `Bearer ${serviceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+    },
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
+async function supabaseUpdate(table, body, match) {
+  const res = await fetch(`${supabaseUrl}/rest/v1/${table}?${match}`, {
+    method: 'PATCH',
+    headers: {
+      'apikey': serviceKey,
+      'Authorization': `Bearer ${serviceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
+// ─── Connect ───
+async function connect() {
+  supabaseUrl = document.getElementById('supabaseUrl').value.replace(/\/+$/, '');
+  serviceKey = document.getElementById('serviceKey').value.trim();
+
+  if (!supabaseUrl || !serviceKey) {
+    toast('Completa URL y Service Key', 'error');
+    return;
+  }
+
+  try {
+    document.getElementById('connDot').className = 'connection-dot';
+    document.getElementById('connStatus').textContent = 'Conectando...';
+
+    await loadAll();
+
+    document.getElementById('connDot').className = 'connection-dot connected';
+    document.getElementById('connStatus').textContent = 'Conectado';
+    toast('Conectado a Supabase', 'success');
+  } catch (err) {
+    document.getElementById('connDot').className = 'connection-dot';
+    document.getElementById('connStatus').textContent = 'Error';
+    toast(`Error: ${err.message}`, 'error');
+  }
+}
+
+// ─── Load All Data ───
+async function loadAll() {
+  const [knowledge, swarms] = await Promise.all([
+    supabaseQuery('steve_knowledge', 'select=id,titulo,contenido,categoria,approval_status,activo,confidence,source_explanation,sources_urls,insight_group_id,created_at,swarm_run_id,orden&order=created_at.desc&limit=500'),
+    supabaseQuery('swarm_runs', 'select=id,status,started_at,completed_at,questions,insights_generated,total_sources,error_message&order=started_at.desc&limit=20'),
+  ]);
+
+  allKnowledge = knowledge || [];
+  swarmRuns = swarms || [];
+
+  updateStats();
+  renderAll();
+}
+
+// ─── Stats ───
+function updateStats() {
+  const pending = allKnowledge.filter(k => k.approval_status === 'pending');
+  const approved = allKnowledge.filter(k => k.approval_status === 'approved');
+  const rejected = allKnowledge.filter(k => k.approval_status === 'rejected');
+  const groups = [...new Set(allKnowledge.filter(k => k.insight_group_id).map(k => k.insight_group_id))];
+
+  document.getElementById('statTotal').textContent = allKnowledge.length;
+  document.getElementById('statPending').textContent = pending.length;
+  document.getElementById('statApproved').textContent = approved.length;
+  document.getElementById('statRejected').textContent = rejected.length;
+  document.getElementById('statGroups').textContent = groups.length;
+
+  document.getElementById('tabPendingCount').textContent = pending.length;
+  document.getElementById('tabApprovedCount').textContent = approved.length;
+  document.getElementById('tabRejectedCount').textContent = rejected.length;
+  document.getElementById('tabGroupCount').textContent = groups.length;
+}
+
+// ─── Render ───
+function renderAll() {
+  renderInsightList('pending');
+  renderInsightList('approved');
+  renderInsightList('rejected');
+  renderGroups();
+  renderSwarms();
+  renderFilters();
+}
+
+function renderFilters() {
+  const categories = [...new Set(allKnowledge.map(k => k.categoria))].sort();
+  for (const containerId of ['filterRowPending', 'filterRowApproved']) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = `<button class="filter-pill ${activeFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">Todas</button>` +
+      categories.map(c =>
+        `<button class="filter-pill ${activeFilter === c ? 'active' : ''}" onclick="setFilter('${c}')">
+          <span class="category-tag cat-${c}" style="padding:1px 6px;font-size:10px;">${c}</span>
+        </button>`
+      ).join('');
+  }
+}
+
+function setFilter(cat) {
+  activeFilter = cat;
+  renderAll();
+}
+
+function getConfidenceColor(c) {
+  if (c >= 8) return 'var(--green)';
+  if (c >= 5) return 'var(--yellow)';
+  return 'var(--red)';
+}
+
+function renderInsightCard(k, showActions = true) {
+  const conf = k.confidence || 0;
+  const confColor = getConfidenceColor(conf);
+  const categories = k.categoria ? [k.categoria] : [];
+  const groupSiblings = k.insight_group_id
+    ? allKnowledge.filter(s => s.insight_group_id === k.insight_group_id && s.id !== k.id)
+    : [];
+  const sources = Array.isArray(k.sources_urls) ? k.sources_urls : [];
+  const date = k.created_at ? new Date(k.created_at).toLocaleString('es-CL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+
+  return `
+    <div class="insight-card ${selectedIds.has(k.id) ? 'selected' : ''}" data-id="${k.id}">
+      <div class="insight-header">
+        ${showActions && k.approval_status === 'pending' ? `<input type="checkbox" class="insight-checkbox" ${selectedIds.has(k.id) ? 'checked' : ''} onchange="toggleSelect('${k.id}')" />` : '<div style="width:18px"></div>'}
+        <div class="insight-title">${escHtml(k.titulo || 'Sin titulo')}</div>
+        <div class="insight-confidence">
+          <div class="confidence-bar">
+            <div class="confidence-fill" style="width:${conf * 10}%;background:${confColor}"></div>
+          </div>
+          <span class="confidence-text" style="color:${confColor}">${conf}</span>
+        </div>
+      </div>
+      <div class="insight-body">${escHtml(k.contenido || '')}</div>
+      <div class="insight-meta">
+        ${categories.map(c => `<span class="category-tag cat-${c}">${c}</span>`).join('')}
+        <span class="status-badge status-${k.approval_status}">${k.approval_status}</span>
+        ${k.insight_group_id ? `<span class="group-badge" title="${k.insight_group_id}">Grupo (${groupSiblings.length + 1} cats)</span>` : ''}
+        <span class="insight-date">${date}</span>
+        ${showActions && k.approval_status === 'pending' ? `
+          <div class="insight-actions">
+            <button class="btn btn-success btn-sm" onclick="approveOne('${k.id}','${k.insight_group_id || ''}')">Aprobar</button>
+            <button class="btn btn-danger btn-sm" onclick="rejectOne('${k.id}','${k.insight_group_id || ''}')">Rechazar</button>
+          </div>
+        ` : ''}
+      </div>
+      ${k.source_explanation ? `<div class="insight-explanation">${escHtml(k.source_explanation)}</div>` : ''}
+      ${sources.length > 0 ? `
+        <div class="insight-sources">
+          ${sources.slice(0, 5).map(u => `<a class="source-link" href="${escHtml(u)}" target="_blank" title="${escHtml(u)}">${escHtml(new URL(u).hostname)}</a>`).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderInsightList(status) {
+  let items = allKnowledge.filter(k => k.approval_status === status);
+  if (activeFilter !== 'all') {
+    items = items.filter(k => k.categoria === activeFilter);
+  }
+
+  const container = document.getElementById(`list${status.charAt(0).toUpperCase() + status.slice(1)}`);
+
+  if (items.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">${status === 'pending' ? '⏳' : status === 'approved' ? '✅' : '❌'}</div>
+        <h3>No hay insights ${status === 'pending' ? 'pendientes' : status === 'approved' ? 'aprobados' : 'rechazados'}</h3>
+        <p>${status === 'pending' ? 'Triggerea un swarm para generar nuevos insights' : 'Los insights apareceran aqui despues de la revision'}</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = items.map(k => renderInsightCard(k, status === 'pending')).join('');
+}
+
+function renderGroups() {
+  const groupMap = {};
+  allKnowledge.forEach(k => {
+    if (!k.insight_group_id) return;
+    if (!groupMap[k.insight_group_id]) groupMap[k.insight_group_id] = [];
+    groupMap[k.insight_group_id].push(k);
+  });
+
+  const groups = Object.entries(groupMap).sort((a, b) => {
+    const dateA = new Date(a[1][0].created_at || 0);
+    const dateB = new Date(b[1][0].created_at || 0);
+    return dateB - dateA;
+  });
+
+  const container = document.getElementById('listGroups');
+
+  if (groups.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">🔗</div>
+        <h3>No hay grupos multi-categoria</h3>
+        <p>Los insights que aplican a multiples categorias aparecen aqui agrupados</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = groups.map(([groupId, items]) => {
+    const title = items[0].titulo;
+    const cats = items.map(i => i.categoria);
+    const status = items[0].approval_status;
+    const conf = items[0].confidence || 0;
+    const date = items[0].created_at ? new Date(items[0].created_at).toLocaleString('es-CL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+
+    return `
+      <div class="insight-card">
+        <div class="insight-header">
+          <div style="width:18px"></div>
+          <div class="insight-title">${escHtml(title)}</div>
+          <div class="insight-confidence">
+            <div class="confidence-bar">
+              <div class="confidence-fill" style="width:${conf * 10}%;background:${getConfidenceColor(conf)}"></div>
+            </div>
+            <span class="confidence-text" style="color:${getConfidenceColor(conf)}">${conf}</span>
+          </div>
+        </div>
+        <div class="insight-body">${escHtml(items[0].contenido || '')}</div>
+        <div class="insight-meta">
+          ${cats.map(c => `<span class="category-tag cat-${c}">${c}</span>`).join('')}
+          <span class="status-badge status-${status}">${status}</span>
+          <span class="group-badge">Grupo: ${items.length} categorias</span>
+          <span class="insight-date">${date}</span>
+          ${status === 'pending' ? `
+            <div class="insight-actions">
+              <button class="btn btn-success btn-sm" onclick="approveGroup('${groupId}')">Aprobar Grupo</button>
+              <button class="btn btn-danger btn-sm" onclick="rejectGroup('${groupId}')">Rechazar Grupo</button>
+            </div>
+          ` : ''}
+        </div>
+        <div class="insight-explanation" style="font-style:normal;">
+          <strong>Group ID:</strong> <code style="font-size:11px;color:var(--text2)">${groupId.slice(0, 8)}...</code>
+          &nbsp;|&nbsp; <strong>Filas:</strong> ${items.map(i => `<span class="category-tag cat-${i.categoria}" style="padding:1px 6px;font-size:10px;">${i.categoria}</span>`).join(' ')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderSwarms() {
+  const container = document.getElementById('listSwarms');
+
+  if (swarmRuns.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">🐝</div>
+        <h3>No hay swarm runs</h3>
+        <p>Triggerea un swarm para iniciar la investigacion</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = swarmRuns.map(s => {
+    const icon = s.status === 'completed' ? '✅' : s.status === 'running' ? '⏳' : '❌';
+    const date = s.started_at ? new Date(s.started_at).toLocaleString('es-CL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    const questions = Array.isArray(s.questions) ? s.questions.length : 0;
+
+    return `
+      <div class="swarm-card">
+        <div class="swarm-status-icon ${s.status}">${icon}</div>
+        <div class="swarm-info">
+          <h3>Swarm Run</h3>
+          <p>${date} &bull; ${s.id?.slice(0, 8)}...</p>
+        </div>
+        <div class="swarm-stats">
+          <span>Preguntas: <strong>${questions}</strong></span>
+          <span>Insights: <strong>${s.insights_generated || 0}</strong></span>
+          <span>Fuentes: <strong>${s.total_sources || 0}</strong></span>
+        </div>
+        <span class="status-badge status-${s.status === 'completed' ? 'approved' : s.status === 'running' ? 'pending' : 'rejected'}">${s.status}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+// ─── Tab Switching ───
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tab}`));
+}
+
+// ─── Selection ───
+function toggleSelect(id) {
+  if (selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  updateSelectionUI();
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  updateSelectionUI();
+}
+
+function updateSelectionUI() {
+  document.getElementById('selectedCount').textContent = selectedIds.size;
+  document.getElementById('bulkPending').style.display = selectedIds.size > 0 ? 'flex' : 'none';
+  document.querySelectorAll('.insight-card').forEach(card => {
+    const id = card.dataset.id;
+    card.classList.toggle('selected', selectedIds.has(id));
+    const cb = card.querySelector('.insight-checkbox');
+    if (cb) cb.checked = selectedIds.has(id);
+  });
+}
+
+// ─── Approve / Reject ───
+async function approveOne(id, groupId) {
+  try {
+    // Approve this one
+    await supabaseUpdate('steve_knowledge', { approval_status: 'approved', orden: 90 }, `id=eq.${id}`);
+    // Approve group siblings
+    if (groupId) {
+      await supabaseUpdate('steve_knowledge', { approval_status: 'approved', orden: 90 }, `insight_group_id=eq.${groupId}&approval_status=eq.pending`);
+    }
+    toast('Insight aprobado (+ siblings)', 'success');
+    await loadAll();
+  } catch (err) {
+    toast(`Error: ${err.message}`, 'error');
+  }
+}
+
+async function rejectOne(id, groupId) {
+  try {
+    await supabaseUpdate('steve_knowledge', { approval_status: 'rejected', activo: false }, `id=eq.${id}`);
+    if (groupId) {
+      await supabaseUpdate('steve_knowledge', { approval_status: 'rejected', activo: false }, `insight_group_id=eq.${groupId}&approval_status=eq.pending`);
+    }
+    toast('Insight rechazado (+ siblings)', 'success');
+    await loadAll();
+  } catch (err) {
+    toast(`Error: ${err.message}`, 'error');
+  }
+}
+
+async function approveGroup(groupId) {
+  try {
+    await supabaseUpdate('steve_knowledge', { approval_status: 'approved', orden: 90 }, `insight_group_id=eq.${groupId}&approval_status=eq.pending`);
+    toast('Grupo aprobado', 'success');
+    await loadAll();
+  } catch (err) {
+    toast(`Error: ${err.message}`, 'error');
+  }
+}
+
+async function rejectGroup(groupId) {
+  try {
+    await supabaseUpdate('steve_knowledge', { approval_status: 'rejected', activo: false }, `insight_group_id=eq.${groupId}&approval_status=eq.pending`);
+    toast('Grupo rechazado', 'success');
+    await loadAll();
+  } catch (err) {
+    toast(`Error: ${err.message}`, 'error');
+  }
+}
+
+async function bulkApprove() {
+  if (selectedIds.size === 0) return;
+  try {
+    const ids = [...selectedIds];
+    // Get group IDs for selected
+    const selected = allKnowledge.filter(k => ids.includes(k.id));
+    const groupIds = [...new Set(selected.map(k => k.insight_group_id).filter(Boolean))];
+
+    // Approve selected
+    for (const id of ids) {
+      await supabaseUpdate('steve_knowledge', { approval_status: 'approved', orden: 90 }, `id=eq.${id}`);
+    }
+    // Approve siblings
+    for (const gid of groupIds) {
+      await supabaseUpdate('steve_knowledge', { approval_status: 'approved', orden: 90 }, `insight_group_id=eq.${gid}&approval_status=eq.pending`);
+    }
+
+    toast(`${ids.length} insights aprobados (+ siblings)`, 'success');
+    selectedIds.clear();
+    await loadAll();
+  } catch (err) {
+    toast(`Error: ${err.message}`, 'error');
+  }
+}
+
+async function bulkReject() {
+  if (selectedIds.size === 0) return;
+  try {
+    const ids = [...selectedIds];
+    const selected = allKnowledge.filter(k => ids.includes(k.id));
+    const groupIds = [...new Set(selected.map(k => k.insight_group_id).filter(Boolean))];
+
+    for (const id of ids) {
+      await supabaseUpdate('steve_knowledge', { approval_status: 'rejected', activo: false }, `id=eq.${id}`);
+    }
+    for (const gid of groupIds) {
+      await supabaseUpdate('steve_knowledge', { approval_status: 'rejected', activo: false }, `insight_group_id=eq.${gid}&approval_status=eq.pending`);
+    }
+
+    toast(`${ids.length} insights rechazados (+ siblings)`, 'success');
+    selectedIds.clear();
+    await loadAll();
+  } catch (err) {
+    toast(`Error: ${err.message}`, 'error');
+  }
+}
+
+async function triggerSwarm() {
+  toast('Swarm trigger requires CRON_SECRET — usa curl o el cron', 'info');
+}
+
+// ─── Utils ───
+function escHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+function toast(msg, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'} ${msg}`;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+</script>
+</body>
+</html>

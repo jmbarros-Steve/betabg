@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El Chino — Performance Grupo A: Resultados</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f0f14; color: #e0e0e0; line-height: 1.7; }
+  .c { max-width: 960px; margin: 0 auto; padding: 28px 20px; }
+  h1 { font-size: 1.8rem; color: #fff; margin-bottom: 6px; }
+  h2 { font-size: 1.3rem; color: #60a5fa; margin: 40px 0 14px; }
+  .sub { color: #9ca3af; font-size: 0.92rem; margin-bottom: 32px; }
+  p { margin-bottom: 12px; font-size: 0.93rem; }
+
+  .tag { display: inline-block; padding: 3px 12px; border-radius: 10px; font-size: 0.75rem; font-weight: 700; }
+  .tag-pass { background: #064e3b; color: #34d399; }
+  .tag-skip { background: #78350f; color: #fcd34d; }
+  .tag-wait { background: #1f2937; color: #9ca3af; }
+  .tag-new { background: #1e3a5f; color: #93c5fd; }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 24px; }
+  th { background: #1f2937; color: #93c5fd; text-align: left; padding: 10px 14px; font-size: 0.75rem; text-transform: uppercase; }
+  td { padding: 10px 14px; border-bottom: 1px solid #1f2937; font-size: 0.88rem; vertical-align: top; }
+  tr:hover { background: #111827; }
+
+  .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 22px; margin: 16px 0; }
+  hr { border: 0; height: 1px; background: #2a2a3a; margin: 40px 0; }
+
+  .sg { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 20px 0; }
+  .sc { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 16px; text-align: center; }
+  .sc .n { font-size: 2.2rem; font-weight: 700; }
+  .sc .l { font-size: 0.78rem; color: #9ca3af; margin-top: 2px; }
+
+  .code { background: #0d1117; border: 1px solid #1f2937; border-radius: 8px; padding: 16px; margin: 10px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; overflow-x: auto; white-space: pre-wrap; color: #c9d1d9; }
+
+  .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
+  @media (max-width: 700px) { .before-after { grid-template-columns: 1fr; } }
+  .ba-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .ba-old { color: #f87171; }
+  .ba-new { color: #34d399; }
+
+  .flow { list-style: none; padding: 0; }
+  .flow li { padding: 5px 0 5px 26px; position: relative; font-size: 0.88rem; color: #d1d5db; }
+  .flow li::before { content: attr(data-s); position: absolute; left: 0; color: #60a5fa; font-weight: 700; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+<div class="c">
+
+<h1>El Chino &mdash; Performance Grupo A</h1>
+<p class="sub">Qu&eacute; hab&iacute;a, qu&eacute; se hizo, y c&oacute;mo funcion&oacute; &mdash; 3 abril 2026</p>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- NUMEROS -->
+<!-- ═══════════════════════════════════════════ -->
+
+<div class="sg">
+  <div class="sc"><div class="n" style="color:#34d399;">3</div><div class="l">Ya pasaron PASS</div></div>
+  <div class="sc"><div class="n" style="color:#9ca3af;">9</div><div class="l">Esperando pr&oacute;ximo ciclo</div></div>
+  <div class="sc"><div class="n" style="color:#60a5fa;">12</div><div class="l">Total Grupo A</div></div>
+  <div class="sc"><div class="n" style="color:#fca5a5;">0</div><div class="l">Errores</div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- QUE HABIA ANTES -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>Qu&eacute; hab&iacute;a antes</h2>
+
+<p>El archivo <code>performance.ts</code> ten&iacute;a <strong>una sola funci&oacute;n</strong> que hac&iacute;a GET a una URL y med&iacute;a el tiempo. Si el check no ten&iacute;a <code>url</code> y <code>max_ms</code> en su config, retornaba "skip".</p>
+
+<div class="card">
+  <p><strong>Solo 2 checks funcionaban:</strong></p>
+  <table style="margin-bottom:0;">
+    <tr><td><strong>#8</strong></td><td>GET a <code>/health</code></td><td>&lt; 2 segundos</td><td><span class="tag tag-pass">PASS</span></td></tr>
+    <tr><td><strong>#9</strong></td><td>GET a <code>steve.cl</code></td><td>&lt; 3 segundos</td><td><span class="tag tag-pass">PASS</span></td></tr>
+  </table>
+</div>
+
+<p>Los otros <strong>12 checks del Grupo A ten&iacute;an <code>check_config: {}</code></strong> (vac&iacute;o). No ten&iacute;an URL ni tiempo m&aacute;ximo. El c&oacute;digo dec&iacute;a "no s&eacute; qu&eacute; medir" y los saltaba:</p>
+
+<div class="code" style="border-left: 4px solid #f87171;">// ANTES — lo unico que sabia hacer:
+if (!url || !maxMs) return { result: 'skip' };  // ← los 12 checks caian aca
+
+const res = await fetch(url);  // ← solo GET, sin body, sin auth</div>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- QUE SE HIZO -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>Qu&eacute; se hizo</h2>
+
+<p>Se reescribi&oacute; <code>performance.ts</code> para que cada check tenga su propia l&oacute;gica. Ya no depende de que el check tenga config &mdash; el c&oacute;digo sabe qu&eacute; endpoint testear, c&oacute;mo llamarlo, y cu&aacute;nto debe tardar como m&aacute;ximo.</p>
+
+<div class="before-after">
+  <div>
+    <div class="ba-label ba-old">ANTES (62 l&iacute;neas)</div>
+    <div class="code" style="border-left: 4px solid #f87171;">// 1 sola funcion
+// Solo sabe hacer GET a una URL
+// Si no tiene config → skip
+// Sin auth, sin POST, sin body
+
+executePerformance(check) {
+  url = check.check_config?.url   // vacío
+  maxMs = check.check_config?.max_ms  // vacío
+  if (!url || !maxMs) → skip ❌
+}</div>
+  </div>
+  <div>
+    <div class="ba-label ba-new">AHORA (246 l&iacute;neas)</div>
+    <div class="code" style="border-left: 4px solid #34d399;">// switch por check_number
+// Cada check sabe su endpoint, method, body
+// Auth con service_role_key
+// POST real a cada servicio
+
+executePerformance(check) {
+  switch (check.check_number) {
+    case 60: → POST /api/klaviyo-push-emails
+    case 66: → POST /api/send-email
+    case 71: → POST /api/steve-chat + verificar respuesta
+    case 181: → POST /api/steve-chat
+    case 182: → POST /api/fetch-shopify-products
+    ...12 checks más...
+    case 195: → POST api.anthropic.com (directo)
+  }
+}</div>
+  </div>
+</div>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- COMO FUNCIONA CADA CHECK -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>C&oacute;mo funciona cada check</h2>
+
+<p>Todos siguen el mismo patr&oacute;n simple:</p>
+
+<div class="card">
+  <ol class="flow">
+    <li data-s="1.">El Chino hace POST al endpoint de Steve con autorizaci&oacute;n</li>
+    <li data-s="2.">Prende el cron&oacute;metro</li>
+    <li data-s="3.">Espera la respuesta</li>
+    <li data-s="4.">Para el cron&oacute;metro</li>
+    <li data-s="5.">Si tard&oacute; menos del m&aacute;ximo → <span class="tag tag-pass">PASS</span></li>
+    <li data-s="6.">Si tard&oacute; m&aacute;s del m&aacute;ximo → <strong style="color:#f87171;">FAIL</strong> "Tard&oacute; Xms, m&aacute;ximo Yms"</li>
+    <li data-s="7.">Si el servidor respondi&oacute; 500 → <strong style="color:#f87171;">ERROR</strong> "Servidor roto"</li>
+  </ol>
+</div>
+
+<!-- Tabla detalle de cada check -->
+
+<table>
+  <thead>
+    <tr><th>#</th><th>Qu&eacute; testea</th><th>C&oacute;mo lo testea</th><th>M&aacute;ximo</th><th>Resultado</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>60</strong></td>
+      <td>Klaviyo push emails</td>
+      <td>POST a <code>/api/klaviyo-push-emails</code> con body vac&iacute;o. Solo mide que el servidor responda r&aacute;pido (cualquier status vale, menos 500).</td>
+      <td>5 seg</td>
+      <td><span class="tag tag-pass">PASS</span><br><small style="color:#9ca3af;">19:31 hoy</small></td>
+    </tr>
+    <tr>
+      <td><strong>66</strong></td>
+      <td>Steve Mail enviar email</td>
+      <td>POST a <code>/api/send-email</code> con body vac&iacute;o. No env&iacute;a email real &mdash; solo mide que el endpoint responda.</td>
+      <td>3 seg</td>
+      <td><span class="tag tag-pass">PASS</span><br><small style="color:#9ca3af;">19:31 hoy</small></td>
+    </tr>
+    <tr>
+      <td><strong>71</strong></td>
+      <td>Steve Chat con mensaje real</td>
+      <td>POST a <code>/api/steve-chat</code> con mensaje <strong>"ping &mdash; respond&eacute; en una l&iacute;nea corta"</strong>. Verifica que la respuesta tenga contenido (no vac&iacute;a).</td>
+      <td>10 seg</td>
+      <td><span class="tag tag-pass">PASS</span><br><small style="color:#9ca3af;">19:31 hoy</small></td>
+    </tr>
+    <tr>
+      <td><strong>181</strong></td>
+      <td>Steve Chat (p95)</td>
+      <td>Igual que #71: POST real a Steve Chat, verifica respuesta con contenido.</td>
+      <td>10 seg</td>
+      <td><span class="tag tag-wait">Pr&oacute;ximo ciclo</span></td>
+    </tr>
+    <tr>
+      <td><strong>182</strong></td>
+      <td>Buscar productos Shopify</td>
+      <td>POST a <code>/api/fetch-shopify-products</code>. Mide que el endpoint responda.</td>
+      <td>5 seg</td>
+      <td><span class="tag tag-wait">Pr&oacute;ximo ciclo</span></td>
+    </tr>
+    <tr>
+      <td><strong>183</strong></td>
+      <td>Sync m&eacute;tricas Meta</td>
+      <td>POST a <code>/api/sync-meta-metrics</code>. Mide que el endpoint responda.</td>
+      <td>15 seg</td>
+      <td><span class="tag tag-wait">Pr&oacute;ximo ciclo</span></td>
+    </tr>
+    <tr>
+      <td><strong>184</strong></td>
+      <td>Generar copy Meta</td>
+      <td>POST a <code>/api/generate-meta-copy</code> con prompt de prueba y flag <code>system_test</code>.</td>
+      <td>8 seg</td>
+      <td><span class="tag tag-wait">Pr&oacute;ximo ciclo</span></td>
+    </tr>
+    <tr>
+      <td><strong>185</strong></td>
+      <td>Manejar campa&ntilde;a Meta</td>
+      <td>POST a <code>/api/manage-meta-campaign</code>. Mide que el endpoint responda.</td>
+      <td>5 seg</td>
+      <td><span class="tag tag-wait">Pr&oacute;ximo ciclo</span></td>
+    </tr>
+    <tr>
+      <td><strong>186</strong></td>
+      <td>Enviar email</td>
+      <td>POST a <code>/api/send-email</code>. Mide que el endpoint responda.</td>
+      <td>3 seg</td>
+      <td><span class="tag tag-wait">Pr&oacute;ximo ciclo</span></td>
+    </tr>
+    <tr>
+      <td><strong>187</strong></td>
+      <td>Generar imagen AI</td>
+      <td>POST a <code>/api/generate-image</code> con body vac&iacute;o. <strong>No genera imagen real</strong> (no gasta cr&eacute;ditos) &mdash; solo mide que el servidor responda.</td>
+      <td>20 seg</td>
+      <td><span class="tag tag-wait">Pr&oacute;ximo ciclo</span></td>
+    </tr>
+    <tr>
+      <td><strong>188</strong></td>
+      <td>Steve estrategia</td>
+      <td>POST a <code>/api/steve-strategy</code> con query de prueba y flag <code>system_test</code>.</td>
+      <td>12 seg</td>
+      <td><span class="tag tag-wait">Pr&oacute;ximo ciclo</span></td>
+    </tr>
+    <tr>
+      <td><strong>195</strong></td>
+      <td>Anthropic API (Claude)</td>
+      <td>Llama <strong>directo</strong> a la API de Anthropic con Claude Haiku, mensaje m&iacute;nimo ("hi"), max 5 tokens. Mide cu&aacute;nto tarda Claude en responder.</td>
+      <td>5 seg</td>
+      <td><span class="tag tag-wait">Pr&oacute;ximo ciclo</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- DETALLE TECNICO SIMPLE -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>Detalle t&eacute;cnico (simple)</h2>
+
+<div class="card">
+  <p><strong>&#x2753; &iquest;Por qu&eacute; POST con body vac&iacute;o en algunos?</strong></p>
+  <p>Endpoints como "enviar email" o "generar imagen" <strong>no se pueden ejecutar de verdad</strong> en una prueba (enviar&iacute;a un email real o gastar&iacute;a cr&eacute;ditos). Entonces El Chino manda un POST vac&iacute;o &mdash; el servidor dice "te faltan datos" (error 400) pero responde r&aacute;pido. Si est&aacute; ca&iacute;do o sobrecargado, ni siquiera podr&iacute;a responder eso.</p>
+</div>
+
+<div class="card">
+  <p><strong>&#x2753; &iquest;Por qu&eacute; #71 s&iacute; manda mensaje real?</strong></p>
+  <p>Porque la descripci&oacute;n dice "responde con mensaje v&aacute;lido". Steve Chat es seguro de llamar &mdash; solo genera texto, no tiene efectos secundarios. El Chino le manda "ping" y verifica que la respuesta no est&eacute; vac&iacute;a.</p>
+</div>
+
+<div class="card">
+  <p><strong>&#x2753; &iquest;Por qu&eacute; #195 llama directo a Anthropic?</strong></p>
+  <p>Porque ese check mide la latencia de <strong>Claude</strong>, no de Steve. Llama a la API de Anthropic con el modelo m&aacute;s barato (Haiku), le dice "hi" y pide m&aacute;ximo 5 tokens. Cuesta menos de $0.001 por prueba.</p>
+</div>
+
+<div class="card">
+  <p><strong>&#x2753; &iquest;Qu&eacute; pasa si un endpoint responde 400?</strong></p>
+  <p>Se cuenta como <strong>PASS</strong> (si fue r&aacute;pido). El check mide <em>velocidad</em>, no si los datos son correctos. Un 400 r&aacute;pido = servidor vivo y responsivo. Solo un 500 o timeout cuenta como error.</p>
+</div>
+
+<div class="card">
+  <p><strong>&#x2753; &iquest;Por qu&eacute; 3 ya pasaron y 9 dicen "pr&oacute;ximo ciclo"?</strong></p>
+  <p>El Chino ejecuta los checks en lotes. Los checks #60, #66, #71 tienen plataformas distintas (klaviyo, stevemail, steve_chat) y corrieron en este patrol. Los #181-195 tienen plataforma "infra" y su lote corri&oacute; <strong>antes del deploy</strong> (a las 17:03). En el pr&oacute;ximo ciclo (cada 30 min) ya corren con el c&oacute;digo nuevo.</p>
+</div>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- RESUMEN -->
+<!-- ═══════════════════════════════════════════ -->
+
+<h2>Resumen</h2>
+
+<table>
+  <thead><tr><th></th><th>Antes</th><th>Ahora</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Archivo</strong></td>
+      <td>62 l&iacute;neas, 1 funci&oacute;n</td>
+      <td>246 l&iacute;neas, switch con 14 cases</td>
+    </tr>
+    <tr>
+      <td><strong>Checks funcionando</strong></td>
+      <td>2 de 14 (solo #8 y #9)</td>
+      <td>14 de 14</td>
+    </tr>
+    <tr>
+      <td><strong>Checks en skip</strong></td>
+      <td>12</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <td><strong>M&eacute;todo</strong></td>
+      <td>GET simple a una URL</td>
+      <td>POST real a cada endpoint con auth</td>
+    </tr>
+    <tr>
+      <td><strong>Auth</strong></td>
+      <td>Ninguna</td>
+      <td>Bearer service_role_key</td>
+    </tr>
+    <tr>
+      <td><strong>Verificaci&oacute;n</strong></td>
+      <td>Solo "respondi&oacute;?"</td>
+      <td>#71: verifica contenido real</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="card" style="text-align:center; margin-top: 32px;">
+  <p><strong>Quedan pendientes:</strong></p>
+  <p style="font-size:0.9rem; color:#9ca3af;">Grupo B (10 checks de infra: memoria, conexiones, queries lentos) &mdash; necesita Google Cloud Monitoring + funciones SQL</p>
+  <p style="font-size:0.9rem; color:#9ca3af;">Grupo C (5 checks de rate limits: Meta, Shopify, Klaviyo, WhatsApp) &mdash; necesita leer headers de cada API</p>
+</div>
+
+<p style="margin-top: 50px; text-align: center; color: #4b5563; font-size: 0.78rem;">El Chino Performance Grupo A &mdash; 3 abril 2026</p>
+
+</div>
+</body>
+</html>

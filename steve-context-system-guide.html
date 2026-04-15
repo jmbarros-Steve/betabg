@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve — Sistema de Context Files (Guía Completa)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0f; color: #e0e0e0; line-height: 1.6; }
+
+  .hero {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    padding: 60px 40px;
+    text-align: center;
+    border-bottom: 3px solid #e94560;
+  }
+  .hero h1 { font-size: 2.8em; color: #fff; margin-bottom: 10px; }
+  .hero .subtitle { font-size: 1.3em; color: #a0a0b0; margin-bottom: 30px; }
+  .hero .tldr {
+    background: rgba(233, 69, 96, 0.15);
+    border: 1px solid #e94560;
+    border-radius: 12px;
+    padding: 20px 30px;
+    display: inline-block;
+    max-width: 800px;
+    text-align: left;
+    font-size: 1.05em;
+  }
+  .hero .tldr strong { color: #e94560; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 40px 20px; }
+
+  /* Section */
+  .section { margin-bottom: 50px; }
+  .section-title {
+    font-size: 1.8em;
+    color: #fff;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-title .num {
+    background: #e94560;
+    color: #fff;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7em; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .section-desc { color: #888; margin-bottom: 20px; font-size: 1.05em; margin-left: 52px; }
+
+  /* Before/After */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+  }
+  .compare-box {
+    background: #12121a;
+    border-radius: 12px;
+    padding: 24px;
+    border: 1px solid #2a2a3a;
+  }
+  .compare-box.before { border-top: 3px solid #ff6b6b; }
+  .compare-box.after { border-top: 3px solid #51cf66; }
+  .compare-box h3 { font-size: 1.2em; margin-bottom: 12px; }
+  .compare-box.before h3 { color: #ff6b6b; }
+  .compare-box.after h3 { color: #51cf66; }
+  .compare-box ul { list-style: none; }
+  .compare-box ul li { padding: 6px 0; padding-left: 20px; position: relative; }
+  .compare-box ul li::before { content: '→'; position: absolute; left: 0; color: #555; }
+
+  /* Layers */
+  .layers {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 20px;
+  }
+  .layer {
+    display: grid;
+    grid-template-columns: 50px 180px 1fr 200px;
+    align-items: center;
+    padding: 16px 20px;
+    border-radius: 0;
+    border-left: 4px solid;
+    background: #12121a;
+    border-bottom: 1px solid #1a1a2a;
+    gap: 16px;
+  }
+  .layer:first-child { border-radius: 12px 12px 0 0; }
+  .layer:last-child { border-radius: 0 0 12px 12px; border-bottom: none; }
+  .layer .step-num {
+    font-size: 1.5em;
+    font-weight: 800;
+    text-align: center;
+  }
+  .layer .layer-name { font-weight: 700; font-size: 1.1em; }
+  .layer .layer-desc { color: #999; font-size: 0.95em; }
+  .layer .layer-file { font-family: monospace; font-size: 0.85em; color: #666; background: #0a0a12; padding: 4px 10px; border-radius: 6px; }
+
+  .layer-personality { border-left-color: #e94560; }
+  .layer-personality .step-num, .layer-personality .layer-name { color: #e94560; }
+  .layer-context { border-left-color: #ffd43b; }
+  .layer-context .step-num, .layer-context .layer-name { color: #ffd43b; }
+  .layer-state { border-left-color: #4dabf7; }
+  .layer-state .step-num, .layer-state .layer-name { color: #4dabf7; }
+  .layer-memory { border-left-color: #51cf66; }
+  .layer-memory .step-num, .layer-memory .layer-name { color: #51cf66; }
+
+  .new-badge {
+    background: #ffd43b;
+    color: #000;
+    font-size: 0.65em;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  /* Agent grid */
+  .agent-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+  }
+  .agent-card {
+    background: #12121a;
+    border: 1px solid #2a2a3a;
+    border-radius: 12px;
+    padding: 18px;
+    transition: border-color 0.2s;
+  }
+  .agent-card:hover { border-color: #e94560; }
+  .agent-card .agent-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .agent-card .agent-name { font-weight: 700; font-size: 1.1em; color: #fff; }
+  .agent-card .agent-code { font-family: monospace; font-size: 0.85em; color: #888; }
+  .agent-card .agent-role { color: #a0a0b0; font-size: 0.9em; margin-bottom: 10px; }
+  .agent-card .agent-stats {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .stat-pill {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+  }
+  .stat-tables { background: rgba(77, 171, 247, 0.15); color: #4dabf7; }
+  .stat-crons { background: rgba(255, 212, 59, 0.15); color: #ffd43b; }
+  .stat-dead { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
+
+  /* File tree */
+  .file-tree {
+    background: #0d0d15;
+    border: 1px solid #2a2a3a;
+    border-radius: 12px;
+    padding: 24px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.9em;
+    line-height: 1.8;
+    margin-top: 20px;
+    overflow-x: auto;
+  }
+  .file-tree .dir { color: #4dabf7; font-weight: 600; }
+  .file-tree .file { color: #a0a0b0; }
+  .file-tree .new { color: #ffd43b; font-weight: 600; }
+  .file-tree .comment { color: #555; font-style: italic; }
+
+  /* Context file anatomy */
+  .anatomy {
+    background: #12121a;
+    border: 1px solid #2a2a3a;
+    border-radius: 12px;
+    padding: 28px;
+    margin-top: 20px;
+  }
+  .anatomy h3 { color: #ffd43b; margin-bottom: 16px; font-size: 1.2em; }
+  .anatomy-section {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 8px 20px;
+    margin-bottom: 8px;
+    padding: 10px 0;
+    border-bottom: 1px solid #1a1a2a;
+  }
+  .anatomy-section:last-child { border-bottom: none; }
+  .anatomy-section .sec-name { font-weight: 700; color: #fff; font-family: monospace; }
+  .anatomy-section .sec-desc { color: #999; }
+
+  /* Activation flow */
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    margin-top: 20px;
+    align-items: center;
+    justify-content: center;
+  }
+  .flow-step {
+    background: #12121a;
+    border: 1px solid #2a2a3a;
+    border-radius: 10px;
+    padding: 16px 20px;
+    text-align: center;
+    min-width: 140px;
+  }
+  .flow-step .flow-num { font-size: 0.75em; color: #666; margin-bottom: 4px; }
+  .flow-step .flow-label { font-weight: 700; color: #fff; font-size: 0.95em; }
+  .flow-step .flow-file { font-family: monospace; font-size: 0.75em; color: #666; margin-top: 4px; }
+  .flow-arrow { font-size: 1.5em; color: #333; padding: 0 4px; }
+
+  .flow-step.step-new { border-color: #ffd43b; background: rgba(255, 212, 59, 0.05); }
+  .flow-step.step-new .flow-label { color: #ffd43b; }
+
+  /* Automation cards */
+  .auto-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+  }
+  .auto-card {
+    background: #12121a;
+    border: 1px solid #2a2a3a;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .auto-card h4 { color: #fff; margin-bottom: 6px; font-size: 1.05em; }
+  .auto-card .auto-schedule { font-family: monospace; font-size: 0.8em; color: #ffd43b; margin-bottom: 8px; }
+  .auto-card p { color: #999; font-size: 0.9em; }
+  .auto-card .auto-what {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #1a1a2a;
+    font-size: 0.85em;
+    color: #666;
+  }
+
+  /* CLAUDE.md diff */
+  .diff-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+  }
+  .diff-box {
+    background: #12121a;
+    border: 1px solid #2a2a3a;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .diff-box h4 { margin-bottom: 10px; }
+  .diff-box.removed h4 { color: #ff6b6b; }
+  .diff-box.kept h4 { color: #51cf66; }
+  .diff-box ul { list-style: none; }
+  .diff-box ul li { padding: 4px 0; padding-left: 20px; position: relative; color: #999; font-size: 0.9em; }
+  .diff-box.removed ul li::before { content: '✕'; position: absolute; left: 0; color: #ff6b6b; }
+  .diff-box.kept ul li::before { content: '✓'; position: absolute; left: 0; color: #51cf66; }
+
+  /* FAQ */
+  .faq { margin-top: 20px; }
+  .faq-item {
+    background: #12121a;
+    border: 1px solid #2a2a3a;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .faq-q {
+    padding: 16px 20px;
+    font-weight: 700;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .faq-q:hover { background: rgba(255,255,255,0.02); }
+  .faq-q .arrow { transition: transform 0.2s; color: #555; }
+  .faq-a {
+    padding: 0 20px 16px;
+    color: #999;
+    display: none;
+    font-size: 0.95em;
+  }
+  .faq-item.open .faq-a { display: block; }
+  .faq-item.open .faq-q .arrow { transform: rotate(90deg); }
+
+  /* Code block */
+  .code-block {
+    background: #0d0d15;
+    border: 1px solid #2a2a3a;
+    border-radius: 8px;
+    padding: 16px 20px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.85em;
+    overflow-x: auto;
+    margin: 10px 0;
+    color: #c0c0c0;
+    line-height: 1.7;
+  }
+  .code-block .cmd { color: #51cf66; }
+  .code-block .comment { color: #555; }
+  .code-block .highlight { color: #ffd43b; }
+
+  /* Info callout */
+  .callout {
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 0.95em;
+  }
+  .callout-info { background: rgba(77, 171, 247, 0.1); border: 1px solid rgba(77, 171, 247, 0.3); color: #4dabf7; }
+  .callout-warn { background: rgba(255, 212, 59, 0.1); border: 1px solid rgba(255, 212, 59, 0.3); color: #ffd43b; }
+  .callout-danger { background: rgba(255, 107, 107, 0.1); border: 1px solid rgba(255, 107, 107, 0.3); color: #ff6b6b; }
+
+  /* Mini table */
+  .mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 0.9em;
+  }
+  .mini-table th {
+    text-align: left;
+    padding: 10px 14px;
+    background: #0d0d15;
+    color: #888;
+    font-weight: 600;
+    border-bottom: 2px solid #2a2a3a;
+  }
+  .mini-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #1a1a2a;
+    color: #c0c0c0;
+  }
+  .mini-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  footer {
+    text-align: center;
+    padding: 40px;
+    color: #333;
+    font-size: 0.85em;
+    border-top: 1px solid #1a1a2a;
+    margin-top: 40px;
+  }
+
+  @media (max-width: 768px) {
+    .compare, .diff-summary { grid-template-columns: 1fr; }
+    .layer { grid-template-columns: 40px 1fr; }
+    .layer .layer-desc, .layer .layer-file { display: none; }
+    .agent-grid { grid-template-columns: 1fr; }
+    .flow { flex-direction: column; }
+    .flow-arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════ HERO ═══════════════════════════════════════════ -->
+<div class="hero">
+  <h1>Sistema de Context Files</h1>
+  <p class="subtitle">La nueva estructura de Steve — guía a prueba de tontos</p>
+  <div class="tldr">
+    <strong>TL;DR:</strong> Antes, los 14 agentes leían el mismo CLAUDE.md de 690 líneas con TODO (97 tablas, 44 crons, todas las reglas).
+    Ahora cada agente tiene su propio <strong>"manual operacional"</strong> con solo lo que necesita.
+    CLAUDE.md bajó a 277 líneas. Una validación automática cada 12h mantiene todo sincronizado.
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ═══════════════════════════════════════ 1. ANTES vs DESPUÉS ═══════════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <span class="num">1</span> Antes vs Después
+  </div>
+  <p class="section-desc">El cambio en una imagen</p>
+
+  <div class="compare">
+    <div class="compare-box before">
+      <h3>ANTES (3 capas)</h3>
+      <ul>
+        <li><strong>personality/</strong> — quién eres</li>
+        <li><strong>state/</strong> — dónde quedaste</li>
+        <li><strong>memory/</strong> — qué aprendiste</li>
+        <li style="margin-top:12px; color:#ff6b6b"><strong>CLAUDE.md</strong> — 690 líneas con TODO</li>
+        <li style="color:#ff6b6b">Cada agente ve las 97 tablas</li>
+        <li style="color:#ff6b6b">Cada agente ve los 44 crons</li>
+        <li style="color:#ff6b6b">Sin validación automática</li>
+        <li style="color:#ff6b6b">Tablas nuevas se pierden</li>
+      </ul>
+    </div>
+    <div class="compare-box after">
+      <h3>DESPUÉS (4 capas)</h3>
+      <ul>
+        <li><strong>personality/</strong> — quién eres</li>
+        <li style="color:#ffd43b"><strong>contexts/</strong> — con qué trabajas (NUEVO)</li>
+        <li><strong>state/</strong> — dónde quedaste</li>
+        <li><strong>memory/</strong> — qué aprendiste</li>
+        <li style="margin-top:12px; color:#51cf66"><strong>CLAUDE.md</strong> — 277 líneas (reglas generales)</li>
+        <li style="color:#51cf66">Cada agente ve SOLO sus tablas</li>
+        <li style="color:#51cf66">Cada agente ve SOLO sus crons</li>
+        <li style="color:#51cf66">Validación cada 12h automática</li>
+        <li style="color:#51cf66">Tablas nuevas → _unassigned.md</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 2. LAS 4 CAPAS ═══════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <span class="num">2</span> Las 4 Capas de cada Agente
+  </div>
+  <p class="section-desc">Cada capa responde una pregunta distinta. Se leen en orden al activar.</p>
+
+  <div class="layers">
+    <div class="layer layer-personality">
+      <div class="step-num">1</div>
+      <div class="layer-name">Personality</div>
+      <div class="layer-desc">QUIÉN eres — personalidad chilena, 5 misiones, mandato de desafío. <strong>No cambia nunca.</strong></div>
+      <div class="layer-file">agents/personalities/felipe-w2.md</div>
+    </div>
+    <div class="layer layer-context">
+      <div class="step-num">2</div>
+      <div class="layer-name">Context <span class="new-badge">NUEVO</span></div>
+      <div class="layer-desc">CON QUÉ trabajas — tus tablas, tus crons, tus archivos, tus dependencias. <strong>Referencia estática.</strong></div>
+      <div class="layer-file">agents/contexts/felipe-w2.md</div>
+    </div>
+    <div class="layer layer-state">
+      <div class="step-num">3</div>
+      <div class="layer-name">State</div>
+      <div class="layer-desc">DÓNDE quedaste — tareas pendientes, % progreso, blockers. <strong>Cambia cada sesión.</strong></div>
+      <div class="layer-file">agents/state/felipe-w2.md</div>
+    </div>
+    <div class="layer layer-memory">
+      <div class="step-num">4</div>
+      <div class="layer-name">Memory</div>
+      <div class="layer-desc">QUÉ aprendiste — decisiones, descubrimientos, desacuerdos. <strong>Crece siempre, nunca se borra.</strong></div>
+      <div class="layer-file">agents/memory/felipe-w2.md</div>
+    </div>
+  </div>
+
+  <div class="callout callout-info" style="margin-top:20px">
+    <strong>Analogía:</strong> Personality es tu DNI, Context es tu escritorio con herramientas, State es tu lista de tareas del día, Memory es tu diario personal.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 3. FLUJO ACTIVACIÓN ═══════════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <span class="num">3</span> Flujo de Activación
+  </div>
+  <p class="section-desc">Qué pasa cuando dices "activa a Felipe"</p>
+
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-num">Paso 1</div>
+      <div class="flow-label">Personality</div>
+      <div class="flow-file">personalities/felipe-w2.md</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step step-new">
+      <div class="flow-num">Paso 2</div>
+      <div class="flow-label">Context</div>
+      <div class="flow-file">contexts/felipe-w2.md</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-num">Paso 3</div>
+      <div class="flow-label">State</div>
+      <div class="flow-file">state/felipe-w2.md</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-num">Paso 4</div>
+      <div class="flow-label">Memory</div>
+      <div class="flow-file">memory/felipe-w2.md</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step step-new">
+      <div class="flow-num">Paso 5</div>
+      <div class="flow-label">Unassigned?</div>
+      <div class="flow-file">state/_unassigned.md</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-num">Paso 6</div>
+      <div class="flow-label">SYNC + Trabajar</div>
+      <div class="flow-file">→ Supabase</div>
+    </div>
+  </div>
+
+  <div class="callout callout-warn" style="margin-top: 20px;">
+    <strong>Paso 5 es nuevo:</strong> Antes de trabajar, el agente revisa si hay tablas o crons nuevos sin dueño.
+    Si los hay, decide si son suyos o los deja para otro.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 4. ESTRUCTURA ARCHIVOS ════════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <span class="num">4</span> Estructura de Archivos
+  </div>
+  <p class="section-desc">Dónde vive cada cosa en el repo</p>
+
+  <div class="file-tree">
+<span class="dir">agents/</span>
+├── <span class="dir">personalities/</span>    <span class="comment">← 14 archivos, NO se tocan (quién es cada agente)</span>
+│   ├── <span class="file">diego-w8.md</span>
+│   ├── <span class="file">felipe-w2.md</span>
+│   └── <span class="file">... (14 total)</span>
+│
+├── <span class="dir">contexts/</span>          <span class="new">← NUEVO — 14 archivos + 1 compartido</span>
+│   ├── <span class="new">_shared.md</span>         <span class="comment">← convenciones que TODOS comparten (84 líneas)</span>
+│   ├── <span class="new">diego-w8.md</span>        <span class="comment">← 8 tablas, 0 crons</span>
+│   ├── <span class="new">felipe-w2.md</span>       <span class="comment">← 8 tablas, 3 crons</span>
+│   ├── <span class="new">rodrigo-w0.md</span>      <span class="comment">← 5 tablas, 0 crons</span>
+│   ├── <span class="new">valentina-w1.md</span>    <span class="comment">← 12 tablas, 2 crons</span>
+│   ├── <span class="new">andres-w3.md</span>       <span class="comment">← 1 tabla (módulo MUERTO)</span>
+│   ├── <span class="new">camila-w4.md</span>       <span class="comment">← 1 tabla, lee de todos para dashboards</span>
+│   ├── <span class="new">sebastian-w5.md</span>    <span class="comment">← 6 tablas, TODOS los 44 crons</span>
+│   ├── <span class="new">isidora-w6.md</span>      <span class="comment">← 2 tablas, 3 crons</span>
+│   ├── <span class="new">tomas-w7.md</span>        <span class="comment">← 19 tablas, 11 crons</span>
+│   ├── <span class="new">javiera-w12.md</span>     <span class="comment">← 3 tablas, 4 crons</span>
+│   ├── <span class="new">matias-w13.md</span>      <span class="comment">← 2 tablas (módulo MUERTO)</span>
+│   ├── <span class="new">ignacio-w17.md</span>     <span class="comment">← 5 tablas, 3 crons</span>
+│   ├── <span class="new">valentin-w18.md</span>    <span class="comment">← 5 tablas, 3 crons</span>
+│   └── <span class="new">paula-w19.md</span>       <span class="comment">← 14 tablas, 6 crons</span>
+│
+├── <span class="dir">state/</span>             <span class="comment">← tareas y progreso por sesión</span>
+│   ├── <span class="file">diego-w8.md</span>
+│   ├── <span class="file">...</span>
+│   └── <span class="new">_unassigned.md</span>     <span class="comment">← NUEVO — items sin dueño</span>
+│
+└── <span class="dir">memory/</span>            <span class="comment">← journal acumulativo (crece siempre)</span>
+
+<span class="dir">scripts/</span>
+└── <span class="new">validate-context-files.sh</span>  <span class="comment">← NUEVO — validación local</span>
+
+<span class="dir">cloud-run-api/src/routes/cron/</span>
+└── <span class="new">validate-contexts.ts</span>       <span class="comment">← NUEVO — endpoint para cron 12h</span>
+
+<span class="file">CLAUDE.md</span>              <span class="comment">← ADELGAZADO de 690 → 277 líneas</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 5. QUÉ TIENE UN CONTEXT FILE ═════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <span class="num">5</span> Anatomía de un Context File
+  </div>
+  <p class="section-desc">Qué secciones tiene cada agents/contexts/{agente}.md</p>
+
+  <div class="anatomy">
+    <h3>Ejemplo: agents/contexts/felipe-w2.md</h3>
+
+    <div class="anatomy-section">
+      <div class="sec-name">## Tus Tablas</div>
+      <div class="sec-desc">Las tablas que este agente <strong>escribe</strong>. Con columnas clave, filas conocidas, estado actual. Solo las suyas (Felipe ve 8, no las 97).</div>
+    </div>
+    <div class="anatomy-section">
+      <div class="sec-name">## Tablas que Lees</div>
+      <div class="sec-desc">Tablas de <strong>otros agentes</strong> que necesita consultar (read-only). Dice quién es el dueño y para qué la lee.</div>
+    </div>
+    <div class="anatomy-section">
+      <div class="sec-name">## Tus Crons</div>
+      <div class="sec-desc">Crons de Cloud Scheduler que le pertenecen. Con schedule, endpoint, y estado conocido.</div>
+    </div>
+    <div class="anatomy-section">
+      <div class="sec-name">## Tus Archivos</div>
+      <div class="sec-desc">Archivos de código que mantiene: backend, frontend, edge functions, libs. Con rutas exactas.</div>
+    </div>
+    <div class="anatomy-section">
+      <div class="sec-name">## Dependencias</div>
+      <div class="sec-desc">De quién depende (agentes que le alimentan data) y a quién alimenta. El grafo de dependencias del agente.</div>
+    </div>
+    <div class="anatomy-section">
+      <div class="sec-name">## Problemas Conocidos</div>
+      <div class="sec-desc">Tablas vacías, crons rotos, features desconectadas, env vars faltantes. Lo que hay que arreglar.</div>
+    </div>
+  </div>
+
+  <div class="callout callout-info" style="margin-top:16px">
+    <strong>_shared.md</strong> tiene las convenciones que TODOS comparten: naming, imports, auth patterns, cross-review, archivos prohibidos, deploy commands.
+    Cada context file solo tiene lo específico del agente.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 6. LOS 14 AGENTES ════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <span class="num">6</span> Los 14 Agentes y sus Recursos
+  </div>
+  <p class="section-desc">Qué tiene cada agente en su context file</p>
+
+  <div class="agent-grid">
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-name">Diego</span>
+        <span class="agent-code">W8</span>
+      </div>
+      <div class="agent-role">Database & Data Pipeline</div>
+      <div class="agent-stats">
+        <span class="stat-pill stat-tables">8 tablas</span>
+        <span class="stat-pill stat-crons">0 crons</span>
+      </div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-name">Felipe</span>
+        <span class="agent-code">W2</span>
+      </div>
+      <div class="agent-role">Meta Ads</div>
+      <div class="agent-stats">
+        <span class="stat-pill stat-tables">8 tablas</span>
+        <span class="stat-pill stat-crons">3 crons</span>
+      </div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-name">Rodrigo</span>
+        <span class="agent-code">W0</span>
+      </div>
+      <div class="agent-role">Klaviyo</div>
+      <div class="agent-stats">
+        <span class="stat-pill stat-tables">5 tablas</span>
+        <span class="stat-pill stat-crons">0 crons</span>
+      </div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-name">Valentina</span>
+        <span class="agent-code">W1</span>
+      </div>
+      <div class="agent-role">Steve Mail</div>
+      <div class="agent-stats">
+        <span class="stat-pill stat-tables">12 tablas</span>
+        <span class="stat-pill stat-crons">2 crons</span>
+      </div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-name">Andrés</span>
+        <span class="agent-code">W3</span>
+      </div>
+      <div class="agent-role">Google Ads</div>
+      <div class="agent-stats">
+        <span class="stat-pill stat-tables">1 tabla</span>
+        <span class="stat-pill stat-dead">MUERTO</span>
+      </div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-name">Camila</span>
+        <span class="agent-code">W4</span>
+      </div>
+      <div class="agent-role">Frontend & Dashboards</div>
+      <div class="agent-stats">
+        <span class="stat-pill stat-tables">1 tabla</span>
+        <span class="stat-pill stat-crons">0 crons</span>
+      </div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-name">Sebastián</span>
+        <span class="agent-code">W5</span>
+      </div>
+      <div class="agent-role">Cloud & Infra</div>
+      <div class="agent-stats">
+        <span class="stat-pill stat-tables">6 tablas</span>
+        <span class="stat-pill stat-crons">44 crons</span>
+      </div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-name">Isidora</span>
+        <span class="agent-code">W6</span>
+      </div>
+      <div class="agent-role">Criterio & Code Review</div>
+      <div class="agent-stats">
+        <span class="stat-pill stat-tables">2 tablas</span>
+        <span class="stat-pill stat-crons">3 crons</span>
+      </div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-name">Tomás</span>
+        <span class="agent-code">W7</span>
+      </div>
+      <div class="agent-role">Steve AI / Cerebro</div>
+      <div class="agent-stats">
+        <span class="stat-pill stat-tables">19 tablas</span>
+        <span class="stat-pill stat-crons">11 crons</span>
+      </div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-name">Javiera</span>
+        <span class="agent-code">W12</span>
+      </div>
+      <div class="agent-role">QA / El Chino</div>
+      <div class="agent-stats">
+        <span class="stat-pill stat-tables">3 tablas</span>
+        <span class="stat-pill stat-crons">4 crons</span>
+      </div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-name">Matías</span>
+        <span class="agent-code">W13</span>
+      </div>
+      <div class="agent-role">Shopify</div>
+      <div class="agent-stats">
+        <span class="stat-pill stat-tables">2 tablas</span>
+        <span class="stat-pill stat-dead">MUERTO</span>
+      </div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-name">Ignacio</span>
+        <span class="agent-code">W17</span>
+      </div>
+      <div class="agent-role">Métricas & Analytics</div>
+      <div class="agent-stats">
+        <span class="stat-pill stat-tables">5 tablas</span>
+        <span class="stat-pill stat-crons">3 crons</span>
+      </div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-name">Valentín</span>
+        <span class="agent-code">W18</span>
+      </div>
+      <div class="agent-role">Creativos & Imágenes</div>
+      <div class="agent-stats">
+        <span class="stat-pill stat-tables">5 tablas</span>
+        <span class="stat-pill stat-crons">3 crons</span>
+      </div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-name">Paula</span>
+        <span class="agent-code">W19</span>
+      </div>
+      <div class="agent-role">WhatsApp, CRM & Ventas</div>
+      <div class="agent-stats">
+        <span class="stat-pill stat-tables">14 tablas</span>
+        <span class="stat-pill stat-crons">6 crons</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 7. VALIDACIÓN AUTOMÁTICA ═══════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <span class="num">7</span> Validación Automática (cada 12h)
+  </div>
+  <p class="section-desc">El sistema se auto-mantiene. No tienes que hacer nada manualmente.</p>
+
+  <div class="auto-grid">
+    <div class="auto-card">
+      <h4>Context Validator</h4>
+      <div class="auto-schedule">0 6,18 * * * (6am y 6pm UTC)</div>
+      <p>Compara tablas reales de Supabase y crons de Cloud Scheduler contra los context files.</p>
+      <div class="auto-what">
+        <strong>Si encuentra algo nuevo sin dueño:</strong><br>
+        1. Lo agrega a <code>_unassigned.md</code><br>
+        2. Crea una task en Supabase con severity "medium"<br>
+        3. El próximo agente que se active lo ve en Paso 5
+      </div>
+    </div>
+    <div class="auto-card">
+      <h4>_unassigned.md</h4>
+      <div class="auto-schedule">Se llena automáticamente</div>
+      <p>Archivo que acumula tablas y crons nuevos que ningún agente tiene en su context.</p>
+      <div class="auto-what">
+        <strong>Formato de cada entrada:</strong><br>
+        <code>- [2026-04-04] tabla campaign_ab_tests — sin dueño</code><br>
+        Cuando un agente se activa, revisa este archivo y decide si algo es suyo.
+      </div>
+    </div>
+    <div class="auto-card">
+      <h4>Qué detecta</h4>
+      <div class="auto-schedule">Chequeos automáticos</div>
+      <p>Tres tipos de discrepancia:</p>
+      <div class="auto-what">
+        1. <strong>Tabla sin dueño:</strong> existe en Supabase pero en ningún context<br>
+        2. <strong>Tabla fantasma:</strong> está en un context pero no existe en Supabase<br>
+        3. <strong>Cron huérfano:</strong> activo en Cloud Scheduler pero sin mención
+      </div>
+    </div>
+    <div class="auto-card">
+      <h4>Dónde vive</h4>
+      <div class="auto-schedule">Dos versiones</div>
+      <p>Hay dos implementaciones para cobertura total:</p>
+      <div class="auto-what">
+        <strong>Cloud Run:</strong> <code>cloud-run-api/src/routes/cron/validate-contexts.ts</code><br>
+        → Lo llama el cron <code>context-validator-12h</code><br><br>
+        <strong>Local:</strong> <code>scripts/validate-context-files.sh</code><br>
+        → Lo corres manualmente cuando quieras
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 8. QUÉ PASÓ CON CLAUDE.MD ═════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <span class="num">8</span> Qué pasó con CLAUDE.md
+  </div>
+  <p class="section-desc">De 690 líneas a 277. Qué se movió y qué se quedó.</p>
+
+  <div class="diff-summary">
+    <div class="diff-box removed">
+      <h4>Se movió a context files</h4>
+      <ul>
+        <li>Catálogo detallado de 97 tablas con columnas (~260 líneas)</li>
+        <li>Lista detallada de 44 crons con schedules (~90 líneas)</li>
+        <li>Historial de commits</li>
+        <li>Detalles de edge functions por agente</li>
+      </ul>
+    </div>
+    <div class="diff-box kept">
+      <h4>Se quedó en CLAUDE.md</h4>
+      <ul>
+        <li>Stack y deploy commands</li>
+        <li>Reglas de código y naming</li>
+        <li>Imports y auth patterns</li>
+        <li>Estructura del proyecto</li>
+        <li>Organigrama del equipo (nombres + roles)</li>
+        <li>Tabla resumen de 97 tablas (1 línea c/u, con dueño)</li>
+        <li>Cross-review obligatorio</li>
+        <li>SYNC agresivo a Supabase</li>
+        <li>Protocolo de activación (actualizado a 4 capas)</li>
+        <li>Env vars (20 obligatorias + 8 pendientes)</li>
+        <li>Archivos grandes (>30KB)</li>
+        <li>Delegación dinámica de sub-agentes</li>
+        <li>Protocolo de desafío</li>
+        <li>Bug → Task automático</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout callout-warn" style="margin-top:16px">
+    <strong>CLAUDE.md sigue siendo la "biblia general".</strong> Todos los agentes lo leen siempre.
+    La diferencia es que ahora tiene las reglas, no los datos. Los datos están en cada context file.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 9. COMANDOS ÚTILES ═══════════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <span class="num">9</span> Comandos Útiles
+  </div>
+  <p class="section-desc">Lo que necesitas saber para operar el sistema</p>
+
+  <div class="code-block">
+<span class="comment"># Activar un agente (en el chat con Claude)</span>
+<span class="cmd">"Activa a Felipe"</span>
+<span class="comment"># → Lee personality → context → state → memory → _unassigned → SYNC</span>
+
+<span class="comment"># Ver el context file de un agente</span>
+<span class="cmd">cat agents/contexts/felipe-w2.md</span>
+
+<span class="comment"># Ver items sin asignar</span>
+<span class="cmd">cat agents/state/_unassigned.md</span>
+
+<span class="comment"># Correr validación manualmente</span>
+<span class="cmd">bash scripts/validate-context-files.sh</span>
+
+<span class="comment"># Ver el cron de validación en Cloud Scheduler</span>
+<span class="cmd">gcloud scheduler jobs describe context-validator-12h \
+  --project=steveapp-agency --location=us-central1</span>
+
+<span class="comment"># Forzar ejecución del cron ahora</span>
+<span class="cmd">gcloud scheduler jobs run context-validator-12h \
+  --project=steveapp-agency --location=us-central1</span>
+
+<span class="comment"># Ver estado de los 14 agentes en el admin</span>
+<span class="cmd">https://tu-dominio.com/admin/organigrama</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 10. FAQ ═══════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <span class="num">10</span> Preguntas Frecuentes
+  </div>
+
+  <div class="faq">
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+        ¿Qué pasa si creo una tabla nueva en Supabase?
+        <span class="arrow">▶</span>
+      </div>
+      <div class="faq-a">
+        En máximo 12 horas, el cron <code>context-validator-12h</code> la detecta y la agrega a <code>agents/state/_unassigned.md</code>.
+        El próximo agente que se active la verá en el Paso 5 de activación y podrá reclamarla.
+        También crea una task en Supabase para que no se olvide.
+      </div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+        ¿Qué pasa si borro una tabla de Supabase?
+        <span class="arrow">▶</span>
+      </div>
+      <div class="faq-a">
+        El validador la marca como "tabla fantasma" — existe en el context file pero no en Supabase.
+        El script local (<code>validate-context-files.sh</code>) la puede auto-remover del context file.
+        El endpoint Cloud Run solo reporta el warning.
+      </div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+        ¿Tengo que editar los context files manualmente?
+        <span class="arrow">▶</span>
+      </div>
+      <div class="faq-a">
+        <strong>Casi nunca.</strong> Los context files son referencia estática — cambian cuando agregas tablas, crons, o archivos nuevos.
+        El validador automático te avisa cuando hay discrepancias. Si un agente necesita actualizar su context,
+        lo hace como parte de su trabajo normal. Tú solo intervienes para asignar items de <code>_unassigned.md</code> a un agente.
+      </div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+        ¿Qué es _shared.md?
+        <span class="arrow">▶</span>
+      </div>
+      <div class="faq-a">
+        Son 84 líneas con convenciones que TODOS los agentes necesitan: naming conventions, import aliases,
+        auth patterns, cross-review protocol, archivos prohibidos, deploy commands, SYNC protocol.
+        Es como el "reglamento interno" que aplica a todo el equipo. Cada agente lo lee junto con su context personal.
+      </div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+        ¿Puedo ver todo esto en el admin?
+        <span class="arrow">▶</span>
+      </div>
+      <div class="faq-a">
+        Sí. <strong>AdminOrganigrama</strong> fue actualizado con:<br>
+        • Protocolo de Activación (4 capas) visual<br>
+        • Sección "Automatizaciones" mostrando los 5 procesos automáticos<br>
+        • Cada agente muestra cuántas tablas y crons tiene<br>
+        • Tab "Contexto" en el detalle de cada agente con su context file y stats
+      </div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+        ¿Qué ganamos con esto?
+        <span class="arrow">▶</span>
+      </div>
+      <div class="faq-a">
+        <strong>3 cosas concretas:</strong><br><br>
+        1. <strong>Menos ruido:</strong> Felipe (Meta Ads) ya no ve las 17 tablas de email. Ve sus 8 tablas y punto.<br>
+        2. <strong>Auto-mantenimiento:</strong> Si alguien crea una tabla nueva, el sistema la detecta solo. No se pierde nada.<br>
+        3. <strong>CLAUDE.md legible:</strong> 277 líneas vs 690. Las reglas generales claras, sin data dump.
+      </div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">
+        ¿Y si quiero agregar un agente nuevo (W20, W21...)?
+        <span class="arrow">▶</span>
+      </div>
+      <div class="faq-a">
+        Tres archivos:<br>
+        1. <code>agents/personalities/nuevo-wXX.md</code> — personalidad y misiones<br>
+        2. <code>agents/contexts/nuevo-wXX.md</code> — tablas, crons, archivos (seguir el template de los existentes)<br>
+        3. <code>agents/state/nuevo-wXX.md</code> — estado inicial vacío<br><br>
+        Además, agregar sus tablas al mapa <code>ASSIGNED_TABLES</code> en <code>cloud-run-api/src/routes/cron/validate-contexts.ts</code>
+        para que el validador lo reconozca.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ RESUMEN VISUAL ════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <span class="num">!</span> Resumen en una Tabla
+  </div>
+
+  <table class="mini-table">
+    <thead>
+      <tr>
+        <th>Archivo</th>
+        <th>Qué es</th>
+        <th>Quién lo lee</th>
+        <th>Cuándo cambia</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>CLAUDE.md</code></td>
+        <td>Reglas generales (277 líneas)</td>
+        <td>TODOS los agentes</td>
+        <td>Cuando cambian reglas del proyecto</td>
+      </tr>
+      <tr>
+        <td><code>contexts/_shared.md</code></td>
+        <td>Convenciones compartidas (84 líneas)</td>
+        <td>TODOS los agentes</td>
+        <td>Cuando cambian convenciones</td>
+      </tr>
+      <tr>
+        <td><code>contexts/{agente}.md</code></td>
+        <td>Manual operacional del agente</td>
+        <td>SOLO ese agente</td>
+        <td>Cuando agregan/quitan tablas, crons, archivos</td>
+      </tr>
+      <tr>
+        <td><code>personalities/{agente}.md</code></td>
+        <td>Quién es, 5 misiones, mandato</td>
+        <td>SOLO ese agente</td>
+        <td>NUNCA (es fija)</td>
+      </tr>
+      <tr>
+        <td><code>state/{agente}.md</code></td>
+        <td>Tareas, progreso, blockers</td>
+        <td>SOLO ese agente</td>
+        <td>Cada sesión</td>
+      </tr>
+      <tr>
+        <td><code>memory/{agente}.md</code></td>
+        <td>Journal acumulativo</td>
+        <td>SOLO ese agente</td>
+        <td>Crece siempre, no se borra</td>
+      </tr>
+      <tr>
+        <td><code>state/_unassigned.md</code></td>
+        <td>Items sin dueño</td>
+        <td>TODOS (en Paso 5)</td>
+        <td>Auto — cada 12h el cron lo llena</td>
+      </tr>
+      <tr>
+        <td><code>validate-contexts.ts</code></td>
+        <td>Endpoint de validación</td>
+        <td>Cloud Scheduler</td>
+        <td>Cuando cambia la lógica de validación</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</div>
+
+<footer>
+  Steve Platform — Sistema de Context Files — Implementado 2026-04-04<br>
+  21 archivos creados/modificados · CLAUDE.md: 690→277 líneas · Cron: context-validator-12h cada 12h
+</footer>
+
+</body>
+</html>

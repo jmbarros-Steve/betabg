@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Mail — Documentación Completa de Funciones</title>
+<style>
+  :root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --bg: #0f0f11;
+    --surface: #18181b;
+    --surface2: #1e1e23;
+    --border: #27272a;
+    --text: #e4e4e7;
+    --text-muted: #a1a1aa;
+    --green: #22c55e;
+    --blue: #3b82f6;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --pink: #ec4899;
+    --cyan: #06b6d4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+  /* Hero */
+  .hero { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%); padding: 80px 0 60px; text-align: center; border-bottom: 1px solid var(--border); }
+  .hero h1 { font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, #c7d2fe, #818cf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 12px; }
+  .hero .subtitle { font-size: 1.2rem; color: #a5b4fc; max-width: 600px; margin: 0 auto 30px; }
+  .hero-stats { display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; }
+  .hero-stat { text-align: center; }
+  .hero-stat .num { font-size: 2rem; font-weight: 700; color: #fff; }
+  .hero-stat .label { font-size: 0.85rem; color: #a5b4fc; }
+
+  /* Nav */
+  .toc { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 0; position: sticky; top: 0; z-index: 100; }
+  .toc-inner { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+  .toc a { color: var(--text-muted); text-decoration: none; font-size: 0.8rem; padding: 6px 14px; border-radius: 20px; white-space: nowrap; transition: all 0.2s; border: 1px solid transparent; }
+  .toc a:hover { color: #fff; background: var(--surface2); border-color: var(--border); }
+
+  /* Sections */
+  section { padding: 60px 0; border-bottom: 1px solid var(--border); }
+  section:last-child { border-bottom: none; }
+  .section-header { margin-bottom: 40px; }
+  .section-header h2 { font-size: 2rem; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+  .section-header p { color: var(--text-muted); font-size: 1rem; max-width: 700px; }
+  .badge { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 3px 10px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .badge-purple { background: rgba(99,102,241,0.2); color: #a5b4fc; }
+  .badge-green { background: rgba(34,197,94,0.2); color: #86efac; }
+  .badge-blue { background: rgba(59,130,246,0.2); color: #93c5fd; }
+  .badge-orange { background: rgba(245,158,11,0.2); color: #fcd34d; }
+  .badge-red { background: rgba(239,68,68,0.2); color: #fca5a5; }
+  .badge-pink { background: rgba(236,72,153,0.2); color: #f9a8d4; }
+  .badge-cyan { background: rgba(6,182,212,0.2); color: #67e8f9; }
+
+  /* Cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s, transform 0.2s; }
+  .card:hover { border-color: var(--primary); transform: translateY(-2px); }
+  .card h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .card p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 12px; }
+  .card ul { list-style: none; padding: 0; }
+  .card ul li { font-size: 0.85rem; color: var(--text-muted); padding: 4px 0; padding-left: 18px; position: relative; }
+  .card ul li::before { content: "›"; position: absolute; left: 0; color: var(--primary); font-weight: bold; }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; margin: 20px 0; border-radius: 8px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { background: var(--surface2); color: var(--text); font-weight: 600; text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 16px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(99,102,241,0.05); }
+  code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; color: #c084fc; font-family: 'JetBrains Mono', monospace; }
+
+  /* Feature list */
+  .feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 20px; }
+  .feature-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .feature-item h4 { font-size: 0.95rem; margin-bottom: 6px; }
+  .feature-item p { font-size: 0.82rem; color: var(--text-muted); }
+
+  /* File tree */
+  .file-tree { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; line-height: 1.8; color: var(--text-muted); }
+  .file-tree .dir { color: var(--blue); }
+  .file-tree .file { color: var(--text); }
+  .file-tree .size { color: var(--text-muted); opacity: 0.6; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 2rem; }
+    .hero-stats { gap: 20px; }
+    .cards { grid-template-columns: 1fr; }
+    .feature-grid { grid-template-columns: 1fr; }
+  }
+
+  .flow-diagram { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  .flow-step { background: var(--surface2); border: 1px solid var(--border); padding: 8px 16px; border-radius: 8px; font-size: 0.82rem; }
+  .flow-arrow { color: var(--primary); font-weight: bold; }
+
+  .score-bar { height: 8px; border-radius: 4px; background: var(--surface2); margin-top: 6px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 4px; }
+
+  .endpoint-group { margin-bottom: 32px; }
+  .endpoint-group h4 { font-size: 0.95rem; color: var(--text); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .endpoint { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 0.82rem; }
+  .method { font-family: monospace; font-weight: 700; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
+  .method-post { background: rgba(34,197,94,0.2); color: #86efac; }
+  .method-get { background: rgba(59,130,246,0.2); color: #93c5fd; }
+  .endpoint-path { font-family: monospace; color: var(--text); }
+  .endpoint-desc { color: var(--text-muted); margin-left: auto; }
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="container">
+    <h1>&#9993; Steve Mail</h1>
+    <p class="subtitle">Plataforma completa de email marketing nativa para e-commerce. Documentación de todas las funciones del módulo.</p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="num">28</div><div class="label">Componentes Frontend</div></div>
+      <div class="hero-stat"><div class="num">25</div><div class="label">Rutas Backend</div></div>
+      <div class="hero-stat"><div class="num">46</div><div class="label">Endpoints API</div></div>
+      <div class="hero-stat"><div class="num">15</div><div class="label">Tablas DB</div></div>
+      <div class="hero-stat"><div class="num">3</div><div class="label">Edge Functions</div></div>
+      <div class="hero-stat"><div class="num">85+</div><div class="label">Acciones API</div></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ TOC ============ -->
+<nav class="toc">
+  <div class="container">
+    <div class="toc-inner">
+      <a href="#overview">Resumen</a>
+      <a href="#frontend">Frontend</a>
+      <a href="#campaigns">Campañas</a>
+      <a href="#flows">Automatizaciones</a>
+      <a href="#contacts">Contactos</a>
+      <a href="#forms">Formularios</a>
+      <a href="#analytics">Analítica</a>
+      <a href="#editor">Editor Visual</a>
+      <a href="#templates">Templates</a>
+      <a href="#ai">Inteligencia AI</a>
+      <a href="#domain">Dominios</a>
+      <a href="#tracking">Tracking</a>
+      <a href="#abtesting">A/B Testing</a>
+      <a href="#recommendations">Recomendaciones</a>
+      <a href="#alerts">Alertas Producto</a>
+      <a href="#queue">Cola de Envío</a>
+      <a href="#api">API Endpoints</a>
+      <a href="#database">Base de Datos</a>
+      <a href="#edge">Edge Functions</a>
+      <a href="#integrations">Integraciones</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ 1. OVERVIEW ============ -->
+<section id="overview">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#128640; Resumen General</h2>
+      <p>Steve Mail es un módulo de email marketing completo integrado en la plataforma Steve Ads, comparable a Klaviyo o Mailchimp, construido nativamente sobre React + Supabase + Cloud Run.</p>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3>&#127912; Creación</h3>
+        <p>Editor visual drag-and-drop, AI generativa, galería de templates profesionales.</p>
+        <ul>
+          <li>Editor GrapeJS Studio SDK</li>
+          <li>109KB de templates pre-built</li>
+          <li>14 categorías de plantillas</li>
+          <li>Bloques universales reutilizables</li>
+          <li>Merge tags personalizados</li>
+          <li>Contenido condicional por segmento</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128101; Audiencia</h3>
+        <p>Gestión completa de contactos, listas, segmentos y formularios de captura.</p>
+        <ul>
+          <li>Sync automático desde Shopify</li>
+          <li>Listas estáticas y segmentos dinámicos</li>
+          <li>Importación CSV</li>
+          <li>Formularios popup/slide-in/inline/full-page</li>
+          <li>Tags y campos personalizados</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#9889; Automatización</h3>
+        <p>Flujos automatizados con triggers de Shopify, branching condicional y delays.</p>
+        <ul>
+          <li>Carrito abandonado (3 emails)</li>
+          <li>Bienvenida (3 emails)</li>
+          <li>Post-compra (2 emails)</li>
+          <li>Win-back (3 emails)</li>
+          <li>Browse abandonment</li>
+          <li>Cumpleaños</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128200; Analítica</h3>
+        <p>Dashboard completo con métricas, heatmaps, atribución de revenue y benchmarks.</p>
+        <ul>
+          <li>Open/click/bounce/unsubscribe rates</li>
+          <li>Click heatmaps por enlace</li>
+          <li>Revenue attribution (CLP)</li>
+          <li>Deliverability dashboard</li>
+          <li>Benchmarks de industria</li>
+          <li>Health score 0-100</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#129302; Inteligencia AI</h3>
+        <p>Claude AI integrado para generación de contenido, evaluación de calidad y optimización.</p>
+        <ul>
+          <li>CRITERIO: evaluación de calidad (18 reglas)</li>
+          <li>ESPEJO: evaluación visual (5 dimensiones)</li>
+          <li>Generación MJML con Claude</li>
+          <li>A/B subject line variants</li>
+          <li>Smart Send Time optimization</li>
+          <li>Product recommendations engine</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128295; Infraestructura</h3>
+        <p>Envío vía Resend, tracking completo, cola con rate limiting, y limpieza automática.</p>
+        <ul>
+          <li>Resend API (Amazon SES)</li>
+          <li>Open pixel + click redirect tracking</li>
+          <li>HMAC-signed unsubscribe</li>
+          <li>Send queue con rate limiting</li>
+          <li>Cloud Tasks scheduling</li>
+          <li>List cleanup / sunset automático</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2. FRONTEND ============ -->
+<section id="frontend">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#128421; Arquitectura Frontend</h2>
+      <p>28 archivos de componentes React + TypeScript en <code>src/components/client-portal/email/</code></p>
+    </div>
+
+    <h3 style="margin-bottom:16px;">Estructura de Tabs Principal</h3>
+    <div class="flow-diagram">
+      <div class="flow-step"><strong>Steve Mail</strong></div>
+      <div class="flow-arrow">&#8594;</div>
+      <div class="flow-step">&#128231; Campañas</div>
+      <div class="flow-arrow">&#8594;</div>
+      <div class="flow-step">&#128101; Contactos</div>
+      <div class="flow-arrow">&#8594;</div>
+      <div class="flow-step">&#9889; Automatizaciones</div>
+      <div class="flow-arrow">&#8594;</div>
+      <div class="flow-step">&#128203; Formularios</div>
+      <div class="flow-arrow">&#8594;</div>
+      <div class="flow-step">&#128200; Rendimiento</div>
+    </div>
+
+    <div class="table-wrap" style="margin-top: 24px;">
+      <table>
+        <thead><tr><th>Archivo</th><th>Tamaño</th><th>Función</th><th>Tipo</th></tr></thead>
+        <tbody>
+          <tr><td><code>EmailMarketing.tsx</code></td><td>~5KB</td><td>Container principal con 5 tabs</td><td><span class="badge badge-purple">Core</span></td></tr>
+          <tr><td><code>CampaignBuilder.tsx</code></td><td>82KB</td><td>CRUD de campañas + editor multi-paso</td><td><span class="badge badge-purple">Core</span></td></tr>
+          <tr><td><code>FlowBuilder.tsx</code></td><td>35KB</td><td>Constructor de flujos automatizados</td><td><span class="badge badge-purple">Core</span></td></tr>
+          <tr><td><code>FlowCanvas.tsx</code></td><td>28KB</td><td>Canvas visual de pasos con branching</td><td><span class="badge badge-purple">Core</span></td></tr>
+          <tr><td><code>EmailAnalytics.tsx</code></td><td>27KB</td><td>Dashboard de analítica y métricas</td><td><span class="badge badge-purple">Core</span></td></tr>
+          <tr><td><code>SubscribersList.tsx</code></td><td>14KB</td><td>Gestión de suscriptores</td><td><span class="badge badge-purple">Core</span></td></tr>
+          <tr><td><code>ListsManager.tsx</code></td><td>30KB</td><td>Listas estáticas y segmentos dinámicos</td><td><span class="badge badge-purple">Core</span></td></tr>
+          <tr><td><code>FormBuilder.tsx</code></td><td>27KB</td><td>Constructor de formularios de captura</td><td><span class="badge badge-purple">Core</span></td></tr>
+          <tr><td><code>GrapesEmailEditor.tsx</code></td><td>12KB</td><td>Editor visual GrapeJS Studio SDK</td><td><span class="badge badge-blue">Editor</span></td></tr>
+          <tr><td><code>BlocksEditorWrapper.tsx</code></td><td>7.6KB</td><td>Wrapper del editor con interfaz UnlayerEditorRef</td><td><span class="badge badge-blue">Editor</span></td></tr>
+          <tr><td><code>EmailTemplateGallery.tsx</code></td><td>71KB</td><td>Galería de templates con 14 categorías</td><td><span class="badge badge-blue">Editor</span></td></tr>
+          <tr><td><code>ProductBlockPanel.tsx</code></td><td>20KB</td><td>Inserción de bloques de producto Shopify</td><td><span class="badge badge-blue">Editor</span></td></tr>
+          <tr><td><code>ConditionalBlockPanel.tsx</code></td><td>18KB</td><td>Contenido condicional por segmento/compras/ubicación</td><td><span class="badge badge-blue">Editor</span></td></tr>
+          <tr><td><code>UniversalBlocksPanel.tsx</code></td><td>16KB</td><td>Biblioteca de bloques reutilizables</td><td><span class="badge badge-blue">Editor</span></td></tr>
+          <tr><td><code>GlobalStylesPanel.tsx</code></td><td>13KB</td><td>Estilos globales de marca (colores, fuentes)</td><td><span class="badge badge-blue">Editor</span></td></tr>
+          <tr><td><code>ImageEditorPanel.tsx</code></td><td>8KB</td><td>Editor de imágenes para emails</td><td><span class="badge badge-blue">Editor</span></td></tr>
+          <tr><td><code>DomainSetup.tsx</code></td><td>15KB</td><td>Verificación de dominio SPF/DKIM/DMARC</td><td><span class="badge badge-green">Infra</span></td></tr>
+          <tr><td><code>SegmentBuilder.tsx</code></td><td>12KB</td><td>Constructor de filtros para segmentos</td><td><span class="badge badge-green">Infra</span></td></tr>
+          <tr><td><code>DeliverabilityDashboard.tsx</code></td><td>15KB</td><td>Monitoreo de entregabilidad</td><td><span class="badge badge-orange">Analytics</span></td></tr>
+          <tr><td><code>ABTestResultsPanel.tsx</code></td><td>16KB</td><td>Resultados de A/B testing</td><td><span class="badge badge-orange">Analytics</span></td></tr>
+          <tr><td><code>ClickHeatmapPanel.tsx</code></td><td>15KB</td><td>Heatmap de clicks por enlace</td><td><span class="badge badge-orange">Analytics</span></td></tr>
+          <tr><td><code>RevenueAttributionPanel.tsx</code></td><td>9KB</td><td>Atribución de revenue por campaña</td><td><span class="badge badge-orange">Analytics</span></td></tr>
+          <tr><td><code>IndustryBenchmarksPanel.tsx</code></td><td>11KB</td><td>Comparación con benchmarks de industria</td><td><span class="badge badge-orange">Analytics</span></td></tr>
+          <tr><td><code>ProductAlerts.tsx</code></td><td>13KB</td><td>Alertas back-in-stock y price-drop</td><td><span class="badge badge-pink">Feature</span></td></tr>
+          <tr><td><code>emailTemplates.ts</code></td><td>109KB</td><td>Datos de templates profesionales pre-built</td><td><span class="badge badge-cyan">Data</span></td></tr>
+          <tr><td><code>grapes-steve-blocks.ts</code></td><td>7KB</td><td>Bloques MJML personalizados para GrapeJS</td><td><span class="badge badge-cyan">Data</span></td></tr>
+          <tr><td><code>grapes-theme.ts</code></td><td>901B</td><td>Tema visual del editor GrapeJS</td><td><span class="badge badge-cyan">Data</span></td></tr>
+          <tr><td><code>steveMailMergeTags.ts</code></td><td>3.8KB</td><td>Definiciones de merge tags</td><td><span class="badge badge-cyan">Data</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. CAMPAIGNS ============ -->
+<section id="campaigns">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#128231; Campañas de Email</h2>
+      <p>Sistema completo de creación, envío y gestión de campañas con editor multi-paso, A/B testing y scheduling.</p>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3>&#128221; CRUD de Campañas</h3>
+        <p>Acciones disponibles via <code>/api/manage-email-campaigns</code></p>
+        <ul>
+          <li><code>list</code> — Listar campañas con filtro de status y paginación</li>
+          <li><code>get</code> — Obtener campaña por ID</li>
+          <li><code>create</code> — Crear campaña borrador (guarda en creative_history)</li>
+          <li><code>update</code> — Actualizar borrador/programada</li>
+          <li><code>delete</code> — Eliminar borrador o cancelada</li>
+          <li><code>send</code> — Enviar inmediatamente a audiencia filtrada</li>
+          <li><code>schedule</code> — Programar envío futuro via Cloud Tasks</li>
+          <li><code>cancel</code> — Cancelar campaña programada</li>
+          <li><code>get_client_brand</code> — Obtener info de marca para el editor</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128466; Editor Multi-Paso</h3>
+        <p>Flujo de creación en 4 pasos secuenciales.</p>
+        <div class="flow-diagram" style="margin:16px 0;">
+          <div class="flow-step">1. Setup</div>
+          <div class="flow-arrow">&#8594;</div>
+          <div class="flow-step">2. Design</div>
+          <div class="flow-arrow">&#8594;</div>
+          <div class="flow-step">3. Audience</div>
+          <div class="flow-arrow">&#8594;</div>
+          <div class="flow-step">4. Review</div>
+        </div>
+        <ul>
+          <li>Nombre, asunto, preview text, from name/email</li>
+          <li>Editor visual GrapeJS con templates</li>
+          <li>Filtro de audiencia: todos, lista, segmento</li>
+          <li>Vista previa desktop/mobile + revisión final</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128640; Tipos de Campaña</h3>
+        <p>6 tipos de campaña pre-configurados para diferentes objetivos.</p>
+        <ul>
+          <li><strong>Promocional</strong> — Ofertas y descuentos</li>
+          <li><strong>Newsletter</strong> — Contenido editorial</li>
+          <li><strong>Lanzamiento de Producto</strong> — Nuevos productos</li>
+          <li><strong>Temporada/Holiday</strong> — Eventos estacionales</li>
+          <li><strong>Anuncio</strong> — Novedades de la marca</li>
+          <li><strong>Restock/Back in Stock</strong> — Reposición de stock</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128270; Filtrado de Audiencia</h3>
+        <p>Selector de audiencia con 3 modos de targeting.</p>
+        <ul>
+          <li><strong>Todos</strong> — Todos los suscriptores activos</li>
+          <li><strong>Lista</strong> — Miembros de una lista específica</li>
+          <li><strong>Segmento</strong> — Filtro dinámico con condiciones</li>
+          <li>Excluye automáticamente unsubscribed/bounced</li>
+          <li>Soporte para legacy audience filters</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128272; Protección Gmail Clipping</h3>
+        <p>Detección automática de emails que exceden el límite de Gmail.</p>
+        <ul>
+          <li>Constante: <code>GMAIL_CLIP_LIMIT = 102KB</code></li>
+          <li>Warning visual si el HTML excede el límite</li>
+          <li>Gmail recorta emails >102KB mostrando "Ver mensaje completo"</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128197; Scheduling</h3>
+        <p>Programación de envío futuro via Google Cloud Tasks.</p>
+        <ul>
+          <li>Cola: <code>steve-mail</code> en Cloud Tasks</li>
+          <li>Ejecuta <code>/api/execute-scheduled-campaign</code></li>
+          <li>Envío con status tracking en tiempo real</li>
+          <li>Cancelación de campañas programadas</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. FLOWS ============ -->
+<section id="flows">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#9889; Automatizaciones (Flows)</h2>
+      <p>Motor de flujos automatizados con triggers de Shopify, branching condicional, delays y canvas visual.</p>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3>&#128722; Carrito Abandonado</h3>
+        <p>Trigger: <code>checkouts/create</code> (Shopify webhook)</p>
+        <ul>
+          <li>Email 1: Recordatorio suave (1 hora)</li>
+          <li>Email 2: Urgencia (24 horas)</li>
+          <li>Email 3: Descuento / última oportunidad (72 horas)</li>
+          <li>Merge tags: <code>{{ cart_url }}</code>, <code>{{ cart_total }}</code>, <code>{{ cart_items_count }}</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128075; Bienvenida</h3>
+        <p>Trigger: <code>customers/create</code> (Shopify webhook) o signup form</p>
+        <ul>
+          <li>Email 1: Bienvenida + historia de marca (inmediato)</li>
+          <li>Email 2: Mejores productos (48 horas)</li>
+          <li>Email 3: Incentivo primera compra (7 días)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128230; Post-Compra</h3>
+        <p>Trigger: <code>orders/create</code> (Shopify webhook)</p>
+        <ul>
+          <li>Email 1: Agradecimiento + tips de uso</li>
+          <li>Email 2: Solicitud de review + productos complementarios</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128148; Win-back</h3>
+        <p>Trigger: Cron job — clientes inactivos</p>
+        <ul>
+          <li>Email 1: Te extrañamos</li>
+          <li>Email 2: Novedades y qué hay de nuevo</li>
+          <li>Email 3: Descuento especial de reactivación</li>
+          <li>Cron endpoint: <code>/api/email-flow-cron-winback</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#127874; Cumpleaños</h3>
+        <p>Trigger: Cron job — fecha de cumpleaños del suscriptor</p>
+        <ul>
+          <li>Email automático con felicitación y oferta</li>
+          <li>Cron endpoint: <code>/api/email-flow-cron-birthday</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128065; Browse Abandonment</h3>
+        <p>Trigger: Tracking pixel de navegación</p>
+        <ul>
+          <li>Detecta productos visitados sin compra</li>
+          <li>Tracking endpoint: <code>/api/email-flow-track-browse</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin: 32px 0 16px;">Motor de Ejecución de Flujos</h3>
+    <div class="cards">
+      <div class="card">
+        <h3>&#9881; Flow Engine</h3>
+        <p>Endpoint: <code>/api/email-flow-execute</code> (Cloud Tasks)</p>
+        <ul>
+          <li>Soporta arrays planos (legacy) y árboles con branching</li>
+          <li>Tipos de step: <code>email</code>, <code>delay</code>, <code>condition</code></li>
+          <li>Branching condicional con paths: <code>yes_steps</code> / <code>no_steps</code></li>
+          <li>Step paths tipo árbol: <code>2.yes.0</code></li>
+          <li>Quiet hours: no envía en horarios de descanso</li>
+          <li>Verificación de status del enrollment</li>
+          <li>Verificación de status del subscriber</li>
+          <li>Completion automática al final del flow</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128268; Flow Webhooks</h3>
+        <p>Endpoint: <code>/api/email-flow-webhooks</code></p>
+        <ul>
+          <li>Recibe webhooks de Shopify con verificación HMAC</li>
+          <li>Topics: <code>checkouts/create</code>, <code>customers/create</code>, <code>orders/create</code></li>
+          <li>Identifica subscriber por email</li>
+          <li>Enrolla en flows activos matching trigger_type</li>
+          <li>Inserción duplicate-safe (constraint unique)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#127912; Canvas Visual</h3>
+        <p>Componente: <code>FlowCanvas.tsx</code> (28KB)</p>
+        <ul>
+          <li>Visualización gráfica de pasos del flow</li>
+          <li>Nodos de email, delay y condición</li>
+          <li>Branching visual con ramas yes/no</li>
+          <li>Drag-and-drop para reordenar pasos</li>
+          <li>Edición inline de contenido de cada paso</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5. CONTACTS ============ -->
+<section id="contacts">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#128101; Contactos y Segmentación</h2>
+      <p>Gestión completa de suscriptores con sync de Shopify, listas estáticas, segmentos dinámicos y exportación.</p>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3>&#128100; Gestión de Suscriptores</h3>
+        <p>Endpoints: <code>/api/sync-email-subscribers</code> + <code>/api/query-email-subscribers</code></p>
+        <ul>
+          <li><code>sync</code> — Sync completo desde Shopify customers (paginado)</li>
+          <li><code>add</code> — Agregar contacto manualmente</li>
+          <li><code>update</code> — Actualizar nombre, tags, status</li>
+          <li><code>delete</code> — Eliminar suscriptor</li>
+          <li><code>stats</code> — Estadísticas (total, subscribed, unsubscribed, by source)</li>
+          <li><code>list</code> — Listar con filtros (search, status, source, tags) + paginación</li>
+          <li><code>segment</code> — Query avanzado con condiciones arbitrarias</li>
+          <li><code>get</code> — Detalle de subscriber con últimos 50 eventos</li>
+          <li><code>export</code> — Exportar subscribers como JSON</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128203; Listas y Segmentos</h3>
+        <p>Endpoint: <code>/api/manage-email-lists</code></p>
+        <ul>
+          <li><code>list</code> — Listar todas las listas/segmentos con member counts</li>
+          <li><code>create</code> — Crear lista (static) o segmento (dynamic)</li>
+          <li><code>update</code> — Actualizar nombre, descripción o filtros</li>
+          <li><code>delete</code> — Eliminar lista</li>
+          <li><code>add_members</code> — Agregar subscribers a lista estática</li>
+          <li><code>remove_members</code> — Quitar subscribers de lista</li>
+          <li><code>get_members</code> — Obtener miembros paginados</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#127919; Segmentos Pre-configurados</h3>
+        <p>Templates de segmento listos para usar.</p>
+        <ul>
+          <li><strong>Compradores frecuentes</strong> — 3+ órdenes</li>
+          <li><strong>Clientes VIP</strong> — $100,000+ CLP total gastado</li>
+          <li><strong>Nuevos clientes</strong> — Registrados últimos 30 días</li>
+          <li><strong>Inactivos</strong> — Sin engagement en N días</li>
+          <li><strong>Por engagement</strong> — Basado en aperturas/clicks</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128296; Segment Builder</h3>
+        <p>Componente: <code>SegmentBuilder.tsx</code></p>
+        <ul>
+          <li>Filtros con patrón: field + operator + value</li>
+          <li>Campos: status, source, tags, total_orders, total_spent, last_order_at</li>
+          <li>Operadores: equals, contains, greater_than, less_than, in, before, after</li>
+          <li>Modo <code>count_only</code> para preview del tamaño</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128465; List Cleanup / Sunset</h3>
+        <p>Endpoint: <code>/api/email-list-cleanup</code></p>
+        <ul>
+          <li><code>detect/preview</code> — Encontrar suscriptores con 0 engagement en N días (default 90)</li>
+          <li><code>sunset</code> — Tagear inactivos con "sunset", opcionalmente unsubscribe</li>
+          <li><code>reactivate</code> — Quitar tag "sunset" de re-engageados (últimos 30 días)</li>
+          <li><code>stats</code> — Estadísticas de limpieza</li>
+          <li>Categoriza: "never engaged" vs "lapsed"</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128196; Merge Tags Disponibles</h3>
+        <p>7 categorías de merge tags con sintaxis <code>{{ tag }}</code></p>
+        <ul>
+          <li><strong>Contacto:</strong> nombre, apellido, nombre_completo, email</li>
+          <li><strong>Tienda:</strong> empresa, tienda_url, color_marca</li>
+          <li><strong>Compras:</strong> total_orders, total_spent, last_order_date</li>
+          <li><strong>Carrito:</strong> cart_url, cart_total, cart_items_count, cart_first_item_name</li>
+          <li><strong>Productos:</strong> product_recommendations, discount_code, product_name/price/image</li>
+          <li><strong>Suscripción:</strong> unsubscribe_url, subscriber_tags</li>
+          <li><strong>Fechas:</strong> current_date, current_month, current_year</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6. FORMS ============ -->
+<section id="forms">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#128203; Formularios de Captura</h2>
+      <p>Constructor de formularios de signup con 4 tipos, trigger rules, incentivos y widgets embebibles.</p>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3>&#128736; Tipos de Formulario</h3>
+        <p>4 formatos de captura para diferentes contextos.</p>
+        <ul>
+          <li><strong>Popup</strong> — Ventana modal centrada</li>
+          <li><strong>Slide-in</strong> — Panel deslizante lateral</li>
+          <li><strong>Inline (Barra)</strong> — Integrado en el contenido</li>
+          <li><strong>Full Page</strong> — Página completa de captura</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#127912; Personalización del Diseño</h3>
+        <p>Campos configurables del formulario.</p>
+        <ul>
+          <li>Headline y descripción</li>
+          <li>Texto y color del botón</li>
+          <li>Color de fondo y color de texto</li>
+          <li>Mostrar/ocultar campo de nombre</li>
+          <li>Mostrar/ocultar campo de teléfono</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#127919; Trigger Rules</h3>
+        <p>Reglas de activación del formulario.</p>
+        <ul>
+          <li><strong>Exit intent</strong> — Al intentar salir de la página</li>
+          <li><strong>Scroll depth</strong> — Al scrollear X% de la página</li>
+          <li><strong>Time on page</strong> — Después de N segundos</li>
+          <li><strong>Page URL filter</strong> — Solo en URLs específicas</li>
+          <li><strong>Frecuencia:</strong> una vez, por sesión, o siempre</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#127873; Incentivos</h3>
+        <p>Motivación para el signup del visitante.</p>
+        <ul>
+          <li><strong>Ninguno</strong> — Sin incentivo</li>
+          <li><strong>Código de descuento</strong> — Crea cupón en Shopify automáticamente</li>
+          <li><strong>Envío gratis</strong> — Free shipping incentive</li>
+          <li>Tags automáticos asignados al nuevo suscriptor</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128187; Widgets Embebibles</h3>
+        <p>Scripts JavaScript para instalar en tiendas Shopify.</p>
+        <ul>
+          <li>Endpoint público: <code>GET /api/email-form-widget</code></li>
+          <li>Sirve JS que renderiza el formulario en la tienda</li>
+          <li>Instalación automática como Shopify ScriptTag</li>
+          <li>Submit público: <code>POST /api/email-signup-form-public</code></li>
+          <li>Tracking de views y submissions por formulario</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128202; API de Formularios</h3>
+        <p>Endpoint: <code>/api/email-signup-forms</code></p>
+        <ul>
+          <li><code>list</code> — Listar todos los formularios</li>
+          <li><code>create</code> — Crear formulario con diseño y trigger rules</li>
+          <li><code>update</code> — Actualizar configuración</li>
+          <li><code>delete</code> — Eliminar (también quita ScriptTag de Shopify)</li>
+          <li><code>activate</code> — Activar e instalar ScriptTag</li>
+          <li><code>pause</code> — Pausar y quitar ScriptTag</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7. ANALYTICS ============ -->
+<section id="analytics">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#128200; Analítica y Rendimiento</h2>
+      <p>Dashboard completo con métricas de campaña, deliverability, heatmaps, revenue attribution y benchmarks de industria.</p>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3>&#128202; Campaign Analytics</h3>
+        <p>Endpoint: <code>/api/email-campaign-analytics</code></p>
+        <ul>
+          <li><code>overview</code> — Resumen de todas las campañas en N días</li>
+          <li><code>campaign-stats</code> — Stats detallados por campaña (sent, delivered, opened, clicked, bounced, complained, unsubscribed, converted + rates + top links + revenue)</li>
+          <li><code>timeline</code> — Datos temporales para gráficos de línea</li>
+          <li><code>click_heatmap</code> — Distribución de clicks por enlace</li>
+          <li><code>deliverability_dashboard</code> — Métricas de entregabilidad</li>
+          <li><code>industry_benchmarks</code> — Comparación con la industria</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#129505; Health Score (0-100)</h3>
+        <p>Score compuesto de salud del email calculado en el frontend.</p>
+        <ul>
+          <li><strong>Open rate</strong> (peso 40%) — 25%+ = score perfecto</li>
+          <li><strong>Bounce rate</strong> (peso 30%) — &lt;5% = score perfecto</li>
+          <li><strong>Unsubscribe rate</strong> (peso 30%) — &lt;2% = score perfecto</li>
+          <li>Indicadores visuales con colores por rango</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128293; Click Heatmap</h3>
+        <p>Componente: <code>ClickHeatmapPanel.tsx</code></p>
+        <ul>
+          <li>Datos por enlace: URL, texto, clicks, unique_clicks, porcentaje</li>
+          <li><strong>Hot</strong> (&ge;80%) — Link más clickeado</li>
+          <li><strong>Warm</strong> (&ge;50%) — Buen engagement</li>
+          <li><strong>Mild</strong> (&ge;20%) — Engagement medio</li>
+          <li><strong>Cold</strong> (&lt;20%) — Bajo engagement</li>
+          <li>Overlay visual sobre el HTML del email</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128176; Revenue Attribution</h3>
+        <p>Endpoint: <code>/api/email-revenue-attribution</code></p>
+        <ul>
+          <li><code>campaign_revenue</code> — Revenue por campaña específica</li>
+          <li><code>revenue_summary</code> — Resumen de revenue de todas las campañas</li>
+          <li>Ventana de atribución: 7 días post-envío</li>
+          <li>Match por email del suscriptor con órdenes Shopify</li>
+          <li>Métricas: total_revenue, total_orders, AOV, conversion_rate</li>
+          <li>Desglose: conversiones por día + top productos</li>
+          <li>Formato: Pesos Chilenos (CLP)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128203; Deliverability Dashboard</h3>
+        <p>Componente: <code>DeliverabilityDashboard.tsx</code></p>
+        <ul>
+          <li>Health score (0-100) de entregabilidad</li>
+          <li>Volúmenes: sent, delivered, bounced, complained</li>
+          <li>Rates: delivery, bounce, complaint, open</li>
+          <li>Inbox placement: <code>likely_inbox</code>, <code>mixed</code>, <code>likely_spam</code></li>
+          <li>Spam score: <code>good</code>, <code>warning</code>, <code>critical</code></li>
+          <li>Desglose: hard bounces vs soft bounces</li>
+          <li>Health por dominio: SPF, DKIM, DMARC status</li>
+          <li>Trend data: serie temporal por fecha</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#127942; Industry Benchmarks</h3>
+        <p>Componente: <code>IndustryBenchmarksPanel.tsx</code></p>
+        <ul>
+          <li>Comparación con 3 verticales: E-commerce, Retail, SaaS</li>
+          <li>Métricas comparadas: open_rate, click_rate, bounce_rate, unsubscribe_rate, conversion_rate</li>
+          <li>Benchmarks top-performer (best-in-class)</li>
+          <li>Estimación de percentil del cliente</li>
+          <li>Indicadores de tendencia: mejorando vs declinando</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 8. EDITOR ============ -->
+<section id="editor">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#127912; Editor Visual de Emails</h2>
+      <p>Editor drag-and-drop basado en GrapeJS Studio SDK con bloques personalizados, estilos de marca y localización en español.</p>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3>&#128295; GrapeJS Studio SDK</h3>
+        <p>Componente: <code>GrapesEmailEditor.tsx</code></p>
+        <ul>
+          <li>Editor visual WYSIWYG para emails</li>
+          <li>Licencia configurable via <code>VITE_GRAPESJS_LICENSE_KEY</code></li>
+          <li>Tema Steve personalizado (<code>getSteveTheme()</code>)</li>
+          <li>Bloques Steve registrados (<code>registerSteveBlocks()</code>)</li>
+          <li>Localización completa en español</li>
+          <li>Prop <code>brandColor</code> para consistencia de marca</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128268; API del Editor (UnlayerEditorRef)</h3>
+        <p>Interfaz expuesta para control programático.</p>
+        <ul>
+          <li><code>getHtml()</code> — Exportar HTML final</li>
+          <li><code>getProjectData()</code> — Exportar design JSON</li>
+          <li><code>loadDesign(design)</code> — Cargar diseño existente</li>
+          <li><code>setHtml(html)</code> — Establecer HTML raw</li>
+          <li><code>insertHtml(html)</code> — Insertar snippet en cursor</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128230; Bloques Steve (MJML)</h3>
+        <p>Archivo: <code>grapes-steve-blocks.ts</code></p>
+        <ul>
+          <li><strong>Producto</strong> — Imagen + nombre + precio + botón comprar</li>
+          <li><strong>Recomendados</strong> — Feed dinámico con <code>data-steve-products</code></li>
+          <li><strong>Cupón</strong> — Código de descuento con descripción y CTA</li>
+          <li><strong>Logo</strong> — Bloque de logo de marca</li>
+          <li>Cada bloque usa MJML y tiene icono SVG propio</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#127463; Contenido Condicional</h3>
+        <p>Componente: <code>ConditionalBlockPanel.tsx</code></p>
+        <ul>
+          <li>Show/hide bloques según datos del subscriber</li>
+          <li>Serialización a <code>data-steve-condition</code> HTML attributes</li>
+          <li><strong>Segmento</strong> — Por segmento del subscriber</li>
+          <li><strong>Compras</strong> — Por historial de compras</li>
+          <li><strong>Ubicación</strong> — Por datos geográficos</li>
+          <li><strong>Custom</strong> — Por campos personalizados</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#127912; Estilos Globales de Marca</h3>
+        <p>Componente: <code>GlobalStylesPanel.tsx</code></p>
+        <ul>
+          <li>Color primario y secundario de marca</li>
+          <li>Font de marca (13 web-safe fonts disponibles)</li>
+          <li>Logo URL y nombre de marca</li>
+          <li>Aplicación directa al editor via ref</li>
+          <li>Color picker con Popover</li>
+          <li>Fonts: Arial, Georgia, Verdana, Trebuchet, Times, Courier, Tahoma, Inter, Roboto, Open Sans, Lato, Montserrat, Poppins</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128444; Bloques Universales Reutilizables</h3>
+        <p>Endpoint: <code>/api/universal-blocks</code></p>
+        <ul>
+          <li><code>list</code> — Listar bloques del cliente (por usage_count)</li>
+          <li><code>save</code> — Guardar nuevo bloque (name, category, block_json)</li>
+          <li><code>update</code> — Actualizar bloque existente</li>
+          <li><code>delete</code> — Eliminar bloque</li>
+          <li><code>increment_usage</code> — Incrementar contador de uso</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 9. TEMPLATES ============ -->
+<section id="templates">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#128196; Galería de Templates</h2>
+      <p>Biblioteca de plantillas profesionales con 14 categorías, templates del sistema y templates personalizados.</p>
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature-item"><h4>&#128722; E-commerce</h4><p>Templates para tiendas online con productos, precios y CTAs de compra.</p></div>
+      <div class="feature-item"><h4>&#128075; Bienvenida</h4><p>Emails de onboarding para nuevos suscriptores.</p></div>
+      <div class="feature-item"><h4>&#127873; Promoción</h4><p>Ofertas, descuentos y campañas promocionales.</p></div>
+      <div class="feature-item"><h4>&#128240; Newsletter</h4><p>Contenido editorial y novedades de la marca.</p></div>
+      <div class="feature-item"><h4>&#128722; Carrito</h4><p>Recuperación de carritos abandonados.</p></div>
+      <div class="feature-item"><h4>&#128148; Win-back</h4><p>Reactivación de clientes inactivos.</p></div>
+      <div class="feature-item"><h4>&#128230; Post-compra</h4><p>Agradecimiento, tips y cross-sell.</p></div>
+      <div class="feature-item"><h4>&#11088; Reviews</h4><p>Solicitud de reseñas de productos.</p></div>
+      <div class="feature-item"><h4>&#128276; Back in Stock</h4><p>Notificación de reposición de productos.</p></div>
+      <div class="feature-item"><h4>&#127874; Cumpleaños</h4><p>Felicitaciones con ofertas personalizadas.</p></div>
+      <div class="feature-item"><h4>&#128640; Lanzamiento</h4><p>Nuevos productos y colecciones.</p></div>
+      <div class="feature-item"><h4>&#127876; Temporada</h4><p>Eventos estacionales y holidays.</p></div>
+      <div class="feature-item"><h4>&#128196; Todas</h4><p>Vista completa de todas las categorías.</p></div>
+      <div class="feature-item"><h4>&#128100; Mis Plantillas</h4><p>Templates personalizados guardados por el usuario.</p></div>
+    </div>
+
+    <h3 style="margin: 32px 0 16px;">API de Templates</h3>
+    <div class="cards">
+      <div class="card">
+        <h3>&#128202; Operaciones</h3>
+        <p>Endpoint: <code>/api/email-templates</code></p>
+        <ul>
+          <li><code>list</code> — System templates + custom templates (filtrable por categoría, industria, tipo)</li>
+          <li><code>get</code> — Obtener template por ID</li>
+          <li><code>create</code> — Crear template personalizado</li>
+          <li><code>delete</code> — Eliminar template custom (system templates no se pueden borrar)</li>
+          <li><code>seed</code> — Sembrar templates del sistema (idempotente, admin)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 10. AI ============ -->
+<section id="ai">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#129302; Inteligencia Artificial</h2>
+      <p>4 sistemas de AI integrados: generación de contenido, evaluación de calidad (CRITERIO), evaluación visual (ESPEJO) y recomendaciones de producto.</p>
+    </div>
+
+    <div class="cards">
+      <div class="card" style="border-color: var(--primary);">
+        <h3>&#9997; Generación de Contenido AI</h3>
+        <p>Endpoint: <code>/api/generate-steve-mail-content</code> — Claude Sonnet 4.6, 8000 tokens, 4min timeout</p>
+        <ul>
+          <li><code>generate_campaign_html</code> — Email MJML completo con header, greeting personalizado, 5-6 secciones, CTA, footer legal</li>
+          <li><code>generate_flow_emails</code> — Secuencia multi-email con estrategias por tipo de flow</li>
+          <li><code>generate_subjects</code> — N variantes de subject + preview con estrategias (urgencia, curiosidad, beneficio, social proof)</li>
+          <li>Carga contexto de marca: buyer persona, catálogo Shopify (20 productos), info del cliente, knowledge base</li>
+          <li>System prompt: "Steve, experto en email marketing" — siempre en español, mobile-first, MJML válido</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color: var(--orange);">
+        <h3>&#9878; CRITERIO — Quality Gate</h3>
+        <p>Endpoint: <code>/api/criterio-email</code> — Motor de reglas determinístico (no LLM)</p>
+        <ul>
+          <li><strong>EMAIL SUBJECT (6 reglas):</strong> max 50 chars, min 15 chars, preview text 40-130 chars, sin spam words, sin ALL CAPS (&lt;40%), max 2 emojis, distinto a últimos 5</li>
+          <li><strong>EMAIL BODY (8 reglas):</strong> CTA presente, link unsubscribe, 50-500 palabras, alt text en imágenes, sin JavaScript, max-width 600px, solo HTTPS, UTM parameters</li>
+          <li><strong>TIMING (3 reglas):</strong> hora 8-21, mín 3 días entre envíos, timezone America/Santiago</li>
+          <li><strong>SEGMENT (2 reglas):</strong> excluir unsubscribed, mín 100 recipients</li>
+          <li>Output: <code>can_publish</code> (boolean) + <code>score</code> (numérico) + <code>failed_rules</code></li>
+          <li>Si falla: crea tarea automática en tabla <code>tasks</code> con prioridad critical/high</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color: var(--pink);">
+        <h3>&#128065; ESPEJO — Evaluación Visual</h3>
+        <p>Endpoint: <code>/api/espejo</code> — Claude Sonnet 4.6 Vision, 600 tokens</p>
+        <ul>
+          <li><strong>MOBILE (1-10):</strong> texto legible (min 14px), alt text, CTA visible sin scroll, botones clickeables (min 44px)</li>
+          <li><strong>LAYOUT (1-10):</strong> jerarquía visual, espaciado, alineación, max-width ~600px</li>
+          <li><strong>BRAND (1-10):</strong> match de colores, logo presente, tono visual coherente</li>
+          <li><strong>CTA (1-10):</strong> botón visible y contrastante, texto de acción claro</li>
+          <li><strong>PRODUCTS (1-10):</strong> imagen de producto, precios visibles, nombres legibles</li>
+          <li>Umbral: overall &ge; 7 para pasar. <strong>Bloquea envío si no pasa.</strong></li>
+          <li>Criterios dinámicos aprendidos de <code>steve_knowledge</code></li>
+          <li>Si falla: crea tarea automática prioridad alta, squad marketing</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color: var(--cyan);">
+        <h3>&#128300; Edge Function: AI Content</h3>
+        <p>Edge Function: <code>steve-email-content</code> — Claude Sonnet 4.6, 4000 tokens</p>
+        <ul>
+          <li><code>generate_subject</code> — 5 subjects (&lt;50 chars) + 5 preview texts (&lt;90 chars)</li>
+          <li><code>generate_copy</code> — Body completo (title, intro, CTA, secciones)</li>
+          <li><code>analyze_content</code> — Score 0-100 en 9 criterios</li>
+          <li><code>generate_ab_variants</code> — N variantes A/B con diferentes estrategias</li>
+          <li><code>generate_flow_emails</code> — Secuencia completa para flows</li>
+          <li><code>chat</code> — Asesor conversacional con 10+ best practices</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color: var(--green);">
+        <h3>&#128300; Edge Function: Parse Email HTML</h3>
+        <p>Edge Function: <code>parse-email-html</code> — Claude Sonnet, 8000 tokens</p>
+        <ul>
+          <li>Convierte HTML raw a bloques JSON estructurados</li>
+          <li>12 tipos de bloque: image, text, button, product, divider, spacer, social_links, header_bar, coupon, review, html</li>
+          <li>Detecta variables Klaviyo (<code>{{ Title }}</code>, <code>{{ Price }}</code>)</li>
+          <li>Convierte a <code>productMode: "dynamic"</code> cuando detecta variables</li>
+          <li>Usado para importar emails HTML existentes al editor visual</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color: var(--blue);">
+        <h3>&#128640; Smart Send Time</h3>
+        <p>Endpoint: <code>/api/email-smart-send-time</code> — Algoritmo estadístico (no LLM)</p>
+        <ul>
+          <li><code>analyze</code> — Calcula hora óptima (UTC) por subscriber basada en historial de opens</li>
+          <li>Individual: 3+ opens = predicción personalizada</li>
+          <li>Fallback: promedio global del cliente</li>
+          <li>Batch updates de 50 en 50</li>
+          <li><code>get_distribution</code> — Distribución horaria de opens</li>
+          <li><code>get_settings</code> / <code>update_settings</code> — Config de smart send</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 11. DOMAIN ============ -->
+<section id="domain">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#128274; Verificación de Dominio</h2>
+      <p>Autenticación de dominio de envío con SPF, DKIM y DMARC via Resend API.</p>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <h3>&#128268; API de Dominio</h3>
+        <p>Endpoint: <code>/api/verify-email-domain</code></p>
+        <ul>
+          <li><code>initiate</code> — Iniciar verificación en Resend, genera DNS records</li>
+          <li><code>check</code> — Verificar status via Resend API, actualiza SPF/DKIM/DMARC</li>
+          <li><code>list</code> — Listar dominios del cliente</li>
+          <li><code>delete</code> — Eliminar dominio de verificación</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128203; DNS Records Generados</h3>
+        <p>3 registros DNS requeridos para autenticación completa.</p>
+        <ul>
+          <li><strong>SPF</strong> (TXT): <code>v=spf1 include:amazonses.com ~all</code></li>
+          <li><strong>DKIM</strong> (CNAME): Apunta a infraestructura DKIM de Resend</li>
+          <li><strong>DMARC</strong> (TXT): Política de quarantine</li>
+          <li>Copy-to-clipboard para cada valor DNS</li>
+          <li>Indicadores de status: verified, pending, failed</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 12. TRACKING ============ -->
+<section id="tracking">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#128269; Tracking y Eventos</h2>
+      <p>Sistema completo de tracking de opens, clicks, bounces y unsubscribes con HMAC security.</p>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <h3>&#128065; Open Tracking</h3>
+        <p>Endpoint: <code>GET /api/email-track/open?eid=EVENT_ID</code></p>
+        <ul>
+          <li>Sirve GIF transparente 1x1 pixel</li>
+          <li>Registra evento "opened" (fire-and-forget)</li>
+          <li>Actualiza <code>last_engaged_at</code> del subscriber</li>
+          <li>Inyectado automáticamente antes de <code>&lt;/body&gt;</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128433; Click Tracking</h3>
+        <p>Endpoint: <code>GET /api/email-track/click?eid=EVENT_ID&amp;url=ENCODED_URL</code></p>
+        <ul>
+          <li>Registra evento "clicked" con URL destino</li>
+          <li>Redirect 302 a la URL original</li>
+          <li>Validación de protocolo (previene open redirect attacks)</li>
+          <li>Actualiza <code>last_engaged_at</code> del subscriber</li>
+          <li>Wrapping automático de todos los <code>&lt;a href&gt;</code> con UTM params</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128165; SES Webhooks</h3>
+        <p>Endpoint: <code>POST /api/email-ses-webhooks</code></p>
+        <ul>
+          <li>Maneja notificaciones SNS de Amazon SES</li>
+          <li>Tipos: bounces, complaints, deliveries</li>
+          <li>Confirmación automática de suscripción SNS</li>
+          <li>Actualiza status del subscriber según evento</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128275; Unsubscribe</h3>
+        <p>Endpoint: <code>GET /api/email-unsubscribe?token=TOKEN</code></p>
+        <ul>
+          <li>Token HMAC-signed para seguridad</li>
+          <li>Marca subscriber como unsubscribed</li>
+          <li>Registra evento de unsubscribe</li>
+          <li>Cancela enrollments activos de flows</li>
+          <li>Renderiza página HTML de confirmación con branding</li>
+          <li>Footer unsubscribe agregado automáticamente a todos los emails</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128203; Tipos de Evento</h3>
+        <p>8 tipos de evento trackeados en <code>email_events</code>.</p>
+        <ul>
+          <li><code>sent</code> — Email enviado exitosamente</li>
+          <li><code>delivered</code> — Confirmación de entrega (SES)</li>
+          <li><code>opened</code> — Apertura detectada (tracking pixel)</li>
+          <li><code>clicked</code> — Click en enlace (redirect)</li>
+          <li><code>bounced</code> — Rebote (hard/soft via SES)</li>
+          <li><code>complained</code> — Marcado como spam (SES)</li>
+          <li><code>unsubscribed</code> — Desuscripción</li>
+          <li><code>converted</code> — Conversión (compra atribuida)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128200; Envío de Email</h3>
+        <p>Función core: <code>sendSingleEmail()</code></p>
+        <ul>
+          <li>Envío via Resend API (Amazon SES)</li>
+          <li>Crea evento tracking antes de enviar</li>
+          <li>Inyecta open-tracking pixel</li>
+          <li>Wraps links para click tracking</li>
+          <li>Agrega UTM parameters a links</li>
+          <li>Appends footer con link de unsubscribe</li>
+          <li>Genera token HMAC-signed para unsubscribe</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 13. A/B TESTING ============ -->
+<section id="abtesting">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#128300; A/B Testing</h2>
+      <p>Sistema completo de A/B testing para subject lines con selección automática de ganador.</p>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <h3>&#9881; API de A/B Testing</h3>
+        <p>Endpoint: <code>/api/email-ab-testing</code></p>
+        <ul>
+          <li><code>create_test</code> — Crear test con variant B (subject, preview, HTML), test %, winning metric, duración</li>
+          <li><code>get_test</code> — Obtener config del test para una campaña</li>
+          <li><code>get_results</code> — Resultados con stats por variante (sent, opens, clicks, conversions, revenue, rates)</li>
+          <li><code>delete_test</code> — Eliminar test</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128202; Configuración</h3>
+        <p>Parámetros del A/B test.</p>
+        <ul>
+          <li><strong>Test percentage:</strong> 5-50% (default 20%)</li>
+          <li><strong>Duration:</strong> 1-72 horas (default 4h)</li>
+          <li><strong>Winning metric:</strong> <code>open_rate</code>, <code>click_rate</code>, o <code>revenue</code></li>
+          <li>Selección automática de ganador via Cloud Tasks</li>
+          <li>Endpoint: <code>/api/execute-ab-test-winner</code></li>
+          <li>Envío del ganador al resto de la audiencia</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 14. RECOMMENDATIONS ============ -->
+<section id="recommendations">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#127919; Recomendaciones de Producto</h2>
+      <p>Motor de recomendaciones con 7 estrategias y scoring multi-señal para personalización de emails.</p>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <h3>&#128202; API de Recomendaciones</h3>
+        <p>Endpoint: <code>/api/email-product-recommendations</code></p>
+        <ul>
+          <li><code>list_products</code> — Catálogo completo para el product picker</li>
+          <li><code>search_products</code> — Buscar por nombre/handle/type</li>
+          <li><code>generate</code> — Generar bloque HTML de recomendaciones personalizado</li>
+          <li><code>preview</code> — Preview de grid de productos</li>
+          <li><code>clear_cache</code> — Limpiar cache de productos del cliente</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#127919; 7 Estrategias de Recomendación</h3>
+        <p>Tipos disponibles en <code>RecommendationConfig.type</code>.</p>
+        <ul>
+          <li><strong>best_sellers</strong> — Por conversiones globales</li>
+          <li><strong>new_arrivals</strong> — Por posición en catálogo (recencia)</li>
+          <li><strong>complementary</strong> — Via Shopify Recommendations API</li>
+          <li><strong>personalized</strong> — Scoring multi-señal (algoritmo principal)</li>
+          <li><strong>not_purchased</strong> — Productos no comprados, por popularidad</li>
+          <li><strong>recently_viewed</strong> — Basado en historial de clicks</li>
+          <li><strong>abandoned_cart</strong> — Recomendaciones basadas en carrito</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128202; Scoring Multi-Señal (0-7 pts)</h3>
+        <p>Algoritmo de scoring para recomendaciones personalizadas.</p>
+        <ul>
+          <li><strong>+3 pts</strong> — Misma categoría que compras previas</li>
+          <li><strong>+2 pts</strong> — Producto similar clickeado previamente</li>
+          <li><strong>+1 pt</strong> — Producto popular (1+ conversiones globales)</li>
+          <li><strong>+1 pt</strong> — Producto nuevo (top 25% del catálogo)</li>
+          <li><strong>Desempate:</strong> mayor precio primero</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128260; Cadena de Fallback</h3>
+        <p>Estrategia de degradación cuando faltan datos.</p>
+        <ul>
+          <li>1. Scoring personalizado (si hay historial de compras)</li>
+          <li>2. Best sellers (si no hay historial, usa conversiones globales)</li>
+          <li>3. Mayor precio (si no hay datos de conversión)</li>
+          <li>4. Productos más nuevos (si el subscriber ya compró todo)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 15. ALERTS ============ -->
+<section id="alerts">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#128276; Alertas de Producto</h2>
+      <p>Sistema de alertas back-in-stock y price-drop con widgets embebibles para tiendas Shopify.</p>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <h3>&#128202; API de Alertas</h3>
+        <p>Endpoint: <code>/api/email-product-alerts</code></p>
+        <ul>
+          <li><code>subscribe</code> — (Público) Suscribir a alerta back-in-stock o price-drop</li>
+          <li><code>list</code> — Listar alertas con filtros (status, tipo, producto) + paginación</li>
+          <li><code>get_stats</code> — Conteos agrupados por tipo y status</li>
+          <li><code>delete</code> — Cancelar alerta específica</li>
+          <li><code>trigger_check</code> — Verificar stock/precio y enviar notificaciones</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128187; Widget de Alertas</h3>
+        <p>Script embebible para tiendas.</p>
+        <ul>
+          <li>Endpoint: <code>GET /api/email-product-alert-widget</code></li>
+          <li>JavaScript que renderiza botón de suscripción en páginas de producto</li>
+          <li>Dos tipos: <strong>Back in Stock</strong> y <strong>Price Drop</strong></li>
+          <li>Statuses: active, triggered, cancelled, expired</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 16. QUEUE ============ -->
+<section id="queue">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#128295; Cola de Envío</h2>
+      <p>Sistema de envío throttleado con rate limiting, prioridades, smart send time y reintentos.</p>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <h3>&#128202; API de Cola</h3>
+        <p>Endpoint: <code>/api/email-send-queue</code></p>
+        <ul>
+          <li><code>enqueue</code> — Agregar emails a la cola (integra smart send time)</li>
+          <li><code>process</code> — Procesar cola respetando rate limits (cron/Cloud Task)</li>
+          <li><code>status</code> — Estado de la cola por campaña o cliente</li>
+          <li><code>cancel</code> — Cancelar emails encolados de una campaña</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#9881; Configuración por Cliente</h3>
+        <p>Tabla: <code>email_send_settings</code></p>
+        <ul>
+          <li><strong>rate_limit_per_hour:</strong> 500 (default)</li>
+          <li><strong>smart_send_enabled:</strong> true (default)</li>
+          <li><strong>auto_cleanup_enabled:</strong> true (default)</li>
+          <li><strong>sunset_days:</strong> 90 (default)</li>
+          <li>Prioridad: 1 (máxima) a 10 (mínima), default 5</li>
+          <li>Reintentos: max 3 intentos por email</li>
+          <li>Status: queued → processing → sent/failed/cancelled</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 17. API ENDPOINTS ============ -->
+<section id="api">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#128268; Todos los API Endpoints</h2>
+      <p>46 endpoints organizados por categoría. Autenticados via JWT excepto los marcados como públicos.</p>
+    </div>
+
+    <div class="endpoint-group">
+      <h4>&#128272; Endpoints Autenticados (JWT requerido)</h4>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/send-email</span><span class="endpoint-desc">Enviar email individual</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/sync-email-subscribers</span><span class="endpoint-desc">Sync de suscriptores desde Shopify</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/manage-email-campaigns</span><span class="endpoint-desc">CRUD de campañas + send + schedule</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/manage-email-flows</span><span class="endpoint-desc">CRUD de flujos automatizados</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/query-email-subscribers</span><span class="endpoint-desc">Query/filtro de suscriptores</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/manage-email-lists</span><span class="endpoint-desc">CRUD de listas y segmentos</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/verify-email-domain</span><span class="endpoint-desc">Verificación de dominio</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-campaign-analytics</span><span class="endpoint-desc">Analytics de campañas</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/generate-steve-mail-content</span><span class="endpoint-desc">Generación AI de contenido</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/upload-email-image</span><span class="endpoint-desc">Upload de imágenes</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-product-recommendations</span><span class="endpoint-desc">Recomendaciones de producto</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-templates</span><span class="endpoint-desc">CRUD de templates</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/universal-blocks</span><span class="endpoint-desc">Bloques reutilizables</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-ab-testing</span><span class="endpoint-desc">A/B testing</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-revenue-attribution</span><span class="endpoint-desc">Atribución de revenue</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-signup-forms</span><span class="endpoint-desc">CRUD de formularios</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-smart-send-time</span><span class="endpoint-desc">Optimización de hora de envío</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-send-queue</span><span class="endpoint-desc">Cola de envío throttled</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-list-cleanup</span><span class="endpoint-desc">Limpieza de listas / sunset</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/criterio-email</span><span class="endpoint-desc">Evaluación de calidad (CRITERIO)</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-product-alerts</span><span class="endpoint-desc">Alertas de producto (admin)</span></div>
+    </div>
+
+    <div class="endpoint-group">
+      <h4>&#9881; Endpoints Internos (Cloud Tasks / Cron)</h4>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-flow-execute</span><span class="endpoint-desc">Ejecutar paso de flow (Cloud Tasks)</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/execute-scheduled-campaign</span><span class="endpoint-desc">Ejecutar campaña programada (Cloud Tasks)</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/execute-ab-test-winner</span><span class="endpoint-desc">Seleccionar ganador A/B (Cloud Tasks)</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-flow-cron-winback</span><span class="endpoint-desc">Cron: trigger winback flows</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-flow-cron-birthday</span><span class="endpoint-desc">Cron: trigger birthday flows</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/cron/prospect-email-nurture</span><span class="endpoint-desc">Cron: nurture diario 10am Chile</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/seed-email-templates</span><span class="endpoint-desc">Seed de templates del sistema (admin)</span></div>
+    </div>
+
+    <div class="endpoint-group">
+      <h4>&#127760; Endpoints Públicos (sin JWT)</h4>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/api/email-track/open</span><span class="endpoint-desc">Tracking pixel de apertura</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/api/email-track/click</span><span class="endpoint-desc">Click tracking redirect</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/api/email-unsubscribe</span><span class="endpoint-desc">Unsubscribe con token HMAC</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-ses-webhooks</span><span class="endpoint-desc">Webhooks SES bounces/complaints</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-flow-webhooks</span><span class="endpoint-desc">Webhooks Shopify para flows (HMAC)</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-flow-track-browse</span><span class="endpoint-desc">Tracking de navegación de productos</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-product-alerts</span><span class="endpoint-desc">Suscripción pública a alertas</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/api/email-product-alert-widget</span><span class="endpoint-desc">Widget JS de alertas de producto</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/email-signup-form-public</span><span class="endpoint-desc">Submit público de formulario</span></div>
+      <div class="endpoint"><span class="method method-get">GET</span><span class="endpoint-path">/api/email-form-widget</span><span class="endpoint-desc">Widget JS de formulario</span></div>
+    </div>
+
+    <div class="endpoint-group">
+      <h4>&#128268; Endpoints Klaviyo (legacy)</h4>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/import-klaviyo-templates</span><span class="endpoint-desc">Importar templates de Klaviyo</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/upload-klaviyo-drafts</span><span class="endpoint-desc">Subir borradores a Klaviyo</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/klaviyo-manage-flows</span><span class="endpoint-desc">Gestión de flows Klaviyo</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/klaviyo-push-emails</span><span class="endpoint-desc">Push emails a Klaviyo</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/klaviyo-smart-format</span><span class="endpoint-desc">Formato inteligente Klaviyo</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/preview-flow-emails</span><span class="endpoint-desc">Preview de flows Klaviyo</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/parse-email-html</span><span class="endpoint-desc">Parser HTML a bloques JSON</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/steve-email-content</span><span class="endpoint-desc">AI content generation (edge fn)</span></div>
+      <div class="endpoint"><span class="method method-post">POST</span><span class="endpoint-path">/api/steve-send-time-analysis</span><span class="endpoint-desc">AI análisis de hora de envío</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 18. DATABASE ============ -->
+<section id="database">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#128451; Base de Datos</h2>
+      <p>15 tablas dedicadas a Steve Mail con RLS policies, indexes optimizados y 9 migraciones SQL.</p>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tabla</th><th>Descripción</th><th>Columnas Clave</th><th>Indexes</th></tr></thead>
+        <tbody>
+          <tr><td><code>email_subscribers</code></td><td>Lista de contactos</td><td>email, status, source, tags[], total_orders, total_spent, send_time_hour, bounce_count, last_engaged_at</td><td>5 + GIN(tags)</td></tr>
+          <tr><td><code>email_campaigns</code></td><td>Campañas de email</td><td>subject, html_content, status, audience_filter, design_json, recommendation_config, campaign_type</td><td>2</td></tr>
+          <tr><td><code>email_flows</code></td><td>Flujos automatizados</td><td>trigger_type, status, steps (JSONB), settings, conditional_blocks</td><td>2</td></tr>
+          <tr><td><code>email_events</code></td><td>Tracking (opens, clicks, etc)</td><td>event_type, campaign_id, flow_id, subscriber_id, message_id, metadata, ab_variant</td><td>5</td></tr>
+          <tr><td><code>email_flow_enrollments</code></td><td>Enrollments en flows</td><td>flow_id, subscriber_id, status, current_step, next_send_at, metadata, cloud_task_name</td><td>3 + UNIQUE</td></tr>
+          <tr><td><code>email_domains</code></td><td>Verificación de dominio</td><td>domain, status, dns_records, dkim_tokens, resend_domain_id</td><td>1</td></tr>
+          <tr><td><code>email_templates</code></td><td>Galería de templates</td><td>name, category, design_json, html_preview, is_system, client_id</td><td>3</td></tr>
+          <tr><td><code>email_universal_blocks</code></td><td>Bloques reutilizables</td><td>name, category, block_json, usage_count</td><td>1</td></tr>
+          <tr><td><code>email_ab_tests</code></td><td>Config A/B testing</td><td>variant_b_subject/preview/html, test_percentage, winning_metric, winner, status</td><td>2</td></tr>
+          <tr><td><code>product_alerts</code></td><td>Alertas back-in-stock / price-drop</td><td>product_id, alert_type, email, status, original_price</td><td>2</td></tr>
+          <tr><td><code>email_forms</code></td><td>Formularios de signup</td><td>form_type, design, trigger_rules, incentive_type, tags_to_apply, total_views/submissions</td><td>1</td></tr>
+          <tr><td><code>email_send_queue</code></td><td>Cola de envío throttled</td><td>subject, html_content, priority, status, scheduled_for, attempts, ab_variant</td><td>2</td></tr>
+          <tr><td><code>email_send_settings</code></td><td>Config de envío por cliente</td><td>rate_limit_per_hour, smart_send_enabled, auto_cleanup_enabled, sunset_days</td><td>0</td></tr>
+          <tr><td><code>email_lists</code></td><td>Listas y segmentos</td><td>name, type (static/segment), filters, subscriber_count</td><td>1</td></tr>
+          <tr><td><code>klaviyo_email_plans</code></td><td>Planes de email (legacy Klaviyo)</td><td>flow_type, status, emails (JSONB), campaign_date</td><td>1</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 19. EDGE FUNCTIONS ============ -->
+<section id="edge">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#9889; Edge Functions (Supabase)</h2>
+      <p>3 funciones serverless para generación AI, parsing HTML y push a Klaviyo.</p>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3>&#9997; steve-email-content</h3>
+        <p>Generación AI de contenido con 6 acciones. Claude Sonnet 4.6, 4000 tokens.</p>
+        <ul>
+          <li><code>generate_subject</code> — 5 subjects + 5 preview texts</li>
+          <li><code>generate_copy</code> — Body completo (title, intro, CTA, secciones)</li>
+          <li><code>analyze_content</code> — Score 0-100 en 9 criterios</li>
+          <li><code>generate_ab_variants</code> — N variantes A/B</li>
+          <li><code>generate_flow_emails</code> — Secuencia multi-email</li>
+          <li><code>chat</code> — Asesor conversacional con 10+ best practices</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128196; parse-email-html</h3>
+        <p>Convierte HTML raw a bloques JSON. Claude Sonnet, 8000 tokens.</p>
+        <ul>
+          <li>12 tipos de bloque soportados</li>
+          <li>Detecta variables Klaviyo dinámicas</li>
+          <li>Output: <code>{ id, type, props }</code> por bloque</li>
+          <li>Usado para importar emails existentes al editor</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128268; klaviyo-push-emails</h3>
+        <p>Push de campañas a Klaviyo. API revision 2024-10-15.</p>
+        <ul>
+          <li>Pipeline de 7 pasos: fetch lists → create template → create campaign → get message → assign template → update message → send/schedule</li>
+          <li>Lee de <code>klaviyo_email_plans</code></li>
+          <li>Decripta API key via RPC <code>decrypt_platform_token</code></li>
+          <li>Actualiza plan status a "implemented"</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 20. INTEGRATIONS ============ -->
+<section id="integrations">
+  <div class="container">
+    <div class="section-header">
+      <h2>&#128268; Integraciones Externas</h2>
+      <p>Steve Mail se integra con 5 servicios externos para delivery, commerce, AI y scheduling.</p>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3>&#128231; Resend (Amazon SES)</h3>
+        <p>Servicio de envío de emails y verificación de dominio.</p>
+        <ul>
+          <li>Envío de emails transaccionales y marketing</li>
+          <li>Verificación de dominio (SPF/DKIM/DMARC)</li>
+          <li>Webhooks SES: bounces, complaints, deliveries</li>
+          <li>Env var: <code>RESEND_API_KEY</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128722; Shopify</h3>
+        <p>Integración bidireccional con tiendas Shopify.</p>
+        <ul>
+          <li>Sync de customers → email_subscribers</li>
+          <li>Webhooks: checkouts/create, customers/create, orders/create</li>
+          <li>Product catalog para recomendaciones</li>
+          <li>Creación automática de discount codes</li>
+          <li>ScriptTag para widgets embebibles</li>
+          <li>Product Recommendations API</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#129302; Anthropic Claude</h3>
+        <p>AI para generación de contenido y evaluación de calidad.</p>
+        <ul>
+          <li>Modelo: Claude Sonnet 4.6</li>
+          <li>Generación de emails MJML completos</li>
+          <li>Evaluación visual ESPEJO (vision)</li>
+          <li>Generación de subjects y A/B variants</li>
+          <li>Parser HTML → bloques JSON</li>
+          <li>Chat advisor con best practices</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#9881; Google Cloud Tasks</h3>
+        <p>Scheduling de tareas asíncronas.</p>
+        <ul>
+          <li>Cola: <code>steve-mail</code></li>
+          <li>Campañas programadas</li>
+          <li>Selección de ganador A/B</li>
+          <li>Ejecución de pasos de flows</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#127912; GrapeJS Studio SDK</h3>
+        <p>Editor visual de emails drag-and-drop.</p>
+        <ul>
+          <li>SDK comercial con licencia</li>
+          <li>Soporte MJML nativo</li>
+          <li>Bloques personalizados Steve</li>
+          <li>Tema visual personalizado</li>
+          <li>Localización en español</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>&#128268; Klaviyo (Legacy)</h3>
+        <p>Integración legacy que Steve Mail está reemplazando.</p>
+        <ul>
+          <li>Push de campañas a Klaviyo</li>
+          <li>Import de templates desde Klaviyo</li>
+          <li>Gestión de flows Klaviyo</li>
+          <li>API revision 2024-10-15</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer style="background: var(--surface); border-top: 1px solid var(--border); padding: 40px 0; text-align: center;">
+  <div class="container">
+    <p style="color: var(--text-muted); font-size: 0.9rem;">Steve Mail — Documentación de Funciones</p>
+    <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 8px;">Generado el 3 de abril de 2026 · Repositorio: jmbarros-Steve/betabg</p>
+    <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 8px;">Stack: React + Vite + TypeScript + Supabase + Cloud Run + Resend + GrapeJS + Claude AI</p>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Sales Deck — Preview</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f0f1a; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+
+  h1 { text-align: center; font-size: 14px; color: #7C3AED; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 8px; }
+  .subtitle { text-align: center; color: #666; font-size: 13px; margin-bottom: 40px; }
+
+  /* WhatsApp preview showing how it arrives */
+  .wa-preview {
+    max-width: 400px;
+    margin: 0 auto 60px;
+    background: #111;
+    border-radius: 20px;
+    padding: 20px;
+    border: 1px solid #222;
+  }
+  .wa-preview-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #222;
+  }
+  .wa-preview-header .avatar { width: 36px; height: 36px; border-radius: 50%; background: #7C3AED; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .wa-preview-header .name { font-size: 14px; font-weight: 600; }
+  .wa-preview-header .status { font-size: 11px; color: #25D366; }
+
+  .wa-bubble {
+    background: #1a1a2e; border-radius: 12px 12px 12px 4px; padding: 10px 14px; margin-bottom: 8px; max-width: 85%; font-size: 13px; line-height: 1.5;
+  }
+  .wa-bubble.image { padding: 4px; }
+  .wa-bubble.image img { width: 100%; border-radius: 8px; }
+  .wa-bubble .caption { padding: 8px 10px 4px; font-size: 12px; color: #ccc; }
+  .wa-bubble .time { text-align: right; font-size: 10px; color: #666; margin-top: 4px; }
+
+  /* Deck slides grid */
+  .deck-section { margin-bottom: 60px; }
+  .deck-section h2 { font-size: 20px; margin-bottom: 8px; }
+  .deck-section p { color: #888; font-size: 14px; margin-bottom: 30px; }
+
+  .slides-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  @media (max-width: 768px) { .slides-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 480px) { .slides-grid { grid-template-columns: 1fr; } }
+
+  .slide {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16162a 100%);
+    border: 1px solid #2a2a4a;
+    border-radius: 16px;
+    padding: 24px;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .slide:hover { transform: translateY(-4px); border-color: #7C3AED; }
+
+  .slide-number {
+    font-size: 11px; color: #7C3AED; font-weight: 700; letter-spacing: 2px; margin-bottom: 12px;
+  }
+  .slide h3 {
+    font-size: 16px; margin-bottom: 16px; line-height: 1.3;
+    background: linear-gradient(135deg, #fff 0%, #c4b5fd 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .slide ul { list-style: none; }
+  .slide li {
+    font-size: 13px; color: #aaa; margin-bottom: 8px; padding-left: 16px; position: relative; line-height: 1.4;
+  }
+  .slide li::before {
+    content: '→'; position: absolute; left: 0; color: #7C3AED;
+  }
+
+  /* Text fallback preview */
+  .text-fallback {
+    max-width: 400px;
+    margin: 0 auto;
+    background: #111;
+    border-radius: 20px;
+    padding: 20px;
+    border: 1px solid #222;
+  }
+  .text-msg {
+    background: #1a1a2e; border-radius: 12px 12px 12px 4px; padding: 14px; margin-bottom: 8px; font-size: 13px; line-height: 1.6; white-space: pre-line;
+  }
+  .text-msg strong { color: #c4b5fd; }
+
+  /* Flow diagram */
+  .flow {
+    display: flex; align-items: center; justify-content: center; gap: 12px; margin: 40px 0; flex-wrap: wrap;
+  }
+  .flow-step {
+    background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 12px 18px; font-size: 12px; text-align: center;
+  }
+  .flow-step .icon { font-size: 20px; margin-bottom: 4px; }
+  .flow-step .label { color: #aaa; }
+  .flow-arrow { color: #7C3AED; font-size: 20px; }
+
+  .badge {
+    display: inline-block; background: #7C3AED22; color: #7C3AED; border: 1px solid #7C3AED44;
+    border-radius: 20px; padding: 4px 12px; font-size: 11px; font-weight: 600;
+  }
+
+  hr { border: none; border-top: 1px solid #222; margin: 50px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Steve Sales Deck System</h1>
+  <p class="subtitle">Cómo Steve genera y envía presentaciones personalizadas por WhatsApp</p>
+
+  <!-- Flow -->
+  <div class="flow">
+    <div class="flow-step"><div class="icon">💬</div><div class="label">Prospecto pide<br>presentación</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step"><div class="icon">🧠</div><div class="label">Claude Sonnet<br>genera 6 slides</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step"><div class="icon">🎨</div><div class="label">Gemini genera<br>imagen visual</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step"><div class="icon">📱</div><div class="label">Se envía por<br>WhatsApp</div></div>
+  </div>
+
+  <hr>
+
+  <!-- Example: Gabri Gin -->
+  <div class="deck-section">
+    <h2>Ejemplo: Presentación para Gabrí Gin (Patagonia)</h2>
+    <p>Generada automáticamente con datos reales del prospecto. Cada slide se personaliza con su industria, dolores y plataforma.</p>
+
+    <div class="slides-grid">
+      <div class="slide">
+        <div class="slide-number">SLIDE 01</div>
+        <h3>Para Gabrí — cómo escalar gin premium en Shopify</h3>
+        <ul>
+          <li>Gin premium con botánicos orgánicos de la Patagonia</li>
+          <li>Canal DTC en Shopify con oportunidad de crecimiento</li>
+          <li>Meta Ads como motor principal de adquisición</li>
+        </ul>
+      </div>
+
+      <div class="slide">
+        <div class="slide-number">SLIDE 02</div>
+        <h3>Tu situación hoy</h3>
+        <ul>
+          <li>Datos de Shopify y Meta separados — sin ROAS real cruzado</li>
+          <li>Email, WhatsApp y agencia cada uno por su lado</li>
+          <li>No hay visibilidad de qué campaña genera cada venta</li>
+        </ul>
+      </div>
+
+      <div class="slide">
+        <div class="slide-number">SLIDE 03</div>
+        <h3>Qué hace Steve por Gabrí</h3>
+        <ul>
+          <li>Dashboard unificado: Shopify + Meta + Google en un panel</li>
+          <li>WhatsApp automático: recupera carritos abandonados</li>
+          <li>Steve Mail: email marketing nativo con flujos automatizados</li>
+        </ul>
+      </div>
+
+      <div class="slide">
+        <div class="slide-number">SLIDE 04</div>
+        <h3>Marcas de spirits premium en Steve</h3>
+        <ul>
+          <li>Reducción de stack de herramientas de 5 a 1</li>
+          <li>Visibilidad completa: cada peso invertido rastreado</li>
+          <li>Recuperación de carritos genera ventas incrementales sin más ads</li>
+        </ul>
+      </div>
+
+      <div class="slide">
+        <div class="slide-number">SLIDE 05</div>
+        <h3>Planes Steve (50% OFF lanzamiento)</h3>
+        <ul>
+          <li>Visual: $49.990/mes → <strong>$24.995/mes</strong> — ve tus datos</li>
+          <li>Estrategia: $99.990/mes → <strong>$49.995/mes</strong> — ve + IA + análisis</li>
+          <li>Full: $199.990/mes → <strong>$99.995/mes</strong> — ve + IA + crea + ejecuta</li>
+        </ul>
+      </div>
+
+      <div class="slide">
+        <div class="slide-number">SLIDE 06</div>
+        <h3>Siguiente paso</h3>
+        <ul>
+          <li>Agenda una reunión de 15 min con el equipo</li>
+          <li>Conectamos tu Shopify y Meta reales en vivo</li>
+          <li>meetings.hubspot.com/jose-manuel15</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- WhatsApp: cómo se ve con imagen -->
+  <div class="deck-section">
+    <h2>Cómo llega por WhatsApp <span class="badge">CON GEMINI_API_KEY</span></h2>
+    <p>Gemini genera una imagen visual del deck que se envía como foto con caption.</p>
+
+    <div class="wa-preview">
+      <div class="wa-preview-header">
+        <div class="avatar">🐕</div>
+        <div>
+          <div class="name">Steve AI</div>
+          <div class="status">en línea</div>
+        </div>
+      </div>
+
+      <div class="wa-bubble image">
+        <!-- Simulated deck image -->
+        <div style="width:100%; aspect-ratio:16/9; background: linear-gradient(135deg, #1a1a2e, #2d1b69); border-radius: 8px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 4px; padding: 12px;">
+          <div style="background:#1e1e3a; border-radius:6px; padding:8px; overflow:hidden;">
+            <div style="font-size:7px; color:#7C3AED; font-weight:700;">SLIDE 1</div>
+            <div style="font-size:8px; color:#fff; font-weight:600; margin-top:3px;">Para Gabrí — gin premium</div>
+            <div style="font-size:6px; color:#888; margin-top:4px;">→ Botánicos orgánicos Patagonia<br>→ Shopify DTC<br>→ Meta Ads motor</div>
+          </div>
+          <div style="background:#1e1e3a; border-radius:6px; padding:8px; overflow:hidden;">
+            <div style="font-size:7px; color:#7C3AED; font-weight:700;">SLIDE 2</div>
+            <div style="font-size:8px; color:#fff; font-weight:600; margin-top:3px;">Tu situación hoy</div>
+            <div style="font-size:6px; color:#888; margin-top:4px;">→ Datos separados<br>→ Sin ROAS cruzado<br>→ Stack fragmentado</div>
+          </div>
+          <div style="background:#1e1e3a; border-radius:6px; padding:8px; overflow:hidden;">
+            <div style="font-size:7px; color:#7C3AED; font-weight:700;">SLIDE 3</div>
+            <div style="font-size:8px; color:#fff; font-weight:600; margin-top:3px;">Qué hace Steve</div>
+            <div style="font-size:6px; color:#888; margin-top:4px;">→ Dashboard unificado<br>→ WhatsApp automático<br>→ Steve Mail nativo</div>
+          </div>
+          <div style="background:#1e1e3a; border-radius:6px; padding:8px; overflow:hidden;">
+            <div style="font-size:7px; color:#7C3AED; font-weight:700;">SLIDE 4</div>
+            <div style="font-size:8px; color:#fff; font-weight:600; margin-top:3px;">Marcas similares</div>
+            <div style="font-size:6px; color:#888; margin-top:4px;">→ 5 herramientas → 1<br>→ Cada peso rastreado<br>→ Carritos recuperados</div>
+          </div>
+          <div style="background:#1e1e3a; border-radius:6px; padding:8px; overflow:hidden;">
+            <div style="font-size:7px; color:#7C3AED; font-weight:700;">SLIDE 5</div>
+            <div style="font-size:8px; color:#fff; font-weight:600; margin-top:3px;">Planes 50% OFF</div>
+            <div style="font-size:6px; color:#888; margin-top:4px;">→ Visual $24.995<br>→ Estrategia $49.995<br>→ Full $99.995</div>
+          </div>
+          <div style="background:#1e1e3a; border-radius:6px; padding:8px; overflow:hidden;">
+            <div style="font-size:7px; color:#7C3AED; font-weight:700;">SLIDE 6</div>
+            <div style="font-size:8px; color:#fff; font-weight:600; margin-top:3px;">Siguiente paso</div>
+            <div style="font-size:6px; color:#888; margin-top:4px;">→ Reunión 15 min<br>→ Shopify + Meta en vivo<br>→ meetings.hubspot.com</div>
+          </div>
+        </div>
+        <div class="caption">Te armé un resumen de cómo Steve puede ayudar a Gabrí en gin premium. Échale un ojo 👆</div>
+        <div class="time" style="text-align:right; font-size:10px; color:#666; padding: 0 10px 6px;">17:43 ✓✓</div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- Text fallback -->
+  <div class="deck-section">
+    <h2>Fallback: Cómo llega SIN Gemini <span class="badge">TEXTO</span></h2>
+    <p>Si Gemini falla o no está configurado, Steve envía el deck como texto formateado.</p>
+
+    <div class="text-fallback">
+      <div class="wa-preview-header">
+        <div class="avatar" style="width:36px;height:36px;border-radius:50%;background:#7C3AED;display:flex;align-items:center;justify-content:center;font-size:14px;">🐕</div>
+        <div>
+          <div class="name" style="font-size:14px;font-weight:600;">Steve AI</div>
+          <div class="status" style="font-size:11px;color:#25D366;">en línea</div>
+        </div>
+      </div>
+
+      <div class="text-msg">📊 <strong>Propuesta para Gabrí</strong>
+
+<strong>Para Gabrí — cómo escalar gin premium en Shopify</strong>
+→ Gin premium con botánicos orgánicos de la Patagonia
+→ Canal DTC en Shopify con oportunidad de crecimiento
+→ Meta Ads como motor principal de adquisición
+
+<strong>Tu situación hoy</strong>
+→ Datos de Shopify y Meta separados
+→ Email, WhatsApp y agencia cada uno por su lado
+→ No hay visibilidad de qué campaña genera cada venta
+
+<strong>Qué hace Steve por Gabrí</strong>
+→ Dashboard unificado: Shopify + Meta + Google en un panel
+→ WhatsApp automático: recupera carritos abandonados
+→ Steve Mail: email marketing nativo con flujos automatizados</div>
+
+      <div class="text-msg"><strong>Marcas de spirits premium en Steve</strong>
+→ Reducción de stack de 5 herramientas a 1
+→ Cada peso invertido rastreado de inicio a fin
+→ Carritos recuperados sin más inversión en ads
+
+<strong>Planes Steve (50% OFF lanzamiento)</strong>
+→ Visual: $49.990 → <strong>$24.995/mes</strong>
+→ Estrategia: $99.990 → <strong>$49.995/mes</strong>
+→ Full: $199.990 → <strong>$99.995/mes</strong>
+
+<strong>Siguiente paso</strong>
+→ Agenda 15 min con el equipo
+→ Conectamos tu Shopify y Meta en vivo
+→ meetings.hubspot.com/jose-manuel15</div>
+      <div style="text-align:right; font-size:10px; color:#666; padding: 4px 10px;">17:43 ✓✓</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- Status -->
+  <div style="text-align:center; padding: 30px 0;">
+    <h2 style="font-size: 16px; margin-bottom: 20px;">Estado actual del sistema</h2>
+    <div style="display:flex; justify-content:center; gap: 20px; flex-wrap:wrap;">
+      <div style="background:#0d3320; border:1px solid #25D366; border-radius:12px; padding:16px 24px;">
+        <div style="color:#25D366; font-size:13px; font-weight:600;">✓ GEMINI_API_KEY</div>
+        <div style="color:#888; font-size:11px;">Imagen visual activa</div>
+      </div>
+      <div style="background:#0d3320; border:1px solid #25D366; border-radius:12px; padding:16px 24px;">
+        <div style="color:#25D366; font-size:13px; font-weight:600;">✓ ANTHROPIC_API_KEY</div>
+        <div style="color:#888; font-size:11px;">Contenido personalizado</div>
+      </div>
+      <div style="background:#0d3320; border:1px solid #25D366; border-radius:12px; padding:16px 24px;">
+        <div style="color:#25D366; font-size:13px; font-weight:600;">✓ TWILIO</div>
+        <div style="color:#888; font-size:11px;">Envío WhatsApp activo</div>
+      </div>
+      <div style="background:#0d3320; border:1px solid #25D366; border-radius:12px; padding:16px 24px;">
+        <div style="color:#25D366; font-size:13px; font-weight:600;">✓ Task Queue</div>
+        <div style="color:#888; font-size:11px;">Cola persistente (no setTimeout)</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

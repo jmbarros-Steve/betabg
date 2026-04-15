@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El Chino — Fix 16 Data Integrity Checks</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0a0a0f; color: #e0e0e0; line-height: 1.6; }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+  h1 { font-size: 2rem; color: #fff; margin-bottom: 8px; }
+  h2 { font-size: 1.5rem; color: #60a5fa; margin: 40px 0 16px; border-bottom: 2px solid #1e3a5f; padding-bottom: 8px; }
+  h3 { font-size: 1.15rem; color: #93c5fd; margin: 24px 0 12px; }
+
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .badge-pass { background: #064e3b; color: #34d399; }
+  .badge-fail { background: #7f1d1d; color: #fca5a5; }
+  .badge-skip { background: #78350f; color: #fcd34d; }
+  .badge-new { background: #1e3a5f; color: #60a5fa; }
+  .badge-fixed { background: #4c1d95; color: #c4b5fd; }
+  .badge-shopify { background: #064e3b; color: #6ee7b7; }
+  .badge-meta { background: #1e3a5f; color: #93c5fd; }
+  .badge-klaviyo { background: #4c1d95; color: #c4b5fd; }
+  .badge-all { background: #374151; color: #d1d5db; }
+  .badge-steve { background: #78350f; color: #fcd34d; }
+
+  .subtitle { color: #9ca3af; font-size: 0.95rem; margin-bottom: 30px; }
+
+  /* Summary cards */
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin: 24px 0; }
+  .summary-card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 20px; text-align: center; }
+  .summary-card .number { font-size: 2.5rem; font-weight: 700; }
+  .summary-card .label { font-size: 0.85rem; color: #9ca3af; margin-top: 4px; }
+  .summary-card.total .number { color: #60a5fa; }
+  .summary-card.fixed .number { color: #c4b5fd; }
+  .summary-card.new .number { color: #34d399; }
+  .summary-card.broken .number { color: #fca5a5; }
+  .summary-card.files .number { color: #fcd34d; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 32px; }
+  th { background: #1f2937; color: #93c5fd; text-align: left; padding: 12px 16px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 12px 16px; border-bottom: 1px solid #1f2937; font-size: 0.9rem; vertical-align: top; }
+  tr:hover { background: #111827; }
+
+  /* Code blocks */
+  .code-block { background: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 16px; margin: 12px 0; overflow-x: auto; font-size: 0.82rem; }
+  .code-block pre { font-family: 'JetBrains Mono', 'Fira Code', monospace; white-space: pre-wrap; word-break: break-all; }
+  .code-old { border-left: 4px solid #ef4444; }
+  .code-new { border-left: 4px solid #22c55e; }
+  .code-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .code-label-old { color: #ef4444; }
+  .code-label-new { color: #22c55e; }
+
+  /* Comparison grid */
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+  @media (max-width: 900px) { .compare-grid { grid-template-columns: 1fr; } }
+
+  /* Check cards */
+  .check-card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 24px; margin: 16px 0; }
+  .check-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .check-number { font-size: 1.3rem; font-weight: 700; color: #60a5fa; min-width: 50px; }
+  .check-desc { font-size: 1rem; color: #e0e0e0; flex: 1; }
+
+  .check-detail { margin-top: 16px; }
+  .check-detail h4 { font-size: 0.85rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .check-detail p { font-size: 0.9rem; color: #d1d5db; margin-bottom: 6px; }
+
+  .flow-steps { list-style: none; padding: 0; }
+  .flow-steps li { position: relative; padding: 8px 0 8px 28px; font-size: 0.88rem; }
+  .flow-steps li::before { content: attr(data-step); position: absolute; left: 0; top: 8px; width: 20px; height: 20px; background: #1e3a5f; color: #60a5fa; font-size: 0.7rem; font-weight: 700; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+
+  .arrow { color: #4b5563; font-size: 1.2rem; text-align: center; padding: 4px 0; }
+
+  /* Diff highlight */
+  .diff-add { color: #34d399; }
+  .diff-del { color: #f87171; text-decoration: line-through; }
+
+  /* File change indicator */
+  .file-tag { display: inline-flex; align-items: center; gap: 6px; background: #1f2937; padding: 4px 12px; border-radius: 6px; font-family: monospace; font-size: 0.82rem; color: #93c5fd; margin: 4px 0; }
+
+  /* Section divider */
+  .divider { border: 0; height: 1px; background: linear-gradient(to right, transparent, #374151, transparent); margin: 40px 0; }
+
+  /* Needs token indicator */
+  .needs { display: inline-flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+  .needs .tag { font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; background: #1f2937; color: #9ca3af; }
+  .needs .tag.token { background: #7f1d1d33; color: #fca5a5; }
+  .needs .tag.db { background: #064e3b33; color: #6ee7b7; }
+  .needs .tag.api { background: #1e3a5f33; color: #93c5fd; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- HEADER -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<h1>El Chino - Fix 16 Data Integrity Checks</h1>
+<p class="subtitle">Rewrite completo de <code>data-quality.ts</code> + 2 fixes en <code>runner.ts</code> y <code>fixer.ts</code> &mdash; 3 abril 2026</p>
+
+<div class="summary-grid">
+  <div class="summary-card total"><div class="number">16</div><div class="label">Checks corregidos</div></div>
+  <div class="summary-card fixed"><div class="number">5</div><div class="label">Validaciones incorrectas reescritas</div></div>
+  <div class="summary-card new"><div class="number">11</div><div class="label">Fallback generico eliminado</div></div>
+  <div class="summary-card broken"><div class="number">0</div><div class="label">Errores de compilacion</div></div>
+  <div class="summary-card files"><div class="number">3</div><div class="label">Archivos modificados</div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- RESUMEN DEL PROBLEMA -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<h2>Problema</h2>
+<p>Los 16 checks de tipo <code>data_quality</code> estaban mal implementados:</p>
+<ul style="margin: 12px 0 12px 20px; color: #d1d5db;">
+  <li><strong>Checks 15, 16, 18, 19, 20</strong> &mdash; ten&iacute;an validaciones que <strong>no coincid&iacute;an</strong> con la descripci&oacute;n real en la DB (se inventaron en el primer deploy)</li>
+  <li><strong>Checks 7, 10, 29, 30, 37, 38, 39, 40, 43, 49, 50</strong> &mdash; ca&iacute;an al <strong>fallback gen&eacute;rico</strong> que solo contaba nulls (in&uacute;til)</li>
+</ul>
+<p style="margin-top: 12px;">Restricciones descubiertas: <code>shopify_orders</code> <strong>NO EXISTE</strong>, <code>shopify_products</code> no tiene columna <code>price</code> (tiene <code>price_min</code>/<code>price_max</code>), el campo es <code>last_sync_at</code> (no <code>last_synced_at</code>).</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ARCHIVOS MODIFICADOS -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<h2>Archivos Modificados</h2>
+
+<table>
+  <thead><tr><th>Archivo</th><th>Tipo de cambio</th><th>Detalle</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="file-tag">cloud-run-api/src/chino/checks/data-quality.ts</span></td>
+      <td><span class="badge badge-new">REWRITE</span></td>
+      <td>369 l&iacute;neas &rarr; 957 l&iacute;neas. 16 funciones espec&iacute;ficas reemplazan 5 funciones incorrectas + 1 fallback gen&eacute;rico</td>
+    </tr>
+    <tr>
+      <td><span class="file-tag">cloud-run-api/src/chino/runner.ts</span></td>
+      <td><span class="badge badge-fixed">2 EDITS</span></td>
+      <td>Quitar <code>data_quality</code> de <code>NO_TOKEN_TYPES</code> + pasar <code>decryptedToken</code> al executor</td>
+    </tr>
+    <tr>
+      <td><span class="file-tag">cloud-run-api/src/chino/fixer.ts</span></td>
+      <td><span class="badge badge-fixed">1 EDIT</span></td>
+      <td>Pasar <code>decryptedToken</code> al executor en <code>reExecuteCheck</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- CAMBIOS EN runner.ts Y fixer.ts -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<h2>Cambios en runner.ts</h2>
+
+<h3>Cambio 1: data_quality ahora recibe token</h3>
+<div class="compare-grid">
+  <div class="code-block code-old">
+    <div class="code-label code-label-old">ANTES (l&iacute;nea 31)</div>
+    <pre>const NO_TOKEN_TYPES = new Set([
+  'performance', 'visual', <span class="diff-del">'data_quality',</span> 'api_exists'
+]);</pre>
+  </div>
+  <div class="code-block code-new">
+    <div class="code-label code-label-new">DESPUES (l&iacute;nea 31)</div>
+    <pre>const NO_TOKEN_TYPES = new Set([
+  'performance', 'visual', 'api_exists'
+]);</pre>
+  </div>
+</div>
+<p style="font-size: 0.9rem; color: #9ca3af;">Esto hace que el runner <strong>desencripte el token</strong> antes de llamar a data_quality checks. Sin esto, los checks de Shopify/Meta/Klaviyo no pod&iacute;an llamar APIs externas.</p>
+
+<h3>Cambio 2: Pasar token al executor</h3>
+<div class="compare-grid">
+  <div class="code-block code-old">
+    <div class="code-label code-label-old">ANTES (l&iacute;nea 238)</div>
+    <pre>case 'data_quality':
+  return await executeDataQuality(supabase, check, <span class="diff-del">merchant</span>);</pre>
+  </div>
+  <div class="code-block code-new">
+    <div class="code-label code-label-new">DESPUES (l&iacute;nea 238)</div>
+    <pre>case 'data_quality':
+  return await executeDataQuality(supabase, check, merchant, <span class="diff-add">decryptedToken</span>);</pre>
+  </div>
+</div>
+
+<h2>Cambio en fixer.ts</h2>
+<div class="compare-grid">
+  <div class="code-block code-old">
+    <div class="code-label code-label-old">ANTES (l&iacute;nea 48)</div>
+    <pre>case 'data_quality':
+  return await executeDataQuality(supabase, check, <span class="diff-del">merchant</span>);</pre>
+  </div>
+  <div class="code-block code-new">
+    <div class="code-label code-label-new">DESPUES (l&iacute;nea 48)</div>
+    <pre>case 'data_quality':
+  return await executeDataQuality(supabase, check, merchant, <span class="diff-add">decryptedToken</span>);</pre>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- COMPARACION ANTES vs DESPUES: Firma principal -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<h2>data-quality.ts &mdash; Firma Principal</h2>
+
+<div class="compare-grid">
+  <div class="code-block code-old">
+    <div class="code-label code-label-old">ANTES</div>
+    <pre>export async function executeDataQuality(
+  supabase: SupabaseClient,
+  check: ChinoCheck,
+  merchant?: MerchantConn | null
+): Promise&lt;CheckResult&gt;</pre>
+  </div>
+  <div class="code-block code-new">
+    <div class="code-label code-label-new">DESPUES</div>
+    <pre>export async function executeDataQuality(
+  supabase: SupabaseClient,
+  check: ChinoCheck,
+  merchant?: MerchantConn | null,
+  <span class="diff-add">decryptedToken?: string | null</span>
+): Promise&lt;CheckResult&gt;</pre>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- COMPARACION: Switch principal -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<h2>data-quality.ts &mdash; Switch de Routing</h2>
+
+<div class="compare-grid">
+  <div class="code-block code-old">
+    <div class="code-label code-label-old">ANTES (5 cases + fallback)</div>
+    <pre>switch (check.check_number) {
+  case 15: validatePlatformMetrics(...)    // INCORRECTO
+  case 16: validateCampaignMetrics(...)    // INCORRECTO
+  case 18: validateShopifyProducts(...)    // INCORRECTO
+  case 19: validateEmailEvents(...)        // INCORRECTO
+  case 20: validateClients(...)            // INCORRECTO
+  default: validateGeneric(...)            // INUTIL
+}</pre>
+  </div>
+  <div class="code-block code-new">
+    <div class="code-label code-label-new">DESPUES (16 cases expl&iacute;citos)</div>
+    <pre>switch (check.check_number) {
+  case 7:  check7_duplicateConnections(...)
+  case 10: check10_staleSync(...)
+  case 15: check15_supabaseProductsExistInShopify(...)
+  case 16: check16_shopifyProductsMissingInSupabase(...)
+  case 18: check18_productImagesLoad(...)
+  case 19: check19_revenueToday(...)
+  case 20: check20_recentOrder(...)
+  case 29: check29_metaCampaignsNotInSteve(...)
+  case 30: check30_steveCampaignsNotInMeta(...)
+  case 37: check37_klaviyoCampaignsNotInSteve(...)
+  case 38: check38_bounceRate(...)
+  case 39: check39_spamRate(...)
+  case 40: check40_deliverability(...)
+  case 43: check43_chatSpanish(...)
+  case 49: check49_briefMentionsRealData(...)
+  case 50: check50_scrapingFreshData(...)
+  default: skip (not implemented)
+}</pre>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- DETALLE POR CHECK: Los 5 que estaban MAL -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<h2>Los 5 checks que ten&iacute;an validaci&oacute;n INCORRECTA</h2>
+
+<!-- CHECK 15 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#15</span>
+    <span class="badge badge-shopify">Shopify</span>
+    <span class="badge badge-fixed">CORREGIDO</span>
+    <span class="check-desc">No hay productos en Supabase que no existen en Shopify</span>
+  </div>
+
+  <div class="compare-grid">
+    <div>
+      <h4 style="color: #f87171; font-size: 0.85rem;">QUE HACIA ANTES</h4>
+      <p style="font-size: 0.88rem; color: #d1d5db;">Validaba <code>platform_metrics</code>: que <code>metric_type</code> no sea null, que revenue no sea negativo, que <code>metric_value</code> sea un n&uacute;mero v&aacute;lido. <strong>Nada que ver con productos.</strong></p>
+    </div>
+    <div>
+      <h4 style="color: #34d399; font-size: 0.85rem;">QUE HACE AHORA</h4>
+      <ol class="flow-steps">
+        <li data-step="1">Query <code>shopify_products.shopify_product_id</code> WHERE <code>client_id = merchant</code></li>
+        <li data-step="2">Si vac&iacute;o &rarr; pass (nada que validar)</li>
+        <li data-step="3">Llama Shopify API <code>GET /products.json?ids={ids}&amp;fields=id</code> en batches de 100</li>
+        <li data-step="4">Compara: si alg&uacute;n ID de Supabase no existe en Shopify &rarr; <strong>fail</strong></li>
+      </ol>
+      <div class="needs"><span class="tag token">Token Shopify</span><span class="tag api">Shopify API</span><span class="tag db">shopify_products</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- CHECK 16 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#16</span>
+    <span class="badge badge-shopify">Shopify</span>
+    <span class="badge badge-fixed">CORREGIDO</span>
+    <span class="check-desc">No hay productos en Shopify que faltan en Supabase</span>
+  </div>
+
+  <div class="compare-grid">
+    <div>
+      <h4 style="color: #f87171; font-size: 0.85rem;">QUE HACIA ANTES</h4>
+      <p style="font-size: 0.88rem; color: #d1d5db;">Validaba <code>campaign_metrics</code>: CTR &gt; 100%, CPC negativo, impressions &lt; clicks. <strong>Nada que ver con Shopify.</strong></p>
+    </div>
+    <div>
+      <h4 style="color: #34d399; font-size: 0.85rem;">QUE HACE AHORA</h4>
+      <ol class="flow-steps">
+        <li data-step="1">Llama Shopify API <code>GET /products/count.json</code> &rarr; obtiene total</li>
+        <li data-step="2">Query count de <code>shopify_products</code> WHERE <code>client_id = merchant</code></li>
+        <li data-step="3">Si Shopify tiene m&aacute;s productos que Supabase &rarr; <strong>fail</strong> con la diferencia</li>
+      </ol>
+      <div class="needs"><span class="tag token">Token Shopify</span><span class="tag api">Shopify API</span><span class="tag db">shopify_products</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- CHECK 18 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#18</span>
+    <span class="badge badge-shopify">Shopify</span>
+    <span class="badge badge-fixed">CORREGIDO</span>
+    <span class="check-desc">Todas las im&aacute;genes de productos cargan (no 404)</span>
+  </div>
+
+  <div class="compare-grid">
+    <div>
+      <h4 style="color: #f87171; font-size: 0.85rem;">QUE HACIA ANTES</h4>
+      <p style="font-size: 0.88rem; color: #d1d5db;">Verificaba <code>shopify_products</code> buscando <code>price=0</code> con status active y t&iacute;tulos vac&iacute;os. Adem&aacute;s usaba columna <code>price</code> <strong>que no existe</strong> (la tabla tiene <code>price_min</code>/<code>price_max</code>).</p>
+    </div>
+    <div>
+      <h4 style="color: #34d399; font-size: 0.85rem;">QUE HACE AHORA</h4>
+      <ol class="flow-steps">
+        <li data-step="1">Query <code>shopify_products.image_url</code> WHERE not null, limit 10 (configurable)</li>
+        <li data-step="2">Si DB vac&iacute;a: fallback a Shopify API <code>GET /products.json?fields=id,images</code></li>
+        <li data-step="3">HEAD request a cada URL de imagen</li>
+        <li data-step="4">Si alguna retorna 404/410 &rarr; <strong>fail</strong></li>
+      </ol>
+      <div class="needs"><span class="tag token">Token Shopify</span><span class="tag api">Shopify API (fallback)</span><span class="tag db">shopify_products</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- CHECK 19 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#19</span>
+    <span class="badge badge-shopify">Shopify</span>
+    <span class="badge badge-fixed">CORREGIDO</span>
+    <span class="check-desc">Revenue de hoy &gt; 0 si merchant normalmente vende</span>
+  </div>
+
+  <div class="compare-grid">
+    <div>
+      <h4 style="color: #f87171; font-size: 0.85rem;">QUE HACIA ANTES</h4>
+      <p style="font-size: 0.88rem; color: #d1d5db;">Validaba tabla <code>email_events</code>: fechas futuras y open_rate en metadata. <strong>Nada que ver con revenue ni Shopify.</strong></p>
+    </div>
+    <div>
+      <h4 style="color: #34d399; font-size: 0.85rem;">QUE HACE AHORA</h4>
+      <ol class="flow-steps">
+        <li data-step="1">Calcula <code>todayStart</code> = hoy 00:00:00</li>
+        <li data-step="2">Shopify API: <code>GET /orders.json?created_at_min={today}&amp;status=any&amp;fields=id,total_price</code></li>
+        <li data-step="3">Suma <code>total_price</code> de todos los orders</li>
+        <li data-step="4">Si revenue = $0 y <code>min_daily_avg</code> &gt; 0 &rarr; <strong>fail</strong></li>
+      </ol>
+      <div class="needs"><span class="tag token">Token Shopify</span><span class="tag api">Shopify Orders API</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- CHECK 20 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#20</span>
+    <span class="badge badge-shopify">Shopify</span>
+    <span class="badge badge-fixed">CORREGIDO</span>
+    <span class="check-desc">Fecha del order m&aacute;s reciente es de hoy</span>
+  </div>
+
+  <div class="compare-grid">
+    <div>
+      <h4 style="color: #f87171; font-size: 0.85rem;">QUE HACIA ANTES</h4>
+      <p style="font-size: 0.88rem; color: #d1d5db;">Validaba tabla <code>clients</code>: emails vac&iacute;os, nombres vac&iacute;os, emails duplicados. <strong>Nada que ver con orders.</strong></p>
+    </div>
+    <div>
+      <h4 style="color: #34d399; font-size: 0.85rem;">QUE HACE AHORA</h4>
+      <ol class="flow-steps">
+        <li data-step="1">Shopify API: <code>GET /orders.json?limit=1&amp;order=created_at+desc&amp;status=any</code></li>
+        <li data-step="2">Si no hay orders &rarr; skip</li>
+        <li data-step="3">Calcula horas desde el &uacute;ltimo order</li>
+        <li data-step="4">Si &gt; <code>max_hours_old</code> (default 24h) &rarr; <strong>fail</strong></li>
+      </ol>
+      <div class="needs"><span class="tag token">Token Shopify</span><span class="tag api">Shopify Orders API</span></div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- DETALLE: Los 11 que caian al fallback -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<h2>Los 11 checks que ca&iacute;an al fallback gen&eacute;rico</h2>
+
+<p style="margin-bottom: 16px; font-size: 0.9rem; color: #9ca3af;">Todos estos ca&iacute;an al <code>default:</code> del switch, que ejecutaba <code>validateGeneric()</code>. Esa funci&oacute;n solo contaba campos null en una tabla gen&eacute;rica &mdash; completamente in&uacute;til para lo que deb&iacute;an validar.</p>
+
+<div class="code-block code-old">
+  <div class="code-label code-label-old">FALLBACK GENERICO ELIMINADO</div>
+  <pre>async function validateGeneric(supabase, check, merchant) {
+  const table = check.check_config?.table || check.check_config?.data_source;
+  if (!table) return { invalid_count: 0, total_count: 0, sample_errors: ['No table configured'] };
+
+  // Solo contaba campos null... completamente inutil
+  for (const row of data) {
+    const nullFields = Object.entries(row)
+      .filter(([key, val]) => val === null && ...)
+    if (nullFields.length > 3) errors.push(...);
+  }
+}</pre>
+</div>
+
+<!-- CHECK 7 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#7</span>
+    <span class="badge badge-all">All</span>
+    <span class="badge badge-new">NUEVO</span>
+    <span class="check-desc">No hay platform_connections duplicadas por merchant + plataforma</span>
+  </div>
+  <div class="check-detail">
+    <h4>Como funciona</h4>
+    <ol class="flow-steps">
+      <li data-step="1">Query <code>platform_connections</code> WHERE <code>is_active = true</code>, select <code>client_id, platform</code></li>
+      <li data-step="2">Agrupa en JS por <code>client_id::platform</code></li>
+      <li data-step="3">Si alg&uacute;n grupo tiene &gt;1 registro &rarr; <strong>fail</strong> con detalle de duplicados</li>
+    </ol>
+    <div class="needs"><span class="tag db">platform_connections</span></div>
+  </div>
+</div>
+
+<!-- CHECK 10 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#10</span>
+    <span class="badge badge-all">All</span>
+    <span class="badge badge-new">NUEVO</span>
+    <span class="check-desc">Ninguna conexi&oacute;n lleva &gt; 24hrs sin sync exitoso</span>
+  </div>
+  <div class="check-detail">
+    <h4>Como funciona</h4>
+    <ol class="flow-steps">
+      <li data-step="1">Query <code>platform_connections</code> WHERE <code>is_active = true</code>, select <code>last_sync_at</code></li>
+      <li data-step="2">Calcula cutoff = ahora - <code>max_hours</code> (config, default 24h)</li>
+      <li data-step="3">Filtra conexiones donde <code>last_sync_at</code> &lt; cutoff &oacute; es null (nunca sincrono)</li>
+      <li data-step="4">Si hay alguna stale &rarr; <strong>fail</strong> con lista de conexiones atrasadas</li>
+    </ol>
+    <div class="needs"><span class="tag db">platform_connections.last_sync_at</span></div>
+  </div>
+</div>
+
+<!-- CHECK 29 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#29</span>
+    <span class="badge badge-meta">Meta</span>
+    <span class="badge badge-new">NUEVO</span>
+    <span class="check-desc">No hay campa&ntilde;as en Meta que no aparecen en Steve</span>
+  </div>
+  <div class="check-detail">
+    <h4>Como funciona</h4>
+    <ol class="flow-steps">
+      <li data-step="1">Meta Graph API: <code>GET /act_{id}/campaigns?fields=id,name,status</code></li>
+      <li data-step="2">Query DB: <code>campaign_metrics</code> WHERE <code>platform = 'meta'</code>, select distinct <code>campaign_id</code></li>
+      <li data-step="3">Compara: campa&ntilde;as de Meta que no est&aacute;n en DB &rarr; <strong>fail</strong></li>
+    </ol>
+    <div class="needs"><span class="tag token">Token Meta</span><span class="tag api">Graph API</span><span class="tag db">campaign_metrics</span></div>
+  </div>
+</div>
+
+<!-- CHECK 30 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#30</span>
+    <span class="badge badge-meta">Meta</span>
+    <span class="badge badge-new">NUEVO</span>
+    <span class="check-desc">No hay campa&ntilde;as en Steve que no existen en Meta</span>
+  </div>
+  <div class="check-detail">
+    <h4>Como funciona</h4>
+    <ol class="flow-steps">
+      <li data-step="1">Meta Graph API: <code>GET /act_{id}/campaigns?fields=id</code></li>
+      <li data-step="2">Query DB: <code>campaign_metrics</code> WHERE <code>platform = 'meta'</code>, select <code>campaign_id, campaign_name</code></li>
+      <li data-step="3">Inverso de #29: campa&ntilde;as en DB que no existen en Meta &rarr; <strong>fail</strong> (hu&eacute;rfanas)</li>
+    </ol>
+    <div class="needs"><span class="tag token">Token Meta</span><span class="tag api">Graph API</span><span class="tag db">campaign_metrics</span></div>
+  </div>
+</div>
+
+<!-- CHECK 37 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#37</span>
+    <span class="badge badge-klaviyo">Klaviyo</span>
+    <span class="badge badge-new">NUEVO</span>
+    <span class="check-desc">No hay campa&ntilde;as en Klaviyo que Steve no muestra</span>
+  </div>
+  <div class="check-detail">
+    <h4>Como funciona</h4>
+    <ol class="flow-steps">
+      <li data-step="1">Klaviyo API: <code>GET /api/campaigns/?filter=equals(messages.channel,'email')</code></li>
+      <li data-step="2">Query DB: <code>campaign_metrics</code> WHERE <code>platform = 'klaviyo'</code></li>
+      <li data-step="3">Compara: campa&ntilde;as Klaviyo que no est&aacute;n en DB &rarr; <strong>fail</strong></li>
+    </ol>
+    <div class="needs"><span class="tag token">API Key Klaviyo</span><span class="tag api">Klaviyo API v2024-10</span><span class="tag db">campaign_metrics</span></div>
+  </div>
+</div>
+
+<!-- CHECK 38 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#38</span>
+    <span class="badge badge-klaviyo">Klaviyo</span>
+    <span class="badge badge-new">NUEVO</span>
+    <span class="check-desc">Bounce rate &lt; 1%</span>
+  </div>
+  <div class="check-detail">
+    <h4>Como funciona</h4>
+    <ol class="flow-steps">
+      <li data-step="1">Query <code>platform_metrics</code> WHERE <code>metric_type = 'bounce_rate'</code> ORDER BY <code>metric_date</code> DESC LIMIT 1</li>
+      <li data-step="2">Si <code>metric_value</code> &gt; <code>max_bounce</code> (config, default 0.01 = 1%) &rarr; <strong>fail</strong></li>
+      <li data-step="3">Si no hay datos &rarr; skip</li>
+    </ol>
+    <div class="needs"><span class="tag db">platform_metrics</span></div>
+  </div>
+</div>
+
+<!-- CHECK 39 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#39</span>
+    <span class="badge badge-klaviyo">Klaviyo</span>
+    <span class="badge badge-new">NUEVO</span>
+    <span class="check-desc">Spam rate &lt; 0.1%</span>
+  </div>
+  <div class="check-detail">
+    <h4>Como funciona</h4>
+    <ol class="flow-steps">
+      <li data-step="1">Query <code>platform_metrics</code> WHERE <code>metric_type = 'spam_rate'</code> ORDER BY <code>metric_date</code> DESC LIMIT 1</li>
+      <li data-step="2">Si <code>metric_value</code> &gt; <code>max_spam</code> (config, default 0.001 = 0.1%) &rarr; <strong>fail</strong></li>
+      <li data-step="3">Si no hay datos &rarr; skip</li>
+    </ol>
+    <div class="needs"><span class="tag db">platform_metrics</span></div>
+  </div>
+</div>
+
+<!-- CHECK 40 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#40</span>
+    <span class="badge badge-klaviyo">Klaviyo</span>
+    <span class="badge badge-new">NUEVO</span>
+    <span class="check-desc">Deliverability: SPF + DKIM verificados</span>
+  </div>
+  <div class="check-detail">
+    <h4>Como funciona</h4>
+    <ol class="flow-steps">
+      <li data-step="1">Query <code>platform_metrics</code> WHERE <code>metric_type = 'spf_pass'</code> (m&aacute;s reciente)</li>
+      <li data-step="2">Query <code>platform_metrics</code> WHERE <code>metric_type = 'dkim_pass'</code> (m&aacute;s reciente)</li>
+      <li data-step="3">Si no hay datos de ninguno &rarr; skip</li>
+      <li data-step="4">Si alguno no est&aacute; en "true"/"1" &rarr; <strong>fail</strong> con detalle</li>
+    </ol>
+    <div class="needs"><span class="tag db">platform_metrics (spf_pass, dkim_pass)</span></div>
+  </div>
+</div>
+
+<!-- CHECK 43 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#43</span>
+    <span class="badge badge-steve">Steve Chat</span>
+    <span class="badge badge-new">NUEVO</span>
+    <span class="check-desc">Steve Chat responde en espa&ntilde;ol, no ingl&eacute;s</span>
+  </div>
+  <div class="check-detail">
+    <h4>Como funciona (sin LLM)</h4>
+    <ol class="flow-steps">
+      <li data-step="1">POST interno a <code>/api/ai/steve-chat</code> con "¿Cu&aacute;les son las m&eacute;tricas de hoy?"</li>
+      <li data-step="2">Cuenta palabras inglesas: "the", "and", "your", "campaign", etc.</li>
+      <li data-step="3">Cuenta palabras espa&ntilde;olas: "las", "los", "del", "para", "m&eacute;tricas", etc.</li>
+      <li data-step="4">Si ratio ingl&eacute;s &gt; espa&ntilde;ol y EN &ge; 3 &rarr; <strong>fail</strong></li>
+    </ol>
+    <div class="needs"><span class="tag api">Steve Chat API (interno)</span></div>
+  </div>
+</div>
+
+<!-- CHECK 49 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#49</span>
+    <span class="badge badge-steve">Brief</span>
+    <span class="badge badge-new">NUEVO</span>
+    <span class="check-desc">Brief generado menciona datos reales del merchant</span>
+  </div>
+  <div class="check-detail">
+    <h4>Como funciona</h4>
+    <ol class="flow-steps">
+      <li data-step="1">Query <code>steve_knowledge</code> WHERE <code>categoria = 'brief'</code> (5 m&aacute;s recientes)</li>
+      <li data-step="2">Query <code>clients</code> para obtener nombres de merchants</li>
+      <li data-step="3">Verifica que al menos 1 brief contenga el nombre de un merchant real</li>
+      <li data-step="4">Si ninguno menciona datos reales &rarr; <strong>fail</strong></li>
+    </ol>
+    <div class="needs"><span class="tag db">steve_knowledge</span><span class="tag db">clients</span></div>
+  </div>
+</div>
+
+<!-- CHECK 50 -->
+<div class="check-card">
+  <div class="check-header">
+    <span class="check-number">#50</span>
+    <span class="badge badge-steve">Scraping</span>
+    <span class="badge badge-new">NUEVO</span>
+    <span class="check-desc">Resultados de scraping tienen datos de 2025-2026</span>
+  </div>
+  <div class="check-detail">
+    <h4>Como funciona</h4>
+    <ol class="flow-steps">
+      <li data-step="1">Query <code>steve_knowledge</code> WHERE <code>source_url IS NOT NULL</code> (10 m&aacute;s recientes)</li>
+      <li data-step="2">Si no hay datos con <code>source_url</code> &rarr; <strong>fail</strong> (scraping no funciona)</li>
+      <li data-step="3">Verifica que alg&uacute;n registro tenga <code>created_at</code> en 2025 o 2026</li>
+      <li data-step="4">Si todos son pre-2025 &rarr; <strong>fail</strong> (datos obsoletos)</li>
+    </ol>
+    <div class="needs"><span class="tag db">steve_knowledge</span></div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- TABLA RESUMEN FINAL -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<h2>Tabla Resumen: ANTES vs DESPUES</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Descripci&oacute;n Real (DB)</th>
+      <th>Platform</th>
+      <th>ANTES</th>
+      <th>DESPUES</th>
+      <th>Necesita Token</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>7</strong></td>
+      <td>No hay connections duplicadas</td>
+      <td><span class="badge badge-all">all</span></td>
+      <td style="color: #f87171;">Fallback gen&eacute;rico (null count)</td>
+      <td style="color: #34d399;">Agrupa por client_id+platform, detecta dupes</td>
+      <td>No</td>
+    </tr>
+    <tr>
+      <td><strong>10</strong></td>
+      <td>Ninguna conexi&oacute;n &gt;24h sin sync</td>
+      <td><span class="badge badge-all">all</span></td>
+      <td style="color: #f87171;">Fallback gen&eacute;rico (null count)</td>
+      <td style="color: #34d399;">Filtra last_sync_at &lt; cutoff</td>
+      <td>No</td>
+    </tr>
+    <tr>
+      <td><strong>15</strong></td>
+      <td>Productos Supabase existen en Shopify</td>
+      <td><span class="badge badge-shopify">shopify</span></td>
+      <td style="color: #f87171;">Validaba platform_metrics (INCORRECTO)</td>
+      <td style="color: #34d399;">Shopify API /products.json?ids=...</td>
+      <td>Si (Shopify)</td>
+    </tr>
+    <tr>
+      <td><strong>16</strong></td>
+      <td>Productos Shopify no faltan en Supabase</td>
+      <td><span class="badge badge-shopify">shopify</span></td>
+      <td style="color: #f87171;">Validaba campaign_metrics (INCORRECTO)</td>
+      <td style="color: #34d399;">Shopify API /products/count.json vs DB count</td>
+      <td>Si (Shopify)</td>
+    </tr>
+    <tr>
+      <td><strong>18</strong></td>
+      <td>Im&aacute;genes de productos cargan</td>
+      <td><span class="badge badge-shopify">shopify</span></td>
+      <td style="color: #f87171;">Buscaba price=0 con columna inexistente</td>
+      <td style="color: #34d399;">HEAD request a image_url, fallback API</td>
+      <td>Si (Shopify)</td>
+    </tr>
+    <tr>
+      <td><strong>19</strong></td>
+      <td>Revenue de hoy &gt; 0</td>
+      <td><span class="badge badge-shopify">shopify</span></td>
+      <td style="color: #f87171;">Validaba email_events (INCORRECTO)</td>
+      <td style="color: #34d399;">Shopify API /orders.json, suma total_price</td>
+      <td>Si (Shopify)</td>
+    </tr>
+    <tr>
+      <td><strong>20</strong></td>
+      <td>Order m&aacute;s reciente es de hoy</td>
+      <td><span class="badge badge-shopify">shopify</span></td>
+      <td style="color: #f87171;">Validaba clients (emails duplicados)</td>
+      <td style="color: #34d399;">Shopify API /orders.json?limit=1&amp;order=desc</td>
+      <td>Si (Shopify)</td>
+    </tr>
+    <tr>
+      <td><strong>29</strong></td>
+      <td>Campa&ntilde;as Meta no en Steve</td>
+      <td><span class="badge badge-meta">meta</span></td>
+      <td style="color: #f87171;">Fallback gen&eacute;rico (null count)</td>
+      <td style="color: #34d399;">Graph API /campaigns vs campaign_metrics</td>
+      <td>Si (Meta)</td>
+    </tr>
+    <tr>
+      <td><strong>30</strong></td>
+      <td>Campa&ntilde;as Steve no en Meta</td>
+      <td><span class="badge badge-meta">meta</span></td>
+      <td style="color: #f87171;">Fallback gen&eacute;rico (null count)</td>
+      <td style="color: #34d399;">campaign_metrics vs Graph API (inverso)</td>
+      <td>Si (Meta)</td>
+    </tr>
+    <tr>
+      <td><strong>37</strong></td>
+      <td>Campa&ntilde;as Klaviyo no en Steve</td>
+      <td><span class="badge badge-klaviyo">klaviyo</span></td>
+      <td style="color: #f87171;">Fallback gen&eacute;rico (null count)</td>
+      <td style="color: #34d399;">Klaviyo API /campaigns vs campaign_metrics</td>
+      <td>Si (Klaviyo)</td>
+    </tr>
+    <tr>
+      <td><strong>38</strong></td>
+      <td>Bounce rate &lt; 1%</td>
+      <td><span class="badge badge-klaviyo">klaviyo</span></td>
+      <td style="color: #f87171;">Fallback gen&eacute;rico (null count)</td>
+      <td style="color: #34d399;">platform_metrics bounce_rate vs threshold</td>
+      <td>No (solo DB)</td>
+    </tr>
+    <tr>
+      <td><strong>39</strong></td>
+      <td>Spam rate &lt; 0.1%</td>
+      <td><span class="badge badge-klaviyo">klaviyo</span></td>
+      <td style="color: #f87171;">Fallback gen&eacute;rico (null count)</td>
+      <td style="color: #34d399;">platform_metrics spam_rate vs threshold</td>
+      <td>No (solo DB)</td>
+    </tr>
+    <tr>
+      <td><strong>40</strong></td>
+      <td>SPF + DKIM verificados</td>
+      <td><span class="badge badge-klaviyo">klaviyo</span></td>
+      <td style="color: #f87171;">Fallback gen&eacute;rico (null count)</td>
+      <td style="color: #34d399;">platform_metrics spf_pass + dkim_pass</td>
+      <td>No (solo DB)</td>
+    </tr>
+    <tr>
+      <td><strong>43</strong></td>
+      <td>Steve Chat en espa&ntilde;ol</td>
+      <td><span class="badge badge-steve">steve_chat</span></td>
+      <td style="color: #f87171;">Fallback gen&eacute;rico (null count)</td>
+      <td style="color: #34d399;">POST a /steve-chat, word count ES vs EN</td>
+      <td>No (interno)</td>
+    </tr>
+    <tr>
+      <td><strong>49</strong></td>
+      <td>Brief menciona datos reales</td>
+      <td><span class="badge badge-steve">brief</span></td>
+      <td style="color: #f87171;">Fallback gen&eacute;rico (null count)</td>
+      <td style="color: #34d399;">steve_knowledge briefs vs clients names</td>
+      <td>No (solo DB)</td>
+    </tr>
+    <tr>
+      <td><strong>50</strong></td>
+      <td>Scraping datos 2025-2026</td>
+      <td><span class="badge badge-steve">scraping</span></td>
+      <td style="color: #f87171;">Fallback gen&eacute;rico (null count)</td>
+      <td style="color: #34d399;">steve_knowledge source_url, created_at &ge; 2025</td>
+      <td>No (solo DB)</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- PROXIMOS PASOS -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+
+<h2>Pr&oacute;ximos Pasos</h2>
+
+<table>
+  <thead><tr><th>Paso</th><th>Comando</th><th>Qu&eacute; verifica</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1. Compilaci&oacute;n</td>
+      <td><code>cd cloud-run-api && npx tsc --noEmit</code></td>
+      <td>Ya verificado &mdash; 0 errores</td>
+    </tr>
+    <tr>
+      <td>2. Deploy</td>
+      <td><code>gcloud run deploy steve-api --source . --project steveapp-agency --region us-central1</code></td>
+      <td>Sube los 3 archivos modificados</td>
+    </tr>
+    <tr>
+      <td>3. Env vars</td>
+      <td>Script de verificaci&oacute;n de 20 vars</td>
+      <td>Que no se hayan perdido variables</td>
+    </tr>
+    <tr>
+      <td>4. Trigger patrol</td>
+      <td><code>gcloud scheduler jobs run chino-patrol --project=steveapp-agency --location=us-central1</code></td>
+      <td>Ejecutar los 16 checks corregidos</td>
+    </tr>
+    <tr>
+      <td>5. Verificar</td>
+      <td>Query <code>chino_reports</code></td>
+      <td>Los 16 checks ya no retornan "skip" gen&eacute;rico</td>
+    </tr>
+  </tbody>
+</table>
+
+<p style="margin-top: 40px; text-align: center; color: #4b5563; font-size: 0.8rem;">El Chino Data Quality &mdash; Rewrite completo &mdash; 3 abril 2026</p>
+
+</div>
+</body>
+</html>

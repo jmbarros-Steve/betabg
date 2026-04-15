@@ -114,20 +114,31 @@ export async function googleAdsMutate(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`[google-ads-api] Mutate error (${response.status}):`, errorText.slice(0, 2000));
+    // Log full error for debugging (structured so Cloud Logging captures it)
+    console.error(JSON.stringify({
+      severity: 'ERROR',
+      message: '[google-ads-api] Mutate error',
+      status: response.status,
+      errorBody: errorText.slice(0, 4000),
+      operationCount: mutateOperations.length,
+      operationTypes: mutateOperations.map((op: any) => Object.keys(op)[0]),
+    }));
     let errorMessage = `Google Ads API error (${response.status})`;
     try {
       const errJson = JSON.parse(errorText);
       const detail = errJson?.error?.message || errJson?.[0]?.error?.message;
       if (detail) errorMessage = detail;
-      // Extract field violation details
+      // Extract field violation details with operation index
       const details = errJson?.error?.details || errJson?.[0]?.error?.details;
       if (details?.length) {
         for (const d of details) {
           if (d.errors?.length) {
-            const fieldErrors = d.errors.map((e: any) =>
-              `${e.message} (field: ${e.location?.fieldPathElements?.map((f: any) => f.fieldName).join('.') || 'unknown'})`
-            ).join('; ');
+            const fieldErrors = d.errors.map((e: any) => {
+              const path = e.location?.fieldPathElements?.map((f: any) =>
+                f.index !== undefined ? `${f.fieldName}[${f.index}]` : f.fieldName
+              ).join('.') || 'unknown';
+              return `${e.message} (${path})`;
+            }).join('; ');
             if (fieldErrors) errorMessage += ` — ${fieldErrors}`;
           }
         }

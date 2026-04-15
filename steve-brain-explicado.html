@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Brain — Cómo Funciona</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0e1a; color: #e0e0e0; line-height: 1.6; }
+
+  .hero { text-align: center; padding: 60px 20px 40px; background: linear-gradient(135deg, #0a0e1a 0%, #1a1e3a 100%); }
+  .hero h1 { font-size: 3em; margin-bottom: 10px; }
+  .hero h1 span { background: linear-gradient(90deg, #6366f1, #a78bfa, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p { font-size: 1.2em; color: #888; max-width: 600px; margin: 0 auto; }
+
+  .container { max-width: 1000px; margin: 0 auto; padding: 0 20px; }
+
+  /* Resumen rápido */
+  .quick-summary { background: #111827; border: 1px solid #374151; border-radius: 16px; padding: 30px; margin: 40px auto; max-width: 800px; }
+  .quick-summary h2 { color: #a78bfa; margin-bottom: 15px; font-size: 1.4em; }
+  .quick-summary p { font-size: 1.1em; color: #d1d5db; }
+  .quick-summary .highlight { color: #f472b6; font-weight: bold; }
+
+  /* Analogía visual */
+  .analogy { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin: 50px auto; max-width: 900px; }
+  .analogy-card { background: #111827; border: 1px solid #374151; border-radius: 16px; padding: 25px; text-align: center; }
+  .analogy-card .emoji { font-size: 3em; margin-bottom: 10px; }
+  .analogy-card h3 { color: #6366f1; margin-bottom: 8px; }
+  .analogy-card p { color: #9ca3af; font-size: 0.95em; }
+
+  /* Flow principal */
+  .flow-section { margin: 60px auto; max-width: 900px; }
+  .flow-section h2 { text-align: center; font-size: 2em; margin-bottom: 40px; color: #fff; }
+
+  .flow-step { display: flex; gap: 25px; margin-bottom: 0; position: relative; }
+  .flow-step:not(:last-child) { margin-bottom: 0; }
+
+  .flow-timeline { display: flex; flex-direction: column; align-items: center; min-width: 60px; }
+  .flow-number { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.3em; font-weight: bold; color: #fff; flex-shrink: 0; }
+  .flow-line { width: 3px; flex-grow: 1; min-height: 30px; }
+
+  .flow-content { background: #111827; border: 1px solid #374151; border-radius: 16px; padding: 25px; flex: 1; margin-bottom: 15px; }
+  .flow-content h3 { font-size: 1.2em; margin-bottom: 8px; }
+  .flow-content p { color: #9ca3af; }
+  .flow-content .detail { background: #1f2937; border-radius: 8px; padding: 12px 15px; margin-top: 12px; font-size: 0.9em; color: #d1d5db; }
+  .flow-content .tag { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.75em; font-weight: 600; margin-right: 5px; margin-top: 8px; }
+
+  .color-1 { background: #6366f1; }
+  .color-2 { background: #8b5cf6; }
+  .color-3 { background: #a78bfa; }
+  .color-4 { background: #c084fc; }
+  .color-5 { background: #e879f9; }
+  .color-6 { background: #f472b6; }
+  .color-7 { background: #fb923c; }
+  .color-8 { background: #34d399; }
+
+  .border-1 { border-left: 4px solid #6366f1; }
+  .border-2 { border-left: 4px solid #8b5cf6; }
+  .border-3 { border-left: 4px solid #a78bfa; }
+  .border-4 { border-left: 4px solid #c084fc; }
+  .border-5 { border-left: 4px solid #e879f9; }
+  .border-6 { border-left: 4px solid #f472b6; }
+  .border-7 { border-left: 4px solid #fb923c; }
+  .border-8 { border-left: 4px solid #34d399; }
+
+  /* Schedule visual */
+  .schedule { margin: 60px auto; max-width: 900px; }
+  .schedule h2 { text-align: center; font-size: 2em; margin-bottom: 10px; color: #fff; }
+  .schedule .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+
+  .schedule-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+  .day-col { background: #111827; border-radius: 12px; padding: 12px 8px; text-align: center; }
+  .day-col h4 { color: #6366f1; font-size: 0.85em; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #374151; }
+  .day-slot { background: #1f2937; border-radius: 8px; padding: 8px 6px; margin-bottom: 6px; font-size: 0.7em; }
+  .day-slot .time { color: #6366f1; font-weight: 600; display: block; }
+  .day-slot .topic { color: #d1d5db; }
+
+  /* Status section */
+  .status { margin: 60px auto; max-width: 900px; }
+  .status h2 { text-align: center; font-size: 2em; margin-bottom: 30px; color: #fff; }
+
+  .status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
+  .status-card { background: #111827; border: 1px solid #374151; border-radius: 12px; padding: 20px; }
+  .status-card h4 { font-size: 0.9em; color: #888; margin-bottom: 5px; }
+  .status-card .value { font-size: 1.8em; font-weight: bold; }
+  .status-card .desc { font-size: 0.85em; color: #666; margin-top: 4px; }
+  .green { color: #34d399; }
+  .yellow { color: #fbbf24; }
+  .red { color: #f87171; }
+  .blue { color: #60a5fa; }
+  .purple { color: #a78bfa; }
+
+  /* Checklist */
+  .checklist { margin: 60px auto; max-width: 800px; background: #111827; border: 1px solid #374151; border-radius: 16px; padding: 30px; }
+  .checklist h2 { color: #34d399; margin-bottom: 20px; font-size: 1.5em; }
+  .check-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid #1f2937; }
+  .check-item:last-child { border-bottom: none; }
+  .check-icon { font-size: 1.3em; flex-shrink: 0; margin-top: 2px; }
+  .check-text h4 { color: #e0e0e0; font-size: 1em; }
+  .check-text p { color: #888; font-size: 0.85em; margin-top: 2px; }
+  .check-text code { background: #1f2937; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; color: #a78bfa; }
+
+  /* Actions */
+  .actions { margin: 60px auto; max-width: 800px; }
+  .actions h2 { text-align: center; font-size: 2em; margin-bottom: 30px; color: #fff; }
+  .action-card { background: linear-gradient(135deg, #1a1040, #0f172a); border: 1px solid #4c1d95; border-radius: 16px; padding: 25px; margin-bottom: 15px; }
+  .action-card h3 { color: #a78bfa; margin-bottom: 8px; }
+  .action-card p { color: #9ca3af; font-size: 0.95em; }
+  .action-card .cmd { background: #0f172a; border: 1px solid #374151; border-radius: 8px; padding: 10px 15px; margin-top: 10px; font-family: monospace; font-size: 0.85em; color: #6ee7b7; overflow-x: auto; }
+
+  .footer { text-align: center; padding: 40px 20px; color: #444; font-size: 0.85em; }
+
+  @media (max-width: 768px) {
+    .analogy { grid-template-columns: 1fr; }
+    .schedule-grid { grid-template-columns: repeat(2, 1fr); }
+    .hero h1 { font-size: 2em; }
+    .flow-step { flex-direction: column; }
+    .flow-timeline { flex-direction: row; min-width: auto; margin-bottom: 10px; }
+    .flow-line { width: 30px; height: 3px; min-height: auto; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <h1>🧠 <span>Steve Brain</span></h1>
+  <p>Cómo Steve aprende solo, investiga el mercado y se vuelve más inteligente cada día — explicado fácil.</p>
+</div>
+
+<div class="container">
+
+<!-- RESUMEN RÁPIDO -->
+<div class="quick-summary">
+  <h2>En 30 segundos</h2>
+  <p>
+    Steve Brain es un <span class="highlight">equipo de investigación automatizado</span> que funciona 24/7.
+    Cada 2 horas manda a 10 "investigadores" a buscar en internet las últimas tendencias de marketing.
+    Después un "jefe senior" cruza los hallazgos y genera insights accionables.
+    <span class="highlight">Tú solo apruebas o rechazas lo que encuentra</span> desde WhatsApp.
+  </p>
+</div>
+
+<!-- ANALOGÍA -->
+<div class="analogy">
+  <div class="analogy-card">
+    <div class="emoji">🏢</div>
+    <h3>Consultora Real</h3>
+    <p>Un director asigna temas → 10 consultores investigan → un socio senior cruza hallazgos → el cliente revisa las recomendaciones</p>
+  </div>
+  <div class="analogy-card">
+    <div class="emoji">🤖</div>
+    <h3>Steve Brain</h3>
+    <p>Haiku genera preguntas → 10 buscadores de OpenAI investigan en paralelo → Opus sintetiza insights → JM aprueba desde WhatsApp</p>
+  </div>
+</div>
+
+<!-- FLOW PRINCIPAL -->
+<div class="flow-section">
+  <h2>El Flujo Completo</h2>
+
+  <!-- Paso 1 -->
+  <div class="flow-step">
+    <div class="flow-timeline">
+      <div class="flow-number color-1">1</div>
+      <div class="flow-line" style="background: linear-gradient(#6366f1, #8b5cf6);"></div>
+    </div>
+    <div class="flow-content border-1">
+      <h3>🎯 Director genera preguntas</h3>
+      <p>Cada 2 horas, Claude Haiku mira qué día y hora es, elige un tema del calendario, y genera 10 preguntas de investigación.</p>
+      <div class="detail">
+        <strong>Nuevo:</strong> Si tienes fuentes preferidas configuradas (ej: Sabri Suby, HubSpot Blog),
+        7 de las 10 preguntas apuntan a esas fuentes. Las otras 3 buscan cosas nuevas.
+      </div>
+      <span class="tag color-1">Claude Haiku</span>
+      <span class="tag" style="background:#374151;">Cada 2 horas</span>
+    </div>
+  </div>
+
+  <!-- Paso 2 -->
+  <div class="flow-step">
+    <div class="flow-timeline">
+      <div class="flow-number color-2">2</div>
+      <div class="flow-line" style="background: linear-gradient(#8b5cf6, #a78bfa);"></div>
+    </div>
+    <div class="flow-content border-2">
+      <h3>🔍 10 investigadores buscan en paralelo</h3>
+      <p>10 agentes de OpenAI (o4-mini) salen a buscar en la web real al mismo tiempo. Cada uno investiga una pregunta diferente y vuelve con un reporte + las URLs donde encontró la info.</p>
+      <div class="detail">
+        Ejemplo: "¿Qué dijo Sabri Suby sobre campañas ASC en su último video?" → o4-mini busca en YouTube, blogs, y trae la respuesta con fuentes.
+      </div>
+      <span class="tag color-2">OpenAI o4-mini</span>
+      <span class="tag" style="background:#374151;">10 en paralelo</span>
+    </div>
+  </div>
+
+  <!-- Paso 3 -->
+  <div class="flow-step">
+    <div class="flow-timeline">
+      <div class="flow-number color-3">3</div>
+      <div class="flow-line" style="background: linear-gradient(#a78bfa, #c084fc);"></div>
+    </div>
+    <div class="flow-content border-3">
+      <h3>🧠 Socio Senior cruza los hallazgos</h3>
+      <p>Claude Opus (el más inteligente) recibe los 10 reportes y busca <strong>conexiones entre ellos</strong>. No repite lo que dijeron — encuentra lo que ninguno pudo ver solo.</p>
+      <div class="detail">
+        Ejemplo: El reporte de Meta dice que ASC funciona mejor con catálogo. El de Shopify dice que las colecciones bien organizadas suben el AOV.
+        Opus cruza: "Si organizas bien tus colecciones en Shopify, tu ASC de Meta rinde 30% más porque el catálogo se alimenta mejor."
+      </div>
+      <span class="tag color-3">Claude Opus</span>
+      <span class="tag" style="background:#374151;">Máx 8 insights</span>
+    </div>
+  </div>
+
+  <!-- Paso 4 -->
+  <div class="flow-step">
+    <div class="flow-timeline">
+      <div class="flow-number color-4">4</div>
+      <div class="flow-line" style="background: linear-gradient(#c084fc, #e879f9);"></div>
+    </div>
+    <div class="flow-content border-4">
+      <h3>📥 Se guardan como "pendientes"</h3>
+      <p>Los insights se guardan en la base de conocimiento con estado <strong>"pendiente"</strong>. Steve NO los usa todavía hasta que tú los apruebes.</p>
+      <span class="tag color-4">steve_knowledge</span>
+      <span class="tag" style="background:#374151;">approval_status = pending</span>
+    </div>
+  </div>
+
+  <!-- Paso 5 -->
+  <div class="flow-step">
+    <div class="flow-timeline">
+      <div class="flow-number color-5">5</div>
+      <div class="flow-line" style="background: linear-gradient(#e879f9, #34d399);"></div>
+    </div>
+    <div class="flow-content border-5">
+      <h3>📱 Te llega un resumen por WhatsApp</h3>
+      <p>Todos los días a las 9am Chile, te llega un mensaje con los insights pendientes. Incluye un link para aprobar o rechazar cada uno.</p>
+      <div class="detail">
+        "Tienes 12 insights pendientes: 5 de Meta Ads, 4 de Klaviyo, 3 de Shopify. Los 2 más interesantes son..."
+      </div>
+      <span class="tag color-5">WhatsApp</span>
+      <span class="tag" style="background:#374151;">Diario 9am Chile</span>
+    </div>
+  </div>
+
+  <!-- Paso 6 -->
+  <div class="flow-step">
+    <div class="flow-timeline">
+      <div class="flow-number color-8">6</div>
+      <div class="flow-line" style="background: #34d399; opacity: 0;"></div>
+    </div>
+    <div class="flow-content border-8">
+      <h3>✅ Apruebas → Steve lo usa</h3>
+      <p>Cuando apruebas un insight, Steve lo incorpora a su conocimiento activo. La próxima vez que un merchant le pregunte sobre ese tema, Steve lo usa.</p>
+      <span class="tag color-8">Aprobado = Activo</span>
+    </div>
+  </div>
+</div>
+
+<!-- CALENDARIO DEL SWARM -->
+<div class="schedule">
+  <h2>📅 Calendario del Swarm</h2>
+  <p class="subtitle">Cada día investiga temas diferentes. AM = mañana, PM = tarde.</p>
+
+  <div class="schedule-grid">
+    <div class="day-col">
+      <h4>Lunes</h4>
+      <div class="day-slot"><span class="time">AM</span><span class="topic">Meta Ads</span></div>
+      <div class="day-slot"><span class="time">PM</span><span class="topic">Google Ads</span></div>
+    </div>
+    <div class="day-col">
+      <h4>Martes</h4>
+      <div class="day-slot"><span class="time">AM</span><span class="topic">Klaviyo & Email</span></div>
+      <div class="day-slot"><span class="time">PM</span><span class="topic">Shopify & Checkout</span></div>
+    </div>
+    <div class="day-col">
+      <h4>Miércoles</h4>
+      <div class="day-slot"><span class="time">AM</span><span class="topic">Retención</span></div>
+      <div class="day-slot"><span class="time">PM</span><span class="topic">Pricing</span></div>
+    </div>
+    <div class="day-col">
+      <h4>Jueves</h4>
+      <div class="day-slot"><span class="time">AM</span><span class="topic">Creativos & Copy</span></div>
+      <div class="day-slot"><span class="time">PM</span><span class="topic">LATAM Trends</span></div>
+    </div>
+    <div class="day-col">
+      <h4>Viernes</h4>
+      <div class="day-slot"><span class="time">AM</span><span class="topic">Cross-Channel</span></div>
+      <div class="day-slot"><span class="time">PM</span><span class="topic">Automatización</span></div>
+    </div>
+    <div class="day-col">
+      <h4>Sábado</h4>
+      <div class="day-slot"><span class="time">AM</span><span class="topic">Competencia</span></div>
+      <div class="day-slot"><span class="time">PM</span><span class="topic">Competencia</span></div>
+    </div>
+    <div class="day-col">
+      <h4>Domingo</h4>
+      <div class="day-slot"><span class="time">AM</span><span class="topic">Tema Libre</span></div>
+      <div class="day-slot"><span class="time">PM</span><span class="topic">Tema Libre</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- LOS OTROS CEREBROS -->
+<div class="flow-section">
+  <h2>Los Otros Cerebros (automáticos)</h2>
+  <p style="text-align:center; color:#888; margin-bottom:30px;">Además del Swarm, hay otros sistemas que trabajan solos:</p>
+
+  <div class="status-grid">
+    <div class="status-card">
+      <h4>🔎 Cazador de Contenido</h4>
+      <div class="value blue" style="font-size:1.2em;">Cada 20 min</div>
+      <div class="desc">Revisa tus fuentes configuradas (YouTube, blogs, RSS) y extrae reglas de lo que publica cada autor.</div>
+    </div>
+    <div class="status-card">
+      <h4>🔬 Descubridor de Patrones</h4>
+      <div class="value purple" style="font-size:1.2em;">Domingos 2am</div>
+      <div class="desc">Analiza los datos reales de tus clientes y descubre patrones que nadie pidió buscar. "Los martes Meta rinde 20% más".</div>
+    </div>
+    <div class="status-card">
+      <h4>🧬 Evolucionador de Prompts</h4>
+      <div class="value purple" style="font-size:1.2em;">Domingos 3am</div>
+      <div class="desc">Mira el feedback que dan los merchants y ajusta cómo Steve responde. Se auto-mejora.</div>
+    </div>
+    <div class="status-card">
+      <h4>💬 Aprendizaje de Ventas</h4>
+      <div class="value yellow" style="font-size:1.2em;">Diario 8pm</div>
+      <div class="desc">Lee las conversaciones de WhatsApp con prospectos y aprende qué técnicas de venta funcionan y cuáles no.</div>
+    </div>
+    <div class="status-card">
+      <h4>🏢 Aprendizaje Cross-Cliente</h4>
+      <div class="value green" style="font-size:1.2em;">1° del mes</div>
+      <div class="desc">Compara métricas entre todos los clientes (anónimo) y encuentra qué funciona en general.</div>
+    </div>
+    <div class="status-card">
+      <h4>🧹 Limpieza de Conocimiento</h4>
+      <div class="value green" style="font-size:1.2em;">1° del mes</div>
+      <div class="desc">Desactiva reglas viejas, elimina duplicados, consolida reglas similares. Se auto-mantiene.</div>
+    </div>
+  </div>
+</div>
+
+<!-- QUÉ TE FALTA -->
+<div class="checklist">
+  <h2>✅ Qué tienes / ❓Qué te falta</h2>
+
+  <div class="check-item">
+    <div class="check-icon">✅</div>
+    <div class="check-text">
+      <h4>Tabla swarm_sources creada</h4>
+      <p>Ya existe en Supabase. Puedes agregar fuentes.</p>
+    </div>
+  </div>
+
+  <div class="check-item">
+    <div class="check-icon">✅</div>
+    <div class="check-text">
+      <h4>Código del Swarm deployado en Cloud Run</h4>
+      <p>El endpoint <code>/api/cron/swarm-research</code> ya tiene la lógica de fuentes preferidas.</p>
+    </div>
+  </div>
+
+  <div class="check-item">
+    <div class="check-icon">✅</div>
+    <div class="check-text">
+      <h4>Página admin de fuentes</h4>
+      <p>Disponible en <code>/admin/swarm-sources</code></p>
+    </div>
+  </div>
+
+  <div class="check-item">
+    <div class="check-icon">✅</div>
+    <div class="check-text">
+      <h4>ANTHROPIC_API_KEY en Cloud Run</h4>
+      <p>Necesaria para Haiku (preguntas) y Opus (síntesis).</p>
+    </div>
+  </div>
+
+  <div class="check-item">
+    <div class="check-icon">✅</div>
+    <div class="check-text">
+      <h4>OPENAI_API_KEY en Cloud Run</h4>
+      <p>Necesaria para o4-mini (búsqueda web).</p>
+    </div>
+  </div>
+
+  <div class="check-item">
+    <div class="check-icon">⚠️</div>
+    <div class="check-text">
+      <h4>Cron Job para disparar el Swarm cada 2 horas</h4>
+      <p>Necesitas un cron en OpenClaw (o Cloud Scheduler) que haga <code>POST /api/cron/swarm-research</code> con header <code>X-Cron-Secret</code> cada 2 horas. Sin esto, el swarm no corre solo.</p>
+    </div>
+  </div>
+
+  <div class="check-item">
+    <div class="check-icon">⚠️</div>
+    <div class="check-text">
+      <h4>Cron Job para el digest diario de WhatsApp</h4>
+      <p>Necesitas un cron que llame <code>POST /api/cron/auto-learning-digest</code> diario a las 9am Chile. Sin esto, no te llega el resumen por WhatsApp para aprobar insights.</p>
+    </div>
+  </div>
+
+  <div class="check-item">
+    <div class="check-icon">⚠️</div>
+    <div class="check-text">
+      <h4>Variable ADMIN_WA_PHONE en Cloud Run</h4>
+      <p>Tu número de WhatsApp para recibir el digest diario. Formato: <code>+56912345678</code></p>
+    </div>
+  </div>
+
+  <div class="check-item">
+    <div class="check-icon">❓</div>
+    <div class="check-text">
+      <h4>Agregar tus primeras fuentes preferidas</h4>
+      <p>Ve a <code>/admin/swarm-sources</code> y agrega los autores, canales y blogs que quieres que Steve priorice.</p>
+    </div>
+  </div>
+
+  <div class="check-item">
+    <div class="check-icon">❓</div>
+    <div class="check-text">
+      <h4>Probar el Swarm manualmente una vez</h4>
+      <p>Para verificar que todo funciona antes de dejarlo en automático.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ACCIONES CONCRETAS -->
+<div class="actions">
+  <h2>🚀 Pasos para echarlo a andar</h2>
+
+  <div class="action-card">
+    <h3>Paso 1: Agregar fuentes preferidas</h3>
+    <p>Entra a la página admin y agrega tus fuentes favoritas. Ejemplos:</p>
+    <div class="cmd">
+      Sabri Suby → https://youtube.com/@SabriSuby → meta_ads<br>
+      HubSpot Blog → https://blog.hubspot.com → cross_channel<br>
+      Baymard Institute → https://baymard.com → shopify<br>
+      Klaviyo Blog → https://www.klaviyo.com/blog → klaviyo
+    </div>
+  </div>
+
+  <div class="action-card">
+    <h3>Paso 2: Probar el Swarm manualmente</h3>
+    <p>Dispara una corrida del swarm para verificar que funciona:</p>
+    <div class="cmd">
+      curl -X POST https://steve-api-850416724643.us-central1.run.app/api/cron/swarm-research \<br>
+      &nbsp;&nbsp;-H "X-Cron-Secret: TU_CRON_SECRET" \<br>
+      &nbsp;&nbsp;-H "Content-Type: application/json"
+    </div>
+  </div>
+
+  <div class="action-card">
+    <h3>Paso 3: Crear cron en OpenClaw</h3>
+    <p>Crear un cron job que dispare el swarm cada 2 horas:</p>
+    <div class="cmd">
+      URL: POST https://steve-api-850416724643.us-central1.run.app/api/cron/swarm-research<br>
+      Header: X-Cron-Secret: [tu secret]<br>
+      Schedule: 0 */2 * * * (cada 2 horas)
+    </div>
+  </div>
+
+  <div class="action-card">
+    <h3>Paso 4: Crear cron para el digest diario</h3>
+    <p>Para que te llegue el resumen por WhatsApp cada mañana:</p>
+    <div class="cmd">
+      URL: POST https://steve-api-850416724643.us-central1.run.app/api/cron/auto-learning-digest<br>
+      Header: X-Cron-Secret: [tu secret]<br>
+      Schedule: 0 12 * * * (9am Chile = 12 UTC)
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="footer">
+  Steve Brain v2 — Fuentes Preferidas — Abril 2026
+</div>
+
+</body>
+</html>

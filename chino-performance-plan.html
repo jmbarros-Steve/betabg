@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El Chino — Performance Checks: Plan de Implementación</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0a0a0f; color: #e0e0e0; line-height: 1.6; }
+  .container { max-width: 1440px; margin: 0 auto; padding: 24px; }
+
+  h1 { font-size: 2rem; color: #fff; margin-bottom: 4px; }
+  h2 { font-size: 1.45rem; color: #60a5fa; margin: 44px 0 16px; border-bottom: 2px solid #1e3a5f; padding-bottom: 8px; }
+  h3 { font-size: 1.1rem; color: #93c5fd; margin: 28px 0 12px; }
+  .sub { color: #9ca3af; font-size: 0.95rem; margin-bottom: 32px; }
+
+  /* badges */
+  .b { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; vertical-align: middle; }
+  .b-pass { background: #064e3b; color: #34d399; }
+  .b-skip { background: #78350f; color: #fcd34d; }
+  .b-a { background: #1e3a5f; color: #93c5fd; }
+  .b-b { background: #4c1d95; color: #c4b5fd; }
+  .b-c { background: #7f1d1d; color: #fca5a5; }
+  .b-easy { background: #064e3b; color: #6ee7b7; }
+  .b-med { background: #78350f; color: #fcd34d; }
+  .b-hard { background: #7f1d1d; color: #fca5a5; }
+  .b-get { background: #1e3a5f33; color: #93c5fd; border: 1px solid #1e3a5f; }
+  .b-post { background: #4c1d9533; color: #c4b5fd; border: 1px solid #4c1d95; }
+  .b-gcp { background: #7f1d1d33; color: #fca5a5; border: 1px solid #7f1d1d; }
+  .b-db { background: #064e3b33; color: #6ee7b7; border: 1px solid #064e3b; }
+  .b-api { background: #78350f33; color: #fcd34d; border: 1px solid #78350f; }
+  .b-new { background: #1e3a5f; color: #60a5fa; }
+
+  /* summary cards */
+  .sg { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin: 24px 0; }
+  .sc { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 18px; text-align: center; }
+  .sc .n { font-size: 2.4rem; font-weight: 700; }
+  .sc .l { font-size: 0.8rem; color: #9ca3af; margin-top: 2px; }
+  .sc.t .n { color: #60a5fa; }
+  .sc.w .n { color: #34d399; }
+  .sc.s .n { color: #fca5a5; }
+  .sc.g .n { color: #c4b5fd; }
+  .sc.y .n { color: #fcd34d; }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 28px; font-size: 0.88rem; }
+  th { background: #1f2937; color: #93c5fd; text-align: left; padding: 10px 14px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: .5px; }
+  td { padding: 10px 14px; border-bottom: 1px solid #1f2937; vertical-align: top; }
+  tr:hover { background: #111827; }
+  td code { background: #1f2937; padding: 2px 6px; border-radius: 4px; font-size: 0.82rem; color: #93c5fd; }
+
+  /* cards */
+  .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 22px; margin: 14px 0; }
+  .card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .card-num { font-size: 1.2rem; font-weight: 700; color: #60a5fa; min-width: 36px; }
+  .card-desc { font-size: 0.95rem; color: #e0e0e0; flex: 1; }
+
+  /* flow */
+  .flow { list-style: none; padding: 0; margin: 10px 0; }
+  .flow li { position: relative; padding: 7px 0 7px 32px; font-size: 0.86rem; color: #d1d5db; }
+  .flow li::before { content: attr(data-s); position: absolute; left: 0; top: 7px; width: 22px; height: 22px; background: #1e3a5f; color: #60a5fa; font-size: 0.68rem; font-weight: 700; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .flow li.fail::before { background: #7f1d1d; color: #fca5a5; }
+  .flow li.pass::before { background: #064e3b; color: #34d399; }
+
+  /* code */
+  .code { background: #0d1117; border: 1px solid #1f2937; border-radius: 8px; padding: 14px; margin: 10px 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.8rem; overflow-x: auto; white-space: pre-wrap; word-break: break-all; color: #c9d1d9; }
+  .code .cm { color: #8b949e; }
+  .code .kw { color: #ff7b72; }
+  .code .str { color: #a5d6ff; }
+  .code .fn { color: #d2a8ff; }
+  .code .num { color: #79c0ff; }
+
+  /* compare grid */
+  .cg { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
+  @media (max-width: 900px) { .cg { grid-template-columns: 1fr; } }
+
+  /* section label */
+  .sl { display: inline-block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 3px 10px; border-radius: 4px; margin-bottom: 8px; }
+  .sl-old { background: #7f1d1d; color: #fca5a5; }
+  .sl-new { background: #064e3b; color: #34d399; }
+
+  hr.div { border: 0; height: 1px; background: linear-gradient(to right, transparent, #374151, transparent); margin: 44px 0; }
+
+  /* architecture diagram */
+  .arch { background: #0d1117; border: 1px solid #1f2937; border-radius: 12px; padding: 24px; margin: 18px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; line-height: 1.8; color: #8b949e; overflow-x: auto; white-space: pre; }
+  .arch .box { color: #60a5fa; }
+  .arch .arr { color: #4b5563; }
+  .arch .ok { color: #34d399; }
+  .arch .err { color: #fca5a5; }
+  .arch .yl { color: #fcd34d; }
+
+  .legend { display: flex; gap: 20px; flex-wrap: wrap; margin: 12px 0; font-size: 0.8rem; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .legend .dot { width: 10px; height: 10px; border-radius: 50%; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- HEADER -->
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<h1>El Chino &mdash; Performance Checks</h1>
+<p class="sub">Plan de implementaci&oacute;n para los 27 checks de rendimiento que est&aacute;n en skip &mdash; Abril 2026</p>
+
+<div class="sg">
+  <div class="sc t"><div class="n">29</div><div class="l">Checks totales</div></div>
+  <div class="sc w"><div class="n">2</div><div class="l">Funcionando hoy</div></div>
+  <div class="sc s"><div class="n">27</div><div class="l">En skip (no hacen nada)</div></div>
+  <div class="sc g"><div class="n">3</div><div class="l">Grupos a implementar</div></div>
+  <div class="sc y"><div class="n">1</div><div class="l">Archivo a modificar</div></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SITUACION ACTUAL -->
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<h2>Situaci&oacute;n Actual</h2>
+
+<div class="cg">
+  <div>
+    <div class="sl sl-old">HOY &mdash; performance.ts</div>
+    <div class="code"><span class="cm">// Solo sabe hacer 1 cosa:</span>
+<span class="cm">// GET a una URL y medir tiempo</span>
+
+<span class="kw">const</span> url = check.check_config?.url;
+<span class="kw">const</span> maxMs = check.check_config?.max_ms;
+
+<span class="cm">// Si no tiene config → skip</span>
+<span class="kw">if</span> (!url || !maxMs) <span class="kw">return</span> { result: <span class="str">'skip'</span> };
+
+<span class="cm">// Fetch simple</span>
+<span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(url);
+<span class="kw">if</span> (elapsed <= maxMs) → <span class="ok">pass</span>
+<span class="kw">else</span> → <span class="err">fail</span></div>
+  </div>
+  <div>
+    <div class="sl sl-old">PROBLEMA</div>
+    <div class="card" style="margin-top:0;">
+      <p style="margin-bottom:10px;"><strong>Solo 2 checks tienen config:</strong></p>
+      <table style="margin:0;">
+        <tr><td><strong>#8</strong></td><td>steve-api /health</td><td><span class="b b-pass">PASS</span></td></tr>
+        <tr><td><strong>#9</strong></td><td>steve.cl homepage</td><td><span class="b b-pass">PASS</span></td></tr>
+      </table>
+      <p style="margin-top:14px;"><strong>Los otros 27 tienen <code>check_config: {}</code></strong></p>
+      <p>→ Todos retornan <span class="b b-skip">SKIP</span> porque no tienen <code>url</code> ni <code>max_ms</code></p>
+      <p style="margin-top:10px;">Adem&aacute;s, muchos checks necesitan l&oacute;gica especial (POST con body, APIs de GCP, queries a Postgres) que un simple <code>fetch(url)</code> no puede resolver.</p>
+    </div>
+  </div>
+</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- ARQUITECTURA NUEVA -->
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<h2>Arquitectura Nueva</h2>
+
+<div class="arch"><span class="box">executePerformance(check)</span>
+        <span class="arr">│</span>
+        <span class="arr">├──</span> check.check_number in <span class="yl">[8,9]</span>
+        <span class="arr">│</span>   <span class="arr">└──</span> <span class="fn">perfSimpleFetch(url, max_ms)</span> <span class="cm">← ya existe, sigue igual</span>
+        <span class="arr">│</span>
+        <span class="arr">├──</span> check.check_number in <span class="yl">[60,66,71,181-188]</span>  <span class="cm">GRUPO A</span>
+        <span class="arr">│</span>   <span class="arr">└──</span> <span class="fn">perfEndpoint(method, url, body, max_ms)</span>
+        <span class="arr">│</span>       <span class="arr">├──</span> POST con body de prueba al endpoint real
+        <span class="arr">│</span>       <span class="arr">├──</span> Mide response time
+        <span class="arr">│</span>       <span class="arr">└──</span> Compara vs threshold → <span class="ok">pass</span> / <span class="err">fail</span>
+        <span class="arr">│</span>
+        <span class="arr">├──</span> check.check_number in <span class="yl">[48,82,89,90,189-194]</span>  <span class="cm">GRUPO B</span>
+        <span class="arr">│</span>   <span class="arr">├──</span> <span class="fn">perfCloudRunMetrics(metric, threshold)</span>
+        <span class="arr">│</span>   <span class="arr">│</span>   <span class="arr">└──</span> GCP Monitoring API → memory, latency, instances, cold start
+        <span class="arr">│</span>   <span class="arr">├──</span> <span class="fn">perfSupabaseStats(query, threshold)</span>
+        <span class="arr">│</span>   <span class="arr">│</span>   <span class="arr">└──</span> pg_stat_statements → query time, slow queries
+        <span class="arr">│</span>   <span class="arr">└──</span> <span class="fn">perfEdgeFunctionErrors(minutes)</span>
+        <span class="arr">│</span>       <span class="arr">└──</span> Supabase Management API / GCP Logs
+        <span class="arr">│</span>
+        <span class="arr">├──</span> check.check_number in <span class="yl">[195-200]</span>  <span class="cm">GRUPO C</span>
+        <span class="arr">│</span>   <span class="arr">├──</span> <span class="fn">perfAnthropicLatency(max_ms)</span>
+        <span class="arr">│</span>   <span class="arr">│</span>   <span class="arr">└──</span> Llamada real a Anthropic API → mide latency
+        <span class="arr">│</span>   <span class="arr">├──</span> <span class="fn">perfRateLimit(platform, threshold)</span>
+        <span class="arr">│</span>   <span class="arr">│</span>   <span class="arr">└──</span> Lee headers de rate limit de Meta/Shopify/Klaviyo
+        <span class="arr">│</span>   <span class="arr">├──</span> <span class="fn">perfWhatsAppDelivery(min_rate)</span>
+        <span class="arr">│</span>   <span class="arr">│</span>   <span class="arr">└──</span> Twilio API → delivery stats
+        <span class="arr">│</span>   <span class="arr">└──</span> <span class="fn">perfErrorRate(hours, max_pct)</span>
+        <span class="arr">│</span>       <span class="arr">└──</span> GCP Monitoring → error count / total requests
+        <span class="arr">│</span>
+        <span class="arr">└──</span> default → <span class="yl">skip</span> (<span class="str">"check not implemented"</span>)</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- GRUPO A: Endpoint Response Time -->
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<h2><span class="b b-a">GRUPO A</span> Endpoint Response Time &mdash; 12 checks</h2>
+<p style="margin-bottom:16px; font-size:0.9rem; color:#9ca3af;">Mide cu&aacute;nto tarda cada endpoint cr&iacute;tico de Steve en responder. Usa llamadas reales (POST con body m&iacute;nimo de prueba) en vez de GET vac&iacute;o.</p>
+
+<div class="card">
+  <h3 style="margin-top:0;">M&eacute;todo de medici&oacute;n</h3>
+  <ol class="flow">
+    <li data-s="1">Arma request real: m&eacute;todo POST/GET, URL del endpoint, body de prueba, headers con <code>Authorization: Bearer service_role_key</code></li>
+    <li data-s="2">Marca <code>t0 = Date.now()</code></li>
+    <li data-s="3">Ejecuta <code>fetch(url, { method, headers, body })</code> con timeout de 30s</li>
+    <li data-s="4">Marca <code>elapsed = Date.now() - t0</code></li>
+    <li data-s="5">Si HTTP status != 2xx → <strong>error</strong> (endpoint roto)</li>
+    <li data-s="6" class="pass">Si <code>elapsed &le; max_ms</code> → <strong>pass</strong></li>
+    <li data-s="7" class="fail">Si <code>elapsed &gt; max_ms</code> → <strong>fail</strong> con detalle "Tard&oacute; Xms, m&aacute;ximo Yms"</li>
+  </ol>
+</div>
+
+<table>
+  <thead><tr><th>#</th><th>Descripci&oacute;n</th><th>Endpoint</th><th>Method</th><th>Body de prueba</th><th>Threshold</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>60</strong></td>
+      <td>Klaviyo push emails &lt; 5s</td>
+      <td><code>/api/klaviyo/sync</code></td>
+      <td><span class="b b-post">POST</span></td>
+      <td><code>{ "dry_run": true }</code></td>
+      <td>5,000ms</td>
+    </tr>
+    <tr>
+      <td><strong>66</strong></td>
+      <td>SteveMail send-email &lt; 3s</td>
+      <td><code>/api/email/send</code></td>
+      <td><span class="b b-post">POST</span></td>
+      <td><code>{ "dry_run": true }</code></td>
+      <td>3,000ms</td>
+    </tr>
+    <tr>
+      <td><strong>71</strong></td>
+      <td>Steve Chat responde &lt; 10s</td>
+      <td><code>/api/ai/steve-chat</code></td>
+      <td><span class="b b-post">POST</span></td>
+      <td><code>{ "message": "ping", "system_test": true }</code></td>
+      <td>10,000ms</td>
+    </tr>
+    <tr>
+      <td><strong>181</strong></td>
+      <td>steve-chat p95 &lt; 10s</td>
+      <td><code>/api/ai/steve-chat</code></td>
+      <td><span class="b b-post">POST</span></td>
+      <td><code>{ "message": "resumen breve", "system_test": true }</code></td>
+      <td>10,000ms</td>
+    </tr>
+    <tr>
+      <td><strong>182</strong></td>
+      <td>fetch-shopify-products p95 &lt; 5s</td>
+      <td><code>/api/shopify/products</code></td>
+      <td><span class="b b-get">GET</span></td>
+      <td><code>?limit=1</code></td>
+      <td>5,000ms</td>
+    </tr>
+    <tr>
+      <td><strong>183</strong></td>
+      <td>sync-meta-metrics p95 &lt; 15s</td>
+      <td><code>/api/meta/sync-metrics</code></td>
+      <td><span class="b b-post">POST</span></td>
+      <td><code>{ "dry_run": true }</code></td>
+      <td>15,000ms</td>
+    </tr>
+    <tr>
+      <td><strong>184</strong></td>
+      <td>generate-meta-copy p95 &lt; 8s</td>
+      <td><code>/api/ai/generate-meta-copy</code></td>
+      <td><span class="b b-post">POST</span></td>
+      <td><code>{ "prompt": "test", "system_test": true }</code></td>
+      <td>8,000ms</td>
+    </tr>
+    <tr>
+      <td><strong>185</strong></td>
+      <td>manage-meta-campaign p95 &lt; 5s</td>
+      <td><code>/api/meta/campaigns</code></td>
+      <td><span class="b b-get">GET</span></td>
+      <td><code>?limit=1</code></td>
+      <td>5,000ms</td>
+    </tr>
+    <tr>
+      <td><strong>186</strong></td>
+      <td>send-email p95 &lt; 3s</td>
+      <td><code>/api/email/send</code></td>
+      <td><span class="b b-post">POST</span></td>
+      <td><code>{ "dry_run": true }</code></td>
+      <td>3,000ms</td>
+    </tr>
+    <tr>
+      <td><strong>187</strong></td>
+      <td>generate-image p95 &lt; 20s</td>
+      <td><code>/api/ai/generate-image</code></td>
+      <td><span class="b b-post">POST</span></td>
+      <td><code>{ "prompt": "test square", "system_test": true }</code></td>
+      <td>20,000ms</td>
+    </tr>
+    <tr>
+      <td><strong>188</strong></td>
+      <td>steve-strategy p95 &lt; 12s</td>
+      <td><code>/api/ai/steve-strategy</code></td>
+      <td><span class="b b-post">POST</span></td>
+      <td><code>{ "query": "test", "system_test": true }</code></td>
+      <td>12,000ms</td>
+    </tr>
+    <tr>
+      <td><strong>195</strong></td>
+      <td>Anthropic API latency &lt; 5s</td>
+      <td>Anthropic API directa</td>
+      <td><span class="b b-post">POST</span></td>
+      <td>Llamada m&iacute;nima: <code>messages.create({ model: "claude-haiku", messages: [{role:"user", content:"hi"}], max_tokens: 5 })</code></td>
+      <td>5,000ms</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="card">
+  <h3 style="margin-top:0;">Ejemplo: Check #71 &mdash; Steve Chat &lt; 10s</h3>
+  <div class="code"><span class="cm">// 1. Armar request</span>
+<span class="kw">const</span> url = <span class="str">`${API_BASE}/api/ai/steve-chat`</span>;
+<span class="kw">const</span> body = { message: <span class="str">"ping"</span>, system_test: <span class="num">true</span> };
+
+<span class="cm">// 2. Medir</span>
+<span class="kw">const</span> t0 = Date.now();
+<span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetchWithTimeout</span>(url, {
+  method: <span class="str">'POST'</span>,
+  headers: { <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span>, Authorization: <span class="str">`Bearer ${serviceKey}`</span> },
+  body: JSON.stringify(body),
+}, <span class="num">30000</span>);
+<span class="kw">const</span> elapsed = Date.now() - t0;
+
+<span class="cm">// 3. Evaluar</span>
+<span class="kw">if</span> (!res.ok) → <span class="err">error</span>: <span class="str">"Steve Chat returned 502"</span>
+<span class="kw">if</span> (elapsed <= <span class="num">10000</span>) → <span class="ok">pass</span>: <span class="str">"3,240ms (max 10,000ms)"</span>
+<span class="kw">if</span> (elapsed > <span class="num">10000</span>) → <span class="err">fail</span>: <span class="str">"Tardó 12,500ms, máximo 10,000ms"</span></div>
+</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- GRUPO B: Infraestructura -->
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<h2><span class="b b-b">GRUPO B</span> M&eacute;tricas de Infraestructura &mdash; 10 checks</h2>
+<p style="margin-bottom:16px; font-size:0.9rem; color:#9ca3af;">Consultan GCP Monitoring API y Supabase para verificar salud interna de la plataforma. No son endpoints &mdash; son m&eacute;tricas del sistema.</p>
+
+<h3>B.1 &mdash; GCP Cloud Monitoring (6 checks)</h3>
+
+<div class="card">
+  <h3 style="margin-top:0;">M&eacute;todo de medici&oacute;n</h3>
+  <ol class="flow">
+    <li data-s="1">Obtener access token GCP: <code>google-auth-library</code> con credenciales del service account de Cloud Run</li>
+    <li data-s="2">Llamar <code>monitoring.googleapis.com/v3/projects/steveapp-agency/timeSeries</code></li>
+    <li data-s="3">Filtrar por <code>resource.type = "cloud_run_revision"</code> y <code>resource.labels.service_name = "steve-api"</code></li>
+    <li data-s="4">Leer el valor m&aacute;s reciente del time series</li>
+    <li data-s="5" class="pass">Si valor &le; threshold → <strong>pass</strong></li>
+    <li data-s="6" class="fail">Si valor &gt; threshold → <strong>fail</strong></li>
+  </ol>
+</div>
+
+<table>
+  <thead><tr><th>#</th><th>Descripci&oacute;n</th><th>M&eacute;trica GCP</th><th>Threshold</th><th>C&oacute;mo mide</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>89</strong></td>
+      <td>Memory &lt; 512MB</td>
+      <td><code>run.googleapis.com/container/memory/utilizations</code></td>
+      <td>&lt; 0.5 (50% de 1GB)</td>
+      <td>Lee el percentil m&aacute;s reciente del time series. Si &gt; 50% del l&iacute;mite configurado → fail</td>
+    </tr>
+    <tr>
+      <td><strong>90</strong></td>
+      <td>p95 latency &lt; 5s</td>
+      <td><code>run.googleapis.com/request_latencies</code></td>
+      <td>&lt; 5,000ms</td>
+      <td>Pide el percentil 95 de las request latencies de los &uacute;ltimos 30 minutos</td>
+    </tr>
+    <tr>
+      <td><strong>192</strong></td>
+      <td>Cold start &lt; 3s</td>
+      <td><code>run.googleapis.com/request_latencies</code> filtrado por cold start</td>
+      <td>&lt; 3,000ms</td>
+      <td>Filtra requests donde <code>is_cold_start=true</code>, mide p95 de esas latencies</td>
+    </tr>
+    <tr>
+      <td><strong>193</strong></td>
+      <td>Instances &lt; 10</td>
+      <td><code>run.googleapis.com/container/instance_count</code></td>
+      <td>&lt; 10</td>
+      <td>Lee el valor actual de instancias activas</td>
+    </tr>
+    <tr>
+      <td><strong>194</strong></td>
+      <td>Requests/min &lt; 1000</td>
+      <td><code>run.googleapis.com/request_count</code></td>
+      <td>&lt; 1,000/min</td>
+      <td>Suma request_count del &uacute;ltimo minuto</td>
+    </tr>
+    <tr>
+      <td><strong>200</strong></td>
+      <td>Error rate &lt; 2%</td>
+      <td><code>run.googleapis.com/request_count</code> con filtro <code>response_code_class="5xx"</code></td>
+      <td>&lt; 2%</td>
+      <td>Cuenta 5xx / total requests en &uacute;ltimas 6 horas. Si ratio &gt; 0.02 → fail</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="card">
+  <h3 style="margin-top:0;">Ejemplo: Check #89 &mdash; Memory &lt; 512MB</h3>
+  <div class="code"><span class="cm">// 1. Auth con GCP</span>
+<span class="kw">const</span> auth = <span class="kw">new</span> <span class="fn">GoogleAuth</span>({ scopes: [<span class="str">'https://www.googleapis.com/auth/monitoring.read'</span>] });
+<span class="kw">const</span> token = <span class="kw">await</span> auth.getAccessToken();
+
+<span class="cm">// 2. Query Cloud Monitoring</span>
+<span class="kw">const</span> filter = <span class="str">'metric.type="run.googleapis.com/container/memory/utilizations"'</span>
+  + <span class="str">' AND resource.labels.service_name="steve-api"'</span>;
+<span class="kw">const</span> url = <span class="str">`https://monitoring.googleapis.com/v3/projects/steveapp-agency/timeSeries`</span>
+  + <span class="str">`?filter=${filter}&interval.endTime=${now}&interval.startTime=${minus30min}`</span>;
+
+<span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(url, { headers: { Authorization: <span class="str">`Bearer ${token}`</span> } });
+<span class="kw">const</span> data = <span class="kw">await</span> res.json();
+
+<span class="cm">// 3. Leer valor más reciente</span>
+<span class="kw">const</span> utilization = data.timeSeries[<span class="num">0</span>].points[<span class="num">0</span>].value.doubleValue; <span class="cm">// e.g. 0.35</span>
+<span class="kw">const</span> memoryMB = utilization * <span class="num">1024</span>; <span class="cm">// 358MB</span>
+
+<span class="cm">// 4. Evaluar</span>
+<span class="kw">if</span> (memoryMB < <span class="num">512</span>) → <span class="ok">pass</span>: <span class="str">"358MB / 512MB max"</span>
+<span class="kw">if</span> (memoryMB >= <span class="num">512</span>) → <span class="err">fail</span>: <span class="str">"623MB, máximo 512MB"</span></div>
+</div>
+
+<h3>B.2 &mdash; Supabase / Postgres (3 checks)</h3>
+
+<div class="card">
+  <h3 style="margin-top:0;">M&eacute;todo de medici&oacute;n</h3>
+  <ol class="flow">
+    <li data-s="1">Ejecutar query SQL via <code>supabase.rpc()</code> o conexi&oacute;n directa</li>
+    <li data-s="2">Parsear resultado</li>
+    <li data-s="3">Comparar contra threshold</li>
+  </ol>
+</div>
+
+<table>
+  <thead><tr><th>#</th><th>Descripci&oacute;n</th><th>Query / Fuente</th><th>Threshold</th><th>C&oacute;mo mide</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>82</strong></td>
+      <td>Connection pool &lt; 80%</td>
+      <td><code>SELECT count(*) FROM pg_stat_activity WHERE state != 'idle'</code></td>
+      <td>&lt; 80% del m&aacute;x (aprox 40 de 50)</td>
+      <td>Cuenta conexiones activas vs <code>max_connections</code>. Si ratio &gt; 0.8 → fail</td>
+    </tr>
+    <tr>
+      <td><strong>189</strong></td>
+      <td>Query time promedio &lt; 100ms</td>
+      <td><code>SELECT mean_exec_time FROM pg_stat_statements ORDER BY calls DESC LIMIT 20</code></td>
+      <td>&lt; 100ms promedio</td>
+      <td>Promedia <code>mean_exec_time</code> de los top 20 queries m&aacute;s ejecutados</td>
+    </tr>
+    <tr>
+      <td><strong>190</strong></td>
+      <td>No queries &gt; 5s</td>
+      <td><code>SELECT query, max_exec_time FROM pg_stat_statements WHERE max_exec_time > 5000</code></td>
+      <td>0 queries &gt; 5s</td>
+      <td>Busca queries cuyo <code>max_exec_time</code> &gt; 5000ms. Si hay alguno → fail con el query</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="card">
+  <h3 style="margin-top:0;">Ejemplo: Check #190 &mdash; No queries &gt; 5s</h3>
+  <div class="code"><span class="cm">// Query via supabase.rpc() — necesita una función SQL en Supabase</span>
+<span class="kw">const</span> { data } = <span class="kw">await</span> supabase.<span class="fn">rpc</span>(<span class="str">'chino_slow_queries'</span>, { min_ms: <span class="num">5000</span> });
+
+<span class="cm">// La función SQL:</span>
+<span class="cm">// CREATE FUNCTION chino_slow_queries(min_ms float)</span>
+<span class="cm">// RETURNS TABLE(query text, max_time float, calls bigint)</span>
+<span class="cm">// AS $$ SELECT query, max_exec_time, calls</span>
+<span class="cm">//        FROM pg_stat_statements</span>
+<span class="cm">//        WHERE max_exec_time > min_ms</span>
+<span class="cm">//        ORDER BY max_exec_time DESC LIMIT 10 $$</span>
+
+<span class="kw">if</span> (data.length === <span class="num">0</span>) → <span class="ok">pass</span>: <span class="str">"No slow queries"</span>
+<span class="kw">if</span> (data.length > <span class="num">0</span>) → <span class="err">fail</span>: <span class="str">"3 queries > 5s: SELECT * FROM steve_knowledge..."</span></div>
+</div>
+
+<h3>B.3 &mdash; Edge Functions (1 check)</h3>
+
+<table>
+  <thead><tr><th>#</th><th>Descripci&oacute;n</th><th>Fuente</th><th>Threshold</th><th>C&oacute;mo mide</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>48</strong></td>
+      <td>Edge Functions sin 500 en 30min</td>
+      <td>Supabase Management API o chequeo de <code>platform_metrics</code> donde se logueen errores</td>
+      <td>0 errores 500</td>
+      <td>Query a logs internos o <code>platform_metrics</code> donde <code>metric_type='edge_function_error'</code>. Si hay errores recientes → fail</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>B.4 &mdash; Realtime (1 check)</h3>
+
+<table>
+  <thead><tr><th>#</th><th>Descripci&oacute;n</th><th>Fuente</th><th>Threshold</th><th>C&oacute;mo mide</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>191</strong></td>
+      <td>Realtime subscriptions &lt; 100</td>
+      <td>Supabase Management API: <code>GET /v1/projects/{ref}/database/health</code> o <code>pg_stat_activity</code> filtrando por realtime</td>
+      <td>&lt; 100</td>
+      <td>Cuenta conexiones de tipo realtime. Si &gt; 100 → fail (posible leak de subscriptions)</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- GRUPO C: Rate Limits y APIs Externas -->
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<h2><span class="b b-c">GRUPO C</span> Rate Limits &amp; APIs Externas &mdash; 5 checks</h2>
+<p style="margin-bottom:16px; font-size:0.9rem; color:#9ca3af;">Verifican que no estamos cerca de los l&iacute;mites de las APIs externas y que los servicios de mensajer&iacute;a funcionan bien.</p>
+
+<table>
+  <thead><tr><th>#</th><th>Descripci&oacute;n</th><th>API</th><th>Threshold</th><th>C&oacute;mo mide</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>196</strong></td>
+      <td>Meta API rate limit &lt; 80%</td>
+      <td><span class="b b-api">Meta Graph API</span></td>
+      <td>&lt; 80% usage</td>
+      <td>
+        <ol class="flow" style="margin:0;">
+          <li data-s="1">GET <code>/act_{id}?fields=id</code> con el token del merchant</li>
+          <li data-s="2">Leer header <code>x-business-use-case-usage</code> de la response</li>
+          <li data-s="3">Parsear JSON: <code>call_count</code>, <code>total_cputime</code>, <code>total_time</code></li>
+          <li data-s="4" class="fail">Si cualquiera &gt; 80 → fail</li>
+        </ol>
+      </td>
+    </tr>
+    <tr>
+      <td><strong>197</strong></td>
+      <td>Shopify API bucket &gt; 20%</td>
+      <td><span class="b b-api">Shopify REST</span></td>
+      <td>&gt; 20% restante</td>
+      <td>
+        <ol class="flow" style="margin:0;">
+          <li data-s="1">GET <code>/admin/api/2025-01/shop.json</code> (llamada liviana)</li>
+          <li data-s="2">Leer header <code>X-Shopify-Shop-Api-Call-Limit</code> → e.g. "32/40"</li>
+          <li data-s="3">Calcular: restante = 40-32 = 8, ratio = 8/40 = 20%</li>
+          <li data-s="4" class="fail">Si restante &lt; 20% del total → fail</li>
+        </ol>
+      </td>
+    </tr>
+    <tr>
+      <td><strong>198</strong></td>
+      <td>Klaviyo no hitting 429</td>
+      <td><span class="b b-api">Klaviyo API</span></td>
+      <td>0 errores 429</td>
+      <td>
+        <ol class="flow" style="margin:0;">
+          <li data-s="1">GET <code>/api/profiles/?page[size]=1</code> (llamada m&iacute;nima)</li>
+          <li data-s="2">Si retorna 429 → fail inmediato</li>
+          <li data-s="3">Si retorna 200, leer header <code>RateLimit-Remaining</code></li>
+          <li data-s="4" class="fail">Si remaining &lt; 10 → fail (casi en el l&iacute;mite)</li>
+        </ol>
+      </td>
+    </tr>
+    <tr>
+      <td><strong>199</strong></td>
+      <td>WhatsApp delivery &gt; 95%</td>
+      <td><span class="b b-api">Twilio API</span></td>
+      <td>&gt; 95% delivered</td>
+      <td>
+        <ol class="flow" style="margin:0;">
+          <li data-s="1">GET <code>api.twilio.com/2010-04/Accounts/{sid}/Messages.json?DateSent>={hoy}&PageSize=100</code></li>
+          <li data-s="2">Contar mensajes con status <code>delivered</code> vs total</li>
+          <li data-s="3">Calcular delivery rate = delivered / total</li>
+          <li data-s="4" class="fail">Si &lt; 95% → fail con el rate real</li>
+        </ol>
+      </td>
+    </tr>
+    <tr>
+      <td><strong>200</strong></td>
+      <td>Error rate &lt; 2% en 6h</td>
+      <td><span class="b b-gcp">GCP Monitoring</span></td>
+      <td>&lt; 2%</td>
+      <td>
+        <ol class="flow" style="margin:0;">
+          <li data-s="1">Query GCP Monitoring: <code>request_count</code> con <code>response_code_class="5xx"</code> vs total</li>
+          <li data-s="2">Rango: &uacute;ltimas 6 horas</li>
+          <li data-s="3">Calcular ratio = 5xx / total</li>
+          <li data-s="4" class="fail">Si &gt; 2% → fail</li>
+        </ol>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="card">
+  <h3 style="margin-top:0;">Ejemplo: Check #197 &mdash; Shopify Rate Limit</h3>
+  <div class="code"><span class="cm">// 1. Llamada liviana a Shopify</span>
+<span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">shopifyApi</span>(store_url, token, <span class="str">'shop.json'</span>);
+
+<span class="cm">// 2. Leer header de rate limit</span>
+<span class="kw">const</span> limit = res.headers.get(<span class="str">'X-Shopify-Shop-Api-Call-Limit'</span>); <span class="cm">// "32/40"</span>
+<span class="kw">const</span> [used, total] = limit.split(<span class="str">'/'</span>).map(Number);      <span class="cm">// [32, 40]</span>
+<span class="kw">const</span> remaining = (total - used) / total;                 <span class="cm">// 0.20 = 20%</span>
+
+<span class="cm">// 3. Evaluar</span>
+<span class="kw">if</span> (remaining >= <span class="num">0.20</span>) → <span class="ok">pass</span>: <span class="str">"32/40 used, 20% remaining"</span>
+<span class="kw">if</span> (remaining < <span class="num">0.20</span>) → <span class="err">fail</span>: <span class="str">"38/40 used, solo 5% remaining"</span></div>
+</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- RESUMEN DE DEPENDENCIAS -->
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<h2>Dependencias por Grupo</h2>
+
+<table>
+  <thead><tr><th>Grupo</th><th>Checks</th><th>Necesita</th><th>Ya tenemos?</th><th>Esfuerzo</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="b b-a">A</span></td>
+      <td>12 checks</td>
+      <td><code>fetch()</code> + service_role_key + ANTHROPIC_API_KEY</td>
+      <td style="color:#34d399;">Si &mdash; todas las env vars est&aacute;n en Cloud Run</td>
+      <td><span class="b b-easy">F&aacute;cil</span></td>
+    </tr>
+    <tr>
+      <td rowspan="3"><span class="b b-b">B</span></td>
+      <td>6 checks (GCP)</td>
+      <td>GCP Monitoring API + <code>google-auth-library</code></td>
+      <td style="color:#fcd34d;">Parcial &mdash; Cloud Run tiene SA pero hay que verificar permisos <code>monitoring.timeSeries.list</code></td>
+      <td><span class="b b-med">Medio</span></td>
+    </tr>
+    <tr>
+      <td>3 checks (Postgres)</td>
+      <td><code>pg_stat_statements</code> habilitado + funciones RPC en Supabase</td>
+      <td style="color:#fca5a5;">No &mdash; hay que crear 2-3 funciones SQL en Supabase y verificar que la extensi&oacute;n est&eacute; activa</td>
+      <td><span class="b b-med">Medio</span></td>
+    </tr>
+    <tr>
+      <td>1 check (Edge Fn)</td>
+      <td>Logs de Edge Functions</td>
+      <td style="color:#fcd34d;">Parcial &mdash; depende de si logueamos errores en <code>platform_metrics</code></td>
+      <td><span class="b b-easy">F&aacute;cil</span></td>
+    </tr>
+    <tr>
+      <td><span class="b b-c">C</span></td>
+      <td>5 checks</td>
+      <td>Tokens de Meta/Shopify/Klaviyo + Twilio creds + GCP Monitoring</td>
+      <td style="color:#34d399;">Si &mdash; tokens se desencriptan en el runner, Twilio creds est&aacute;n en env vars</td>
+      <td><span class="b b-med">Medio</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- ORDEN DE IMPLEMENTACION -->
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<h2>Orden de Implementaci&oacute;n Recomendado</h2>
+
+<div class="card">
+  <table style="margin:0;">
+    <thead><tr><th>Fase</th><th>Grupo</th><th>Checks</th><th>Impacto</th><th>Qu&eacute; se modifica</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Fase 1</strong></td>
+        <td><span class="b b-a">A</span></td>
+        <td>12 checks (60, 66, 71, 181-188, 195)</td>
+        <td>Cada endpoint cr&iacute;tico monitoreado en tiempo real</td>
+        <td><code>performance.ts</code> &mdash; rewrite con switch por check_number + helpers POST/GET</td>
+      </tr>
+      <tr>
+        <td><strong>Fase 2</strong></td>
+        <td><span class="b b-c">C</span></td>
+        <td>5 checks (196-200)</td>
+        <td>Evitar rate limit surprises + delivery monitoring</td>
+        <td><code>performance.ts</code> &mdash; agregar funciones de rate limit + runner.ts necesita pasar token</td>
+      </tr>
+      <tr>
+        <td><strong>Fase 3</strong></td>
+        <td><span class="b b-b">B</span></td>
+        <td>10 checks (48, 82, 89, 90, 189-194)</td>
+        <td>Visibilidad completa de la infra</td>
+        <td><code>performance.ts</code> + nueva migración SQL (funciones RPC) + verificar permisos GCP</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>Archivo a Modificar</h2>
+
+<table>
+  <thead><tr><th>Archivo</th><th>Cambio</th><th>L&iacute;neas estimadas</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>cloud-run-api/src/chino/checks/performance.ts</code></td>
+      <td>Rewrite completo: de 1 funci&oacute;n gen&eacute;rica a switch con 27+ funciones espec&iacute;ficas</td>
+      <td>~800-1000</td>
+    </tr>
+    <tr>
+      <td><code>cloud-run-api/src/chino/runner.ts</code></td>
+      <td>Quitar <code>performance</code> de <code>NO_TOKEN_TYPES</code> (checks del Grupo C necesitan token)</td>
+      <td>2 l&iacute;neas</td>
+    </tr>
+    <tr>
+      <td><code>supabase/migrations/XXXXXX_chino_perf_rpc.sql</code></td>
+      <td>Funciones SQL: <code>chino_slow_queries</code>, <code>chino_connection_pool</code>, <code>chino_avg_query_time</code></td>
+      <td>~40 (solo Fase 3)</td>
+    </tr>
+  </tbody>
+</table>
+
+<p style="margin-top: 50px; text-align: center; color: #4b5563; font-size: 0.8rem;">El Chino Performance &mdash; Plan de implementaci&oacute;n &mdash; 3 abril 2026</p>
+
+</div>
+</body>
+</html>

@@ -91,3 +91,69 @@ Frontend MetaPartnerSetup.tsx → Leadsie con ?customUserId={client_id}
 4. Configurar Leadsie Connect Profile para Google Ads con el MCC de Steve
 5. Implementar webhook handler + resolver en getTokenForConnection()
 6. Setear env vars: GOOGLE_MCC_CUSTOMER_ID, GOOGLE_MCC_REFRESH_TOKEN, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_ADS_DEVELOPER_TOKEN
+
+## Sesión 10/04/2026 — Tier 1 + Tier 2 + Fix Pipeline
+
+### Tier 1: Campañas + Reglas Automáticas
+- 6 archivos nuevos, 3 modificados, 2075 líneas
+- Tablas: `google_automated_rules` + `google_rule_execution_log` (con RLS + indexes)
+- `manage-google-campaign.ts`: pause/resume/update_budget/list_details
+- `manage-google-rules.ts`: CRUD reglas
+- `execute-google-rules.ts`: cron cada hora
+- Frontend: `GoogleCampaignManager.tsx` + `GoogleAutomatedRules.tsx` (5 presets + historial)
+- `GoogleAdsTab.tsx` modificado: 4 tabs (Analíticas / Campañas / Reglas / Copys)
+- Deploy completo: Supabase + Cloud Run + Vercel + Cloud Scheduler
+- Commit: `12b642f0`
+
+### Tier 2: 5 Features Search
+- Keywords Manager, Search Terms + Negative Keywords, RSA Ads, Ad Extensions, Conversions
+- 8 archivos nuevos, 2 modificados
+- 5 rondas de QA
+
+### Fix Pipeline
+- `sync-campaign-metrics.ts`: arreglado para Google
+- `check-google-ads-health.ts`: nuevo health check
+- `currency.ts`: conversión a CLP
+- MCC 403 fallback implementado
+- Deploy: rev 00478
+
+## Sesión 12/04/2026 — Tier 3: Shared Lib + PMAX + Steve AI
+
+### Lo que se hizo (6 fases en una sesión)
+1. **Shared lib `google-ads-api.ts`** — ~465 líneas eliminando código duplicado
+2. **`manage-google-campaign.ts`** — expandido a 13 actions
+3. **`manage-google-pmax.ts`** — NUEVO, 6 actions para Performance Max
+4. **Frontend expandido:** wizard campañas, settings, ad groups, PMAX manager, Steve AI recommendations
+5. **Commit `5b3c60bb`**, deploy rev 00513-489
+6. **12 archivos, +2979/-785 líneas**
+
+### Lecciones API v23
+- Google Ads API v23 requiere GAQL con `searchStream` (no `search`)
+- `mutate` requiere `operations` con `create`/`update`/`remove`
+- PMAX necesita TODOS los assets mínimos en un solo batch
+- MCC puede dar 403 si Leadsie offboard rompió link → fallback obligatorio
+
+## Sesión 13/04/2026 — Wizard PMAX 6 pasos + 10 fixes API v23
+
+### Wizard PMAX expandido
+- De 4 a 6 pasos: +imágenes (base64), +videos YouTube, +CTA, +display URL path
+- Sub-componentes: `ImageUploadZone`, `YouTubeInput`, `fileToBase64`
+- Arquitectura rediseñada: frontend convierte imágenes a base64, backend crea todo en un solo `mutate` batch
+
+### 10 fixes API v23
+1. `startDate` formato correcto
+2. `deliveryMethod` deprecated → removido
+3. Bidding strategy: `maximizeConversions` con campo correcto
+4. `explicitlyShared` en budget
+5. EU political ads compliance field
+6. `brandGuidelines` campo nuevo
+7. URL protocol validation (https://)
+8. Asset batch: todos los assets mínimos en un mutate
+9. Text truncation a límites Google Ads (30/90 chars)
+10. Error details con field violations para debugging
+
+### Cambios clave
+- Timeout API: 15s → 60s
+- Error messages ahora incluyen field violations
+- 7 commits, 6 deploys Cloud Run
+- `GoogleCampaignManager.tsx` +496 líneas

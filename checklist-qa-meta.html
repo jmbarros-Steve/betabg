@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Ads — QA Checklist Meta/Instagram/Campañas</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+.container{max-width:1100px;margin:0 auto;padding:20px}
+
+/* HEADER */
+.header{text-align:center;padding:30px 0 20px}
+.header h1{font-size:2rem;background:linear-gradient(135deg,#3b82f6,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header p{color:#94a3b8;margin-top:4px}
+
+/* PROGRESS BAR */
+.progress-container{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;margin-bottom:20px;position:sticky;top:0;z-index:100;backdrop-filter:blur(10px)}
+.progress-bar-bg{background:#334155;border-radius:8px;height:28px;overflow:hidden;position:relative}
+.progress-bar-fill{height:100%;border-radius:8px;transition:width .4s ease;background:linear-gradient(90deg,#ef4444 0%,#f59e0b 30%,#22c55e 70%,#10b981 100%)}
+.progress-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-weight:700;font-size:.85rem;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.progress-stats{display:flex;justify-content:space-between;margin-top:12px;font-size:.85rem;color:#94a3b8}
+.progress-stats span{display:flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.dot-done{background:#22c55e}
+.dot-fail{background:#ef4444}
+.dot-skip{background:#f59e0b}
+.dot-pending{background:#475569}
+
+/* CONTROLS */
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.controls button{padding:8px 16px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;cursor:pointer;font-size:.82rem;transition:.2s}
+.controls button:hover{background:#334155;border-color:#60a5fa}
+.controls button.active{background:#1e3a5f;border-color:#3b82f6;color:#93c5fd}
+.controls .danger{border-color:#7f1d1d;color:#fca5a5}
+.controls .danger:hover{background:#7f1d1d}
+.controls .export-btn{border-color:#065f46;color:#6ee7b7}
+.controls .export-btn:hover{background:#065f46}
+
+/* SEARCH */
+.search-box{width:100%;padding:10px 16px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:.9rem;margin-bottom:20px;outline:none}
+.search-box:focus{border-color:#3b82f6}
+.search-box::placeholder{color:#64748b}
+
+/* SECTIONS */
+.section{background:#1e293b;border:1px solid #334155;border-radius:12px;margin-bottom:16px;overflow:hidden;transition:.2s}
+.section.collapsed .section-body{display:none}
+.section-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;cursor:pointer;user-select:none}
+.section-header:hover{background:#243044}
+.section-title{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem;color:#60a5fa}
+.section-title .arrow{transition:transform .2s;color:#475569}
+.section.collapsed .arrow{transform:rotate(-90deg)}
+.section-badge{font-size:.75rem;padding:3px 10px;border-radius:12px;font-weight:600}
+.section-progress{display:flex;align-items:center;gap:8px}
+.section-progress-bar{width:120px;height:6px;background:#334155;border-radius:3px;overflow:hidden}
+.section-progress-fill{height:100%;border-radius:3px;transition:width .3s}
+.section-progress-text{font-size:.78rem;color:#94a3b8;min-width:36px;text-align:right}
+
+/* ITEMS */
+.section-body{padding:0 8px 8px}
+.item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;margin:2px 0;transition:.15s;cursor:pointer}
+.item:hover{background:#243044}
+.item.done{opacity:.6}
+.item.done .item-text{text-decoration:line-through;color:#64748b}
+.item.fail .item-text{color:#fca5a5}
+.item.skip .item-text{color:#fde68a}
+
+/* STATUS BUTTONS */
+.status-btns{display:flex;gap:4px;flex-shrink:0;margin-top:1px}
+.status-btn{width:26px;height:26px;border-radius:6px;border:2px solid #475569;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.75rem;transition:.15s;padding:0}
+.status-btn:hover{transform:scale(1.15)}
+.btn-pass{border-color:#22c55e30}
+.btn-pass:hover,.btn-pass.active{background:#22c55e;border-color:#22c55e}
+.btn-fail{border-color:#ef444430}
+.btn-fail:hover,.btn-fail.active{background:#ef4444;border-color:#ef4444}
+.btn-skip{border-color:#f59e0b30}
+.btn-skip:hover,.btn-skip.active{background:#f59e0b;border-color:#f59e0b;color:#000}
+
+.item-id{color:#64748b;font-size:.78rem;font-weight:600;min-width:30px;margin-top:3px}
+.item-text{flex:1;font-size:.88rem;margin-top:2px}
+.item-note{width:100%;margin-top:6px;padding:6px 10px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:.8rem;resize:none;outline:none;display:none}
+.item-note:focus{border-color:#3b82f6}
+.item.has-note .item-note{display:block}
+.note-toggle{background:none;border:none;color:#64748b;cursor:pointer;font-size:.85rem;padding:2px 6px;border-radius:4px;flex-shrink:0;margin-top:1px}
+.note-toggle:hover{color:#93c5fd;background:#1e3a5f}
+
+/* TAGS */
+.tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.7rem;font-weight:600;margin-left:6px;vertical-align:middle}
+.tag-api{background:#1e3a5f;color:#60a5fa}
+.tag-ui{background:#5b21b6;color:#c4b5fd}
+.tag-db{background:#065f46;color:#6ee7b7}
+.tag-security{background:#7f1d1d;color:#fca5a5}
+.tag-edge{background:#78350f;color:#fde68a}
+
+/* FOOTER */
+.footer{text-align:center;padding:30px;color:#475569;font-size:.8rem}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:#22c55e;color:#fff;padding:12px 20px;border-radius:8px;font-weight:600;transform:translateY(100px);opacity:0;transition:.3s;z-index:200}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.error{background:#ef4444}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<div class="header">
+<h1>QA Checklist — Meta / Instagram / Campañas</h1>
+<p>Steve Ads Platform — Generado 3 Abril 2026 — Progreso guardado en localStorage</p>
+</div>
+
+<!-- PROGRESS -->
+<div class="progress-container">
+<div class="progress-bar-bg">
+<div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+<div class="progress-text" id="progressText">0 / 186</div>
+</div>
+<div class="progress-stats">
+<span><span class="dot dot-done"></span> Pass: <strong id="countPass">0</strong></span>
+<span><span class="dot dot-fail"></span> Fail: <strong id="countFail">0</strong></span>
+<span><span class="dot dot-skip"></span> Skip: <strong id="countSkip">0</strong></span>
+<span><span class="dot dot-pending"></span> Pendiente: <strong id="countPending">186</strong></span>
+</div>
+</div>
+
+<!-- CONTROLS -->
+<div class="controls">
+<button onclick="filterItems('all')" class="active" id="filterAll">Todos</button>
+<button onclick="filterItems('pending')" id="filterPending">Pendientes</button>
+<button onclick="filterItems('done')" id="filterDone">Pass</button>
+<button onclick="filterItems('fail')" id="filterFail">Fail</button>
+<button onclick="filterItems('skip')" id="filterSkip">Skip</button>
+<button onclick="expandAll()" title="Expandir todas">Expandir</button>
+<button onclick="collapseAll()" title="Colapsar todas">Colapsar</button>
+<button onclick="exportResults()" class="export-btn" title="Copiar reporte">Exportar Reporte</button>
+<button onclick="resetAll()" class="danger" title="Borrar todo progreso">Reset</button>
+</div>
+
+<!-- SEARCH -->
+<input type="text" class="search-box" id="searchBox" placeholder="Buscar items... (ej: oauth, token, campaign, carousel)" oninput="searchItems(this.value)">
+
+<!-- CHECKLIST SECTIONS -->
+<div id="checklistContainer"></div>
+
+<div class="footer">
+Steve Ads QA — Progreso se guarda automáticamente en tu browser (localStorage)
+</div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY = 'steve-ads-qa-meta-v1';
+
+const sections = [
+  {
+    id: 'A', title: 'OAuth & Conexión Meta', tag: 'api',
+    items: [
+      'Click "Conectar Meta" genera URL OAuth correcta con scopes (ads_read, ads_management, business_management, pages_manage_metadata)',
+      'State contiene formato nonce:clientId y se guarda en sessionStorage',
+      'Callback recibe code y state, valida CSRF contra sessionStorage',
+      'Fallback a formato legacy de state (solo clientId sin nonce) funciona',
+      'Code se intercambia por short-lived token exitosamente',
+      'Short-lived token se intercambia por long-lived token (~60 días)',
+      'Token se encripta via encrypt_platform_token() RPC antes de guardar',
+      'platform_connection se crea con platform=meta, account_id, token_expires_at',
+      'Businesses y ad accounts se fetchean en paralelo post-auth',
+      'Auto-sync de métricas se dispara (fire-and-forget) después de conexión',
+      'Redirige a /portal?tab=connections después de éxito (1.5s delay)',
+      'Error de Meta muestra mensaje user-friendly en español',
+      'Conexión duplicada retorna 409 y mensaje apropiado',
+      'check-meta-scopes retorna granted[] y declined[] correctamente',
+    ]
+  },
+  {
+    id: 'B', title: 'Token Lifecycle', tag: 'security',
+    items: [
+      'Token con <7 días para expirar se refreshea proactivamente',
+      'Token expirado (code 190, subcode 463/467) trigger force refresh',
+      'Si refresh falla, connection se marca is_active=false',
+      'Token refresheado se encripta y actualiza en DB con nuevo token_expires_at',
+      'check-meta-scopes retorna flag token_expired si decryption falla',
+    ]
+  },
+  {
+    id: 'C', title: 'Gestión de Campañas', tag: 'api',
+    items: [
+      'Crear campaña (action: create) con name, objective, budget, targeting, creative',
+      'Crear campaña 3:2:2 (action: create_322) — variant testing',
+      'Pausar campaña activa → status PAUSED en Meta',
+      'Resumir campaña pausada → status ACTIVE en Meta',
+      'Actualizar campaña (nombre, budget, targeting)',
+      'Actualizar budget específicamente (update_budget)',
+      'Duplicar campaña existente',
+      'Archivar campaña',
+      'Ver detalles de un ad específico (get_ad_details)',
+      'Actualizar ad (copy, creative) — update_ad',
+      'Upload de imágenes: URL directa funciona',
+      'Upload de imágenes: fallback a base64 funciona',
+      'Evaluación CRITERIO AI se ejecuta y retorna score',
+      'Evaluación ESPEJO visual se ejecuta y retorna score',
+      'Detección de angle funciona automáticamente',
+      'Creative history (D.6) se guarda post-creación exitosa',
+      'Conversión de moneda usa cache 5min y funciona con CLP',
+      'Error en adset creation retorna 502 + adset_error',
+      'Error en creative retorna 502 + creative_error',
+      'Error en ad creation retorna 502 + ad_error con campaign_id presente',
+      'Carousel requiere mínimo 2 imágenes (error si <2)',
+      'DPA con product_catalog_id y product_set_id funciona',
+      'Flexible ad set format con múltiples imágenes/textos',
+      'Auth: 401 si JWT missing, 403 si no owner/admin, 404 si connection no existe',
+    ]
+  },
+  {
+    id: 'D', title: 'Operaciones Ad Set', tag: 'api',
+    items: [
+      'Pausar ad set → status PAUSED, retorna adset_id + status',
+      'Resumir ad set → status ACTIVE',
+      'Admin bypass funciona para ad set actions',
+      'fetch-campaign-adsets retorna ad sets con insights agregados 30 días',
+      'Cada ad set incluye ads anidados con creativos (thumbnail, body, title, image)',
+      'Métricas ad set: spend, impressions, clicks, conversions, roas correctas',
+      'Límites respetados: 100 ad sets, 50 ads por ad set',
+    ]
+  },
+  {
+    id: 'E', title: 'Sync de Métricas', tag: 'edge',
+    items: [
+      'sync-campaign-metrics obtiene campañas + insights diarios (últimos 30 días)',
+      'Métricas correctas: spend, impressions, clicks, CTR, CPC, CPM, ROAS',
+      'Conversions: busca purchase y omni_purchase en actions array',
+      'Conversion value extraído de action_values correctamente',
+      'purchase_roas extraído correctamente',
+      'Purge de métricas antiguas ANTES de upsert (previene duplicados)',
+      'Batch upsert en chunks de 100 registros',
+      'Conversión a CLP con exchange rate API funciona',
+      'Fallback a rates hardcoded si API falla (CLP=950, MXN=17.5)',
+      'Cache de exchange rates funciona (5min TTL)',
+      'last_sync_at se actualiza en platform_connection',
+      'sync-meta-metrics (Cloud Run) con Shopify session token auth funciona',
+      'Error individual de campaña NO detiene sync completo',
+    ]
+  },
+  {
+    id: 'F', title: 'Reglas Automatizadas', tag: 'api',
+    items: [
+      'Listar reglas de un account (action: list)',
+      'Crear regla con condition {metric, operator, threshold}',
+      'Métricas: SPEND, IMPRESSIONS, CLICKS, CONVERSIONS, CPA, ROAS, CTR, CPM, FREQUENCY',
+      'Operadores: GREATER_THAN, LESS_THAN, EQUALS, BETWEEN funcionan',
+      'Time windows: LAST_3_DAYS, LAST_7_DAYS, LAST_14_DAYS, LAST_30_DAYS',
+      'Actions: PAUSE_CAMPAIGN, INCREASE_BUDGET, DECREASE_BUDGET, SCALE_BUDGET',
+      'Frecuencias: EVERY_15_MIN, EVERY_30_MIN, EVERY_1_HOUR, DAILY',
+      'Toggle enable/disable regla (action: toggle)',
+      'Ejecutar regla manualmente (action: execute)',
+      'Execution log se crea con metrics_snapshot JSONB',
+      'Actualizar regla existente (action: update)',
+      'Eliminar regla — cascade elimina execution_log',
+      'apply_to: ALL_CAMPAIGNS vs SPECIFIC_CAMPAIGNS funciona',
+      'trigger_count se incrementa correctamente tras ejecución',
+    ]
+  },
+  {
+    id: 'G', title: 'Audiencias', tag: 'api',
+    items: [
+      'Listar custom audiences del ad account',
+      'Crear custom audience tipo WEBSITE',
+      'Crear custom audience tipo CUSTOM (customer_list)',
+      'Crear audience tipo ENGAGEMENT',
+      'Crear lookalike audience',
+      'Crear retargeting audience',
+      'Eliminar audience',
+      'approximate_count_lower/upper_bound se muestran (no deprecated count)',
+      'detect-audience-overlap compara: edad, género, geo, intereses, custom audiences',
+      'Solo reporta overlaps >30%',
+      'Mensajes de overlap en español',
+    ]
+  },
+  {
+    id: 'H', title: 'Sync Klaviyo → Meta', tag: 'api',
+    items: [
+      'Fetch perfiles Klaviyo paginado (max 50 páginas = 5000 perfiles)',
+      'Crear Custom Audience en Meta con nombre especificado',
+      'Emails hasheados con SHA256 antes de upload',
+      'Upload en batches de 10,000 registros',
+      'Response incluye profiles_found y profiles_uploaded',
+      'Funciona con klaviyo_list_id específico',
+      'Funciona sin list_id (sync todos los perfiles)',
+    ]
+  },
+  {
+    id: 'I', title: 'Tracking Competidores (Instagram)', tag: 'edge',
+    items: [
+      'Agregar handle de Instagram a competitor_tracking',
+      'Resolución handle → meta_page_id via Pages Search API',
+      'Fallback a search_terms si Pages Search falla',
+      'Variaciones de búsqueda: handle directo, underscore→space, camelCase split',
+      'Cache de page_id para syncs posteriores',
+      'Sync Ad Library con search_page_ids si page_id disponible',
+      'Países de búsqueda: CL, MX, CO, AR, PE, US',
+      'Ads extraídos correctamente: ad_text, headline, description, image_url, video_url',
+      'ad_type: detección automática (carousel si collation_count > 1)',
+      'cta_type: mapping correcto de link titles (SHOP_NOW, LEARN_MORE, etc.)',
+      'days_running calculado desde ad_delivery_start_time',
+      'is_active determinado correctamente',
+      'Cache 24h — no re-sync si sincronizado hace <24h',
+      'Token priority: user token (ads_read) > app token',
+      'Error token_expired manejado correctamente',
+      'Unique constraint (tracking_id, ad_library_id) previene duplicados',
+    ]
+  },
+  {
+    id: 'J', title: 'Social Inbox', tag: 'api',
+    items: [
+      'list_pages retorna Facebook Pages + Instagram accounts',
+      'list_conversations para una page específica',
+      'get_messages de una conversation con contenido correcto',
+      'list_post_comments de un post',
+      'list_ad_comments de un ad',
+      'get_comment_replies — threading funciona',
+      'reply_message envía respuesta correctamente',
+      'reply_comment responde a comentario',
+      'mark_read marca conversación como leída',
+      'Paginación con cursors funciona (param after)',
+      'Filtro por platform: instagram vs facebook funciona',
+    ]
+  },
+  {
+    id: 'K', title: 'Píxeles & Catálogos', tag: 'api',
+    items: [
+      'Listar píxeles del ad account (action: list)',
+      'Obtener detalle de píxel específico (id, name, code, last_fired)',
+      'Stats de eventos del píxel (action: stats)',
+      'Listar catálogos de productos con product_sets',
+      'Cada catálogo incluye product_count correctamente',
+      'Graceful degradation: cuenta sin catálogos retorna [] (no error)',
+    ]
+  },
+  {
+    id: 'L', title: 'Búsqueda de Targeting', tag: 'api',
+    items: [
+      'Búsqueda intereses: retorna id, name, audience_size bounds, path, description',
+      'Búsqueda locations: retorna key, name, type, country_code',
+      'Búsqueda locales funciona correctamente',
+      'Mínimo 2 caracteres requeridos (validación)',
+      'location_types filter funciona (country, region, city, zip)',
+    ]
+  },
+  {
+    id: 'M', title: 'Jerarquía Business', tag: 'api',
+    items: [
+      'fetch-meta-business-hierarchy retorna businesses → ad accounts → pages → pixels',
+      'Cache in-memory 5 min funciona (segundo request es más rápido)',
+      'Cache eviction: max 100 entries no causa memory leak',
+      'fetch-meta-ad-accounts retorna accounts con currency, timezone, permissions',
+      'force_refresh=true bypassa cache correctamente',
+    ]
+  },
+  {
+    id: 'N', title: 'GDPR Data Deletion', tag: 'security',
+    items: [
+      'Recibe signed_request de Meta (HMAC-SHA256) correctamente',
+      'Firma inválida retorna 403',
+      'Firma válida procesa deletion y retorna confirmation_code UUID',
+      'Response incluye URL de status',
+      'No falla aunque haya error interno (previene retry loops de Meta)',
+    ]
+  },
+  {
+    id: 'O', title: 'Instagram Scheduled Posts', tag: 'db',
+    items: [
+      'Crear post draft con media_type IMAGE',
+      'Crear post draft con media_type CAROUSEL',
+      'Crear post draft con media_type REELS',
+      'Programar post (status: scheduled, scheduled_at se guarda)',
+      'Publicar post → status cambia a publishing → published',
+      'Post fallido → status: failed + error message guardado',
+      'AI generated flag y ai_prompt se guardan correctamente',
+      'Hashtags como array se guardan y recuperan',
+      'Multiple image_urls para carousel funciona',
+      'creation_id, media_id, permalink se populan post-publicación',
+    ]
+  },
+  {
+    id: 'P', title: 'Frontend UI', tag: 'ui',
+    items: [
+      'PlatformConnectionsPanel muestra conexiones existentes con status correcto',
+      'Botón "Sync" dispara sync de métricas y muestra feedback',
+      'Eliminar conexión funciona y actualiza UI',
+      'ClientMetricsPanel muestra KPIs: Spend, Purchases, ROAS, CPC, CPM',
+      'Date presets funcionan: last7days, mtd, last_month, ytd',
+      'Valores formateados en CLP correctamente',
+      'CreativeReviewFeed muestra badge Meta azul',
+      'Google Ads muestra "en desarrollo" (deshabilitado)',
+      'Loading states mientras cargan datos (spinners/skeletons)',
+      'Empty states cuando no hay conexiones/métricas',
+    ]
+  },
+  {
+    id: 'Q', title: 'Creative History & AI', tag: 'db',
+    items: [
+      'creative_history se crea al crear campaña exitosamente',
+      'Campos guardados: copy_text, angle, cqs_score, criterio_score, espejo_score',
+      'entity_type correcto: meta_copy, meta_campaign según contexto',
+      'Performance columns se populan post-sync: meta_ctr, meta_cpa, meta_roas',
+      'Benchmark comparison JSONB se guarda y lee correctamente',
+      'Index unmeasured (where measured_at IS NULL) permite queries eficientes',
+    ]
+  },
+  {
+    id: 'R', title: 'Resiliencia & Rate Limiting', tag: 'api',
+    items: [
+      'Circuit breaker se activa tras muchos fallos consecutivos',
+      'Retry exponencial: 2s, 4s, 8s con max 3 intentos',
+      'Inter-request delay 200ms previene rate limiting (~300 req/min)',
+      'Rate limit codes (4, 32, 80004) trigger backoff correctamente',
+      'Timeout 30s con AbortController cancela request',
+      'Retry-After header se respeta cuando Meta lo envía',
+      'Token siempre en Authorization header (nunca en URL query param)',
+      'FormData requests adjuntan token correctamente al body',
+      'Pagination strips access_token de cursor URLs y lo re-agrega via header',
+    ]
+  },
+  {
+    id: 'S', title: 'Seguridad', tag: 'security',
+    items: [
+      'Tokens encriptados at rest en DB (encrypt_platform_token RPC)',
+      'OAuth CSRF protegido por nonce en sessionStorage',
+      'Backend valida ownership: user_id OR client_user_id match',
+      'Fallback a admin role check (user_roles table) funciona',
+      'RLS policies restringen acceso por client ownership en todas las tablas',
+      'GDPR signed_request validado con HMAC-SHA256 + META_APP_SECRET',
+      'Cascade deletes previenen registros huérfanos',
+      'Unique constraints previenen datos duplicados en todas las tablas',
+      'Service role solo usado para operaciones administrativas',
+      'Token nunca retornado en plaintext al frontend',
+    ]
+  },
+  {
+    id: 'T', title: 'Edge Cases & Errores', tag: 'api',
+    items: [
+      'Conexión con token expirado: refresh automático o marca inactive',
+      'Meta API rate limit: circuit breaker + retry funcionan',
+      'Exchange rate API caída: fallback a rates hardcoded funciona',
+      'Ad account sin campañas: retorna array vacío (no error)',
+      'Campaign sin insights: continúa sin detener sync completo',
+      'Competitor sin resultados en Ad Library: skip sin error',
+      'Duplicate connection (23505): retorna 409 con mensaje claro',
+      'JWT inválido: 401 consistente en TODOS los endpoints',
+      'Usuario no owner ni admin: 403 consistente en TODOS los endpoints',
+      'Meta API error genérico: 502 con detalles del error',
+      'Token decryption falla: 500 o flag token_expired según endpoint',
+      'Network timeout: AbortController cancela request correctamente',
+      'Google Ads en fetch-campaign-adsets retorna [] (no implementado, no crash)',
+      'Carousel con <2 imágenes: error específico rechaza creación',
+      'All image uploads fail: mensaje "All image uploads failed"',
+    ]
+  },
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let state = loadState();
+let currentFilter = 'all';
+let searchQuery = '';
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function getItemKey(sectionId, index) {
+  return `${sectionId}${index + 1}`;
+}
+
+function getItemState(key) {
+  return state[key] || { status: 'pending', note: '' };
+}
+
+function setItemStatus(key, status) {
+  if (!state[key]) state[key] = { status: 'pending', note: '' };
+  state[key].status = state[key].status === status ? 'pending' : status;
+  saveState();
+  render();
+}
+
+function setItemNote(key, note) {
+  if (!state[key]) state[key] = { status: 'pending', note: '' };
+  state[key].note = note;
+  saveState();
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function render() {
+  const container = document.getElementById('checklistContainer');
+  let html = '';
+  let totalItems = 0, doneCount = 0, failCount = 0, skipCount = 0;
+
+  const tagColors = {
+    api: ['tag-api', 'API'],
+    ui: ['tag-ui', 'UI'],
+    db: ['tag-db', 'DB'],
+    security: ['tag-security', 'SECURITY'],
+    edge: ['tag-edge', 'EDGE FN'],
+  };
+
+  sections.forEach(section => {
+    let sectionDone = 0, sectionTotal = section.items.length;
+    let visibleItems = [];
+
+    section.items.forEach((text, i) => {
+      const key = getItemKey(section.id, i);
+      const itemState = getItemState(key);
+      totalItems++;
+
+      if (itemState.status === 'done') { doneCount++; sectionDone++; }
+      else if (itemState.status === 'fail') { failCount++; sectionDone++; }
+      else if (itemState.status === 'skip') { skipCount++; sectionDone++; }
+
+      // Filter
+      let show = true;
+      if (currentFilter === 'pending' && itemState.status !== 'pending') show = false;
+      if (currentFilter === 'done' && itemState.status !== 'done') show = false;
+      if (currentFilter === 'fail' && itemState.status !== 'fail') show = false;
+      if (currentFilter === 'skip' && itemState.status !== 'skip') show = false;
+
+      // Search
+      if (searchQuery && !text.toLowerCase().includes(searchQuery.toLowerCase()) && !key.toLowerCase().includes(searchQuery.toLowerCase())) show = false;
+
+      if (show) visibleItems.push({ text, i, key, itemState });
+    });
+
+    if (searchQuery && visibleItems.length === 0) return;
+
+    const sectionPct = sectionTotal > 0 ? Math.round((sectionDone / sectionTotal) * 100) : 0;
+    const fillColor = sectionPct === 100 ? '#22c55e' : sectionPct > 50 ? '#f59e0b' : '#3b82f6';
+    const [tagClass, tagLabel] = tagColors[section.tag] || ['', ''];
+    const isCollapsed = document.querySelector(`[data-section="${section.id}"]`)?.classList.contains('collapsed');
+
+    html += `<div class="section ${isCollapsed ? 'collapsed' : ''}" data-section="${section.id}">`;
+    html += `<div class="section-header" onclick="toggleSection('${section.id}')">`;
+    html += `<div class="section-title"><span class="arrow">▼</span> ${section.id}. ${section.title} <span class="tag ${tagClass}">${tagLabel}</span></div>`;
+    html += `<div class="section-progress">`;
+    html += `<div class="section-progress-bar"><div class="section-progress-fill" style="width:${sectionPct}%;background:${fillColor}"></div></div>`;
+    html += `<div class="section-progress-text">${sectionDone}/${sectionTotal}</div>`;
+    html += `</div></div>`;
+    html += `<div class="section-body">`;
+
+    visibleItems.forEach(({ text, i, key, itemState }) => {
+      const statusClass = itemState.status === 'done' ? 'done' : itemState.status === 'fail' ? 'fail' : itemState.status === 'skip' ? 'skip' : '';
+      const hasNote = itemState.note ? 'has-note' : '';
+
+      html += `<div class="item ${statusClass} ${hasNote}" data-key="${key}">`;
+      html += `<div class="status-btns">`;
+      html += `<button class="status-btn btn-pass ${itemState.status === 'done' ? 'active' : ''}" onclick="setItemStatus('${key}','done')" title="Pass">✓</button>`;
+      html += `<button class="status-btn btn-fail ${itemState.status === 'fail' ? 'active' : ''}" onclick="setItemStatus('${key}','fail')" title="Fail">✗</button>`;
+      html += `<button class="status-btn btn-skip ${itemState.status === 'skip' ? 'active' : ''}" onclick="setItemStatus('${key}','skip')" title="Skip">—</button>`;
+      html += `</div>`;
+      html += `<div class="item-id">${key}</div>`;
+      html += `<div class="item-text">${text}</div>`;
+      html += `<button class="note-toggle" onclick="toggleNote('${key}',event)" title="Agregar nota">📝</button>`;
+      html += `<textarea class="item-note" id="note-${key}" placeholder="Notas..." onblur="setItemNote('${key}',this.value)">${itemState.note || ''}</textarea>`;
+      html += `</div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  container.innerHTML = html;
+
+  // Update progress
+  const totalChecked = doneCount + failCount + skipCount;
+  const pct = totalItems > 0 ? Math.round((totalChecked / totalItems) * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = `${totalChecked} / ${totalItems} (${pct}%)`;
+  document.getElementById('countPass').textContent = doneCount;
+  document.getElementById('countFail').textContent = failCount;
+  document.getElementById('countSkip').textContent = skipCount;
+  document.getElementById('countPending').textContent = totalItems - totalChecked;
+
+  // Update filter buttons
+  document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+  const activeBtn = document.getElementById('filter' + currentFilter.charAt(0).toUpperCase() + currentFilter.slice(1));
+  if (activeBtn) activeBtn.classList.add('active');
+}
+
+function toggleSection(id) {
+  const el = document.querySelector(`[data-section="${id}"]`);
+  if (el) el.classList.toggle('collapsed');
+}
+
+function toggleNote(key, event) {
+  event.stopPropagation();
+  const item = document.querySelector(`[data-key="${key}"]`);
+  if (item) {
+    item.classList.toggle('has-note');
+    if (item.classList.contains('has-note')) {
+      const textarea = item.querySelector('.item-note');
+      if (textarea) textarea.focus();
+    }
+  }
+}
+
+function filterItems(filter) {
+  currentFilter = filter;
+  render();
+}
+
+function searchItems(query) {
+  searchQuery = query;
+  render();
+}
+
+function expandAll() {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('collapsed'));
+}
+
+function collapseAll() {
+  document.querySelectorAll('.section').forEach(s => s.classList.add('collapsed'));
+}
+
+function resetAll() {
+  if (confirm('¿Estás seguro? Se borrará TODO el progreso del checklist.')) {
+    state = {};
+    saveState();
+    render();
+    showToast('Checklist reseteado', true);
+  }
+}
+
+function showToast(msg, isError = false) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => toast.className = 'toast', 2500);
+}
+
+function exportResults() {
+  let report = '# QA Report — Steve Ads Meta/Instagram/Campañas\n';
+  report += `# Fecha: ${new Date().toLocaleString('es-CL')}\n\n`;
+
+  let totalItems = 0, pass = 0, fail = 0, skip = 0;
+  const failedItems = [];
+
+  sections.forEach(section => {
+    report += `## ${section.id}. ${section.title}\n`;
+    section.items.forEach((text, i) => {
+      const key = getItemKey(section.id, i);
+      const s = getItemState(key);
+      totalItems++;
+      const icon = s.status === 'done' ? '[PASS]' : s.status === 'fail' ? '[FAIL]' : s.status === 'skip' ? '[SKIP]' : '[    ]';
+      if (s.status === 'done') pass++;
+      else if (s.status === 'fail') { fail++; failedItems.push({ key, text, note: s.note }); }
+      else if (s.status === 'skip') skip++;
+      report += `  ${icon} ${key}. ${text}\n`;
+      if (s.note) report += `        NOTA: ${s.note}\n`;
+    });
+    report += '\n';
+  });
+
+  report += `\n## RESUMEN\n`;
+  report += `Total: ${totalItems} | Pass: ${pass} | Fail: ${fail} | Skip: ${skip} | Pendiente: ${totalItems - pass - fail - skip}\n`;
+  report += `Progreso: ${Math.round(((pass + fail + skip) / totalItems) * 100)}%\n`;
+
+  if (failedItems.length > 0) {
+    report += `\n## ITEMS FALLIDOS\n`;
+    failedItems.forEach(f => {
+      report += `  - ${f.key}: ${f.text}\n`;
+      if (f.note) report += `    NOTA: ${f.note}\n`;
+    });
+  }
+
+  navigator.clipboard.writeText(report).then(() => {
+    showToast('Reporte copiado al clipboard');
+  }).catch(() => {
+    // Fallback: download
+    const blob = new Blob([report], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'qa-report-meta.txt';
+    a.click();
+    showToast('Reporte descargado');
+  });
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.getElementById('searchBox').value = '';
+    searchQuery = '';
+    render();
+  }
+});
+
+// Initial render
+render();
+</script>
+</body>
+</html>

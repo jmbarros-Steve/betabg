@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Brain Swarm — Flujo Completo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0a0a0f;
+    color: #e0e0e0;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    padding: 60px 20px 40px;
+    background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 50%, #0a1a2e 100%);
+    border-bottom: 1px solid #2a2a4a;
+  }
+  .header h1 {
+    font-size: 2.4rem;
+    background: linear-gradient(135deg, #7c3aed, #06b6d4, #10b981);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 12px;
+  }
+  .header p { color: #8888aa; font-size: 1.1rem; max-width: 600px; margin: 0 auto; }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    margin: 40px auto 0;
+    max-width: 800px;
+    padding: 0 20px;
+  }
+  .tab {
+    flex: 1;
+    max-width: 280px;
+    padding: 16px 24px;
+    text-align: center;
+    cursor: pointer;
+    border: 1px solid #2a2a4a;
+    background: #111122;
+    color: #8888aa;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.3s;
+  }
+  .tab:first-child { border-radius: 12px 0 0 12px; }
+  .tab:last-child { border-radius: 0 12px 12px 0; }
+  .tab.active {
+    background: linear-gradient(135deg, #1a1a3e, #1a2a3e);
+    color: #fff;
+    border-color: #7c3aed;
+  }
+  .tab:hover:not(.active) { background: #1a1a2e; color: #bbb; }
+
+  /* Content */
+  .content { max-width: 900px; margin: 0 auto; padding: 20px; }
+  .flow-section { display: none; padding: 30px 0; }
+  .flow-section.active { display: block; }
+
+  /* Flow Steps */
+  .flow-step {
+    position: relative;
+    margin-bottom: 0;
+    padding: 0 0 0 60px;
+  }
+  .flow-step::before {
+    content: '';
+    position: absolute;
+    left: 24px;
+    top: 50px;
+    bottom: -1px;
+    width: 2px;
+    background: linear-gradient(to bottom, #7c3aed44, #7c3aed11);
+  }
+  .flow-step:last-child::before { display: none; }
+
+  .step-number {
+    position: absolute;
+    left: 8px;
+    top: 20px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    z-index: 2;
+  }
+
+  .step-card {
+    background: #111122;
+    border: 1px solid #2a2a4a;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+    transition: all 0.3s;
+  }
+  .step-card:hover {
+    border-color: #7c3aed55;
+    box-shadow: 0 0 30px #7c3aed11;
+  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .step-icon { font-size: 1.5rem; }
+  .step-title { font-size: 1.15rem; font-weight: 700; color: #fff; }
+  .step-subtitle { font-size: 0.8rem; color: #7c3aed; font-weight: 600; margin-top: 2px; }
+
+  .step-body { color: #aaa; font-size: 0.92rem; }
+  .step-body strong { color: #ddd; }
+
+  .step-meta {
+    display: flex;
+    gap: 16px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+  .meta-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .meta-time { background: #1a1a3e; color: #7c3aed; border: 1px solid #7c3aed33; }
+  .meta-cost { background: #1a2e1a; color: #10b981; border: 1px solid #10b98133; }
+  .meta-model { background: #2e1a1a; color: #f97316; border: 1px solid #f9731633; }
+  .meta-data { background: #1a2a3e; color: #06b6d4; border: 1px solid #06b6d433; }
+
+  /* Color variants for step numbers */
+  .step-haiku .step-number { background: #7c3aed; color: #fff; }
+  .step-openai .step-number { background: #10b981; color: #fff; }
+  .step-opus .step-number { background: #f97316; color: #fff; }
+  .step-db .step-number { background: #06b6d4; color: #fff; }
+  .step-wa .step-number { background: #25d366; color: #fff; }
+  .step-user .step-number { background: #ec4899; color: #fff; }
+
+  /* Comparison Table */
+  .compare-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 30px 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #2a2a4a;
+  }
+  .compare-table th {
+    background: #1a1a3e;
+    padding: 14px 16px;
+    text-align: left;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #7c3aed;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .compare-table td {
+    padding: 12px 16px;
+    border-top: 1px solid #1a1a2e;
+    font-size: 0.9rem;
+  }
+  .compare-table tr:nth-child(even) td { background: #0d0d1a; }
+  .compare-table tr:nth-child(odd) td { background: #111122; }
+  .winner { color: #10b981; font-weight: 600; }
+  .loser { color: #ef4444; }
+
+  /* Section titles */
+  .section-title {
+    font-size: 1.6rem;
+    font-weight: 800;
+    margin: 40px 0 10px;
+    color: #fff;
+  }
+  .section-desc {
+    color: #8888aa;
+    margin-bottom: 30px;
+    font-size: 0.95rem;
+  }
+
+  /* Arrow connector between sections */
+  .flow-arrow {
+    text-align: center;
+    padding: 10px 0;
+    font-size: 1.8rem;
+    color: #7c3aed44;
+  }
+
+  /* WA Message mockup */
+  .wa-mockup {
+    background: #0b141a;
+    border-radius: 16px;
+    padding: 20px;
+    margin: 20px 0;
+    border: 1px solid #1a2a1a;
+    max-width: 420px;
+  }
+  .wa-mockup-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #1a2a1a;
+    margin-bottom: 12px;
+  }
+  .wa-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c3aed, #06b6d4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: #fff;
+  }
+  .wa-name { font-weight: 600; color: #e0e0e0; font-size: 0.9rem; }
+  .wa-bubble {
+    background: #1a3a2a;
+    border-radius: 0 12px 12px 12px;
+    padding: 12px 14px;
+    font-size: 0.82rem;
+    color: #d0e0d0;
+    line-height: 1.5;
+    white-space: pre-line;
+  }
+  .wa-time {
+    text-align: right;
+    color: #5a7a5a;
+    font-size: 0.7rem;
+    margin-top: 4px;
+  }
+
+  /* Approval UI mockup */
+  .approval-card {
+    background: #111122;
+    border: 1px solid #2a2a4a;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 12px 0;
+  }
+  .approval-cat {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .cat-cross { background: #2e1a3e; color: #a78bfa; }
+  .cat-meta { background: #1a1a3e; color: #60a5fa; }
+  .cat-klaviyo { background: #3e1a2a; color: #f472b6; }
+  .approval-title { font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .approval-body { font-size: 0.85rem; color: #999; margin-bottom: 10px; }
+  .approval-confidence {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .conf-bar {
+    height: 6px;
+    border-radius: 3px;
+    background: #1a1a2e;
+    flex: 1;
+    max-width: 120px;
+    overflow: hidden;
+  }
+  .conf-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #7c3aed, #10b981);
+  }
+  .conf-text { font-size: 0.75rem; color: #7c3aed; font-weight: 600; }
+  .approval-sources {
+    font-size: 0.78rem;
+    color: #06b6d4;
+    margin-bottom: 12px;
+  }
+  .approval-sources a { color: #06b6d4; text-decoration: none; }
+  .approval-sources a:hover { text-decoration: underline; }
+  .approval-btns { display: flex; gap: 10px; }
+  .btn-approve {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    background: #10b981;
+    color: #fff;
+  }
+  .btn-reject {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    background: #ef4444;
+    color: #fff;
+  }
+  .btn-approve:hover { background: #059669; }
+  .btn-reject:hover { background: #dc2626; }
+
+  /* Big flow diagram */
+  .big-flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    margin: 30px 0;
+  }
+  .big-flow-node {
+    padding: 16px 28px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-align: center;
+    min-width: 280px;
+    position: relative;
+  }
+  .big-flow-arrow {
+    width: 2px;
+    height: 30px;
+    background: #7c3aed44;
+    position: relative;
+  }
+  .big-flow-arrow::after {
+    content: '▼';
+    position: absolute;
+    bottom: -8px;
+    left: -6px;
+    color: #7c3aed44;
+    font-size: 0.7rem;
+  }
+  .node-cron { background: #1a1a3e; border: 1px solid #7c3aed55; color: #a78bfa; }
+  .node-haiku { background: #1a2e3e; border: 1px solid #06b6d455; color: #67e8f9; }
+  .node-openai { background: #1a2e1a; border: 1px solid #10b98155; color: #6ee7b7; }
+  .node-opus { background: #2e1a1a; border: 1px solid #f9731655; color: #fdba74; }
+  .node-db { background: #1a1a2e; border: 1px solid #3b82f655; color: #93c5fd; }
+  .node-wa { background: #0b2a1a; border: 1px solid #25d36655; color: #6ee7b7; }
+  .node-user { background: #2e1a2e; border: 1px solid #ec489955; color: #f9a8d4; }
+  .node-label { font-size: 0.7rem; color: #666; margin-top: 4px; font-weight: 400; }
+
+  /* Parallel indicator */
+  .parallel-box {
+    border: 2px dashed #10b98144;
+    border-radius: 16px;
+    padding: 20px;
+    margin: 0;
+    position: relative;
+  }
+  .parallel-label {
+    position: absolute;
+    top: -10px;
+    left: 20px;
+    background: #0a0a0f;
+    padding: 0 10px;
+    font-size: 0.75rem;
+    color: #10b981;
+    font-weight: 700;
+  }
+  .parallel-items {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .parallel-item {
+    padding: 8px 14px;
+    background: #1a2e1a;
+    border: 1px solid #10b98133;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    color: #6ee7b7;
+    font-weight: 600;
+  }
+
+  /* Cost summary */
+  .cost-box {
+    background: linear-gradient(135deg, #111122, #1a1a2e);
+    border: 1px solid #2a2a4a;
+    border-radius: 16px;
+    padding: 24px;
+    margin: 30px 0;
+  }
+  .cost-title { font-weight: 700; color: #fff; margin-bottom: 16px; font-size: 1.1rem; }
+  .cost-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #1a1a2e;
+  }
+  .cost-row:last-child { border: none; font-weight: 700; color: #7c3aed; }
+  .cost-label { color: #999; }
+  .cost-value { color: #ddd; font-weight: 600; }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .header h1 { font-size: 1.6rem; }
+    .tabs { flex-direction: column; align-items: center; }
+    .tab { max-width: 100%; border-radius: 8px !important; }
+    .flow-step { padding-left: 44px; }
+    .step-number { left: 2px; width: 28px; height: 28px; font-size: 0.75rem; }
+    .compare-table { font-size: 0.8rem; }
+    .big-flow-node { min-width: 200px; font-size: 0.8rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Steve Brain Swarm</h1>
+  <p>10 investigadores paralelos + síntesis cruzada + aprobación por WhatsApp</p>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('overview')">Vista General</div>
+  <div class="tab" onclick="showTab('fast')">Caso 1: Rápido</div>
+  <div class="tab" onclick="showTab('deep')">Caso 2: Deep Research</div>
+</div>
+
+<div class="content">
+
+  <!-- ============================================================ -->
+  <!-- TAB: OVERVIEW -->
+  <!-- ============================================================ -->
+  <div id="tab-overview" class="flow-section active">
+
+    <h2 class="section-title">Flujo Completo</h2>
+    <p class="section-desc">Desde la investigación automática hasta tu aprobación por WhatsApp.</p>
+
+    <div class="big-flow">
+      <div class="big-flow-node node-cron">
+        ⏰ CRON cada 2 horas
+        <div class="node-label">Cloud Scheduler → POST /api/cron/swarm-research</div>
+      </div>
+      <div class="big-flow-arrow"></div>
+
+      <div class="big-flow-node node-haiku">
+        🧠 HAIKU — Director
+        <div class="node-label">Lee WA merchants + gaps de conocimiento → 10 preguntas</div>
+      </div>
+      <div class="big-flow-arrow"></div>
+
+      <div class="parallel-box">
+        <div class="parallel-label">× 10 EN PARALELO</div>
+        <div class="parallel-items">
+          <div class="parallel-item">🔍 Pregunta 1</div>
+          <div class="parallel-item">🔍 Pregunta 2</div>
+          <div class="parallel-item">🔍 Pregunta 3</div>
+          <div class="parallel-item">🔍 Pregunta 4</div>
+          <div class="parallel-item">🔍 Pregunta 5</div>
+          <div class="parallel-item">🔍 Pregunta 6</div>
+          <div class="parallel-item">🔍 Pregunta 7</div>
+          <div class="parallel-item">🔍 Pregunta 8</div>
+          <div class="parallel-item">🔍 Pregunta 9</div>
+          <div class="parallel-item">🔍 Pregunta 10</div>
+        </div>
+        <div style="text-align:center; margin-top:12px; font-size:0.8rem; color:#10b981;">
+          OpenAI busca en internet — cada una lee múltiples fuentes
+        </div>
+      </div>
+      <div class="big-flow-arrow"></div>
+
+      <div class="big-flow-node node-opus">
+        👔 OPUS — Socio Senior
+        <div class="node-label">Cruza los 10 reportes → máx 8 insights interdisciplinarios</div>
+      </div>
+      <div class="big-flow-arrow"></div>
+
+      <div class="big-flow-node node-db">
+        💾 Guarda en steve_knowledge
+        <div class="node-label">approval_status = 'pending' · orden = 0 (no activos aún)</div>
+      </div>
+      <div class="big-flow-arrow"></div>
+
+      <div style="text-align:center; padding:15px; color:#666; font-size:0.85rem; font-style:italic;">
+        ··· se repite cada 2 horas — acumula insights pendientes ···
+      </div>
+      <div class="big-flow-arrow"></div>
+
+      <div class="big-flow-node node-wa">
+        📱 WhatsApp Digest — 9am Chile
+        <div class="node-label">Resumen de insights pendientes + link con token seguro</div>
+      </div>
+      <div class="big-flow-arrow"></div>
+
+      <div class="big-flow-node node-user">
+        👆 JM Aprueba / Rechaza
+        <div class="node-label">Abre link → ve insights con fuentes → aprueba o rechaza</div>
+      </div>
+      <div class="big-flow-arrow"></div>
+
+      <div class="big-flow-node node-db">
+        ✅ Insights Activos en Steve
+        <div class="node-label">approval_status = 'approved' · orden = 90 → Steve los usa en copies, estrategia, chat</div>
+      </div>
+    </div>
+
+    <!-- WA Mockup -->
+    <h2 class="section-title">Así se ve el WhatsApp</h2>
+    <p class="section-desc">Cada mañana a las 9am, si hay insights pendientes.</p>
+
+    <div class="wa-mockup">
+      <div class="wa-mockup-header">
+        <div class="wa-avatar">S</div>
+        <div class="wa-name">Steve Brain</div>
+      </div>
+      <div class="wa-bubble">Buenos días JM.
+
+Steve investigó y tiene 12 insights nuevos pendientes:
+  - cross_channel: 3
+  - meta_ads: 3
+  - klaviyo: 2
+  - google_ads: 2
+  - shopify: 2
+
+Revísalos aquí (con fuente y explicación):
+🔗 steve.cl/admin/approve-rules?token=a8f2...
+
+Los insights más interesantes:
+• "Reutilizar Reels como GIFs en emails da 3x más clicks" (confianza: 9/10)
+• "Checkout en 1 paso aumenta conversión 23%" (confianza: 8/10)
+
+Link válido por 7 días.</div>
+      <div class="wa-time">9:00 AM ✓✓</div>
+    </div>
+
+    <!-- Approval UI Mockup -->
+    <h2 class="section-title">Pantalla de Aprobación</h2>
+    <p class="section-desc">Lo que ves al abrir el link. Cada insight con fuente, explicación y confianza.</p>
+
+    <div style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;">
+      <button onclick="" style="padding:10px 20px; border-radius:8px; border:none; background:#10b981; color:#fff; font-weight:700; cursor:pointer;">✅ Aprobar Todos (12)</button>
+      <button onclick="" style="padding:10px 20px; border-radius:8px; border:none; background:#ef4444; color:#fff; font-weight:700; cursor:pointer;">❌ Rechazar Todos</button>
+    </div>
+
+    <div class="approval-card">
+      <div class="approval-cat cat-cross">cross_channel</div>
+      <div class="approval-title">Reutilizar Reels como GIFs animados en emails da 3x más clicks</div>
+      <div class="approval-body">CUANDO: un merchant tenga Reels exitosos en Instagram. HAZ: 1. Convertir el Reel a GIF. 2. Usarlo como hero image en email de Klaviyo. PORQUE: los GIFs animados en emails tienen 3x más CTR que imágenes estáticas (Litmus 2026).</div>
+      <div class="approval-confidence">
+        <span class="conf-text">Confianza: 9/10</span>
+        <div class="conf-bar"><div class="conf-fill" style="width:90%"></div></div>
+      </div>
+      <div class="approval-sources">
+        📎 Fuentes: <a href="#">litmus.com/blog/gif-email-stats</a> · <a href="#">klaviyo.com/blog/animated-emails</a>
+      </div>
+      <div style="background:#1a1a2e; border-radius:8px; padding:12px; margin-bottom:14px; font-size:0.82rem; color:#8888aa;">
+        <strong style="color:#a78bfa;">💡 Por qué es valioso:</strong> Cruzando el reporte de Meta Ads (engagement de Reels) con el reporte de Email Marketing (rendimiento de formatos), se descubre que el contenido que ya funciona en social puede amplificarse en email sin costo adicional de producción.
+      </div>
+      <div class="approval-btns">
+        <button class="btn-approve">✅ Aprobar</button>
+        <button class="btn-reject">❌ Rechazar</button>
+      </div>
+    </div>
+
+    <div class="approval-card">
+      <div class="approval-cat cat-meta">meta_ads</div>
+      <div class="approval-title">Campañas ASC con catálogo superan 40% ROAS vs manuales en Q2 2026</div>
+      <div class="approval-body">CUANDO: un merchant tenga catálogo de Shopify conectado a Meta. HAZ: 1. Crear campaña Advantage+ Shopping. 2. Desactivar campañas manuales equivalentes. PORQUE: Meta reporta 40% más ROAS en ASC vs campañas manuales para ecommerce (Meta Performance Report Q1 2026).</div>
+      <div class="approval-confidence">
+        <span class="conf-text">Confianza: 8/10</span>
+        <div class="conf-bar"><div class="conf-fill" style="width:80%"></div></div>
+      </div>
+      <div class="approval-sources">
+        📎 Fuentes: <a href="#">about.meta.com/asc-report-2026</a> · <a href="#">jonloomer.com/advantage-shopping</a>
+      </div>
+      <div style="background:#1a1a2e; border-radius:8px; padding:12px; margin-bottom:14px; font-size:0.82rem; color:#8888aa;">
+        <strong style="color:#a78bfa;">💡 Por qué es valioso:</strong> Cruzando el reporte de Meta Ads con el reporte de Shopify checkout optimization, se confirma que la automatización de Meta + catálogo sync es la combinación ganadora para DTC pequeños.
+      </div>
+      <div class="approval-btns">
+        <button class="btn-approve">✅ Aprobar</button>
+        <button class="btn-reject">❌ Rechazar</button>
+      </div>
+    </div>
+
+    <div class="approval-card">
+      <div class="approval-cat cat-klaviyo">klaviyo</div>
+      <div class="approval-title">Flow de post-compra con review request a los 7 días genera 22% más reseñas</div>
+      <div class="approval-body">CUANDO: un merchant tenga flow de post-compra activo. HAZ: 1. Agregar email de review request al día 7. 2. Incluir incentivo de 10% descuento en próxima compra. PORQUE: emails de review a los 7 días (no 3, no 14) maximizan tasa de respuesta (Klaviyo Benchmarks 2026).</div>
+      <div class="approval-confidence">
+        <span class="conf-text">Confianza: 7/10</span>
+        <div class="conf-bar"><div class="conf-fill" style="width:70%"></div></div>
+      </div>
+      <div class="approval-sources">
+        📎 Fuentes: <a href="#">klaviyo.com/benchmarks-2026</a> · <a href="#">yotpo.com/review-timing-study</a>
+      </div>
+      <div style="background:#1a1a2e; border-radius:8px; padding:12px; margin-bottom:14px; font-size:0.82rem; color:#8888aa;">
+        <strong style="color:#a78bfa;">💡 Por qué es valioso:</strong> Cruzando reporte de customer retention con email marketing benchmarks. El timing de 7 días aparece consistentemente como sweet spot entre recencia de experiencia y tiempo suficiente para evaluar el producto.
+      </div>
+      <div class="approval-btns">
+        <button class="btn-approve">✅ Aprobar</button>
+        <button class="btn-reject">❌ Rechazar</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- TAB: FAST (web_search_preview) -->
+  <!-- ============================================================ -->
+  <div id="tab-fast" class="flow-section">
+
+    <h2 class="section-title">Caso 1: Web Search Preview</h2>
+    <p class="section-desc">Rápido y barato. OpenAI o4-mini hace búsquedas web simples. Como un Google inteligente.</p>
+
+    <div class="flow-step step-haiku">
+      <div class="step-number">1</div>
+      <div class="step-card">
+        <div class="step-header">
+          <span class="step-icon">🧠</span>
+          <div>
+            <div class="step-title">Director — Claude Haiku</div>
+            <div class="step-subtitle">PASO 1 · ~5 segundos</div>
+          </div>
+        </div>
+        <div class="step-body">
+          Lee las <strong>últimas 24h de mensajes WA</strong> de merchants + el <strong>mapa de conocimiento</strong> de Steve (qué sabe y qué NO sabe por categoría). Con eso genera <strong>10 preguntas</strong> de investigación en inglés, enfocadas en los gaps.
+        </div>
+        <div class="step-meta">
+          <span class="meta-badge meta-time">⏱ ~5 seg</span>
+          <span class="meta-badge meta-cost">💰 ~$0.003</span>
+          <span class="meta-badge meta-model">🤖 claude-haiku-4.5</span>
+          <span class="meta-badge meta-data">📊 wa_messages + steve_knowledge</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-step step-openai">
+      <div class="step-number">2</div>
+      <div class="step-card">
+        <div class="step-header">
+          <span class="step-icon">🔍</span>
+          <div>
+            <div class="step-title">10 Buscadores — OpenAI o4-mini + web_search_preview</div>
+            <div class="step-subtitle">PASO 2 · ~10-15 segundos (en paralelo)</div>
+          </div>
+        </div>
+        <div class="step-body">
+          Cada pregunta se envía a <strong>o4-mini con herramienta web_search_preview</strong>. El modelo hace una búsqueda web, lee los snippets de los resultados, y genera una respuesta con citas. <strong>NO navega a los sitios completos</strong> — solo lee los snippets de Google/Bing.<br><br>
+          <strong>Resultado:</strong> ~1 página de texto por pregunta con 3-5 URLs citadas.
+        </div>
+        <div class="step-meta">
+          <span class="meta-badge meta-time">⏱ ~10-15 seg total</span>
+          <span class="meta-badge meta-cost">💰 ~$0.10-0.30 × 10</span>
+          <span class="meta-badge meta-model">🤖 o4-mini</span>
+          <span class="meta-badge meta-data">🌐 ~30-50 snippets total</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-step step-opus">
+      <div class="step-number">3</div>
+      <div class="step-card">
+        <div class="step-header">
+          <span class="step-icon">👔</span>
+          <div>
+            <div class="step-title">Socio Senior — Claude Opus</div>
+            <div class="step-subtitle">PASO 3 · ~30 segundos</div>
+          </div>
+        </div>
+        <div class="step-body">
+          Recibe los 10 reportes concatenados. Busca <strong>conexiones entre disciplinas</strong> que ningún reporte individual podía ver. Genera máximo <strong>8 insights cruzados</strong> con formato accionable.
+        </div>
+        <div class="step-meta">
+          <span class="meta-badge meta-time">⏱ ~30 seg</span>
+          <span class="meta-badge meta-cost">💰 ~$0.15</span>
+          <span class="meta-badge meta-model">🤖 claude-opus-4.6</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-step step-db">
+      <div class="step-number">4</div>
+      <div class="step-card">
+        <div class="step-header">
+          <span class="step-icon">💾</span>
+          <div>
+            <div class="step-title">Guardar — steve_knowledge (pending)</div>
+            <div class="step-subtitle">PASO 4 · instantáneo</div>
+          </div>
+        </div>
+        <div class="step-body">
+          Cada insight se guarda con <strong>approval_status='pending'</strong> y <strong>orden=0</strong>. Steve NO los usa todavía hasta que JM los apruebe. Incluye: explicación, confianza 1-10, URLs fuente.
+        </div>
+      </div>
+    </div>
+
+    <div class="cost-box">
+      <div class="cost-title">💵 Costos — Caso 1 (Web Search Preview)</div>
+      <div class="cost-row">
+        <span class="cost-label">Haiku director × 12 runs/día</span>
+        <span class="cost-value">~$0.04/día</span>
+      </div>
+      <div class="cost-row">
+        <span class="cost-label">o4-mini × 10 × 12 runs/día</span>
+        <span class="cost-value">~$12-36/día</span>
+      </div>
+      <div class="cost-row">
+        <span class="cost-label">Opus síntesis × 12 runs/día</span>
+        <span class="cost-value">~$1.80/día</span>
+      </div>
+      <div class="cost-row">
+        <span class="cost-label">TOTAL</span>
+        <span class="cost-value">~$14-38/día</span>
+      </div>
+    </div>
+
+    <div style="background:#1a2e1a; border:1px solid #10b98133; border-radius:12px; padding:20px; margin:20px 0;">
+      <strong style="color:#10b981;">✅ Ventajas:</strong>
+      <ul style="margin:10px 0 0 20px; color:#999; font-size:0.9rem;">
+        <li>Rápido: todo el swarm en <strong>~1 minuto</strong></li>
+        <li>Barato: $14-38/día</li>
+        <li>Simple: una sola llamada API por pregunta</li>
+        <li>Sin polling: respuesta síncrona</li>
+      </ul>
+    </div>
+    <div style="background:#2e1a1a; border:1px solid #ef444433; border-radius:12px; padding:20px;">
+      <strong style="color:#ef4444;">❌ Desventajas:</strong>
+      <ul style="margin:10px 0 0 20px; color:#999; font-size:0.9rem;">
+        <li>Superficial: solo lee snippets, no artículos completos</li>
+        <li>~3-5 fuentes por pregunta (vs 50-70 en deep research)</li>
+        <li>Los insights pueden ser genéricos / obvios</li>
+        <li>Menos datos duros, más opiniones generales</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- TAB: DEEP RESEARCH -->
+  <!-- ============================================================ -->
+  <div id="tab-deep" class="flow-section">
+
+    <h2 class="section-title">Caso 2: Deep Research</h2>
+    <p class="section-desc">Lento pero potente. OpenAI navega la web de verdad, lee artículos completos, 50-70 fuentes por pregunta.</p>
+
+    <div class="flow-step step-haiku">
+      <div class="step-number">1</div>
+      <div class="step-card">
+        <div class="step-header">
+          <span class="step-icon">🧠</span>
+          <div>
+            <div class="step-title">Director — Claude Haiku</div>
+            <div class="step-subtitle">PASO 1 · ~5 segundos (igual que Caso 1)</div>
+          </div>
+        </div>
+        <div class="step-body">
+          Mismo proceso: lee WA + knowledge gaps → genera 10 preguntas. <strong>Idéntico al Caso 1.</strong>
+        </div>
+        <div class="step-meta">
+          <span class="meta-badge meta-time">⏱ ~5 seg</span>
+          <span class="meta-badge meta-cost">💰 ~$0.003</span>
+          <span class="meta-badge meta-model">🤖 claude-haiku-4.5</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-step step-openai">
+      <div class="step-number">2</div>
+      <div class="step-card" style="border-color:#10b98155;">
+        <div class="step-header">
+          <span class="step-icon">🕵️</span>
+          <div>
+            <div class="step-title">10 McKinseys — OpenAI Deep Research (o3-deep-research)</div>
+            <div class="step-subtitle">PASO 2 · ~3-5 minutos (en paralelo) ← LA DIFERENCIA</div>
+          </div>
+        </div>
+        <div class="step-body">
+          Cada pregunta se envía al endpoint de <strong>Deep Research</strong>. El modelo:<br><br>
+          <strong>1.</strong> Planifica una estrategia de búsqueda<br>
+          <strong>2.</strong> Hace múltiples búsquedas web (15-30 queries por pregunta)<br>
+          <strong>3.</strong> <strong>Navega a cada sitio y lee el artículo completo</strong><br>
+          <strong>4.</strong> Sintetiza todo en un reporte de 2-5 páginas con citas exactas<br><br>
+          <strong>Resultado:</strong> ~3-5 páginas por pregunta con <strong>50-70 URLs</strong> citadas y datos duros.
+          <br><br>
+          <strong>⚠️ Es asíncrono:</strong> hay que hacer polling o usar webhook para saber cuándo termina.
+        </div>
+        <div class="step-meta">
+          <span class="meta-badge meta-time">⏱ ~3-5 min total (paralelo)</span>
+          <span class="meta-badge meta-cost">💰 ~$2-5 × 10</span>
+          <span class="meta-badge meta-model">🤖 o3-deep-research</span>
+          <span class="meta-badge meta-data">🌐 ~500-700 artículos total</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-step step-opus">
+      <div class="step-number">3</div>
+      <div class="step-card">
+        <div class="step-header">
+          <span class="step-icon">👔</span>
+          <div>
+            <div class="step-title">Socio Senior — Claude Opus</div>
+            <div class="step-subtitle">PASO 3 · ~45-60 segundos (más input = más tiempo)</div>
+          </div>
+        </div>
+        <div class="step-body">
+          Recibe los 10 reportes (ahora mucho más densos, ~30-50 páginas total). La síntesis es <strong>mucho más rica</strong> porque tiene datos reales con los que cruzar. Genera hasta <strong>8 insights cruzados</strong> con datos duros y fuentes verificables.
+        </div>
+        <div class="step-meta">
+          <span class="meta-badge meta-time">⏱ ~45-60 seg</span>
+          <span class="meta-badge meta-cost">💰 ~$0.30-0.50</span>
+          <span class="meta-badge meta-model">🤖 claude-opus-4.6</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-step step-db">
+      <div class="step-number">4</div>
+      <div class="step-card">
+        <div class="step-header">
+          <span class="step-icon">💾</span>
+          <div>
+            <div class="step-title">Guardar — steve_knowledge (pending)</div>
+            <div class="step-subtitle">PASO 4 · instantáneo (igual que Caso 1)</div>
+          </div>
+        </div>
+        <div class="step-body">
+          Mismo proceso de guardado. La diferencia: los insights tienen <strong>más fuentes</strong>, <strong>mayor confianza</strong>, y <strong>datos más específicos</strong>.
+        </div>
+      </div>
+    </div>
+
+    <div class="cost-box">
+      <div class="cost-title">💵 Costos — Caso 2 (Deep Research)</div>
+      <div class="cost-row">
+        <span class="cost-label">Haiku director × 12 runs/día</span>
+        <span class="cost-value">~$0.04/día</span>
+      </div>
+      <div class="cost-row">
+        <span class="cost-label">Deep Research × 10 × 12 runs/día</span>
+        <span class="cost-value">~$240-600/día</span>
+      </div>
+      <div class="cost-row">
+        <span class="cost-label">Opus síntesis × 12 runs/día</span>
+        <span class="cost-value">~$3.60-6/día</span>
+      </div>
+      <div class="cost-row">
+        <span class="cost-label">TOTAL</span>
+        <span class="cost-value">~$244-606/día</span>
+      </div>
+    </div>
+
+    <div style="background:#1a2e1a; border:1px solid #10b98133; border-radius:12px; padding:20px; margin:20px 0;">
+      <strong style="color:#10b981;">✅ Ventajas:</strong>
+      <ul style="margin:10px 0 0 20px; color:#999; font-size:0.9rem;">
+        <li>Profundo: lee <strong>50-70 artículos completos</strong> por pregunta</li>
+        <li>Datos duros: porcentajes, benchmarks, case studies reales</li>
+        <li>Los insights son tipo <strong>McKinsey real</strong> — no genéricos</li>
+        <li>Fuentes verificables con extractos exactos</li>
+      </ul>
+    </div>
+    <div style="background:#2e1a1a; border:1px solid #ef444433; border-radius:12px; padding:20px;">
+      <strong style="color:#ef4444;">❌ Desventajas:</strong>
+      <ul style="margin:10px 0 0 20px; color:#999; font-size:0.9rem;">
+        <li>Lento: ~5 minutos por swarm run</li>
+        <li><strong>Muy caro: $244-606/día</strong> a 12 runs/día</li>
+        <li>Asíncrono: requiere polling (más complejidad en código)</li>
+        <li>Podría exceder timeout de Cloud Run si no se maneja bien</li>
+      </ul>
+    </div>
+
+    <!-- Recommendation -->
+    <div style="background:linear-gradient(135deg,#1a1a3e,#1a2a3e); border:2px solid #7c3aed55; border-radius:16px; padding:24px; margin:30px 0;">
+      <h3 style="color:#a78bfa; margin-bottom:12px;">💡 Recomendación: Híbrido</h3>
+      <p style="color:#bbb; font-size:0.9rem; line-height:1.7;">
+        <strong style="color:#fff;">Web Search Preview (Caso 1) cada 2 horas</strong> — para mantener el conocimiento fresco a bajo costo.<br><br>
+        <strong style="color:#fff;">Deep Research (Caso 2) una vez al día</strong> (en vez de 12 veces) — un solo deep dive nocturno a las 3am con las 10 preguntas más importantes. Costo: ~$20-50/día en vez de $244-606.
+      </p>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- COMPARISON TABLE (visible in all tabs) -->
+  <!-- ============================================================ -->
+  <h2 class="section-title">Comparación Directa</h2>
+
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>Aspecto</th>
+        <th>Caso 1: Web Search</th>
+        <th>Caso 2: Deep Research</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Modelo OpenAI</td>
+        <td>o4-mini + web_search_preview</td>
+        <td>o3-deep-research</td>
+      </tr>
+      <tr>
+        <td>Qué hace</td>
+        <td>Busca en web, lee snippets</td>
+        <td class="winner">Navega sitios completos, lee artículos</td>
+      </tr>
+      <tr>
+        <td>Fuentes por pregunta</td>
+        <td class="loser">3-5 URLs</td>
+        <td class="winner">50-70 URLs</td>
+      </tr>
+      <tr>
+        <td>Profundidad del reporte</td>
+        <td>~1 página, resumen general</td>
+        <td class="winner">~3-5 páginas, datos duros</td>
+      </tr>
+      <tr>
+        <td>Tiempo total (10 paralelo)</td>
+        <td class="winner">~15 segundos</td>
+        <td>~3-5 minutos</td>
+      </tr>
+      <tr>
+        <td>Costo por run (10 preguntas)</td>
+        <td class="winner">~$1-3</td>
+        <td>~$20-50</td>
+      </tr>
+      <tr>
+        <td>Costo/día (cada 2h = 12 runs)</td>
+        <td class="winner">~$14-38</td>
+        <td class="loser">~$244-606</td>
+      </tr>
+      <tr>
+        <td>Calidad de insights</td>
+        <td>Buenos, algo genéricos</td>
+        <td class="winner">Excelentes, tipo consultor real</td>
+      </tr>
+      <tr>
+        <td>API</td>
+        <td class="winner">Síncrona (simple)</td>
+        <td>Asíncrona (requiere polling)</td>
+      </tr>
+      <tr>
+        <td>Implementación actual</td>
+        <td class="winner">✅ Implementado</td>
+        <td>⏳ Pendiente</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="text-align:center; padding:40px 20px; color:#555; font-size:0.85rem;">
+    Steve Brain Swarm v1.0 — Abril 2026
+  </div>
+
+</div>
+
+<script>
+function showTab(name) {
+  document.querySelectorAll('.flow-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>
