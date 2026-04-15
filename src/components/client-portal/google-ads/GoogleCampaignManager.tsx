@@ -39,6 +39,9 @@ import {
   CalendarIcon,
   Upload,
   X,
+  Globe,
+  Link2,
+  Sparkles,
 } from 'lucide-react';
 import SteveRecommendation from './SteveRecommendation';
 
@@ -102,6 +105,25 @@ const bidStrategies = [
   { value: 'TARGET_ROAS', label: 'ROAS objetivo' },
   { value: 'MANUAL_CPC', label: 'CPC manual' },
   { value: 'MAXIMIZE_CONVERSION_VALUE', label: 'Maximizar valor' },
+];
+
+const locationOptions = [
+  { id: '2152', label: 'Chile' },
+  { id: '2032', label: 'Argentina' },
+  { id: '2484', label: 'Mexico' },
+  { id: '2170', label: 'Colombia' },
+  { id: '2604', label: 'Peru' },
+  { id: '2724', label: 'Espana' },
+  { id: '2840', label: 'Estados Unidos' },
+  { id: '2076', label: 'Brasil' },
+];
+
+const languageOptions = [
+  { id: '1003', label: 'Espanol' },
+  { id: '1000', label: 'Ingles' },
+  { id: '1014', label: 'Portugues' },
+  { id: '1002', label: 'Frances' },
+  { id: '1001', label: 'Aleman' },
 ];
 
 // ─── AssetLineEditor ─────────────────────────────────────────────────
@@ -496,6 +518,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     target_search_network: true,
     target_content_network: false,
     start_date: '',
+    end_date: '',
     ad_group_name: 'Ad Group 1',
     ad_group_cpc_bid_micros: '',
     // PMAX
@@ -515,9 +538,20 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     call_to_action: '',
     display_url_path1: '',
     display_url_path2: '',
-    // Shopping
+    // Sitelinks
+    sitelinks: [] as Array<{ text: string; url: string; description1: string; description2: string }>,
+    // Targeting
+    locations: [] as string[],
+    languages: [] as string[],
+    search_themes: '' as string,
+    url_expansion_opt_out: false,
+    // Shopping / Merchant Center
     merchant_center_id: '',
   });
+  const [budgetOptions, setBudgetOptions] = useState<any>(null);
+  const [budgetLoading, setBudgetLoading] = useState(false);
+  const [merchantCenters, setMerchantCenters] = useState<Array<{ id: string; name: string; status: string }>>([]);
+  const [merchantLoading, setMerchantLoading] = useState(false);
 
   // ─── Fetch campaigns ──────────────────────────────────────────────
 
@@ -777,8 +811,19 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       target_search_network: wizardData.target_search_network,
       target_content_network: wizardData.target_content_network,
       start_date: wizardData.start_date || undefined,
+      end_date: wizardData.end_date || undefined,
       ad_group_name: wizardData.ad_group_name || 'Ad Group 1',
     };
+
+    // Location targeting
+    if (wizardData.locations.length > 0) {
+      payload.locations = wizardData.locations;
+    }
+
+    // Language targeting
+    if (wizardData.languages.length > 0) {
+      payload.languages = wizardData.languages;
+    }
 
     if (wizardData.ad_group_cpc_bid_micros) {
       payload.ad_group_cpc_bid_micros = Math.round(Number(wizardData.ad_group_cpc_bid_micros) * 1_000_000);
@@ -794,6 +839,17 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       if (wizardData.call_to_action) payload.call_to_action = wizardData.call_to_action;
       if (wizardData.display_url_path1) payload.display_url_path1 = wizardData.display_url_path1;
       if (wizardData.display_url_path2) payload.display_url_path2 = wizardData.display_url_path2;
+      if (wizardData.url_expansion_opt_out) payload.url_expansion_opt_out = true;
+      if (wizardData.merchant_center_id) payload.merchant_center_id = wizardData.merchant_center_id;
+
+      // Sitelinks
+      const validSitelinks = wizardData.sitelinks.filter(sl => sl.text.trim() && sl.url.trim());
+      if (validSitelinks.length > 0) payload.sitelinks = validSitelinks;
+
+      // Search themes
+      if (wizardData.search_themes) {
+        payload.search_themes = wizardData.search_themes.split(',').map(t => t.trim()).filter(Boolean);
+      }
 
       // Convert images to base64 for single-batch creation (Google requires all assets together)
       setWizardProgress('Procesando imagenes...');
@@ -848,14 +904,51 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     setWizardData({
       name: '', channel_type: 'SEARCH', daily_budget: '', bid_strategy: 'MAXIMIZE_CONVERSIONS',
       target_google_search: true, target_search_network: true, target_content_network: false,
-      start_date: '', ad_group_name: 'Ad Group 1', ad_group_cpc_bid_micros: '',
+      start_date: '', end_date: '', ad_group_name: 'Ad Group 1', ad_group_cpc_bid_micros: '',
       final_urls: '', business_name: '', headlines: [''], long_headlines: [''], descriptions: [''],
       images_landscape: [], images_square: [], images_logo: [],
       images_portrait: [], images_landscape_logo: [],
       youtube_urls: [], call_to_action: '', display_url_path1: '', display_url_path2: '',
+      sitelinks: [], locations: [], languages: [],
+      search_themes: '', url_expansion_opt_out: false,
       merchant_center_id: '',
     });
+    setBudgetOptions(null);
     fetchCampaigns();
+  };
+
+  const fetchBudgetRecommendation = async () => {
+    setBudgetLoading(true);
+    setBudgetOptions(null);
+    const themes = wizardData.search_themes
+      ? wizardData.search_themes.split(',').map(t => t.trim()).filter(Boolean)
+      : [];
+    const { data, error } = await callApi('manage-google-campaign', {
+      body: {
+        action: 'get_budget_recommendation',
+        connection_id: connectionId,
+        data: { channel_type: wizardData.channel_type, search_themes: themes },
+      },
+    });
+    setBudgetLoading(false);
+    if (error) {
+      toast.error('Error obteniendo recomendacion: ' + error);
+      return;
+    }
+    setBudgetOptions(data?.options || null);
+  };
+
+  const fetchMerchantCenters = async () => {
+    setMerchantLoading(true);
+    const { data, error } = await callApi('manage-google-campaign', {
+      body: { action: 'list_merchant_centers', connection_id: connectionId },
+    });
+    setMerchantLoading(false);
+    if (error) {
+      toast.error('Error cargando Merchant Centers: ' + error);
+      return;
+    }
+    setMerchantCenters(data?.merchant_centers || []);
   };
 
   const handleApplyRecommendation = (rec: any) => {
@@ -1409,6 +1502,44 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                   onChange={e => setWizardData(prev => ({ ...prev, daily_budget: e.target.value }))}
                   placeholder="Monto en moneda de la cuenta"
                 />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs"
+                  onClick={fetchBudgetRecommendation}
+                  disabled={budgetLoading}
+                >
+                  {budgetLoading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                  Ver presupuesto recomendado
+                </Button>
+                {budgetOptions && (
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    {(['low', 'recommended', 'high'] as const).map(level => {
+                      const opt = budgetOptions[level];
+                      if (!opt?.daily_budget) return null;
+                      return (
+                        <button
+                          key={level}
+                          className={`p-2 rounded-lg border text-left text-xs hover:border-primary transition-colors ${
+                            wizardData.daily_budget === String(opt.daily_budget)
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border'
+                          }`}
+                          onClick={() => setWizardData(prev => ({ ...prev, daily_budget: String(opt.daily_budget) }))}
+                        >
+                          <p className="font-medium capitalize">{level === 'low' ? 'Bajo' : level === 'recommended' ? 'Recomendado' : 'Alto'}</p>
+                          <p className="text-base font-bold">${opt.daily_budget}</p>
+                          {opt.estimated_clicks > 0 && (
+                            <p className="text-muted-foreground">~{opt.estimated_clicks} clics/dia</p>
+                          )}
+                          {opt.reasoning && (
+                            <p className="text-muted-foreground mt-1">{opt.reasoning}</p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1478,6 +1609,103 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 </div>
               )}
 
+              {/* Merchant Center for PMAX (optional — enables Shopping ads) */}
+              {isPmax && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5" />
+                    Merchant Center <span className="text-muted-foreground font-normal">(opcional)</span>
+                  </Label>
+                  <div className="flex gap-2">
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      value={wizardData.merchant_center_id}
+                      onChange={e => setWizardData(prev => ({ ...prev, merchant_center_id: e.target.value }))}
+                    >
+                      <option value="">Sin Merchant Center</option>
+                      {merchantCenters.map(mc => (
+                        <option key={mc.id} value={mc.id}>{mc.name} ({mc.id})</option>
+                      ))}
+                    </select>
+                    <Button variant="outline" size="sm" onClick={fetchMerchantCenters} disabled={merchantLoading}>
+                      {merchantLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Vincula Merchant Center para habilitar Shopping ads dentro de PMAX.
+                  </p>
+                </div>
+              )}
+
+              {/* Location Targeting */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5" />
+                  Segmentacion geografica <span className="text-muted-foreground font-normal">(opcional)</span>
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {locationOptions.map(loc => {
+                    const selected = wizardData.locations.includes(loc.id);
+                    return (
+                      <button
+                        key={loc.id}
+                        className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                          selected
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background hover:bg-muted border-border'
+                        }`}
+                        onClick={() => {
+                          setWizardData(prev => ({
+                            ...prev,
+                            locations: selected
+                              ? prev.locations.filter(id => id !== loc.id)
+                              : [...prev.locations, loc.id],
+                          }));
+                        }}
+                      >
+                        {loc.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {wizardData.locations.length === 0 ? 'Sin seleccion = todos los paises' : `${wizardData.locations.length} pais(es) seleccionado(s)`}
+                </p>
+              </div>
+
+              {/* Language Targeting */}
+              <div className="space-y-2">
+                <Label>Idiomas <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+                <div className="flex flex-wrap gap-2">
+                  {languageOptions.map(lang => {
+                    const selected = wizardData.languages.includes(lang.id);
+                    return (
+                      <button
+                        key={lang.id}
+                        className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                          selected
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background hover:bg-muted border-border'
+                        }`}
+                        onClick={() => {
+                          setWizardData(prev => ({
+                            ...prev,
+                            languages: selected
+                              ? prev.languages.filter(id => id !== lang.id)
+                              : [...prev.languages, lang.id],
+                          }));
+                        }}
+                      >
+                        {lang.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {wizardData.languages.length === 0 ? 'Sin seleccion = todos los idiomas' : `${wizardData.languages.length} idioma(s)`}
+                </p>
+              </div>
+
               {isPmax && (
                 <>
                   <div className="space-y-2">
@@ -1501,21 +1729,70 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 </>
               )}
 
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1.5">
-                  <CalendarIcon className="w-3.5 h-3.5" />
-                  Fecha de inicio (opcional)
-                </Label>
-                <Input
-                  type="date"
-                  value={wizardData.start_date ? `${wizardData.start_date.slice(0,4)}-${wizardData.start_date.slice(4,6)}-${wizardData.start_date.slice(6,8)}` : ''}
-                  min={new Date().toISOString().split('T')[0]}
-                  onChange={e => {
-                    const val = e.target.value;
-                    setWizardData(prev => ({ ...prev, start_date: val ? val.replace(/-/g, '') : '' }));
-                  }}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                    Fecha inicio <span className="text-muted-foreground font-normal">(opc.)</span>
+                  </Label>
+                  <Input
+                    type="date"
+                    value={wizardData.start_date ? `${wizardData.start_date.slice(0,4)}-${wizardData.start_date.slice(4,6)}-${wizardData.start_date.slice(6,8)}` : ''}
+                    min={new Date().toISOString().split('T')[0]}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setWizardData(prev => ({ ...prev, start_date: val ? val.replace(/-/g, '') : '' }));
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                    Fecha fin <span className="text-muted-foreground font-normal">(opc.)</span>
+                  </Label>
+                  <Input
+                    type="date"
+                    value={wizardData.end_date ? `${wizardData.end_date.slice(0,4)}-${wizardData.end_date.slice(4,6)}-${wizardData.end_date.slice(6,8)}` : ''}
+                    min={wizardData.start_date
+                      ? `${wizardData.start_date.slice(0,4)}-${wizardData.start_date.slice(4,6)}-${wizardData.start_date.slice(6,8)}`
+                      : new Date().toISOString().split('T')[0]
+                    }
+                    onChange={e => {
+                      const val = e.target.value;
+                      setWizardData(prev => ({ ...prev, end_date: val ? val.replace(/-/g, '') : '' }));
+                    }}
+                  />
+                </div>
               </div>
+
+              {/* Search Themes (audience signals for PMAX) */}
+              {isPmax && (
+                <div className="space-y-2">
+                  <Label>Search Themes <span className="text-muted-foreground font-normal">(senales de audiencia, opcional)</span></Label>
+                  <Input
+                    value={wizardData.search_themes}
+                    onChange={e => setWizardData(prev => ({ ...prev, search_themes: e.target.value }))}
+                    placeholder="zapatos, zapatillas deportivas, calzado online"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Separados por comas (max 25). Google los usa como punto de partida, no como restricciones.
+                  </p>
+                </div>
+              )}
+
+              {/* URL Expansion toggle (PMAX) */}
+              {isPmax && (
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <Label>Expansion de URL final</Label>
+                    <p className="text-xs text-muted-foreground">Permite a Google mostrar anuncios en URLs similares</p>
+                  </div>
+                  <Switch
+                    checked={!wizardData.url_expansion_opt_out}
+                    onCheckedChange={val => setWizardData(prev => ({ ...prev, url_expansion_opt_out: !val }))}
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -1616,7 +1893,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
             </div>
           )}
 
-          {/* Step 5 PMAX: Videos + Extras */}
+          {/* Step 5 PMAX: Videos, Sitelinks & Extras */}
           {wizardStep === 5 && isPmax && (
             <div className="space-y-5">
               <YouTubeInput
@@ -1658,6 +1935,92 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">Max 15 caracteres por segmento</p>
+              </div>
+
+              {/* Sitelinks */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-1.5">
+                    <Link2 className="w-3.5 h-3.5" />
+                    Sitelinks <span className="text-muted-foreground font-normal">(vinculos de sitio, opcional)</span>
+                  </Label>
+                  <span className="text-xs text-muted-foreground">{wizardData.sitelinks.length}/20</span>
+                </div>
+                {wizardData.sitelinks.map((sl, i) => (
+                  <div key={i} className="border rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium">Sitelink {i + 1}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-red-500"
+                        onClick={() => setWizardData(prev => ({
+                          ...prev,
+                          sitelinks: prev.sitelinks.filter((_, idx) => idx !== i),
+                        }))}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        value={sl.text}
+                        onChange={e => {
+                          const next = [...wizardData.sitelinks];
+                          next[i] = { ...next[i], text: e.target.value.slice(0, 25) };
+                          setWizardData(prev => ({ ...prev, sitelinks: next }));
+                        }}
+                        placeholder="Texto del link (25 chars)"
+                        maxLength={25}
+                      />
+                      <Input
+                        value={sl.url}
+                        onChange={e => {
+                          const next = [...wizardData.sitelinks];
+                          next[i] = { ...next[i], url: e.target.value };
+                          setWizardData(prev => ({ ...prev, sitelinks: next }));
+                        }}
+                        placeholder="https://ejemplo.com/pagina"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        value={sl.description1}
+                        onChange={e => {
+                          const next = [...wizardData.sitelinks];
+                          next[i] = { ...next[i], description1: e.target.value.slice(0, 35) };
+                          setWizardData(prev => ({ ...prev, sitelinks: next }));
+                        }}
+                        placeholder="Descripcion 1 (35 chars)"
+                        maxLength={35}
+                      />
+                      <Input
+                        value={sl.description2}
+                        onChange={e => {
+                          const next = [...wizardData.sitelinks];
+                          next[i] = { ...next[i], description2: e.target.value.slice(0, 35) };
+                          setWizardData(prev => ({ ...prev, sitelinks: next }));
+                        }}
+                        placeholder="Descripcion 2 (35 chars)"
+                        maxLength={35}
+                      />
+                    </div>
+                  </div>
+                ))}
+                {wizardData.sitelinks.length < 20 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => setWizardData(prev => ({
+                      ...prev,
+                      sitelinks: [...prev.sitelinks, { text: '', url: '', description1: '', description2: '' }],
+                    }))}
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Agregar sitelink
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -1706,6 +2069,24 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                       <>
                         <p className="text-muted-foreground">Inicio</p>
                         <p>{wizardData.start_date.slice(0,4)}-{wizardData.start_date.slice(4,6)}-{wizardData.start_date.slice(6,8)}</p>
+                      </>
+                    )}
+                    {wizardData.end_date && (
+                      <>
+                        <p className="text-muted-foreground">Fin</p>
+                        <p>{wizardData.end_date.slice(0,4)}-{wizardData.end_date.slice(4,6)}-{wizardData.end_date.slice(6,8)}</p>
+                      </>
+                    )}
+                    {wizardData.locations.length > 0 && (
+                      <>
+                        <p className="text-muted-foreground">Paises</p>
+                        <p>{wizardData.locations.map(id => locationOptions.find(l => l.id === id)?.label).filter(Boolean).join(', ')}</p>
+                      </>
+                    )}
+                    {wizardData.languages.length > 0 && (
+                      <>
+                        <p className="text-muted-foreground">Idiomas</p>
+                        <p>{wizardData.languages.map(id => languageOptions.find(l => l.id === id)?.label).filter(Boolean).join(', ')}</p>
                       </>
                     )}
                   </div>
@@ -1797,6 +2178,28 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                       )}
                       {wizardData.final_urls && (
                         <p className="text-xs">URL: <strong>{wizardData.final_urls}</strong></p>
+                      )}
+                      {wizardData.merchant_center_id && (
+                        <p className="text-xs">Merchant Center: <strong>{wizardData.merchant_center_id}</strong></p>
+                      )}
+                      {wizardData.search_themes && (
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">Search Themes</p>
+                          <p className="text-xs">{wizardData.search_themes}</p>
+                        </div>
+                      )}
+                      {wizardData.url_expansion_opt_out && (
+                        <Badge variant="outline" className="text-xs">URL Expansion: Desactivada</Badge>
+                      )}
+                      {wizardData.sitelinks.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">Sitelinks ({wizardData.sitelinks.filter(s => s.text.trim()).length})</p>
+                          <div className="flex flex-wrap gap-1">
+                            {wizardData.sitelinks.filter(s => s.text.trim()).map((sl, i) => (
+                              <Badge key={i} variant="secondary" className="text-xs">{sl.text}</Badge>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}

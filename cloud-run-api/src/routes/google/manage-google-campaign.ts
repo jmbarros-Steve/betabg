@@ -508,11 +508,17 @@ async function handleCreateCampaign(
   const {
     name, daily_budget, channel_type, bid_strategy,
     target_google_search, target_search_network, target_content_network,
-    start_date, ad_group_name, ad_group_cpc_bid_micros,
+    start_date, end_date, ad_group_name, ad_group_cpc_bid_micros,
     // PMAX-specific
     final_urls, business_name, headlines, descriptions, long_headlines,
     image_assets, youtube_video_ids,
-    // Shopping-specific
+    call_to_action, display_url_path1, display_url_path2,
+    url_expansion_opt_out, search_themes,
+    // Sitelinks
+    sitelinks,
+    // Targeting
+    locations, languages,
+    // Shopping / Merchant Center
     merchant_center_id,
   } = data;
 
@@ -527,9 +533,12 @@ async function handleCreateCampaign(
   const bidStrategy = bid_strategy || 'MAXIMIZE_CONVERSIONS';
   const amountMicros = Math.round(Number(daily_budget) * 1_000_000).toString();
 
-  // Format start date (YYYY-MM-DD for Google Ads API v23+)
+  // Format dates (YYYY-MM-DD for Google Ads API v23+)
   const formattedStartDate = start_date
     ? `${start_date.slice(0, 4)}-${start_date.slice(4, 6)}-${start_date.slice(6, 8)}`
+    : null;
+  const formattedEndDate = end_date
+    ? `${end_date.slice(0, 4)}-${end_date.slice(4, 6)}-${end_date.slice(6, 8)}`
     : null;
 
   const mutateOps: any[] = [];
@@ -557,16 +566,17 @@ async function handleCreateCampaign(
     containsEuPoliticalAdvertising: 'DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING',
   };
 
-  // Geo targeting only for non-PMAX (PMAX manages targeting automatically)
-  if (channelType !== 'PERFORMANCE_MAX') {
-    campaignCreate.geoTargetTypeSetting = {
-      positiveGeoTargetType: 'PRESENCE_OR_INTEREST',
-    };
-  }
+  // Geo target type setting (how to match locations)
+  campaignCreate.geoTargetTypeSetting = {
+    positiveGeoTargetType: 'PRESENCE_OR_INTEREST',
+  };
 
-  // Start date (only if explicitly set)
+  // Start/end dates (only if explicitly set)
   if (formattedStartDate) {
     campaignCreate.startDate = formattedStartDate;
+  }
+  if (formattedEndDate) {
+    campaignCreate.endDate = formattedEndDate;
   }
 
   // Network settings for Search campaigns
@@ -578,7 +588,7 @@ async function handleCreateCampaign(
     };
   }
 
-  // Shopping-specific
+  // Shopping-specific (required)
   if (channelType === 'SHOPPING') {
     if (!merchant_center_id) {
       return { body: { error: 'merchant_center_id is required for Shopping campaigns' }, status: 400 };
@@ -588,7 +598,46 @@ async function handleCreateCampaign(
     };
   }
 
+  // PMAX + Merchant Center (optional — enables Shopping ads within PMAX)
+  if (channelType === 'PERFORMANCE_MAX' && merchant_center_id) {
+    campaignCreate.shoppingSetting = {
+      merchantId: String(merchant_center_id),
+    };
+  }
+
   mutateOps.push({ campaignOperation: { create: campaignCreate } });
+
+  // Location targeting criteria
+  if (locations?.length) {
+    for (const geoId of locations) {
+      mutateOps.push({
+        campaignCriterionOperation: {
+          create: {
+            campaign: `customers/${customerId}/campaigns/-2`,
+            location: {
+              geoTargetConstant: `geoTargetConstants/${geoId}`,
+            },
+          },
+        },
+      });
+    }
+  }
+
+  // Language targeting criteria
+  if (languages?.length) {
+    for (const langId of languages) {
+      mutateOps.push({
+        campaignCriterionOperation: {
+          create: {
+            campaign: `customers/${customerId}/campaigns/-2`,
+            language: {
+              languageConstant: `languageConstants/${langId}`,
+            },
+          },
+        },
+      });
+    }
+  }
 
   // 3. Ad Group (temp ID -3) — for Search campaigns
   if (channelType === 'SEARCH') {
@@ -804,20 +853,114 @@ async function handleCreateCampaign(
       }
     }
 
-    // Push in correct order: assets → asset group → links
-    mutateOps.push(...assetOps);
-    mutateOps.push({
-      assetGroupOperation: {
-        create: {
-          resourceName: `customers/${customerId}/assetGroups/-3`,
-          campaign: `customers/${customerId}/campaigns/-2`,
-          name: ad_group_name || 'Asset Group 1',
-          finalUrls: sanitizedUrls,
-          status: 'ENABLED',
+    // CTA — create text asset + link with CALL_TO_ACTION_SELECTION
+    if (call_to_action) {
+      const ctaAssetId = tempId--;
+      assetOps.push({
+        assetOperation: {
+          create: {
+            resourceName: `customers/${customerId}/assets/${ctaAssetId}`,
+            textAsset: { text: call_to_action },
+          },
         },
-      },
-    });
+      });
+      linkOps.push({
+        assetGroupAssetOperation: {
+          create: {
+            asset: `customers/${customerId}/assets/${ctaAssetId}`,
+            assetGroup: `customers/${customerId}/assetGroups/-3`,
+            fieldType: 'CALL_TO_ACTION_SELECTION',
+          },
+        },
+      });
+    }
+
+    // Asset group create — includes display URL paths + URL expansion opt-out
+    const assetGroupCreate: Record<string, any> = {
+      resourceName: `customers/${customerId}/assetGroups/-3`,
+      campaign: `customers/${customerId}/campaigns/-2`,
+      name: ad_group_name || 'Asset Group 1',
+      finalUrls: sanitizedUrls,
+      status: 'ENABLED',
+    };
+
+    // Display URL paths (max 15 chars each)
+    if (display_url_path1) {
+      assetGroupCreate.path1 = display_url_path1.slice(0, 15);
+    }
+    if (display_url_path2 && display_url_path1) {
+      assetGroupCreate.path2 = display_url_path2.slice(0, 15);
+    }
+
+    // URL expansion opt-out
+    if (url_expansion_opt_out === true) {
+      assetGroupCreate.urlExpansionOptOut = true;
+    }
+
+    // Sitelink assets + campaign asset links (before asset group)
+    const sitelinkOps: any[] = [];
+    const sitelinkLinkOps: any[] = [];
+    if (sitelinks?.length) {
+      for (const sl of sitelinks.slice(0, 20)) {
+        if (!sl.text?.trim() || !sl.url?.trim()) continue;
+        const slAssetId = tempId--;
+        const slUrl = /^https?:\/\//i.test(sl.url) ? sl.url : `https://${sl.url}`;
+        const slAsset: Record<string, any> = {
+          resourceName: `customers/${customerId}/assets/${slAssetId}`,
+          sitelinkAsset: {
+            linkText: sl.text.slice(0, 25),
+            finalUrls: [slUrl],
+          },
+        };
+        if (sl.description1?.trim()) {
+          slAsset.sitelinkAsset.description1 = sl.description1.slice(0, 35);
+        }
+        if (sl.description2?.trim()) {
+          slAsset.sitelinkAsset.description2 = sl.description2.slice(0, 35);
+        }
+        sitelinkOps.push({ assetOperation: { create: slAsset } });
+        sitelinkLinkOps.push({
+          campaignAssetOperation: {
+            create: {
+              asset: `customers/${customerId}/assets/${slAssetId}`,
+              campaign: `customers/${customerId}/campaigns/-2`,
+              fieldType: 'SITELINK',
+            },
+          },
+        });
+      }
+    }
+
+    // Push in correct order:
+    // 1. Sitelink asset creation
+    // 2. Campaign-level sitelink links
+    // 3. Text/image/video asset creation
+    // 4. Asset group
+    // 5. Asset group asset links
+    // 6. Asset group signal (search themes)
+    mutateOps.push(...sitelinkOps);
+    mutateOps.push(...sitelinkLinkOps);
+    mutateOps.push(...assetOps);
+    mutateOps.push({ assetGroupOperation: { create: assetGroupCreate } });
     mutateOps.push(...linkOps);
+
+    // Search themes as AssetGroupSignal (audience signals)
+    if (search_themes?.length) {
+      const validThemes = search_themes
+        .filter((t: string) => t?.trim())
+        .slice(0, 25)
+        .map((t: string) => ({ text: t.trim() }));
+      if (validThemes.length > 0) {
+        mutateOps.push({
+          assetGroupSignalOperation: {
+            create: {
+              assetGroup: `customers/${customerId}/assetGroups/-3`,
+              searchTheme: { searchThemeTargets: validThemes },
+            },
+          },
+        });
+      }
+    }
   }
 
   // Log asset counts for debugging
@@ -826,7 +969,10 @@ async function handleCreateCampaign(
   const longHlCount = mutateOps.filter((op: any) => op.assetGroupAssetOperation?.create?.fieldType === 'LONG_HEADLINE').length;
   const bizNameCount = mutateOps.filter((op: any) => op.assetGroupAssetOperation?.create?.fieldType === 'BUSINESS_NAME').length;
   const imgCount2 = mutateOps.filter((op: any) => op.assetGroupAssetOperation?.create?.fieldType?.includes('IMAGE') || op.assetGroupAssetOperation?.create?.fieldType === 'LOGO').length;
-  console.log(`[manage-google-campaign] Creating ${channelType} campaign "${name}" with ${mutateOps.length} ops — headlines:${headlineCount} desc:${descCount} longHl:${longHlCount} bizName:${bizNameCount} images:${imgCount2} videos:${youtube_video_ids?.length || 0}`);
+  const sitelinkCount = mutateOps.filter((op: any) => op.campaignAssetOperation?.create?.fieldType === 'SITELINK').length;
+  const locationCount = mutateOps.filter((op: any) => op.campaignCriterionOperation?.create?.location).length;
+  const languageCount = mutateOps.filter((op: any) => op.campaignCriterionOperation?.create?.language).length;
+  console.log(`[manage-google-campaign] Creating ${channelType} campaign "${name}" with ${mutateOps.length} ops — headlines:${headlineCount} desc:${descCount} longHl:${longHlCount} bizName:${bizNameCount} images:${imgCount2} videos:${youtube_video_ids?.length || 0} sitelinks:${sitelinkCount} locations:${locationCount} languages:${languageCount}`);
 
   const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, mutateOps);
 
@@ -844,6 +990,198 @@ async function handleCreateCampaign(
     },
     status: 200,
   };
+}
+
+// --- Fase 3: Merchant Center ---
+
+async function handleListMerchantCenters(
+  customerId: string,
+  accessToken: string,
+  developerToken: string,
+  loginCustomerId: string
+): Promise<{ body: any; status: number }> {
+  console.log(`[manage-google-campaign] Listing merchant centers for ${customerId}`);
+
+  const query = `
+    SELECT merchant_center_link.id, merchant_center_link.merchant_center_account_name,
+           merchant_center_link.status
+    FROM merchant_center_link
+  `;
+
+  const result = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, query);
+
+  if (!result.ok) {
+    // Not all accounts have merchant center links — return empty rather than error
+    return { body: { success: true, merchant_centers: [] }, status: 200 };
+  }
+
+  const merchantCenters = (result.data || []).map((row: any) => ({
+    id: row.merchantCenterLink?.id,
+    name: row.merchantCenterLink?.merchantCenterAccountName || `MC ${row.merchantCenterLink?.id}`,
+    status: row.merchantCenterLink?.status,
+  }));
+
+  return { body: { success: true, merchant_centers: merchantCenters }, status: 200 };
+}
+
+// --- Fase 4: Budget Recommendation ---
+
+async function handleGetBudgetRecommendation(
+  customerId: string,
+  accessToken: string,
+  developerToken: string,
+  loginCustomerId: string,
+  data: Record<string, any>
+): Promise<{ body: any; status: number }> {
+  const { channel_type, search_themes: themes } = data;
+  console.log(`[manage-google-campaign] Getting budget recommendation for ${customerId}`);
+
+  // Try SmartCampaignSuggestService for PMAX budget suggestions
+  try {
+    const suggestUrl = `https://googleads.googleapis.com/v18/customers/${customerId}:suggestSmartCampaignBudgetOptions`;
+    const suggestBody: Record<string, any> = {};
+
+    // Build suggestion criteria from search themes
+    if (themes?.length) {
+      suggestBody.suggestionInfo = {
+        keywordThemes: themes.slice(0, 10).map((t: string) => ({
+          freeFormKeywordTheme: t.trim(),
+        })),
+      };
+    }
+
+    const response = await fetch(suggestUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'developer-token': developerToken,
+        'login-customer-id': loginCustomerId,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(suggestBody),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (response.ok) {
+      const result = await response.json() as any;
+      const low = result?.low;
+      const recommended = result?.recommended;
+      const high = result?.high;
+
+      if (recommended) {
+        return {
+          body: {
+            success: true,
+            source: 'google_api',
+            options: {
+              low: {
+                daily_budget: Number(low?.dailyAmountMicros || 0) / 1_000_000,
+                estimated_clicks: low?.metrics?.minDailyClicks || 0,
+                estimated_impressions: low?.metrics?.minDailyImpressions || 0,
+              },
+              recommended: {
+                daily_budget: Number(recommended?.dailyAmountMicros || 0) / 1_000_000,
+                estimated_clicks: recommended?.metrics?.minDailyClicks || 0,
+                estimated_impressions: recommended?.metrics?.minDailyImpressions || 0,
+              },
+              high: {
+                daily_budget: Number(high?.dailyAmountMicros || 0) / 1_000_000,
+                estimated_clicks: high?.metrics?.minDailyClicks || 0,
+                estimated_impressions: high?.metrics?.minDailyImpressions || 0,
+              },
+            },
+          },
+          status: 200,
+        };
+      }
+    }
+  } catch (err: any) {
+    console.log(`[manage-google-campaign] Smart budget suggest failed (falling back to AI): ${err.message}`);
+  }
+
+  // Fallback: AI-based recommendation using account context
+  const metricsQuery = `
+    SELECT metrics.cost_micros, metrics.conversions, metrics.clicks, metrics.impressions,
+           campaign.advertising_channel_type
+    FROM campaign
+    WHERE segments.date DURING LAST_30_DAYS AND campaign.status = 'ENABLED'
+  `;
+  const metricsResult = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, metricsQuery);
+
+  let totalSpend = 0;
+  let totalConversions = 0;
+  let totalClicks = 0;
+  let campaignCount = 0;
+  if (metricsResult.ok && metricsResult.data) {
+    for (const row of metricsResult.data) {
+      totalSpend += Number(row.metrics?.costMicros || 0);
+      totalConversions += Number(row.metrics?.conversions || 0);
+      totalClicks += Number(row.metrics?.clicks || 0);
+      campaignCount++;
+    }
+  }
+  totalSpend = totalSpend / 1_000_000;
+
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    return { body: { error: 'ANTHROPIC_API_KEY not configured' }, status: 500 };
+  }
+
+  const prompt = `Eres experto en Google Ads. Basado en:
+- Gasto 30d: $${totalSpend.toFixed(0)}
+- Conversiones 30d: ${totalConversions}
+- Clics 30d: ${totalClicks}
+- Campañas activas: ${campaignCount}
+- Tipo campaña nueva: ${channel_type || 'PERFORMANCE_MAX'}
+${themes?.length ? `- Temas: ${themes.join(', ')}` : ''}
+
+Sugiere 3 opciones de presupuesto diario (bajo/recomendado/alto) en la moneda de la cuenta.
+Responde SOLO JSON: {"low":{"daily_budget":N,"reasoning":"..."},"recommended":{"daily_budget":N,"reasoning":"..."},"high":{"daily_budget":N,"reasoning":"..."}}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    const result = await response.json() as any;
+    let text = result?.content?.[0]?.text || '{}';
+    text = text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+
+    let recommendation: any;
+    try {
+      recommendation = JSON.parse(text);
+    } catch {
+      recommendation = { raw: text, parse_error: true };
+    }
+
+    return {
+      body: {
+        success: true,
+        source: 'ai_analysis',
+        options: {
+          low: { daily_budget: recommendation.low?.daily_budget || 0, reasoning: recommendation.low?.reasoning },
+          recommended: { daily_budget: recommendation.recommended?.daily_budget || 0, reasoning: recommendation.recommended?.reasoning },
+          high: { daily_budget: recommendation.high?.daily_budget || 0, reasoning: recommendation.high?.reasoning },
+        },
+        account_context: { total_spend_30d: totalSpend, campaign_count: campaignCount },
+      },
+      status: 200,
+    };
+  } catch (err: any) {
+    console.error('[manage-google-campaign] Budget recommendation error:', err);
+    return { body: { error: 'Failed to generate budget recommendation', details: err.message }, status: 502 };
+  }
 }
 
 // --- Fase 5: AI Recommendations ---
@@ -989,7 +1327,9 @@ type AllActions = Action
   | 'get_settings' | 'update_settings'
   | 'list_ad_groups' | 'create_ad_group' | 'update_ad_group' | 'pause_ad_group' | 'enable_ad_group'
   | 'create_campaign'
-  | 'get_recommendations';
+  | 'get_recommendations'
+  | 'list_merchant_centers'
+  | 'get_budget_recommendation';
 
 export async function manageGoogleCampaign(c: Context) {
   try {
@@ -1013,6 +1353,8 @@ export async function manageGoogleCampaign(c: Context) {
       'list_ad_groups', 'create_ad_group', 'update_ad_group', 'pause_ad_group', 'enable_ad_group',
       'create_campaign',
       'get_recommendations',
+      'list_merchant_centers',
+      'get_budget_recommendation',
     ];
 
     if (!validActions.includes(action)) {
@@ -1095,6 +1437,12 @@ export async function manageGoogleCampaign(c: Context) {
         break;
       case 'get_recommendations':
         result = await handleGetRecommendations(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, data || {});
+        break;
+      case 'list_merchant_centers':
+        result = await handleListMerchantCenters(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId);
+        break;
+      case 'get_budget_recommendation':
+        result = await handleGetBudgetRecommendation(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, data || {});
         break;
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };
