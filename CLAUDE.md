@@ -14,6 +14,25 @@ cd ~/steve && git pull
 - Backend: cd ~/steve/cloud-run-api && gcloud run deploy steve-api --source . --project steveapp-agency --region us-central1
 - Base de datos: cd ~/steve && npx supabase db push
 
+## ZONA PROTEGIDA: Brief (requiere aprobación de JM)
+**NINGÚN agente puede modificar estos archivos sin aprobación explícita de JM:**
+
+| Archivo | Tamaño | Qué hace |
+|---------|--------|----------|
+| `cloud-run-api/src/routes/ai/steve-chat.ts` | 120KB | Lógica brief Q0→Q16, questionContext, truncación |
+| `cloud-run-api/src/routes/ai/analyze-brand-research.ts` | — | Scraping + análisis AI Phase 1 |
+| `cloud-run-api/src/routes/ai/analyze-brand-strategy.ts` | — | Estrategia AI Phase 2 (12 secciones) |
+| `src/components/client-portal/BrandBriefView.tsx` | 287KB | Rendering del brief, normalización, PDF |
+| `src/components/client-portal/SteveChat.tsx` | — | Formularios del brief, timeout Q16 |
+| `src/components/client-portal/StructuredFieldsForm.tsx` | — | Formularios dinámicos por pregunta |
+| `src/lib/briefPdfSections.ts` | — | Secciones del PDF export |
+
+**Protocolo obligatorio:**
+1. **Solo Bastián W24** puede proponer cambios al Brief. Otros agentes NO tocan estos archivos.
+2. Antes de modificar, el agente DEBE mostrar a JM el cambio exacto (qué líneas, qué cambia, por qué).
+3. JM dice "sí" → se aplica. JM dice "no" o no responde → NO se toca.
+4. **Sin excepción.** Ni hotfix, ni "es un cambio chico", ni "es solo un typo". Todo pasa por JM.
+
 ## Reglas de Código
 - **NUNCA** tocar `src/integrations/supabase/` (auto-generado por Supabase)
 - **NUNCA** tocar `src/components/ui/` (shadcn — se actualiza con CLI)
