@@ -217,6 +217,39 @@ const fileToBase64 = (file: File): Promise<string> =>
 
 // ─── ImageUploadZone ────────────────────────────────────────────────
 
+// Aspect ratio + dimension requirements per Google Ads PMAX
+const IMAGE_SPECS: Record<string, { ratio: number; tolerance: number; minW: number; minH: number; label: string }> = {
+  'landscape':       { ratio: 1.91, tolerance: 0.15, minW: 600,  minH: 314, label: 'Landscape (1.91:1, min 600x314)' },
+  'cuadrada':        { ratio: 1.0,  tolerance: 0.05, minW: 300,  minH: 300, label: 'Cuadrada (1:1, min 300x300)' },
+  'logo':            { ratio: 1.0,  tolerance: 0.05, minW: 128,  minH: 128, label: 'Logo (1:1, min 128x128)' },
+  'portrait':        { ratio: 0.8,  tolerance: 0.05, minW: 480,  minH: 600, label: 'Portrait (4:5, min 480x600)' },
+  'logo landscape':  { ratio: 4.0,  tolerance: 0.3,  minW: 512,  minH: 128, label: 'Logo Landscape (4:1, min 512x128)' },
+};
+
+function validateImageDimensions(file: File, zoneLabel: string): Promise<string | null> {
+  return new Promise(resolve => {
+    const spec = IMAGE_SPECS[zoneLabel.toLowerCase()];
+    if (!spec) { resolve(null); return; }
+    const img = new Image();
+    img.onload = () => {
+      const { naturalWidth: w, naturalHeight: h } = img;
+      URL.revokeObjectURL(img.src);
+      if (w < spec.minW || h < spec.minH) {
+        resolve(`${file.name}: muy chica (${w}x${h}), minimo ${spec.minW}x${spec.minH}`);
+        return;
+      }
+      const actualRatio = w / h;
+      if (Math.abs(actualRatio - spec.ratio) > spec.tolerance) {
+        resolve(`${file.name}: aspect ratio incorrecto (${actualRatio.toFixed(2)}), necesita ~${spec.ratio} — ${spec.label}`);
+        return;
+      }
+      resolve(null);
+    };
+    img.onerror = () => { URL.revokeObjectURL(img.src); resolve(null); };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 function ImageUploadZone({
   label,
   files,
@@ -237,7 +270,7 @@ function ImageUploadZone({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const handleFiles = (newFiles: FileList | null) => {
+  const handleFiles = async (newFiles: FileList | null) => {
     if (!newFiles) return;
     const valid: File[] = [];
     for (const f of Array.from(newFiles)) {
@@ -247,6 +280,12 @@ function ImageUploadZone({
       }
       if (f.size > 5 * 1024 * 1024) {
         toast.error(`${f.name}: maximo 5MB`);
+        continue;
+      }
+      // Validate dimensions and aspect ratio
+      const dimError = await validateImageDimensions(f, label);
+      if (dimError) {
+        toast.error(dimError);
         continue;
       }
       valid.push(f);

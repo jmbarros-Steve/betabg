@@ -622,6 +622,26 @@ async function handleCreateCampaign(
       return { body: { error: 'final_urls required for PMAX campaigns' }, status: 400 };
     }
 
+    // Validate PMAX minimum asset requirements (Google Ads enforces these)
+    const validHeadlines = (headlines || []).filter((h: string) => h?.trim());
+    const validDescriptions = (descriptions || []).filter((d: string) => d?.trim());
+    const validLongHeadlines = (long_headlines || []).filter((h: string) => h?.trim());
+    const errors: string[] = [];
+    if (validHeadlines.length < 3) errors.push(`Minimo 3 headlines (tienes ${validHeadlines.length})`);
+    if (validDescriptions.length < 2) errors.push(`Minimo 2 descriptions (tienes ${validDescriptions.length})`);
+    if (validLongHeadlines.length < 1) errors.push(`Minimo 1 long headline (tienes ${validLongHeadlines.length})`);
+    if (!business_name?.trim()) errors.push('Business name es requerido');
+    const imgCount = image_assets?.length || 0;
+    const hasLandscape = image_assets?.some((i: any) => i.field_type === 'MARKETING_IMAGE');
+    const hasSquare = image_assets?.some((i: any) => i.field_type === 'SQUARE_MARKETING_IMAGE');
+    const hasLogo = image_assets?.some((i: any) => i.field_type === 'LOGO');
+    if (!hasLandscape) errors.push('Minimo 1 imagen landscape (1.91:1)');
+    if (!hasSquare) errors.push('Minimo 1 imagen cuadrada (1:1)');
+    if (!hasLogo) errors.push('Minimo 1 logo (1:1)');
+    if (errors.length > 0) {
+      return { body: { error: `PMAX requiere assets minimos: ${errors.join('; ')}` }, status: 400 };
+    }
+
     // Ensure URLs have protocol
     const sanitizedUrls = final_urls.map((u: string) =>
       /^https?:\/\//i.test(u) ? u : `https://${u}`
