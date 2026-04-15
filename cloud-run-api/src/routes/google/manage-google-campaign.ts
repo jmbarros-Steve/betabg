@@ -748,7 +748,6 @@ async function handleCreateCampaign(
         assetOperation: {
           create: {
             resourceName: `customers/${customerId}/assets/${assetTempId}`,
-            type: 'TEXT',
             textAsset: { text: business_name },
           },
         },
@@ -772,7 +771,6 @@ async function handleCreateCampaign(
           assetOperation: {
             create: {
               resourceName: `customers/${customerId}/assets/${assetTempId}`,
-              type: 'IMAGE',
               imageAsset: { data: img.data },
               name: img.name || 'Image',
             },
@@ -798,7 +796,6 @@ async function handleCreateCampaign(
           assetOperation: {
             create: {
               resourceName: `customers/${customerId}/assets/${assetTempId}`,
-              type: 'YOUTUBE_VIDEO',
               youtubeVideoAsset: { youtubeVideoId: videoId },
             },
           },
