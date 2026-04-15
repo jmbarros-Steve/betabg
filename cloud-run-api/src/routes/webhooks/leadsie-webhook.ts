@@ -156,30 +156,69 @@ export async function leadsieWebhook(c: Context) {
       return c.json({ ok: true, status: 'no_assets_mapped', client_id: clientId });
     }
 
-    // ── 5. Upsert Meta connection ──────────────────────
+    // ── 5. Merge Meta connection (non-null wins) ──────
     let metaActive = false;
     if (meta.account_id || meta.page_id || meta.ig_account_id || meta.pixel_id) {
-      metaActive = !!(meta.account_id || meta.page_id || meta.ig_account_id);
-      const { error: metaErr } = await supabase
+      // Check if connection already exists to MERGE instead of blindly overwriting.
+      // Leadsie fires multiple webhooks (PARTIAL_SUCCESS retries) within ms — the last
+      // one to commit wins.  A webhook with fewer Connected assets would null out fields
+      // set by a previous webhook.  Fix: only update fields that are non-null in THIS
+      // webhook; preserve previously stored values for the rest.
+      const { data: existing } = await supabase
         .from('platform_connections')
-        .upsert(
-          {
+        .select('id, account_id, page_id, ig_account_id, pixel_id')
+        .eq('client_id', clientId)
+        .eq('platform', 'meta')
+        .maybeSingle();
+
+      const merged = {
+        account_id: meta.account_id ?? existing?.account_id ?? null,
+        page_id: meta.page_id ?? existing?.page_id ?? null,
+        ig_account_id: meta.ig_account_id ?? existing?.ig_account_id ?? null,
+        pixel_id: meta.pixel_id ?? existing?.pixel_id ?? null,
+      };
+
+      metaActive = !!(merged.account_id || merged.page_id || merged.ig_account_id);
+
+      if (existing) {
+        // UPDATE — merge non-null values, keep existing for null fields
+        const { error: metaErr } = await supabase
+          .from('platform_connections')
+          .update({
+            connection_type: 'leadsie',
+            account_id: merged.account_id,
+            page_id: merged.page_id,
+            ig_account_id: merged.ig_account_id,
+            pixel_id: merged.pixel_id,
+            is_active: metaActive,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id);
+
+        if (metaErr) {
+          console.error('[leadsie-webhook] Meta update error:', metaErr);
+          return c.json({ error: 'Failed to save Meta connection' }, 500);
+        }
+      } else {
+        // INSERT — first time, no existing data to merge
+        const { error: metaErr } = await supabase
+          .from('platform_connections')
+          .insert({
             client_id: clientId,
             platform: 'meta',
             connection_type: 'leadsie',
-            account_id: meta.account_id,
-            page_id: meta.page_id,
-            ig_account_id: meta.ig_account_id,
-            pixel_id: meta.pixel_id,
+            account_id: merged.account_id,
+            page_id: merged.page_id,
+            ig_account_id: merged.ig_account_id,
+            pixel_id: merged.pixel_id,
             is_active: metaActive,
             updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'client_id,platform' },
-        );
+          });
 
-      if (metaErr) {
-        console.error('[leadsie-webhook] Meta upsert error:', metaErr);
-        return c.json({ error: 'Failed to save Meta connection' }, 500);
+        if (metaErr) {
+          console.error('[leadsie-webhook] Meta insert error:', metaErr);
+          return c.json({ error: 'Failed to save Meta connection' }, 500);
+        }
       }
 
       if (metaActive) {
@@ -189,7 +228,7 @@ export async function leadsieWebhook(c: Context) {
       }
 
       console.log(
-        `[leadsie-webhook] Meta connected client=${clientId} ad_account=${meta.account_id} page=${meta.page_id} ig=${meta.ig_account_id} pixel=${meta.pixel_id} active=${metaActive}`,
+        `[leadsie-webhook] Meta connected client=${clientId} ad_account=${merged.account_id} page=${merged.page_id} ig=${merged.ig_account_id} pixel=${merged.pixel_id} active=${metaActive} (merged=${!!existing})`,
       );
     }
 

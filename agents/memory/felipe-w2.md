@@ -165,3 +165,64 @@ El código deployado `steve-api-00426-869` está en prod pero NO hay commit git.
 - **Siguientes 3 acciones en orden**: #27 setear `LEADSIE_WEBHOOK_SECRET` → #16 JM configura Leadsie dashboard → #18 test E2E cliente real
 - 8 items de deuda técnica documentados, no blockers
 
+---
+
+## 2026-04-15: Hallazgo CRITERIO — 83 reglas fantasma bloquean campañas Meta
+
+### Contexto
+JM intentó subir campaña Razas Pet desde el wizard. CRITERIO la rechazó con score 32% (86 reglas fallidas, 4 blockers).
+
+### Hallazgo #1: Reglas no implementadas fallan por defecto
+De 86 reglas fallidas, **83 dicen "Rule not yet implemented"**. Las reglas están definidas en `criterio_rules` (R-006 a R-111) pero la lógica de evaluación nunca se escribió. El evaluador marca fail por defecto → bloquea campañas válidas.
+
+Solo 3 reglas evaluaron algo real:
+- R-033: 0 intereses (targeting no pasado al evaluador)
+- R-087: imagen 0x0 (imagen no pasada al evaluador)
+- R-088: formato vacío (creative format no pasado)
+
+### Hallazgo #2: Steve pelea consigo mismo
+El copy rechazado fue generado por `generate-meta-copy`. La IA genera → CRITERIO rechaza → cliente bloqueado.
+
+### Root cause: 3 problemas, 3 agentes
+1. **Isidora W6**: reglas not-implemented deben retornar pass (no fail)
+2. **Tomás W7**: generate-meta-copy no conoce reglas CRITERIO
+3. **Felipe W2**: wizard no pasa data completa (imagen/targeting) al evaluador
+
+### Impacto
+NINGÚN cliente puede subir campañas Meta por Steve hasta que se arregle.
+
+### Registros
+- Supabase `tasks`: `c7cb5271-49fe-462e-b247-910c1d7b5896` (critica, producto)
+- Notion sesión: https://www.notion.so/3439af51b58d819f88add4b8232ee050
+- Supabase `agent_sessions` w2: session_count=5, actualizado
+
+---
+
+## 2026-04-15 (sesión 2): Webhook race condition + wizard overwrite + Razas Pet restore
+
+### Bugs encontrados y corregidos
+
+**Bug #32: Webhook race condition en leadsie-webhook.ts**
+Leadsie manda múltiples webhooks `PARTIAL_SUCCESS` en ráfaga (<100ms). Cada uno tiene diferentes assets como `Connected`. El `upsert` con `onConflict: client_id,platform` reemplaza TODOS los campos — el último webhook gana y nulea campos set por webhooks anteriores.
+
+**Fix:** Check-then-merge. Si la conexión existe, solo actualizar campos non-null del webhook actual; preservar valores previos para campos null.
+
+**Bug #33: Wizard sobreescribe campos existentes en MetaConnectionWizard.tsx**
+`handleConfirmConnect` escribía los 7 campos del portfolio. Si el hierarchy endpoint no descubrió page/ig (porque la conexión ya tenía page_id null por el bug #32), el wizard nulea esos valores.
+
+**Fix:** Leer valores actuales de la conexión antes de hacer update. Solo sobreescribir si el portfolio trae valor non-null.
+
+### Hallazgo arquitectónico: Leadsie IDs ≠ BM IDs
+
+**Descubrimiento crítico:** Los IDs que Leadsie manda en `connectionAssets` son los IDs del **merchant** (su cuenta personal), NO necesariamente los IDs accesibles via el SUAT del BM de Steve. Ejemplo Razas Pet:
+- Leadsie mandó page `100393186274585` → INACCESIBLE via SUAT
+- BM de Steve tiene page `731826166673553` (Razas Pet Shop) → ACCESIBLE
+
+**Implicación:** El webhook NO puede confiar ciegamente en los IDs de Leadsie para conexiones SUAT. Debería cross-reference con `/me/accounts` (pages accesibles al SUAT) para validar. TODO para futuro.
+
+### Lecciones
+1. **Race conditions en webhooks** son silenciosas — no hay error, simplemente data incorrecta. Siempre hacer merge, nunca overwrite ciego.
+2. **PARTIAL_SUCCESS de Leadsie** es un estado real que produce múltiples webhooks. El código debe ser resiliente a ráfagas.
+3. **Los IDs de Leadsie son del merchant, no del BM.** Para SUAT, los IDs útiles son los que `/me/accounts` y `/act_X/adspixels` devuelven. El webhook debería validar.
+4. **Sin audit trail para webhooks exitosos** — solo guardamos raw_payload para orphans. Si el webhook matchea, perdemos el payload original. Debería guardarse siempre para debugging.
+

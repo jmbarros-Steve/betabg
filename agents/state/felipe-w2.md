@@ -1,7 +1,32 @@
 # Felipe W2 — Meta Ads
-Squad: Marketing | Última sesión: 2026-04-10
+Squad: Marketing | Última sesión: 2026-04-15
 
-## Estado actual: 126 fixes totales, Leadsie dual-platform (Meta+Google), MetaPartnerSetup hardened
+## Estado actual: 128 fixes + 1 data restore, webhook race condition + wizard overwrite fixed
+
+### Completado sesión 15/04/2026 — Leadsie webhook merge + wizard preserve + Razas Pet restore
+
+**2 bugs fixed + 1 data restore.**
+
+#### Bug fixes
+- [x] **#32 Webhook race condition**: `leadsie-webhook.ts` — cambiado upsert ciego a check-then-merge. Solo actualiza campos non-null, preserva valores previos. Fix para race condition con múltiples webhooks `PARTIAL_SUCCESS` concurrentes.
+- [x] **#33 Wizard overwrite**: `MetaConnectionWizard.tsx` — `handleConfirmConnect` ahora lee valores actuales de la conexión antes de hacer update. No nulea page_id/ig_account_id/pixel_id si el hierarchy no los descubrió.
+
+#### Data restore Razas Pet
+- [x] Diagnóstico forense: 3 webhooks PARTIAL_SUCCESS concurrentes (10/04, 16:16:12) → race condition → último webhook nuló page/ad_account
+- [x] Descubrimiento: IDs de Leadsie (100393186274585, 17841457283055925, 754690016268621) NO son accesibles via SUAT — son IDs personales del merchant
+- [x] IDs correctos del BM de Steve: page=731826166673553 (Razas Pet Shop, 264 fans), pixel=1414593686413735 (Pixel - RazasPet 2025)
+- [x] IG: la page 731826166673553 NO tiene Instagram Business Account vinculado → ig_account_id=null (requiere que Razas Pet vincule IG a su page en Meta Business Suite)
+
+#### Archivos tocados 15/04
+1. `cloud-run-api/src/routes/webhooks/leadsie-webhook.ts` (webhook merge logic)
+2. `src/components/client-portal/meta-ads/MetaConnectionWizard.tsx` (preserve existing values)
+
+#### Pendiente deploy
+- [ ] Deploy backend a Cloud Run (webhook fix)
+- [ ] Push frontend (Vercel auto-deploy del wizard fix)
+- [ ] Razas Pet: vincular IG Business Account a FB Page en Meta Business Suite
+
+---
 
 ### Completado sesión 10/04/2026 — MetaPartnerSetup fixes + Leadsie dual-platform
 

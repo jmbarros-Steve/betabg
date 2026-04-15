@@ -197,17 +197,26 @@ export default function MetaConnectionWizard({
     if (!selectedPortfolio) return;
     setConnecting(true);
     try {
-      // Save all assets to platform_connections
+      // Read existing values so we don't null out fields the hierarchy didn't discover.
+      // Example: Leadsie webhook stored page_id + ig_account_id, but the SUAT-scoped
+      // hierarchy couldn't re-discover them (page_id was already null from a race).
+      // Without this merge, the wizard would overwrite those with null.
+      const { data: current } = await supabase
+        .from('platform_connections')
+        .select('account_id, page_id, ig_account_id, pixel_id')
+        .eq('id', connectionId)
+        .maybeSingle();
+
       const { error: updateError, data: updateData } = await supabase
         .from('platform_connections')
         .update({
-          account_id: selectedPortfolio.adAccountId,
+          account_id: selectedPortfolio.adAccountId ?? current?.account_id,
           store_name: selectedPortfolio.name,
           business_id: selectedPortfolio.businessId,
           portfolio_name: selectedPortfolio.name,
-          page_id: selectedPortfolio.pageId,
-          ig_account_id: selectedPortfolio.igAccountId,
-          pixel_id: selectedPortfolio.pixelId,
+          page_id: selectedPortfolio.pageId ?? current?.page_id,
+          ig_account_id: selectedPortfolio.igAccountId ?? current?.ig_account_id,
+          pixel_id: selectedPortfolio.pixelId ?? current?.pixel_id,
         })
         .eq('id', connectionId)
         .select('id, account_id');
