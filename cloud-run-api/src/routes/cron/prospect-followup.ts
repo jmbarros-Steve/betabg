@@ -68,11 +68,10 @@ export async function prospectFollowup(c: Context) {
       'prospectFollowup.fetchActiveProspects',
     );
 
-    if (prospects.length > 0) {
     // Load Steve Brain knowledge for personalized follow-ups
     const { knowledgeBlock } = await loadKnowledge(['brief', 'buyer_persona', 'analisis'], { limit: 5, label: 'REGLAS APRENDIDAS DE VENTAS', audit: { source: 'prospect-followup' } });
 
-    if (prospects && prospects.length > 0) {
+    if (prospects.length > 0) {
       for (const prospect of prospects) {
         try {
           // Bug #57 fix: Only count INBOUND messages from the prospect for last activity,

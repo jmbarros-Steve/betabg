@@ -28,47 +28,6 @@ export async function loadKnowledge(
     return EMPTY_RESULT;
   }
 
-  const knowledgeQuery = supabase
-    .from('steve_knowledge')
-    .select('id, titulo, contenido, categoria')
-    .in('categoria', categories)
-    .eq('activo', true)
-    .eq('approval_status', 'approved')
-    .is('purged_at', null) // Tomás W7 (2026-04-07): no inyectar reglas soft-deleted en ventana de rescate
-    .order('orden', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(limit);
-
-  const bugsQuery = supabase
-    .from('steve_bugs')
-    .select('descripcion, ejemplo_bueno')
-    .in('categoria', categories)
-    .eq('activo', true);
-
-  const [knowledgeRes, bugsRes] = await Promise.all([
-    knowledgeQuery.then(r => r),
-    bugsQuery.then(r => r),
-  ]);
-
-  let clientRulesData: any[] = [];
-  if (clientId) {
-    clientRulesData = await safeQueryOrDefault<any>(
-      supabase
-        .from('steve_knowledge')
-        .select('id, titulo, contenido, categoria')
-        .eq('client_id', clientId)
-        .eq('activo', true)
-        .eq('approval_status', 'approved')
-        .is('purged_at', null) // Tomás W7 (2026-04-07): no inyectar reglas soft-deleted en ventana de rescate
-        .order('orden', { ascending: false })
-        .limit(10),
-      [],
-      'knowledge-loader.clientRules',
-    );
-  }
-  const globalRules = knowledgeRes.data || [];
-  const bugs = bugsRes.data || [];
-  const clientRules = clientRulesData;
   try {
     const { clientId, limit = 15, label = 'REGLAS APRENDIDAS' } = options;
     const supabase = getSupabaseAdmin();

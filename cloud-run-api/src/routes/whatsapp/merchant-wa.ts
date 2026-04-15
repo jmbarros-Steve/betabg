@@ -365,7 +365,6 @@ export async function merchantWAWebhook(c: Context) {
     // Credit deducted — proceed with AI call. If anything fails critically, we still
     // send a fallback reply (credit was legitimately used for the response attempt).
     // Build context and generate response
-    const [context, history] = await Promise.all([
     // Build context, knowledge, and history in parallel
     const [context, history, { knowledgeBlock }] = await Promise.all([
       buildMerchantContext(clientId),

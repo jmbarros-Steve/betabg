@@ -18,7 +18,6 @@ import {
   buildDynamicSalesPrompt,
 } from '../../lib/steve-wa-brain.js';
 import { runInvestigator, runStrategist, runConversationalist } from '../../lib/steve-multi-brain.js';
-import { loadIndustryCaseStudy } from '../../lib/steve-wa-brain.js';
 import { loadKnowledge } from '../../lib/knowledge-loader.js';
 import { generateProspectMockup } from '../../lib/steve-mockup-generator.js';
 import { generateAndSendSalesDeck } from '../../lib/steve-sales-deck.js';
