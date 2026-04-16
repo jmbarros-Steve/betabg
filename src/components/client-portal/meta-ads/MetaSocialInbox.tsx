@@ -37,6 +37,10 @@ import {
   Facebook,
   Megaphone,
   Download,
+  ExternalLink,
+  ImageIcon,
+  Film,
+  LayoutGrid,
 } from 'lucide-react';
 import MetaScopeAlert from './MetaScopeAlert';
 import { useMetaBusinessSafe } from './MetaBusinessContext';
@@ -79,7 +83,12 @@ interface ConversationItem {
   snippet?: string;
   message?: string;
   post_text?: string;
+  post_image?: string | null;
+  post_permalink?: string | null;
   ad_text?: string;
+  ad_image?: string | null;
+  ad_permalink?: string | null;
+  media_type?: string | null;
   updated_time?: string;
   created_time?: string;
   unread_count?: number;
@@ -764,6 +773,15 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[#2A4F9E] rounded-full border-2 border-background" aria-label="No leído" role="status" />
                           )}
                         </div>
+                        {/* Post/Ad thumbnail */}
+                        {(conv.post_image || conv.ad_image) && (
+                          <img
+                            src={conv.post_image || conv.ad_image || ''}
+                            alt=""
+                            className="w-8 h-8 rounded object-cover shrink-0 bg-muted"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-1.5 mb-0.5">
                             <span
@@ -865,6 +883,15 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                       {getInitials(selectedConversation.user_name)}
                     </AvatarFallback>
                   </Avatar>
+                  {/* Post/Ad image in thread header */}
+                  {(selectedConversation.post_image || selectedConversation.ad_image) && (
+                    <img
+                      src={selectedConversation.post_image || selectedConversation.ad_image || ''}
+                      alt=""
+                      className="w-10 h-10 rounded object-cover shrink-0 bg-muted"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm truncate">
@@ -880,41 +907,70 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                       >
                         {selectedConversation.platform === 'instagram' ? 'Instagram' : 'Facebook'}
                       </Badge>
+                      {selectedConversation.media_type && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-[18px] gap-1">
+                          {selectedConversation.media_type === 'VIDEO' ? (
+                            <Film className="w-2.5 h-2.5" />
+                          ) : selectedConversation.media_type === 'CAROUSEL_ALBUM' ? (
+                            <LayoutGrid className="w-2.5 h-2.5" />
+                          ) : (
+                            <ImageIcon className="w-2.5 h-2.5" />
+                          )}
+                          {selectedConversation.media_type === 'VIDEO'
+                            ? 'Video'
+                            : selectedConversation.media_type === 'CAROUSEL_ALBUM'
+                              ? 'Carrusel'
+                              : 'Imagen'}
+                        </Badge>
+                      )}
                     </div>
-                    {messages.length > 0 && (
-                      <button
-                        onClick={() => {
-                          const lines = messages.map(
-                            (m) =>
-                              `[${new Date(m.created_time).toLocaleString('es-CL')}] ${m.from_name}: ${m.message}`,
-                          );
-                          const text = `Conversación con ${selectedConversation.user_name}\n${selectedConversation.platform} · ${selectedConversation.type}\n${'─'.repeat(40)}\n${lines.join('\n')}`;
-                          const blob = new Blob([text], { type: 'text/plain' });
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `conversacion-${selectedConversation.user_name.replace(/\s+/g, '-')}.txt`;
-                          a.click();
-                          URL.revokeObjectURL(url);
-                          toast.success('Conversación exportada');
-                        }}
-                        className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                        title="Exportar conversación"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
-                    )}
-                    {selectedConversation.post_text && (
-                      <p className="text-[11px] text-muted-foreground truncate">
-                        En: {selectedConversation.post_text}
-                      </p>
-                    )}
-                    {selectedConversation.ad_text && (
-                      <p className="text-[11px] text-muted-foreground truncate">
-                        Ad: {selectedConversation.ad_text}
-                      </p>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {selectedConversation.post_text && (
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          En: {selectedConversation.post_text}
+                        </p>
+                      )}
+                      {selectedConversation.ad_text && (
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          Ad: {selectedConversation.ad_text}
+                        </p>
+                      )}
+                      {(selectedConversation.post_permalink || selectedConversation.ad_permalink) && (
+                        <a
+                          href={selectedConversation.post_permalink || selectedConversation.ad_permalink || ''}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-0.5 text-[11px] text-primary hover:underline shrink-0"
+                        >
+                          Ver original
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
                   </div>
+                  {messages.length > 0 && (
+                    <button
+                      onClick={() => {
+                        const lines = messages.map(
+                          (m) =>
+                            `[${new Date(m.created_time).toLocaleString('es-CL')}] ${m.from_name}: ${m.message}`,
+                        );
+                        const text = `Conversación con ${selectedConversation.user_name}\n${selectedConversation.platform} · ${selectedConversation.type}\n${'─'.repeat(40)}\n${lines.join('\n')}`;
+                        const blob = new Blob([text], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `conversacion-${selectedConversation.user_name.replace(/\s+/g, '-')}.txt`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        toast.success('Conversación exportada');
+                      }}
+                      className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                      title="Exportar conversación"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Messages */}

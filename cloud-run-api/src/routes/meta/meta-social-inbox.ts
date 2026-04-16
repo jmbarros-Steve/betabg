@@ -300,7 +300,7 @@ async function handleListPostComments(token: string, body: RequestBody): Promise
 
   // Get recent FB posts with their comments
   const postsResult = await metaGet(`${page_id}/feed`, pageToken, {
-    fields: 'id,message,created_time,comments{id,message,from{name,id,picture},created_time,comment_count,like_count}',
+    fields: 'id,message,created_time,full_picture,permalink_url,comments{id,message,from{name,id,picture},created_time,comment_count,like_count}',
     limit: '15',
   });
 
@@ -313,6 +313,8 @@ async function handleListPostComments(token: string, body: RequestBody): Promise
           id: comment.id,
           post_id: post.id,
           post_text: (post.message || '').slice(0, 100),
+          post_image: post.full_picture || null,
+          post_permalink: post.permalink_url || null,
           platform: 'facebook',
           type: 'comments',
           user_name: comment.from?.name || 'Usuario',
@@ -330,7 +332,7 @@ async function handleListPostComments(token: string, body: RequestBody): Promise
   // Get Instagram media comments if IG account is linked
   if (igAccountId) {
     const mediaResult = await metaGet(`${igAccountId}/media`, pageToken, {
-      fields: 'id,caption,media_type,thumbnail_url,permalink,timestamp',
+      fields: 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp',
       limit: '15',
     });
 
@@ -347,6 +349,9 @@ async function handleListPostComments(token: string, body: RequestBody): Promise
               id: comment.id,
               post_id: media.id,
               post_text: (media.caption || '').slice(0, 100),
+              post_image: media.media_url || media.thumbnail_url || null,
+              post_permalink: media.permalink || null,
+              media_type: media.media_type || null,
               platform: 'instagram',
               type: 'comments',
               user_name: comment.from?.username || 'Usuario IG',
@@ -382,18 +387,30 @@ async function handleListAdComments(token: string, body: RequestBody): Promise<{
   }
   const pageToken = pageTokenResult.data.access_token;
 
-  // If specific ad_id provided, get comments for that ad
+  // If specific ad_id provided, get comments + ad info in parallel
   if (ad_id) {
-    const result = await metaGet(`${ad_id}/comments`, pageToken, {
-      fields: 'id,message,from{name,id,picture},created_time,like_count,comment_count',
-      limit: '50',
-    });
+    const [result, adInfoResult] = await Promise.all([
+      metaGet(`${ad_id}/comments`, pageToken, {
+        fields: 'id,message,from{name,id,picture},created_time,like_count,comment_count',
+        limit: '50',
+      }),
+      metaGet(ad_id, token, {
+        fields: 'id,name,creative{effective_object_story_id,image_url,thumbnail_url}',
+      }),
+    ]);
 
     if (!result.ok) return { body: { success: false, error: result.error }, status: 502 };
+
+    const adImage = adInfoResult.ok
+      ? (adInfoResult.data?.creative?.image_url || adInfoResult.data?.creative?.thumbnail_url || null)
+      : null;
+    const adName = adInfoResult.ok ? (adInfoResult.data?.name || null) : null;
 
     const comments = (result.data?.data || []).map((c: any) => ({
       id: c.id,
       ad_id,
+      ad_text: adName,
+      ad_image: adImage,
       platform: 'facebook',
       type: 'ad_comments',
       user_name: c.from?.name || 'Usuario',
@@ -410,7 +427,7 @@ async function handleListAdComments(token: string, body: RequestBody): Promise<{
 
   // Otherwise get promoted posts (ads) and their comments
   const promotedResult = await metaGet(`${page_id}/promotable_posts`, pageToken, {
-    fields: 'id,message,created_time,is_published,comments{id,message,from{name,id},created_time,like_count}',
+    fields: 'id,message,created_time,is_published,full_picture,permalink_url,comments{id,message,from{name,id},created_time,like_count}',
     limit: '10',
   });
 
@@ -423,6 +440,8 @@ async function handleListAdComments(token: string, body: RequestBody): Promise<{
           id: comment.id,
           ad_id: post.id,
           ad_text: (post.message || '').slice(0, 100),
+          ad_image: post.full_picture || null,
+          ad_permalink: post.permalink_url || null,
           platform: 'facebook',
           type: 'ad_comments',
           user_name: comment.from?.name || 'Usuario',
