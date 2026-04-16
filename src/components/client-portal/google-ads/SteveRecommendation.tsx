@@ -6,7 +6,7 @@ import { Loader2, Sparkles, X, Check } from 'lucide-react';
 
 interface SteveRecommendationProps {
   connectionId: string;
-  recommendationType: 'campaign_setup' | 'pmax_assets' | 'bid_strategy';
+  recommendationType: 'campaign_setup' | 'pmax_assets' | 'bid_strategy' | 'campaign_name' | 'targeting' | 'cta_sitelinks';
   channelType?: string;
   context?: string;
   clientId?: string;
@@ -113,6 +113,30 @@ export default function SteveRecommendation({
             {recommendationType === 'pmax_assets' && recommendation?.headlines && (
               <div className="text-xs text-blue-500 mt-1">
                 <p>{recommendation.headlines.length} headlines + {recommendation.descriptions?.length || 0} descripciones sugeridas</p>
+              </div>
+            )}
+
+            {recommendationType === 'campaign_name' && recommendation?.name && (
+              <div className="text-xs text-blue-500 mt-1">
+                <p>Nombre: <strong>{recommendation.name}</strong></p>
+              </div>
+            )}
+
+            {recommendationType === 'targeting' && (recommendation?.locations || recommendation?.languages) && (
+              <div className="text-xs text-blue-500 space-y-0.5 mt-1">
+                {recommendation.locations?.length > 0 && (
+                  <p>Paises: <strong>{recommendation.locations.map((l: any) => l.name).join(', ')}</strong></p>
+                )}
+                {recommendation.languages?.length > 0 && (
+                  <p>Idiomas: <strong>{recommendation.languages.map((l: any) => l.name).join(', ')}</strong></p>
+                )}
+              </div>
+            )}
+
+            {recommendationType === 'cta_sitelinks' && (recommendation?.call_to_action || recommendation?.sitelinks) && (
+              <div className="text-xs text-blue-500 space-y-0.5 mt-1">
+                {recommendation.call_to_action && <p>CTA: <strong>{recommendation.call_to_action}</strong></p>}
+                {recommendation.sitelinks?.length > 0 && <p>{recommendation.sitelinks.length} sitelinks sugeridos</p>}
               </div>
             )}
           </div>

@@ -553,6 +553,10 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   const [merchantCenters, setMerchantCenters] = useState<Array<{ id: string; name: string; status: string }>>([]);
   const [merchantLoading, setMerchantLoading] = useState(false);
 
+  // AI image generation
+  const [aiImageLoading, setAiImageLoading] = useState<Record<string, boolean>>({});
+  const [aiImagePreviews, setAiImagePreviews] = useState<Record<string, string>>({});
+
   // ─── Fetch campaigns ──────────────────────────────────────────────
 
   const fetchCampaigns = useCallback(async () => {
@@ -978,6 +982,113 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       }));
       toast.success('Assets de Steve aplicados (basados en tu brief)');
     }
+  };
+
+  const handleApplyCampaignName = (rec: any) => {
+    if (rec?.name) {
+      setWizardData(prev => ({ ...prev, name: rec.name.slice(0, 128) }));
+      toast.success('Nombre de campaña aplicado');
+    }
+  };
+
+  const handleApplyTargeting = (rec: any) => {
+    const validLocationIds = locationOptions.map(l => l.id);
+    const validLanguageIds = languageOptions.map(l => l.id);
+    const newLocations = (rec?.locations || [])
+      .map((l: any) => l.id)
+      .filter((id: string) => validLocationIds.includes(id));
+    const newLanguages = (rec?.languages || [])
+      .map((l: any) => l.id)
+      .filter((id: string) => validLanguageIds.includes(id));
+    if (newLocations.length > 0 || newLanguages.length > 0) {
+      setWizardData(prev => ({
+        ...prev,
+        locations: newLocations.length > 0 ? newLocations : prev.locations,
+        languages: newLanguages.length > 0 ? newLanguages : prev.languages,
+      }));
+      toast.success('Segmentación de Steve aplicada');
+    }
+  };
+
+  const handleApplyCtaSitelinks = (rec: any) => {
+    const updates: Partial<typeof wizardData> = {};
+    if (rec?.call_to_action) {
+      updates.call_to_action = rec.call_to_action;
+    }
+    if (rec?.sitelinks?.length) {
+      const baseUrl = wizardData.final_urls || '';
+      updates.sitelinks = rec.sitelinks.slice(0, 20).map((sl: any) => ({
+        text: (sl.text || '').slice(0, 25),
+        url: sl.url?.startsWith('http') ? sl.url : (baseUrl + (sl.url || '')),
+        description1: (sl.description1 || '').slice(0, 35),
+        description2: (sl.description2 || '').slice(0, 35),
+      }));
+    }
+    if (Object.keys(updates).length > 0) {
+      setWizardData(prev => ({ ...prev, ...updates }));
+      toast.success('CTA y sitelinks de Steve aplicados');
+    }
+  };
+
+  const generateAiImage = async (format: string, fieldKey: string) => {
+    setAiImageLoading(prev => ({ ...prev, [fieldKey]: true }));
+    setAiImagePreviews(prev => { const n = { ...prev }; delete n[fieldKey]; return n; });
+
+    const formatPrompts: Record<string, string> = {
+      landscape: `Foto publicitaria horizontal panorámica de producto para banner de Google Ads. Negocio: ${wizardData.business_name || 'marca'}. Aspecto ratio 1.91:1, 1200x628px.`,
+      square: `Foto publicitaria cuadrada de producto para Google Ads. Negocio: ${wizardData.business_name || 'marca'}. Aspecto ratio 1:1, 1200x1200px.`,
+      portrait: `Foto publicitaria vertical de producto para Google Ads móvil. Negocio: ${wizardData.business_name || 'marca'}. Aspecto ratio 4:5, 960x1200px.`,
+    };
+
+    try {
+      const { data, error } = await callApi('generate-image', {
+        body: {
+          clientId,
+          promptGeneracion: formatPrompts[format] || formatPrompts.landscape,
+          formato: format,
+          engine: 'imagen',
+        },
+      });
+
+      if (error || !data?.imageUrl) {
+        toast.error('Error generando imagen: ' + (error || 'sin URL'));
+        setAiImageLoading(prev => ({ ...prev, [fieldKey]: false }));
+        return;
+      }
+
+      setAiImagePreviews(prev => ({ ...prev, [fieldKey]: data.imageUrl }));
+    } catch (err: any) {
+      toast.error('Error generando imagen: ' + err.message);
+    }
+    setAiImageLoading(prev => ({ ...prev, [fieldKey]: false }));
+  };
+
+  const acceptAiImage = async (fieldKey: string, wizardField: keyof typeof wizardData) => {
+    const url = aiImagePreviews[fieldKey];
+    if (!url) return;
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const fileName = `ai-${fieldKey}-${Date.now()}.png`;
+      const file = new File([blob], fileName, { type: blob.type || 'image/png' });
+      setWizardData(prev => ({
+        ...prev,
+        [wizardField]: [...(prev[wizardField] as File[]), file],
+      }));
+      setAiImagePreviews(prev => { const n = { ...prev }; delete n[fieldKey]; return n; });
+      toast.success('Imagen AI agregada');
+    } catch {
+      toast.error('Error descargando imagen generada');
+    }
+  };
+
+  const generateAllAiImages = async () => {
+    const formats = [
+      { format: 'landscape', key: 'ai_landscape', field: 'images_landscape' as const },
+      { format: 'square', key: 'ai_square', field: 'images_square' as const },
+      { format: 'portrait', key: 'ai_portrait', field: 'images_portrait' as const },
+    ];
+    await Promise.all(formats.map(f => generateAiImage(f.format, f.key)));
   };
 
   // Wizard step helpers
@@ -1482,6 +1593,13 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                   placeholder="Mi Campana Search"
                   maxLength={128}
                 />
+                <SteveRecommendation
+                  connectionId={connectionId}
+                  recommendationType="campaign_name"
+                  clientId={clientId}
+                  channelType={wizardData.channel_type}
+                  onApply={handleApplyCampaignName}
+                />
               </div>
 
               <div className="space-y-2">
@@ -1643,6 +1761,15 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                   </p>
                 </div>
               )}
+
+              {/* AI Targeting recommendation */}
+              <SteveRecommendation
+                connectionId={connectionId}
+                recommendationType="targeting"
+                clientId={clientId}
+                channelType={wizardData.channel_type}
+                onApply={handleApplyTargeting}
+              />
 
               {/* Location Targeting */}
               <div className="space-y-2">
@@ -1847,9 +1974,25 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           {/* Step 4 PMAX: Images */}
           {wizardStep === 4 && isPmax && (
             <div className="space-y-5">
-              <p className="text-sm text-muted-foreground">
-                Sube las imagenes para tu campana PMAX. Google requiere al menos 1 landscape, 1 cuadrada y 1 logo.
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Sube las imagenes para tu campana PMAX. Google requiere al menos 1 landscape, 1 cuadrada y 1 logo.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs gap-1.5 shrink-0"
+                  onClick={generateAllAiImages}
+                  disabled={aiImageLoading.ai_landscape || aiImageLoading.ai_square || aiImageLoading.ai_portrait}
+                >
+                  {(aiImageLoading.ai_landscape || aiImageLoading.ai_square || aiImageLoading.ai_portrait)
+                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                    : <Sparkles className="w-3 h-3" />
+                  }
+                  Generar todas con AI
+                </Button>
+              </div>
+
               <ImageUploadZone
                 label="Landscape"
                 files={wizardData.images_landscape}
@@ -1859,6 +2002,28 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 aspectHint="1.91:1 — rec. 1200x628"
                 required
               />
+              {/* AI generate for landscape */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-blue-500 gap-1"
+                  onClick={() => generateAiImage('landscape', 'ai_landscape')}
+                  disabled={aiImageLoading.ai_landscape}
+                >
+                  {aiImageLoading.ai_landscape ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                  Generar con AI
+                </Button>
+                {aiImagePreviews.ai_landscape && (
+                  <div className="flex items-center gap-2">
+                    <img src={aiImagePreviews.ai_landscape} alt="AI preview" className="w-20 h-12 rounded border object-cover" />
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => acceptAiImage('ai_landscape', 'images_landscape')}>Usar</Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => generateAiImage('landscape', 'ai_landscape')}>Regenerar</Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setAiImagePreviews(p => { const n = { ...p }; delete n.ai_landscape; return n; })}><X className="w-3 h-3" /></Button>
+                  </div>
+                )}
+              </div>
+
               <ImageUploadZone
                 label="Cuadrada"
                 files={wizardData.images_square}
@@ -1868,6 +2033,28 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 aspectHint="1:1 — rec. 1200x1200"
                 required
               />
+              {/* AI generate for square */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-blue-500 gap-1"
+                  onClick={() => generateAiImage('square', 'ai_square')}
+                  disabled={aiImageLoading.ai_square}
+                >
+                  {aiImageLoading.ai_square ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                  Generar con AI
+                </Button>
+                {aiImagePreviews.ai_square && (
+                  <div className="flex items-center gap-2">
+                    <img src={aiImagePreviews.ai_square} alt="AI preview" className="w-14 h-14 rounded border object-cover" />
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => acceptAiImage('ai_square', 'images_square')}>Usar</Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => generateAiImage('square', 'ai_square')}>Regenerar</Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setAiImagePreviews(p => { const n = { ...p }; delete n.ai_square; return n; })}><X className="w-3 h-3" /></Button>
+                  </div>
+                )}
+              </div>
+
               <ImageUploadZone
                 label="Logo"
                 files={wizardData.images_logo}
@@ -1889,6 +2076,27 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                     maxFiles={20}
                     aspectHint="4:5 — rec. 960x1200"
                   />
+                  {/* AI generate for portrait */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-blue-500 gap-1"
+                      onClick={() => generateAiImage('portrait', 'ai_portrait')}
+                      disabled={aiImageLoading.ai_portrait}
+                    >
+                      {aiImageLoading.ai_portrait ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                      Generar con AI
+                    </Button>
+                    {aiImagePreviews.ai_portrait && (
+                      <div className="flex items-center gap-2">
+                        <img src={aiImagePreviews.ai_portrait} alt="AI preview" className="w-12 h-16 rounded border object-cover" />
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => acceptAiImage('ai_portrait', 'images_portrait')}>Usar</Button>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => generateAiImage('portrait', 'ai_portrait')}>Regenerar</Button>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setAiImagePreviews(p => { const n = { ...p }; delete n.ai_portrait; return n; })}><X className="w-3 h-3" /></Button>
+                      </div>
+                    )}
+                  </div>
                   <ImageUploadZone
                     label="Logo Landscape"
                     files={wizardData.images_landscape_logo}
@@ -1907,6 +2115,14 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
               <YouTubeInput
                 urls={wizardData.youtube_urls}
                 onChange={urls => setWizardData(prev => ({ ...prev, youtube_urls: urls }))}
+              />
+              <SteveRecommendation
+                connectionId={connectionId}
+                recommendationType="cta_sitelinks"
+                clientId={clientId}
+                channelType="PERFORMANCE_MAX"
+                context={`URL: ${wizardData.final_urls || 'Sin URL'}, Negocio: ${wizardData.business_name || 'Sin nombre'}`}
+                onApply={handleApplyCtaSitelinks}
               />
               <div className="space-y-2">
                 <Label>Call to Action <span className="text-muted-foreground font-normal">(opcional)</span></Label>

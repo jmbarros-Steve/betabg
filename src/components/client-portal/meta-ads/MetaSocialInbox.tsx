@@ -778,7 +778,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                           <img
                             src={conv.post_image || conv.ad_image || ''}
                             alt=""
-                            className="w-8 h-8 rounded object-cover shrink-0 bg-muted"
+                            className="w-11 h-11 rounded-md object-cover shrink-0 bg-muted"
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                           />
                         )}
@@ -888,7 +888,7 @@ export default function MetaSocialInbox({ clientId }: MetaSocialInboxProps) {
                     <img
                       src={selectedConversation.post_image || selectedConversation.ad_image || ''}
                       alt=""
-                      className="w-10 h-10 rounded object-cover shrink-0 bg-muted"
+                      className="w-14 h-14 rounded-md object-cover shrink-0 bg-muted border border-border/50"
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                     />
                   )}

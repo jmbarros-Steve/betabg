@@ -1411,6 +1411,61 @@ ${extraContext ? `- Contexto: ${extraContext}` : ''}
 
 Recomienda el mejor bid strategy de [MAXIMIZE_CONVERSIONS, MAXIMIZE_CLICKS, TARGET_CPA, TARGET_ROAS, MANUAL_CPC].
 Responde en JSON: { "bid_strategy": "...", "reasoning": "..." }`;
+  } else if (recommendation_type === 'campaign_name') {
+    const hasBrief = briefContext.trim().length > 0;
+    prompt = `Eres Steve, un experto en Google Ads.
+${hasBrief ? `\n## BRIEF DEL CLIENTE\n${briefContext.slice(0, 2000)}` : ''}
+${extraContext ? `\nContexto adicional: ${extraContext}` : ''}
+
+Genera un nombre descriptivo para una campaña Performance Max de Google Ads.
+El nombre debe:
+- Ser claro y profesional (ej: "PMAX - Nacuttus Alimento Natural")
+- Incluir "PMAX" al inicio
+- Reflejar la marca o producto principal del brief
+- Máximo 80 caracteres
+
+Responde SOLO en JSON válido: { "name": "...", "reasoning": "..." }`;
+  } else if (recommendation_type === 'targeting') {
+    const hasBrief = briefContext.trim().length > 0;
+    prompt = `Eres Steve, un experto en Google Ads y segmentación.
+${hasBrief ? `\n## BRIEF DEL CLIENTE\n${briefContext.slice(0, 2000)}` : ''}
+${extraContext ? `\nContexto adicional: ${extraContext}` : ''}
+
+Basado en el brief del cliente, recomienda la segmentación geográfica e idiomas.
+Usa SOLO estos IDs válidos:
+- Locations: 2152=Chile, 2032=Argentina, 2484=Mexico, 2170=Colombia, 2604=Peru, 2724=España, 2840=Estados Unidos, 2076=Brasil
+- Languages: 1003=Español, 1000=Inglés, 1014=Portugués, 1002=Francés, 1001=Alemán
+
+Responde SOLO en JSON válido:
+{
+  "locations": [{ "id": "2152", "name": "Chile" }],
+  "languages": [{ "id": "1003", "name": "Español" }],
+  "reasoning": "..."
+}`;
+  } else if (recommendation_type === 'cta_sitelinks') {
+    const hasBrief = briefContext.trim().length > 0;
+    prompt = `Eres Steve, un experto en Google Ads Performance Max.
+${hasBrief ? `\n## BRIEF DEL CLIENTE\n${briefContext.slice(0, 2000)}` : ''}
+${extraContext ? `\nContexto adicional: ${extraContext}` : ''}
+
+Genera recomendaciones de Call to Action y Sitelinks para una campaña PMAX.
+
+CTAs válidos: LEARN_MORE, SHOP_NOW, SIGN_UP, SUBSCRIBE, GET_QUOTE, CONTACT_US, BOOK_NOW, APPLY_NOW
+
+Para sitelinks genera 4 links relevantes. Cada sitelink tiene:
+- text: máximo 25 caracteres
+- url: una URL relativa basada en el sitio del cliente (ej: /productos, /contacto)
+- description1: máximo 35 caracteres
+- description2: máximo 35 caracteres
+
+Responde SOLO en JSON válido:
+{
+  "call_to_action": "SHOP_NOW",
+  "sitelinks": [
+    { "text": "Ver Productos", "url": "/productos", "description1": "Explora nuestro catálogo", "description2": "Envío gratis sobre $30.000" }
+  ],
+  "reasoning": "..."
+}`;
   } else {
     return { body: { error: `Unknown recommendation_type: ${recommendation_type}` }, status: 400 };
   }
