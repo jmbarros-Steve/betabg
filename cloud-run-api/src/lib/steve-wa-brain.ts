@@ -9,6 +9,7 @@ import { getSupabaseAdmin } from './supabase.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from './safe-supabase.js';
 import { getProductCatalogPrompt } from './steve-product-catalog.js';
 import { anthropicFetch } from './anthropic-fetch.js';
+import { buildCriterioRulesBlock } from './criterio/rules-context.js';
 // Fix R5-#30: import StrategistResult for proper typing of buildDynamicSalesPrompt param
 import type { StrategistResult } from './steve-multi-brain.js';
 
@@ -538,12 +539,19 @@ export async function buildWAContext(clientId: string, userMessage: string = '')
     }
   }
 
+  // Load CRITERIO light rules (only BLOQUEAR/Rechazar) for WA quality
+  const criterioBlock = await buildCriterioRulesBlock(supabase, ['STEVE RESP'], { lightMode: true });
+
   let context = `MERCHANT: ${client?.name || client?.company || 'N/A'}${client?.shop_domain ? ` (${client.shop_domain})` : ''}
 ${metricsContext || 'Sin métricas conectadas aún.'}
 BRIEF (resumen): ${briefSummary}`;
 
   if (knowledgeText) {
     context += `\n\n${knowledgeText}`;
+  }
+
+  if (criterioBlock) {
+    context += `\n${criterioBlock}`;
   }
 
   return context;
@@ -1709,6 +1717,9 @@ NUNCA digas "éxito", "suerte", ni nada que suene a despedida. Mantén la puerta
   if (disqResult.disqualified) {
     prompt += `⚠️ El prospecto NO está interesado. Despídete con respeto y cierra la conversación: "Entendido, sin problema. Si en algún momento quieres retomar, aquí estoy. Éxito!"\n`;
     // Short-circuit — no need for other tactics
+    // Inject CRITERIO light rules for quality
+    const criterioProspect = await buildCriterioRulesBlock(supabase, ['STEVE RESP'], { lightMode: true });
+    if (criterioProspect) prompt += criterioProspect;
     prompt += `\n🗣️ PERSONALIDAD:\n${WA_SALES_PROMPT_BASE}`;
     return { prompt, ruleIds: collectedRuleIds };
   }
@@ -1929,6 +1940,10 @@ SOLO después de decir esto, envía el link.`;
   if (creativeInsightsText) {
     prompt += creativeInsightsText;
   }
+
+  // 3.5. CRITERIO light rules for quality
+  const criterioSalesBlock = await buildCriterioRulesBlock(supabase, ['STEVE RESP'], { lightMode: true });
+  if (criterioSalesBlock) prompt += criterioSalesBlock;
 
   // 4. PERSONALITY (short)
   prompt += `\n\n🗣️ PERSONALIDAD:\n${WA_SALES_PROMPT_BASE}`;

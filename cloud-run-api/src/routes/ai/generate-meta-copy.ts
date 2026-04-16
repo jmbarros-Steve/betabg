@@ -5,6 +5,7 @@ import { detectAngle } from '../../lib/angle-detector.js';
 import { checkRateLimit } from '../../lib/rate-limiter.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.js';
+import { buildCriterioRulesBlock } from '../../lib/criterio/rules-context.js';
 
 /**
  * Sanitize an object's string values recursively for prompt injection.
@@ -26,28 +27,7 @@ function sanitizeObjectForPrompt(obj: any, maxDepth = 3): any {
   return obj;
 }
 
-/**
- * Fetches active CRITERIO rules for meta/creative/copy categories
- * and builds an injection block for the system prompt.
- */
-async function buildCriterioRulesBlock(supabase: any): Promise<string> {
-  try {
-    const { data: rules, error } = await supabase
-      .from('criterio_rules')
-      .select('name, check_rule, category')
-      .eq('active', true)
-      .or('category.ilike.%meta%,category.ilike.%creative%,category.ilike.%copy%')
-      .limit(20);
-
-    if (error || !rules || rules.length === 0) return '';
-
-    const rulesText = rules.map((r: { name: string; check_rule: string }) => `- ${r.name}: ${r.check_rule}`).join('\n');
-    return `\nREGLAS DE CALIDAD (tu contenido DEBE cumplir estas reglas):\n${rulesText}\n`;
-  } catch (err) {
-    console.error('[generate-meta-copy] Failed to fetch criterio_rules:', err);
-    return '';
-  }
-}
+// buildCriterioRulesBlock extracted to lib/criterio/rules-context.ts
 
 interface GenerateRequest {
   clientId: string;
@@ -739,7 +719,7 @@ export async function generateMetaCopy(c: Context) {
   }
 
   // Fetch CRITERIO quality rules once for all code paths
-  const criterioBlock = await buildCriterioRulesBlock(supabase);
+  const criterioBlock = await buildCriterioRulesBlock(supabase, ['META COPY', 'META CREATIVE']);
 
   // Rate limit: 10 requests/minute per client
   const rl = checkRateLimit(resolvedClientId, 'generate-meta-copy');

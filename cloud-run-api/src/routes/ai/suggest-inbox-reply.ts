@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getUserClientIds } from '../../lib/user-scoping.js';
 import { anthropicFetch } from '../../lib/anthropic-fetch.js';
+import { buildCriterioRulesBlock } from '../../lib/criterio/rules-context.js';
 
 /**
  * POST /api/ai/suggest-inbox-reply
@@ -50,6 +51,9 @@ export async function suggestInboxReply(c: Context) {
       return c.json({ error: 'AI service not configured' }, 500);
     }
 
+    // Load CRITERIO light rules (only blockers/rejects) for reply quality
+    const criterioBlock = await buildCriterioRulesBlock(supabase, ['STEVE RESP'], { lightMode: true, maxRules: 10 });
+
     // Build conversation context for Claude
     const conversationText = messages
       .map((m: { role: string; content: string }) =>
@@ -70,7 +74,7 @@ Reglas:
 - Que sean naturales para ${platform || 'redes sociales'}
 - No uses hashtags ni emojis excesivos
 - Responde SOLO con un JSON array de 3 strings, sin markdown ni explicaciones
-
+${criterioBlock}
 Ejemplo de formato de respuesta:
 ["Respuesta profesional aquí", "Respuesta amigable aquí", "Respuesta empática aquí"]`;
 

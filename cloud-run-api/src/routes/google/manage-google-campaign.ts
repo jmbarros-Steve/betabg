@@ -1253,52 +1253,73 @@ async function handleGetRecommendations(
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (supabaseUrl && supabaseKey) {
+      const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
       try {
-        // Fetch brand_research
+        // 1) Fetch buyer_personas — contains the actual brief Q&A responses
+        const bpRes = await fetch(
+          `${supabaseUrl}/rest/v1/buyer_personas?client_id=eq.${client_id}&select=persona_data&limit=1`,
+          { headers, signal: AbortSignal.timeout(5_000) }
+        );
+        if (bpRes.ok) {
+          const bpData = await bpRes.json() as any[];
+          const pd = bpData?.[0]?.persona_data;
+          if (pd) {
+            // raw_responses = array of the 17 brief answers (Q0-Q16)
+            if (Array.isArray(pd.raw_responses) && pd.raw_responses.length > 0) {
+              briefContext += '## RESPUESTAS DEL BRIEF DEL CLIENTE\n';
+              for (let i = 0; i < pd.raw_responses.length; i++) {
+                const resp = pd.raw_responses[i];
+                if (resp && typeof resp === 'string' && resp.trim()) {
+                  briefContext += `${resp.trim()}\n`;
+                }
+              }
+              briefContext += '\n';
+            }
+            if (pd.fase_negocio) briefContext += `Fase del negocio: ${pd.fase_negocio}\n`;
+            if (pd.presupuesto_ads) briefContext += `Presupuesto ads: ${pd.presupuesto_ads}\n`;
+          }
+        }
+
+        // 2) Fetch brand_research — google_ads_strategy has ad copies & keywords
         const brRes = await fetch(
-          `${supabaseUrl}/rest/v1/brand_research?client_id=eq.${client_id}&select=research_type,research_data&order=created_at.desc&limit=5`,
-          { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }, signal: AbortSignal.timeout(5_000) }
+          `${supabaseUrl}/rest/v1/brand_research?client_id=eq.${client_id}&select=research_type,research_data&research_type=in.(google_ads_strategy,competitive_analysis,keywords)&order=created_at.desc&limit=3`,
+          { headers, signal: AbortSignal.timeout(5_000) }
         );
         if (brRes.ok) {
           const brData = await brRes.json() as any[];
           for (const row of brData) {
             const rd = row.research_data;
             if (!rd) continue;
-            if (row.research_type === 'brand_strategy' || row.research_type === 'ai_strategy') {
-              // Extract key strategy fields
-              const fields = ['brand_positioning', 'value_proposition', 'target_audience', 'brand_voice',
-                'competitive_advantage', 'key_messages', 'brand_promise', 'brand_personality',
-                'unique_selling_points', 'tone_of_voice', 'industry', 'product_description'];
-              for (const f of fields) {
-                if (rd[f]) briefContext += `${f}: ${typeof rd[f] === 'string' ? rd[f] : JSON.stringify(rd[f])}\n`;
-              }
-            } else if (row.research_type === 'brand_analysis' || row.research_type === 'scraping') {
-              if (rd.summary) briefContext += `Analisis: ${rd.summary}\n`;
-              if (rd.brand_description) briefContext += `Descripcion: ${rd.brand_description}\n`;
-              if (rd.products) briefContext += `Productos: ${typeof rd.products === 'string' ? rd.products : JSON.stringify(rd.products)}\n`;
-            }
-          }
-        }
 
-        // Fetch buyer_personas
-        const bpRes = await fetch(
-          `${supabaseUrl}/rest/v1/buyer_personas?client_id=eq.${client_id}&select=persona_data&limit=3`,
-          { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }, signal: AbortSignal.timeout(5_000) }
-        );
-        if (bpRes.ok) {
-          const bpData = await bpRes.json() as any[];
-          for (const row of bpData) {
-            const pd = row.persona_data;
-            if (!pd) continue;
-            if (pd.name) briefContext += `Persona: ${pd.name}`;
-            if (pd.description) briefContext += ` — ${pd.description}`;
-            if (pd.pain_points) briefContext += ` | Dolores: ${Array.isArray(pd.pain_points) ? pd.pain_points.join(', ') : pd.pain_points}`;
-            briefContext += '\n';
+            if (row.research_type === 'google_ads_strategy') {
+              // Extract existing ad copies for tone/style reference
+              if (Array.isArray(rd.ad_copies) && rd.ad_copies.length > 0) {
+                briefContext += '\n## ESTRATEGIA GOOGLE ADS (referencia de tono)\n';
+                const copy = rd.ad_copies[0];
+                if (copy.headline1) briefContext += `Headline ejemplo: ${copy.headline1}\n`;
+                if (copy.description1) briefContext += `Descripcion ejemplo: ${copy.description1}\n`;
+              }
+              if (rd.bidding_strategy) briefContext += `Estrategia de pujas sugerida: ${JSON.stringify(rd.bidding_strategy)}\n`;
+            }
+
+            if (row.research_type === 'competitive_analysis') {
+              if (rd.strategic_insights) {
+                briefContext += `\n## INSIGHTS COMPETITIVOS\n${typeof rd.strategic_insights === 'string' ? rd.strategic_insights : JSON.stringify(rd.strategic_insights).slice(0, 500)}\n`;
+              }
+            }
+
+            if (row.research_type === 'keywords') {
+              if (Array.isArray(rd.primary)) {
+                briefContext += `\n## KEYWORDS PRINCIPALES\n${rd.primary.map((k: any) => typeof k === 'string' ? k : k.keyword || k.term || JSON.stringify(k)).slice(0, 15).join(', ')}\n`;
+              }
+            }
           }
         }
 
         if (briefContext) {
           console.log(`[manage-google-campaign] Loaded brief context for client ${client_id}: ${briefContext.length} chars`);
+        } else {
+          console.log(`[manage-google-campaign] No brief data found for client ${client_id}`);
         }
       } catch (err: any) {
         console.log(`[manage-google-campaign] Brief fetch failed (non-critical): ${err.message}`);

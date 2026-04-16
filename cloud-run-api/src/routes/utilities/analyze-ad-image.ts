@@ -1,5 +1,7 @@
 import { Context } from 'hono';
 import { loadKnowledge } from '../../lib/knowledge-loader.js';
+import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { buildCriterioRulesBlock } from '../../lib/criterio/rules-context.js';
 
 export async function analyzeAdImage(c: Context) {
   try {
@@ -20,7 +22,11 @@ export async function analyzeAdImage(c: Context) {
     ? '❌ ANUNCIO QUE NO FUNCIONÓ'
     : '🤷 RENDIMIENTO DESCONOCIDO';
 
-  const { knowledgeBlock } = await loadKnowledge(['anuncios', 'meta_ads'], { limit: 10, label: 'REGLAS APRENDIDAS DE CREATIVOS', audit: { source: 'analyze-ad-image' } });
+  const supabase = getSupabaseAdmin();
+  const [{ knowledgeBlock }, criterioBlock] = await Promise.all([
+    loadKnowledge(['anuncios', 'meta_ads'], { limit: 10, label: 'REGLAS APRENDIDAS DE CREATIVOS', audit: { source: 'analyze-ad-image' } }),
+    buildCriterioRulesBlock(supabase, ['VISUAL AD', 'VISUAL BRAND', 'META CREATIVE']),
+  ]);
 
   const contextBlock = context
     ? `\nMétricas / contexto real proporcionado:\n${context}\n`
@@ -57,7 +63,7 @@ export async function analyzeAdImage(c: Context) {
             {
               type: 'text',
               text: `Eres un experto en performance marketing y creativos de alta conversión.
-${knowledgeBlock}
+${knowledgeBlock}${criterioBlock}
 CONTEXTO: ${perfLabel}
 ${contextBlock}
 ${focusInstruction}

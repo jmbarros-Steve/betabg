@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQueryOrDefault } from '../../lib/safe-supabase.js';
+import { buildCriterioRulesBlock } from '../../lib/criterio/rules-context.js';
 
 const GOOGLE_ADS_METHODOLOGY = `
 ═══════════════════════════════════════════════════════════════════════════════
@@ -175,7 +176,10 @@ ${clientNegative.map(f => `- "${f.feedback_text}"`).join('\n')}
 
   const campaign = CAMPAIGN_TYPES[campaignType as string] || CAMPAIGN_TYPES.search;
 
-  const systemPrompt = `${bugSectionGG}${knowledgeSectionGG}Eres un experto en Google Ads y copywriting, entrenado en las metodologías de Sabri Suby y Russell Brunson.
+  // Load CRITERIO rules for Google Ads quality
+  const criterioBlock = await buildCriterioRulesBlock(supabase, ['GOOGLE ADS']);
+
+  const systemPrompt = `${bugSectionGG}${knowledgeSectionGG}${criterioBlock}Eres un experto en Google Ads y copywriting, entrenado en las metodologías de Sabri Suby y Russell Brunson.
 
 ${GOOGLE_ADS_METHODOLOGY}
 

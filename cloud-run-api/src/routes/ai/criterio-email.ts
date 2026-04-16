@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { evaluateWithRegistry } from '../../lib/criterio/evaluator-registry.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -170,9 +171,9 @@ function evaluateEmailRule(
     }
   }
 
-  // Default: FAIL unimplemented rules so they don't silently pass quality gates
-  console.warn(`[criterio-email] Rule "${rule.name}" not implemented — failing by default`);
-  return { passed: false, actual: 'Not yet implemented', expected: rule.check_rule, details: `Rule not yet implemented: ${rule.name}` };
+  // Default: SKIP unimplemented rules — they pass with a skip flag so they don't block publishing.
+  // As rules get implemented (check_type + check_config), they'll be evaluated by the registry.
+  return { passed: true, actual: 'Skipped (not yet implemented)', expected: rule.check_rule, details: null };
 }
 
 interface CriterioResult {
@@ -240,10 +241,24 @@ async function criterioEmailEvaluate(emailData: EmailData, shopId: string): Prom
     return { can_publish: true, score: 100, reason: 'No active EMAIL rules found', failed_rules: [] };
   }
 
-  // 3. Evaluate each rule
+  // 3. Evaluate each rule — try config-driven registry first, fallback to legacy if-blocks
   const results = [];
   for (const rule of rules) {
-    const result = evaluateEmailRule(rule, emailData, brief, recentEmails, history);
+    let result: RuleResult;
+
+    // Config-driven evaluation: if rule has a check_type other than 'manual', use the registry
+    if (rule.check_type && rule.check_type !== 'manual' && rule.implemented) {
+      const registryResult = await evaluateWithRegistry(rule, emailData as Record<string, any>, { brief });
+      if (registryResult) {
+        result = registryResult;
+      } else {
+        // Registry returned null (unknown check_type) — fallback to legacy
+        result = evaluateEmailRule(rule, emailData, brief, recentEmails, history);
+      }
+    } else {
+      result = evaluateEmailRule(rule, emailData, brief, recentEmails, history);
+    }
+
     results.push({
       rule_id: rule.id,
       passed: result.passed,

@@ -1,10 +1,13 @@
 /**
- * Steve Social — 2-layer moderation (regex + Haiku)
+ * Steve Social — 3-layer moderation (regex + CRITERIO + Haiku)
  */
+
+import { getSupabaseAdmin } from './supabase.js';
+import { moderateWithCriterio } from './criterio/rules-context.js';
 
 export interface ModerationResult {
   approved: boolean;
-  layer: 'regex' | 'haiku';
+  layer: 'regex' | 'haiku' | 'criterio';
   reason: string;
 }
 
@@ -108,16 +111,33 @@ Responde SOLO con JSON: {"approved": true/false, "reason": "motivo breve"}`,
 }
 
 /**
- * Full moderation pipeline: regex first, then Haiku.
+ * Full moderation pipeline: regex → CRITERIO → Haiku.
  */
 export async function moderatePost(
   content: string,
   apiKey: string,
 ): Promise<ModerationResult> {
-  // Capa 1
+  // Capa 1: Regex (free, instant)
   const regexResult = moderateRegex(content);
   if (!regexResult.approved) return regexResult;
 
-  // Capa 2
+  // Capa 2: CRITERIO rules (fast DB query, ~50ms)
+  try {
+    const supabase = getSupabaseAdmin();
+    const criterioResult = await moderateWithCriterio(content, supabase, ['SOCIAL']);
+    if (!criterioResult.passed) {
+      const topFailed = criterioResult.failedRules[0];
+      return {
+        approved: false,
+        layer: 'criterio',
+        reason: `${topFailed.name}: ${topFailed.reason}`,
+      };
+    }
+  } catch (err) {
+    // CRITERIO failure is non-blocking — fall through to Haiku
+    console.warn('[social-moderation] CRITERIO check failed, continuing:', err);
+  }
+
+  // Capa 3: Haiku AI moderation
   return moderateHaiku(content, apiKey);
 }

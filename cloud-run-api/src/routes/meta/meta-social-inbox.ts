@@ -307,6 +307,10 @@ async function handleListPostComments(token: string, body: RequestBody): Promise
   const comments: any[] = [];
 
   if (postsResult.ok) {
+    const firstPost = postsResult.data?.data?.[0];
+    if (firstPost) {
+      console.log(`[social-inbox] FB post sample keys: ${Object.keys(firstPost).join(',')}, full_picture=${!!firstPost.full_picture}, permalink_url=${!!firstPost.permalink_url}`);
+    }
     for (const post of postsResult.data?.data || []) {
       for (const comment of post.comments?.data || []) {
         comments.push({
@@ -337,6 +341,10 @@ async function handleListPostComments(token: string, body: RequestBody): Promise
     });
 
     if (mediaResult.ok && mediaResult.data?.data) {
+      const firstMedia = mediaResult.data.data[0];
+      if (firstMedia) {
+        console.log(`[social-inbox] IG media sample keys: ${Object.keys(firstMedia).join(',')}, media_url=${!!firstMedia.media_url}, thumbnail_url=${!!firstMedia.thumbnail_url}, permalink=${!!firstMedia.permalink}`);
+      }
       for (const media of mediaResult.data.data) {
         const commentsResult = await metaGet(`${media.id}/comments`, pageToken, {
           fields: 'id,text,from{id,username},timestamp,like_count',
