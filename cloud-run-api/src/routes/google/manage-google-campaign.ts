@@ -522,8 +522,12 @@ async function handleCreateCampaign(
     acquisition_mode,
     // Audience signal generado por AI (demografia/intereses)
     audience_signal,
+    // Productos del catalogo seleccionados (SKUs) — restringen la campana PMAX Shopping a estos IDs
+    selected_product_ids,
     // Shopping / Merchant Center
     merchant_center_id,
+    // Client ID (inyectado por dispatcher, ownership-validated)
+    client_id: clientIdForValidation,
   } = data;
 
   if (!name || name.length > 128) {
@@ -953,6 +957,88 @@ async function handleCreateCampaign(
     mutateOps.push({ assetGroupOperation: { create: assetGroupCreate } });
     mutateOps.push(...linkOps);
 
+    // Listing Group Filter tree — restringe PMAX Shopping a un subset de SKUs (si el user eligio productos).
+    // Solo aplica cuando hay merchant_center (Shopping) y selected_product_ids provistos.
+    // Estructura: Root SUBDIVISION → 1 leaf UNIT_INCLUDED por SKU + 1 leaf UNIT_EXCLUDED "other".
+    let validSelectedIds: string[] = Array.isArray(selected_product_ids)
+      ? Array.from(new Set(selected_product_ids.map((id: any) => String(id || '').trim()).filter((id: string) => id.length > 0)))
+      : [];
+    // Cross-validate selected SKUs against the client's actual catalog (shopify_products)
+    // — evita que el body inyecte SKUs que no pertenecen al cliente / campaña zombie.
+    if (merchant_center_id && validSelectedIds.length > 0 && clientIdForValidation && UUID_RX.test(String(clientIdForValidation))) {
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (supabaseUrl && supabaseKey) {
+        try {
+          // Use PostgREST "in.(...)" — quote each ID to be safe
+          const idList = validSelectedIds.slice(0, 500).map(id => `"${id.replace(/"/g, '')}"`).join(',');
+          const res = await fetch(
+            `${supabaseUrl}/rest/v1/shopify_products?client_id=eq.${String(clientIdForValidation).trim()}&product_id=in.(${encodeURIComponent(idList)})&select=product_id&limit=500`,
+            { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }, signal: AbortSignal.timeout(5_000) }
+          );
+          if (res.ok) {
+            const rows = await res.json() as any[];
+            const ownedSet = new Set(rows.map((r: any) => String(r.product_id)));
+            const before = validSelectedIds.length;
+            validSelectedIds = validSelectedIds.filter(id => ownedSet.has(id));
+            const dropped = before - validSelectedIds.length;
+            if (dropped > 0) {
+              console.warn(`[manage-google-campaign] selected_product_ids: dropped ${dropped} SKU(s) not owned by client ${clientIdForValidation}`);
+            }
+          }
+        } catch (err: any) {
+          console.warn('[manage-google-campaign] selected_product_ids validation failed:', err.message);
+        }
+      }
+    }
+    if (merchant_center_id && validSelectedIds.length > 0) {
+      const rootLgfTempId = tempId--;
+      const rootLgfResource = `customers/${customerId}/assetGroupListingGroupFilters/${rootLgfTempId}`;
+      const assetGroupResource = `customers/${customerId}/assetGroups/-3`;
+      // Root subdivision node
+      mutateOps.push({
+        assetGroupListingGroupFilterOperation: {
+          create: {
+            resourceName: rootLgfResource,
+            assetGroup: assetGroupResource,
+            type: 'SUBDIVISION',
+            listingSource: 'SHOPPING',
+          },
+        },
+      });
+      // One UNIT_INCLUDED leaf per selected SKU
+      // Note: listingSource va SOLO en el root (SUBDIVISION). v23 rechaza si se repite en children.
+      for (const sku of validSelectedIds.slice(0, 500)) {
+        mutateOps.push({
+          assetGroupListingGroupFilterOperation: {
+            create: {
+              assetGroup: assetGroupResource,
+              type: 'UNIT_INCLUDED',
+              parentListingGroupFilter: rootLgfResource,
+              caseValue: {
+                productItemId: { value: sku },
+              },
+            },
+          },
+        });
+      }
+      // Catch-all UNIT_EXCLUDED leaf for everything else (productItemId without value)
+      mutateOps.push({
+        assetGroupListingGroupFilterOperation: {
+          create: {
+            assetGroup: assetGroupResource,
+            type: 'UNIT_EXCLUDED',
+            parentListingGroupFilter: rootLgfResource,
+            caseValue: {
+              productItemId: {},
+            },
+          },
+        },
+      });
+      console.log(`[manage-google-campaign] pmax listing group filter queued: ${validSelectedIds.length} included SKUs + 1 catch-all excluded`);
+    }
+
+
     // Search themes as AssetGroupSignal (audience signals).
     // Google Ads API v23: one AssetGroupSignal per theme, with searchTheme: { text: "..." }.
     if (search_themes?.length) {
@@ -1155,6 +1241,7 @@ async function handleGetBudgetRecommendation(
   data: Record<string, any>
 ): Promise<{ body: any; status: number }> {
   const { channel_type, search_themes: themes, client_id } = data;
+  const userIntent = typeof data.user_intent === 'string' ? data.user_intent.trim().slice(0, 800) : '';
   console.log(`[manage-google-campaign] Getting budget recommendation for ${customerId}`);
 
   // Primary path: Unit-economics-based recommendation using brief + financial config
@@ -1198,6 +1285,7 @@ async function handleGetBudgetRecommendation(
           const briefResponses = Array.isArray(bp?.raw_responses) ? bp.raw_responses.filter((r: any) => typeof r === 'string' && r.trim()).join('\n').slice(0, 2000) : '';
 
           const prompt = `Eres Steve, experto en presupuestos de Google Ads basado en UNIT ECONOMICS del cliente.
+${userIntent ? `\n## OBJETIVO DE LA CAMPAÑA (palabras del usuario)\n${userIntent}\n` : ''}
 
 ## UNIT ECONOMICS
 - Margen bruto por default: ${fin?.default_margin_percentage ?? 'no definido'}%
@@ -1383,7 +1471,7 @@ Responde SOLO en JSON válido, sin markdown:
     return { body: { error: 'ANTHROPIC_API_KEY not configured' }, status: 500 };
   }
 
-  const prompt = `Eres experto en Google Ads. Basado en:
+  const prompt = `Eres experto en Google Ads.${userIntent ? `\nObjetivo de la campaña (usuario): ${userIntent}\n` : ''} Basado en:
 - Gasto 30d: $${totalSpend.toFixed(0)}
 - Conversiones 30d: ${totalConversions}
 - Clics 30d: ${totalClicks}
@@ -1590,7 +1678,15 @@ async function handleGetRecommendations(
   loginCustomerId: string,
   data: Record<string, any>
 ): Promise<{ body: any; status: number }> {
-  const { recommendation_type, channel_type, context: extraContext, client_id } = data;
+  const { recommendation_type, channel_type, client_id } = data;
+  // user_intent (prompt libre del usuario) alimenta todos los recomendadores.
+  // Se concatena con el context adicional que venga del front.
+  const userIntent = typeof data.user_intent === 'string' ? data.user_intent.trim() : '';
+  const extraContextRaw = typeof data.context === 'string' ? data.context : '';
+  const extraContext = [
+    userIntent ? `OBJETIVO DE LA CAMPAÑA (palabras del usuario): ${userIntent.slice(0, 800)}` : '',
+    extraContextRaw.trim(),
+  ].filter(Boolean).join('\n');
 
   if (!recommendation_type) {
     return { body: { error: 'Missing recommendation_type' }, status: 400 };
@@ -1823,6 +1919,37 @@ Responde SOLO en JSON válido:
   "languages": [{ "id": "1003", "name": "Español" }],
   "reasoning": "..."
 }`;
+  } else if (recommendation_type === 'product_selection') {
+    const hasBrief = briefContext.trim().length > 0;
+    const rawProducts = Array.isArray((data as any).products) ? (data as any).products : [];
+    const products = rawProducts
+      .filter((p: any) => p && (p.id || p.product_id) && p.title)
+      .slice(0, 150); // cap to keep prompt manageable
+    if (products.length === 0) {
+      return { body: { error: 'No products provided', details: 'data.products debe ser un array con {id, title, price}' }, status: 400 };
+    }
+    const catalogBlock = products.map((p: any, i: number) => {
+      const id = String(p.id || p.product_id);
+      const price = p.price ? ` - $${p.price}` : '';
+      return `${i + 1}. [${id}] ${String(p.title).slice(0, 120)}${price}`;
+    }).join('\n');
+
+    prompt = `Eres Steve, experto en Google Ads Performance Max Shopping.
+${hasBrief ? `\n## BRIEF DEL CLIENTE\n${briefContext.slice(0, 1800)}` : ''}
+${extraContext ? `\n## CONTEXTO ADICIONAL\n${extraContext}` : ''}
+
+## PRODUCTOS DISPONIBLES EN EL CATÁLOGO (${products.length})
+${catalogBlock}
+
+Elige el subset de productos más alineado con el OBJETIVO de la campaña. NO selecciones todos. Prioriza los que mejor encajan con la intención del usuario (producto/categoría, público, ocasión, precio). Descarta los irrelevantes o mal stockeados.
+
+Rango sugerido: entre 5 y 25 productos (el numero exacto depende del catalogo, objetivo, y diversidad). Si el catalogo es chico (<10), puedes seleccionar todos si todos encajan.
+
+Responde SOLO en JSON valido, sin markdown. Los IDs deben ser EXACTAMENTE los que aparecen entre corchetes [...] arriba:
+{
+  "selected_product_ids": ["id_1", "id_2", ...],
+  "reasoning": "explicacion breve en espanol: por que estos y no los demas"
+}`;
   } else if (recommendation_type === 'audience_signals') {
     const hasBrief = briefContext.trim().length > 0;
     prompt = `Eres Steve, experto en Google Ads Performance Max.
@@ -1931,6 +2058,21 @@ Responde SOLO en JSON válido:
       recommendation = { raw: text, parse_error: true };
     }
 
+    // Post-validation for product_selection: drop any IDs not in the original catalog (anti-mulas)
+    if (recommendation_type === 'product_selection' && !recommendation.parse_error) {
+      const rawProducts = Array.isArray((data as any).products) ? (data as any).products : [];
+      const validIds = new Set(rawProducts.map((p: any) => String(p.id || p.product_id || '')));
+      const aiIds: string[] = Array.isArray(recommendation.selected_product_ids) ? recommendation.selected_product_ids : [];
+      const validated = aiIds.map(String).filter(id => validIds.has(id));
+      const droppedCount = aiIds.length - validated.length;
+      if (droppedCount > 0) {
+        console.warn(`[manage-google-campaign] product_selection: dropped ${droppedCount} invented/invalid product IDs`);
+      }
+      recommendation.selected_product_ids = validated;
+      recommendation.catalog_size = rawProducts.length;
+      recommendation.ids_dropped = droppedCount;
+    }
+
     // Post-validation for cta_sitelinks: drop any sitelink whose url is not in the real list
     if (recommendation_type === 'cta_sitelinks' && !recommendation.parse_error) {
       const realSet = new Set(realSiteUrls);
@@ -1960,6 +2102,52 @@ Responde SOLO en JSON válido:
   } catch (err: any) {
     console.error('[manage-google-campaign] AI recommendation error:', err);
     return { body: { error: 'Failed to generate recommendation', details: err.message }, status: 502 };
+  }
+}
+
+// UUID validator to prevent PostgREST operator injection in eq.${value} interpolation
+const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// --- List catalog products (from Shopify DB) for product-level selection in PMAX Shopping ---
+async function handleListCatalogProducts(clientId: string): Promise<{ body: any; status: number }> {
+  if (!clientId || !UUID_RX.test(clientId.trim())) {
+    return { body: { success: true, products: [], source: 'none', reason: 'no valid client_id' }, status: 200 };
+  }
+  const cid = clientId.trim();
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    return { body: { error: 'Supabase not configured' }, status: 500 };
+  }
+  try {
+    const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/shopify_products?client_id=eq.${cid}&select=id,product_id,title,image_url,price,handle,sku,status&order=created_at.desc&limit=200`,
+      { headers, signal: AbortSignal.timeout(8_000) }
+    );
+    if (!res.ok) {
+      return { body: { error: 'Failed to fetch catalog products', details: await res.text() }, status: 502 };
+    }
+    const rows = await res.json() as any[];
+    const seen = new Set<string>();
+    const products: any[] = [];
+    for (const r of rows) {
+      const id = String(r.product_id || r.id || '');
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      products.push({
+        id,
+        title: r.title,
+        image_url: r.image_url,
+        price: r.price,
+        handle: r.handle,
+        sku: r.sku || null,
+        status: r.status || null,
+      });
+    }
+    return { body: { success: true, products, source: 'shopify_db', count: products.length }, status: 200 };
+  } catch (err: any) {
+    return { body: { error: 'Catalog fetch failed', details: err.message }, status: 502 };
   }
 }
 
@@ -2006,7 +2194,8 @@ type AllActions = Action
   | 'get_recommendations'
   | 'list_merchant_centers'
   | 'get_budget_recommendation'
-  | 'list_image_assets';
+  | 'list_image_assets'
+  | 'list_catalog_products';
 
 export async function manageGoogleCampaign(c: Context) {
   try {
@@ -2033,6 +2222,7 @@ export async function manageGoogleCampaign(c: Context) {
       'list_merchant_centers',
       'get_budget_recommendation',
       'list_image_assets',
+      'list_catalog_products',
     ];
 
     if (!validActions.includes(action)) {
@@ -2111,7 +2301,7 @@ export async function manageGoogleCampaign(c: Context) {
         result = await handleEnableAdGroup(ctx.customerId, ad_group_id!, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId);
         break;
       case 'create_campaign':
-        result = await handleCreateCampaign(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, data || {});
+        result = await handleCreateCampaign(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, { ...(data || {}), client_id: ctx.clientId });
         break;
       case 'get_recommendations':
         result = await handleGetRecommendations(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, { ...(data || {}), client_id: ctx.clientId });
@@ -2124,6 +2314,9 @@ export async function manageGoogleCampaign(c: Context) {
         break;
       case 'list_image_assets':
         result = await handleListImageAssets(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, (data as any)?.limit || 10);
+        break;
+      case 'list_catalog_products':
+        result = await handleListCatalogProducts(ctx.clientId);
         break;
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };

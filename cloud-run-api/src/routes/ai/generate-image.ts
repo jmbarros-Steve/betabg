@@ -137,7 +137,9 @@ export async function generateImage(c: Context) {
     rechazoTexto,
     engine = 'imagen',
     referenceImageUrls,
+    userIntent: rawUserIntent,
   } = body;
+  const userIntent = typeof rawUserIntent === 'string' ? rawUserIntent.trim().slice(0, 600) : '';
   const refUrls: string[] = Array.isArray(referenceImageUrls)
     ? referenceImageUrls.filter((u: any) => typeof u === 'string' && u.trim().length > 0).slice(0, 3)
     : [];
@@ -248,9 +250,10 @@ export async function generateImage(c: Context) {
   }
 
   // Adjust prompt if there's rejection text
+  const userIntentBlock = userIntent ? `\nCAMPAIGN OBJECTIVE (user's words, honor this intent): ${userIntent}\n` : '';
   const promptBase = rechazoTexto
-    ? `${promptGeneracion}. IMPORTANTE: Corregir esto: ${rechazoTexto}. No repetir el error anterior.`
-    : promptGeneracion;
+    ? `${promptGeneracion}${userIntentBlock}. IMPORTANTE: Corregir esto: ${rechazoTexto}. No repetir el error anterior.`
+    : `${promptGeneracion}${userIntentBlock}`;
 
   // Add diversity instruction to avoid repetitive outputs
   const randomDiversity = DIVERSITY_STYLES[Math.floor(Math.random() * DIVERSITY_STYLES.length)];

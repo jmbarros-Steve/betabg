@@ -560,6 +560,10 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       income_ranges?: string[];
       reasoning?: string;
     },
+    // User intent — prompt libre que alimenta a TODOS los AI recomendadores
+    user_intent: '' as string,
+    // Productos del Merchant Center seleccionados (SKUs) — solo los que van a la campaña
+    selected_product_ids: [] as string[],
   });
   const [budgetOptions, setBudgetOptions] = useState<any>(null);
   const [budgetLoading, setBudgetLoading] = useState(false);
@@ -572,6 +576,9 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   const [searchThemesAiLoading, setSearchThemesAiLoading] = useState(false);
   const [prevAdImageUrls, setPrevAdImageUrls] = useState<string[]>([]);
   const [audienceAiLoading, setAudienceAiLoading] = useState(false);
+  const [catalogProducts, setCatalogProducts] = useState<Array<{ id: string; title: string; image_url?: string; price?: number; sku?: string | null }>>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [productAiLoading, setProductAiLoading] = useState(false);
 
   // ─── Fetch campaigns ──────────────────────────────────────────────
 
@@ -943,6 +950,11 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
         payload.audience_signal = wizardData.audience_signal;
       }
 
+      // Productos seleccionados (PMAX Shopping) — Google Ads filtra a este subset
+      if (wizardData.selected_product_ids.length > 0) {
+        payload.selected_product_ids = wizardData.selected_product_ids;
+      }
+
       // Convert images to base64 for single-batch creation (Google requires all assets together)
       setWizardProgress('Procesando imagenes...');
       const imageAssets: Array<{ data: string; field_type: string; name: string }> = [];
@@ -1005,6 +1017,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       search_themes: '', url_expansion_opt_out: false,
       merchant_center_id: '',
       acquisition_mode: '', audience_signal: null,
+      user_intent: '', selected_product_ids: [],
     });
     setBudgetOptions(null);
     fetchCampaigns();
@@ -1020,7 +1033,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       body: {
         action: 'get_budget_recommendation',
         connection_id: connectionId,
-        data: { channel_type: wizardData.channel_type, search_themes: themes, client_id: clientId },
+        data: { channel_type: wizardData.channel_type, search_themes: themes, client_id: clientId, user_intent: wizardData.user_intent },
       },
     });
     setBudgetLoading(false);
@@ -1137,6 +1150,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           formato: format,
           engine: 'imagen',
           referenceImageUrls: prevAdImageUrls.slice(0, 2),
+          userIntent: wizardData.user_intent,
         },
       });
 
@@ -1181,6 +1195,66 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     await Promise.all(formats.map(f => generateAiImage(f.format, f.key)));
   };
 
+  const loadCatalogProducts = async () => {
+    setCatalogLoading(true);
+    try {
+      const { data, error } = await callApi('manage-google-campaign', {
+        body: { action: 'list_catalog_products', connection_id: connectionId },
+      });
+      if (error) { toast.error('Error cargando productos: ' + error); return; }
+      const products = Array.isArray(data?.products) ? data.products : [];
+      setCatalogProducts(products);
+      if (products.length === 0) toast.info('No hay productos en el catálogo (conectá Shopify para recomendaciones)');
+    } catch (err: any) {
+      toast.error('Error: ' + err.message);
+    } finally {
+      setCatalogLoading(false);
+    }
+  };
+
+  const generateAiProductSelection = async () => {
+    if (catalogProducts.length === 0) {
+      toast.info('Cargá los productos primero');
+      return;
+    }
+    setProductAiLoading(true);
+    try {
+      const { data, error } = await callApi('manage-google-campaign', {
+        body: {
+          action: 'get_recommendations',
+          connection_id: connectionId,
+          client_id: clientId,
+          data: {
+            recommendation_type: 'product_selection',
+            user_intent: wizardData.user_intent,
+            products: catalogProducts.map(p => ({ id: p.id, title: p.title, price: p.price })),
+          },
+        },
+      });
+      if (error) { toast.error('Error: ' + error); return; }
+      const rec = data?.recommendation;
+      if (!rec || rec.parse_error) { toast.error('Respuesta AI invalida'); return; }
+      const ids: string[] = Array.isArray(rec.selected_product_ids) ? rec.selected_product_ids.map(String) : [];
+      setWizardData(prev => ({ ...prev, selected_product_ids: ids }));
+      toast.success(`${ids.length} producto(s) sugerido(s) por AI${rec.ids_dropped ? ` (${rec.ids_dropped} inválidos descartados)` : ''}`);
+    } catch (err: any) {
+      toast.error('Error: ' + err.message);
+    } finally {
+      setProductAiLoading(false);
+    }
+  };
+
+  const toggleProduct = (id: string) => {
+    setWizardData(prev => {
+      const has = prev.selected_product_ids.includes(id);
+      if (!has && prev.selected_product_ids.length >= 500) {
+        toast.warning('Máximo 500 SKUs por campaña PMAX. Quitá alguno para agregar otro.');
+        return prev;
+      }
+      return { ...prev, selected_product_ids: has ? prev.selected_product_ids.filter(x => x !== id) : [...prev.selected_product_ids, id] };
+    });
+  };
+
   const generateAiAudienceSignal = async () => {
     setAudienceAiLoading(true);
     try {
@@ -1193,6 +1267,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
             recommendation_type: 'audience_signals',
             channel_type: wizardData.channel_type,
             context: `Negocio: ${wizardData.business_name || 'Sin nombre'}. URL: ${wizardData.final_urls || 'Sin URL'}`,
+            user_intent: wizardData.user_intent,
           },
         },
       });
@@ -1237,6 +1312,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
             recommendation_type: 'search_themes',
             channel_type: wizardData.channel_type,
             context: `URL: ${wizardData.final_urls || 'Sin URL'}, Negocio: ${wizardData.business_name || 'Sin nombre'}`,
+            user_intent: wizardData.user_intent,
           },
         },
       });
@@ -1755,6 +1831,20 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           {/* Step 1: Basic */}
           {wizardStep === 1 && (
             <div className="space-y-4">
+              <div className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-3">
+                <Label className="text-primary">¿Qué quieres de esta campaña? <span className="font-normal text-muted-foreground">(Steve alinea todo a partir de acá)</span></Label>
+                <textarea
+                  className="flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  value={wizardData.user_intent}
+                  onChange={e => setWizardData(prev => ({ ...prev, user_intent: e.target.value }))}
+                  placeholder="Ej: Campaña de retargeting para alimentos naturales, target dueños de perros grandes en Santiago, tono premium, busco escalar ventas del último trimestre"
+                  maxLength={800}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Este prompt alimenta a Steve para: nombre de campaña, targeting, presupuesto, headlines, search themes, audience signal, imágenes y selección de productos.
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <Label>Nombre de la campana *</Label>
                 <Input
@@ -1767,6 +1857,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                   connectionId={connectionId}
                   recommendationType="campaign_name"
                   clientId={clientId}
+                userIntent={wizardData.user_intent}
                   channelType={wizardData.channel_type}
                   onApply={handleApplyCampaignName}
                 />
@@ -1855,6 +1946,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 <SteveRecommendation
                   connectionId={connectionId}
                   clientId={clientId}
+                userIntent={wizardData.user_intent}
                   recommendationType="campaign_setup"
                   channelType={wizardData.channel_type}
                   onApply={handleApplyRecommendation}
@@ -1932,11 +2024,58 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 </div>
               )}
 
+              {/* Product selection panel — solo si hay MC linkeado */}
+              {isPmax && wizardData.merchant_center_id && (
+                <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <Label>Productos del catálogo <span className="text-muted-foreground font-normal">({catalogProducts.length} cargados, {wizardData.selected_product_ids.length} seleccionados)</span></Label>
+                    <div className="flex gap-1.5">
+                      <Button type="button" variant="outline" size="sm" className="text-xs h-7 gap-1.5" onClick={loadCatalogProducts} disabled={catalogLoading}>
+                        {catalogLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                        {catalogProducts.length > 0 ? 'Recargar' : 'Cargar'}
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" className="text-xs h-7 gap-1.5" onClick={generateAiProductSelection} disabled={productAiLoading || catalogProducts.length === 0}>
+                        {productAiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                        Sugerir con AI
+                      </Button>
+                    </div>
+                  </div>
+                  {catalogProducts.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Cargá los productos del catálogo para que la campaña apunte solo a un subset.</p>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 text-xs">
+                        <button type="button" className="underline text-primary" onClick={() => setWizardData(prev => ({ ...prev, selected_product_ids: catalogProducts.map(p => p.id) }))}>Todos</button>
+                        <span className="text-muted-foreground">·</span>
+                        <button type="button" className="underline text-primary" onClick={() => setWizardData(prev => ({ ...prev, selected_product_ids: [] }))}>Ninguno</button>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto rounded border border-border bg-background p-2 space-y-1">
+                        {catalogProducts.map(p => {
+                          const checked = wizardData.selected_product_ids.includes(p.id);
+                          return (
+                            <label key={p.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/40 rounded p-1">
+                              <input type="checkbox" checked={checked} onChange={() => toggleProduct(p.id)} />
+                              {p.image_url && <img src={p.image_url} alt="" className="w-6 h-6 object-cover rounded" />}
+                              <span className="flex-1 truncate">{p.title}</span>
+                              {p.price && <span className="text-muted-foreground shrink-0">${p.price}</span>}
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Si seleccionás algunos, Google SOLO promocionará esos SKUs. Si dejás la lista vacía, usará todo el catálogo.
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+
               {/* AI Targeting recommendation */}
               <SteveRecommendation
                 connectionId={connectionId}
                 recommendationType="targeting"
                 clientId={clientId}
+                userIntent={wizardData.user_intent}
                 channelType={wizardData.channel_type}
                 onApply={handleApplyTargeting}
               />
@@ -2217,6 +2356,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 recommendationType="pmax_assets"
                 channelType="PERFORMANCE_MAX"
                 clientId={clientId}
+                userIntent={wizardData.user_intent}
                 context={`Negocio: ${wizardData.business_name || 'Sin nombre'}, URL: ${wizardData.final_urls || 'Sin URL'}`}
                 onApply={handleApplyPmaxRecommendation}
               />
@@ -2372,6 +2512,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 connectionId={connectionId}
                 recommendationType="cta_sitelinks"
                 clientId={clientId}
+                userIntent={wizardData.user_intent}
                 channelType="PERFORMANCE_MAX"
                 context={`URL: ${wizardData.final_urls || 'Sin URL'}, Negocio: ${wizardData.business_name || 'Sin nombre'}`}
                 onApply={handleApplyCtaSitelinks}

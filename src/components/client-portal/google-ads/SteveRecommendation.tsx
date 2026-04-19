@@ -6,10 +6,11 @@ import { Loader2, Sparkles, X, Check } from 'lucide-react';
 
 interface SteveRecommendationProps {
   connectionId: string;
-  recommendationType: 'campaign_setup' | 'pmax_assets' | 'bid_strategy' | 'campaign_name' | 'targeting' | 'cta_sitelinks';
+  recommendationType: 'campaign_setup' | 'pmax_assets' | 'bid_strategy' | 'campaign_name' | 'targeting' | 'cta_sitelinks' | 'search_themes' | 'audience_signals' | 'product_selection';
   channelType?: string;
   context?: string;
   clientId?: string;
+  userIntent?: string;
   onApply: (recommendation: any) => void;
 }
 
@@ -19,6 +20,7 @@ export default function SteveRecommendation({
   channelType,
   context,
   clientId,
+  userIntent,
   onApply,
 }: SteveRecommendationProps) {
   const [loading, setLoading] = useState(false);
@@ -39,6 +41,7 @@ export default function SteveRecommendation({
           channel_type: channelType,
           context,
           client_id: clientId,
+          user_intent: userIntent,
         },
       },
     });
