@@ -1081,16 +1081,17 @@ async function handleCreateCampaign(
       const validParental = Array.isArray(parental_statuses) ? parental_statuses.filter((p: string) => PARENTAL_ENUMS.has(p)) : [];
       const validIncomes = Array.isArray(income_ranges) ? income_ranges.filter((i: string) => INCOME_ENUMS.has(i)) : [];
 
-      // Shape per Google Ads API v23 proto:
-      //   AgeDimension.age_ranges: AgeRangeInfo[] { type: AgeRange enum }
-      //   GenderDimension.genders: GenderInfo[] { type: Gender enum }
-      //   ParentalStatusDimension.parental_statuses: ParentalStatusInfo[] { type: ParentalStatus enum }
-      //   HouseholdIncomeDimension.income_ranges: IncomeRangeInfo[] { type: IncomeRange enum }
+      // Shape per Google Ads API v23 proto for AUDIENCE (not AdGroupCriterion):
+      //   AudienceAgeDimension.age_ranges: repeated AgeRange (enum string directly)
+      //   AudienceGenderDimension.genders: repeated Gender (enum string directly)
+      //   AudienceParentalStatusDimension.parental_statuses: repeated ParentalStatus (enum string directly)
+      //   AudienceHouseholdIncomeDimension.income_ranges: repeated IncomeRange (enum string directly)
+      // NOTE: los tipos *Info* wrapped { type: ... } son para criteria (ad_group_criterion), NO para audience.
       const dimensions: any[] = [];
-      if (validAges.length) dimensions.push({ age: { ageRanges: validAges.map((r: string) => ({ type: r })) } });
-      if (validGenders.length) dimensions.push({ gender: { genders: validGenders.map((g: string) => ({ type: g })) } });
-      if (validParental.length) dimensions.push({ parentalStatus: { parentalStatuses: validParental.map((p: string) => ({ type: p })) } });
-      if (validIncomes.length) dimensions.push({ householdIncome: { incomeRanges: validIncomes.map((i: string) => ({ type: i })) } });
+      if (validAges.length) dimensions.push({ age: { ageRanges: validAges } });
+      if (validGenders.length) dimensions.push({ gender: { genders: validGenders } });
+      if (validParental.length) dimensions.push({ parentalStatus: { parentalStatuses: validParental } });
+      if (validIncomes.length) dimensions.push({ householdIncome: { incomeRanges: validIncomes } });
 
       if (dimensions.length > 0) {
         const audTempId = tempId--;
