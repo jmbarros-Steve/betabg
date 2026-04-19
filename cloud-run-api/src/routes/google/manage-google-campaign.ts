@@ -1081,14 +1081,32 @@ async function handleCreateCampaign(
       const validParental = Array.isArray(parental_statuses) ? parental_statuses.filter((p: string) => PARENTAL_ENUMS.has(p)) : [];
       const validIncomes = Array.isArray(income_ranges) ? income_ranges.filter((i: string) => INCOME_ENUMS.has(i)) : [];
 
-      // Shape per Google Ads API v23 proto for AUDIENCE (not AdGroupCriterion):
-      //   AudienceAgeDimension.age_ranges: repeated AgeRange (enum string directly)
-      //   AudienceGenderDimension.genders: repeated Gender (enum string directly)
-      //   AudienceParentalStatusDimension.parental_statuses: repeated ParentalStatus (enum string directly)
-      //   AudienceHouseholdIncomeDimension.income_ranges: repeated IncomeRange (enum string directly)
-      // NOTE: los tipos *Info* wrapped { type: ... } son para criteria (ad_group_criterion), NO para audience.
+      // Shape per Google Ads API v23 proto for AUDIENCE (verificado contra docs oficiales):
+      //   AgeDimension.age_ranges: repeated AgeSegment { minAge: int, maxAge: int } — enum se traduce a ints
+      //   AgeDimension.include_undetermined: bool — UNDETERMINED va acá, no en el array
+      //   GenderDimension.genders: repeated GenderType enum (string directo, no wrapped)
+      //   ParentalStatusDimension.parental_statuses: repeated ParentalStatusType enum (string directo)
+      //   HouseholdIncomeDimension.income_ranges: repeated IncomeRangeType enum (string directo)
+      const AGE_MAP: Record<string, { minAge?: number; maxAge?: number }> = {
+        AGE_RANGE_18_24: { minAge: 18, maxAge: 24 },
+        AGE_RANGE_25_34: { minAge: 25, maxAge: 34 },
+        AGE_RANGE_35_44: { minAge: 35, maxAge: 44 },
+        AGE_RANGE_45_54: { minAge: 45, maxAge: 54 },
+        AGE_RANGE_55_64: { minAge: 55, maxAge: 64 },
+        AGE_RANGE_65_UP: { minAge: 65 },
+      };
       const dimensions: any[] = [];
-      if (validAges.length) dimensions.push({ age: { ageRanges: validAges } });
+      if (validAges.length) {
+        const ageSegments = validAges
+          .filter((r: string) => r !== 'AGE_RANGE_UNDETERMINED')
+          .map((r: string) => AGE_MAP[r])
+          .filter(Boolean);
+        const includeUndet = validAges.includes('AGE_RANGE_UNDETERMINED');
+        const ageDim: any = {};
+        if (ageSegments.length) ageDim.ageRanges = ageSegments;
+        if (includeUndet) ageDim.includeUndetermined = true;
+        if (ageSegments.length || includeUndet) dimensions.push({ age: ageDim });
+      }
       if (validGenders.length) dimensions.push({ gender: { genders: validGenders } });
       if (validParental.length) dimensions.push({ parentalStatus: { parentalStatuses: validParental } });
       if (validIncomes.length) dimensions.push({ householdIncome: { incomeRanges: validIncomes } });
@@ -2165,10 +2183,10 @@ async function handleListCatalogProducts(
              shopping_product.title, shopping_product.image_link,
              shopping_product.price_micros, shopping_product.currency_code,
              shopping_product.availability, shopping_product.status,
-             shopping_product.product_type_l1, shopping_product.product_type_l2,
-             shopping_product.product_type_l3,
-             shopping_product.category_l1, shopping_product.category_l2,
-             shopping_product.category_l3
+             shopping_product.product_type_level1, shopping_product.product_type_level2,
+             shopping_product.product_type_level3,
+             shopping_product.category_level1, shopping_product.category_level2,
+             shopping_product.category_level3
       FROM shopping_product
       WHERE shopping_product.merchant_center_id = ${mcIdSafe}
       LIMIT 500
@@ -2184,8 +2202,8 @@ async function handleListCatalogProducts(
         seen.add(id);
         const priceMicros = Number(sp.priceMicros || sp.price_micros || 0);
         const price = priceMicros > 0 ? priceMicros / 1_000_000 : null;
-        const pt = [sp.productTypeL1, sp.productTypeL2, sp.productTypeL3].filter(Boolean);
-        const cat = [sp.categoryL1, sp.categoryL2, sp.categoryL3].filter(Boolean);
+        const pt = [sp.productTypeLevel1, sp.productTypeLevel2, sp.productTypeLevel3].filter(Boolean);
+        const cat = [sp.categoryLevel1, sp.categoryLevel2, sp.categoryLevel3].filter(Boolean);
         products.push(normalize({
           id,
           title: sp.title,
