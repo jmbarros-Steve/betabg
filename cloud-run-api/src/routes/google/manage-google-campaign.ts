@@ -518,6 +518,10 @@ async function handleCreateCampaign(
     sitelinks,
     // Targeting
     locations, languages,
+    // Acquisition mode: BID_HIGHER (prioriza nuevos), TARGET_ALL_EQUALLY (todos), BID_ONLY (default)
+    acquisition_mode,
+    // Audience signal generado por AI (demografia/intereses)
+    audience_signal,
     // Shopping / Merchant Center
     merchant_center_id,
   } = data;
@@ -666,6 +670,11 @@ async function handleCreateCampaign(
 
     // Disable Brand Guidelines (requires CampaignAsset logo+name which we add in Phase 2)
     campaignCreate.brandGuidelinesEnabled = false;
+
+    // Customer Acquisition Setting — solo valores válidos de la API v23
+    if (acquisition_mode && ['BID_HIGHER', 'TARGET_ALL_EQUALLY', 'BID_ONLY'].includes(acquisition_mode)) {
+      campaignCreate.customerAcquisitionSetting = { optimizationMode: acquisition_mode };
+    }
 
     if (!final_urls?.length) {
       return { body: { error: 'final_urls required for PMAX campaigns' }, status: 400 };
@@ -960,6 +969,69 @@ async function handleCreateCampaign(
             },
           },
         });
+      }
+    }
+
+    // Audience Signal (demografia + intereses) generado por AI — capa 2
+    // Crea un Audience customer-level + lo linkea al AssetGroup como signal.
+    if (audience_signal && typeof audience_signal === 'object') {
+      const {
+        name: audName,
+        description: audDescription,
+        age_ranges,
+        genders,
+        parental_statuses,
+        income_ranges,
+      } = audience_signal as any;
+
+      // Valid enums Google Ads API v23 (whitelist — cualquier valor fuera se descarta)
+      const AGE_ENUMS = new Set(['AGE_RANGE_18_24', 'AGE_RANGE_25_34', 'AGE_RANGE_35_44', 'AGE_RANGE_45_54', 'AGE_RANGE_55_64', 'AGE_RANGE_65_UP', 'AGE_RANGE_UNDETERMINED']);
+      const GENDER_ENUMS = new Set(['MALE', 'FEMALE', 'UNDETERMINED']);
+      const PARENTAL_ENUMS = new Set(['PARENT', 'NOT_A_PARENT', 'UNDETERMINED']);
+      const INCOME_ENUMS = new Set(['INCOME_RANGE_0_50', 'INCOME_RANGE_50_60', 'INCOME_RANGE_60_70', 'INCOME_RANGE_70_80', 'INCOME_RANGE_80_90', 'INCOME_RANGE_90_UP', 'INCOME_RANGE_UNDETERMINED']);
+
+      const validAges = Array.isArray(age_ranges) ? age_ranges.filter((a: string) => AGE_ENUMS.has(a)) : [];
+      const validGenders = Array.isArray(genders) ? genders.filter((g: string) => GENDER_ENUMS.has(g)) : [];
+      const validParental = Array.isArray(parental_statuses) ? parental_statuses.filter((p: string) => PARENTAL_ENUMS.has(p)) : [];
+      const validIncomes = Array.isArray(income_ranges) ? income_ranges.filter((i: string) => INCOME_ENUMS.has(i)) : [];
+
+      // Shape per Google Ads API v23 proto:
+      //   AgeDimension.age_ranges: AgeRangeInfo[] { type: AgeRange enum }
+      //   GenderDimension.genders: GenderInfo[] { type: Gender enum }
+      //   ParentalStatusDimension.parental_statuses: ParentalStatusInfo[] { type: ParentalStatus enum }
+      //   HouseholdIncomeDimension.income_ranges: IncomeRangeInfo[] { type: IncomeRange enum }
+      const dimensions: any[] = [];
+      if (validAges.length) dimensions.push({ age: { ageRanges: validAges.map((r: string) => ({ type: r })) } });
+      if (validGenders.length) dimensions.push({ gender: { genders: validGenders.map((g: string) => ({ type: g })) } });
+      if (validParental.length) dimensions.push({ parentalStatus: { parentalStatuses: validParental.map((p: string) => ({ type: p })) } });
+      if (validIncomes.length) dimensions.push({ householdIncome: { incomeRanges: validIncomes.map((i: string) => ({ type: i })) } });
+
+      if (dimensions.length > 0) {
+        const audTempId = tempId--;
+        const audResource = `customers/${customerId}/audiences/${audTempId}`;
+        // Audience op FIRST so it appears in the batch before the AssetGroupSignal that references it (clarity)
+        mutateOps.push({
+          audienceOperation: {
+            create: {
+              resourceName: audResource,
+              name: (typeof audName === 'string' && audName.trim()) ? audName.trim().slice(0, 50) : `Audiencia PMAX ${Date.now()}`,
+              description: (typeof audDescription === 'string' && audDescription.trim()) ? audDescription.trim().slice(0, 250) : 'Audiencia generada para PMAX',
+              dimensions,
+            },
+          },
+        });
+        // AssetGroupSignal.audience is AudienceInfo { audience: resource_name } (wrapped), not a bare string
+        mutateOps.push({
+          assetGroupSignalOperation: {
+            create: {
+              assetGroup: `customers/${customerId}/assetGroups/-3`,
+              audience: { audience: audResource },
+            },
+          },
+        });
+        console.log(`[manage-google-campaign] pmax audience signal queued: name="${audName || 'auto'}" ages=${validAges.length} genders=${validGenders.length} parental=${validParental.length} income=${validIncomes.length}`);
+      } else {
+        console.warn('[manage-google-campaign] audience_signal provided but no valid dimensions after enum whitelist — skipping audience creation');
       }
     }
   }
@@ -1750,6 +1822,32 @@ Responde SOLO en JSON válido:
   "locations": [{ "id": "2152", "name": "Chile" }],
   "languages": [{ "id": "1003", "name": "Español" }],
   "reasoning": "..."
+}`;
+  } else if (recommendation_type === 'audience_signals') {
+    const hasBrief = briefContext.trim().length > 0;
+    prompt = `Eres Steve, experto en Google Ads Performance Max.
+${hasBrief ? `\n## BRIEF DEL CLIENTE\n${briefContext.slice(0, 2500)}` : ''}
+${extraContext ? `\nContexto adicional: ${extraContext}` : ''}
+
+Genera un "audience signal" para una campaña PMAX (señales demográficas para guiar al algoritmo — NO restricciones).
+
+Devuelve SOLO enums válidos de Google Ads API v23:
+- age_ranges: subset de [AGE_RANGE_18_24, AGE_RANGE_25_34, AGE_RANGE_35_44, AGE_RANGE_45_54, AGE_RANGE_55_64, AGE_RANGE_65_UP]
+- genders: subset de [MALE, FEMALE, UNDETERMINED]
+- parental_statuses: subset de [PARENT, NOT_A_PARENT, UNDETERMINED]
+- income_ranges: subset de [INCOME_RANGE_0_50, INCOME_RANGE_50_60, INCOME_RANGE_60_70, INCOME_RANGE_70_80, INCOME_RANGE_80_90, INCOME_RANGE_90_UP, INCOME_RANGE_UNDETERMINED]
+
+Incluye SOLO los segmentos realmente relevantes al buyer persona del brief (no incluyas todos para "jugar seguro"). Incluir todo dilige la senal. Si no estas seguro de income o parental, omite ese campo (devuelve [] o no lo incluyas).
+
+Responde SOLO en JSON válido:
+{
+  "name": "nombre corto (max 50 chars) de la audiencia",
+  "description": "por qué este perfil es el ideal (max 250 chars, español)",
+  "age_ranges": ["AGE_RANGE_25_34", "AGE_RANGE_35_44"],
+  "genders": ["FEMALE"],
+  "parental_statuses": ["PARENT"],
+  "income_ranges": ["INCOME_RANGE_50_60", "INCOME_RANGE_60_70"],
+  "reasoning": "breve"
 }`;
   } else if (recommendation_type === 'search_themes') {
     const hasBrief = briefContext.trim().length > 0;

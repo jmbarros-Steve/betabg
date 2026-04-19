@@ -548,6 +548,18 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     url_expansion_opt_out: false,
     // Shopping / Merchant Center
     merchant_center_id: '',
+    // Acquisition mode: '' (default) | 'BID_HIGHER' (prioriza nuevos) | 'TARGET_ALL_EQUALLY' | 'BID_ONLY'
+    acquisition_mode: '' as string,
+    // Audience signal generado con AI (demografia)
+    audience_signal: null as null | {
+      name?: string;
+      description?: string;
+      age_ranges?: string[];
+      genders?: string[];
+      parental_statuses?: string[];
+      income_ranges?: string[];
+      reasoning?: string;
+    },
   });
   const [budgetOptions, setBudgetOptions] = useState<any>(null);
   const [budgetLoading, setBudgetLoading] = useState(false);
@@ -559,6 +571,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   const [aiImagePreviews, setAiImagePreviews] = useState<Record<string, string>>({});
   const [searchThemesAiLoading, setSearchThemesAiLoading] = useState(false);
   const [prevAdImageUrls, setPrevAdImageUrls] = useState<string[]>([]);
+  const [audienceAiLoading, setAudienceAiLoading] = useState(false);
 
   // ─── Fetch campaigns ──────────────────────────────────────────────
 
@@ -920,6 +933,16 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
         payload.search_themes = wizardData.search_themes.split(',').map(t => t.trim()).filter(Boolean);
       }
 
+      // Acquisition mode (Capa 1: clientes nuevos vs todos)
+      if (wizardData.acquisition_mode) {
+        payload.acquisition_mode = wizardData.acquisition_mode;
+      }
+
+      // Audience signal generado por AI (Capa 2: demografia)
+      if (wizardData.audience_signal) {
+        payload.audience_signal = wizardData.audience_signal;
+      }
+
       // Convert images to base64 for single-batch creation (Google requires all assets together)
       setWizardProgress('Procesando imagenes...');
       const imageAssets: Array<{ data: string; field_type: string; name: string }> = [];
@@ -981,6 +1004,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       sitelinks: [], locations: [], languages: [],
       search_themes: '', url_expansion_opt_out: false,
       merchant_center_id: '',
+      acquisition_mode: '', audience_signal: null,
     });
     setBudgetOptions(null);
     fetchCampaigns();
@@ -1155,6 +1179,50 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       { format: 'portrait', key: 'ai_portrait', field: 'images_portrait' as const },
     ];
     await Promise.all(formats.map(f => generateAiImage(f.format, f.key)));
+  };
+
+  const generateAiAudienceSignal = async () => {
+    setAudienceAiLoading(true);
+    try {
+      const { data, error } = await callApi('manage-google-campaign', {
+        body: {
+          action: 'get_recommendations',
+          connection_id: connectionId,
+          client_id: clientId,
+          data: {
+            recommendation_type: 'audience_signals',
+            channel_type: wizardData.channel_type,
+            context: `Negocio: ${wizardData.business_name || 'Sin nombre'}. URL: ${wizardData.final_urls || 'Sin URL'}`,
+          },
+        },
+      });
+      if (error) {
+        toast.error('Error generando audience signal: ' + error);
+        return;
+      }
+      const rec = data?.recommendation;
+      if (!rec || rec.parse_error) {
+        toast.error('Respuesta AI invalida');
+        return;
+      }
+      setWizardData(prev => ({
+        ...prev,
+        audience_signal: {
+          name: rec.name,
+          description: rec.description,
+          age_ranges: Array.isArray(rec.age_ranges) ? rec.age_ranges : [],
+          genders: Array.isArray(rec.genders) ? rec.genders : [],
+          parental_statuses: Array.isArray(rec.parental_statuses) ? rec.parental_statuses : [],
+          income_ranges: Array.isArray(rec.income_ranges) ? rec.income_ranges : [],
+          reasoning: rec.reasoning,
+        },
+      }));
+      toast.success('Audience signal generado');
+    } catch (err: any) {
+      toast.error('Error: ' + err.message);
+    } finally {
+      setAudienceAiLoading(false);
+    }
   };
 
   const generateAiSearchThemes = async () => {
@@ -2043,6 +2111,72 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                     checked={!wizardData.url_expansion_opt_out}
                     onCheckedChange={val => setWizardData(prev => ({ ...prev, url_expansion_opt_out: !val }))}
                   />
+                </div>
+              )}
+
+              {/* Capa 1: Acquisition mode — Clientes nuevos vs todos (PMAX) */}
+              {isPmax && (
+                <div className="space-y-2">
+                  <Label>Adquisicion de clientes</Label>
+                  <Select
+                    value={wizardData.acquisition_mode || 'BID_ONLY'}
+                    onValueChange={v => setWizardData(prev => ({ ...prev, acquisition_mode: v }))}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="BID_ONLY">Sin prioridad (todos por igual)</SelectItem>
+                      <SelectItem value="BID_HIGHER">Priorizar clientes nuevos (pujar mas alto)</SelectItem>
+                      <SelectItem value="TARGET_ALL_EQUALLY">Clientes nuevos y antiguos por igual (explicito)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Google deduce quien es "nuevo" via Customer Match lists o conversion actions marcadas como first-time.
+                  </p>
+                </div>
+              )}
+
+              {/* Capa 2: Audience Signal generado con AI (PMAX) */}
+              {isPmax && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Audience Signal <span className="text-muted-foreground font-normal">(demografia, opcional)</span></Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs gap-1.5 h-7"
+                      onClick={generateAiAudienceSignal}
+                      disabled={audienceAiLoading}
+                    >
+                      {audienceAiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                      Generar con AI
+                    </Button>
+                  </div>
+                  {wizardData.audience_signal ? (
+                    <div className="rounded-md border border-border bg-muted/30 p-3 text-xs space-y-1">
+                      {wizardData.audience_signal.name && (
+                        <div><span className="font-medium">Nombre:</span> {wizardData.audience_signal.name}</div>
+                      )}
+                      {wizardData.audience_signal.description && (
+                        <div className="text-muted-foreground">{wizardData.audience_signal.description}</div>
+                      )}
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {(wizardData.audience_signal.age_ranges || []).map(a => <Badge key={a} variant="secondary">{a.replace('AGE_RANGE_', '').replace('_', '-')}</Badge>)}
+                        {(wizardData.audience_signal.genders || []).map(g => <Badge key={g} variant="secondary">{g}</Badge>)}
+                        {(wizardData.audience_signal.parental_statuses || []).map(p => <Badge key={p} variant="secondary">{p.replace('_', ' ')}</Badge>)}
+                        {(wizardData.audience_signal.income_ranges || []).map(i => <Badge key={i} variant="secondary">{i.replace('INCOME_RANGE_', 'Ingreso ').replace('_', '-')}</Badge>)}
+                      </div>
+                      <button
+                        type="button"
+                        className="text-xs text-destructive mt-1 underline"
+                        onClick={() => setWizardData(prev => ({ ...prev, audience_signal: null }))}
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Sin audience signal. Google usara solo los search themes como senal.</p>
+                  )}
                 </div>
               )}
             </div>
