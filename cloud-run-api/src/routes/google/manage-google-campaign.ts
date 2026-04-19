@@ -944,18 +944,19 @@ async function handleCreateCampaign(
     mutateOps.push({ assetGroupOperation: { create: assetGroupCreate } });
     mutateOps.push(...linkOps);
 
-    // Search themes as AssetGroupSignal (audience signals)
+    // Search themes as AssetGroupSignal (audience signals).
+    // Google Ads API v23: one AssetGroupSignal per theme, with searchTheme: { text: "..." }.
     if (search_themes?.length) {
-      const validThemes = search_themes
-        .filter((t: string) => t?.trim())
-        .slice(0, 25)
-        .map((t: string) => ({ text: t.trim() }));
-      if (validThemes.length > 0) {
+      const validThemes: string[] = search_themes
+        .map((t: string) => (typeof t === 'string' ? t.trim() : ''))
+        .filter((t: string) => t.length > 0)
+        .slice(0, 25);
+      for (const themeText of validThemes) {
         mutateOps.push({
           assetGroupSignalOperation: {
             create: {
               assetGroup: `customers/${customerId}/assetGroups/-3`,
-              searchTheme: { searchThemeTargets: validThemes },
+              searchTheme: { text: themeText },
             },
           },
         });
