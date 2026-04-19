@@ -1081,11 +1081,146 @@ async function handleGetBudgetRecommendation(
   loginCustomerId: string,
   data: Record<string, any>
 ): Promise<{ body: any; status: number }> {
-  const { channel_type, search_themes: themes } = data;
+  const { channel_type, search_themes: themes, client_id } = data;
   console.log(`[manage-google-campaign] Getting budget recommendation for ${customerId}`);
 
-  // Try SmartCampaignSuggestService for PMAX budget suggestions
-  try {
+  // Primary path: Unit-economics-based recommendation using brief + financial config
+  if (client_id) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    if (supabaseUrl && supabaseKey && anthropicKey) {
+      try {
+        const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
+
+        const [finRes, bpRes, shopRes] = await Promise.all([
+          fetch(`${supabaseUrl}/rest/v1/client_financial_config?client_id=eq.${client_id}&select=*&limit=1`, { headers, signal: AbortSignal.timeout(5_000) }),
+          fetch(`${supabaseUrl}/rest/v1/buyer_personas?client_id=eq.${client_id}&select=persona_data&limit=1`, { headers, signal: AbortSignal.timeout(5_000) }),
+          fetch(`${supabaseUrl}/rest/v1/shopify_products?client_id=eq.${client_id}&select=price&not.price=is.null&limit=100`, { headers, signal: AbortSignal.timeout(5_000) }),
+        ]);
+
+        const fin = finRes.ok ? ((await finRes.json() as any[])?.[0] || null) : null;
+        const bp = bpRes.ok ? ((await bpRes.json() as any[])?.[0]?.persona_data || null) : null;
+        const prices = shopRes.ok ? ((await shopRes.json() as any[]) || []).map((p: any) => Number(p.price)).filter((n: number) => n > 0) : [];
+        const aovShopify = prices.length > 0 ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length : null;
+
+        const marginPct = Number(fin?.default_margin_percentage || 0);
+        const hasValidAov = !!(aovShopify && aovShopify > 0);
+        const hasValidMargin = marginPct > 0;
+        const hasValidUnitEconomics = hasValidAov && hasValidMargin;
+
+        if (hasValidUnitEconomics) {
+          // Fetch account metrics for context
+          const metricsQuery = `SELECT metrics.cost_micros, metrics.conversions FROM campaign WHERE segments.date DURING LAST_30_DAYS AND campaign.status = 'ENABLED'`;
+          const metricsResult = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, metricsQuery);
+          let acctSpend = 0, acctConv = 0;
+          if (metricsResult.ok && metricsResult.data) {
+            for (const row of metricsResult.data) {
+              acctSpend += Number(row.metrics?.costMicros || 0);
+              acctConv += Number(row.metrics?.conversions || 0);
+            }
+          }
+          acctSpend = acctSpend / 1_000_000;
+
+          const briefResponses = Array.isArray(bp?.raw_responses) ? bp.raw_responses.filter((r: any) => typeof r === 'string' && r.trim()).join('\n').slice(0, 2000) : '';
+
+          const prompt = `Eres Steve, experto en presupuestos de Google Ads basado en UNIT ECONOMICS del cliente.
+
+## UNIT ECONOMICS
+- Margen bruto por default: ${fin?.default_margin_percentage ?? 'no definido'}%
+- Costo envío por orden: $${fin?.shipping_cost_per_order ?? 0}
+- Comisión Shopify: ${fin?.shopify_commission_percentage ?? 0}%
+- Comisión pasarela de pago: ${fin?.payment_gateway_commission ?? 0}%
+- Costos fijos mensuales (Shopify + Klaviyo + otros): $${(fin?.shopify_plan_cost ?? 0) + (fin?.klaviyo_plan_cost ?? 0) + (fin?.other_fixed_costs ?? 0)}
+- AOV promedio (calculado de Shopify products): ${aovShopify ? `$${aovShopify.toFixed(0)}` : 'no disponible — infiérelo del brief'}
+- Fase del negocio: ${bp?.fase_negocio || 'no definida'}
+- Presupuesto ads declarado en brief: ${bp?.presupuesto_ads || 'no declarado'}
+
+## BRIEF DEL CLIENTE (17 respuestas Q0-Q16)
+${briefResponses || 'sin brief disponible'}
+
+## CUENTA ACTUAL
+- Gasto Google Ads 30d: $${acctSpend.toFixed(0)}
+- Conversiones 30d: ${acctConv}
+- Canal nueva campaña: ${channel_type || 'PERFORMANCE_MAX'}
+${themes?.length ? `- Temas: ${themes.join(', ')}` : ''}
+
+## LÓGICA DE CÁLCULO (aplica esta regla de oro)
+1. CAC_max = AOV × margen_bruto (punto de equilibrio — gastar más no es rentable)
+2. CAC_target = CAC_max × 0.4 a 0.5 (para mantener rentabilidad razonable)
+3. Conversiones_diarias_objetivo = (Presupuesto_mensual_brief / 30) / CAC_target
+4. Budget_diario_recomendado = Conversiones_diarias_objetivo × CAC_target
+5. Si no hay presupuesto declarado, usar la fase del negocio:
+   - Inicial: $10k-30k CLP/día
+   - Crecimiento: $50k-150k CLP/día
+   - Escalamiento: $200k+ CLP/día
+6. Low = 50% del recomendado. High = 200% del recomendado.
+
+IMPORTANTE: si los unit economics son débiles (margen <10%, sin AOV), sé CONSERVADOR y recomienda menos presupuesto. Explícalo en el reasoning.
+
+Responde SOLO en JSON válido, sin markdown:
+{
+  "low": {"daily_budget": N, "reasoning": "..."},
+  "recommended": {"daily_budget": N, "reasoning": "..."},
+  "high": {"daily_budget": N, "reasoning": "..."},
+  "unit_economics_used": {
+    "aov": N,
+    "margin_pct": N,
+    "cac_max": N,
+    "cac_target": N,
+    "daily_conversions_target": N
+  }
+}`;
+
+          const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1024, messages: [{ role: 'user', content: prompt }] }),
+            signal: AbortSignal.timeout(20_000),
+          });
+
+          if (aiRes.ok) {
+            const aiJson = await aiRes.json() as any;
+            let text = aiJson?.content?.[0]?.text || '{}';
+            text = text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+            try {
+              const rec = JSON.parse(text);
+              const recBudget = Number(rec.recommended?.daily_budget || 0);
+              // Sanity check: budget must be positive and under a safety cap (100M CLP)
+              if (recBudget > 0 && recBudget < 100_000_000) {
+                return {
+                  body: {
+                    success: true,
+                    source: 'unit_economics',
+                    options: {
+                      low: { daily_budget: Number(rec.low?.daily_budget || 0), reasoning: rec.low?.reasoning },
+                      recommended: { daily_budget: recBudget, reasoning: rec.recommended?.reasoning },
+                      high: { daily_budget: Number(rec.high?.daily_budget || 0), reasoning: rec.high?.reasoning },
+                    },
+                    unit_economics_used: rec.unit_economics_used || null,
+                    account_context: { total_spend_30d: acctSpend, total_conversions_30d: acctConv },
+                  },
+                  status: 200,
+                };
+              }
+              console.warn(`[manage-google-campaign] Unit-economics budget: invalid daily_budget=${recBudget}, falling back`);
+            } catch {
+              console.warn('[manage-google-campaign] Unit-economics budget: JSON parse failed, falling back');
+            }
+          } else {
+            console.warn('[manage-google-campaign] Unit-economics budget AI call failed:', aiRes.status);
+          }
+        } else {
+          console.log(`[manage-google-campaign] Insufficient unit economics for client ${client_id} (margin=${marginPct}, aov=${aovShopify}), falling back`);
+        }
+      } catch (err: any) {
+        console.warn('[manage-google-campaign] Unit economics fetch failed, falling back:', err.message);
+      }
+    }
+  }
+
+  // Fallback: SmartCampaignSuggestService — only for SMART campaigns, not PMAX/Search/Shopping
+  if (channel_type === 'SMART') try {
     const suggestUrl = `https://googleads.googleapis.com/v18/customers/${customerId}:suggestSmartCampaignBudgetOptions`;
     const suggestBody: Record<string, any> = {};
 
@@ -1232,6 +1367,147 @@ Responde SOLO JSON: {"low":{"daily_budget":N,"reasoning":"..."},"recommended":{"
   }
 }
 
+// --- Helper: SSRF-safe host validator ---
+// Blocks private IPs, loopback, link-local (metadata service), and internal TLDs.
+function isPublicHost(urlStr: string): boolean {
+  try {
+    const u = new URL(urlStr);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+    const host = u.hostname.toLowerCase();
+    if (!host) return false;
+    // Reject IPv6 entirely (ambiguous, hard to validate cheaply)
+    if (host.includes(':')) return false;
+    const isIpv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(host);
+    if (isIpv4) {
+      const p = host.split('.').map(Number);
+      if (p.some(n => n < 0 || n > 255)) return false;
+      if (p[0] === 10) return false;                                    // 10.0.0.0/8 (RFC1918)
+      if (p[0] === 127) return false;                                   // loopback
+      if (p[0] === 0) return false;                                     // reserved
+      if (p[0] === 169 && p[1] === 254) return false;                   // link-local (GCP/AWS metadata!)
+      if (p[0] === 172 && p[1] >= 16 && p[1] <= 31) return false;       // RFC1918
+      if (p[0] === 192 && p[1] === 168) return false;                   // RFC1918
+      if (p[0] === 100 && p[1] >= 64 && p[1] <= 127) return false;      // CGNAT
+      if (p[0] >= 224) return false;                                    // multicast + reserved
+      return true;
+    }
+    if (host === 'localhost') return false;
+    if (host.endsWith('.internal') || host.endsWith('.local') || host.endsWith('.localhost')) return false;
+    if (host.endsWith('.metadata.google.internal')) return false;
+    if (!host.includes('.')) return false; // must be a proper hostname
+    return true;
+  } catch { return false; }
+}
+
+// --- Helper: Fetch real URLs from the client's website ---
+// Used to ground sitelink suggestions in REAL site paths (no mulas/invented URLs)
+async function fetchRealSiteUrls(baseUrl: string | null | undefined, maxUrls = 40): Promise<string[]> {
+  if (!baseUrl || typeof baseUrl !== 'string') return [];
+  let origin: string;
+  try {
+    const cleaned = baseUrl.trim();
+    const parsed = new URL(/^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`);
+    if (!isPublicHost(parsed.href)) {
+      console.warn(`[fetchRealSiteUrls] Blocked non-public host: ${parsed.hostname}`);
+      return [];
+    }
+    origin = parsed.origin;
+  } catch {
+    return [];
+  }
+
+  const SUFFICIENT = 20; // Early exit once we have enough ground-truth URLs
+  const FETCH_HEADERS = { 'User-Agent': 'Steve-Ads/1.0 (+https://steve.cl)' };
+  const found = new Set<string>();
+  const isJunkExt = (u: string) => /\.(xml|jpg|jpeg|png|gif|svg|webp|ico|css|js|pdf|mp4|webm)(\?|$)/i.test(u);
+
+  const safeFetch = async (url: string, timeoutMs: number): Promise<Response | null> => {
+    if (!isPublicHost(url)) return null;
+    try {
+      const resp = await fetch(url, {
+        signal: AbortSignal.timeout(timeoutMs),
+        redirect: 'follow',
+        headers: FETCH_HEADERS,
+      });
+      // Post-redirect host re-check (attacker could redirect to private IP)
+      if (resp.url && !isPublicHost(resp.url)) {
+        console.warn(`[fetchRealSiteUrls] Redirect to non-public host blocked: ${resp.url}`);
+        return null;
+      }
+      return resp;
+    } catch { return null; }
+  };
+
+  // Strategy 1: sitemap variants (Shopify, generic, WordPress)
+  const sitemapCandidates = [
+    `${origin}/sitemap.xml`,
+    `${origin}/sitemap_index.xml`,
+    `${origin}/sitemap_products_1.xml`,
+    `${origin}/sitemap_pages_1.xml`,
+    `${origin}/sitemap_collections_1.xml`,
+  ];
+  for (const sm of sitemapCandidates) {
+    if (found.size >= SUFFICIENT) break;
+    const resp = await safeFetch(sm, 8_000);
+    if (!resp?.ok) continue;
+    const text = await resp.text();
+    const locMatches = text.matchAll(/<loc[^>]*>([^<]+)<\/loc>/gi);
+    for (const m of locMatches) {
+      const u = m[1].trim();
+      if (!u.startsWith(origin)) continue;
+      if (isJunkExt(u)) continue;
+      found.add(u);
+      if (found.size >= maxUrls) break;
+    }
+  }
+
+  // Strategy 2: robots.txt → look for Sitemap: directives (only if still short)
+  if (found.size < 5) {
+    const resp = await safeFetch(`${origin}/robots.txt`, 5_000);
+    if (resp?.ok) {
+      const text = await resp.text();
+      const sitemapLines = Array.from(text.matchAll(/^\s*sitemap\s*:\s*(\S+)/gim)).slice(0, 3);
+      for (const m of sitemapLines) {
+        if (found.size >= SUFFICIENT) break;
+        const smResp = await safeFetch(m[1].trim(), 8_000);
+        if (!smResp?.ok) continue;
+        const smText = await smResp.text();
+        const locs = smText.matchAll(/<loc[^>]*>([^<]+)<\/loc>/gi);
+        for (const l of locs) {
+          const u = l[1].trim();
+          if (u.startsWith(origin) && !isJunkExt(u)) {
+            found.add(u);
+            if (found.size >= maxUrls) break;
+          }
+        }
+      }
+    }
+  }
+
+  // Strategy 3: scrape homepage for anchor hrefs
+  if (found.size < 5) {
+    const resp = await safeFetch(origin, 10_000);
+    if (resp?.ok) {
+      const html = await resp.text();
+      const hrefMatches = html.matchAll(/href\s*=\s*["']([^"']+)["']/gi);
+      for (const m of hrefMatches) {
+        if (found.size >= maxUrls) break;
+        let u = m[1].trim();
+        if (u.startsWith('#') || u.startsWith('mailto:') || u.startsWith('tel:') || u.startsWith('javascript:')) continue;
+        if (u.startsWith('//')) continue;
+        if (u.startsWith('/')) u = origin + u;
+        if (!u.startsWith(origin)) continue;
+        if (isJunkExt(u)) continue;
+        u = u.split('#')[0];
+        if (u.length > 0 && u !== origin + '/') found.add(u);
+      }
+    }
+  }
+
+  if (found.size > 0) found.add(origin);
+  return Array.from(found).slice(0, maxUrls);
+}
+
 // --- Fase 5: AI Recommendations ---
 
 async function handleGetRecommendations(
@@ -1363,6 +1639,38 @@ async function handleGetRecommendations(
     return { body: { error: 'ANTHROPIC_API_KEY not configured' }, status: 500 };
   }
 
+  // For cta_sitelinks: fetch REAL site URLs so sitelinks are grounded (no mulas/invented)
+  let realSiteUrls: string[] = [];
+  if (recommendation_type === 'cta_sitelinks') {
+    let websiteUrl: string | null = null;
+    if (client_id) {
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (supabaseUrl && supabaseKey) {
+        try {
+          const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
+          const res = await fetch(
+            `${supabaseUrl}/rest/v1/clients?id=eq.${client_id}&select=website_url&limit=1`,
+            { headers, signal: AbortSignal.timeout(5_000) }
+          );
+          if (res.ok) {
+            const rows = await res.json() as any[];
+            websiteUrl = rows?.[0]?.website_url || null;
+          }
+        } catch (err: any) {
+          console.warn('[manage-google-campaign] website_url fetch failed:', err.message);
+        }
+      }
+    }
+    // Fallback: parse URL from extraContext ("URL: https://...")
+    if (!websiteUrl && typeof extraContext === 'string') {
+      const m = extraContext.match(/https?:\/\/[^\s,]+/i);
+      if (m) websiteUrl = m[0];
+    }
+    realSiteUrls = await fetchRealSiteUrls(websiteUrl, 40);
+    console.log(`[manage-google-campaign] Fetched ${realSiteUrls.length} real URLs from ${websiteUrl || 'n/a'}`);
+  }
+
   let prompt = '';
 
   if (recommendation_type === 'campaign_setup') {
@@ -1442,27 +1750,52 @@ Responde SOLO en JSON válido:
   "languages": [{ "id": "1003", "name": "Español" }],
   "reasoning": "..."
 }`;
+  } else if (recommendation_type === 'search_themes') {
+    const hasBrief = briefContext.trim().length > 0;
+    prompt = `Eres Steve, un experto en Google Ads Performance Max.
+${hasBrief ? `\n## BRIEF DEL CLIENTE\n${briefContext.slice(0, 2500)}` : ''}
+${extraContext ? `\nContexto adicional: ${extraContext}` : ''}
+
+Genera 15-20 "search themes" (audience signals) para una campaña PMAX. Son temas/términos que describen lo que el público ideal busca en Google. Deben ser:
+- Específicos y orientados a intención de compra (NO genéricos como "comprar cosas")
+- Mezcla de: categoría de producto, problema que resuelve, ocasión de uso, marca/competidores, keywords transaccionales
+- 2 a 5 palabras cada uno
+- En español (idioma del brief)
+- Sin duplicar ideas
+
+Responde SOLO en JSON válido:
+{
+  "search_themes": ["tema 1", "tema 2", ...],
+  "reasoning": "breve explicación en español"
+}`;
   } else if (recommendation_type === 'cta_sitelinks') {
     const hasBrief = briefContext.trim().length > 0;
+    const hasRealUrls = realSiteUrls.length > 0;
+    const urlsBlock = hasRealUrls
+      ? `\n## URLs REALES DEL SITIO DEL CLIENTE (${realSiteUrls.length} encontradas)\nDEBES elegir sitelinks SOLO de esta lista. PROHIBIDO inventar o modificar URLs:\n${realSiteUrls.map(u => `- ${u}`).join('\n')}\n`
+      : '\n## SIN URLs VERIFICADAS\nNo se pudieron obtener URLs reales del sitio. Genera SOLO el call_to_action. Devuelve "sitelinks": [] (array vacío).\n';
+
     prompt = `Eres Steve, un experto en Google Ads Performance Max.
 ${hasBrief ? `\n## BRIEF DEL CLIENTE\n${briefContext.slice(0, 2000)}` : ''}
 ${extraContext ? `\nContexto adicional: ${extraContext}` : ''}
-
+${urlsBlock}
 Genera recomendaciones de Call to Action y Sitelinks para una campaña PMAX.
 
 CTAs válidos: LEARN_MORE, SHOP_NOW, SIGN_UP, SUBSCRIBE, GET_QUOTE, CONTACT_US, BOOK_NOW, APPLY_NOW
 
-Para sitelinks genera 4 links relevantes. Cada sitelink tiene:
-- text: máximo 25 caracteres
-- url: una URL relativa basada en el sitio del cliente (ej: /productos, /contacto)
+${hasRealUrls ? `Para sitelinks genera hasta 4 links relevantes eligiendo URLs de la lista de arriba. Cada sitelink tiene:
+- text: máximo 25 caracteres, descriptivo de la página
+- url: EXACTAMENTE una URL de la lista — copiar sin modificar
 - description1: máximo 35 caracteres
 - description2: máximo 35 caracteres
+
+REGLA ABSOLUTA: cada "url" debe aparecer textualmente en la lista de URLs reales. Si inventas una URL o la modificas, el sistema la descartará.` : 'Devuelve "sitelinks": [] (no hay URLs verificadas).'}
 
 Responde SOLO en JSON válido:
 {
   "call_to_action": "SHOP_NOW",
   "sitelinks": [
-    { "text": "Ver Productos", "url": "/productos", "description1": "Explora nuestro catálogo", "description2": "Envío gratis sobre $30.000" }
+    ${hasRealUrls ? `{ "text": "Ver Productos", "url": "${realSiteUrls[0] || 'https://ejemplo.com/productos'}", "description1": "Explora nuestro catálogo", "description2": "Envío gratis sobre $30.000" }` : ''}
   ],
   "reasoning": "..."
 }`;
@@ -1499,6 +1832,23 @@ Responde SOLO en JSON válido:
       recommendation = { raw: text, parse_error: true };
     }
 
+    // Post-validation for cta_sitelinks: drop any sitelink whose url is not in the real list
+    if (recommendation_type === 'cta_sitelinks' && !recommendation.parse_error) {
+      const realSet = new Set(realSiteUrls);
+      const original = Array.isArray(recommendation.sitelinks) ? recommendation.sitelinks : [];
+      const validated = original.filter((sl: any) => {
+        if (!sl || typeof sl.url !== 'string') return false;
+        return realSet.has(sl.url.trim());
+      });
+      const droppedCount = original.length - validated.length;
+      if (droppedCount > 0) {
+        console.warn(`[manage-google-campaign] cta_sitelinks: dropped ${droppedCount} sitelink(s) with invented/invalid URLs`);
+      }
+      recommendation.sitelinks = validated;
+      recommendation.real_urls_available = realSiteUrls.length;
+      recommendation.sitelinks_dropped = droppedCount;
+    }
+
     return {
       body: {
         success: true,
@@ -1514,6 +1864,39 @@ Responde SOLO en JSON válido:
   }
 }
 
+// --- List existing Google Ads IMAGE assets (for brand-consistent image generation) ---
+async function handleListImageAssets(
+  customerId: string,
+  accessToken: string,
+  developerToken: string,
+  loginCustomerId: string,
+  limit: number = 10
+): Promise<{ body: any; status: number }> {
+  const query = `
+    SELECT asset.resource_name, asset.id, asset.name, asset.image_asset.full_size.url,
+           asset.image_asset.full_size.width_pixels, asset.image_asset.full_size.height_pixels,
+           asset.image_asset.file_size
+    FROM asset
+    WHERE asset.type = 'IMAGE'
+    LIMIT ${Math.min(Math.max(limit, 1), 50)}
+  `;
+  const result = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, query);
+  if (!result.ok) {
+    return { body: { error: 'Failed to list image assets', details: result.error }, status: 502 };
+  }
+  const rows = Array.isArray(result.data) ? result.data : [];
+  const assets = rows
+    .map((r: any) => ({
+      id: r.asset?.id || null,
+      name: r.asset?.name || null,
+      url: r.asset?.imageAsset?.fullSize?.url || null,
+      width: r.asset?.imageAsset?.fullSize?.widthPixels || null,
+      height: r.asset?.imageAsset?.fullSize?.heightPixels || null,
+    }))
+    .filter((a: any) => !!a.url);
+  return { body: { success: true, assets, count: assets.length }, status: 200 };
+}
+
 // --- Main handler ---
 
 type AllActions = Action
@@ -1523,7 +1906,8 @@ type AllActions = Action
   | 'create_campaign'
   | 'get_recommendations'
   | 'list_merchant_centers'
-  | 'get_budget_recommendation';
+  | 'get_budget_recommendation'
+  | 'list_image_assets';
 
 export async function manageGoogleCampaign(c: Context) {
   try {
@@ -1549,6 +1933,7 @@ export async function manageGoogleCampaign(c: Context) {
       'get_recommendations',
       'list_merchant_centers',
       'get_budget_recommendation',
+      'list_image_assets',
     ];
 
     if (!validActions.includes(action)) {
@@ -1630,13 +2015,16 @@ export async function manageGoogleCampaign(c: Context) {
         result = await handleCreateCampaign(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, data || {});
         break;
       case 'get_recommendations':
-        result = await handleGetRecommendations(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, data || {});
+        result = await handleGetRecommendations(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, { ...(data || {}), client_id: ctx.clientId });
         break;
       case 'list_merchant_centers':
         result = await handleListMerchantCenters(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId);
         break;
       case 'get_budget_recommendation':
-        result = await handleGetBudgetRecommendation(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, data || {});
+        result = await handleGetBudgetRecommendation(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, { ...(data || {}), client_id: ctx.clientId });
+        break;
+      case 'list_image_assets':
+        result = await handleListImageAssets(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, (data as any)?.limit || 10);
         break;
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };

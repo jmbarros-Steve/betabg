@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { callApi } from '@/lib/api';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -556,6 +557,8 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   // AI image generation
   const [aiImageLoading, setAiImageLoading] = useState<Record<string, boolean>>({});
   const [aiImagePreviews, setAiImagePreviews] = useState<Record<string, string>>({});
+  const [searchThemesAiLoading, setSearchThemesAiLoading] = useState(false);
+  const [prevAdImageUrls, setPrevAdImageUrls] = useState<string[]>([]);
 
   // ─── Fetch campaigns ──────────────────────────────────────────────
 
@@ -584,6 +587,68 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       setHasWriteAccess(data?.has_write_access ?? true);
     });
   }, [fetchCampaigns, connectionId]);
+
+  // Pre-fetch ads Google anteriores del cliente (image assets) al abrir el wizard PMAX
+  // Se usan como referencia visual para que las imagenes AI sean coherentes con la marca
+  useEffect(() => {
+    if (!wizardOpen || wizardData.channel_type !== 'PERFORMANCE_MAX') return;
+    if (prevAdImageUrls.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await callApi('manage-google-campaign', {
+          body: { action: 'list_image_assets', connection_id: connectionId, data: { limit: 10 } },
+        });
+        if (cancelled) return;
+        if (error) {
+          console.warn('[GoogleCampaignManager] list_image_assets error:', error);
+          toast.info('No se pudieron cargar anuncios anteriores de Google (permiso limitado). Las imágenes AI usarán solo logo y producto como referencia.');
+          return;
+        }
+        const assets: Array<{ url?: string }> = data?.assets || [];
+        const urls = assets.map(a => a.url).filter((u): u is string => typeof u === 'string' && u.length > 0);
+        if (urls.length > 0) setPrevAdImageUrls(urls.slice(0, 5));
+      } catch (err) {
+        console.warn('[GoogleCampaignManager] Failed to prefetch prev ad images:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [wizardOpen, wizardData.channel_type, connectionId, prevAdImageUrls.length]);
+
+  // Auto-cargar logo del brief en Step 4 (PMAX) si el slot está vacío
+  useEffect(() => {
+    if (!wizardOpen || wizardStep !== 4) return;
+    if (wizardData.channel_type !== 'PERFORMANCE_MAX') return;
+    if (wizardData.images_logo.length > 0) return;
+    if (!clientId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: assetRow } = await supabase
+          .from('client_assets')
+          .select('url, nombre')
+          .eq('client_id', clientId)
+          .eq('tipo', 'logo')
+          .eq('active', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (cancelled || !assetRow?.url) return;
+        const resp = await fetch(assetRow.url, { signal: AbortSignal.timeout(15_000) });
+        if (!resp.ok) return;
+        const blob = await resp.blob();
+        const filename = assetRow.nombre || 'logo-brief.png';
+        const file = new File([blob], filename, { type: blob.type || 'image/png' });
+        if (cancelled) return;
+        setWizardData(prev => prev.images_logo.length > 0 ? prev : { ...prev, images_logo: [file] });
+        toast.success('Logo del brief cargado automáticamente');
+      } catch (err) {
+        console.warn('[GoogleCampaignManager] Auto-load logo failed:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [wizardOpen, wizardStep, wizardData.channel_type, wizardData.images_logo.length, clientId]);
 
   // ─── Handlers ──────────────────────────────────────────────────────
 
@@ -931,7 +996,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       body: {
         action: 'get_budget_recommendation',
         connection_id: connectionId,
-        data: { channel_type: wizardData.channel_type, search_themes: themes },
+        data: { channel_type: wizardData.channel_type, search_themes: themes, client_id: clientId },
       },
     });
     setBudgetLoading(false);
@@ -1047,6 +1112,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           promptGeneracion: formatPrompts[format] || formatPrompts.landscape,
           formato: format,
           engine: 'imagen',
+          referenceImageUrls: prevAdImageUrls.slice(0, 2),
         },
       });
 
@@ -1089,6 +1155,42 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       { format: 'portrait', key: 'ai_portrait', field: 'images_portrait' as const },
     ];
     await Promise.all(formats.map(f => generateAiImage(f.format, f.key)));
+  };
+
+  const generateAiSearchThemes = async () => {
+    setSearchThemesAiLoading(true);
+    try {
+      const { data, error } = await callApi('manage-google-campaign', {
+        body: {
+          action: 'get_recommendations',
+          connection_id: connectionId,
+          client_id: clientId,
+          data: {
+            recommendation_type: 'search_themes',
+            channel_type: wizardData.channel_type,
+            context: `URL: ${wizardData.final_urls || 'Sin URL'}, Negocio: ${wizardData.business_name || 'Sin nombre'}`,
+          },
+        },
+      });
+
+      if (error) {
+        toast.error('Error generando search themes: ' + error);
+        return;
+      }
+
+      const themes: string[] = data?.recommendation?.search_themes || [];
+      if (!themes.length) {
+        toast.error('No se pudieron generar search themes');
+        return;
+      }
+      const applied = themes.slice(0, 25);
+      setWizardData(prev => ({ ...prev, search_themes: applied.join(', ') }));
+      toast.success(`${applied.length} search themes sugeridos por AI`);
+    } catch (err: any) {
+      toast.error('Error: ' + err.message);
+    } finally {
+      setSearchThemesAiLoading(false);
+    }
   };
 
   // Wizard step helpers
@@ -1902,7 +2004,23 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
               {/* Search Themes (audience signals for PMAX) */}
               {isPmax && (
                 <div className="space-y-2">
-                  <Label>Search Themes <span className="text-muted-foreground font-normal">(senales de audiencia, opcional)</span></Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Search Themes <span className="text-muted-foreground font-normal">(senales de audiencia, opcional)</span></Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs gap-1.5 h-7"
+                      onClick={generateAiSearchThemes}
+                      disabled={searchThemesAiLoading}
+                    >
+                      {searchThemesAiLoading
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <Sparkles className="w-3 h-3" />
+                      }
+                      Sugerir con AI
+                    </Button>
+                  </div>
                   <Input
                     value={wizardData.search_themes}
                     onChange={e => setWizardData(prev => ({ ...prev, search_themes: e.target.value }))}
