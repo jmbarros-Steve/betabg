@@ -576,7 +576,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   const [searchThemesAiLoading, setSearchThemesAiLoading] = useState(false);
   const [prevAdImageUrls, setPrevAdImageUrls] = useState<string[]>([]);
   const [audienceAiLoading, setAudienceAiLoading] = useState(false);
-  const [catalogProducts, setCatalogProducts] = useState<Array<{ id: string; title: string; image_url?: string; price?: number; sku?: string | null }>>([]);
+  const [catalogProducts, setCatalogProducts] = useState<Array<{ id: string; title: string; image_url?: string | null; price?: number | null; sku?: string | null; category?: string | null; product_type?: string | null; availability?: string | null; status?: string | null }>>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [productAiLoading, setProductAiLoading] = useState(false);
 
@@ -1199,12 +1199,21 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     setCatalogLoading(true);
     try {
       const { data, error } = await callApi('manage-google-campaign', {
-        body: { action: 'list_catalog_products', connection_id: connectionId },
+        body: {
+          action: 'list_catalog_products',
+          connection_id: connectionId,
+          data: { merchant_center_id: wizardData.merchant_center_id || undefined },
+        },
       });
       if (error) { toast.error('Error cargando productos: ' + error); return; }
       const products = Array.isArray(data?.products) ? data.products : [];
+      const source = data?.source || 'unknown';
       setCatalogProducts(products);
-      if (products.length === 0) toast.info('No hay productos en el catálogo (conectá Shopify para recomendaciones)');
+      if (products.length === 0) {
+        toast.info('No hay productos en el catálogo (el Merchant Center está vacío o no linkeado)');
+      } else {
+        toast.success(`${products.length} producto(s) cargados desde ${source === 'merchant_center' ? 'Merchant Center' : 'Shopify (fallback)'}`);
+      }
     } catch (err: any) {
       toast.error('Error: ' + err.message);
     } finally {
@@ -1227,7 +1236,14 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           data: {
             recommendation_type: 'product_selection',
             user_intent: wizardData.user_intent,
-            products: catalogProducts.map(p => ({ id: p.id, title: p.title, price: p.price })),
+            products: catalogProducts.map(p => ({
+              id: p.id,
+              title: p.title,
+              price: p.price,
+              category: p.category,
+              product_type: p.product_type,
+              availability: p.availability,
+            })),
           },
         },
       });
@@ -1236,7 +1252,9 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       if (!rec || rec.parse_error) { toast.error('Respuesta AI invalida'); return; }
       const ids: string[] = Array.isArray(rec.selected_product_ids) ? rec.selected_product_ids.map(String) : [];
       setWizardData(prev => ({ ...prev, selected_product_ids: ids }));
-      toast.success(`${ids.length} producto(s) sugerido(s) por AI${rec.ids_dropped ? ` (${rec.ids_dropped} inválidos descartados)` : ''}`);
+      const cats = Array.isArray(rec.selected_categories) ? rec.selected_categories.filter((c: any) => typeof c === 'string') : [];
+      const catsPart = cats.length > 0 ? ` · Categorías: ${cats.slice(0, 4).join(', ')}${cats.length > 4 ? '…' : ''}` : '';
+      toast.success(`${ids.length} producto(s) sugerido(s) por AI${rec.ids_dropped ? ` (${rec.ids_dropped} inválidos descartados)` : ''}${catsPart}`);
     } catch (err: any) {
       toast.error('Error: ' + err.message);
     } finally {
@@ -2049,18 +2067,59 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                         <span className="text-muted-foreground">·</span>
                         <button type="button" className="underline text-primary" onClick={() => setWizardData(prev => ({ ...prev, selected_product_ids: [] }))}>Ninguno</button>
                       </div>
-                      <div className="max-h-60 overflow-y-auto rounded border border-border bg-background p-2 space-y-1">
-                        {catalogProducts.map(p => {
-                          const checked = wizardData.selected_product_ids.includes(p.id);
-                          return (
-                            <label key={p.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/40 rounded p-1">
-                              <input type="checkbox" checked={checked} onChange={() => toggleProduct(p.id)} />
-                              {p.image_url && <img src={p.image_url} alt="" className="w-6 h-6 object-cover rounded" />}
-                              <span className="flex-1 truncate">{p.title}</span>
-                              {p.price && <span className="text-muted-foreground shrink-0">${p.price}</span>}
-                            </label>
-                          );
-                        })}
+                      <div className="max-h-80 overflow-y-auto rounded border border-border bg-background p-2 space-y-2">
+                        {(() => {
+                          // Group by product_type or category
+                          const groups = new Map<string, typeof catalogProducts>();
+                          for (const p of catalogProducts) {
+                            const key = (p.product_type || p.category || 'Sin categoría').trim() || 'Sin categoría';
+                            if (!groups.has(key)) groups.set(key, []);
+                            groups.get(key)!.push(p);
+                          }
+                          return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([categoria, items]) => {
+                            const ids = items.map(p => p.id);
+                            const allSelected = ids.every(id => wizardData.selected_product_ids.includes(id));
+                            const someSelected = ids.some(id => wizardData.selected_product_ids.includes(id));
+                            const toggleCategory = () => {
+                              setWizardData(prev => {
+                                if (allSelected) {
+                                  return { ...prev, selected_product_ids: prev.selected_product_ids.filter(x => !ids.includes(x)) };
+                                } else {
+                                  const merged = Array.from(new Set([...prev.selected_product_ids, ...ids])).slice(0, 500);
+                                  return { ...prev, selected_product_ids: merged };
+                                }
+                              });
+                            };
+                            return (
+                              <details key={categoria} open className="rounded border border-border/50 bg-muted/20">
+                                <summary className="flex items-center gap-2 text-xs font-medium cursor-pointer p-1.5 hover:bg-muted/40 rounded">
+                                  <input
+                                    type="checkbox"
+                                    checked={allSelected}
+                                    ref={el => { if (el) el.indeterminate = !allSelected && someSelected; }}
+                                    onChange={toggleCategory}
+                                    onClick={e => e.stopPropagation()}
+                                  />
+                                  <span className="flex-1 truncate">{categoria}</span>
+                                  <span className="text-muted-foreground font-normal">{items.filter(p => wizardData.selected_product_ids.includes(p.id)).length}/{items.length}</span>
+                                </summary>
+                                <div className="px-1 py-1 space-y-0.5">
+                                  {items.map(p => {
+                                    const checked = wizardData.selected_product_ids.includes(p.id);
+                                    return (
+                                      <label key={p.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/30 rounded p-1 pl-5">
+                                        <input type="checkbox" checked={checked} onChange={() => toggleProduct(p.id)} />
+                                        {p.image_url && <img src={p.image_url} alt="" className="w-6 h-6 object-cover rounded" />}
+                                        <span className="flex-1 truncate">{p.title}</span>
+                                        {p.price && <span className="text-muted-foreground shrink-0">${p.price}</span>}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </details>
+                            );
+                          });
+                        })()}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Si seleccionás algunos, Google SOLO promocionará esos SKUs. Si dejás la lista vacía, usará todo el catálogo.

@@ -1925,31 +1925,54 @@ Responde SOLO en JSON válido:
     const rawProducts = Array.isArray((data as any).products) ? (data as any).products : [];
     const products = rawProducts
       .filter((p: any) => p && (p.id || p.product_id) && p.title)
-      .slice(0, 150); // cap to keep prompt manageable
+      .slice(0, 200); // cap to keep prompt manageable
     if (products.length === 0) {
-      return { body: { error: 'No products provided', details: 'data.products debe ser un array con {id, title, price}' }, status: 400 };
+      return { body: { error: 'No products provided', details: 'data.products debe ser un array con {id, title, price, category/product_type}' }, status: 400 };
     }
-    const catalogBlock = products.map((p: any, i: number) => {
-      const id = String(p.id || p.product_id);
-      const price = p.price ? ` - $${p.price}` : '';
-      return `${i + 1}. [${id}] ${String(p.title).slice(0, 120)}${price}`;
+    // Group by product_type > category (fallback "Sin categoria")
+    const groups = new Map<string, any[]>();
+    for (const p of products) {
+      const key = (p.product_type && String(p.product_type).trim()) || (p.category && String(p.category).trim()) || 'Sin categoría';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(p);
+    }
+    const groupKeys = Array.from(groups.keys()).sort();
+    const catalogBlock = groupKeys.map(k => {
+      const items = groups.get(k)!;
+      const head = `\n### Categoría: ${k} (${items.length} productos en total${items.length > 40 ? `, ver solo ${40} para no saturar` : ''})`;
+      const lines = items.slice(0, 40).map((p: any, i: number) => {
+        const id = String(p.id || p.product_id);
+        const price = p.price ? ` - $${p.price}` : '';
+        return `  ${i + 1}. [${id}] ${String(p.title).slice(0, 100)}${price}`;
+      }).join('\n');
+      const truncated = items.length > 40 ? `\n  ... (${items.length - 40} más productos ocultos en esta categoría — si seleccionás esta categoría, se incluyen todos los ${items.length})` : '';
+      return `${head}\n${lines}${truncated}`;
     }).join('\n');
 
     prompt = `Eres Steve, experto en Google Ads Performance Max Shopping.
-${hasBrief ? `\n## BRIEF DEL CLIENTE\n${briefContext.slice(0, 1800)}` : ''}
-${extraContext ? `\n## CONTEXTO ADICIONAL\n${extraContext}` : ''}
+${hasBrief ? `\n## BRIEF DEL CLIENTE\n${briefContext.slice(0, 1500)}` : ''}
+${extraContext ? `\n## CONTEXTO / USER INTENT\n${extraContext}` : ''}
 
-## PRODUCTOS DISPONIBLES EN EL CATÁLOGO (${products.length})
+## CATÁLOGO DEL MERCHANT CENTER (${products.length} productos agrupados por categoría)
 ${catalogBlock}
 
-Elige el subset de productos más alineado con el OBJETIVO de la campaña. NO selecciones todos. Prioriza los que mejor encajan con la intención del usuario (producto/categoría, público, ocasión, precio). Descarta los irrelevantes o mal stockeados.
+REGLA CLAVE:
+- Si el OBJETIVO del usuario es AMPLIO ("quiero vender más", "hacer marca", "promoción general") → incluye productos de TODAS las categorías relevantes (selecciona los mejores 3-10 por categoría).
+- Si el OBJETIVO es ESPECÍFICO ("solo perros", "producto X", "categoría Y") → selecciona SOLO los productos de esa(s) categoría(s) relevantes. Descarta las categorías que NO matchean.
 
-Rango sugerido: entre 5 y 25 productos (el numero exacto depende del catalogo, objetivo, y diversidad). Si el catalogo es chico (<10), puedes seleccionar todos si todos encajan.
+NO selecciones todo el catálogo por defecto. Prioriza productos que:
+- Alineen con la intención del usuario
+- Estén probablemente en stock (status/availability si está disponible)
+- Tengan título descriptivo (no genéricos tipo "Producto XYZ")
+- Diversifica si el objetivo es amplio, concentrá si es específico
+
+Rango típico: 5-40 productos (más si el usuario pide campaña amplia, menos si es nicho).
 
 Responde SOLO en JSON valido, sin markdown. Los IDs deben ser EXACTAMENTE los que aparecen entre corchetes [...] arriba:
 {
   "selected_product_ids": ["id_1", "id_2", ...],
-  "reasoning": "explicacion breve en espanol: por que estos y no los demas"
+  "selected_categories": ["Categoría 1", "Categoría 2"],
+  "reasoning": "explicación breve: por qué estas categorías/productos y no los demás (1-2 líneas)"
 }`;
   } else if (recommendation_type === 'audience_signals') {
     const hasBrief = briefContext.trim().length > 0;
@@ -2109,26 +2132,100 @@ Responde SOLO en JSON válido:
 // UUID validator to prevent PostgREST operator injection in eq.${value} interpolation
 const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// --- List catalog products (from Shopify DB) for product-level selection in PMAX Shopping ---
-async function handleListCatalogProducts(clientId: string): Promise<{ body: any; status: number }> {
+// --- List catalog products directly from Merchant Center via Google Ads API `shopping_product` ---
+// Fallback a shopify_products si el MC no tiene productos o falla la query.
+async function handleListCatalogProducts(
+  customerId: string,
+  accessToken: string,
+  developerToken: string,
+  loginCustomerId: string,
+  clientId: string,
+  merchantCenterId?: string
+): Promise<{ body: any; status: number }> {
+  const normalize = (p: any) => ({
+    id: String(p.id || p.item_id || p.product_id || ''),
+    title: p.title || '',
+    image_url: p.image_url || null,
+    price: p.price ?? null,
+    availability: p.availability || null,
+    status: p.status || null,
+    category: p.category || null,        // breadcrumb "Level1 > Level2 > Level3"
+    product_type: p.product_type || null, // merchant-defined taxonomy
+  });
+
+  // 1) Primary path: Google Ads API `shopping_product` resource (REAL MC catalog)
+  // Require merchantCenterId (numeric) to evitar cross-MC mixing cuando un customer tiene varios MCs linkeados.
+  const mcIdSafe = (typeof merchantCenterId === 'string' || typeof merchantCenterId === 'number')
+    && /^\d+$/.test(String(merchantCenterId).trim())
+    ? String(merchantCenterId).trim()
+    : null;
+  if (mcIdSafe) try {
+    const gaql = `
+      SELECT shopping_product.merchant_center_id, shopping_product.item_id,
+             shopping_product.title, shopping_product.image_link,
+             shopping_product.price_micros, shopping_product.currency_code,
+             shopping_product.availability, shopping_product.status,
+             shopping_product.product_type_l1, shopping_product.product_type_l2,
+             shopping_product.product_type_l3,
+             shopping_product.category_l1, shopping_product.category_l2,
+             shopping_product.category_l3
+      FROM shopping_product
+      WHERE shopping_product.merchant_center_id = ${mcIdSafe}
+      LIMIT 500
+    `;
+    const result = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, gaql);
+    if (result.ok && Array.isArray(result.data) && result.data.length > 0) {
+      const seen = new Set<string>();
+      const products: any[] = [];
+      for (const row of result.data) {
+        const sp = row.shoppingProduct || row.shopping_product || {};
+        const id = String(sp.itemId || sp.item_id || '');
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        const priceMicros = Number(sp.priceMicros || sp.price_micros || 0);
+        const price = priceMicros > 0 ? priceMicros / 1_000_000 : null;
+        const pt = [sp.productTypeL1, sp.productTypeL2, sp.productTypeL3].filter(Boolean);
+        const cat = [sp.categoryL1, sp.categoryL2, sp.categoryL3].filter(Boolean);
+        products.push(normalize({
+          id,
+          title: sp.title,
+          image_url: sp.imageLink || sp.image_link,
+          price,
+          availability: sp.availability,
+          status: sp.status,
+          product_type: pt.length ? pt.join(' > ') : null,
+          category: cat.length ? cat.join(' > ') : null,
+        }));
+      }
+      if (products.length > 0) {
+        return { body: { success: true, products, source: 'merchant_center', count: products.length, merchant_center_id: mcIdSafe }, status: 200 };
+      }
+    } else if (!result.ok) {
+      console.warn('[manage-google-campaign] shopping_product GAQL not ok, will fall back:', (result as any)?.error?.details || (result as any)?.error);
+    }
+  } catch (err: any) {
+    console.warn('[manage-google-campaign] shopping_product GAQL failed, falling back:', err?.message);
+  } else {
+    console.log('[manage-google-campaign] list_catalog_products: no valid merchant_center_id provided, skipping MC path');
+  }
+
+  // 2) Fallback: Shopify DB (si MC está vacío o la query falla)
   if (!clientId || !UUID_RX.test(clientId.trim())) {
-    return { body: { success: true, products: [], source: 'none', reason: 'no valid client_id' }, status: 200 };
+    return { body: { success: true, products: [], source: 'none', reason: 'no MC products, no valid client_id' }, status: 200 };
   }
   const cid = clientId.trim();
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !supabaseKey) {
-    return { body: { error: 'Supabase not configured' }, status: 500 };
+    return { body: { success: true, products: [], source: 'none', reason: 'Supabase not configured' }, status: 200 };
   }
   try {
     const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
     const res = await fetch(
-      `${supabaseUrl}/rest/v1/shopify_products?client_id=eq.${cid}&select=id,product_id,title,image_url,price,handle,sku,status&order=created_at.desc&limit=200`,
+      `${supabaseUrl}/rest/v1/shopify_products?client_id=eq.${cid}&select=id,product_id,title,image_url,price,handle,sku,status,product_type&order=created_at.desc&limit=200`,
       { headers, signal: AbortSignal.timeout(8_000) }
     );
-    if (!res.ok) {
-      return { body: { error: 'Failed to fetch catalog products', details: await res.text() }, status: 502 };
-    }
+    if (!res.ok) return { body: { success: true, products: [], source: 'none', reason: 'shopify fetch failed' }, status: 200 };
     const rows = await res.json() as any[];
     const seen = new Set<string>();
     const products: any[] = [];
@@ -2136,19 +2233,19 @@ async function handleListCatalogProducts(clientId: string): Promise<{ body: any;
       const id = String(r.product_id || r.id || '');
       if (!id || seen.has(id)) continue;
       seen.add(id);
-      products.push({
+      products.push(normalize({
         id,
         title: r.title,
         image_url: r.image_url,
         price: r.price,
-        handle: r.handle,
-        sku: r.sku || null,
-        status: r.status || null,
-      });
+        status: r.status,
+        product_type: r.product_type || null,
+        category: null,
+      }));
     }
     return { body: { success: true, products, source: 'shopify_db', count: products.length }, status: 200 };
   } catch (err: any) {
-    return { body: { error: 'Catalog fetch failed', details: err.message }, status: 502 };
+    return { body: { success: true, products: [], source: 'none', reason: err.message }, status: 200 };
   }
 }
 
@@ -2317,7 +2414,7 @@ export async function manageGoogleCampaign(c: Context) {
         result = await handleListImageAssets(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, (data as any)?.limit || 10);
         break;
       case 'list_catalog_products':
-        result = await handleListCatalogProducts(ctx.clientId);
+        result = await handleListCatalogProducts(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, ctx.clientId, (data as any)?.merchant_center_id);
         break;
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };
