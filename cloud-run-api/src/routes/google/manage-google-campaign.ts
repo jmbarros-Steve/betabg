@@ -907,9 +907,9 @@ async function handleCreateCampaign(
         const slUrl = /^https?:\/\//i.test(sl.url) ? sl.url : `https://${sl.url}`;
         const slAsset: Record<string, any> = {
           resourceName: `customers/${customerId}/assets/${slAssetId}`,
+          finalUrls: [slUrl],
           sitelinkAsset: {
             linkText: sl.text.slice(0, 25),
-            finalUrls: [slUrl],
           },
         };
         if (sl.description1?.trim()) {
