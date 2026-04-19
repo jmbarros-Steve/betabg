@@ -1050,13 +1050,13 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
         },
       });
 
-      if (error || !data?.imageUrl) {
+      if (error || !data?.asset_url) {
         toast.error('Error generando imagen: ' + (error || 'sin URL'));
         setAiImageLoading(prev => ({ ...prev, [fieldKey]: false }));
         return;
       }
 
-      setAiImagePreviews(prev => ({ ...prev, [fieldKey]: data.imageUrl }));
+      setAiImagePreviews(prev => ({ ...prev, [fieldKey]: data.asset_url }));
     } catch (err: any) {
       toast.error('Error generando imagen: ' + err.message);
     }
