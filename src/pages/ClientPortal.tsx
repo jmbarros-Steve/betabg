@@ -632,7 +632,7 @@ export default function ClientPortal() {
 
       {/* Chonga Support Bot */}
       {effectiveClientId && (
-        <ChongaSupport clientId={effectiveClientId} />
+        <ChongaSupport clientId={effectiveClientId} activeTab={activeTab} userPlan={planSlug} />
       )}
 
       {/* Onboarding Modal — disabled */}

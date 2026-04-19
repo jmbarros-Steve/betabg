@@ -1,5 +1,4 @@
 import { useEffect, useRef, useCallback } from "react";
-import { toast } from "sonner";
 
 export function useDraftSaver(key: string, data: unknown, interval = 30000) {
   const timerRef = useRef<ReturnType<typeof setInterval>>();
@@ -13,7 +12,6 @@ export function useDraftSaver(key: string, data: unknown, interval = 30000) {
     timerRef.current = setInterval(() => {
       try {
         localStorage.setItem(`steve_draft_${key}`, JSON.stringify(dataRef.current));
-        toast("Borrador guardado", { id: "draft-saved", duration: 2000 });
       } catch {
         // localStorage full — silently ignore
       }

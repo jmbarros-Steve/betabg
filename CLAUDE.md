@@ -153,7 +153,7 @@ steve-ads/
 | Competencia (4) | brand_research, competitor_ads, competitor_tracking, campaign_recommendations | Ignacio W17 |
 | Merchant & Billing (12) | client_assets, client_credits, client_financial_config, credit_transactions, merchant_onboarding, merchant_upsell_opportunities, subscription_plans, user_subscriptions, invoices, time_entries, buyer_personas, campaign_month_plans | (compartido) |
 | Infra (6) | slo_config, oauth_states, onboarding_jobs, instagram_scheduled_posts, juez_golden_questions, seller_calendars | Sebastián W5 |
-| Content (4) | blog_posts, academy_courses+*, support_tickets, chino_routine | (compartido) |
+| Content (4) | blog_posts, academy_courses+*, support_tickets, chino_routine | Francisca W23 (support_tickets) + compartido |
 
 ## 44 Crons en Google Cloud Scheduler
 > **Lista completa con schedules: ver `agents/contexts/sebastian-w5.md`**
@@ -175,7 +175,7 @@ steve-ads/
 
 ### Squad Producto
 - **Camila** W4 — Frontend | **Isidora** W6 — Criterio/Métricas | **Tomás** W7 — Steve AI/Cerebro
-- **Renata** W16 — Editor UX | **Sofía** W14 — Integraciones
+- **Renata** W16 — Editor UX | **Sofía** W14 — Integraciones | **Bastián** W24 — Brief & Onboarding
 
 ### Squad Infra
 - **Sebastián** W5 — Cloud/Infra | **Diego** W8 — Database | **Matías** W13 — Shopify
@@ -183,6 +183,9 @@ steve-ads/
 
 ### Squad Ventas
 - **Ignacio** W17 — Métricas & Analytics | **Paula** W19 — WhatsApp, CRM & Ventas
+
+### Squad Soporte
+- **Francisca** W23 — Soporte & Chonga (bot soporte, KB, plan gating)
 
 ## Apify
 - API Token: APIFY_TOKEN

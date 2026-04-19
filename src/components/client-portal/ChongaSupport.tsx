@@ -18,16 +18,18 @@ interface Message {
 }
 
 const QUICK_QUESTIONS = [
-  { label: '¿Cómo conecto Shopify?', message: '¿Cómo conecto mi tienda de Shopify?' },
+  { label: '¿Qué incluye mi plan?', message: '¿Qué incluye mi plan actual y qué features tengo disponibles?' },
   { label: '¿Cómo conecto Meta Ads?', message: '¿Cómo conecto mi cuenta de Meta Ads?' },
-  { label: '¿Qué es el Brief?', message: '¿Qué es el Brief de Marca y para qué sirve?' },
-  { label: '¿Cómo uso Klaviyo?', message: '¿Cómo funciona el planificador de Klaviyo?' },
+  { label: '¿Cómo conecto Shopify?', message: '¿Cómo conecto mi tienda de Shopify?' },
+  { label: '¿Cómo creo una regla?', message: '¿Cómo creo una regla automatizada en Meta Ads?' },
   { label: 'No veo mis datos', message: 'No veo datos en mis métricas, ¿qué hago?' },
   { label: 'Crear ticket', message: 'Quiero crear un ticket de soporte' },
 ];
 
 interface ChongaSupportProps {
   clientId: string;
+  activeTab?: string;
+  userPlan?: string;
 }
 
 // Load knowledge base once
@@ -44,7 +46,7 @@ async function loadKnowledgeBase(): Promise<string> {
   return '';
 }
 
-export function ChongaSupport({ clientId }: ChongaSupportProps) {
+export function ChongaSupport({ clientId, activeTab, userPlan }: ChongaSupportProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -155,6 +157,8 @@ export function ChongaSupport({ clientId }: ChongaSupportProps) {
           messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })),
           client_id: clientId,
           knowledge_base: kb,
+          active_tab: activeTab,
+          user_plan: userPlan,
         },
       });
 
