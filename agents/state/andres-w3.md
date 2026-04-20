@@ -12,6 +12,11 @@
 | 13/04 | Wizard PMAX 6 pasos + 10 fixes API v23 + single-batch arch | 7 commits | 6 deploys CR |
 | 15/04 | AI en cada paso del Wizard PMAX (Step 1-5) | — | — |
 | 20/04 | **Wizard PMAX enterprise:** user_intent + MC + multi-audience + LGF tree + 13 fixes proto v23 | 20+ commits | 12+ deploys CR (final rev 00558-px7) |
+| 20/04 PM | **Fix Asset.name duplicate** en imageAsset creates (PMAX mutate abort cascade) | `055ff6d8` | rev 00560-jrq |
+| 20/04 PM-2 | **Regresión corregida:** `name` es REQUIRED para imageAsset en v23 → solución correcta = name único con sufijo `assetTempId` | `8867f21c` | rev 00561-kd6 |
+| 20/04 PM-3 | **LGF root + catch-all en mismo mutate:** v23 valida per-commit "SUBDIVISION must have everything else child" → root y catch-all van juntos con temp ID resuelto internamente | `c5df2f42` | rev 00562-4bn |
+| 20/04 PM-4 | **LGF resource_name compound `{realAgId}~{tempId}`:** v23 rechaza temp plano `-1`; patrón canónico del factory oficial de Google | `843f1f44` | rev 00563-8sr |
+| 20/04 PM-5 | **listing_source required en todos los nodos LGF:** v21+ lo hizo required en cada nodo, no solo root | `a847e4ff` | rev 00564-fmv |
 
 ### Tiers completados
 - [x] **Tier 1:** Pause/resume, budget, reglas automáticas (2 tablas + RLS + cron)
@@ -26,6 +31,7 @@
 - [x] Goals no se reseteaban al cambiar de cliente en dashboard (2026-04-09)
 - [x] API v23 (13/04): startDate, deliveryMethod, bidding strategy, explicitlyShared, EU political, brandGuidelines, URL protocol, asset batch, text truncation, error details
 - [x] Proto v23 (20/04): AgeSegment{minAge,maxAge} ints, shopping_product._level1..5, image_link removido, searchTheme.text shape, AudienceInfo wrap, callToActionAsset enum, UNDETERMINED filter, sitelink finalUrls en Asset padre, AssetGroupListingGroupFilter sin temp IDs, customerAcquisitionSetting en CampaignLifecycleGoal, 1 audience signal per asset group, TypeScript scope fix
+- [x] **Asset.name duplicate bug** (20/04 PM): imageAsset creates caían al default 'Image' → Google rechaza "Duplicate assets across mutates cannot have different asset level fields" → cascada de 25 ops assetGroupAssetOperation con "Resource was not found". Fix final: `name: \`${img.name || 'Image'}-${Math.abs(assetTempId)}\`` (sufijo único derivado del counter monotónico). Afectaba `manage-google-campaign.ts:900` + `manage-google-pmax.ts:253`. Commits `055ff6d8` (regresión: removía name pero v23 lo requiere) + `8867f21c` (fix correcto). Rev final 00561-kd6.
 
 ## Tareas pendientes (verificación marathon 20/04)
 - [ ] **Probar PMAX end-to-end con productos reales** (LGF tree aplicado correctamente) ← PRIORIDAD
@@ -38,6 +44,10 @@
 - [ ] Documentar en el hub del agente el flujo de 3 mutates para PMAX con LGF
 - [ ] Asset editing post-creación (feature nueva)
 - [ ] Validación aspect ratio client-side (auto-fit con sharp ya lo resuelve server-side, revisar si aún aplica)
+- [ ] Follow-ups Isidora W6 post-fix Asset.name (no-bloqueantes):
+  - Sanitizar `img.name` en `manage-google-campaign.ts:900` (strip newlines, truncar a 120 chars, límite Google Asset.name=128)
+  - Fix colisión cosmética cross-request en `manage-google-pmax.ts`: `assetTempId=-1` constante (línea 241) → cambiar a `Date.now()` o hash corto del `image_data`
+  - Agregar test E2E con 2 imágenes del mismo `img.name` para verificar no-colisión
 
 ## Tareas completadas previas
 - [x] Implementar flujo Leadsie+MCC para onboarding merchants Google (funcionando, 1 cuenta activa synceando)

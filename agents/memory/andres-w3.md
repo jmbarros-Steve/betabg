@@ -198,7 +198,13 @@ Frontend MetaPartnerSetup.tsx → Leadsie con ?customUserId={client_id}
 5. **CTA:** `callToActionAsset` enum (no `textAsset`)
 6. **UNDETERMINED:** filter en gender/parental/income con `includeUndetermined: true` en dimension
 7. **sitelink finalUrls:** en Asset padre (no en `sitelinkAsset`)
-8. **AssetGroupListingGroupFilter:** NO acepta temp IDs → mutate separado OBLIGATORIO
+8. **AssetGroupListingGroupFilter + temp IDs (v23, 3 reglas):**
+   - **Regla 1 (formato compuesto):** `resource_name` debe ser `customers/{cid}/assetGroupListingGroupFilters/{realAssetGroupId}~{filterId}`. Temp ID plano `-1` es rechazado con "'-1' part of the resource name is invalid". Usar `{realAgId}~{tempFilterId}` (factory oficial `AssetGroupListingGroupFilterCreateOperationFactory` hace esto). Por eso el asset group debe crearse ANTES (primary mutate), para tener su real ID disponible al construir los LGF resource names del secondary.
+   - **Regla 2 (root + everything-else):** Un SUBDIVISION debe crearse JUNTO con su child "everything else" (catch-all `UNIT_EXCLUDED` con `productItemId: {}`) en el MISMO mutate call. v23 valida per-commit.
+   - **Regla 3 (within-mutate resolution):** temp IDs en compound form (`9999~-1`) sí funcionan si el parent op va antes que el child op en la lista.
+   - **Regla 4 (listing_source required per-node):** v21+ cambió `listing_source` de opcional/heredable a REQUIRED en cada nodo LGF (SUBDIVISION, UNIT_INCLUDED, UNIT_EXCLUDED). Si falta en un child, Google rechaza con "The required field was not present". Para PMAX Shopping usar `'SHOPPING'` en todos. El comentario viejo "listingSource va SOLO en root" era incorrecto (basado en v20).
+   - Conclusión: mutate 2 = root + catch-all con compound temp. Mutate 3 = UNIT_INCLUDED leaves + signals usando real root resource. Todos con `listingSource: 'SHOPPING'`.
+   - El memory anterior "NO acepta temp IDs" era incompleto: el temp plano no funciona, el compound con real AG sí. Corregido 20/04 PM-3 (`c5df2f42`) + PM-4 (`843f1f44`) + PM-5 (`a847e4ff`).
 9. **Customer Acquisition:** `CampaignLifecycleGoal` mutate separado (no en Campaign.create)
 10. **Audience signal:** Google limit 1 por asset group (backend toma el primero)
 
