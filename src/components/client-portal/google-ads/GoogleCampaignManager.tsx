@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import { callApi } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -500,6 +500,10 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   const [adGroups, setAdGroups] = useState<Record<string, AdGroup[]>>({});
   const [adGroupsLoading, setAdGroupsLoading] = useState<Record<string, boolean>>({});
 
+  // Asset groups (PMAX) — vista jerárquica inline dentro de la tabla de campañas
+  const [assetGroupsByCampaign, setAssetGroupsByCampaign] = useState<Record<string, Array<{ id: string; name: string; status: string; ad_strength: string }>>>({});
+  const [assetGroupsLoading, setAssetGroupsLoading] = useState<Record<string, boolean>>({});
+
   // Create ad group dialog
   const [createAdGroupOpen, setCreateAdGroupOpen] = useState(false);
   const [createAdGroupCampaignId, setCreateAdGroupCampaignId] = useState<string | null>(null);
@@ -829,7 +833,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     fetchCampaigns();
   };
 
-  // Ad Groups
+  // Toggle expansión — branch por tipo: PMAX → asset groups, el resto → ad groups
   const toggleAdGroups = async (campaignId: string) => {
     if (expandedCampaign === campaignId) {
       setExpandedCampaign(null);
@@ -838,6 +842,33 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
 
     setExpandedCampaign(campaignId);
 
+    const campaign = campaigns.find(c => c.id === campaignId);
+    if (!campaign) {
+      // Race: campaigns se limpió entre el click y el handler.
+      setExpandedCampaign(null);
+      return;
+    }
+    const isPmax = campaign.channel_type === 'PERFORMANCE_MAX';
+
+    if (isPmax) {
+      // PMAX: pedir asset groups ya filtrados server-side por campaign_id (GAQL).
+      if (!assetGroupsByCampaign[campaignId]) {
+        setAssetGroupsLoading(prev => ({ ...prev, [campaignId]: true }));
+        const { data, error } = await callApi('manage-google-pmax', {
+          body: { action: 'list_asset_groups', connection_id: connectionId, campaign_id: campaignId },
+        });
+        setAssetGroupsLoading(prev => ({ ...prev, [campaignId]: false }));
+
+        if (error) {
+          toast.error('Error cargando asset groups: ' + error);
+          return;
+        }
+        setAssetGroupsByCampaign(prev => ({ ...prev, [campaignId]: data?.asset_groups || [] }));
+      }
+      return;
+    }
+
+    // No-PMAX: lógica original de ad_groups
     if (!adGroups[campaignId]) {
       setAdGroupsLoading(prev => ({ ...prev, [campaignId]: true }));
       const { data, error } = await callApi('manage-google-campaign', {
@@ -1626,17 +1657,15 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
             </thead>
             <tbody>
               {filteredCampaigns.map(campaign => (
-                <>
-                  <tr key={campaign.id} className="border-b last:border-0 hover:bg-muted/30">
+                <Fragment key={campaign.id}>
+                  <tr className="border-b last:border-0 hover:bg-muted/30">
                     <td className="p-3">
-                      {campaign.channel_type !== 'PERFORMANCE_MAX' && (
-                        <button onClick={() => toggleAdGroups(campaign.id)}>
-                          {expandedCampaign === campaign.id
-                            ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                            : <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                          }
-                        </button>
-                      )}
+                      <button onClick={() => toggleAdGroups(campaign.id)} title={campaign.channel_type === 'PERFORMANCE_MAX' ? 'Ver asset groups' : 'Ver ad groups'}>
+                        {expandedCampaign === campaign.id
+                          ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                          : <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                        }
+                      </button>
                     </td>
                     <td className="p-3 font-medium max-w-[300px] truncate" title={campaign.name}>
                       {campaign.name}
@@ -1697,6 +1726,77 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                       </div>
                     </td>
                   </tr>
+
+                  {/* Asset Groups sub-row (PMAX) */}
+                  {expandedCampaign === campaign.id && campaign.channel_type === 'PERFORMANCE_MAX' && (
+                    <tr key={`${campaign.id}-pmax`}>
+                      <td colSpan={6} className="bg-muted/20 px-6 py-3">
+                        {assetGroupsLoading[campaign.id] ? (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Cargando asset groups...
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-muted-foreground">
+                                Asset Groups ({(assetGroupsByCampaign[campaign.id] || []).length})
+                              </span>
+                            </div>
+                            {(assetGroupsByCampaign[campaign.id] || []).length === 0 ? (
+                              <p className="text-xs text-muted-foreground">
+                                Sin asset groups. Creá uno desde la tab PMAX.
+                              </p>
+                            ) : (
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b">
+                                    <th className="text-left py-1 font-medium">Nombre</th>
+                                    <th className="text-left py-1 font-medium">Estado</th>
+                                    <th className="text-left py-1 font-medium">Calidad (Google)</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(assetGroupsByCampaign[campaign.id] || []).map(ag => {
+                                    const strengthClass =
+                                      ag.ad_strength === 'EXCELLENT' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
+                                      ag.ad_strength === 'GOOD' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
+                                      ag.ad_strength === 'AVERAGE' ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' :
+                                      ag.ad_strength === 'POOR' ? 'bg-red-500/10 text-red-600 border-red-500/20' :
+                                      'bg-gray-500/10 text-gray-500 border-gray-500/20';
+                                    const strengthLabel =
+                                      ag.ad_strength === 'EXCELLENT' ? 'Excelente' :
+                                      ag.ad_strength === 'GOOD' ? 'Buena' :
+                                      ag.ad_strength === 'AVERAGE' ? 'Promedio' :
+                                      ag.ad_strength === 'POOR' ? 'Pobre' :
+                                      'Sin datos';
+                                    return (
+                                      <tr key={ag.id} className="border-b last:border-0">
+                                        <td className="py-1.5 truncate max-w-[300px]" title={ag.name}>{ag.name}</td>
+                                        <td className="py-1.5">
+                                          <Badge variant="outline" className={`text-[10px] ${statusColors[ag.status] || ''}`}>
+                                            {ag.status === 'ENABLED' ? 'Activo' : ag.status}
+                                          </Badge>
+                                        </td>
+                                        <td className="py-1.5">
+                                          <Badge variant="outline" className={`text-[10px] ${strengthClass}`}>
+                                            {strengthLabel}
+                                          </Badge>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            )}
+                            <p className="text-[11px] text-muted-foreground pt-1">
+                              Para editar assets o ver detalle, andá a la tab <span className="font-medium">PMAX</span>.
+                            </p>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
 
                   {/* Ad Groups sub-row */}
                   {expandedCampaign === campaign.id && campaign.channel_type !== 'PERFORMANCE_MAX' && (
@@ -1783,7 +1883,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
