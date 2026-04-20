@@ -1356,9 +1356,13 @@ async function handleCreateCampaign(
     const secondaryOps = JSON.parse(jsonStr);
     console.log(`[manage-google-campaign] secondary batch: ${secondaryOps.length} ops, renumbered ${idMap.size} temp IDs to fresh range`);
 
-    // AssetGroupListingGroupFilter NO acepta temp IDs en Google Ads API v23.
-    // Hay que crear el ROOT (SUBDIVISION) en un mutate SOLO, obtener su resource_name real,
-    // y luego usarlo en las LEAVES + signals (que sí pueden ir juntas en un 3er mutate).
+    // AssetGroupListingGroupFilter en Google Ads API v23:
+    // - Un SUBDIVISION DEBE tener su child "everything else" (catch-all UNIT_EXCLUDED con
+    //   productItemId sin value) en el MISMO mutate call, si no falla con
+    //   "SUBDIVISION node must have everything else child".
+    // - Solución: mutate 2 = root + catch-all juntos, manteniendo el temp resourceName
+    //   del root para que el catch-all lo referencie (Google resuelve temp IDs dentro del
+    //   mismo mutate). Mutate 3 = UNIT_INCLUDED leaves + signals, apuntando al root real.
     const rootLgfIdx = secondaryOps.findIndex((op: any) =>
       op.assetGroupListingGroupFilterOperation?.create?.type === 'SUBDIVISION'
     );
@@ -1367,9 +1371,26 @@ async function handleCreateCampaign(
     if (rootLgfIdx >= 0) {
       const rootLgfOp = secondaryOps[rootLgfIdx];
       const tempRootResource = rootLgfOp.assetGroupListingGroupFilterOperation.create.resourceName as string;
-      // Remover resourceName temporal — Google lo asigna.
-      delete rootLgfOp.assetGroupListingGroupFilterOperation.create.resourceName;
-      const rootResult = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, [rootLgfOp]);
+
+      // Buscar el catch-all UNIT_EXCLUDED (productItemId sin value) que referencia este root.
+      const catchAllIdx = secondaryOps.findIndex((op: any) => {
+        const c = op.assetGroupListingGroupFilterOperation?.create;
+        return c?.type === 'UNIT_EXCLUDED'
+          && c?.parentListingGroupFilter === tempRootResource
+          && c?.caseValue?.productItemId !== undefined
+          && !c?.caseValue?.productItemId?.value;
+      });
+
+      // Root + catch-all juntos. MANTENEMOS el temp resourceName del root para que el
+      // catch-all lo resuelva internamente en el mismo mutate.
+      const rootBatch: any[] = [rootLgfOp];
+      if (catchAllIdx >= 0) {
+        rootBatch.push(secondaryOps[catchAllIdx]);
+      } else {
+        console.warn('[manage-google-campaign] catch-all UNIT_EXCLUDED no encontrado — root mutate probablemente falle con "must have everything else child"');
+      }
+
+      const rootResult = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, rootBatch);
       if (!rootResult.ok) {
         secondaryWarning = `Campaña creada OK, pero no se pudo crear el filtro de productos (root listing group filter): ${rootResult.error}. Agregá los productos manualmente en Google Ads.`;
         console.warn('[manage-google-campaign] root LGF mutate failed:', rootResult.error);
@@ -1377,20 +1398,22 @@ async function handleCreateCampaign(
       } else {
         const rootResponses: any[] = Array.isArray((rootResult.data as any)?.mutateOperationResponses)
           ? (rootResult.data as any).mutateOperationResponses : [];
-        let realRootResource = '';
-        for (const r of rootResponses) {
-          const rn = r?.assetGroupListingGroupFilterResult?.resourceName || r?.asset_group_listing_group_filter_result?.resource_name;
-          if (rn) { realRootResource = rn; break; }
-        }
+        // El primer response es el root SUBDIVISION (orden preservado en mutate).
+        const firstResponse = rootResponses[0];
+        const realRootResource: string = firstResponse?.assetGroupListingGroupFilterResult?.resourceName
+          || firstResponse?.asset_group_listing_group_filter_result?.resource_name
+          || '';
         if (!realRootResource) {
           secondaryWarning = `Root listing group filter creado pero no pudimos extraer su resource_name. Leaves no se aplicaron.`;
           skipFinal = true;
         } else {
-          // Reemplazar refs al temp root por el real en las ops restantes
-          const remainingOps = secondaryOps.filter((_: any, i: number) => i !== rootLgfIdx);
+          // Excluir root + catch-all (ya creados) y reemplazar refs temp por real root.
+          const skipSet = new Set<number>([rootLgfIdx]);
+          if (catchAllIdx >= 0) skipSet.add(catchAllIdx);
+          const remainingOps = secondaryOps.filter((_: any, i: number) => !skipSet.has(i));
           const remainingJson = JSON.stringify(remainingOps).split(tempRootResource).join(realRootResource);
           finalOps = JSON.parse(remainingJson);
-          console.log(`[manage-google-campaign] root LGF created: ${realRootResource}, patching ${finalOps.length} leaves/signals`);
+          console.log(`[manage-google-campaign] root LGF + catch-all created (root: ${realRootResource}), patching ${finalOps.length} leaves/signals`);
         }
       }
     }
