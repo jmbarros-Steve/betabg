@@ -252,28 +252,20 @@ async function handleGetSettings(
   developerToken: string,
   loginCustomerId: string
 ): Promise<{ body: any; status: number }> {
-  // Query 1: campaign base settings (incluye bid strategy targets)
-  const query = `
+  // Query 1 (CORE): campos garantizados en todos los channel_type.
+  // GAQL en v23 devuelve 400 si pedís sub-fields de oneof (bid sub-messages,
+  // network_settings) en canales donde no aplican — ej: PMAX no expone
+  // network_settings.target_content_network. Separamos los opcionales en Query 2.
+  const coreQuery = `
     SELECT campaign.id, campaign.name, campaign.status,
            campaign.bidding_strategy_type,
-           campaign.target_cpa.target_cpa_micros,
-           campaign.target_roas.target_roas,
-           campaign.maximize_conversions.target_cpa_micros,
-           campaign.maximize_conversion_value.target_roas,
-           campaign.manual_cpc.enhanced_cpc_enabled,
-           campaign.network_settings.target_google_search,
-           campaign.network_settings.target_search_network,
-           campaign.network_settings.target_content_network,
-           campaign.network_settings.target_partner_search_network,
-           campaign.geo_target_type_setting.positive_geo_target_type,
-           campaign.geo_target_type_setting.negative_geo_target_type,
            campaign.start_date, campaign.end_date,
            campaign.advertising_channel_type
     FROM campaign
     WHERE campaign.id = ${campaignId}
   `;
 
-  const result = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, query);
+  const result = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, coreQuery);
 
   if (!result.ok || !result.data?.length) {
     return { body: { error: 'Failed to fetch campaign settings', details: result.error }, status: 502 };
@@ -281,6 +273,62 @@ async function handleGetSettings(
 
   const row = result.data[0];
   const c = row.campaign;
+  const channelType = c?.advertisingChannelType;
+  const bidType = c?.biddingStrategyType;
+
+  // Query 2 (EXTENDED): bid sub-messages — solo pedimos el sub-message que
+  // corresponde al bidType. Si este query falla, continuamos sin targets.
+  let target_cpa_micros: number | undefined;
+  let target_roas: number | undefined;
+  let enhanced_cpc_enabled: boolean | undefined;
+  const bidFieldByType: Record<string, string> = {
+    TARGET_CPA: 'campaign.target_cpa.target_cpa_micros',
+    TARGET_ROAS: 'campaign.target_roas.target_roas',
+    MAXIMIZE_CONVERSIONS: 'campaign.maximize_conversions.target_cpa_micros',
+    MAXIMIZE_CONVERSION_VALUE: 'campaign.maximize_conversion_value.target_roas',
+    MANUAL_CPC: 'campaign.manual_cpc.enhanced_cpc_enabled',
+  };
+  const bidField = bidFieldByType[bidType];
+  if (bidField) {
+    const bidQuery = `
+      SELECT ${bidField}
+      FROM campaign
+      WHERE campaign.id = ${campaignId}
+    `;
+    const bidResult = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, bidQuery);
+    if (bidResult.ok && bidResult.data?.[0]?.campaign) {
+      const bc = bidResult.data[0].campaign;
+      if (bidType === 'TARGET_CPA') target_cpa_micros = Number(bc.targetCpa?.targetCpaMicros || 0) || undefined;
+      else if (bidType === 'MAXIMIZE_CONVERSIONS') target_cpa_micros = Number(bc.maximizeConversions?.targetCpaMicros || 0) || undefined;
+      else if (bidType === 'TARGET_ROAS') target_roas = Number(bc.targetRoas?.targetRoas || 0) || undefined;
+      else if (bidType === 'MAXIMIZE_CONVERSION_VALUE') target_roas = Number(bc.maximizeConversionValue?.targetRoas || 0) || undefined;
+      else if (bidType === 'MANUAL_CPC') enhanced_cpc_enabled = !!bc.manualCpc?.enhancedCpcEnabled;
+    }
+  }
+
+  // Query 3 (NETWORK): solo para SEARCH — los otros canales no exponen network_settings editable.
+  let target_google_search: boolean | undefined;
+  let target_search_network: boolean | undefined;
+  let target_content_network: boolean | undefined;
+  let target_partner_search_network: boolean | undefined;
+  if (channelType === 'SEARCH') {
+    const netQuery = `
+      SELECT campaign.network_settings.target_google_search,
+             campaign.network_settings.target_search_network,
+             campaign.network_settings.target_content_network,
+             campaign.network_settings.target_partner_search_network
+      FROM campaign
+      WHERE campaign.id = ${campaignId}
+    `;
+    const netResult = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, netQuery);
+    if (netResult.ok && netResult.data?.[0]?.campaign?.networkSettings) {
+      const ns = netResult.data[0].campaign.networkSettings;
+      target_google_search = ns.targetGoogleSearch;
+      target_search_network = ns.targetSearchNetwork;
+      target_content_network = ns.targetContentNetwork;
+      target_partner_search_network = ns.targetPartnerSearchNetwork;
+    }
+  }
 
   // Query 2: campaign_criterion (locations + languages)
   const criteriaQuery = `
@@ -314,21 +362,6 @@ async function handleGetSettings(
     }
   }
 
-  // Extraer target de la bid strategy activa.
-  // Google Ads v23: los targets viven en distintas sub-mensajes según el type.
-  const bidType = c?.biddingStrategyType;
-  let target_cpa_micros: number | undefined;
-  let target_roas: number | undefined;
-  if (bidType === 'TARGET_CPA') {
-    target_cpa_micros = Number(c?.targetCpa?.targetCpaMicros || 0) || undefined;
-  } else if (bidType === 'MAXIMIZE_CONVERSIONS') {
-    target_cpa_micros = Number(c?.maximizeConversions?.targetCpaMicros || 0) || undefined;
-  } else if (bidType === 'TARGET_ROAS') {
-    target_roas = Number(c?.targetRoas?.targetRoas || 0) || undefined;
-  } else if (bidType === 'MAXIMIZE_CONVERSION_VALUE') {
-    target_roas = Number(c?.maximizeConversionValue?.targetRoas || 0) || undefined;
-  }
-
   return {
     body: {
       success: true,
@@ -339,16 +372,14 @@ async function handleGetSettings(
         bidding_strategy_type: bidType,
         target_cpa_micros,
         target_roas,
-        enhanced_cpc_enabled: c?.manualCpc?.enhancedCpcEnabled,
-        target_google_search: c?.networkSettings?.targetGoogleSearch,
-        target_search_network: c?.networkSettings?.targetSearchNetwork,
-        target_content_network: c?.networkSettings?.targetContentNetwork,
-        target_partner_search_network: c?.networkSettings?.targetPartnerSearchNetwork,
-        positive_geo_target_type: c?.geoTargetTypeSetting?.positiveGeoTargetType,
-        negative_geo_target_type: c?.geoTargetTypeSetting?.negativeGeoTargetType,
+        enhanced_cpc_enabled,
+        target_google_search,
+        target_search_network,
+        target_content_network,
+        target_partner_search_network,
         start_date: c?.startDate,
         end_date: c?.endDate,
-        channel_type: c?.advertisingChannelType,
+        channel_type: channelType,
         locations,
         languages,
       },

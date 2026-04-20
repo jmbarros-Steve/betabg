@@ -208,6 +208,14 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
   const [audienceGenders, setAudienceGenders] = useState<string[]>([]);
   const [audienceLoading, setAudienceLoading] = useState(false);
 
+  // Edit text asset (Asset es inmutable en Google Ads — editar = remove + add nuevo)
+  const [editAssetOpen, setEditAssetOpen] = useState(false);
+  const [editAssetGroupId, setEditAssetGroupId] = useState<string | null>(null);
+  const [editAssetOld, setEditAssetOld] = useState<AssetDetail | null>(null);
+  const [editAssetFieldType, setEditAssetFieldType] = useState<string>('HEADLINE');
+  const [editAssetText, setEditAssetText] = useState('');
+  const [editAssetLoading, setEditAssetLoading] = useState(false);
+
   const fetchAssetGroups = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
     setRefreshing(true);
@@ -579,6 +587,72 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     setSteveReasoning(data?.reasoning || null);
     setSteveMaxChars(data?.max_chars || 90);
     setSteveSelectedIdx(null);
+  };
+
+  // Edit text asset: Google Ads no permite mutar el texto de un Asset.
+  // Workflow: add nuevo primero (si falla, no se pierde el original) + remove viejo.
+  const openEditAsset = (groupId: string, asset: AssetDetail, fieldType: string) => {
+    setEditAssetGroupId(groupId);
+    setEditAssetOld(asset);
+    setEditAssetFieldType(fieldType);
+    setEditAssetText(asset.text || asset.name || '');
+    setEditAssetOpen(true);
+  };
+
+  const submitEditAsset = async () => {
+    if (!editAssetGroupId || !editAssetOld) return;
+    const trimmed = editAssetText.trim();
+    if (!trimmed || trimmed === (editAssetOld.text || editAssetOld.name)) {
+      setEditAssetOpen(false);
+      return;
+    }
+    const MAX_BY_TYPE: Record<string, number> = { HEADLINE: 30, LONG_HEADLINE: 90, DESCRIPTION: 90, BUSINESS_NAME: 25 };
+    const maxLen = MAX_BY_TYPE[editAssetFieldType] ?? 90;
+    if (trimmed.length > maxLen) {
+      toast.error(`Texto excede ${maxLen} caracteres`);
+      return;
+    }
+
+    setEditAssetLoading(true);
+    // Paso 1: add nuevo
+    const { error: addError } = await callApi('manage-google-pmax', {
+      body: {
+        action: 'add_asset',
+        connection_id: connectionId,
+        asset_group_id: editAssetGroupId,
+        data: { field_type: editAssetFieldType, text: trimmed },
+      },
+    });
+    if (addError) {
+      setEditAssetLoading(false);
+      toast.error('Error agregando nueva versión: ' + addError);
+      return;
+    }
+    // Paso 2: remove viejo
+    const { error: removeError } = await callApi('manage-google-pmax', {
+      body: {
+        action: 'remove_asset',
+        connection_id: connectionId,
+        asset_group_id: editAssetGroupId,
+        data: { asset_resource_name: editAssetOld.resource_name, field_type: editAssetFieldType },
+      },
+    });
+    setEditAssetLoading(false);
+    if (removeError) {
+      toast.warning(`Nueva versión agregada, pero no se pudo eliminar la vieja: ${removeError}. Eliminala manualmente.`);
+    } else {
+      toast.success('Asset actualizado');
+    }
+    // Refresh detail
+    setGroupDetails(prev => {
+      const copy = { ...prev };
+      delete copy[editAssetGroupId];
+      return copy;
+    });
+    if (expandedGroup === editAssetGroupId) {
+      toggleGroup(editAssetGroupId);
+    }
+    setEditAssetOpen(false);
   };
 
   // Abre dialog Audience Signal para un AG existente
@@ -977,7 +1051,9 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                           </p>
 
                           <div className="space-y-1">
-                            {(assets as AssetDetail[]).map((asset, idx) => (
+                            {(assets as AssetDetail[]).map((asset, idx) => {
+                              const isText = TEXT_ADDABLE_FIELDS.has(fieldType);
+                              return (
                               <div key={idx} className="flex items-center gap-2 text-sm group">
                                 {asset.image_url ? (
                                   <img
@@ -997,6 +1073,17 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                                 ) : (
                                   <span className="truncate flex-1">{asset.text || asset.name}</span>
                                 )}
+                                {isText && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-blue-500 hover:text-blue-600"
+                                    onClick={() => openEditAsset(group.id, asset, fieldType)}
+                                    title="Editar texto"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </Button>
+                                )}
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -1007,7 +1094,8 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                                   <X className="w-3 h-3" />
                                 </Button>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       ))}
@@ -1285,6 +1373,48 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
             >
               {steveAdding && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
               Agregar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Text Asset Dialog — remove old + add new (Asset inmutable en v23) */}
+      <Dialog open={editAssetOpen} onOpenChange={(open) => { if (!open && !editAssetLoading) setEditAssetOpen(open); }}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Editar {fieldTypeLabels[editAssetFieldType] || editAssetFieldType}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {(() => {
+              const MAX_BY_TYPE: Record<string, number> = { HEADLINE: 30, LONG_HEADLINE: 90, DESCRIPTION: 90, BUSINESS_NAME: 25 };
+              const maxLen = MAX_BY_TYPE[editAssetFieldType] ?? 90;
+              return (
+                <>
+                  <Input
+                    value={editAssetText}
+                    onChange={(e) => setEditAssetText(e.target.value)}
+                    maxLength={maxLen}
+                    autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !editAssetLoading) submitEditAsset(); }}
+                  />
+                  <p className="text-xs text-muted-foreground">{editAssetText.length}/{maxLen} chars</p>
+                  <p className="text-[11px] text-muted-foreground italic">
+                    Google Ads no permite modificar el texto de un asset. Steve crea la versión nueva y elimina la vieja.
+                  </p>
+                </>
+              );
+            })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditAssetOpen(false)} disabled={editAssetLoading}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={submitEditAsset}
+              disabled={editAssetLoading || editAssetText.trim() === '' || editAssetText.trim() === (editAssetOld?.text || editAssetOld?.name)}
+            >
+              {editAssetLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Guardar
             </Button>
           </DialogFooter>
         </DialogContent>
