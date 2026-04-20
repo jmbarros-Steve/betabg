@@ -662,6 +662,10 @@ async function handleCreateCampaign(
     mutateOps.push({ adGroupOperation: { create: adGroupCreate } });
   }
 
+  // Shared outputs (fuera del if PMAX para que estén en scope del return final)
+  let acquisitionWarning: string | null = null;
+  let effectiveAcquisitionMode: string | null = null;
+
   // PMAX: campaign + asset group + assets
   if (channelType === 'PERFORMANCE_MAX') {
     // PMAX requires bidding strategy object, not just type
@@ -680,8 +684,6 @@ async function handleCreateCampaign(
     // BID_HIGHER y TARGET_ALL_EQUALLY requieren distinguir clientes nuevos vs antiguos,
     // lo que exige: Customer Match (user_list CRM_BASED) activa O conversion action "new customer".
     // Si el account no cumple, degradamos a BID_ONLY con warning en la response.
-    let acquisitionWarning: string | null = null;
-    let effectiveAcquisitionMode: string | null = null;
     if (acquisition_mode && ['BID_HIGHER', 'TARGET_ALL_EQUALLY', 'BID_ONLY'].includes(acquisition_mode)) {
       if (acquisition_mode === 'BID_ONLY') {
         effectiveAcquisitionMode = 'BID_ONLY';
