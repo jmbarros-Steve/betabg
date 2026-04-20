@@ -360,7 +360,24 @@ export async function generateImage(c: Context) {
     ? `\nBRAND & CREATIVE RULES (follow these):\n${visualKnowledge}\n`
     : '';
 
-  const promptFinal = `${promptBase}. ${randomDiversity}. ${visualRulesForPrompt}${brandColorsBlock}${brandConsistencyBlock}Ultra-realistic commercial photograph, shot on Canon EOS R5 with 85mm f/1.4 lens. Natural lighting with soft shadows, real skin texture with pores and subtle imperfections, genuine facial expressions. Real physical environment with depth of field and bokeh. No illustrations, no 3D renders, no AI artifacts, no plastic-looking skin, no floating objects. The image must be indistinguishable from a real professional advertising photo shoot.`;
+  // Logos usan un prompt COMPLETAMENTE distinto al de fotos de producto.
+  // Las instrucciones "Canon EOS R5 / real skin texture / genuine facial
+  // expressions" son contraproducentes para logos — confunden a Gemini y
+  // genera caras humanas o escenas fotográficas en vez del logo variado.
+  const isLogoFormat = String(formato || '').toLowerCase() === 'logo' || String(formato || '').toLowerCase() === 'landscape_logo';
+
+  const promptFinal = isLogoFormat
+    ? `${promptBase}.${brandColorsBlock}${brandConsistencyBlock}
+CRITICAL RENDERING INSTRUCTIONS FOR LOGO:
+- This is a LOGO / BRAND MARK. Graphic design asset, NOT a photograph.
+- Clean vector-style graphic. Flat or subtle gradient. Crisp edges.
+- Absolutely NO human figures, faces, skin, hands, people.
+- Absolutely NO photographic elements: NO depth of field, NO bokeh, NO natural lighting, NO "real skin texture".
+- Preserve the EXACT symbol, icon, and typography from the reference logo. Do not redesign the mark.
+- Only vary background color / framing / subtle styling as described in the prompt.
+- Centered composition with breathing space. Solid or flat subtle background.
+- Output must look like a professional brand logo — the kind that appears on a website header or business card.`
+    : `${promptBase}. ${randomDiversity}. ${visualRulesForPrompt}${brandColorsBlock}${brandConsistencyBlock}Ultra-realistic commercial photograph, shot on Canon EOS R5 with 85mm f/1.4 lens. Natural lighting with soft shadows, real skin texture with pores and subtle imperfections, genuine facial expressions. Real physical environment with depth of field and bokeh. No illustrations, no 3D renders, no AI artifacts, no plastic-looking skin, no floating objects. The image must be indistinguishable from a real professional advertising photo shoot.`;
 
   let imageBytes: Uint8Array | null = null;
 
@@ -457,7 +474,12 @@ export async function generateImage(c: Context) {
         idx++;
       }
       if (logoPart) {
-        roleLines.push(`IMAGE ${idx} = the client's LOGO. STYLE REFERENCE ONLY: match its color palette, mood, polish, and design language in the whole composition (lighting, background, props). Do NOT render the logo itself in the scene unless explicitly requested.`);
+        if (isLogoFormat) {
+          // Modo variación: el logo ES el subject principal, preservarlo literal.
+          roleLines.push(`IMAGE ${idx} = the client's EXACT LOGO. This IS the subject to recreate. Preserve its symbol, icon, and typography CHARACTER BY CHARACTER — do NOT redesign or stylize the mark itself. Only vary the background, padding, or subtle framing as described in the prompt below. The output must be INSTANTLY recognizable as the same logo.`);
+        } else {
+          roleLines.push(`IMAGE ${idx} = the client's LOGO. STYLE REFERENCE ONLY: match its color palette, mood, polish, and design language in the whole composition (lighting, background, props). Do NOT render the logo itself in the scene unless explicitly requested.`);
+        }
         idx++;
       }
       if (prevAdParts.length > 0) {
@@ -525,7 +547,11 @@ export async function generateImage(c: Context) {
           const refB64 = Buffer.from(refBuf).toString('base64');
           const mime = refResp.headers.get('content-type') || 'image/jpeg';
           fallbackParts.push({ inlineData: { mimeType: mime, data: refB64 } });
-          fallbackParts.push({ text: `CRITICAL: This is the REAL product photo. The product in the generated image MUST look EXACTLY like this. Place this exact real product into the advertising scene described below.\n\n${promptFinal}` });
+          fallbackParts.push({
+            text: isLogoFormat
+              ? `CRITICAL: This is the REAL BRAND LOGO. Preserve its symbol, icon, and typography EXACTLY. Only vary background / framing / subtle styling as described below. Do NOT redesign the logo. Do NOT generate photographic content.\n\n${promptFinal}`
+              : `CRITICAL: This is the REAL product photo. The product in the generated image MUST look EXACTLY like this. Place this exact real product into the advertising scene described below.\n\n${promptFinal}`,
+          });
         } else {
           fallbackParts.push({ text: promptFinal });
         }
