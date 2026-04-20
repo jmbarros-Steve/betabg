@@ -8,7 +8,8 @@ type Action =
   | 'add_asset'
   | 'remove_asset'
   | 'update_asset_group'
-  | 'remove_asset_group';
+  | 'remove_asset_group'
+  | 'add_audience_signal';
 
 interface RequestBody {
   action: Action;
@@ -436,6 +437,140 @@ async function handleRemoveAssetGroup(
   return { body: { success: true, asset_group_id: assetGroupId, status: 'REMOVED' }, status: 200 };
 }
 
+// --- Add Audience Signal a un AG existente ---
+// Soporta 3 modos (mismo patrón que el wizard PMAX al crear):
+// a) existing_audience_resource — linkea Audience ya existente en customer
+// b) existing_user_list — wrappea una user_list en un nuevo Audience custom
+// c) demographics — crea Audience con age/gender/parental/income dimensions
+// En los casos (b) y (c) creamos el Audience en el mismo mutate con sufijo único
+// en el name para evitar colisión (fix aplicado 21/04 PM).
+async function handleAddAudienceSignal(
+  customerId: string,
+  assetGroupId: string,
+  accessToken: string,
+  developerToken: string,
+  loginCustomerId: string,
+  data: Record<string, any>
+): Promise<{ body: any; status: number }> {
+  const {
+    existing_audience_resource,
+    existing_user_list,
+    name: rawName,
+    description: rawDescription,
+    age_ranges,
+    genders,
+    parental_statuses,
+    income_ranges,
+  } = data;
+
+  const mutateOps: any[] = [];
+  const assetGroupResource = `customers/${customerId}/assetGroups/${assetGroupId}`;
+  const uniqueSuffix = ` ${Date.now() % 1_000_000}`;
+
+  // Path (a): audience ya existente
+  if (existing_audience_resource && typeof existing_audience_resource === 'string') {
+    mutateOps.push({
+      assetGroupSignalOperation: {
+        create: {
+          assetGroup: assetGroupResource,
+          audience: { audience: existing_audience_resource },
+        },
+      },
+    });
+  }
+  // Path (b): wrap user_list
+  else if (existing_user_list && typeof existing_user_list === 'string') {
+    const audTempId = -1 * (Date.now() % 1_000_000);
+    const audResource = `customers/${customerId}/audiences/${audTempId}`;
+    const audNameBase = (typeof rawName === 'string' && rawName.trim()) ? rawName.trim().slice(0, 40) : 'Audiencia PMAX';
+    mutateOps.push({
+      audienceOperation: {
+        create: {
+          resourceName: audResource,
+          name: `${audNameBase}${uniqueSuffix}`,
+          description: (typeof rawDescription === 'string' && rawDescription.trim()) ? rawDescription.trim().slice(0, 250) : 'Audiencia basada en user list existente',
+          dimensions: [
+            { audienceSegments: { segments: [{ userList: { userList: existing_user_list } }] } },
+          ],
+        },
+      },
+    });
+    mutateOps.push({
+      assetGroupSignalOperation: {
+        create: {
+          assetGroup: assetGroupResource,
+          audience: { audience: audResource },
+        },
+      },
+    });
+  }
+  // Path (c): demographics-based
+  else {
+    const AGE_ENUMS = new Set(['AGE_RANGE_18_24', 'AGE_RANGE_25_34', 'AGE_RANGE_35_44', 'AGE_RANGE_45_54', 'AGE_RANGE_55_64', 'AGE_RANGE_65_UP', 'AGE_RANGE_UNDETERMINED']);
+    const GENDER_ENUMS = new Set(['MALE', 'FEMALE', 'UNDETERMINED']);
+    const PARENTAL_ENUMS = new Set(['PARENT', 'NOT_A_PARENT', 'UNDETERMINED']);
+    const INCOME_ENUMS = new Set(['INCOME_RANGE_0_50', 'INCOME_RANGE_50_60', 'INCOME_RANGE_60_70', 'INCOME_RANGE_70_80', 'INCOME_RANGE_80_90', 'INCOME_RANGE_90_UP', 'INCOME_RANGE_UNDETERMINED']);
+    const AGE_MAP: Record<string, { minAge?: number; maxAge?: number }> = {
+      AGE_RANGE_18_24: { minAge: 18, maxAge: 24 },
+      AGE_RANGE_25_34: { minAge: 25, maxAge: 34 },
+      AGE_RANGE_35_44: { minAge: 35, maxAge: 44 },
+      AGE_RANGE_45_54: { minAge: 45, maxAge: 54 },
+      AGE_RANGE_55_64: { minAge: 55, maxAge: 64 },
+      AGE_RANGE_65_UP: { minAge: 65 },
+    };
+
+    const validAges = Array.isArray(age_ranges) ? age_ranges.filter((a: string) => AGE_ENUMS.has(a)) : [];
+    const validGenders = Array.isArray(genders) ? genders.filter((g: string) => GENDER_ENUMS.has(g) && g !== 'UNDETERMINED') : [];
+    const validParental = Array.isArray(parental_statuses) ? parental_statuses.filter((p: string) => PARENTAL_ENUMS.has(p) && p !== 'UNDETERMINED') : [];
+    const validIncomes = Array.isArray(income_ranges) ? income_ranges.filter((i: string) => INCOME_ENUMS.has(i) && i !== 'INCOME_RANGE_UNDETERMINED') : [];
+
+    const dimensions: any[] = [];
+    if (validAges.length) {
+      const ageSegments = validAges.filter((r: string) => r !== 'AGE_RANGE_UNDETERMINED').map((r: string) => AGE_MAP[r]).filter(Boolean);
+      const includeUndet = validAges.includes('AGE_RANGE_UNDETERMINED');
+      const ageDim: any = {};
+      if (ageSegments.length) ageDim.ageRanges = ageSegments;
+      if (includeUndet) ageDim.includeUndetermined = true;
+      if (ageSegments.length || includeUndet) dimensions.push({ age: ageDim });
+    }
+    if (validGenders.length) dimensions.push({ gender: { genders: validGenders } });
+    if (validParental.length) dimensions.push({ parentalStatus: { parentalStatuses: validParental } });
+    if (validIncomes.length) dimensions.push({ householdIncome: { incomeRanges: validIncomes } });
+
+    if (dimensions.length === 0) {
+      return { body: { error: 'Debés proveer al menos una dimensión (ages, genders, parental_statuses o income_ranges) o existing_audience_resource / existing_user_list' }, status: 400 };
+    }
+
+    const audTempId = -1 * (Date.now() % 1_000_000);
+    const audResource = `customers/${customerId}/audiences/${audTempId}`;
+    const audNameBase = (typeof rawName === 'string' && rawName.trim()) ? rawName.trim().slice(0, 40) : 'Audiencia PMAX';
+    mutateOps.push({
+      audienceOperation: {
+        create: {
+          resourceName: audResource,
+          name: `${audNameBase}${uniqueSuffix}`,
+          description: (typeof rawDescription === 'string' && rawDescription.trim()) ? rawDescription.trim().slice(0, 250) : 'Audiencia generada para PMAX',
+          dimensions,
+        },
+      },
+    });
+    mutateOps.push({
+      assetGroupSignalOperation: {
+        create: {
+          assetGroup: assetGroupResource,
+          audience: { audience: audResource },
+        },
+      },
+    });
+  }
+
+  const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, mutateOps);
+  if (!result.ok) {
+    return { body: { error: 'Failed to add audience signal', details: result.error }, status: 502 };
+  }
+  return { body: { success: true, asset_group_id: assetGroupId }, status: 200 };
+}
+
 // --- Main handler ---
 
 export async function manageGooglePmax(c: Context) {
@@ -449,6 +584,7 @@ export async function manageGooglePmax(c: Context) {
     const validActions: Action[] = [
       'list_asset_groups', 'get_asset_group_detail',
       'create_asset_group', 'add_asset', 'remove_asset', 'update_asset_group', 'remove_asset_group',
+      'add_audience_signal',
     ];
 
     if (!validActions.includes(action)) {
@@ -456,7 +592,7 @@ export async function manageGooglePmax(c: Context) {
     }
 
     // Actions that require asset_group_id
-    const needsAssetGroupId: Action[] = ['get_asset_group_detail', 'add_asset', 'remove_asset', 'update_asset_group', 'remove_asset_group'];
+    const needsAssetGroupId: Action[] = ['get_asset_group_detail', 'add_asset', 'remove_asset', 'update_asset_group', 'remove_asset_group', 'add_audience_signal'];
     if (needsAssetGroupId.includes(action) && !asset_group_id) {
       return c.json({ error: `Missing asset_group_id for action "${action}"` }, 400);
     }
@@ -497,6 +633,9 @@ export async function manageGooglePmax(c: Context) {
         break;
       case 'remove_asset_group':
         result = await handleRemoveAssetGroup(ctx.customerId, asset_group_id!, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId);
+        break;
+      case 'add_audience_signal':
+        result = await handleAddAudienceSignal(ctx.customerId, asset_group_id!, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, data || {});
         break;
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };

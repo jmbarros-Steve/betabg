@@ -196,6 +196,17 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
   const [steveMaxChars, setSteveMaxChars] = useState<number>(90);
   // Image mode: cuando steveField es IMAGE/LOGO, usamos generate-image en vez de suggest_asset_content
   const [steveImageUrl, setSteveImageUrl] = useState<string | null>(null);
+  // Variaciones (solo LOGO) — galería de 3 previews alternativas
+  const [steveImageVariations, setSteveImageVariations] = useState<string[]>([]);
+  const [steveVariationsLoading, setSteveVariationsLoading] = useState(false);
+
+  // Audience Signal dialog (agregar a un AG existente)
+  const [audienceOpen, setAudienceOpen] = useState(false);
+  const [audienceGroupId, setAudienceGroupId] = useState<string | null>(null);
+  const [audienceName, setAudienceName] = useState('Audiencia PMAX');
+  const [audienceAges, setAudienceAges] = useState<string[]>([]);
+  const [audienceGenders, setAudienceGenders] = useState<string[]>([]);
+  const [audienceLoading, setAudienceLoading] = useState(false);
 
   const fetchAssetGroups = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -442,6 +453,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     setSteveSelectedIdx(null);
     setSteveUserIntent('');
     setSteveImageUrl(null);
+    setSteveImageVariations([]); // reset galería al cambiar field
     setSteveOpen(true);
 
     if (fieldType === 'CALL_TO_ACTION_SELECTION') {
@@ -481,6 +493,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
   const generateSteveImage = async (fieldType: string, intent: string) => {
     setSteveLoading(true);
     setSteveImageUrl(null);
+    setSteveImageVariations([]);
     const format = IMAGE_FIELD_TO_FORMAT[fieldType] || 'landscape';
     const { data, error } = await callApi('generate-image', {
       body: {
@@ -497,6 +510,43 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
       return;
     }
     setSteveImageUrl(data.asset_url);
+  };
+
+  // Genera 3 variaciones del logo (u otra imagen) en paralelo.
+  // Prompts con ángulos distintos (fondo blanco, transparente, colorido).
+  const generateLogoVariations = async () => {
+    if (!steveGroupId) return;
+    const format = IMAGE_FIELD_TO_FORMAT[steveField] || 'logo';
+    const variationPrompts = [
+      `${buildImagePrompt(steveField)} Fondo blanco limpio, minimalista.`,
+      `${buildImagePrompt(steveField)} Fondo transparente o neutro, crisp.`,
+      `${buildImagePrompt(steveField)} Fondo sutilmente colorido que complementa la marca.`,
+    ];
+    setSteveVariationsLoading(true);
+    try {
+      const results = await Promise.all(variationPrompts.map(prompt =>
+        callApi('generate-image', {
+          body: {
+            clientId,
+            promptGeneracion: prompt,
+            formato: format,
+            engine: 'imagen',
+            userIntent: steveUserIntent || undefined,
+          },
+        })
+      ));
+      const urls = results
+        .map(r => r.data?.asset_url)
+        .filter((u): u is string => typeof u === 'string' && u.length > 0);
+      if (urls.length === 0) {
+        toast.error('No se pudieron generar variaciones');
+        return;
+      }
+      setSteveImageVariations(urls);
+      toast.success(`${urls.length} variaciones listas`);
+    } finally {
+      setSteveVariationsLoading(false);
+    }
   };
 
   const requestSteveSuggestions = async () => {
@@ -529,6 +579,43 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     setSteveReasoning(data?.reasoning || null);
     setSteveMaxChars(data?.max_chars || 90);
     setSteveSelectedIdx(null);
+  };
+
+  // Abre dialog Audience Signal para un AG existente
+  const openAudienceDialog = (groupId: string) => {
+    setAudienceGroupId(groupId);
+    setAudienceName('Audiencia PMAX');
+    setAudienceAges([]);
+    setAudienceGenders([]);
+    setAudienceOpen(true);
+  };
+
+  const submitAudienceSignal = async () => {
+    if (!audienceGroupId) return;
+    if (audienceAges.length === 0 && audienceGenders.length === 0) {
+      toast.error('Elegí al menos una edad o género');
+      return;
+    }
+    setAudienceLoading(true);
+    const { error } = await callApi('manage-google-pmax', {
+      body: {
+        action: 'add_audience_signal',
+        connection_id: connectionId,
+        asset_group_id: audienceGroupId,
+        data: {
+          name: audienceName || 'Audiencia PMAX',
+          age_ranges: audienceAges,
+          genders: audienceGenders,
+        },
+      },
+    });
+    setAudienceLoading(false);
+    if (error) {
+      toast.error('Error agregando audience signal: ' + error);
+      return;
+    }
+    toast.success('Audience signal agregado al grupo de recursos');
+    setAudienceOpen(false);
   };
 
   // Convierte URL pública a base64 (sin header data:). Requerido por add_asset
@@ -848,20 +935,31 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                         );
                       })()}
 
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
                         <span className="text-sm text-muted-foreground">{groupDetails[group.id].count} assets</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setAddAssetGroupId(group.id);
-                            setNewAsset({ field_type: 'HEADLINE', text: '' });
-                            setAddAssetOpen(true);
-                          }}
-                        >
-                          <Plus className="w-3.5 h-3.5 mr-1" />
-                          Agregar asset
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openAudienceDialog(group.id)}
+                            title="Agregar Audience Signal a este grupo"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 mr-1" />
+                            Audience Signal
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setAddAssetGroupId(group.id);
+                              setNewAsset({ field_type: 'HEADLINE', text: '' });
+                              setAddAssetOpen(true);
+                            }}
+                          >
+                            <Plus className="w-3.5 h-3.5 mr-1" />
+                            Agregar asset
+                          </Button>
+                        </div>
                       </div>
 
                       {/* Assets by type */}
@@ -1062,11 +1160,11 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                 {IMAGE_FIELDS.has(steveField) ? 'Steve está generando la imagen...' : 'Steve está pensando...'}
               </div>
             ) : IMAGE_FIELDS.has(steveField) ? (
-              // Modo imagen: preview
+              // Modo imagen: preview + galería de variaciones (solo LOGO)
               <div className="space-y-2">
                 {steveImageUrl ? (
                   <div className="space-y-2">
-                    <div className="border rounded-md overflow-hidden bg-muted/20 flex items-center justify-center">
+                    <div className="border-2 border-primary/60 rounded-md overflow-hidden bg-muted/20 flex items-center justify-center">
                       <img
                         src={steveImageUrl}
                         alt="Steve generated"
@@ -1074,8 +1172,39 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                       />
                     </div>
                     <p className="text-[11px] text-muted-foreground text-center">
-                      Preview generado por Steve. "Agregar" lo sube a Google Ads, "Regenerar" prueba otra.
+                      Preview activo. "Agregar" sube ésta a Google Ads.
                     </p>
+
+                    {(steveField === 'LOGO' || steveField === 'LANDSCAPE_LOGO') && (
+                      <div className="pt-2 border-t border-border/50 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs">Variaciones</Label>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={generateLogoVariations}
+                            disabled={steveVariationsLoading}
+                          >
+                            {steveVariationsLoading ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1" />}
+                            Generar 3 variaciones
+                          </Button>
+                        </div>
+                        {steveImageVariations.length > 0 && (
+                          <div className="grid grid-cols-3 gap-2">
+                            {steveImageVariations.map((url, idx) => (
+                              <button
+                                key={idx}
+                                className="border rounded-md overflow-hidden hover:border-primary transition-colors bg-muted/20"
+                                onClick={() => setSteveImageUrl(url)}
+                                title="Click para usar esta variación"
+                              >
+                                <img src={url} alt={`Variación ${idx + 1}`} className="w-full h-24 object-contain" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-6">
@@ -1155,6 +1284,93 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
               }
             >
               {steveAdding && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Agregar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Audience Signal Dialog — agregar a un AG existente */}
+      <Dialog open={audienceOpen} onOpenChange={(open) => { if (!open && !audienceLoading) setAudienceOpen(open); }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" />
+              Agregar Audience Signal
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label className="text-xs">Nombre</Label>
+              <Input
+                value={audienceName}
+                onChange={e => setAudienceName(e.target.value)}
+                maxLength={40}
+                placeholder="Ej: Dueños de perros Santiago"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Steve le agrega sufijo único automático para evitar colisión.
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Edades</Label>
+              <div className="grid grid-cols-2 gap-2 border rounded-md p-2">
+                {[
+                  { id: 'AGE_RANGE_18_24', label: '18-24' },
+                  { id: 'AGE_RANGE_25_34', label: '25-34' },
+                  { id: 'AGE_RANGE_35_44', label: '35-44' },
+                  { id: 'AGE_RANGE_45_54', label: '45-54' },
+                  { id: 'AGE_RANGE_55_64', label: '55-64' },
+                  { id: 'AGE_RANGE_65_UP', label: '65+' },
+                ].map(age => {
+                  const checked = audienceAges.includes(age.id);
+                  return (
+                    <label key={age.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={e => setAudienceAges(prev =>
+                          e.target.checked ? [...prev, age.id] : prev.filter(x => x !== age.id)
+                        )}
+                      />
+                      {age.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Género</Label>
+              <div className="flex gap-3 border rounded-md p-2">
+                {[
+                  { id: 'MALE', label: 'Masculino' },
+                  { id: 'FEMALE', label: 'Femenino' },
+                ].map(g => {
+                  const checked = audienceGenders.includes(g.id);
+                  return (
+                    <label key={g.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={e => setAudienceGenders(prev =>
+                          e.target.checked ? [...prev, g.id] : prev.filter(x => x !== g.id)
+                        )}
+                      />
+                      {g.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAudienceOpen(false)} disabled={audienceLoading}>
+              Cancelar
+            </Button>
+            <Button onClick={submitAudienceSignal} disabled={audienceLoading}>
+              {audienceLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
               Agregar
             </Button>
           </DialogFooter>

@@ -199,6 +199,63 @@ export async function generateImage(c: Context) {
 
   // Load brand context (colors from brief + website, logo URL) for visual coherence
   const brandCtx = await loadBrandContext(supabase, clientId);
+
+  // Shortcut: formato=landscape_logo con logo del cliente presente → letterbox con sharp
+  // (logo centrado en canvas 1200x300 blanco). No llamamos a Gemini — es gratis, instantáneo,
+  // y preserva el logo original. Si falla, cae al flujo normal de Gemini.
+  if (String(formato || '').toLowerCase() === 'landscape_logo' && brandCtx.logoUrl) {
+    try {
+      const logoResp = await fetch(brandCtx.logoUrl, { signal: AbortSignal.timeout(10_000) });
+      if (!logoResp.ok) throw new Error(`logo fetch failed: ${logoResp.status}`);
+      const logoBuf = Buffer.from(await logoResp.arrayBuffer());
+
+      const TARGET_W = 1200;
+      const TARGET_H = 300;
+      const PADDING = 20; // margen interno — logo nunca toca bordes
+
+      const logoResized = await sharp(logoBuf)
+        .resize({ height: TARGET_H - PADDING * 2, fit: 'inside', withoutEnlargement: false })
+        .png()
+        .toBuffer();
+
+      const composed = await sharp({
+        create: {
+          width: TARGET_W,
+          height: TARGET_H,
+          channels: 4,
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
+        },
+      })
+        .composite([{ input: logoResized, gravity: 'center' }])
+        .png({ compressionLevel: 6 })
+        .toBuffer();
+
+      const ts = Date.now();
+      const storagePath = `assets/${clientId}/generated/landscape-logo-${ts}.png`;
+      const { error: storageErr } = await supabase.storage
+        .from('client-assets')
+        .upload(storagePath, composed, { contentType: 'image/png', upsert: false });
+      if (storageErr) throw storageErr;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('client-assets')
+        .getPublicUrl(storagePath);
+
+      await supabase.from('ad_assets').insert({
+        creative_id: creativeId || null,
+        client_id: clientId,
+        asset_url: publicUrl,
+        tipo: 'imagen',
+      });
+
+      console.log('[generate-image] landscape_logo letterbox generated from brand logo');
+      return c.json({ asset_url: publicUrl, source: 'letterbox' });
+    } catch (err: any) {
+      console.warn('[generate-image] letterbox failed, falling through to Gemini:', err?.message);
+      // cae al flujo normal
+    }
+  }
+
   const includeLogoReference = !!brandCtx.logoUrl && String(formato || '').toLowerCase() !== 'logo';
   const brandColorsBlock = brandCtx.colors.length > 0
     ? `\nBRAND COLORS (use these in the composition — props, lighting accents, background tones): ${brandCtx.colors.join(', ')}\n`
