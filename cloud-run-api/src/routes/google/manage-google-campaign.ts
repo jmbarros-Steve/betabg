@@ -3,7 +3,7 @@ import sharp from 'sharp';
 import { googleAdsQuery, googleAdsMutate, resolveConnectionAndToken } from '../../lib/google-ads-api.js';
 import { convertToCLP, fetchGoogleAccountCurrency } from '../../lib/currency.js';
 
-type Action = 'pause' | 'resume' | 'update_budget' | 'list_details';
+type Action = 'pause' | 'resume' | 'remove' | 'update_budget' | 'list_details';
 
 interface RequestBody {
   action: Action;
@@ -64,6 +64,34 @@ async function handleResume(
   }
 
   return { body: { success: true, campaign_id: campaignId, status: 'ENABLED' }, status: 200 };
+}
+
+// Soft-delete: cambia status a REMOVED. Google Ads oculta la campaña de queries normales
+// (filtro `status != 'REMOVED'`) pero preserva el historial de métricas.
+async function handleRemove(
+  customerId: string,
+  campaignId: string,
+  accessToken: string,
+  developerToken: string,
+  loginCustomerId: string
+): Promise<{ body: any; status: number }> {
+  console.log(`[manage-google-campaign] Removing campaign ${campaignId}`);
+
+  const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, [{
+    campaignOperation: {
+      update: {
+        resourceName: `customers/${customerId}/campaigns/${campaignId}`,
+        status: 'REMOVED',
+      },
+      updateMask: 'status',
+    },
+  }]);
+
+  if (!result.ok) {
+    return { body: { error: 'Failed to remove campaign', details: result.error }, status: 502 };
+  }
+
+  return { body: { success: true, campaign_id: campaignId, status: 'REMOVED' }, status: 200 };
 }
 
 async function handleUpdateBudget(
@@ -2872,7 +2900,7 @@ export async function manageGoogleCampaign(c: Context) {
     if (!connection_id) return c.json({ error: 'Missing required field: connection_id' }, 400);
 
     const validActions: AllActions[] = [
-      'pause', 'resume', 'update_budget', 'list_details',
+      'pause', 'resume', 'remove', 'update_budget', 'list_details',
       'check_write_access',
       'get_settings', 'update_settings',
       'list_ad_groups', 'create_ad_group', 'update_ad_group', 'pause_ad_group', 'enable_ad_group',
@@ -2891,7 +2919,7 @@ export async function manageGoogleCampaign(c: Context) {
 
     // Actions that require campaign_id
     const needsCampaignId: AllActions[] = [
-      'pause', 'resume', 'update_budget',
+      'pause', 'resume', 'remove', 'update_budget',
       'get_settings', 'update_settings',
       'list_ad_groups', 'create_ad_group',
     ];
@@ -2929,6 +2957,9 @@ export async function manageGoogleCampaign(c: Context) {
         break;
       case 'resume':
         result = await handleResume(ctx.customerId, campaign_id!, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId);
+        break;
+      case 'remove':
+        result = await handleRemove(ctx.customerId, campaign_id!, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId);
         break;
       case 'update_budget':
         result = await handleUpdateBudget(ctx.customerId, campaign_id!, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, data || {});

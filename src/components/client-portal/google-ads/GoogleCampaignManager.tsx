@@ -747,6 +747,39 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     toast.success(`Campana ${action === 'pause' ? 'pausada' : 'reanudada'}`);
   };
 
+  const handleRemoveCampaign = async (campaign: Campaign) => {
+    const isPmax = campaign.channel_type === 'PERFORMANCE_MAX';
+    const agCount = (assetGroupsByCampaign[campaign.id] || []).length;
+    const pmaxWarning = isPmax && agCount > 0
+      ? `\n\n⚠️ Esta campaña PMAX tiene ${agCount} grupo${agCount !== 1 ? 's' : ''} de recursos que quedarán inaccesibles al eliminarla.`
+      : '';
+    const ok = window.confirm(
+      `¿Eliminar la campaña "${campaign.name}"?\n\n` +
+      `Esto la marcará como REMOVED en Google Ads. El historial de métricas se mantiene, ` +
+      `pero la campaña dejará de aparecer en tu lista.${pmaxWarning}\n\n` +
+      `Esta acción no se puede deshacer desde Steve.`
+    );
+    if (!ok) return;
+
+    setActionLoading(prev => ({ ...prev, [campaign.id]: true }));
+
+    const { error } = await callApi('manage-google-campaign', {
+      body: { action: 'remove', connection_id: connectionId, campaign_id: campaign.id },
+    });
+
+    setActionLoading(prev => ({ ...prev, [campaign.id]: false }));
+
+    if (error) {
+      toast.error(`Error eliminando campaña: ${error}`);
+      return;
+    }
+
+    toast.success(`Campaña "${campaign.name}" eliminada`);
+    // Remover del estado local — ya no debería aparecer en futuros fetches (filtro status != REMOVED).
+    setCampaigns(prev => prev.filter(c => c.id !== campaign.id));
+    if (expandedCampaign === campaign.id) setExpandedCampaign(null);
+  };
+
   const openBudgetDialog = (campaign: Campaign) => {
     setBudgetCampaign(campaign);
     setNewBudget(campaign.daily_budget_currency.toString());
@@ -1769,6 +1802,16 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                               title="Configuracion"
                             >
                               <Settings className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                              disabled={actionLoading[campaign.id]}
+                              onClick={() => handleRemoveCampaign(campaign)}
+                              title="Eliminar campaña"
+                            >
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </>
                         )}
