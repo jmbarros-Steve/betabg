@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -60,6 +60,7 @@ const adStrengthColors: Record<string, string> = {
   AVERAGE: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
   POOR: 'bg-red-500/10 text-red-600 border-red-500/20',
   UNSPECIFIED: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
+  SYNCING: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
 };
 
 const adStrengthLabels: Record<string, string> = {
@@ -68,7 +69,14 @@ const adStrengthLabels: Record<string, string> = {
   AVERAGE: 'Promedio',
   POOR: 'Pobre',
   UNSPECIFIED: 'Sin datos',
+  SYNCING: 'Sincronizando...',
 };
+
+// Key local para identificar asset groups optimistas (creados pero aún no visibles en GAQL)
+type PendingGroup = AssetGroup & { __pendingKey: string; __createdAt: number };
+const PENDING_TTL_MS = 2 * 60 * 1000; // 2 min — después de eso avisamos al user
+const POLL_FAST_MS = 10_000;           // 10s mientras hay pending
+const POLL_IDLE_MS = 30_000;           // 30s normal
 
 const fieldTypeLabels: Record<string, string> = {
   HEADLINE: 'Headline',
@@ -85,7 +93,9 @@ const fieldTypeLabels: Record<string, string> = {
 
 export default function GooglePmaxManager({ connectionId, clientId }: GooglePmaxManagerProps) {
   const [assetGroups, setAssetGroups] = useState<AssetGroup[]>([]);
+  const [pendingGroups, setPendingGroups] = useState<PendingGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [groupDetails, setGroupDetails] = useState<Record<string, { assets: Record<string, AssetDetail[]>; count: number }>>({});
   const [detailLoading, setDetailLoading] = useState<Record<string, boolean>>({});
@@ -109,25 +119,76 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
   const [addAssetLoading, setAddAssetLoading] = useState(false);
   const [newAsset, setNewAsset] = useState({ field_type: 'HEADLINE', text: '' });
 
-  const fetchAssetGroups = useCallback(async () => {
-    setLoading(true);
+  const fetchAssetGroups = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
+    setRefreshing(true);
     const { data, error } = await callApi('manage-google-pmax', {
       body: { action: 'list_asset_groups', connection_id: connectionId },
     });
 
+    setRefreshing(false);
     if (error) {
-      toast.error('Error cargando asset groups: ' + error);
+      if (!opts?.silent) toast.error('Error cargando asset groups: ' + error);
       setLoading(false);
       return;
     }
 
-    setAssetGroups(data?.asset_groups || []);
+    const groups: AssetGroup[] = data?.asset_groups || [];
+    setAssetGroups(groups);
     setLoading(false);
+
+    // Limpiar pending groups cuyo nombre+campaña ya apareció en el fetch real
+    // o que ya superaron el TTL (timeout — Google no procesó aún).
+    setPendingGroups(prev => {
+      const kept: PendingGroup[] = [];
+      const expired: PendingGroup[] = [];
+      for (const p of prev) {
+        const matched = groups.some(g => g.name === p.name && g.campaign_id === p.campaign_id);
+        if (matched) continue; // apareció en Google → drop
+        const aged = Date.now() - p.__createdAt > PENDING_TTL_MS;
+        if (aged) expired.push(p); else kept.push(p);
+      }
+      if (expired.length > 0) {
+        expired.forEach(p => toast.warning(
+          `"${p.name}" aún no aparece en Google tras 2 min. Verificalo directamente en Google Ads.`,
+          { duration: 8_000 }
+        ));
+      }
+      return kept;
+    });
   }, [connectionId]);
 
+  // Auto-refresh: al mount + interval (rápido si hay pending, lento si no) + al volver a la tab.
   useEffect(() => {
     fetchAssetGroups();
   }, [fetchAssetGroups]);
+
+  // isVisible: pausamos el poll cuando la tab está oculta para no quemar cuota de Google Ads API.
+  const [isVisible, setIsVisible] = useState(() =>
+    typeof document !== 'undefined' ? document.visibilityState === 'visible' : true
+  );
+
+  useEffect(() => {
+    const onFocus = () => {
+      const visible = document.visibilityState === 'visible';
+      setIsVisible(visible);
+      if (visible) fetchAssetGroups({ silent: true });
+    };
+    document.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [fetchAssetGroups]);
+
+  useEffect(() => {
+    if (!isVisible) return; // no pollear si la tab no está visible
+    const hasPending = pendingGroups.length > 0;
+    const ms = hasPending ? POLL_FAST_MS : POLL_IDLE_MS;
+    const interval = setInterval(() => fetchAssetGroups({ silent: true }), ms);
+    return () => clearInterval(interval);
+  }, [fetchAssetGroups, pendingGroups.length, isVisible]);
 
   const toggleGroup = async (groupId: string) => {
     if (expandedGroup === groupId) {
@@ -187,10 +248,26 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
       return;
     }
 
-    toast.success('Asset group creado');
+    toast.success('Asset group creado — sincronizando con Google (puede tardar unos minutos)');
+    // Optimistic: agregar a pendingGroups para que aparezca con badge "Sincronizando..."
+    // hasta que fetchAssetGroups lo devuelva real (match por name + campaign_id) o expire TTL.
+    const pmaxMatch = pmaxCampaigns.find(c => c.id === newGroup.campaign_id);
+    setPendingGroups(prev => [
+      ...prev,
+      {
+        __pendingKey: `pending-${Date.now()}`,
+        __createdAt: Date.now(),
+        id: `pending-${Date.now()}`,
+        name: newGroup.name,
+        status: 'ENABLED',
+        ad_strength: 'SYNCING',
+        campaign_id: newGroup.campaign_id,
+        campaign_name: pmaxMatch?.name || '',
+      },
+    ]);
     setCreateOpen(false);
     setNewGroup({ name: '', campaign_id: '', final_url: '', business_name: '', headlines: '', long_headlines: '', descriptions: '' });
-    fetchAssetGroups();
+    fetchAssetGroups({ silent: true });
   };
 
   const handleAddAsset = async () => {
@@ -267,6 +344,9 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
   // Get unique PMAX campaign IDs for the create dialog
   const pmaxCampaigns = [...new Map(assetGroups.map(ag => [ag.campaign_id, { id: ag.campaign_id, name: ag.campaign_name }])).values()];
 
+  // Merge real asset groups con los pending (optimistic) — los pending quedan primero para visibilidad.
+  const displayGroups: (AssetGroup | PendingGroup)[] = [...pendingGroups, ...assetGroups];
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -281,13 +361,23 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-muted-foreground">
-          {assetGroups.length} asset group{assetGroups.length !== 1 ? 's' : ''} PMAX
-        </h3>
+        <div className="flex flex-col gap-1">
+          <h3 className="text-sm font-medium text-muted-foreground">
+            {displayGroups.length} asset group{displayGroups.length !== 1 ? 's' : ''} PMAX
+            {pendingGroups.length > 0 && (
+              <span className="ml-2 text-xs text-blue-600">
+                ({pendingGroups.length} sincronizando)
+              </span>
+            )}
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Auto-refresco {pendingGroups.length > 0 ? 'cada 10s' : 'cada 30s'}. Los asset groups recién creados tardan unos minutos en aparecer desde Google.
+          </p>
+        </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchAssetGroups}>
-            <RefreshCw className="w-4 h-4 mr-1" />
-            Refrescar
+          <Button variant="outline" size="sm" onClick={() => fetchAssetGroups()} disabled={refreshing}>
+            <RefreshCw className={`w-4 h-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Actualizando...' : 'Refrescar'}
           </Button>
           {pmaxCampaigns.length > 0 && (
             <Button size="sm" onClick={() => setCreateOpen(true)}>
@@ -299,7 +389,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
       </div>
 
       {/* List */}
-      {assetGroups.length === 0 ? (
+      {displayGroups.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             No hay asset groups PMAX en esta cuenta.
@@ -309,16 +399,21 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
         </Card>
       ) : (
         <div className="space-y-2">
-          {assetGroups.map(group => (
-            <Card key={group.id} className="overflow-hidden">
+          {displayGroups.map(group => {
+            const isPending = '__pendingKey' in group;
+            return (
+            <Card key={isPending ? (group as PendingGroup).__pendingKey : group.id} className={`overflow-hidden ${isPending ? 'opacity-70 border-blue-500/30' : ''}`}>
               {/* Group header */}
               <button
-                className="w-full flex items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
-                onClick={() => toggleGroup(group.id)}
+                className={`w-full flex items-center gap-3 p-4 text-left transition-colors ${isPending ? 'cursor-wait' : 'hover:bg-muted/30'}`}
+                onClick={() => !isPending && toggleGroup(group.id)}
+                disabled={isPending}
               >
-                {expandedGroup === group.id
-                  ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-                  : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                {isPending
+                  ? <Loader2 className="w-4 h-4 text-blue-500 shrink-0 animate-spin" />
+                  : expandedGroup === group.id
+                    ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                    : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                 }
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{group.name}</p>
@@ -412,7 +507,8 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                 </div>
               )}
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
