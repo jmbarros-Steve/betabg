@@ -675,9 +675,32 @@ async function handleCreateCampaign(
     // Disable Brand Guidelines (requires CampaignAsset logo+name which we add in Phase 2)
     campaignCreate.brandGuidelinesEnabled = false;
 
-    // Customer Acquisition Setting — solo valores válidos de la API v23
+    // Customer Acquisition Setting — validar requisitos de Google antes de aplicar.
+    // BID_HIGHER y TARGET_ALL_EQUALLY requieren distinguir clientes nuevos vs antiguos,
+    // lo que exige: Customer Match (user_list CRM_BASED) activa O conversion action "new customer".
+    // Si el account no cumple, degradamos a BID_ONLY con warning en la response.
+    let acquisitionWarning: string | null = null;
+    let effectiveAcquisitionMode: string | null = null;
     if (acquisition_mode && ['BID_HIGHER', 'TARGET_ALL_EQUALLY', 'BID_ONLY'].includes(acquisition_mode)) {
-      campaignCreate.customerAcquisitionSetting = { optimizationMode: acquisition_mode };
+      if (acquisition_mode === 'BID_ONLY') {
+        effectiveAcquisitionMode = 'BID_ONLY';
+      } else {
+        try {
+          const checkGaql = `SELECT user_list.id FROM user_list WHERE user_list.type = 'CRM_BASED' AND user_list.membership_status = 'OPEN' AND user_list.size_for_display > 0 LIMIT 1`;
+          const checkRes = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, checkGaql);
+          const hasCM = checkRes.ok && Array.isArray(checkRes.data) && checkRes.data.length > 0;
+          if (hasCM) {
+            effectiveAcquisitionMode = acquisition_mode;
+          } else {
+            effectiveAcquisitionMode = 'BID_ONLY';
+            acquisitionWarning = `El modo "${acquisition_mode}" requiere una lista Customer Match activa con datos para distinguir clientes nuevos. No se encontró ninguna → campaña creada con "Sin prioridad" (BID_ONLY). Importá una lista Customer Match para usar este modo.`;
+          }
+        } catch (err: any) {
+          effectiveAcquisitionMode = 'BID_ONLY';
+          acquisitionWarning = `No se pudo verificar Customer Match — campaña creada con "Sin prioridad" por seguridad.`;
+        }
+      }
+      campaignCreate.customerAcquisitionSetting = { optimizationMode: effectiveAcquisitionMode };
     }
 
     if (!final_urls?.length) {
@@ -1094,17 +1117,79 @@ async function handleCreateCampaign(
       }
     }
 
-    // Audience Signal (demografia + intereses) generado por AI — capa 2
-    // Crea un Audience customer-level + lo linkea al AssetGroup como signal.
+    // Audience Signal (demografia/intereses/existente) — tres paths:
+    //   (a) existing_audience_resource → linkea Audience ya guardado (sin crear)
+    //   (b) existing_user_list_resource → crea Audience custom que contiene el user_list (Customer Match / remarketing)
+    //   (c) demographics (age/gender/parental/income) → crea Audience con dimensiones demográficas
     if (audience_signal && typeof audience_signal === 'object') {
-      const {
-        name: audName,
-        description: audDescription,
-        age_ranges,
-        genders,
-        parental_statuses,
-        income_ranges,
-      } = audience_signal as any;
+      const as = audience_signal as any;
+      const ownerPrefix = `customers/${customerId}/`;
+      const existingAudience = typeof as.existing_audience_resource === 'string' && as.existing_audience_resource.trim().startsWith(`${ownerPrefix}audiences/`)
+        ? as.existing_audience_resource.trim()
+        : null;
+      const existingUserList = typeof as.existing_user_list_resource === 'string' && as.existing_user_list_resource.trim().startsWith(`${ownerPrefix}userLists/`)
+        ? as.existing_user_list_resource.trim()
+        : null;
+      // Fail-fast: si el user envió un resource existente pero no pasa el prefix check del customer actual,
+      // NO cae silenciosamente a path (c) — retorna error claro.
+      const rawAudienceRef = typeof as.existing_audience_resource === 'string' ? as.existing_audience_resource.trim() : '';
+      const rawUserListRef = typeof as.existing_user_list_resource === 'string' ? as.existing_user_list_resource.trim() : '';
+      if ((rawAudienceRef && !existingAudience) || (rawUserListRef && !existingUserList)) {
+        return {
+          body: {
+            error: 'Audience resource no pertenece al customer actual',
+            details: `El resource_name provisto no tiene el prefix esperado (customers/${customerId}/...). Revisá que la audiencia sea del mismo account.`,
+          },
+          status: 400,
+        };
+      }
+
+      if (existingAudience) {
+        // Path (a): reuse existing Audience
+        mutateOps.push({
+          assetGroupSignalOperation: {
+            create: {
+              assetGroup: `customers/${customerId}/assetGroups/-3`,
+              audience: { audience: existingAudience },
+            },
+          },
+        });
+        console.log(`[manage-google-campaign] pmax audience signal: linked existing audience ${existingAudience}`);
+      } else if (existingUserList) {
+        // Path (b): wrap user_list in a new Audience custom (audience_segments dimension)
+        const audTempId = tempId--;
+        const audResource = `customers/${customerId}/audiences/${audTempId}`;
+        mutateOps.push({
+          audienceOperation: {
+            create: {
+              resourceName: audResource,
+              name: (typeof as.name === 'string' && as.name.trim()) ? as.name.trim().slice(0, 50) : `Audiencia PMAX ${Date.now()}`,
+              description: (typeof as.description === 'string' && as.description.trim()) ? as.description.trim().slice(0, 250) : 'Audiencia basada en user list existente',
+              dimensions: [
+                { audienceSegments: { segments: [{ userList: { userList: existingUserList } }] } },
+              ],
+            },
+          },
+        });
+        mutateOps.push({
+          assetGroupSignalOperation: {
+            create: {
+              assetGroup: `customers/${customerId}/assetGroups/-3`,
+              audience: { audience: audResource },
+            },
+          },
+        });
+        console.log(`[manage-google-campaign] pmax audience signal: wrapped user_list ${existingUserList} into new audience`);
+      } else {
+        // Path (c): demographics-based audience (legacy flow)
+        const {
+          name: audName,
+          description: audDescription,
+          age_ranges,
+          genders,
+          parental_statuses,
+          income_ranges,
+        } = as;
 
       // Valid enums Google Ads API v23 (whitelist — cualquier valor fuera se descarta)
       const AGE_ENUMS = new Set(['AGE_RANGE_18_24', 'AGE_RANGE_25_34', 'AGE_RANGE_35_44', 'AGE_RANGE_45_54', 'AGE_RANGE_55_64', 'AGE_RANGE_65_UP', 'AGE_RANGE_UNDETERMINED']);
@@ -1176,6 +1261,7 @@ async function handleCreateCampaign(
       } else {
         console.warn('[manage-google-campaign] audience_signal provided but no valid dimensions after enum whitelist — skipping audience creation');
       }
+      } // end path (c)
     }
   }
 
@@ -1203,6 +1289,8 @@ async function handleCreateCampaign(
       channel_type: channelType,
       status: 'PAUSED',
       data: result.data,
+      warnings: acquisitionWarning ? [acquisitionWarning] : [],
+      effective_acquisition_mode: effectiveAcquisitionMode,
     },
     status: 200,
   };
@@ -2251,6 +2339,83 @@ const PMAX_IMAGE_SPECS: Record<string, { targetRatio: number; tolerance: number;
   LANDSCAPE_LOGO:           { targetRatio: 4.0,  tolerance: 0.2,  minW: 512, minH: 128, label: 'Logo landscape 4:1' },
 };
 
+// --- List audiences + user_lists del account (para permitir reuso en AssetGroupSignal) ---
+async function handleListAudiences(
+  customerId: string,
+  accessToken: string,
+  developerToken: string,
+  loginCustomerId: string
+): Promise<{ body: any; status: number }> {
+  const out: { audiences: any[]; user_lists: any[]; has_customer_match: boolean } = {
+    audiences: [],
+    user_lists: [],
+    has_customer_match: false,
+  };
+
+  // 1) Audiences resources (custom audiences del account)
+  try {
+    const gaql = `
+      SELECT audience.resource_name, audience.id, audience.name,
+             audience.description, audience.status
+      FROM audience
+      WHERE audience.status != 'REMOVED'
+      LIMIT 100
+    `;
+    const r = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, gaql);
+    if (r.ok && Array.isArray(r.data)) {
+      for (const row of r.data) {
+        const a = row.audience || {};
+        if (!a.resourceName) continue;
+        out.audiences.push({
+          resource_name: a.resourceName,
+          id: a.id || null,
+          name: a.name || '(sin nombre)',
+          description: a.description || null,
+          status: a.status || null,
+          kind: 'audience',
+        });
+      }
+    }
+  } catch (err: any) {
+    console.warn('[manage-google-campaign] list audiences failed:', err?.message);
+  }
+
+  // 2) User lists (Customer Match, remarketing, etc.)
+  try {
+    const gaql = `
+      SELECT user_list.resource_name, user_list.id, user_list.name, user_list.description,
+             user_list.type, user_list.size_for_display, user_list.access_reason,
+             user_list.membership_status
+      FROM user_list
+      WHERE user_list.access_reason IN ('OWNED', 'SHARED')
+        AND user_list.membership_status = 'OPEN'
+      LIMIT 100
+    `;
+    const r = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, gaql);
+    if (r.ok && Array.isArray(r.data)) {
+      for (const row of r.data) {
+        const u = row.userList || {};
+        if (!u.resourceName) continue;
+        const type = u.type || '';
+        if (type === 'CRM_BASED') out.has_customer_match = true;
+        out.user_lists.push({
+          resource_name: u.resourceName,
+          id: u.id || null,
+          name: u.name || '(sin nombre)',
+          description: u.description || null,
+          type,
+          size: u.sizeForDisplay || null,
+          kind: 'user_list',
+        });
+      }
+    }
+  } catch (err: any) {
+    console.warn('[manage-google-campaign] list user_lists failed:', err?.message);
+  }
+
+  return { body: { success: true, ...out, count: out.audiences.length + out.user_lists.length }, status: 200 };
+}
+
 // --- List catalog products directly from Merchant Center via Google Ads API `shopping_product` ---
 // Fallback a shopify_products si el MC no tiene productos o falla la query.
 async function handleListCatalogProducts(
@@ -2412,7 +2577,8 @@ type AllActions = Action
   | 'list_merchant_centers'
   | 'get_budget_recommendation'
   | 'list_image_assets'
-  | 'list_catalog_products';
+  | 'list_catalog_products'
+  | 'list_audiences';
 
 export async function manageGoogleCampaign(c: Context) {
   try {
@@ -2440,6 +2606,7 @@ export async function manageGoogleCampaign(c: Context) {
       'get_budget_recommendation',
       'list_image_assets',
       'list_catalog_products',
+      'list_audiences',
     ];
 
     if (!validActions.includes(action)) {
@@ -2534,6 +2701,9 @@ export async function manageGoogleCampaign(c: Context) {
         break;
       case 'list_catalog_products':
         result = await handleListCatalogProducts(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, ctx.clientId, (data as any)?.merchant_center_id);
+        break;
+      case 'list_audiences':
+        result = await handleListAudiences(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId);
         break;
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };
