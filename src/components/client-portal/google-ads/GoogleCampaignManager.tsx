@@ -2594,19 +2594,16 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 </div>
               <div className="space-y-2">
                 <Label>Estrategia de puja</Label>
-                <Select
+                {/* Select nativo: Radix Portal falla dentro del Dialog con overflow-y-auto del wizard */}
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   value={wizardData.bid_strategy}
-                  onValueChange={v => setWizardData(prev => ({ ...prev, bid_strategy: v }))}
+                  onChange={e => setWizardData(prev => ({ ...prev, bid_strategy: e.target.value }))}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar estrategia" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {bidStrategies.map(bs => (
-                      <SelectItem key={bs.value} value={bs.value}>{bs.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {bidStrategies.map(bs => (
+                    <option key={bs.value} value={bs.value}>{bs.label}</option>
+                  ))}
+                </select>
                 <SteveRecommendation
                   connectionId={connectionId}
                   clientId={clientId}
@@ -2670,18 +2667,16 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                     Merchant Center <span className="text-muted-foreground font-normal">(opcional)</span>
                   </Label>
                   <div className="flex gap-2">
-                    <Select
-                      value={wizardData.merchant_center_id || '__none__'}
-                      onValueChange={v => setWizardData(prev => ({ ...prev, merchant_center_id: v === '__none__' ? '' : v }))}
+                    <select
+                      className="flex h-10 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      value={wizardData.merchant_center_id}
+                      onChange={e => setWizardData(prev => ({ ...prev, merchant_center_id: e.target.value }))}
                     >
-                      <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Sin Merchant Center</SelectItem>
-                        {merchantCenters.map(mc => (
-                          <SelectItem key={mc.id} value={mc.id}>{mc.name} ({mc.id})</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <option value="">Sin Merchant Center</option>
+                      {merchantCenters.map(mc => (
+                        <option key={mc.id} value={mc.id}>{mc.name} ({mc.id})</option>
+                      ))}
+                    </select>
                     <Button variant="outline" size="sm" onClick={fetchMerchantCenters} disabled={merchantLoading}>
                       {merchantLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                     </Button>
@@ -2966,17 +2961,15 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
               {isPmax && (
                 <div className="space-y-2">
                   <Label>Adquisicion de clientes</Label>
-                  <Select
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     value={wizardData.acquisition_mode || 'BID_ONLY'}
-                    onValueChange={v => setWizardData(prev => ({ ...prev, acquisition_mode: v }))}
+                    onChange={e => setWizardData(prev => ({ ...prev, acquisition_mode: e.target.value }))}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="BID_ONLY">Sin prioridad (todos por igual)</SelectItem>
-                      <SelectItem value="BID_HIGHER">Priorizar clientes nuevos (pujar mas alto)</SelectItem>
-                      <SelectItem value="TARGET_ALL_EQUALLY">Clientes nuevos y antiguos por igual (explicito)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <option value="BID_ONLY">Sin prioridad (todos por igual)</option>
+                    <option value="BID_HIGHER">Priorizar clientes nuevos (pujar mas alto)</option>
+                    <option value="TARGET_ALL_EQUALLY">Clientes nuevos y antiguos por igual (explicito)</option>
+                  </select>
                   <p className="text-xs text-muted-foreground">
                     Google deduce quien es "nuevo" via Customer Match lists o conversion actions marcadas como first-time.
                   </p>
@@ -3311,17 +3304,15 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
               />
               <div className="space-y-2">
                 <Label>Call to Action <span className="text-muted-foreground font-normal">(opcional)</span></Label>
-                <Select
-                  value={wizardData.call_to_action || '__auto__'}
-                  onValueChange={v => setWizardData(prev => ({ ...prev, call_to_action: v === '__auto__' ? '' : v }))}
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={wizardData.call_to_action}
+                  onChange={e => setWizardData(prev => ({ ...prev, call_to_action: e.target.value }))}
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {ctaOptions.map(opt => (
-                      <SelectItem key={opt.value || '__auto__'} value={opt.value || '__auto__'}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {ctaOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
                 <Label>Display URL Path <span className="text-muted-foreground font-normal">(opcional)</span></Label>
