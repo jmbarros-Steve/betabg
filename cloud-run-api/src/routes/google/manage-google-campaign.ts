@@ -368,6 +368,24 @@ async function handleUpdateSettings(
   const updateFields: Record<string, any> = {};
   const updateMaskParts: string[] = [];
 
+  // Hardening: network_settings solo es editable en SEARCH. PMAX/SHOPPING/DISPLAY
+  // lo rechazarían con FieldError. Fetchamos el channel_type actual de la campaña
+  // y descartamos silenciosamente network_settings si no aplica (belt-and-
+  // suspenders con el frontend que ya oculta el UI).
+  if (data.network_settings) {
+    const channelQuery = `
+      SELECT campaign.advertising_channel_type
+      FROM campaign
+      WHERE campaign.id = ${campaignId}
+    `;
+    const channelResult = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, channelQuery);
+    const channelType = channelResult.ok && channelResult.data?.[0]?.campaign?.advertisingChannelType;
+    if (channelType && channelType !== 'SEARCH') {
+      console.warn(`[update_settings] dropping network_settings for non-SEARCH channel: ${channelType}`);
+      delete data.network_settings;
+    }
+  }
+
   if (data.name) {
     updateFields.name = data.name;
     updateMaskParts.push('name');
@@ -1128,12 +1146,15 @@ async function handleCreateCampaign(
       }
       for (const img of validatedImages) {
         const assetTempId = tempId--;
+        // Google Asset.name limit=128. Sanitizamos: strip newlines/tabs + cap 120
+        // (margen para el sufijo -assetTempId). Nombres con \n rompen la API.
+        const baseName = (img.name || 'Image').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120) || 'Image';
         assetOps.push({
           assetOperation: {
             create: {
               resourceName: `customers/${customerId}/assets/${assetTempId}`,
               imageAsset: { data: img.data },
-              name: `${img.name || 'Image'}-${Math.abs(assetTempId)}`,
+              name: `${baseName}-${Math.abs(assetTempId)}`,
             },
           },
         });

@@ -512,6 +512,10 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   const [deleteAgTarget, setDeleteAgTarget] = useState<{ campaignId: string; id: string; name: string } | null>(null);
   const [deleteAgLoading, setDeleteAgLoading] = useState(false);
 
+  // Delete campaign dialog (reemplaza window.confirm)
+  const [deleteCampaignTarget, setDeleteCampaignTarget] = useState<Campaign | null>(null);
+  const [deleteCampaignLoading, setDeleteCampaignLoading] = useState(false);
+
   // Create ad group dialog
   const [createAdGroupOpen, setCreateAdGroupOpen] = useState(false);
   const [createAdGroupCampaignId, setCreateAdGroupCampaignId] = useState<string | null>(null);
@@ -751,20 +755,16 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     toast.success(`Campana ${action === 'pause' ? 'pausada' : 'reanudada'}`);
   };
 
-  const handleRemoveCampaign = async (campaign: Campaign) => {
-    const isPmax = campaign.channel_type === 'PERFORMANCE_MAX';
-    const agCount = (assetGroupsByCampaign[campaign.id] || []).length;
-    const pmaxWarning = isPmax && agCount > 0
-      ? `\n\n⚠️ Esta campaña PMAX tiene ${agCount} grupo${agCount !== 1 ? 's' : ''} de recursos que quedarán inaccesibles al eliminarla.`
-      : '';
-    const ok = window.confirm(
-      `¿Eliminar la campaña "${campaign.name}"?\n\n` +
-      `Esto la marcará como REMOVED en Google Ads. El historial de métricas se mantiene, ` +
-      `pero la campaña dejará de aparecer en tu lista.${pmaxWarning}\n\n` +
-      `Esta acción no se puede deshacer desde Steve.`
-    );
-    if (!ok) return;
+  const handleRemoveCampaign = (campaign: Campaign) => {
+    // Abre el Dialog de confirmación — la acción real corre en confirmRemoveCampaign.
+    setDeleteCampaignTarget(campaign);
+  };
 
+  const confirmRemoveCampaign = async () => {
+    const campaign = deleteCampaignTarget;
+    if (!campaign) return;
+
+    setDeleteCampaignLoading(true);
     setActionLoading(prev => ({ ...prev, [campaign.id]: true }));
 
     const { error } = await callApi('manage-google-campaign', {
@@ -772,6 +772,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     });
 
     setActionLoading(prev => ({ ...prev, [campaign.id]: false }));
+    setDeleteCampaignLoading(false);
 
     if (error) {
       toast.error(`Error eliminando campaña: ${error}`);
@@ -782,6 +783,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     // Remover del estado local — ya no debería aparecer en futuros fetches (filtro status != REMOVED).
     setCampaigns(prev => prev.filter(c => c.id !== campaign.id));
     if (expandedCampaign === campaign.id) setExpandedCampaign(null);
+    setDeleteCampaignTarget(null);
   };
 
   const openBudgetDialog = (campaign: Campaign) => {
@@ -3660,6 +3662,40 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           refreshAssetGroupsForCampaign(campaign_id);
         }}
       />
+
+      {/* Eliminar Campaña — reemplaza window.confirm */}
+      <Dialog open={!!deleteCampaignTarget} onOpenChange={(open) => { if (!open && !deleteCampaignLoading) setDeleteCampaignTarget(null); }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Eliminar campaña</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm">
+              ¿Seguro que quieres eliminar <strong>"{deleteCampaignTarget?.name}"</strong>?
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Google Ads la marcará como REMOVED. El historial de métricas se mantiene,
+              pero la campaña deja de aparecer en tu lista.
+            </p>
+            {deleteCampaignTarget?.channel_type === 'PERFORMANCE_MAX' && (assetGroupsByCampaign[deleteCampaignTarget.id]?.length || 0) > 0 && (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-700 dark:text-amber-400">
+                ⚠️ Esta campaña PMAX tiene {assetGroupsByCampaign[deleteCampaignTarget.id]?.length} grupo
+                {(assetGroupsByCampaign[deleteCampaignTarget.id]?.length || 0) !== 1 ? 's' : ''} de recursos que quedarán inaccesibles.
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground pt-1">Esta acción no se puede deshacer desde Steve.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteCampaignTarget(null)} disabled={deleteCampaignLoading}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmRemoveCampaign} disabled={deleteCampaignLoading}>
+              {deleteCampaignLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Eliminar Grupo de recursos (PMAX) — reemplaza window.confirm */}
       <Dialog open={!!deleteAgTarget} onOpenChange={(open) => { if (!open && !deleteAgLoading) setDeleteAgTarget(null); }}>

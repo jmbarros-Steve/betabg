@@ -244,7 +244,19 @@ async function handleAddAsset(
   if (!field_type) return { body: { error: 'Missing field_type' }, status: 400 };
 
   const mutateOps: any[] = [];
-  const assetTempId = -1;
+  // Temp ID único por request: evita colisiones cosméticas cross-request si
+  // varios usuarios agregan assets concurrentemente (antes era -1 constante).
+  // Google resuelve temp IDs per-mutate, pero el name del asset (que lleva
+  // este ID) sí puede colisionar en logs/audit si dos requests pegan al
+  // mismo tiempo. Date.now() da un sufijo razonablemente único.
+  const assetTempId = -1 * (Date.now() % 1_000_000);
+
+  // Sanitiza image_name: strip newlines + cap 120 chars (Google Asset.name
+  // limit=128, dejamos margen para sufijo).
+  const sanitizeAssetName = (raw: string | undefined): string => {
+    const base = (raw || 'Image').replace(/[\r\n\t]+/g, ' ').trim();
+    return base.slice(0, 120) || 'Image';
+  };
 
   // Create asset based on type
   if (field_type === 'MARKETING_IMAGE' || field_type === 'SQUARE_MARKETING_IMAGE' ||
@@ -257,7 +269,7 @@ async function handleAddAsset(
           resourceName: `customers/${customerId}/assets/${assetTempId}`,
           type: 'IMAGE',
           imageAsset: { data: image_data },
-          name: `${image_name || 'Image'}-${Math.abs(assetTempId)}`,
+          name: `${sanitizeAssetName(image_name)}-${Math.abs(assetTempId)}`,
         },
       },
     });
