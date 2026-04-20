@@ -27,45 +27,9 @@ Frontend MetaPartnerSetup.tsx → Leadsie con ?customUserId={client_id}
 - No cambiar contratos hardcoded sin grep first
 - gcloud deploy puede reportar false 'failed' — validar con `revisions list`
 
-**Estado Leadsie (09/04/2026):**
-- Deploy prod: steve-api-00426-869 (100% traffic) con 9 fixes
-- Git: código SIN commit/push — drift activo prod↔repo
-- Blockers E2E: #27 LEADSIE_WEBHOOK_SECRET, #16 JM config Connect Profile, #18 test E2E
-- 8 items deuda técnica pendientes
-
-### Documento Google Ads API Application
-- Creado en `docs/google-ads-api-application.md`
-- Cubre: datos empresa, descripción producto, detalle técnico, seguridad, compliance, checklist
-- Access level: Basic (15,000 ops/día) — justificado por multi-tenant agency model
-- 3 funcionalidades declaradas: metrics sync (GAQL searchStream), account management (listAccessibleCustomers), AI copy generation (usa datos de la API, no la API directamente)
-- Compliance: NO app conversion tracking, NO remarketing lists, NO customer match
-
 ### Investigación: Leadsie para Google Ads — SÍ SE PUEDE
 
 **Leadsie soporta Google Ads.** Confirmado en leadsie.com/integrations/google.
-
-**Cómo funciona:**
-- Merchant recibe link Leadsie → se loguea en Google → selecciona las cuentas Google Ads que quiere compartir
-- El acceso se otorga al **MCC (Manager Account)** de Steve, NO como usuario individual
-- El merchant NO comparte contraseñas — Leadsie maneja el flujo OAuth internamente
-- El acceso **NO expira** a menos que el merchant lo revoque manualmente
-- Leadsie soporta webhooks para Google Ads ("trigger automations after you receive access")
-- Soporta `customUserId` en la URL (mismo patrón que Meta)
-
-**Plataformas Google soportadas por Leadsie:**
-1. Google Ads (con MCC)
-2. Google Analytics (GA4 + Universal)
-3. Google Tag Manager
-4. Google Search Console
-5. Google Business Profile
-6. Google Merchant Center
-7. YouTube
-
-**¿Cómo accedemos a la API de Google Ads vía MCC?**
-- Un MCC (Manager Account) puede hacer llamadas API a TODAS las sub-cuentas bajo su jerarquía
-- Se necesita UN developer token aprobado en el MCC (5-14 días de aprobación)
-- OAuth2 credentials del MCC → refresh token del MCC → API calls con `customer_id` del merchant
-- NO necesitamos OAuth individual por merchant — el MCC tiene acceso programático a todas las sub-cuentas
 
 **Flujo propuesto Google Ads via Leadsie + MCC:**
 ```
@@ -73,7 +37,6 @@ Frontend MetaPartnerSetup.tsx → Leadsie con ?customUserId={client_id}
 2. Merchant aprueba acceso Google Ads al MCC de Steve
 3. Leadsie POST webhook → /api/webhooks/leadsie-google con body.user = client_id
 4. Webhook persiste en platform_connections (platform='google', connection_type='leadsie')
-   + guarda customer_id de Google Ads del merchant
 5. getTokenForConnection() detecta platform='google' + type='leadsie'
    → retorna OAuth token del MCC (env var o refresh token del MCC)
 6. API calls con developer token + MCC OAuth + customer_id del merchant
@@ -81,16 +44,8 @@ Frontend MetaPartnerSetup.tsx → Leadsie con ?customUserId={client_id}
 
 **Ventaja vs OAuth individual:**
 - Un solo token (MCC) para todos los merchants (como SUAT de Meta)
-- No hay tokens expirando por merchant (como SUAT, el MCC refresh se mantiene centralmente)
+- No hay tokens expirando por merchant
 - Mismos antipatrones aplican: scoping por customer_id, nunca listar TODAS las cuentas
-
-**Lo que necesitamos (ANTES de implementar):**
-1. Crear MCC de Steve en Google Ads (si no existe)
-2. Solicitar developer token en el MCC (5-14 días aprobación)
-3. Crear OAuth2 credentials del MCC en Google Cloud Console
-4. Configurar Leadsie Connect Profile para Google Ads con el MCC de Steve
-5. Implementar webhook handler + resolver en getTokenForConnection()
-6. Setear env vars: GOOGLE_MCC_CUSTOMER_ID, GOOGLE_MCC_REFRESH_TOKEN, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_ADS_DEVELOPER_TOKEN
 
 ## Sesión 10/04/2026 — Tier 1 + Tier 2 + Fix Pipeline
 
@@ -101,8 +56,6 @@ Frontend MetaPartnerSetup.tsx → Leadsie con ?customUserId={client_id}
 - `manage-google-rules.ts`: CRUD reglas
 - `execute-google-rules.ts`: cron cada hora
 - Frontend: `GoogleCampaignManager.tsx` + `GoogleAutomatedRules.tsx` (5 presets + historial)
-- `GoogleAdsTab.tsx` modificado: 4 tabs (Analíticas / Campañas / Reglas / Copys)
-- Deploy completo: Supabase + Cloud Run + Vercel + Cloud Scheduler
 - Commit: `12b642f0`
 
 ### Tier 2: 5 Features Search
@@ -115,11 +68,9 @@ Frontend MetaPartnerSetup.tsx → Leadsie con ?customUserId={client_id}
 - `check-google-ads-health.ts`: nuevo health check
 - `currency.ts`: conversión a CLP
 - MCC 403 fallback implementado
-- Deploy: rev 00478
 
 ## Sesión 12/04/2026 — Tier 3: Shared Lib + PMAX + Steve AI
 
-### Lo que se hizo (6 fases en una sesión)
 1. **Shared lib `google-ads-api.ts`** — ~465 líneas eliminando código duplicado
 2. **`manage-google-campaign.ts`** — expandido a 13 actions
 3. **`manage-google-pmax.ts`** — NUEVO, 6 actions para Performance Max
@@ -157,3 +108,108 @@ Frontend MetaPartnerSetup.tsx → Leadsie con ?customUserId={client_id}
 - Error messages ahora incluyen field violations
 - 7 commits, 6 deploys Cloud Run
 - `GoogleCampaignManager.tsx` +496 líneas
+
+## Sesión 15/04/2026 — AI en cada paso del Wizard PMAX
+
+- AI en Step 1: nombre de campaña sugerido
+- AI en Step 2: targeting (locations + languages)
+- AI en Step 4: generación imágenes con Gemini (3 formatos + generar todas)
+- AI en Step 5: CTA + sitelinks automáticos
+- Brief fetch: lee `raw_responses` + `google_ads_strategy` + `keywords` + `competitive_analysis`
+
+### Lección estructura Brief
+- `buyer_personas.persona_data.raw_responses` = array de 17 strings (Q0-Q16)
+- `buyer_personas.persona_data.fase_negocio / presupuesto_ads` = metadata
+- `brand_research` con `research_type=brand_strategy` solo tiene `{status, completed_at, sections_saved}` = METADATA, no contenido
+- Contenido real está en: `google_ads_strategy` (ad_copies, extensions, bidding_strategy), `competitive_analysis`, `keywords`
+- NUNCA buscar `brand_positioning/value_proposition/brand_voice` en `brand_research` — esos campos no existen
+
+## Sesión 20/04/2026 — Wizard PMAX enterprise (marathon)
+
+**Archivos modificados:** manage-google-campaign.ts, generate-image.ts, GoogleCampaignManager.tsx, SteveRecommendation.tsx.
+**Commits:** 20+. **Deploys Cloud Run:** 12+. **Revision final:** steve-api-00558-px7.
+**Cross-review:** Isidora W6 (5 rondas) + Javiera W12 (2 rondas).
+
+### Features implementadas
+
+#### 1. user_intent — prompt libre que alimenta todos los AI
+- Frontend: textarea en Step 1 (maxLength=800)
+- Backend `handleGetRecommendations`: lee `user_intent` y concatena al `extraContext` como "OBJETIVO DE LA CAMPAÑA (palabras del usuario)" → propaga a TODOS los prompts
+- `handleGetBudgetRecommendation`: inyecta en unit_economics + fallback
+- `generate-image.ts`: acepta `userIntent` y concatena al `promptBase`
+- `SteveRecommendation`: prop `userIntent`, lo pasa en `data.user_intent`
+
+#### 2. Merchant Center direct + categorías
+- `handleListCatalogProducts`: GAQL `shopping_product` primary + Shopify fallback
+- Fields correctos v17+: `product_type_level1/2/3`, `category_level1/2/3` (NO `_l1`)
+- `merchantCenterId` required (regex `/^\d+$/`) para evitar cross-MC mix
+- Cross-reference con `shopify_products` por `product_id`/`handle`/`sku` para enriquecer `image_url`
+- UI panel Step 2: `<details>` colapsables por categoría con checkbox indeterminate
+
+#### 3. Listing Group Filter tree (PMAX Shopping)
+- Root SUBDIVISION + N UNIT_INCLUDED (caseValue.productItemId.value=sku) + catch-all UNIT_EXCLUDED
+- `listingSource: 'SHOPPING'` solo en root (v23 rechaza en children)
+- **CRÍTICO:** `AssetGroupListingGroupFilter` NO acepta temp resource names → **3 mutates separados:**
+  1. Primary: core (campaign + assetGroup + assets + criteria + sitelinks)
+  2. Middle: root LGF solo (sin resourceName, Google asigna → extraer real)
+  3. Final: leaves + audience + signals referenciando real root + real asset_group
+
+#### 4. Audience Signal AI + existentes
+- `recommendation_type='audience_signals'` + whitelist enums (AGE/GENDER/PARENTAL/INCOME)
+- Shape proto v23: `AgeSegment { minAge, maxAge }` ints (NO enum wrapper `{ type }`)
+- `AGE_RANGE_65_UP` → solo `{ minAge: 65 }`; `UNDETERMINED` → `includeUndetermined: true` de la dimension
+- Gender/parental/income: **strings enum directos**, no wrapped
+- `AssetGroupSignal.audience = { audience: resource }` (AudienceInfo wrapped)
+- **Google límite:** 1 audience signal por asset group (backend toma el primero)
+- Nuevo action `list_audiences` (GAQL `audience` + `user_list`) + UI con checkboxes + badges
+
+#### 5. Auto-fit de imágenes con sharp
+- Nuevo dep `sharp` en cloud-run-api/package.json
+- `generate-image.ts`: `normalizeToPmaxSpec(buf, formato)` — center-crop + resize al spec exacto después de Gemini
+- `manage-google-campaign.ts`: `autoFitImageToSpec(base64, field_type)` — si imagen no cumple ratio, se adapta en memoria
+- Specs: MARKETING_IMAGE 1200x628, SQUARE 1200x1200, PORTRAIT 960x1200, LOGO 1200x1200, LANDSCAPE_LOGO 1200x300
+- Ya no rechaza por aspect ratio — corrige
+
+#### 6. Customer Acquisition via CampaignLifecycleGoal
+- `customerAcquisitionSetting` NO es field de Campaign — vive en `CampaignLifecycleGoal` (mutate aparte)
+- Después del primary mutate, extraer `campaignResource`, POST a `customers/{cid}/campaignLifecycleGoals:mutate`
+- Validación pre: GAQL check user_list CRM_BASED activo → si no, degradar a BID_ONLY + warning
+
+#### 7. Security hardening
+- UUID regex antes de interpolar `clientId` en PostgREST `eq.${}` (previene operator injection)
+- SSRF helper `isPublicHost()`: bloquea RFC1918, loopback, 169.254.x metadata, .internal, .local
+- `fetchRealSiteUrls`: SSRF-safe con re-check de `resp.url` post-redirect
+- `selected_product_ids` cross-validated contra `shopify_products WHERE client_id=ctx.clientId`
+- Dispatcher sobrescribe `client_id` del body con `ctx.clientId` en create_campaign, get_recommendations, get_budget_recommendation
+
+#### 8. UI cleanup (Step 2 wizard)
+- Dialog 600px → 1024px, `w-[95vw]`, overflow-x-hidden
+- `prettyAudienceName()` regex limpia timestamps de `AssetGroupPersona_...` → `Asset Group #553510`
+- Badges con iconos (Target, Users, Sparkles) en preview cards
+- Warning Customer Match: card amber con AlertCircle
+- Checkbox indeterminate para categorías con selección parcial
+- Mensajes user-friendly para errores comunes (duplicate name, budget inválido)
+
+### Lecciones proto v23 (cascada de fixes)
+1. **AudienceAgeDimension.ageRanges:** `AgeSegment{minAge,maxAge}` ints (no enum wrapper `{ type }`)
+2. **shopping_product fields:** `_level1..level5` (no `_l1`); `image_link` NO existe (removido)
+3. **searchTheme.text shape** (no `searchThemeTargets`) — 1 AssetGroupSignal por tema
+4. **AssetGroupSignal.audience:** `AudienceInfo{audience:resource}` wrapped
+5. **CTA:** `callToActionAsset` enum (no `textAsset`)
+6. **UNDETERMINED:** filter en gender/parental/income con `includeUndetermined: true` en dimension
+7. **sitelink finalUrls:** en Asset padre (no en `sitelinkAsset`)
+8. **AssetGroupListingGroupFilter:** NO acepta temp IDs → mutate separado OBLIGATORIO
+9. **Customer Acquisition:** `CampaignLifecycleGoal` mutate separado (no en Campaign.create)
+10. **Audience signal:** Google limit 1 por asset group (backend toma el primero)
+
+### Arquitectura clave: 2-batch mutate (que se volvió 3 con LGF)
+- **Primary batch:** core (campaign + assetGroup + assets + criteria + sitelinks)
+- **Secondary batch:** LGF root separado + leaves + signals
+- Renumerado de temp IDs bajos (-1..-10) en secondary batch via regex
+- CampaignLifecycleGoal es un tercer mutate aparte si aplica
+
+### Red flags descubiertos
+- `AssetGroupListingGroupFilter` NO acepta temp IDs — aprendizaje caro, obliga a 3 mutates
+- `customerAcquisitionSetting` NO es field de Campaign — hay que buscar en CampaignLifecycleGoal
+- `shopping_product.image_link` NO existe en v23 — cross-reference con shopify_products es obligatorio para enriquecer imágenes
+- Google API limit 1 audience signal por asset group aunque la UI permita multi-select
