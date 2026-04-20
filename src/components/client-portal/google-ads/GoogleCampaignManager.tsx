@@ -43,6 +43,8 @@ import {
   Globe,
   Link2,
   Sparkles,
+  Target,
+  Users,
 } from 'lucide-react';
 import SteveRecommendation from './SteveRecommendation';
 
@@ -1342,6 +1344,15 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     }
   };
 
+  // Limpia nombres auto-generados por Google (AssetGroupPersona_281481..._2023-12-21T21:00...) → "AssetGroup #281481..."
+  const prettyAudienceName = (raw: string): string => {
+    if (!raw) return '(sin nombre)';
+    const m = raw.match(/^AssetGroupPersona_(\d+)_\d{4}-\d{2}-\d{2}T/);
+    if (m) return `Asset Group #${m[1].slice(-6)}`;
+    // Tambien saca timestamps tipo _2023-12-21T... al final
+    return raw.replace(/_\d{4}-\d{2}-\d{2}T[\d:.Z]+$/, '');
+  };
+
   const toggleExistingAudience = (aud: { resource_name: string; name: string; kind: 'audience' | 'user_list' }) => {
     setWizardData(prev => {
       const matching = prev.audience_signals.find(s =>
@@ -1360,7 +1371,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           kind: aud.kind,
           existing_audience_resource: aud.kind === 'audience' ? aud.resource_name : undefined,
           existing_user_list_resource: aud.kind === 'user_list' ? aud.resource_name : undefined,
-          existing_label: `${aud.kind === 'user_list' ? '[Lista]' : '[Audiencia]'} ${aud.name}`,
+          existing_label: prettyAudienceName(aud.name),
           name: aud.name,
         }],
       };
@@ -1935,7 +1946,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
 
       {/* ─── Create Campaign Wizard ─────────────────────────────────── */}
       <Dialog open={wizardOpen} onOpenChange={(open) => { setWizardOpen(open); if (!open) setWizardStep(1); }}>
-        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[720px] max-h-[85vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>
               Crear Campana — Paso {wizardStep} de {totalSteps}
@@ -2476,27 +2487,33 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                   {savedAudiences.length > 0 && (
                     <div className="max-h-48 overflow-y-auto rounded border border-border bg-background p-2 space-y-1">
                       {savedAudiences.filter(a => a.kind === 'audience').length > 0 && (
-                        <div className="text-xs font-medium text-muted-foreground px-1 pt-1">Audiencias guardadas</div>
+                        <div className="text-xs font-medium text-muted-foreground px-1 pt-1 flex items-center gap-1.5">
+                          <Target className="w-3 h-3" /> Audiencias guardadas
+                        </div>
                       )}
                       {savedAudiences.filter(a => a.kind === 'audience').map(a => {
                         const checked = wizardData.audience_signals.some(s => s.existing_audience_resource === a.resource_name);
+                        const pretty = prettyAudienceName(a.name);
                         return (
-                          <label key={a.resource_name} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/40 rounded p-1">
-                            <input type="checkbox" checked={checked} onChange={() => toggleExistingAudience(a)} />
-                            <span className="flex-1 truncate">{a.name}</span>
+                          <label key={a.resource_name} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/40 rounded p-1" title={a.name}>
+                            <input type="checkbox" checked={checked} onChange={() => toggleExistingAudience(a)} className="shrink-0" />
+                            <span className="flex-1 truncate">{pretty}</span>
                           </label>
                         );
                       })}
                       {savedAudiences.filter(a => a.kind === 'user_list').length > 0 && (
-                        <div className="text-xs font-medium text-muted-foreground px-1 pt-2">Listas (Customer Match / remarketing)</div>
+                        <div className="text-xs font-medium text-muted-foreground px-1 pt-2 flex items-center gap-1.5">
+                          <Users className="w-3 h-3" /> Listas (Customer Match / remarketing)
+                        </div>
                       )}
                       {savedAudiences.filter(a => a.kind === 'user_list').map(a => {
                         const checked = wizardData.audience_signals.some(s => s.existing_user_list_resource === a.resource_name);
+                        const pretty = prettyAudienceName(a.name);
                         return (
-                          <label key={a.resource_name} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/40 rounded p-1">
-                            <input type="checkbox" checked={checked} onChange={() => toggleExistingAudience(a)} />
-                            <span className="flex-1 truncate">{a.name}</span>
-                            {a.size && <span className="text-muted-foreground shrink-0">{a.size}</span>}
+                          <label key={a.resource_name} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/40 rounded p-1" title={a.name}>
+                            <input type="checkbox" checked={checked} onChange={() => toggleExistingAudience(a)} className="shrink-0" />
+                            <span className="flex-1 truncate">{pretty}</span>
+                            {a.size && <span className="text-muted-foreground shrink-0 text-[10px]">{a.size}</span>}
                           </label>
                         );
                       })}
@@ -2507,17 +2524,25 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                   {wizardData.audience_signals.length > 0 ? (
                     <div className="space-y-1.5">
                       {wizardData.audience_signals.map((s, idx) => (
-                        <div key={idx} className="rounded-md border border-border bg-muted/30 p-2 text-xs flex items-start gap-2">
-                          <div className="flex-1 space-y-0.5">
+                        <div key={idx} className="rounded-md border border-border bg-muted/30 p-2 text-xs flex items-start gap-2 min-w-0">
+                          <div className="flex-1 space-y-0.5 min-w-0">
                             {s.existing_label ? (
-                              <div>{s.existing_label}</div>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Badge variant="outline" className="text-[10px] h-4 gap-1 shrink-0">
+                                  {s.kind === 'user_list' ? <Users className="w-2.5 h-2.5" /> : <Target className="w-2.5 h-2.5" />}
+                                  {s.kind === 'user_list' ? 'Lista' : 'Audiencia'}
+                                </Badge>
+                                <span className="truncate" title={s.name}>{s.existing_label}</span>
+                              </div>
                             ) : (
                               <>
                                 <div className="flex items-center gap-1.5">
-                                  <Badge variant="outline" className="text-[10px] h-4">AI</Badge>
-                                  <span className="font-medium">{s.name || 'Audiencia AI'}</span>
+                                  <Badge variant="outline" className="text-[10px] h-4 gap-1 shrink-0">
+                                    <Sparkles className="w-2.5 h-2.5" /> AI
+                                  </Badge>
+                                  <span className="font-medium truncate">{s.name || 'Audiencia AI'}</span>
                                 </div>
-                                {s.description && <div className="text-muted-foreground">{s.description}</div>}
+                                {s.description && <div className="text-muted-foreground break-words">{s.description}</div>}
                                 <div className="flex flex-wrap gap-1 pt-0.5">
                                   {(s.age_ranges || []).map(a => <Badge key={a} variant="secondary" className="text-[10px] h-4">{a.replace('AGE_RANGE_', '').replace('_', '-')}</Badge>)}
                                   {(s.genders || []).map(g => <Badge key={g} variant="secondary" className="text-[10px] h-4">{g}</Badge>)}
@@ -2529,10 +2554,12 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                           </div>
                           <button
                             type="button"
-                            className="text-xs text-destructive shrink-0"
+                            className="text-xs text-destructive shrink-0 hover:bg-destructive/10 rounded w-5 h-5 flex items-center justify-center"
                             onClick={() => removeAudienceSignal(idx)}
                             title="Quitar"
-                          >✕</button>
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -2543,9 +2570,12 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                   )}
 
                   {hasCustomerMatch === false && (wizardData.acquisition_mode === 'BID_HIGHER' || wizardData.acquisition_mode === 'TARGET_ALL_EQUALLY') && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                      ⚠ El account no tiene Customer Match activa. El modo "{wizardData.acquisition_mode}" se degradará a "Sin prioridad" al crear la campaña.
-                    </p>
+                    <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <span className="break-words">
+                        El account no tiene Customer Match activa. El modo "<strong>{wizardData.acquisition_mode === 'BID_HIGHER' ? 'Priorizar nuevos' : 'Nuevos y antiguos'}</strong>" se degradará a "Sin prioridad" al crear la campaña.
+                      </span>
+                    </div>
                   )}
                 </div>
               )}
