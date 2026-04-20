@@ -27,6 +27,10 @@ async function handleListAssetGroups(
   loginCustomerId: string,
   campaignId?: string
 ): Promise<{ body: any; status: number }> {
+  // Filtro `campaign.status != 'REMOVED'` crítico: Google no permite mutar
+  // asset groups de campañas eliminadas ("Asset group cannot be mutated for
+  // removed campaign"). Mostrar AGs huérfanos hace que cualquier acción
+  // (pause/rename/delete) falle con ese error.
   let query = `
     SELECT asset_group.id, asset_group.name, asset_group.status,
            asset_group.campaign, campaign.name, campaign.id,
@@ -34,6 +38,7 @@ async function handleListAssetGroups(
     FROM asset_group
     WHERE campaign.advertising_channel_type = 'PERFORMANCE_MAX'
       AND asset_group.status != 'REMOVED'
+      AND campaign.status != 'REMOVED'
   `;
 
   if (campaignId) {
