@@ -2246,17 +2246,16 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
               {/* Bid strategy + targets */}
               <div className="space-y-2">
                 <Label>Estrategia de puja</Label>
-                <Select
+                {/* Select nativo: Radix Portal falla dentro del Dialog con overflow-y-auto */}
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   value={settingsData.bidding_strategy_type || ''}
-                  onValueChange={v => setSettingsData((p: any) => ({ ...p, bidding_strategy_type: v }))}
+                  onChange={e => setSettingsData((p: any) => ({ ...p, bidding_strategy_type: e.target.value }))}
                 >
-                  <SelectTrigger><SelectValue placeholder="Seleccionar estrategia" /></SelectTrigger>
-                  <SelectContent>
-                    {bidStrategies.map(bs => (
-                      <SelectItem key={bs.value} value={bs.value}>{bs.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {bidStrategies.map(bs => (
+                    <option key={bs.value} value={bs.value}>{bs.label}</option>
+                  ))}
+                </select>
 
                 {(settingsData.bidding_strategy_type === 'TARGET_CPA' ||
                   settingsData.bidding_strategy_type === 'MAXIMIZE_CONVERSIONS') && (
