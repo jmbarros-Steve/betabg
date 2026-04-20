@@ -1,4 +1,5 @@
 import { Context } from 'hono';
+import sharp from 'sharp';
 import { googleAdsQuery, googleAdsMutate, resolveConnectionAndToken } from '../../lib/google-ads-api.js';
 import { convertToCLP, fetchGoogleAccountCurrency } from '../../lib/currency.js';
 
@@ -840,39 +841,45 @@ async function handleCreateCampaign(
       });
     }
 
-    // Image assets — validate aspect ratio + min dimensions before pushing ops
+    // Image assets — auto-fit al aspect ratio/dimensions correctos en vez de rechazar
     if (image_assets?.length) {
       const validatedImages: any[] = [];
-      const rejected: string[] = [];
+      const skipped: string[] = [];
+      const fixed: string[] = [];
       for (const img of image_assets) {
         const spec = PMAX_IMAGE_SPECS[img.field_type];
-        if (!spec) { rejected.push(`${img.name || 'image'}: field_type desconocido ${img.field_type}`); continue; }
+        if (!spec) { skipped.push(`${img.name || 'image'}: field_type desconocido ${img.field_type}`); continue; }
         const dims = parseImageDimensions(img.data);
-        if (!dims) { rejected.push(`${img.name || 'image'}: no se pudo leer dimensiones (formato no soportado)`); continue; }
-        if (dims.width < spec.minW || dims.height < spec.minH) {
-          rejected.push(`${img.name || 'image'} (${dims.width}x${dims.height}): menor que mínimo ${spec.minW}x${spec.minH} para ${spec.label}`);
-          continue;
+        const needsFit = !dims
+          || dims.width < spec.minW
+          || dims.height < spec.minH
+          || Math.abs((dims.width / dims.height) - spec.targetRatio) > spec.tolerance
+          || dims.width !== spec.targetW
+          || dims.height !== spec.targetH;
+        if (needsFit) {
+          const fittedData = await autoFitImageToSpec(img.data, img.field_type);
+          if (fittedData) {
+            validatedImages.push({ ...img, data: fittedData });
+            fixed.push(`${img.name || 'image'}: ${dims ? `${dims.width}x${dims.height}` : 'unknown'} → ${spec.targetW}x${spec.targetH} (${spec.label})`);
+          } else {
+            skipped.push(`${img.name || 'image'}: auto-fit falló, imagen descartada`);
+          }
+        } else {
+          validatedImages.push(img);
         }
-        const actualRatio = dims.width / dims.height;
-        if (Math.abs(actualRatio - spec.targetRatio) > spec.tolerance) {
-          rejected.push(`${img.name || 'image'} (${dims.width}x${dims.height}, ratio ${actualRatio.toFixed(2)}): no cumple ${spec.label} (objetivo ${spec.targetRatio})`);
-          continue;
-        }
-        validatedImages.push(img);
       }
-      if (rejected.length > 0) {
-        console.warn(`[manage-google-campaign] PMAX rejected ${rejected.length}/${image_assets.length} image(s):`, rejected);
-      }
-      // Re-validate PMAX minimums after filtering
+      if (fixed.length > 0) console.log(`[manage-google-campaign] auto-fit ${fixed.length} image(s):`, fixed);
+      if (skipped.length > 0) console.warn(`[manage-google-campaign] skipped ${skipped.length} image(s):`, skipped);
+
+      // Solo rechaza si después de auto-fit todavía faltan las MÍNIMAS (MARKETING_IMAGE, SQUARE, LOGO).
       const okLandscape = validatedImages.some((i: any) => i.field_type === 'MARKETING_IMAGE');
       const okSquare = validatedImages.some((i: any) => i.field_type === 'SQUARE_MARKETING_IMAGE');
       const okLogo = validatedImages.some((i: any) => i.field_type === 'LOGO');
       if (!okLandscape || !okSquare || !okLogo) {
         return {
           body: {
-            error: 'Faltan imágenes válidas después de validar aspect ratios',
-            details: `Requiere al menos 1 landscape (1.91:1), 1 cuadrada (1:1), 1 logo (1:1). Imágenes rechazadas: ${rejected.join(' | ')}`,
-            rejected_images: rejected,
+            error: 'PMAX requiere al menos 1 landscape, 1 cuadrada y 1 logo. No se pudo auto-adaptar ninguna imagen de alguno de estos formatos.',
+            details: skipped.join(' | '),
           },
           status: 400,
         };
@@ -2330,14 +2337,30 @@ function parseImageDimensions(base64: string): { width: number; height: number }
   } catch { return null; }
 }
 
-// Aspect ratio + min size requirements per PMAX field_type (Google Ads API v23).
-const PMAX_IMAGE_SPECS: Record<string, { targetRatio: number; tolerance: number; minW: number; minH: number; label: string }> = {
-  MARKETING_IMAGE:          { targetRatio: 1.91, tolerance: 0.08, minW: 600, minH: 314, label: 'Landscape 1.91:1' },
-  SQUARE_MARKETING_IMAGE:   { targetRatio: 1.0,  tolerance: 0.05, minW: 300, minH: 300, label: 'Cuadrada 1:1' },
-  PORTRAIT_MARKETING_IMAGE: { targetRatio: 0.8,  tolerance: 0.05, minW: 480, minH: 600, label: 'Vertical 4:5' },
-  LOGO:                     { targetRatio: 1.0,  tolerance: 0.05, minW: 128, minH: 128, label: 'Logo 1:1' },
-  LANDSCAPE_LOGO:           { targetRatio: 4.0,  tolerance: 0.2,  minW: 512, minH: 128, label: 'Logo landscape 4:1' },
+// Aspect ratio + min/target size per PMAX field_type (Google Ads API v23).
+const PMAX_IMAGE_SPECS: Record<string, { targetRatio: number; tolerance: number; minW: number; minH: number; targetW: number; targetH: number; label: string }> = {
+  MARKETING_IMAGE:          { targetRatio: 1.91, tolerance: 0.08, minW: 600, minH: 314, targetW: 1200, targetH: 628,  label: 'Landscape 1.91:1' },
+  SQUARE_MARKETING_IMAGE:   { targetRatio: 1.0,  tolerance: 0.05, minW: 300, minH: 300, targetW: 1200, targetH: 1200, label: 'Cuadrada 1:1' },
+  PORTRAIT_MARKETING_IMAGE: { targetRatio: 0.8,  tolerance: 0.05, minW: 480, minH: 600, targetW: 960,  targetH: 1200, label: 'Vertical 4:5' },
+  LOGO:                     { targetRatio: 1.0,  tolerance: 0.05, minW: 128, minH: 128, targetW: 1200, targetH: 1200, label: 'Logo 1:1' },
+  LANDSCAPE_LOGO:           { targetRatio: 4.0,  tolerance: 0.2,  minW: 512, minH: 128, targetW: 1200, targetH: 300,  label: 'Logo landscape 4:1' },
 };
+
+// Auto-corrige una imagen base64 al spec exacto del field_type (center-crop + resize via sharp).
+async function autoFitImageToSpec(base64Data: string, fieldType: string): Promise<string | null> {
+  const spec = PMAX_IMAGE_SPECS[fieldType];
+  if (!spec) return null;
+  try {
+    const out = await sharp(Buffer.from(base64Data, 'base64'))
+      .resize(spec.targetW, spec.targetH, { fit: 'cover', position: 'center' })
+      .png({ compressionLevel: 6 })
+      .toBuffer();
+    return out.toString('base64');
+  } catch (err: any) {
+    console.warn(`[manage-google-campaign] autoFitImageToSpec failed for ${fieldType}:`, err?.message);
+    return null;
+  }
+}
 
 // --- List audiences + user_lists del account (para permitir reuso en AssetGroupSignal) ---
 async function handleListAudiences(

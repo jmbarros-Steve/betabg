@@ -1,7 +1,34 @@
 import { Context } from 'hono';
+import sharp from 'sharp';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { loadKnowledge } from '../../lib/knowledge-loader.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+
+// Spec oficial de Google Ads PMAX per field_type
+const PMAX_OUTPUT_SPECS: Record<string, { width: number; height: number }> = {
+  landscape:        { width: 1200, height: 628 },  // 1.91:1 MARKETING_IMAGE
+  square:           { width: 1200, height: 1200 }, // 1:1 SQUARE_MARKETING_IMAGE
+  portrait:         { width: 960,  height: 1200 }, // 4:5 PORTRAIT_MARKETING_IMAGE
+  logo:             { width: 1200, height: 1200 }, // 1:1 LOGO
+  landscape_logo:   { width: 1200, height: 300 },  // 4:1 LANDSCAPE_LOGO
+};
+
+// Normaliza un buffer de imagen al aspect ratio exacto que PMAX espera (center-crop + resize).
+async function normalizeToPmaxSpec(buf: Uint8Array, formato: string | undefined): Promise<Uint8Array> {
+  const key = String(formato || '').toLowerCase();
+  const spec = PMAX_OUTPUT_SPECS[key];
+  if (!spec) return buf; // formato desconocido → no transformar
+  try {
+    const out = await sharp(Buffer.from(buf))
+      .resize(spec.width, spec.height, { fit: 'cover', position: 'attention' }) // attention = auto-center en el sujeto principal
+      .png({ compressionLevel: 6 })
+      .toBuffer();
+    return new Uint8Array(out);
+  } catch (err: any) {
+    console.warn('[generate-image] normalizeToPmaxSpec failed, using original:', err?.message);
+    return buf;
+  }
+}
 
 const IMAGE_CREDIT_COST = 2;
 const DIVERSITY_STYLES = [
@@ -468,6 +495,10 @@ export async function generateImage(c: Context) {
     console.error('[generate-image] No image data obtained');
     return c.json({ error: 'Error generando la imagen. Intenta de nuevo.' }, 500);
   }
+
+  // Normalize output to exact PMAX aspect ratio + dimensions (Gemini a menudo genera 1024x1024
+  // ignorando el prompt; hacemos center-crop + resize al spec exacto que Google Ads exige).
+  imageBytes = await normalizeToPmaxSpec(imageBytes, formato);
 
   // Save to Storage
   const timestamp = Date.now();
