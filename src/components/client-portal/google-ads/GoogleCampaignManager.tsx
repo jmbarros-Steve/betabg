@@ -2499,18 +2499,17 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
 
               <div className="space-y-2">
                 <Label>Tipo de campaña *</Label>
-                <Select
+                {/* Select nativo para evitar conflicto de Radix Portal con el overflow-y-auto del Dialog */}
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   value={wizardData.channel_type}
-                  onValueChange={v => setWizardData(prev => ({ ...prev, channel_type: v }))}
+                  onChange={e => setWizardData(prev => ({ ...prev, channel_type: e.target.value }))}
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SEARCH">Search</SelectItem>
-                    <SelectItem value="PERFORMANCE_MAX">Performance Max</SelectItem>
-                    <SelectItem value="SHOPPING">Shopping</SelectItem>
-                    <SelectItem value="DISPLAY">Display</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <option value="SEARCH">Search</option>
+                  <option value="PERFORMANCE_MAX">Performance Max</option>
+                  <option value="SHOPPING">Shopping</option>
+                  <option value="DISPLAY">Display</option>
+                </select>
                 <p className="text-xs text-muted-foreground">
                   Steve usa el tipo para el prefijo del nombre (PMAX-, Search-, Shopping-...) y para adaptar sus sugerencias.
                 </p>
