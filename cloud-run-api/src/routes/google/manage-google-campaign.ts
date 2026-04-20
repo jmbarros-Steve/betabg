@@ -705,7 +705,9 @@ async function handleCreateCampaign(
           acquisitionWarning = `No se pudo verificar Customer Match — campaña creada con "Sin prioridad" por seguridad.`;
         }
       }
-      campaignCreate.customerAcquisitionSetting = { optimizationMode: effectiveAcquisitionMode };
+      // customerAcquisitionSetting NO es field del Campaign en v23 — vive en el resource
+      // separado CampaignLifecycleGoal. Lo setearemos después del mutate principal con un
+      // segundo mutate a CampaignLifecycleGoalService. Acá solo guardamos el modo efectivo.
     }
 
     if (!final_urls?.length) {
@@ -1294,6 +1296,58 @@ async function handleCreateCampaign(
 
   if (!result.ok) {
     return { body: { error: `Failed to create campaign: ${result.error}` }, status: 502 };
+  }
+
+  // Post-create: si se pidió acquisition mode (BID_HIGHER / TARGET_ALL_EQUALLY) y la verificación de
+  // Customer Match pasó, setearlo via CampaignLifecycleGoalService (mutate separado, no va en Campaign.create).
+  if (effectiveAcquisitionMode && effectiveAcquisitionMode !== 'BID_ONLY') {
+    try {
+      // Extraer el resource_name de la campaña creada del response del mutate.
+      const responses: any[] = Array.isArray((result.data as any)?.mutateOperationResponses) ? (result.data as any).mutateOperationResponses : [];
+      let campaignResource: string | null = null;
+      for (const r of responses) {
+        const rn = r?.campaignResult?.resourceName || r?.campaign_result?.resource_name;
+        if (rn && typeof rn === 'string') { campaignResource = rn; break; }
+      }
+      if (campaignResource) {
+        const lgUrl = `https://googleads.googleapis.com/v23/customers/${customerId}/campaignLifecycleGoals:mutate`;
+        const lgBody = {
+          operations: [{
+            create: {
+              campaign: campaignResource,
+              customerAcquisitionGoalSettings: { optimizationMode: effectiveAcquisitionMode },
+            },
+          }],
+        };
+        const lgResp = await fetch(lgUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'developer-token': developerToken,
+            'login-customer-id': loginCustomerId,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(lgBody),
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (!lgResp.ok) {
+          const errText = await lgResp.text();
+          console.warn('[manage-google-campaign] CampaignLifecycleGoal mutate failed:', lgResp.status, errText.slice(0, 300));
+          acquisitionWarning = `Campaña creada, pero no se pudo setear el modo "${effectiveAcquisitionMode}" (requiere Customer Lifecycle Goal configurado a nivel del account en Google Ads UI).`;
+          effectiveAcquisitionMode = 'BID_ONLY';
+        } else {
+          console.log(`[manage-google-campaign] CampaignLifecycleGoal set: ${effectiveAcquisitionMode} for ${campaignResource}`);
+        }
+      } else {
+        console.warn('[manage-google-campaign] Could not extract campaign resource_name from mutate response — skipping lifecycle goal');
+        acquisitionWarning = `Campaña creada, pero no se pudo aplicar el modo "${effectiveAcquisitionMode}" (faltó resource_name del response).`;
+        effectiveAcquisitionMode = 'BID_ONLY';
+      }
+    } catch (err: any) {
+      console.warn('[manage-google-campaign] CampaignLifecycleGoal error:', err?.message);
+      acquisitionWarning = `Campaña creada, pero falló setear "${effectiveAcquisitionMode}": ${err?.message}`;
+      effectiveAcquisitionMode = 'BID_ONLY';
+    }
   }
 
   return {
