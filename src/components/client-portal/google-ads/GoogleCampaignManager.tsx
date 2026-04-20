@@ -1946,7 +1946,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
 
       {/* ─── Create Campaign Wizard ─────────────────────────────────── */}
       <Dialog open={wizardOpen} onOpenChange={(open) => { setWizardOpen(open); if (!open) setWizardStep(1); }}>
-        <DialogContent className="sm:max-w-[720px] max-h-[85vh] overflow-y-auto overflow-x-hidden">
+        <DialogContent className="sm:max-w-[1024px] w-[95vw] max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>
               Crear Campana — Paso {wizardStep} de {totalSteps}
@@ -2067,7 +2067,11 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
 
           {/* Step 2: Config */}
           {wizardStep === 2 && (
-            <div className="space-y-4">
+            <div className="space-y-5">
+              <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+                <div className="text-sm font-semibold flex items-center gap-2">
+                  <DollarSign className="w-4 h-4" /> Estrategia & Presupuesto
+                </div>
               <div className="space-y-2">
                 <Label>Estrategia de puja</Label>
                 <select
@@ -2088,6 +2092,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                   context={wizardData.daily_budget ? `El usuario ya eligió un presupuesto diario de $${wizardData.daily_budget}. Respetá ese número como base; solo ajustalo (±20%) si la bid_strategy lo exige, y justificá el cambio en el reasoning.` : undefined}
                   onApply={handleApplyRecommendation}
                 />
+              </div>
               </div>
 
               {wizardData.channel_type === 'SEARCH' && (
