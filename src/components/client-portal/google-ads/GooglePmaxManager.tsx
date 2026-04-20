@@ -208,6 +208,9 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
   const [audienceGenders, setAudienceGenders] = useState<string[]>([]);
   const [audienceLoading, setAudienceLoading] = useState(false);
 
+  // Upload directo de imagen (sin Gemini) — por sección del AG
+  const [uploadingFor, setUploadingFor] = useState<string | null>(null); // `${groupId}:${fieldType}`
+
   // Edit text asset (Asset es inmutable en Google Ads — editar = remove + add nuevo)
   const [editAssetOpen, setEditAssetOpen] = useState(false);
   const [editAssetGroupId, setEditAssetGroupId] = useState<string | null>(null);
@@ -587,6 +590,67 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     setSteveReasoning(data?.reasoning || null);
     setSteveMaxChars(data?.max_chars || 90);
     setSteveSelectedIdx(null);
+  };
+
+  // Subir imagen directa (sin Gemini). Convierte File → base64 y llama add_asset.
+  // Respeta el field_type del section (MARKETING_IMAGE / SQUARE_MARKETING_IMAGE /
+  // PORTRAIT_MARKETING_IMAGE / LOGO / LANDSCAPE_LOGO). Google hace auto-fit al spec
+  // en backend vía sharp (autoFitImageToSpec en manage-google-campaign.ts).
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || '');
+        const commaIdx = result.indexOf(',');
+        resolve(commaIdx >= 0 ? result.slice(commaIdx + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+  const handleUploadImage = async (groupId: string, fieldType: string, file: File) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Solo se permiten imágenes');
+      return;
+    }
+    const MAX_MB = 5;
+    if (file.size > MAX_MB * 1024 * 1024) {
+      toast.error(`Imagen demasiado grande (>${MAX_MB}MB)`);
+      return;
+    }
+    const key = `${groupId}:${fieldType}`;
+    setUploadingFor(key);
+    try {
+      const base64 = await fileToBase64(file);
+      const { error } = await callApi('manage-google-pmax', {
+        body: {
+          action: 'add_asset',
+          connection_id: connectionId,
+          asset_group_id: groupId,
+          data: {
+            field_type: fieldType,
+            image_data: base64,
+            image_name: file.name.replace(/\.[^.]+$/, '').slice(0, 120) || 'Upload',
+          },
+        },
+      });
+      if (error) {
+        toast.error('Error subiendo imagen: ' + error);
+        return;
+      }
+      toast.success('Imagen agregada');
+      setGroupDetails(prev => {
+        const copy = { ...prev };
+        delete copy[groupId];
+        return copy;
+      });
+      if (expandedGroup === groupId) {
+        toggleGroup(groupId);
+      }
+    } finally {
+      setUploadingFor(null);
+    }
   };
 
   // Edit text asset: Google Ads no permite mutar el texto de un Asset.
@@ -1037,18 +1101,54 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                       </div>
 
                       {/* Assets by type */}
-                      {Object.entries(groupDetails[group.id].assets).map(([fieldType, assets]) => (
+                      {Object.entries(groupDetails[group.id].assets).map(([fieldType, assets]) => {
+                        const isImageField = IMAGE_FIELDS.has(fieldType);
+                        const uploadKey = `${group.id}:${fieldType}`;
+                        const isUploading = uploadingFor === uploadKey;
+                        return (
                         <div key={fieldType}>
-                          <p className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
-                            {fieldType.includes('IMAGE') || fieldType.includes('LOGO')
-                              ? <ImageIcon className="w-3 h-3" />
-                              : fieldType.includes('VIDEO')
-                              ? <Video className="w-3 h-3" />
-                              : <Type className="w-3 h-3" />
-                            }
-                            {fieldTypeLabels[fieldType] || fieldType}
-                            <span className="text-muted-foreground/60">({(assets as AssetDetail[]).length})</span>
-                          </p>
+                          <div className="flex items-center justify-between mb-1.5 gap-2">
+                            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                              {fieldType.includes('IMAGE') || fieldType.includes('LOGO')
+                                ? <ImageIcon className="w-3 h-3" />
+                                : fieldType.includes('VIDEO')
+                                ? <Video className="w-3 h-3" />
+                                : <Type className="w-3 h-3" />
+                              }
+                              {fieldTypeLabels[fieldType] || fieldType}
+                              <span className="text-muted-foreground/60">({(assets as AssetDetail[]).length})</span>
+                            </p>
+                            {isImageField && (
+                              <div className="flex items-center gap-1">
+                                <label
+                                  className={`text-[11px] cursor-pointer flex items-center gap-1 px-2 py-0.5 rounded border border-border hover:border-primary/60 transition-colors ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                                  title="Subir imagen propia"
+                                >
+                                  {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                                  Subir
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const f = e.target.files?.[0];
+                                      if (f) handleUploadImage(group.id, fieldType, f);
+                                      e.target.value = ''; // permitir re-seleccionar el mismo archivo
+                                    }}
+                                    disabled={isUploading}
+                                  />
+                                </label>
+                                <button
+                                  className="text-[11px] flex items-center gap-1 px-2 py-0.5 rounded border border-border hover:border-primary/60 text-primary transition-colors"
+                                  onClick={() => openSteveSuggest(group.id, fieldType)}
+                                  title="Generar con Steve (Gemini)"
+                                >
+                                  <Sparkles className="w-3 h-3" />
+                                  Steve
+                                </button>
+                              </div>
+                            )}
+                          </div>
 
                           <div className="space-y-1">
                             {(assets as AssetDetail[]).map((asset, idx) => {
@@ -1098,7 +1198,8 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                             })}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
 
                       {Object.keys(groupDetails[group.id].assets).length === 0 && (
                         <p className="text-sm text-muted-foreground text-center py-4">Sin assets</p>
