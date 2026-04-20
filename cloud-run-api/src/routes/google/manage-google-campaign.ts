@@ -1442,11 +1442,16 @@ async function handleCreateCampaign(
         // Path (b): wrap user_list in a new Audience custom (audience_segments dimension)
         const audTempId = tempId--;
         const audResource = `customers/${customerId}/audiences/${audTempId}`;
+        // Sufijo único SIEMPRE para evitar colisión "An audience with this name already exists":
+        // Google Ads exige unicidad del Audience.name a nivel customer. Aunque el user provea
+        // un nombre, lo truncamos a 40 chars y le anexamos timestamp corto.
+        const uniqueSuffix = ` ${Date.now() % 1_000_000}`;
+        const audNameBase = (typeof as.name === 'string' && as.name.trim()) ? as.name.trim().slice(0, 40) : 'Audiencia PMAX';
         mutateOps.push({
           audienceOperation: {
             create: {
               resourceName: audResource,
-              name: (typeof as.name === 'string' && as.name.trim()) ? as.name.trim().slice(0, 50) : `Audiencia PMAX ${Date.now()}`,
+              name: `${audNameBase}${uniqueSuffix}`,
               description: (typeof as.description === 'string' && as.description.trim()) ? as.description.trim().slice(0, 250) : 'Audiencia basada en user list existente',
               dimensions: [
                 { audienceSegments: { segments: [{ userList: { userList: existingUserList } }] } },
@@ -1520,12 +1525,16 @@ async function handleCreateCampaign(
       if (dimensions.length > 0) {
         const audTempId = tempId--;
         const audResource = `customers/${customerId}/audiences/${audTempId}`;
+        // Sufijo único SIEMPRE para evitar colisión "An audience with this name already exists":
+        // Google Ads exige unicidad del Audience.name a nivel customer.
+        const uniqueSuffix = ` ${Date.now() % 1_000_000}`;
+        const audNameBase = (typeof audName === 'string' && audName.trim()) ? audName.trim().slice(0, 40) : 'Audiencia PMAX';
         // Audience op FIRST so it appears in the batch before the AssetGroupSignal that references it (clarity)
         mutateOps.push({
           audienceOperation: {
             create: {
               resourceName: audResource,
-              name: (typeof audName === 'string' && audName.trim()) ? audName.trim().slice(0, 50) : `Audiencia PMAX ${Date.now()}`,
+              name: `${audNameBase}${uniqueSuffix}`,
               description: (typeof audDescription === 'string' && audDescription.trim()) ? audDescription.trim().slice(0, 250) : 'Audiencia generada para PMAX',
               dimensions,
             },
