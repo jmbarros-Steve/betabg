@@ -1081,13 +1081,16 @@ async function handleCreateCampaign(
         },
       });
       // One UNIT_INCLUDED leaf per selected SKU
-      // Note: listingSource va SOLO en el root (SUBDIVISION). v23 rechaza si se repite en children.
+      // Note: v23 exige listingSource en TODOS los nodos LGF (root + leaves + catch-all),
+      // no solo en el root. Error "The required field was not present (listing_source)"
+      // aparece en mutate si el child se envía sin él.
       for (const sku of validSelectedIds.slice(0, 500)) {
         mutateOps.push({
           assetGroupListingGroupFilterOperation: {
             create: {
               assetGroup: assetGroupResource,
               type: 'UNIT_INCLUDED',
+              listingSource: 'SHOPPING',
               parentListingGroupFilter: rootLgfResource,
               caseValue: {
                 productItemId: { value: sku },
@@ -1102,6 +1105,7 @@ async function handleCreateCampaign(
           create: {
             assetGroup: assetGroupResource,
             type: 'UNIT_EXCLUDED',
+            listingSource: 'SHOPPING',
             parentListingGroupFilter: rootLgfResource,
             caseValue: {
               productItemId: {},
