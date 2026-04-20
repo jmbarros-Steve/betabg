@@ -165,6 +165,7 @@ export async function generateImage(c: Context) {
     engine = 'imagen',
     referenceImageUrls,
     userIntent: rawUserIntent,
+    use_brand_logo_reference: forceBrandLogo,
   } = body;
   const userIntent = typeof rawUserIntent === 'string' ? rawUserIntent.trim().slice(0, 600) : '';
   const refUrls: string[] = Array.isArray(referenceImageUrls)
@@ -203,7 +204,9 @@ export async function generateImage(c: Context) {
   // Shortcut: formato=landscape_logo con logo del cliente presente → letterbox con sharp
   // (logo centrado en canvas 1200x300 blanco). No llamamos a Gemini — es gratis, instantáneo,
   // y preserva el logo original. Si falla, cae al flujo normal de Gemini.
-  if (String(formato || '').toLowerCase() === 'landscape_logo' && brandCtx.logoUrl) {
+  // Exception: si use_brand_logo_reference=true, el user pidió VARIACIONES explícitas
+  // → bypass letterbox y usa Gemini con el logo como referencia.
+  if (String(formato || '').toLowerCase() === 'landscape_logo' && brandCtx.logoUrl && forceBrandLogo !== true) {
     try {
       const logoResp = await fetch(brandCtx.logoUrl, { signal: AbortSignal.timeout(10_000) });
       if (!logoResp.ok) throw new Error(`logo fetch failed: ${logoResp.status}`);
@@ -256,13 +259,24 @@ export async function generateImage(c: Context) {
     }
   }
 
-  const includeLogoReference = !!brandCtx.logoUrl && String(formato || '').toLowerCase() !== 'logo';
+  // Normalmente excluimos el logo del set de referencias cuando formato=logo
+  // (porque asumimos que estamos creando el logo desde cero). PERO para
+  // "variaciones del logo" el frontend pasa use_brand_logo_reference=true
+  // para forzar que Gemini lo use como referencia y lo mantenga consistente.
+  const includeLogoReference = !!brandCtx.logoUrl && (
+    String(formato || '').toLowerCase() !== 'logo' || forceBrandLogo === true
+  );
   const brandColorsBlock = brandCtx.colors.length > 0
     ? `\nBRAND COLORS (use these in the composition — props, lighting accents, background tones): ${brandCtx.colors.join(', ')}\n`
     : '';
-  const brandConsistencyBlock = includeLogoReference
-    ? `\nBRAND IDENTITY CONSISTENCY: A second reference image is provided — it is the client's LOGO. The generated photograph MUST feel visually consistent with that logo: match its color palette, mood, level of polish, and design language. Do NOT render the logo itself in the scene unless explicitly requested; the logo is shared only for style reference.\n`
-    : '';
+  // Dos modos distintos según si estamos generando una VARIACIÓN del logo
+  // (forceBrandLogo=true) o solo usando el logo como style reference para
+  // una foto de producto/banner.
+  const brandConsistencyBlock = !includeLogoReference
+    ? ''
+    : forceBrandLogo === true
+      ? `\nLOGO VARIATION TASK: A reference image is provided — it is the client's CURRENT LOGO. Create a VARIATION of that exact logo: keep the core symbol, typography, and brand identity recognizable, but change ONLY the background, framing, or subtle stylistic elements (color tones, lighting, texture) as requested in the prompt. The output MUST be immediately identifiable as the same brand. Do NOT invent a new logo — preserve the recognizable design.\n`
+      : `\nBRAND IDENTITY CONSISTENCY: A second reference image is provided — it is the client's LOGO. The generated photograph MUST feel visually consistent with that logo: match its color palette, mood, level of polish, and design language. Do NOT render the logo itself in the scene unless explicitly requested; the logo is shared only for style reference.\n`;
 
   // TODO: Re-enable credit system when billing is ready
 

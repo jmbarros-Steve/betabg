@@ -538,15 +538,16 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     setSteveImageUrl(data.asset_url);
   };
 
-  // Genera 3 variaciones del logo (u otra imagen) en paralelo.
-  // Prompts con ángulos distintos (fondo blanco, transparente, colorido).
+  // Genera 3 variaciones del logo usando el logo del cliente como referencia.
+  // Pasa use_brand_logo_reference=true para forzar que Gemini mantenga el
+  // símbolo/tipografía reconocibles y solo varíe fondo/framing/colores.
   const generateLogoVariations = async () => {
     if (!steveGroupId) return;
     const format = IMAGE_FIELD_TO_FORMAT[steveField] || 'logo';
     const variationPrompts = [
-      `${buildImagePrompt(steveField)} Fondo blanco limpio, minimalista.`,
-      `${buildImagePrompt(steveField)} Fondo transparente o neutro, crisp.`,
-      `${buildImagePrompt(steveField)} Fondo sutilmente colorido que complementa la marca.`,
+      `Variation of the brand logo: keep the exact same symbol and typography, change background to a clean solid white. Minimalist framing.`,
+      `Variation of the brand logo: keep the exact same symbol and typography, render on a transparent or very light neutral background. Crisp edges.`,
+      `Variation of the brand logo: keep the exact same symbol and typography, place it on a subtle branded color background (use brand accent colors). Still immediately recognizable as the same logo.`,
     ];
     setSteveVariationsLoading(true);
     try {
@@ -558,6 +559,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
             formato: format,
             engine: 'imagen',
             userIntent: steveUserIntent || undefined,
+            use_brand_logo_reference: true,
           },
         })
       ));
