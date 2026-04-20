@@ -1201,24 +1201,44 @@ async function handleCreateCampaign(
           status: 400,
         };
       }
+      // Dedupe por hash del data: si 2 imágenes tienen los mismos bytes
+      // (user subió el mismo archivo 2x, o auto-fit produjo output idéntico
+      // para 2 inputs similares), Google v23 dedupea internamente y rechaza
+      // con "Duplicate assets across mutates cannot have different asset level
+      // fields" si los names difieren. Solución: creamos 1 solo asset por hash
+      // pero respetamos todos los field_type distintos (si aplican).
+      const dataHashToResource = new Map<string, string>();
+      const dedupedLinks: Set<string> = new Set(); // evita 2 links al mismo AG/field_type
+      const crypto = await import('node:crypto');
       for (const img of validatedImages) {
-        const assetTempId = tempId--;
-        // Google Asset.name limit=128. Sanitizamos: strip newlines/tabs + cap 120
-        // (margen para el sufijo -assetTempId). Nombres con \n rompen la API.
-        const baseName = (img.name || 'Image').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120) || 'Image';
-        assetOps.push({
-          assetOperation: {
-            create: {
-              resourceName: `customers/${customerId}/assets/${assetTempId}`,
-              imageAsset: { data: img.data },
-              name: `${baseName}-${Math.abs(assetTempId)}`,
+        const hash = crypto.createHash('sha1').update(img.data).digest('hex').slice(0, 16);
+        let assetResource = dataHashToResource.get(hash);
+        if (!assetResource) {
+          const assetTempId = tempId--;
+          assetResource = `customers/${customerId}/assets/${assetTempId}`;
+          dataHashToResource.set(hash, assetResource);
+          // Google Asset.name limit=128. Sanitizamos: strip newlines/tabs + cap 120
+          // (margen para el sufijo -assetTempId). Nombres con \n rompen la API.
+          const baseName = (img.name || 'Image').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120) || 'Image';
+          assetOps.push({
+            assetOperation: {
+              create: {
+                resourceName: assetResource,
+                imageAsset: { data: img.data },
+                name: `${baseName}-${Math.abs(assetTempId)}`,
+              },
             },
-          },
-        });
+          });
+        }
+        // Dedup de links: (assetResource + field_type) único — Google rechaza
+        // linkear el mismo asset al mismo AG + mismo field_type dos veces.
+        const linkKey = `${assetResource}|${img.field_type}`;
+        if (dedupedLinks.has(linkKey)) continue;
+        dedupedLinks.add(linkKey);
         linkOps.push({
           assetGroupAssetOperation: {
             create: {
-              asset: `customers/${customerId}/assets/${assetTempId}`,
+              asset: assetResource,
               assetGroup: `customers/${customerId}/assetGroups/-3`,
               fieldType: img.field_type,
             },
