@@ -897,7 +897,6 @@ async function handleCreateCampaign(
             create: {
               resourceName: `customers/${customerId}/assets/${assetTempId}`,
               imageAsset: { data: img.data },
-              name: img.name || 'Image',
             },
           },
         });

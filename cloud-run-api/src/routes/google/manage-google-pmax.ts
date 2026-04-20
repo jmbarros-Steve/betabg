@@ -250,7 +250,6 @@ async function handleAddAsset(
         create: {
           resourceName: `customers/${customerId}/assets/${assetTempId}`,
           type: 'IMAGE',
-          name: image_name || 'Image',
           imageAsset: { data: image_data },
         },
       },
