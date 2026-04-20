@@ -2232,15 +2232,17 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
               {/* Bid strategy + targets */}
               <div className="space-y-2">
                 <Label>Estrategia de puja</Label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                <Select
                   value={settingsData.bidding_strategy_type || ''}
-                  onChange={e => setSettingsData((p: any) => ({ ...p, bidding_strategy_type: e.target.value }))}
+                  onValueChange={v => setSettingsData((p: any) => ({ ...p, bidding_strategy_type: v }))}
                 >
-                  {bidStrategies.map(bs => (
-                    <option key={bs.value} value={bs.value}>{bs.label}</option>
-                  ))}
-                </select>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar estrategia" /></SelectTrigger>
+                  <SelectContent>
+                    {bidStrategies.map(bs => (
+                      <SelectItem key={bs.value} value={bs.value}>{bs.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
                 {(settingsData.bidding_strategy_type === 'TARGET_CPA' ||
                   settingsData.bidding_strategy_type === 'MAXIMIZE_CONVERSIONS') && (
@@ -2494,35 +2496,40 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
               </div>
 
               <div className="space-y-2">
-                <Label>Nombre de la campana *</Label>
+                <Label>Tipo de campaña *</Label>
+                <Select
+                  value={wizardData.channel_type}
+                  onValueChange={v => setWizardData(prev => ({ ...prev, channel_type: v }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SEARCH">Search</SelectItem>
+                    <SelectItem value="PERFORMANCE_MAX">Performance Max</SelectItem>
+                    <SelectItem value="SHOPPING">Shopping</SelectItem>
+                    <SelectItem value="DISPLAY">Display</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Steve usa el tipo para el prefijo del nombre (PMAX-, Search-, Shopping-...) y para adaptar sus sugerencias.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Nombre de la campaña *</Label>
                 <Input
                   value={wizardData.name}
                   onChange={e => setWizardData(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Mi Campana Search"
+                  placeholder={`Mi Campaña ${wizardData.channel_type === 'PERFORMANCE_MAX' ? 'PMAX' : wizardData.channel_type === 'SHOPPING' ? 'Shopping' : wizardData.channel_type === 'DISPLAY' ? 'Display' : 'Search'}`}
                   maxLength={128}
                 />
                 <SteveRecommendation
                   connectionId={connectionId}
                   recommendationType="campaign_name"
                   clientId={clientId}
-                userIntent={wizardData.user_intent}
+                  userIntent={wizardData.user_intent}
                   channelType={wizardData.channel_type}
                   onApply={handleApplyCampaignName}
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Tipo de campana</Label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  value={wizardData.channel_type}
-                  onChange={e => setWizardData(prev => ({ ...prev, channel_type: e.target.value }))}
-                >
-                  <option value="SEARCH">Search</option>
-                  <option value="PERFORMANCE_MAX">Performance Max</option>
-                  <option value="SHOPPING">Shopping</option>
-                  <option value="DISPLAY">Display</option>
-                </select>
               </div>
 
               <div className="space-y-2">
@@ -2662,16 +2669,18 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                     Merchant Center <span className="text-muted-foreground font-normal">(opcional)</span>
                   </Label>
                   <div className="flex gap-2">
-                    <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      value={wizardData.merchant_center_id}
-                      onChange={e => setWizardData(prev => ({ ...prev, merchant_center_id: e.target.value }))}
+                    <Select
+                      value={wizardData.merchant_center_id || '__none__'}
+                      onValueChange={v => setWizardData(prev => ({ ...prev, merchant_center_id: v === '__none__' ? '' : v }))}
                     >
-                      <option value="">Sin Merchant Center</option>
-                      {merchantCenters.map(mc => (
-                        <option key={mc.id} value={mc.id}>{mc.name} ({mc.id})</option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Sin Merchant Center</SelectItem>
+                        {merchantCenters.map(mc => (
+                          <SelectItem key={mc.id} value={mc.id}>{mc.name} ({mc.id})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Button variant="outline" size="sm" onClick={fetchMerchantCenters} disabled={merchantLoading}>
                       {merchantLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                     </Button>
@@ -3301,15 +3310,17 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
               />
               <div className="space-y-2">
                 <Label>Call to Action <span className="text-muted-foreground font-normal">(opcional)</span></Label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  value={wizardData.call_to_action}
-                  onChange={e => setWizardData(prev => ({ ...prev, call_to_action: e.target.value }))}
+                <Select
+                  value={wizardData.call_to_action || '__auto__'}
+                  onValueChange={v => setWizardData(prev => ({ ...prev, call_to_action: v === '__auto__' ? '' : v }))}
                 >
-                  {ctaOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ctaOptions.map(opt => (
+                      <SelectItem key={opt.value || '__auto__'} value={opt.value || '__auto__'}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Display URL Path <span className="text-muted-foreground font-normal">(opcional)</span></Label>

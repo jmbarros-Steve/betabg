@@ -147,6 +147,17 @@ function scoreColor(score: number): string {
 // el "+ Agregar" no puede resolverlo y linkeamos al user a Google Ads.
 const TEXT_ADDABLE_FIELDS = new Set(['HEADLINE', 'LONG_HEADLINE', 'DESCRIPTION', 'BUSINESS_NAME']);
 
+// Mapping field_type → formato del endpoint /api/ai/generate-image.
+// El backend hace auto-fit con sharp al spec exacto (ratio + dimensions).
+const IMAGE_FIELD_TO_FORMAT: Record<string, string> = {
+  MARKETING_IMAGE: 'landscape',            // 1200x628
+  SQUARE_MARKETING_IMAGE: 'square',        // 1200x1200
+  PORTRAIT_MARKETING_IMAGE: 'portrait',    // 960x1200
+  LOGO: 'logo',                             // 1200x1200
+  LANDSCAPE_LOGO: 'landscape_logo',        // 1200x300
+};
+const IMAGE_FIELDS = new Set(Object.keys(IMAGE_FIELD_TO_FORMAT));
+
 export default function GooglePmaxManager({ connectionId, clientId }: GooglePmaxManagerProps) {
   const [assetGroups, setAssetGroups] = useState<AssetGroup[]>([]);
   const [pendingGroups, setPendingGroups] = useState<PendingGroup[]>([]);
@@ -183,6 +194,8 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
   const [steveReasoning, setSteveReasoning] = useState<string | null>(null);
   const [steveSelectedIdx, setSteveSelectedIdx] = useState<number | null>(null);
   const [steveMaxChars, setSteveMaxChars] = useState<number>(90);
+  // Image mode: cuando steveField es IMAGE/LOGO, usamos generate-image en vez de suggest_asset_content
+  const [steveImageUrl, setSteveImageUrl] = useState<string | null>(null);
 
   const fetchAssetGroups = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -407,6 +420,19 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     }
   };
 
+  // Prompt base por formato (para el flujo imagen). El backend concatena brief,
+  // brand colors y logo del cliente como referencia.
+  const buildImagePrompt = (fieldType: string): string => {
+    const map: Record<string, string> = {
+      MARKETING_IMAGE: 'Foto publicitaria horizontal panorámica de producto para Google Ads. Aspecto 1.91:1, 1200x628px, profesional, luz natural.',
+      SQUARE_MARKETING_IMAGE: 'Foto publicitaria cuadrada de producto para Google Ads. Aspecto 1:1, 1200x1200px, composición centrada, profesional.',
+      PORTRAIT_MARKETING_IMAGE: 'Foto publicitaria vertical de producto para Google Ads móvil. Aspecto 4:5, 960x1200px, formato stories, profesional.',
+      LOGO: 'Logo de la marca, fondo transparente o blanco, centrado, 1200x1200px, crisp, high-resolution.',
+      LANDSCAPE_LOGO: 'Logo horizontal de la marca, fondo transparente o blanco, 1200x300px, wide format.',
+    };
+    return map[fieldType] || map.MARKETING_IMAGE;
+  };
+
   // Steve AI suggest: abre dialog y pide sugerencias al backend.
   const openSteveSuggest = async (groupId: string, fieldType: string) => {
     setSteveGroupId(groupId);
@@ -415,6 +441,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     setSteveReasoning(null);
     setSteveSelectedIdx(null);
     setSteveUserIntent('');
+    setSteveImageUrl(null);
     setSteveOpen(true);
 
     if (fieldType === 'CALL_TO_ACTION_SELECTION') {
@@ -423,6 +450,12 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                    'GET_QUOTE', 'CONTACT_US', 'APPLY_NOW', 'DOWNLOAD', 'ORDER_NOW', 'BUY_NOW'];
       setSteveOptions(CTA.map(v => ({ text: v, angle: null })));
       setSteveMaxChars(40);
+      return;
+    }
+
+    if (IMAGE_FIELDS.has(fieldType)) {
+      // Imagen: genera automáticamente al abrir
+      await generateSteveImage(fieldType, '');
       return;
     }
 
@@ -445,8 +478,35 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     setSteveMaxChars(data?.max_chars || 90);
   };
 
+  const generateSteveImage = async (fieldType: string, intent: string) => {
+    setSteveLoading(true);
+    setSteveImageUrl(null);
+    const format = IMAGE_FIELD_TO_FORMAT[fieldType] || 'landscape';
+    const { data, error } = await callApi('generate-image', {
+      body: {
+        clientId,
+        promptGeneracion: buildImagePrompt(fieldType),
+        formato: format,
+        engine: 'imagen',
+        userIntent: intent || undefined,
+      },
+    });
+    setSteveLoading(false);
+    if (error || !data?.asset_url) {
+      toast.error('Steve no pudo generar imagen: ' + (error || 'sin URL'));
+      return;
+    }
+    setSteveImageUrl(data.asset_url);
+  };
+
   const requestSteveSuggestions = async () => {
     if (!steveGroupId) return;
+
+    if (IMAGE_FIELDS.has(steveField)) {
+      await generateSteveImage(steveField, steveUserIntent);
+      return;
+    }
+
     setSteveLoading(true);
     const { data, error } = await callApi('manage-google-campaign', {
       body: {
@@ -471,39 +531,88 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     setSteveSelectedIdx(null);
   };
 
+  // Convierte URL pública a base64 (sin header data:). Requerido por add_asset
+  // que espera image_data como string base64 puro (imageAsset.data en v23).
+  const urlToBase64 = async (url: string): Promise<string> => {
+    const resp = await fetch(url);
+    const blob = await resp.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || '');
+        // dataURL formato: data:image/png;base64,XXXX → extraer solo XXXX
+        const commaIdx = result.indexOf(',');
+        resolve(commaIdx >= 0 ? result.slice(commaIdx + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  };
+
   const steveAddSelected = async () => {
-    if (!steveGroupId || steveSelectedIdx === null) return;
-    const option = steveOptions[steveSelectedIdx];
-    if (!option?.text) return;
+    if (!steveGroupId) return;
 
     setSteveAdding(true);
-    const isCta = steveField === 'CALL_TO_ACTION_SELECTION';
-    const { error } = await callApi('manage-google-pmax', {
-      body: {
-        action: 'add_asset',
-        connection_id: connectionId,
-        asset_group_id: steveGroupId,
-        data: isCta
-          ? { field_type: steveField, cta_enum: option.text }
-          : { field_type: steveField, text: option.text.slice(0, steveMaxChars) },
-      },
-    });
-    setSteveAdding(false);
-    if (error) {
-      toast.error('Error agregando asset: ' + error);
-      return;
+    try {
+      if (IMAGE_FIELDS.has(steveField)) {
+        if (!steveImageUrl) {
+          toast.error('Genera una imagen primero');
+          setSteveAdding(false);
+          return;
+        }
+        const base64 = await urlToBase64(steveImageUrl);
+        const { error } = await callApi('manage-google-pmax', {
+          body: {
+            action: 'add_asset',
+            connection_id: connectionId,
+            asset_group_id: steveGroupId,
+            data: {
+              field_type: steveField,
+              image_data: base64,
+              image_name: `Steve-${steveField}`,
+            },
+          },
+        });
+        if (error) {
+          toast.error('Error agregando imagen: ' + error);
+          setSteveAdding(false);
+          return;
+        }
+      } else {
+        if (steveSelectedIdx === null) { setSteveAdding(false); return; }
+        const option = steveOptions[steveSelectedIdx];
+        if (!option?.text) { setSteveAdding(false); return; }
+        const isCta = steveField === 'CALL_TO_ACTION_SELECTION';
+        const { error } = await callApi('manage-google-pmax', {
+          body: {
+            action: 'add_asset',
+            connection_id: connectionId,
+            asset_group_id: steveGroupId,
+            data: isCta
+              ? { field_type: steveField, cta_enum: option.text }
+              : { field_type: steveField, text: option.text.slice(0, steveMaxChars) },
+          },
+        });
+        if (error) {
+          toast.error('Error agregando asset: ' + error);
+          setSteveAdding(false);
+          return;
+        }
+      }
+      toast.success('Asset agregado por Steve');
+      // Refresh detail
+      setGroupDetails(prev => {
+        const copy = { ...prev };
+        delete copy[steveGroupId];
+        return copy;
+      });
+      if (expandedGroup === steveGroupId) {
+        toggleGroup(steveGroupId);
+      }
+      setSteveOpen(false);
+    } finally {
+      setSteveAdding(false);
     }
-    toast.success('Asset agregado por Steve');
-    // Refresh detail
-    setGroupDetails(prev => {
-      const copy = { ...prev };
-      delete copy[steveGroupId];
-      return copy;
-    });
-    if (expandedGroup === steveGroupId) {
-      toggleGroup(steveGroupId);
-    }
-    setSteveOpen(false);
   };
 
   const handleRemoveAsset = async (groupId: string, asset: AssetDetail) => {
@@ -687,8 +796,11 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                                 <ul className="space-y-1 text-xs">
                                   {missing.slice(0, 6).map(m => {
                                     const canAddInline = TEXT_ADDABLE_FIELDS.has(m.fieldType);
-                                    const canSteveText = canAddInline; // text fields: HEADLINE, LONG_HEADLINE, DESCRIPTION, BUSINESS_NAME
+                                    const canSteveText = canAddInline; // HEADLINE, LONG_HEADLINE, DESCRIPTION, BUSINESS_NAME
                                     const canSteveCta = m.fieldType === 'CALL_TO_ACTION_SELECTION';
+                                    const canSteveImage = IMAGE_FIELDS.has(m.fieldType);
+                                    const canSteve = canSteveText || canSteveCta || canSteveImage;
+                                    const isVideo = m.fieldType === 'YOUTUBE_VIDEO';
                                     return (
                                     <li key={m.fieldType} className="flex items-center justify-between gap-2">
                                       <span className="flex items-center gap-1.5">
@@ -698,17 +810,17 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                                         </span>
                                       </span>
                                       <span className="flex items-center gap-2">
-                                        {(canSteveText || canSteveCta) && (
+                                        {canSteve && (
                                           <button
                                             className="text-primary hover:underline flex items-center gap-1"
                                             onClick={() => openSteveSuggest(group.id, m.fieldType)}
-                                            title="Deja que Steve sugiera según tu brief"
+                                            title={canSteveImage ? 'Steve genera la imagen con Gemini' : 'Steve sugiere según tu brief'}
                                           >
                                             <Sparkles className="w-3 h-3" />
-                                            Steve sugiere
+                                            {canSteveImage ? 'Steve genera' : 'Steve sugiere'}
                                           </button>
                                         )}
-                                        {canAddInline ? (
+                                        {canAddInline && (
                                           <button
                                             className="text-blue-600 hover:underline"
                                             onClick={() => {
@@ -719,8 +831,9 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                                           >
                                             + Manual
                                           </button>
-                                        ) : !canSteveCta && (
-                                          <span className="text-muted-foreground/60 text-[11px]" title="Imágenes/videos: agregalos desde Google Ads.">
+                                        )}
+                                        {isVideo && (
+                                          <span className="text-muted-foreground/60 text-[11px]" title="Videos: agregalos desde Google Ads (Steve aún no genera video).">
                                             desde Google Ads
                                           </span>
                                         )}
@@ -907,31 +1020,37 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
         </DialogContent>
       </Dialog>
 
-      {/* Steve AI Suggest Dialog */}
+      {/* Steve AI Suggest Dialog — modo texto (options), CTA (enum), imagen (preview) */}
       <Dialog open={steveOpen} onOpenChange={(open) => { if (!open && !steveAdding) setSteveOpen(open); }}>
         <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-primary" />
-              Steve sugiere: {fieldTypeLabels[steveField] || steveField}
+              {IMAGE_FIELDS.has(steveField) ? 'Steve genera' : 'Steve sugiere'}: {fieldTypeLabels[steveField] || steveField}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {steveField !== 'CALL_TO_ACTION_SELECTION' && (
               <div className="space-y-1">
-                <Label className="text-xs">¿Algo específico que deba enfatizar? (opcional)</Label>
+                <Label className="text-xs">
+                  {IMAGE_FIELDS.has(steveField)
+                    ? '¿Cómo quieres la imagen? (opcional — describe escena, estilo, objetos)'
+                    : '¿Algo específico que deba enfatizar? (opcional)'}
+                </Label>
                 <Textarea
                   value={steveUserIntent}
                   onChange={e => setSteveUserIntent(e.target.value)}
-                  placeholder="Ej: queremos destacar el envío gratis, o foco en mujeres 25-40..."
-                  maxLength={300}
+                  placeholder={IMAGE_FIELDS.has(steveField)
+                    ? 'Ej: producto sobre mesa de madera, luz de ventana, tono cálido...'
+                    : 'Ej: queremos destacar el envío gratis, o foco en mujeres 25-40...'}
+                  maxLength={500}
                   rows={2}
                 />
                 <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">{steveUserIntent.length}/300</p>
+                  <p className="text-xs text-muted-foreground">{steveUserIntent.length}/500</p>
                   <Button size="sm" variant="outline" onClick={requestSteveSuggestions} disabled={steveLoading}>
                     {steveLoading ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
-                    Regenerar
+                    {IMAGE_FIELDS.has(steveField) ? 'Regenerar imagen' : 'Regenerar'}
                   </Button>
                 </div>
               </div>
@@ -940,9 +1059,32 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
             {steveLoading ? (
               <div className="flex items-center gap-2 py-8 justify-center text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Steve está pensando...
+                {IMAGE_FIELDS.has(steveField) ? 'Steve está generando la imagen...' : 'Steve está pensando...'}
+              </div>
+            ) : IMAGE_FIELDS.has(steveField) ? (
+              // Modo imagen: preview
+              <div className="space-y-2">
+                {steveImageUrl ? (
+                  <div className="space-y-2">
+                    <div className="border rounded-md overflow-hidden bg-muted/20 flex items-center justify-center">
+                      <img
+                        src={steveImageUrl}
+                        alt="Steve generated"
+                        className="max-w-full max-h-[400px] object-contain"
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground text-center">
+                      Preview generado por Steve. "Agregar" lo sube a Google Ads, "Regenerar" prueba otra.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    Sin imagen. Usa "Regenerar" para generar una.
+                  </p>
+                )}
               </div>
             ) : (
+              // Modo texto / CTA: lista de opciones
               <div className="space-y-2">
                 <Label className="text-xs">Elige una opción (editable)</Label>
                 <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
@@ -1006,7 +1148,11 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
             </Button>
             <Button
               onClick={steveAddSelected}
-              disabled={steveAdding || steveLoading || steveSelectedIdx === null}
+              disabled={
+                steveAdding ||
+                steveLoading ||
+                (IMAGE_FIELDS.has(steveField) ? !steveImageUrl : steveSelectedIdx === null)
+              }
             >
               {steveAdding && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
               Agregar
