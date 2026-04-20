@@ -2074,15 +2074,19 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 </div>
               <div className="space-y-2">
                 <Label>Estrategia de puja</Label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                <Select
                   value={wizardData.bid_strategy}
-                  onChange={e => setWizardData(prev => ({ ...prev, bid_strategy: e.target.value }))}
+                  onValueChange={v => setWizardData(prev => ({ ...prev, bid_strategy: v }))}
                 >
-                  {bidStrategies.map(bs => (
-                    <option key={bs.value} value={bs.value}>{bs.label}</option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar estrategia" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bidStrategies.map(bs => (
+                      <SelectItem key={bs.value} value={bs.value}>{bs.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <SteveRecommendation
                   connectionId={connectionId}
                   clientId={clientId}

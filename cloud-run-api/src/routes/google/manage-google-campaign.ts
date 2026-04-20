@@ -2249,14 +2249,24 @@ Recomienda el mejor bid strategy de [MAXIMIZE_CONVERSIONS, MAXIMIZE_CLICKS, TARG
 Responde en JSON: { "bid_strategy": "...", "reasoning": "..." }`;
   } else if (recommendation_type === 'campaign_name') {
     const hasBrief = briefContext.trim().length > 0;
+    const ch = String(channel_type || 'PERFORMANCE_MAX').toUpperCase();
+    const channelLabels: Record<string, { full: string; prefix: string; example: string }> = {
+      PERFORMANCE_MAX: { full: 'Performance Max', prefix: 'PMAX', example: 'PMAX - Nacuttus Alimento Natural' },
+      SEARCH: { full: 'Search', prefix: 'Search', example: 'Search - Nacuttus Alimento Natural' },
+      SHOPPING: { full: 'Shopping', prefix: 'Shopping', example: 'Shopping - Nacuttus Catálogo Premium' },
+      DISPLAY: { full: 'Display', prefix: 'Display', example: 'Display - Nacuttus Retargeting' },
+      VIDEO: { full: 'Video', prefix: 'Video', example: 'Video - Nacuttus Brand Awareness' },
+      DEMAND_GEN: { full: 'Demand Gen', prefix: 'DemandGen', example: 'DemandGen - Nacuttus Lanzamiento' },
+    };
+    const ci = channelLabels[ch] || channelLabels.PERFORMANCE_MAX;
     prompt = `Eres Steve, un experto en Google Ads.
 ${hasBrief ? `\n## BRIEF DEL CLIENTE\n${briefContext.slice(0, 2000)}` : ''}
 ${extraContext ? `\nContexto adicional: ${extraContext}` : ''}
 
-Genera un nombre descriptivo para una campaña Performance Max de Google Ads.
+Genera un nombre descriptivo para una campaña ${ci.full} de Google Ads.
 El nombre debe:
-- Ser claro y profesional (ej: "PMAX - Nacuttus Alimento Natural")
-- Incluir "PMAX" al inicio
+- Ser claro y profesional (ej: "${ci.example}")
+- Incluir "${ci.prefix}" al inicio para identificar el canal
 - Reflejar la marca o producto principal del brief
 - Máximo 80 caracteres
 
