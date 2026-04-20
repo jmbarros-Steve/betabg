@@ -1130,14 +1130,18 @@ async function handleCreateCampaign(
       }
     }
 
-    // Audience Signals (array de hasta 5) — tres paths por cada uno:
+    // Audience Signal — Google Ads permite SOLO 1 audience signal por asset group.
+    // Si el user selecciona múltiples, tomamos el primero (con warning en response).
     //   (a) existing_audience_resource → linkea Audience ya guardado (sin crear)
     //   (b) existing_user_list_resource → crea Audience custom que contiene el user_list (Customer Match / remarketing)
     //   (c) demographics (age/gender/parental/income) → crea Audience con dimensiones demográficas
-    // Backward compat: si viene `audience_signal` singular, lo normalizamos a array.
-    const signalSpecs: any[] = Array.isArray(audience_signals)
-      ? audience_signals.filter((s: any) => s && typeof s === 'object').slice(0, 5)
+    const signalSpecsAll: any[] = Array.isArray(audience_signals)
+      ? audience_signals.filter((s: any) => s && typeof s === 'object')
       : (audience_signal && typeof audience_signal === 'object' ? [audience_signal] : []);
+    const signalSpecs = signalSpecsAll.slice(0, 1); // Google limit: 1 audience signal per asset group
+    if (signalSpecsAll.length > 1) {
+      console.warn(`[manage-google-campaign] audience_signals: Google permite solo 1 por asset group. Tomando el primero, descartando ${signalSpecsAll.length - 1}.`);
+    }
     for (const as of signalSpecs) {
       const ownerPrefix = `customers/${customerId}/`;
       const existingAudience = typeof as.existing_audience_resource === 'string' && as.existing_audience_resource.trim().startsWith(`${ownerPrefix}audiences/`)
@@ -1305,6 +1309,14 @@ async function handleCreateCampaign(
   const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, primaryOps);
 
   if (!result.ok) {
+    const errStr = String(result.error || '');
+    // Traducir errores comunes de Google a mensajes claros
+    if (errStr.includes('name is already assigned') || errStr.toLowerCase().includes('duplicate name')) {
+      return { body: { error: `Ya existe una campaña con el nombre "${name}" en tu cuenta de Google Ads. Cambialo y volvé a intentar.` }, status: 400 };
+    }
+    if (errStr.includes('INVALID_ARGUMENT') && errStr.includes('budget')) {
+      return { body: { error: `Presupuesto inválido. Verificá que daily_budget sea un número positivo en la moneda de la cuenta.` }, status: 400 };
+    }
     return { body: { error: `Failed to create campaign: ${result.error}` }, status: 502 };
   }
 
@@ -1344,12 +1356,53 @@ async function handleCreateCampaign(
     const secondaryOps = JSON.parse(jsonStr);
     console.log(`[manage-google-campaign] secondary batch: ${secondaryOps.length} ops, renumbered ${idMap.size} temp IDs to fresh range`);
 
-    const secondaryResult = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, secondaryOps);
-    if (!secondaryResult.ok) {
-      secondaryWarning = `Campaña creada OK, pero ${secondaryOpsRaw.length} operaciones secundarias (listing group filter / audience signals) fallaron: ${secondaryResult.error}. Podés agregar esos productos/audiencias manualmente en Google Ads.`;
-      console.warn('[manage-google-campaign] secondary mutate failed:', secondaryResult.error);
-    } else {
-      console.log(`[manage-google-campaign] secondary mutate OK: ${secondaryOps.length} ops applied`);
+    // AssetGroupListingGroupFilter NO acepta temp IDs en Google Ads API v23.
+    // Hay que crear el ROOT (SUBDIVISION) en un mutate SOLO, obtener su resource_name real,
+    // y luego usarlo en las LEAVES + signals (que sí pueden ir juntas en un 3er mutate).
+    const rootLgfIdx = secondaryOps.findIndex((op: any) =>
+      op.assetGroupListingGroupFilterOperation?.create?.type === 'SUBDIVISION'
+    );
+    let finalOps: any[] = secondaryOps;
+    let skipFinal = false;
+    if (rootLgfIdx >= 0) {
+      const rootLgfOp = secondaryOps[rootLgfIdx];
+      const tempRootResource = rootLgfOp.assetGroupListingGroupFilterOperation.create.resourceName as string;
+      // Remover resourceName temporal — Google lo asigna.
+      delete rootLgfOp.assetGroupListingGroupFilterOperation.create.resourceName;
+      const rootResult = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, [rootLgfOp]);
+      if (!rootResult.ok) {
+        secondaryWarning = `Campaña creada OK, pero no se pudo crear el filtro de productos (root listing group filter): ${rootResult.error}. Agregá los productos manualmente en Google Ads.`;
+        console.warn('[manage-google-campaign] root LGF mutate failed:', rootResult.error);
+        skipFinal = true;
+      } else {
+        const rootResponses: any[] = Array.isArray((rootResult.data as any)?.mutateOperationResponses)
+          ? (rootResult.data as any).mutateOperationResponses : [];
+        let realRootResource = '';
+        for (const r of rootResponses) {
+          const rn = r?.assetGroupListingGroupFilterResult?.resourceName || r?.asset_group_listing_group_filter_result?.resource_name;
+          if (rn) { realRootResource = rn; break; }
+        }
+        if (!realRootResource) {
+          secondaryWarning = `Root listing group filter creado pero no pudimos extraer su resource_name. Leaves no se aplicaron.`;
+          skipFinal = true;
+        } else {
+          // Reemplazar refs al temp root por el real en las ops restantes
+          const remainingOps = secondaryOps.filter((_: any, i: number) => i !== rootLgfIdx);
+          const remainingJson = JSON.stringify(remainingOps).split(tempRootResource).join(realRootResource);
+          finalOps = JSON.parse(remainingJson);
+          console.log(`[manage-google-campaign] root LGF created: ${realRootResource}, patching ${finalOps.length} leaves/signals`);
+        }
+      }
+    }
+
+    if (!skipFinal && finalOps.length > 0) {
+      const finalResult = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, finalOps);
+      if (!finalResult.ok) {
+        secondaryWarning = `Campaña creada OK, pero ${finalOps.length} operaciones secundarias fallaron: ${finalResult.error}. Podés agregar esos productos/audiencias manualmente en Google Ads.`;
+        console.warn('[manage-google-campaign] final secondary mutate failed:', finalResult.error);
+      } else {
+        console.log(`[manage-google-campaign] secondary mutate OK: ${finalOps.length} ops applied`);
+      }
     }
   }
 
