@@ -89,7 +89,59 @@ const fieldTypeLabels: Record<string, string> = {
   LOGO: 'Logo',
   LANDSCAPE_LOGO: 'Logo landscape',
   YOUTUBE_VIDEO: 'Video YouTube',
+  CALL_TO_ACTION_SELECTION: 'Call to Action',
 };
+
+// Configuración de strength: recomendado + peso por field_type.
+// Basado en best practices de Google Ads PMAX (min/max/recommended por tipo).
+const STRENGTH_CONFIG: Record<string, { recommended: number; weight: number; required?: boolean }> = {
+  HEADLINE:                 { recommended: 5, weight: 3 },
+  LONG_HEADLINE:            { recommended: 5, weight: 2 },
+  DESCRIPTION:              { recommended: 5, weight: 3 },
+  BUSINESS_NAME:            { recommended: 1, weight: 1, required: true },
+  MARKETING_IMAGE:          { recommended: 3, weight: 3, required: true },
+  SQUARE_MARKETING_IMAGE:   { recommended: 3, weight: 3, required: true },
+  LOGO:                     { recommended: 1, weight: 2 },
+  LANDSCAPE_LOGO:           { recommended: 1, weight: 1 },
+  PORTRAIT_MARKETING_IMAGE: { recommended: 1, weight: 1 },
+  YOUTUBE_VIDEO:            { recommended: 1, weight: 2 },
+  CALL_TO_ACTION_SELECTION: { recommended: 1, weight: 1 },
+};
+
+function computeStrength(assets: Record<string, AssetDetail[]>) {
+  let earned = 0;
+  let total = 0;
+  const missing: Array<{ fieldType: string; label: string; current: number; recommended: number; required: boolean; weight: number }> = [];
+  for (const [fieldType, config] of Object.entries(STRENGTH_CONFIG)) {
+    const current = (assets[fieldType] || []).length;
+    total += config.weight;
+    const coverage = Math.min(current / config.recommended, 1);
+    earned += config.weight * coverage;
+    if (current < config.recommended) {
+      missing.push({
+        fieldType,
+        label: fieldTypeLabels[fieldType] || fieldType,
+        current,
+        recommended: config.recommended,
+        required: !!config.required,
+        weight: config.weight,
+      });
+    }
+  }
+  const score = Math.round((earned / total) * 100);
+  return { score, missing: missing.sort((a, b) => (b.required === a.required ? b.weight - a.weight : (b.required ? 1 : -1))) };
+}
+
+function scoreColor(score: number): string {
+  if (score >= 90) return 'bg-green-500';
+  if (score >= 75) return 'bg-emerald-500';
+  if (score >= 50) return 'bg-yellow-500';
+  return 'bg-red-500';
+}
+
+// El add-asset dialog actual solo soporta campos de texto. Para el resto,
+// el "+ Agregar" no puede resolverlo y linkeamos al user a Google Ads.
+const TEXT_ADDABLE_FIELDS = new Set(['HEADLINE', 'LONG_HEADLINE', 'DESCRIPTION', 'BUSINESS_NAME']);
 
 export default function GooglePmaxManager({ connectionId, clientId }: GooglePmaxManagerProps) {
   const [assetGroups, setAssetGroups] = useState<AssetGroup[]>([]);
@@ -437,12 +489,73 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                     </div>
                   ) : groupDetails[group.id] ? (
                     <>
+                      {(() => {
+                        const { score, missing } = computeStrength(groupDetails[group.id].assets);
+                        return (
+                          <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="font-medium">Calidad del asset group</span>
+                              <span className="text-muted-foreground">
+                                Google: <span className="font-semibold">{adStrengthLabels[group.ad_strength] || group.ad_strength}</span>
+                                {' '}· Steve: <span className="font-semibold">{score}%</span>
+                              </span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                              <div
+                                className={`h-full transition-all ${scoreColor(score)}`}
+                                style={{ width: `${score}%` }}
+                              />
+                            </div>
+                            {missing.length > 0 && (
+                              <div className="space-y-1 pt-2 border-t border-border/50">
+                                <p className="text-xs font-medium text-muted-foreground">Qué mejorar:</p>
+                                <ul className="space-y-1 text-xs">
+                                  {missing.slice(0, 6).map(m => {
+                                    const canAddInline = TEXT_ADDABLE_FIELDS.has(m.fieldType);
+                                    return (
+                                    <li key={m.fieldType} className="flex items-center justify-between gap-2">
+                                      <span className="flex items-center gap-1.5">
+                                        {m.required && <span className="text-red-500" title="Requerido">●</span>}
+                                        <span>
+                                          {m.label}: <span className="font-medium">{m.current}/{m.recommended}</span>
+                                        </span>
+                                      </span>
+                                      {canAddInline ? (
+                                        <button
+                                          className="text-blue-600 hover:underline"
+                                          onClick={() => {
+                                            setAddAssetGroupId(group.id);
+                                            setNewAsset({ field_type: m.fieldType, text: '' });
+                                            setAddAssetOpen(true);
+                                          }}
+                                        >
+                                          + Agregar
+                                        </button>
+                                      ) : (
+                                        <span className="text-muted-foreground/60 text-[11px]" title="Por ahora solo texto se agrega desde acá. Imágenes/videos: agregalos desde Google Ads.">
+                                          desde Google Ads
+                                        </span>
+                                      )}
+                                    </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">{groupDetails[group.id].count} assets</span>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => { setAddAssetGroupId(group.id); setAddAssetOpen(true); }}
+                          onClick={() => {
+                            setAddAssetGroupId(group.id);
+                            setNewAsset({ field_type: 'HEADLINE', text: '' });
+                            setAddAssetOpen(true);
+                          }}
                         >
                           <Plus className="w-3.5 h-3.5 mr-1" />
                           Agregar asset
@@ -630,15 +743,23 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
             </div>
             <div className="space-y-2">
               <Label>Texto</Label>
-              <Input
-                value={newAsset.text}
-                onChange={e => setNewAsset(prev => ({ ...prev, text: e.target.value }))}
-                placeholder="Texto del asset..."
-                maxLength={newAsset.field_type === 'HEADLINE' ? 30 : 90}
-              />
-              <p className="text-xs text-muted-foreground">
-                {newAsset.text.length}/{newAsset.field_type === 'HEADLINE' ? 30 : 90} chars
-              </p>
+              {(() => {
+                const MAX_BY_TYPE: Record<string, number> = { HEADLINE: 30, LONG_HEADLINE: 90, DESCRIPTION: 90, BUSINESS_NAME: 25 };
+                const max = MAX_BY_TYPE[newAsset.field_type] ?? 90;
+                return (
+                  <>
+                    <Input
+                      value={newAsset.text}
+                      onChange={e => setNewAsset(prev => ({ ...prev, text: e.target.value }))}
+                      placeholder="Texto del asset..."
+                      maxLength={max}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {newAsset.text.length}/{max} chars
+                    </p>
+                  </>
+                );
+              })()}
             </div>
           </div>
           <DialogFooter>
