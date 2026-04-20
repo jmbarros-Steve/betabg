@@ -551,7 +551,8 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     // Acquisition mode: '' (default) | 'BID_HIGHER' (prioriza nuevos) | 'TARGET_ALL_EQUALLY' | 'BID_ONLY'
     acquisition_mode: '' as string,
     // Audience signal generado con AI (demografia)
-    audience_signal: null as null | {
+    // Audience signals — hasta 5. Cada item es un spec: AI-gen demographics, Audience existente o UserList existente.
+    audience_signals: [] as Array<{
       name?: string;
       description?: string;
       age_ranges?: string[];
@@ -559,11 +560,11 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       parental_statuses?: string[];
       income_ranges?: string[];
       reasoning?: string;
-      // Usar Audience o UserList existente (en vez de crear uno nuevo con demografía)
       existing_audience_resource?: string;
       existing_user_list_resource?: string;
       existing_label?: string; // texto humano para preview
-    },
+      kind: 'ai' | 'audience' | 'user_list'; // discriminador
+    }>,
     // User intent — prompt libre que alimenta a TODOS los AI recomendadores
     user_intent: '' as string,
     // Productos del Merchant Center seleccionados (SKUs) — solo los que van a la campaña
@@ -975,9 +976,9 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
         payload.acquisition_mode = wizardData.acquisition_mode;
       }
 
-      // Audience signal generado por AI (Capa 2: demografia)
-      if (wizardData.audience_signal) {
-        payload.audience_signal = wizardData.audience_signal;
+      // Audience signals (array de hasta 5)
+      if (wizardData.audience_signals.length > 0) {
+        payload.audience_signals = wizardData.audience_signals;
       }
 
       // Productos seleccionados (PMAX Shopping) — Google Ads filtra a este subset
@@ -1050,7 +1051,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       sitelinks: [], locations: [], languages: [],
       search_themes: '', url_expansion_opt_out: false,
       merchant_center_id: '',
-      acquisition_mode: '', audience_signal: null,
+      acquisition_mode: '', audience_signals: [],
       user_intent: '', selected_product_ids: [],
     });
     setBudgetOptions(null);
@@ -1093,12 +1094,17 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
 
   const handleApplyRecommendation = (rec: any) => {
     if (rec?.bid_strategy) {
-      setWizardData(prev => ({
-        ...prev,
-        bid_strategy: rec.bid_strategy,
-        daily_budget: rec.daily_budget ? String(rec.daily_budget) : prev.daily_budget,
-      }));
-      toast.success('Sugerencia de Steve aplicada');
+      const newBudget = rec.daily_budget ? String(rec.daily_budget) : null;
+      setWizardData(prev => {
+        const prevBudget = prev.daily_budget;
+        const budgetToApply = newBudget || prevBudget;
+        if (newBudget && prevBudget && newBudget !== prevBudget) {
+          toast.info(`Budget ajustado: $${prevBudget} → $${newBudget} (bid strategy ${rec.bid_strategy})`, { duration: 6_000 });
+        } else {
+          toast.success(`Steve aplicó: ${rec.bid_strategy}${budgetToApply ? ` con presupuesto $${budgetToApply}` : ''}`);
+        }
+        return { ...prev, bid_strategy: rec.bid_strategy, daily_budget: budgetToApply };
+      });
     }
   };
 
@@ -1176,6 +1182,16 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       portrait: `Foto publicitaria vertical de producto para Google Ads móvil. Negocio: ${wizardData.business_name || 'marca'}. Aspecto ratio 4:5, 960x1200px.`,
     };
 
+    // Priorizar imágenes de productos seleccionados (catalog MC enriched con Shopify image_url)
+    // Si no hay, caer a prev ads de Google como referencia de estilo.
+    const selectedProductImages = catalogProducts
+      .filter(p => wizardData.selected_product_ids.includes(p.id) && p.image_url)
+      .slice(0, 2)
+      .map(p => p.image_url as string);
+    const refUrls = selectedProductImages.length > 0
+      ? selectedProductImages
+      : prevAdImageUrls.slice(0, 2);
+
     try {
       const { data, error } = await callApi('generate-image', {
         body: {
@@ -1183,7 +1199,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           promptGeneracion: formatPrompts[format] || formatPrompts.landscape,
           formato: format,
           engine: 'imagen',
-          referenceImageUrls: prevAdImageUrls.slice(0, 2),
+          referenceImageUrls: refUrls,
           userIntent: wizardData.user_intent,
         },
       });
@@ -1286,6 +1302,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       if (!rec || rec.parse_error) { toast.error('Respuesta AI invalida'); return; }
       const ids: string[] = Array.isArray(rec.selected_product_ids) ? rec.selected_product_ids.map(String) : [];
       setWizardData(prev => ({ ...prev, selected_product_ids: ids }));
+      // no-op marker
       const cats = Array.isArray(rec.selected_categories) ? rec.selected_categories.filter((c: any) => typeof c === 'string') : [];
       const catsPart = cats.length > 0 ? ` · Categorías: ${cats.slice(0, 4).join(', ')}${cats.length > 4 ? '…' : ''}` : '';
       toast.success(`${ids.length} producto(s) sugerido(s) por AI${rec.ids_dropped ? ` (${rec.ids_dropped} inválidos descartados)` : ''}${catsPart}`);
@@ -1325,17 +1342,33 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     }
   };
 
-  const useExistingAudience = (aud: { resource_name: string; name: string; kind: 'audience' | 'user_list' }) => {
-    setWizardData(prev => ({
-      ...prev,
-      audience_signal: {
-        existing_audience_resource: aud.kind === 'audience' ? aud.resource_name : undefined,
-        existing_user_list_resource: aud.kind === 'user_list' ? aud.resource_name : undefined,
-        existing_label: `${aud.kind === 'user_list' ? '[Lista]' : '[Audiencia]'} ${aud.name}`,
-        name: aud.name,
-      },
-    }));
-    toast.success(`Audience signal: ${aud.name} seleccionada`);
+  const toggleExistingAudience = (aud: { resource_name: string; name: string; kind: 'audience' | 'user_list' }) => {
+    setWizardData(prev => {
+      const matching = prev.audience_signals.find(s =>
+        (s.kind !== 'ai') && (s.existing_audience_resource === aud.resource_name || s.existing_user_list_resource === aud.resource_name)
+      );
+      if (matching) {
+        return { ...prev, audience_signals: prev.audience_signals.filter(s => s !== matching) };
+      }
+      if (prev.audience_signals.length >= 5) {
+        toast.warning('Máximo 5 audience signals por campaña');
+        return prev;
+      }
+      return {
+        ...prev,
+        audience_signals: [...prev.audience_signals, {
+          kind: aud.kind,
+          existing_audience_resource: aud.kind === 'audience' ? aud.resource_name : undefined,
+          existing_user_list_resource: aud.kind === 'user_list' ? aud.resource_name : undefined,
+          existing_label: `${aud.kind === 'user_list' ? '[Lista]' : '[Audiencia]'} ${aud.name}`,
+          name: aud.name,
+        }],
+      };
+    });
+  };
+
+  const removeAudienceSignal = (idx: number) => {
+    setWizardData(prev => ({ ...prev, audience_signals: prev.audience_signals.filter((_, i) => i !== idx) }));
   };
 
   const generateAiAudienceSignal = async () => {
@@ -1363,19 +1396,28 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
         toast.error('Respuesta AI invalida');
         return;
       }
-      setWizardData(prev => ({
-        ...prev,
-        audience_signal: {
-          name: rec.name,
-          description: rec.description,
-          age_ranges: Array.isArray(rec.age_ranges) ? rec.age_ranges : [],
-          genders: Array.isArray(rec.genders) ? rec.genders : [],
-          parental_statuses: Array.isArray(rec.parental_statuses) ? rec.parental_statuses : [],
-          income_ranges: Array.isArray(rec.income_ranges) ? rec.income_ranges : [],
-          reasoning: rec.reasoning,
-        },
-      }));
-      toast.success('Audience signal generado');
+      setWizardData(prev => {
+        // Reemplazar si ya existía un AI-generated signal (solo 1 AI permitido), dejando los existentes
+        const withoutAi = prev.audience_signals.filter(s => s.kind !== 'ai');
+        if (withoutAi.length >= 5) {
+          toast.warning('Máximo 5 audience signals por campaña — quitá una para generar nueva con AI');
+          return prev;
+        }
+        return {
+          ...prev,
+          audience_signals: [...withoutAi, {
+            kind: 'ai',
+            name: rec.name,
+            description: rec.description,
+            age_ranges: Array.isArray(rec.age_ranges) ? rec.age_ranges : [],
+            genders: Array.isArray(rec.genders) ? rec.genders : [],
+            parental_statuses: Array.isArray(rec.parental_statuses) ? rec.parental_statuses : [],
+            income_ranges: Array.isArray(rec.income_ranges) ? rec.income_ranges : [],
+            reasoning: rec.reasoning,
+          }],
+        };
+      });
+      toast.success('Audience signal AI generado y agregado');
     } catch (err: any) {
       toast.error('Error: ' + err.message);
     } finally {
@@ -2029,9 +2071,10 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 <SteveRecommendation
                   connectionId={connectionId}
                   clientId={clientId}
-                userIntent={wizardData.user_intent}
+                  userIntent={wizardData.user_intent}
                   recommendationType="campaign_setup"
                   channelType={wizardData.channel_type}
+                  context={wizardData.daily_budget ? `El usuario ya eligió un presupuesto diario de $${wizardData.daily_budget}. Respetá ese número como base; solo ajustalo (±20%) si la bid_strategy lo exige, y justificá el cambio en el reasoning.` : undefined}
                   onApply={handleApplyRecommendation}
                 />
               </div>
@@ -2398,11 +2441,11 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 </div>
               )}
 
-              {/* Capa 2: Audience Signal (PMAX) — AI demográfica O audiencia existente */}
+              {/* Capa 2: Audience Signals (PMAX) — múltiples: AI demográfica + audiencias/listas existentes (max 5) */}
               {isPmax && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between flex-wrap gap-2">
-                    <Label>Audience Signal <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+                    <Label>Audience Signals <span className="text-muted-foreground font-normal">(opcional, hasta 5)</span></Label>
                     <div className="flex gap-1.5">
                       <Button
                         type="button"
@@ -2429,67 +2472,73 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                     </div>
                   </div>
 
-                  {/* Dropdown de audiencias guardadas */}
-                  {savedAudiences.length > 0 && !wizardData.audience_signal && (
-                    <select
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      onChange={e => {
-                        const aud = savedAudiences.find(a => a.resource_name === e.target.value);
-                        if (aud) useExistingAudience(aud);
-                      }}
-                      defaultValue=""
-                    >
-                      <option value="" disabled>-- Elegí una audiencia existente --</option>
+                  {/* Lista multi-select de audiencias guardadas */}
+                  {savedAudiences.length > 0 && (
+                    <div className="max-h-48 overflow-y-auto rounded border border-border bg-background p-2 space-y-1">
                       {savedAudiences.filter(a => a.kind === 'audience').length > 0 && (
-                        <optgroup label="Audiencias guardadas">
-                          {savedAudiences.filter(a => a.kind === 'audience').map(a => (
-                            <option key={a.resource_name} value={a.resource_name}>{a.name}</option>
-                          ))}
-                        </optgroup>
+                        <div className="text-xs font-medium text-muted-foreground px-1 pt-1">Audiencias guardadas</div>
                       )}
+                      {savedAudiences.filter(a => a.kind === 'audience').map(a => {
+                        const checked = wizardData.audience_signals.some(s => s.existing_audience_resource === a.resource_name);
+                        return (
+                          <label key={a.resource_name} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/40 rounded p-1">
+                            <input type="checkbox" checked={checked} onChange={() => toggleExistingAudience(a)} />
+                            <span className="flex-1 truncate">{a.name}</span>
+                          </label>
+                        );
+                      })}
                       {savedAudiences.filter(a => a.kind === 'user_list').length > 0 && (
-                        <optgroup label="Listas (Customer Match / remarketing)">
-                          {savedAudiences.filter(a => a.kind === 'user_list').map(a => (
-                            <option key={a.resource_name} value={a.resource_name}>
-                              {a.name}{a.size ? ` — ${a.size}` : ''}{a.type ? ` (${a.type})` : ''}
-                            </option>
-                          ))}
-                        </optgroup>
+                        <div className="text-xs font-medium text-muted-foreground px-1 pt-2">Listas (Customer Match / remarketing)</div>
                       )}
-                    </select>
+                      {savedAudiences.filter(a => a.kind === 'user_list').map(a => {
+                        const checked = wizardData.audience_signals.some(s => s.existing_user_list_resource === a.resource_name);
+                        return (
+                          <label key={a.resource_name} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/40 rounded p-1">
+                            <input type="checkbox" checked={checked} onChange={() => toggleExistingAudience(a)} />
+                            <span className="flex-1 truncate">{a.name}</span>
+                            {a.size && <span className="text-muted-foreground shrink-0">{a.size}</span>}
+                          </label>
+                        );
+                      })}
+                    </div>
                   )}
 
-                  {wizardData.audience_signal ? (
-                    <div className="rounded-md border border-border bg-muted/30 p-3 text-xs space-y-1">
-                      {wizardData.audience_signal.existing_label ? (
-                        <div><span className="font-medium">Usando existente:</span> {wizardData.audience_signal.existing_label}</div>
-                      ) : (
-                        <>
-                          {wizardData.audience_signal.name && (
-                            <div><span className="font-medium">Nombre:</span> {wizardData.audience_signal.name}</div>
-                          )}
-                          {wizardData.audience_signal.description && (
-                            <div className="text-muted-foreground">{wizardData.audience_signal.description}</div>
-                          )}
-                          <div className="flex flex-wrap gap-1 pt-1">
-                            {(wizardData.audience_signal.age_ranges || []).map(a => <Badge key={a} variant="secondary">{a.replace('AGE_RANGE_', '').replace('_', '-')}</Badge>)}
-                            {(wizardData.audience_signal.genders || []).map(g => <Badge key={g} variant="secondary">{g}</Badge>)}
-                            {(wizardData.audience_signal.parental_statuses || []).map(p => <Badge key={p} variant="secondary">{p.replace('_', ' ')}</Badge>)}
-                            {(wizardData.audience_signal.income_ranges || []).map(i => <Badge key={i} variant="secondary">{i.replace('INCOME_RANGE_', 'Ingreso ').replace('_', '-')}</Badge>)}
+                  {/* Preview de signals seleccionados */}
+                  {wizardData.audience_signals.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {wizardData.audience_signals.map((s, idx) => (
+                        <div key={idx} className="rounded-md border border-border bg-muted/30 p-2 text-xs flex items-start gap-2">
+                          <div className="flex-1 space-y-0.5">
+                            {s.existing_label ? (
+                              <div>{s.existing_label}</div>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-1.5">
+                                  <Badge variant="outline" className="text-[10px] h-4">AI</Badge>
+                                  <span className="font-medium">{s.name || 'Audiencia AI'}</span>
+                                </div>
+                                {s.description && <div className="text-muted-foreground">{s.description}</div>}
+                                <div className="flex flex-wrap gap-1 pt-0.5">
+                                  {(s.age_ranges || []).map(a => <Badge key={a} variant="secondary" className="text-[10px] h-4">{a.replace('AGE_RANGE_', '').replace('_', '-')}</Badge>)}
+                                  {(s.genders || []).map(g => <Badge key={g} variant="secondary" className="text-[10px] h-4">{g}</Badge>)}
+                                  {(s.parental_statuses || []).map(p => <Badge key={p} variant="secondary" className="text-[10px] h-4">{p.replace('_', ' ')}</Badge>)}
+                                  {(s.income_ranges || []).map(i => <Badge key={i} variant="secondary" className="text-[10px] h-4">{i.replace('INCOME_RANGE_', 'Ingreso ').replace('_', '-')}</Badge>)}
+                                </div>
+                              </>
+                            )}
                           </div>
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        className="text-xs text-destructive mt-1 underline"
-                        onClick={() => setWizardData(prev => ({ ...prev, audience_signal: null }))}
-                      >
-                        Quitar
-                      </button>
+                          <button
+                            type="button"
+                            className="text-xs text-destructive shrink-0"
+                            onClick={() => removeAudienceSignal(idx)}
+                            title="Quitar"
+                          >✕</button>
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Sin audience signal. Podés generar una con AI (demografía) o elegir una audiencia/lista guardada del account.
+                      Sin audience signals. Podés generar con AI, elegir varias guardadas, o ambas (hasta 5).
                     </p>
                   )}
 

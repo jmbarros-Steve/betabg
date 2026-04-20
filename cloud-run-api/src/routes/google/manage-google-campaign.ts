@@ -521,7 +521,9 @@ async function handleCreateCampaign(
     locations, languages,
     // Acquisition mode: BID_HIGHER (prioriza nuevos), TARGET_ALL_EQUALLY (todos), BID_ONLY (default)
     acquisition_mode,
-    // Audience signal generado por AI (demografia/intereses)
+    // Audience signals — array de hasta 5 specs (cada uno: existing_audience, existing_user_list, o demographics)
+    audience_signals,
+    // LEGACY: audience_signal single — backward compat
     audience_signal,
     // Productos del catalogo seleccionados (SKUs) — restringen la campana PMAX Shopping a estos IDs
     selected_product_ids,
@@ -1126,12 +1128,15 @@ async function handleCreateCampaign(
       }
     }
 
-    // Audience Signal (demografia/intereses/existente) — tres paths:
+    // Audience Signals (array de hasta 5) — tres paths por cada uno:
     //   (a) existing_audience_resource → linkea Audience ya guardado (sin crear)
     //   (b) existing_user_list_resource → crea Audience custom que contiene el user_list (Customer Match / remarketing)
     //   (c) demographics (age/gender/parental/income) → crea Audience con dimensiones demográficas
-    if (audience_signal && typeof audience_signal === 'object') {
-      const as = audience_signal as any;
+    // Backward compat: si viene `audience_signal` singular, lo normalizamos a array.
+    const signalSpecs: any[] = Array.isArray(audience_signals)
+      ? audience_signals.filter((s: any) => s && typeof s === 'object').slice(0, 5)
+      : (audience_signal && typeof audience_signal === 'object' ? [audience_signal] : []);
+    for (const as of signalSpecs) {
       const ownerPrefix = `customers/${customerId}/`;
       const existingAudience = typeof as.existing_audience_resource === 'string' && as.existing_audience_resource.trim().startsWith(`${ownerPrefix}audiences/`)
         ? as.existing_audience_resource.trim()
@@ -2471,7 +2476,7 @@ async function handleListCatalogProducts(
   if (mcIdSafe) try {
     const gaql = `
       SELECT shopping_product.merchant_center_id, shopping_product.item_id,
-             shopping_product.title, shopping_product.image_link,
+             shopping_product.title, shopping_product.brand,
              shopping_product.price_micros, shopping_product.currency_code,
              shopping_product.availability, shopping_product.status,
              shopping_product.product_type_level1, shopping_product.product_type_level2,
@@ -2498,7 +2503,7 @@ async function handleListCatalogProducts(
         products.push(normalize({
           id,
           title: sp.title,
-          image_url: sp.imageLink || sp.image_link,
+          image_url: null, // shopping_product no expone image URL en GAQL — usar Shopify fallback si se necesita
           price,
           availability: sp.availability,
           status: sp.status,
@@ -2507,6 +2512,42 @@ async function handleListCatalogProducts(
         }));
       }
       if (products.length > 0) {
+        // Enrich con image_url cruzando con shopify_products (shopping_product GAQL no expone image_link).
+        // Si el cliente tiene Shopify linkeado y los product_ids del MC matchean con los SKUs de Shopify,
+        // adjuntamos la imagen real para que la AI pueda usarla como referencia visual.
+        try {
+          const supabaseUrl = process.env.SUPABASE_URL;
+          const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          if (supabaseUrl && supabaseKey && clientId && UUID_RX.test(clientId)) {
+            const idList = products.slice(0, 500).map(p => `"${String(p.id).replace(/"/g, '')}"`).join(',');
+            const enrichRes = await fetch(
+              `${supabaseUrl}/rest/v1/shopify_products?client_id=eq.${clientId.trim()}&select=product_id,handle,sku,image_url&limit=500`,
+              { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }, signal: AbortSignal.timeout(5_000) }
+            );
+            if (enrichRes.ok) {
+              const shopRows = await enrichRes.json() as any[];
+              const imageMap = new Map<string, string>();
+              for (const r of shopRows) {
+                const img = r.image_url;
+                if (!img) continue;
+                // Indexamos por todas las claves posibles que puedan matchear con el item_id del MC
+                if (r.product_id) imageMap.set(String(r.product_id), img);
+                if (r.handle) imageMap.set(String(r.handle), img);
+                if (r.sku) imageMap.set(String(r.sku), img);
+              }
+              let enriched = 0;
+              for (const p of products) {
+                if (!p.image_url && imageMap.has(p.id)) {
+                  p.image_url = imageMap.get(p.id)!;
+                  enriched++;
+                }
+              }
+              console.log(`[manage-google-campaign] MC catalog enriched ${enriched}/${products.length} products with Shopify images`);
+            }
+          }
+        } catch (err: any) {
+          console.warn('[manage-google-campaign] MC-Shopify image enrichment failed:', err?.message);
+        }
         return { body: { success: true, products, source: 'merchant_center', count: products.length, merchant_center_id: mcIdSafe }, status: 200 };
       }
     } else if (!result.ok) {
