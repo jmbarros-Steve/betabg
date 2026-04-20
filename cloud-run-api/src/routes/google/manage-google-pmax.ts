@@ -251,6 +251,7 @@ async function handleAddAsset(
           resourceName: `customers/${customerId}/assets/${assetTempId}`,
           type: 'IMAGE',
           imageAsset: { data: image_data },
+          name: `${image_name || 'Image'}-${Math.abs(assetTempId)}`,
         },
       },
     });
