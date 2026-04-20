@@ -255,11 +255,13 @@ async function handleGetSettings(
   // Query 1 (CORE): campos garantizados en todos los channel_type.
   // GAQL en v23 devuelve 400 si pedís sub-fields de oneof (bid sub-messages,
   // network_settings) en canales donde no aplican — ej: PMAX no expone
-  // network_settings.target_content_network. Separamos los opcionales en Query 2.
+  // network_settings.target_content_network. Separamos los opcionales en queries
+  // aparte. También `campaign.start_date` y `campaign.end_date` fueron removidos
+  // del core tras error empírico 22/04: "Unrecognized fields in the query" —
+  // v23 los rechaza en algunos contextos pese a estar en docs.
   const coreQuery = `
     SELECT campaign.id, campaign.name, campaign.status,
            campaign.bidding_strategy_type,
-           campaign.start_date, campaign.end_date,
            campaign.advertising_channel_type
     FROM campaign
     WHERE campaign.id = ${campaignId}
@@ -275,6 +277,25 @@ async function handleGetSettings(
   const c = row.campaign;
   const channelType = c?.advertisingChannelType;
   const bidType = c?.biddingStrategyType;
+
+  // Query schedule (opcional): intentamos leer start_date/end_date en un query
+  // aislado. Si falla, continuamos sin schedule.
+  let start_date: string | undefined;
+  let end_date: string | undefined;
+  try {
+    const scheduleQuery = `
+      SELECT campaign.start_date, campaign.end_date
+      FROM campaign
+      WHERE campaign.id = ${campaignId}
+    `;
+    const scheduleResult = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, scheduleQuery);
+    if (scheduleResult.ok && scheduleResult.data?.[0]?.campaign) {
+      start_date = scheduleResult.data[0].campaign.startDate;
+      end_date = scheduleResult.data[0].campaign.endDate;
+    }
+  } catch (err: any) {
+    console.warn('[handleGetSettings] schedule query failed, continuing:', err?.message);
+  }
 
   // Query 2 (EXTENDED): bid sub-messages — solo pedimos el sub-message que
   // corresponde al bidType. Si este query falla, continuamos sin targets.
@@ -377,8 +398,8 @@ async function handleGetSettings(
         target_search_network,
         target_content_network,
         target_partner_search_network,
-        start_date: c?.startDate,
-        end_date: c?.endDate,
+        start_date,
+        end_date,
         channel_type: channelType,
         locations,
         languages,
