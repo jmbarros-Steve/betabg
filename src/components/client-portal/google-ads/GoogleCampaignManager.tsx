@@ -47,6 +47,7 @@ import {
   Users,
 } from 'lucide-react';
 import SteveRecommendation from './SteveRecommendation';
+import CreateAssetGroupDialog from './CreateAssetGroupDialog';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -503,6 +504,9 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   // Asset groups (PMAX) — vista jerárquica inline dentro de la tabla de campañas
   const [assetGroupsByCampaign, setAssetGroupsByCampaign] = useState<Record<string, Array<{ id: string; name: string; status: string; ad_strength: string }>>>({});
   const [assetGroupsLoading, setAssetGroupsLoading] = useState<Record<string, boolean>>({});
+  const [assetGroupActionLoading, setAssetGroupActionLoading] = useState<Record<string, boolean>>({});
+  const [createAgOpen, setCreateAgOpen] = useState(false);
+  const [createAgCampaignId, setCreateAgCampaignId] = useState<string>('');
 
   // Create ad group dialog
   const [createAdGroupOpen, setCreateAdGroupOpen] = useState(false);
@@ -882,6 +886,51 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       }
       setAdGroups(prev => ({ ...prev, [campaignId]: data?.ad_groups || [] }));
     }
+  };
+
+  // Acciones sobre asset groups PMAX (pause / delete) desde la sub-row de Campañas.
+  // El backend acepta status: ENABLED/PAUSED/REMOVED via update_asset_group.
+  const refreshAssetGroupsForCampaign = async (campaignId: string) => {
+    const { data, error } = await callApi('manage-google-pmax', {
+      body: { action: 'list_asset_groups', connection_id: connectionId, campaign_id: campaignId },
+    });
+    if (error) return;
+    setAssetGroupsByCampaign(prev => ({ ...prev, [campaignId]: data?.asset_groups || [] }));
+  };
+
+  const handleAssetGroupToggleStatus = async (campaignId: string, ag: { id: string; status: string; name: string }) => {
+    const nextStatus = ag.status === 'ENABLED' ? 'PAUSED' : 'ENABLED';
+    setAssetGroupActionLoading(prev => ({ ...prev, [ag.id]: true }));
+    const { error } = await callApi('manage-google-pmax', {
+      body: {
+        action: 'update_asset_group',
+        connection_id: connectionId,
+        asset_group_id: ag.id,
+        data: { status: nextStatus },
+      },
+    });
+    setAssetGroupActionLoading(prev => ({ ...prev, [ag.id]: false }));
+    if (error) { toast.error('Error: ' + error); return; }
+    toast.success(nextStatus === 'PAUSED' ? 'Grupo de recursos pausado' : 'Grupo de recursos activado');
+    await refreshAssetGroupsForCampaign(campaignId);
+  };
+
+  const handleAssetGroupDelete = async (campaignId: string, ag: { id: string; name: string }) => {
+    const ok = window.confirm(`¿Eliminar el grupo de recursos "${ag.name}"? Esta acción no se puede deshacer.`);
+    if (!ok) return;
+    setAssetGroupActionLoading(prev => ({ ...prev, [ag.id]: true }));
+    const { error } = await callApi('manage-google-pmax', {
+      body: {
+        action: 'update_asset_group',
+        connection_id: connectionId,
+        asset_group_id: ag.id,
+        data: { status: 'REMOVED' },
+      },
+    });
+    setAssetGroupActionLoading(prev => ({ ...prev, [ag.id]: false }));
+    if (error) { toast.error('Error: ' + error); return; }
+    toast.success('Grupo de recursos eliminado');
+    await refreshAssetGroupsForCampaign(campaignId);
   };
 
   const handleAdGroupPauseResume = async (ag: AdGroup) => {
@@ -1740,12 +1789,26 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-medium text-muted-foreground">
-                                Asset Groups ({(assetGroupsByCampaign[campaign.id] || []).length})
+                                Grupos de recursos ({(assetGroupsByCampaign[campaign.id] || []).length})
                               </span>
+                              {hasWriteAccess !== false && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => {
+                                    setCreateAgCampaignId(campaign.id);
+                                    setCreateAgOpen(true);
+                                  }}
+                                >
+                                  <Plus className="w-3 h-3 mr-1" />
+                                  Crear Grupo de recursos
+                                </Button>
+                              )}
                             </div>
                             {(assetGroupsByCampaign[campaign.id] || []).length === 0 ? (
                               <p className="text-xs text-muted-foreground">
-                                Sin asset groups. Creá uno desde la tab PMAX.
+                                Sin grupos de recursos. Creá uno con el botón de arriba.
                               </p>
                             ) : (
                               <table className="w-full text-xs">
@@ -1754,6 +1817,9 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                                     <th className="text-left py-1 font-medium">Nombre</th>
                                     <th className="text-left py-1 font-medium">Estado</th>
                                     <th className="text-left py-1 font-medium">Calidad (Google)</th>
+                                    {hasWriteAccess !== false && (
+                                      <th className="text-right py-1 font-medium">Acc</th>
+                                    )}
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -1770,6 +1836,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                                       ag.ad_strength === 'AVERAGE' ? 'Promedio' :
                                       ag.ad_strength === 'POOR' ? 'Pobre' :
                                       'Sin datos';
+                                    const actionLoading = !!assetGroupActionLoading[ag.id];
                                     return (
                                       <tr key={ag.id} className="border-b last:border-0">
                                         <td className="py-1.5 truncate max-w-[300px]" title={ag.name}>{ag.name}</td>
@@ -1783,6 +1850,38 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                                             {strengthLabel}
                                           </Badge>
                                         </td>
+                                        {hasWriteAccess !== false && (
+                                          <td className="py-1.5 text-right">
+                                            <div className="flex items-center justify-end gap-0.5">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 w-6 p-0"
+                                                disabled={actionLoading}
+                                                onClick={() => handleAssetGroupToggleStatus(campaign.id, ag)}
+                                                title={ag.status === 'ENABLED' ? 'Pausar' : 'Activar'}
+                                              >
+                                                {actionLoading ? (
+                                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                ) : ag.status === 'ENABLED' ? (
+                                                  <Pause className="w-3.5 h-3.5" />
+                                                ) : (
+                                                  <Play className="w-3.5 h-3.5" />
+                                                )}
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                                                disabled={actionLoading}
+                                                onClick={() => handleAssetGroupDelete(campaign.id, ag)}
+                                                title="Eliminar"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </Button>
+                                            </div>
+                                          </td>
+                                        )}
                                       </tr>
                                     );
                                   })}
@@ -1790,7 +1889,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                               </table>
                             )}
                             <p className="text-[11px] text-muted-foreground pt-1">
-                              Para editar assets o ver detalle, andá a la tab <span className="font-medium">PMAX</span>.
+                              Para editar assets (headlines, imágenes, etc.) andá a la tab <span className="font-medium">Grupos de recursos PMAX</span>.
                             </p>
                           </div>
                         )}
@@ -3224,6 +3323,19 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Crear Grupo de recursos (PMAX) desde la sub-row de una campaña */}
+      <CreateAssetGroupDialog
+        open={createAgOpen}
+        onOpenChange={setCreateAgOpen}
+        connectionId={connectionId}
+        pmaxCampaigns={campaigns.filter(c => c.channel_type === 'PERFORMANCE_MAX').map(c => ({ id: c.id, name: c.name }))}
+        preselectedCampaignId={createAgCampaignId}
+        onCreated={({ campaign_id }) => {
+          // Refresh asset groups del campaign_id creado para mostrar el nuevo AG inline.
+          refreshAssetGroupsForCampaign(campaign_id);
+        }}
+      />
     </div>
   );
 }

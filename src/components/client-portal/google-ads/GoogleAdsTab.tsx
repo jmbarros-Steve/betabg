@@ -97,7 +97,7 @@ export default function GoogleAdsTab({ clientId }: GoogleAdsTabProps) {
   const tabs: { key: SubTab; label: string; icon: React.ReactNode }[] = [
     { key: 'analytics', label: 'Analiticas', icon: <BarChart3 className="w-4 h-4" /> },
     { key: 'campaigns', label: 'Campanas', icon: <Megaphone className="w-4 h-4" /> },
-    { key: 'pmax', label: 'PMAX', icon: <Rocket className="w-4 h-4" /> },
+    { key: 'pmax', label: 'Grupos de recursos PMAX', icon: <Rocket className="w-4 h-4" /> },
     { key: 'keywords', label: 'Keywords', icon: <KeyRound className="w-4 h-4" /> },
     { key: 'ads', label: 'Anuncios', icon: <Type className="w-4 h-4" /> },
     { key: 'extensions', label: 'Extensiones', icon: <Puzzle className="w-4 h-4" /> },

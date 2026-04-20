@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -25,9 +25,12 @@ import {
   Type,
   Video,
   X,
-  Sparkles,
+  Pause,
+  Play,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
-import SteveRecommendation from './SteveRecommendation';
+import CreateAssetGroupDialog from './CreateAssetGroupDialog';
 
 interface AssetGroup {
   id: string;
@@ -72,7 +75,7 @@ const adStrengthLabels: Record<string, string> = {
   SYNCING: 'Sincronizando...',
 };
 
-// Key local para identificar asset groups optimistas (creados pero aún no visibles en GAQL)
+// Key local para identificar grupos de recursos optimistas (creados pero aún no visibles en GAQL)
 type PendingGroup = AssetGroup & { __pendingKey: string; __createdAt: number };
 const PENDING_TTL_MS = 2 * 60 * 1000; // 2 min — después de eso avisamos al user
 const POLL_FAST_MS = 10_000;           // 10s mientras hay pending
@@ -152,18 +155,8 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
   const [groupDetails, setGroupDetails] = useState<Record<string, { assets: Record<string, AssetDetail[]>; count: number }>>({});
   const [detailLoading, setDetailLoading] = useState<Record<string, boolean>>({});
 
-  // Create dialog
+  // Create dialog (ahora manejado por CreateAssetGroupDialog shared component)
   const [createOpen, setCreateOpen] = useState(false);
-  const [createLoading, setCreateLoading] = useState(false);
-  const [newGroup, setNewGroup] = useState({
-    name: '',
-    campaign_id: '',
-    final_url: '',
-    business_name: '',
-    headlines: '',
-    long_headlines: '',
-    descriptions: '',
-  });
 
   // Add asset dialog
   const [addAssetOpen, setAddAssetOpen] = useState(false);
@@ -180,7 +173,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
 
     setRefreshing(false);
     if (error) {
-      if (!opts?.silent) toast.error('Error cargando asset groups: ' + error);
+      if (!opts?.silent) toast.error('Error cargando grupos de recursos: ' + error);
       setLoading(false);
       return;
     }
@@ -271,55 +264,63 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     }
   };
 
-  const handleCreate = async () => {
-    if (!newGroup.name || !newGroup.campaign_id || !newGroup.final_url) {
-      toast.error('Nombre, campana y URL final son requeridos');
-      return;
-    }
-
-    setCreateLoading(true);
-    const { error } = await callApi('manage-google-pmax', {
-      body: {
-        action: 'create_asset_group',
-        connection_id: connectionId,
-        campaign_id: newGroup.campaign_id,
-        data: {
-          name: newGroup.name,
-          final_urls: [newGroup.final_url],
-          business_name: newGroup.business_name || undefined,
-          headlines: newGroup.headlines ? newGroup.headlines.split('\n').filter(Boolean) : undefined,
-          long_headlines: newGroup.long_headlines ? newGroup.long_headlines.split('\n').filter(Boolean) : undefined,
-          descriptions: newGroup.descriptions ? newGroup.descriptions.split('\n').filter(Boolean) : undefined,
-        },
-      },
-    });
-    setCreateLoading(false);
-
-    if (error) {
-      toast.error('Error creando asset group: ' + error);
-      return;
-    }
-
-    toast.success('Asset group creado — sincronizando con Google (puede tardar unos minutos)');
-    // Optimistic: agregar a pendingGroups para que aparezca con badge "Sincronizando..."
-    // hasta que fetchAssetGroups lo devuelva real (match por name + campaign_id) o expire TTL.
-    const pmaxMatch = pmaxCampaigns.find(c => c.id === newGroup.campaign_id);
+  // Callback post-create del shared dialog: optimistic update + refresh silencioso.
+  const handleAssetGroupCreated = (result: { campaign_id: string; name: string }) => {
+    const pmaxMatch = pmaxCampaigns.find(c => c.id === result.campaign_id);
     setPendingGroups(prev => [
       ...prev,
       {
         __pendingKey: `pending-${Date.now()}`,
         __createdAt: Date.now(),
         id: `pending-${Date.now()}`,
-        name: newGroup.name,
+        name: result.name,
         status: 'ENABLED',
         ad_strength: 'SYNCING',
-        campaign_id: newGroup.campaign_id,
+        campaign_id: result.campaign_id,
         campaign_name: pmaxMatch?.name || '',
       },
     ]);
-    setCreateOpen(false);
-    setNewGroup({ name: '', campaign_id: '', final_url: '', business_name: '', headlines: '', long_headlines: '', descriptions: '' });
     fetchAssetGroups({ silent: true });
+  };
+
+  // Acciones por grupo de recursos: pause/resume/rename/delete (todos via update_asset_group del backend).
+  const handleUpdateAssetGroup = async (groupId: string, updates: Record<string, any>, successMsg: string) => {
+    const { error } = await callApi('manage-google-pmax', {
+      body: {
+        action: 'update_asset_group',
+        connection_id: connectionId,
+        asset_group_id: groupId,
+        data: updates,
+      },
+    });
+    if (error) {
+      toast.error('Error: ' + error);
+      return false;
+    }
+    toast.success(successMsg);
+    fetchAssetGroups({ silent: true });
+    return true;
+  };
+
+  const handleToggleStatus = async (group: AssetGroup) => {
+    const nextStatus = group.status === 'ENABLED' ? 'PAUSED' : 'ENABLED';
+    await handleUpdateAssetGroup(
+      group.id,
+      { status: nextStatus },
+      nextStatus === 'PAUSED' ? 'Grupo de recursos pausado' : 'Grupo de recursos activado'
+    );
+  };
+
+  const handleRename = async (group: AssetGroup) => {
+    const newName = window.prompt('Nuevo nombre del grupo de recursos:', group.name);
+    if (!newName || newName.trim() === '' || newName === group.name) return;
+    await handleUpdateAssetGroup(group.id, { name: newName.trim() }, 'Nombre actualizado');
+  };
+
+  const handleDelete = async (group: AssetGroup) => {
+    const ok = window.confirm(`¿Eliminar el grupo de recursos "${group.name}"? Esta acción no se puede deshacer.`);
+    if (!ok) return;
+    await handleUpdateAssetGroup(group.id, { status: 'REMOVED' }, 'Grupo de recursos eliminado');
   };
 
   const handleAddAsset = async () => {
@@ -381,22 +382,11 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     toggleGroup(groupId);
   };
 
-  const handleApplyRecommendation = (rec: any) => {
-    if (rec?.headlines) {
-      setNewGroup(prev => ({
-        ...prev,
-        headlines: rec.headlines.join('\n'),
-        long_headlines: rec.long_headlines?.join('\n') || prev.long_headlines,
-        descriptions: rec.descriptions?.join('\n') || prev.descriptions,
-      }));
-      toast.success('Sugerencias de Steve aplicadas');
-    }
-  };
 
   // Get unique PMAX campaign IDs for the create dialog
   const pmaxCampaigns = [...new Map(assetGroups.map(ag => [ag.campaign_id, { id: ag.campaign_id, name: ag.campaign_name }])).values()];
 
-  // Merge real asset groups con los pending (optimistic) — los pending quedan primero para visibilidad.
+  // Merge real grupos de recursos con los pending (optimistic) — los pending quedan primero para visibilidad.
   const displayGroups: (AssetGroup | PendingGroup)[] = [...pendingGroups, ...assetGroups];
 
   if (loading) {
@@ -415,7 +405,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <h3 className="text-sm font-medium text-muted-foreground">
-            {displayGroups.length} asset group{displayGroups.length !== 1 ? 's' : ''} PMAX
+            {displayGroups.length} grupo{displayGroups.length !== 1 ? 's' : ''} de recursos PMAX
             {pendingGroups.length > 0 && (
               <span className="ml-2 text-xs text-blue-600">
                 ({pendingGroups.length} sincronizando)
@@ -423,7 +413,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
             )}
           </h3>
           <p className="text-xs text-muted-foreground">
-            Auto-refresco {pendingGroups.length > 0 ? 'cada 10s' : 'cada 30s'}. Los asset groups recién creados tardan unos minutos en aparecer desde Google.
+            Auto-refresco {pendingGroups.length > 0 ? 'cada 10s' : 'cada 30s'}. Los grupos de recursos recién creados tardan unos minutos en aparecer desde Google.
           </p>
         </div>
         <div className="flex gap-2">
@@ -434,7 +424,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
           {pmaxCampaigns.length > 0 && (
             <Button size="sm" onClick={() => setCreateOpen(true)}>
               <Plus className="w-4 h-4 mr-1" />
-              Crear Asset Group
+              Crear Grupo de recursos
             </Button>
           )}
         </div>
@@ -444,7 +434,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
       {displayGroups.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            No hay asset groups PMAX en esta cuenta.
+            No hay grupos de recursos PMAX en esta cuenta.
             <br />
             <span className="text-xs">Crea una campana Performance Max primero.</span>
           </CardContent>
@@ -455,29 +445,65 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
             const isPending = '__pendingKey' in group;
             return (
             <Card key={isPending ? (group as PendingGroup).__pendingKey : group.id} className={`overflow-hidden ${isPending ? 'opacity-70 border-blue-500/30' : ''}`}>
-              {/* Group header */}
-              <button
-                className={`w-full flex items-center gap-3 p-4 text-left transition-colors ${isPending ? 'cursor-wait' : 'hover:bg-muted/30'}`}
-                onClick={() => !isPending && toggleGroup(group.id)}
-                disabled={isPending}
-              >
-                {isPending
-                  ? <Loader2 className="w-4 h-4 text-blue-500 shrink-0 animate-spin" />
-                  : expandedGroup === group.id
-                    ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-                    : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                }
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{group.name}</p>
-                  <p className="text-xs text-muted-foreground">{group.campaign_name}</p>
-                </div>
-                <Badge variant="outline" className={adStrengthColors[group.ad_strength] || adStrengthColors.UNSPECIFIED}>
-                  {adStrengthLabels[group.ad_strength] || group.ad_strength}
-                </Badge>
-                <Badge variant="outline" className={group.status === 'ENABLED' ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'}>
-                  {group.status === 'ENABLED' ? 'Activo' : group.status}
-                </Badge>
-              </button>
+              {/* Group header: área clickeable a la izquierda + acciones a la derecha */}
+              <div className={`w-full flex items-center gap-3 p-4 transition-colors ${isPending ? '' : 'hover:bg-muted/30'}`}>
+                <button
+                  className={`flex-1 flex items-center gap-3 text-left min-w-0 ${isPending ? 'cursor-wait' : ''}`}
+                  onClick={() => !isPending && toggleGroup(group.id)}
+                  disabled={isPending}
+                >
+                  {isPending
+                    ? <Loader2 className="w-4 h-4 text-blue-500 shrink-0 animate-spin" />
+                    : expandedGroup === group.id
+                      ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                      : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                  }
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{group.name}</p>
+                    <p className="text-xs text-muted-foreground">{group.campaign_name}</p>
+                  </div>
+                  <Badge variant="outline" className={adStrengthColors[group.ad_strength] || adStrengthColors.UNSPECIFIED}>
+                    {adStrengthLabels[group.ad_strength] || group.ad_strength}
+                  </Badge>
+                  <Badge variant="outline" className={group.status === 'ENABLED' ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'}>
+                    {group.status === 'ENABLED' ? 'Activo' : group.status}
+                  </Badge>
+                </button>
+                {!isPending && (
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => handleToggleStatus(group)}
+                      title={group.status === 'ENABLED' ? 'Pausar' : 'Activar'}
+                    >
+                      {group.status === 'ENABLED'
+                        ? <Pause className="w-4 h-4" />
+                        : <Play className="w-4 h-4" />
+                      }
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => handleRename(group)}
+                      title="Renombrar"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                      onClick={() => handleDelete(group)}
+                      title="Eliminar"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
 
               {/* Expanded detail */}
               {expandedGroup === group.id && (
@@ -494,7 +520,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                         return (
                           <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
                             <div className="flex items-center justify-between text-sm">
-                              <span className="font-medium">Calidad del asset group</span>
+                              <span className="font-medium">Calidad del grupo de recursos</span>
                               <span className="text-muted-foreground">
                                 Google: <span className="font-semibold">{adStrengthLabels[group.ad_strength] || group.ad_strength}</span>
                                 {' '}· Steve: <span className="font-semibold">{score}%</span>
@@ -625,101 +651,14 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
         </div>
       )}
 
-      {/* Create Asset Group Dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Crear Asset Group PMAX</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Nombre *</Label>
-              <Input
-                value={newGroup.name}
-                onChange={e => setNewGroup(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Mi Asset Group"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Campana PMAX *</Label>
-              <select
-                className="w-full border rounded-md px-3 py-2 text-sm"
-                value={newGroup.campaign_id}
-                onChange={e => setNewGroup(prev => ({ ...prev, campaign_id: e.target.value }))}
-              >
-                <option value="">Seleccionar campana...</option>
-                {pmaxCampaigns.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>URL Final *</Label>
-              <Input
-                value={newGroup.final_url}
-                onChange={e => setNewGroup(prev => ({ ...prev, final_url: e.target.value }))}
-                placeholder="https://mitienda.com"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Nombre del negocio</Label>
-              <Input
-                value={newGroup.business_name}
-                onChange={e => setNewGroup(prev => ({ ...prev, business_name: e.target.value }))}
-                placeholder="Mi Empresa"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Headlines (1 por linea, max 30 chars)</Label>
-                <SteveRecommendation
-                  connectionId={connectionId}
-                  recommendationType="pmax_assets"
-                  context={newGroup.business_name || newGroup.final_url}
-                  onApply={handleApplyRecommendation}
-                />
-              </div>
-              <Textarea
-                value={newGroup.headlines}
-                onChange={e => setNewGroup(prev => ({ ...prev, headlines: e.target.value }))}
-                placeholder="Headline 1&#10;Headline 2&#10;Headline 3"
-                rows={4}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Headlines largos (1 por linea, max 90 chars)</Label>
-              <Textarea
-                value={newGroup.long_headlines}
-                onChange={e => setNewGroup(prev => ({ ...prev, long_headlines: e.target.value }))}
-                placeholder="Headline largo 1&#10;Headline largo 2"
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Descripciones (1 por linea, max 90 chars)</Label>
-              <Textarea
-                value={newGroup.descriptions}
-                onChange={e => setNewGroup(prev => ({ ...prev, descriptions: e.target.value }))}
-                placeholder="Descripcion 1&#10;Descripcion 2"
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreate} disabled={createLoading}>
-              {createLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
-              Crear
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Create Asset Group Dialog (shared component) */}
+      <CreateAssetGroupDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        connectionId={connectionId}
+        pmaxCampaigns={pmaxCampaigns}
+        onCreated={handleAssetGroupCreated}
+      />
 
       {/* Add Asset Dialog */}
       <Dialog open={addAssetOpen} onOpenChange={setAddAssetOpen}>
