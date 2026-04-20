@@ -955,7 +955,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                               <div className="space-y-1 pt-2 border-t border-border/50">
                                 <p className="text-xs font-medium text-muted-foreground">Qué mejorar:</p>
                                 <ul className="space-y-1 text-xs">
-                                  {missing.slice(0, 6).map(m => {
+                                  {missing.map(m => {
                                     const canAddInline = TEXT_ADDABLE_FIELDS.has(m.fieldType);
                                     const canSteveText = canAddInline; // HEADLINE, LONG_HEADLINE, DESCRIPTION, BUSINESS_NAME
                                     const canSteveCta = m.fieldType === 'CALL_TO_ACTION_SELECTION';
