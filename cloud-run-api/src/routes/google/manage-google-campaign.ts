@@ -817,9 +817,44 @@ async function handleCreateCampaign(
       });
     }
 
-    // Image assets
+    // Image assets — validate aspect ratio + min dimensions before pushing ops
     if (image_assets?.length) {
+      const validatedImages: any[] = [];
+      const rejected: string[] = [];
       for (const img of image_assets) {
+        const spec = PMAX_IMAGE_SPECS[img.field_type];
+        if (!spec) { rejected.push(`${img.name || 'image'}: field_type desconocido ${img.field_type}`); continue; }
+        const dims = parseImageDimensions(img.data);
+        if (!dims) { rejected.push(`${img.name || 'image'}: no se pudo leer dimensiones (formato no soportado)`); continue; }
+        if (dims.width < spec.minW || dims.height < spec.minH) {
+          rejected.push(`${img.name || 'image'} (${dims.width}x${dims.height}): menor que mínimo ${spec.minW}x${spec.minH} para ${spec.label}`);
+          continue;
+        }
+        const actualRatio = dims.width / dims.height;
+        if (Math.abs(actualRatio - spec.targetRatio) > spec.tolerance) {
+          rejected.push(`${img.name || 'image'} (${dims.width}x${dims.height}, ratio ${actualRatio.toFixed(2)}): no cumple ${spec.label} (objetivo ${spec.targetRatio})`);
+          continue;
+        }
+        validatedImages.push(img);
+      }
+      if (rejected.length > 0) {
+        console.warn(`[manage-google-campaign] PMAX rejected ${rejected.length}/${image_assets.length} image(s):`, rejected);
+      }
+      // Re-validate PMAX minimums after filtering
+      const okLandscape = validatedImages.some((i: any) => i.field_type === 'MARKETING_IMAGE');
+      const okSquare = validatedImages.some((i: any) => i.field_type === 'SQUARE_MARKETING_IMAGE');
+      const okLogo = validatedImages.some((i: any) => i.field_type === 'LOGO');
+      if (!okLandscape || !okSquare || !okLogo) {
+        return {
+          body: {
+            error: 'Faltan imágenes válidas después de validar aspect ratios',
+            details: `Requiere al menos 1 landscape (1.91:1), 1 cuadrada (1:1), 1 logo (1:1). Imágenes rechazadas: ${rejected.join(' | ')}`,
+            rejected_images: rejected,
+          },
+          status: 400,
+        };
+      }
+      for (const img of validatedImages) {
         const assetTempId = tempId--;
         assetOps.push({
           assetOperation: {
@@ -866,14 +901,15 @@ async function handleCreateCampaign(
       }
     }
 
-    // CTA — create text asset + link with CALL_TO_ACTION_SELECTION
+    // CTA — create CallToActionAsset (no text!) + link with CALL_TO_ACTION_SELECTION
+    // call_to_action es un enum CallToActionType (SHOP_NOW, LEARN_MORE, etc.), no texto libre.
     if (call_to_action) {
       const ctaAssetId = tempId--;
       assetOps.push({
         assetOperation: {
           create: {
             resourceName: `customers/${customerId}/assets/${ctaAssetId}`,
-            textAsset: { text: call_to_action },
+            callToActionAsset: { callToAction: call_to_action },
           },
         },
       });
@@ -1077,9 +1113,11 @@ async function handleCreateCampaign(
       const INCOME_ENUMS = new Set(['INCOME_RANGE_0_50', 'INCOME_RANGE_50_60', 'INCOME_RANGE_60_70', 'INCOME_RANGE_70_80', 'INCOME_RANGE_80_90', 'INCOME_RANGE_90_UP', 'INCOME_RANGE_UNDETERMINED']);
 
       const validAges = Array.isArray(age_ranges) ? age_ranges.filter((a: string) => AGE_ENUMS.has(a)) : [];
-      const validGenders = Array.isArray(genders) ? genders.filter((g: string) => GENDER_ENUMS.has(g)) : [];
-      const validParental = Array.isArray(parental_statuses) ? parental_statuses.filter((p: string) => PARENTAL_ENUMS.has(p)) : [];
-      const validIncomes = Array.isArray(income_ranges) ? income_ranges.filter((i: string) => INCOME_ENUMS.has(i)) : [];
+      // Audience resource rechaza UNDETERMINED en genders/parental/income — solo permite valores concretos.
+      // UNDETERMINED sí es enum válido del sistema pero no se acepta al crear audience.
+      const validGenders = Array.isArray(genders) ? genders.filter((g: string) => GENDER_ENUMS.has(g) && g !== 'UNDETERMINED') : [];
+      const validParental = Array.isArray(parental_statuses) ? parental_statuses.filter((p: string) => PARENTAL_ENUMS.has(p) && p !== 'UNDETERMINED') : [];
+      const validIncomes = Array.isArray(income_ranges) ? income_ranges.filter((i: string) => INCOME_ENUMS.has(i) && i !== 'INCOME_RANGE_UNDETERMINED') : [];
 
       // Shape per Google Ads API v23 proto for AUDIENCE (verificado contra docs oficiales):
       //   AgeDimension.age_ranges: repeated AgeSegment { minAge: int, maxAge: int } — enum se traduce a ints
@@ -2031,6 +2069,17 @@ Genera 15-20 "search themes" (audience signals) para una campaña PMAX. Son tema
 - En español (idioma del brief)
 - Sin duplicar ideas
 
+## POLICY DE GOOGLE ADS — EVITA ESTRICTAMENTE:
+- Enfermedades/condiciones médicas específicas ("diabetes canina", "ansiedad perro", "cáncer") → usa alternativas genéricas ("cuidado de salud", "bienestar animal")
+- Afirmaciones de resultados garantizados ("cura", "solución definitiva", "100% efectivo")
+- Contenido para adultos, drogas, alcohol, armas, apuestas
+- Términos políticos, religiosos o de orientación sexual
+- Marcas competidoras directas registradas (usar categoría en vez de marca)
+- Afirmaciones no verificables ("el mejor del mundo", "aprobado por médicos" sin respaldo)
+- Contenido sensible: violencia, accidentes, tragedias
+
+Prioriza términos neutros y enfocados en beneficio al cliente.
+
 Responde SOLO en JSON válido:
 {
   "search_themes": ["tema 1", "tema 2", ...],
@@ -2149,6 +2198,58 @@ Responde SOLO en JSON válido:
 
 // UUID validator to prevent PostgREST operator injection in eq.${value} interpolation
 const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Parse image dimensions (width/height) from base64-encoded PNG/JPG/WebP without external deps.
+function parseImageDimensions(base64: string): { width: number; height: number } | null {
+  try {
+    const buf = Buffer.from(base64, 'base64');
+    // PNG: 8-byte signature + IHDR chunk
+    if (buf.length >= 24 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) {
+      return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+    }
+    // JPEG: 0xFFD8 SOI, scan for SOF0-SOF15 (except C4/C8/CC)
+    if (buf.length >= 2 && buf[0] === 0xFF && buf[1] === 0xD8) {
+      let i = 2;
+      while (i + 9 < buf.length) {
+        if (buf[i] !== 0xFF) return null;
+        const marker = buf[i + 1];
+        if (marker >= 0xC0 && marker <= 0xCF && marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC) {
+          return { width: buf.readUInt16BE(i + 7), height: buf.readUInt16BE(i + 5) };
+        }
+        const segLen = buf.readUInt16BE(i + 2);
+        i += 2 + segLen;
+      }
+    }
+    // WebP: RIFF....WEBPVP8X/VP8 /VP8L
+    if (buf.length >= 30 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') {
+      const chunkType = buf.toString('ascii', 12, 16);
+      if (chunkType === 'VP8X') {
+        const w = (buf[24] | (buf[25] << 8) | (buf[26] << 16)) + 1;
+        const h = (buf[27] | (buf[28] << 8) | (buf[29] << 16)) + 1;
+        return { width: w, height: h };
+      }
+      if (chunkType === 'VP8 ' && buf.length >= 30) {
+        return { width: buf.readUInt16LE(26) & 0x3FFF, height: buf.readUInt16LE(28) & 0x3FFF };
+      }
+      if (chunkType === 'VP8L' && buf.length >= 25 && buf[20] === 0x2F) {
+        const b1 = buf[21], b2 = buf[22], b3 = buf[23], b4 = buf[24];
+        const w = (((b2 & 0x3F) << 8) | b1) + 1;
+        const h = (((b4 & 0x0F) << 10) | (b3 << 2) | ((b2 & 0xC0) >> 6)) + 1;
+        return { width: w, height: h };
+      }
+    }
+    return null;
+  } catch { return null; }
+}
+
+// Aspect ratio + min size requirements per PMAX field_type (Google Ads API v23).
+const PMAX_IMAGE_SPECS: Record<string, { targetRatio: number; tolerance: number; minW: number; minH: number; label: string }> = {
+  MARKETING_IMAGE:          { targetRatio: 1.91, tolerance: 0.08, minW: 600, minH: 314, label: 'Landscape 1.91:1' },
+  SQUARE_MARKETING_IMAGE:   { targetRatio: 1.0,  tolerance: 0.05, minW: 300, minH: 300, label: 'Cuadrada 1:1' },
+  PORTRAIT_MARKETING_IMAGE: { targetRatio: 0.8,  tolerance: 0.05, minW: 480, minH: 600, label: 'Vertical 4:5' },
+  LOGO:                     { targetRatio: 1.0,  tolerance: 0.05, minW: 128, minH: 128, label: 'Logo 1:1' },
+  LANDSCAPE_LOGO:           { targetRatio: 4.0,  tolerance: 0.2,  minW: 512, minH: 128, label: 'Logo landscape 4:1' },
+};
 
 // --- List catalog products directly from Merchant Center via Google Ads API `shopping_product` ---
 // Fallback a shopify_products si el MC no tiene productos o falla la query.
