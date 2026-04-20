@@ -73,3 +73,68 @@ v21+ hizo listing_source required en SUBDIVISION + UNIT_INCLUDED + UNIT_EXCLUDED
 - [ ] ¿Hay tests E2E que cubran el path arreglado?
 - [ ] Si cambia campos required/optional: ¿link a doc o curl empírico?
 - [ ] ¿Los comentarios en el código reflejan la realidad actual (no un v20 obsoleto)?
+
+## Sesión 20/04/2026 PM-2 — 7 reviews UX más (total 12+ del día)
+
+### Patterns UX que catché hoy (NUEVOS)
+
+1. **Fragment key en React .map con sub-rows condicionales:**
+   `<>...<tr/><tr/></>` sin key causa warning + bug real: cuando filter/sort reordena campaigns, sub-rows expandidas "saltan" entre filas. React no puede trackear el Fragment. Fix: `<Fragment key={id}>` con import explícito.
+
+2. **Server-side filter preferir sobre client-side:**
+   Si el backend soporta filter (ej: `campaign_id` en GAQL), usarlo. Filter client-side infla payload y parsing. Verificar siempre antes de aprobar.
+
+3. **Pluralización español incorrecta por replace_all naive:**
+   Error común: `replace_all 'asset group' → 'grupo de recursos'` produce "grupo de recursoss" para el plural. El núcleo es "grupo" (no "recursos"), pluraliza a "grupos de recursos". Fix: `{n} grupo{n !== 1 ? 's' : ''} de recursos`.
+
+4. **Imports huérfanos tras refactor:**
+   Cuando se extrae un componente, los imports que SOLO usaba ese componente (ej: `useRef`, `Sparkles`, `SteveRecommendation`) quedan sin usar. Con `noUnusedLocals` strict en tsconfig, falla build. Check grep post-refactor.
+
+5. **i18n case-sensitivity en replace_all:**
+   `replace_all 'asset group' → 'grupo de recursos'` es case-sensitive y NO toca 'Asset group' (con A mayúscula). Revisar toasts y labels capitalizados manualmente.
+
+6. **Botón con promesa que el dialog no puede cumplir:**
+   En scorecard, el botón "+ Agregar" abría dialog que solo soporta 4 text fields. Para IMAGE/LOGO/VIDEO/CTA no puede resolver. Fix: disable el botón para tipos no soportados + texto alternativo ("desde Google Ads") con tooltip.
+
+7. **Double-click safety (actionLoading):**
+   En handlers de pause/delete, si no hay `actionLoading` state + `disabled`, doble click dispara 2 requests. Inconsistencia entre componentes del mismo feature (CampaignManager lo tiene, PmaxManager no).
+
+8. **Optimistic state con TTL:**
+   Pending groups con TTL de 2 min — si expira sin match, debe avisar al user (`toast.warning`) en vez de desaparecer silenciosamente (o el user crearía duplicado).
+
+### Stats del día
+
+- Reviews totales: 12+
+- Rechazos correctivos: 4 (ratio 33%)
+- Cada rechazo pilló issue real antes de prod
+- Mi único fallo fue review #1 (aprobé Asset.name remove sin verificar docs) → regresión en prod
+- A partir de review #2 adopté validación empírica rigurosa (doc-link o curl)
+
+### Señales de alerta en reviews futuras (consolidado)
+
+- Cambio en required/optional de campos de API externa → **exigir doc-link**
+- Fix basado en "el memory dice X" → verificar si sigue vigente
+- Fix que **remueve campos** → 80% veces es regresión (el campo SÍ era required)
+- React Fragment `<>` dentro de `.map` → siempre Fragment con key
+- String `replace_all` sobre texto con plurales → verificar pluralización manualmente
+- Componente extraído → buscar imports huérfanos en origen
+- Acciones destructivas (delete/remove) → verificar que el pattern sea correcto para ESE tipo de recurso (no asumir uniformidad API)
+
+### Patrones proto v23 consolidados
+
+**AssetGroupListingGroupFilter:**
+- Resource name compuesto `{realAgId}~{filterId}` (temp plano rechazado)
+- SUBDIVISION + everything-else child juntos (per-commit validation)
+- Temp IDs within-mutate OK con compound form + orden parent-before-child
+- `listing_source` required en cada nodo (v21+, no solo root como v20)
+
+**Asset.name:**
+- REQUIRED para imageAsset (no opcional)
+- Debe ser único dentro del batch → sufijo con counter monotónico
+- Google dedupe por `data` internamente, name es solo display
+
+**Soft-delete INCONSISTENTE por tipo:**
+- **Campaign:** `operation.remove` directo (NO update — rechaza status=REMOVED)
+- **AssetGroup:** update con status=REMOVED (REPORTADO FALLANDO 20/04 PM-2 — verificar si necesita operation.remove igual que Campaign)
+- **Ad Group:** (por verificar)
+- Regla: verificar empíricamente por tipo de recurso, no asumir uniformidad

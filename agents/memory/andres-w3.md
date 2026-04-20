@@ -205,6 +205,67 @@ Frontend MetaPartnerSetup.tsx → Leadsie con ?customUserId={client_id}
    - **Regla 4 (listing_source required per-node):** v21+ cambió `listing_source` de opcional/heredable a REQUIRED en cada nodo LGF (SUBDIVISION, UNIT_INCLUDED, UNIT_EXCLUDED). Si falta en un child, Google rechaza con "The required field was not present". Para PMAX Shopping usar `'SHOPPING'` en todos. El comentario viejo "listingSource va SOLO en root" era incorrecto (basado en v20).
    - Conclusión: mutate 2 = root + catch-all con compound temp. Mutate 3 = UNIT_INCLUDED leaves + signals usando real root resource. Todos con `listingSource: 'SHOPPING'`.
    - El memory anterior "NO acepta temp IDs" era incompleto: el temp plano no funciona, el compound con real AG sí. Corregido 20/04 PM-3 (`c5df2f42`) + PM-4 (`843f1f44`) + PM-5 (`a847e4ff`).
+
+## Sesión 20/04/2026 PM-2 — UX Google Ads marathon (7 commits, 4 deploys más)
+
+### Soft-delete en v23 es INCONSISTENTE por tipo de recurso
+
+- **Campaign:** NO acepta `update { status: 'REMOVED' }` — rechaza con `Enum value 'REMOVED' cannot be used`. Usar `campaignOperation.remove` con resource_name directo como valor. Fix commit `02cb0a5d`.
+- **AssetGroup:** (REPORTADO COMO FALLANDO 20/04 PM-2) probablemente misma restricción que Campaign — aplicar `assetGroupOperation.remove` paralelo. Verificar empíricamente mañana.
+- **Ad Groups:** (por verificar) probablemente update status funciona.
+- **Regla:** antes de asumir que soft-delete funciona via update, probar empíricamente. v23 tiene restricciones per-resource-type no documentadas uniformemente.
+
+### Patterns UX aplicados
+
+**Auto-refresh + optimistic update:**
+- Poll interval con frecuencia variable (fast si hay pending, slow idle)
+- Pause cuando tab hidden (`document.visibilityState`) — evita quemar cuota de API externa (Google Ads basic: 15k ops/día)
+- Visibility/focus listeners refrescan al volver a la tab
+- Optimistic state con TTL (2 min) + toast.warning si expira sin match
+- Refresh button con spinner mientras está en vuelo
+
+**Scorecard local (cuando la API no expone razones):**
+- Dict de `{ recommended, weight, required? }` por field_type
+- Score = sum(weight * min(current/recommended, 1)) / sum(weights) * 100
+- Progress bar color-coded: verde >=90, emerald >=75, yellow >=50, red <50
+- Lista "qué mejorar" ordenada por `required desc, weight desc` (top 6)
+- Mostrar label oficial + label local (`Google: X · Steve: Y%`) con disclaimer
+- Botón "+ Agregar" solo para tipos que el dialog puede resolver
+
+**Shared dialog component pattern:**
+- Extract cuando 2+ tabs necesitan el mismo form (ej: CreateAssetGroupDialog)
+- Props: `open`, `onOpenChange`, `preselectedFields`, `onCreated(result)` callback
+- Parent maneja optimistic state + refresh post-create
+- Evita duplicación (~100 líneas de JSX)
+
+**Vista jerárquica inline:**
+- Fragment con `key` explícito en `.map` con sub-rows condicionales (el `<>` sin key causa bug de reconciliation cuando sort/filter reordena — React no puede trackear el fragment)
+- Server-side filter siempre preferir sobre client-side (verificar si backend lo soporta)
+- Sub-row compacta (name/status/strength badge) + link "editar en tab X" para no duplicar edition logic
+
+### Commits del día
+
+| # | Commit | Feature |
+|---|--------|---------|
+| AM | `27adbe08` | sync state + memory marathon 20/04 AM |
+| PM-1a | `055ff6d8` | Asset.name remove (regresión) |
+| PM-1b | `8867f21c` | Asset.name unique suffix |
+| PM-2 | `c5df2f42` | LGF root + catch-all juntos |
+| PM-3 | `843f1f44` | LGF compound resource_name |
+| PM-4 | `a847e4ff` | listing_source required per-node |
+| — | `0942c454` | sync docs + crear memory Isidora |
+| PM-5 | `145925c5` | nombre campaña dinámico + bid strategy |
+| PM-6 | `ba0571cb` | 🥇 auto-refresh PMAX |
+| PM-7 | `029ef0a8` | 🥈 scorecard calidad AG |
+| PM-8 | `f9fed308` | 🥉 vista jerárquica |
+| PM-9 | `fd6e5391` | acciones por grupo de recursos + shared dialog |
+| PM-10 | `a9d2b405` | soft-delete campañas (v1) |
+| PM-11 | `02cb0a5d` | fix remove campaign via operation.remove |
+
+### ⚠️ PENDIENTES MAÑANA (textual — JM flagged 20/04 PM-2)
+
+1. **FALLA la eliminación de grupos de recursos** — botón Trash2 en tab "Grupos de recursos PMAX" falla. Probablemente AssetGroup tiene misma restricción v23 que Campaign (no acepta update status=REMOVED). Aplicar `assetGroupOperation.remove` paralelo al fix `02cb0a5d` de campañas.
+2. **La edición de AG es poco intuitiva** — `window.prompt` para renombrar y `window.confirm` para delete son UX pobres. Reemplazar por Dialog con Input. Aplica tanto en tab PMAX como en CampaignManager sub-row.
 9. **Customer Acquisition:** `CampaignLifecycleGoal` mutate separado (no en Campaign.create)
 10. **Audience signal:** Google limit 1 por asset group (backend toma el primero)
 

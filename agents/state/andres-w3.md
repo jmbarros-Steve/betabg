@@ -17,6 +17,17 @@
 | 20/04 PM-3 | **LGF root + catch-all en mismo mutate:** v23 valida per-commit "SUBDIVISION must have everything else child" → root y catch-all van juntos con temp ID resuelto internamente | `c5df2f42` | rev 00562-4bn |
 | 20/04 PM-4 | **LGF resource_name compound `{realAgId}~{tempId}`:** v23 rechaza temp plano `-1`; patrón canónico del factory oficial de Google | `843f1f44` | rev 00563-8sr |
 | 20/04 PM-5 | **listing_source required en todos los nodos LGF:** v21+ lo hizo required en cada nodo, no solo root | `a847e4ff` | rev 00564-fmv |
+| 20/04 PM-6 | **UX fixes:** nombre campaña dinámico por channel_type + bid strategy dropdown shadcn | `145925c5` | rev 00565-lf2 |
+| 20/04 PM-7 | **🥇 Auto-refresh PMAX + optimistic update + pause-when-hidden** | `ba0571cb` | Vercel |
+| 20/04 PM-8 | **🥈 Scorecard calidad AG** (STRENGTH_CONFIG + progress bar + "qué mejorar") | `029ef0a8` | Vercel |
+| 20/04 PM-9 | **🥉 Vista jerárquica** asset groups inline en tab Campañas | `f9fed308` | Vercel |
+| 20/04 PM-10 | **Acciones por grupo de recursos** + CreateAssetGroupDialog shared + tab renombrada | `fd6e5391` | Vercel |
+| 20/04 PM-11 | **Soft-delete campañas** (v1 fallido, fix `02cb0a5d` via operation.remove) | `a9d2b405`/`02cb0a5d` | rev 00566-5bp / 00567-l89 |
+
+### ⚠️ PENDIENTES MAÑANA (21/04) — flagged por JM
+
+- **FALLA eliminación de grupos de recursos** — botón Trash2 en tab "Grupos de recursos PMAX" falla al ejecutar. Probablemente AssetGroup tiene misma restricción v23 que Campaign (no acepta update status=REMOVED). Aplicar `assetGroupOperation.remove` paralelo al fix `02cb0a5d`.
+- **Edición de AG poco intuitiva** — reemplazar `window.prompt`/`window.confirm` por Dialog con Input. Aplica en tab PMAX (rename/delete) y CampaignManager sub-row (delete).
 
 ### Tiers completados
 - [x] **Tier 1:** Pause/resume, budget, reglas automáticas (2 tablas + RLS + cron)
