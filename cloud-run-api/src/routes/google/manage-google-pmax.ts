@@ -347,10 +347,18 @@ async function handleRemoveAsset(
   if (!asset_resource_name) return { body: { error: 'Missing asset_resource_name' }, status: 400 };
   if (!field_type) return { body: { error: 'Missing field_type' }, status: 400 };
 
+  // Valida shape del resource_name antes de hacer split (previene errores crípticos
+  // si vienen resource_names malformados). Formato esperado: customers/{cid}/assets/{assetId}
+  const assetIdMatch = String(asset_resource_name).match(/^customers\/\d+\/assets\/(\d+)$/);
+  if (!assetIdMatch) {
+    return { body: { error: `asset_resource_name shape inválido: "${asset_resource_name}". Esperado: customers/{cid}/assets/{id}` }, status: 400 };
+  }
+  const assetId = assetIdMatch[1];
+
   // Remove the asset group asset link
   const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, [{
     assetGroupAssetOperation: {
-      remove: `customers/${customerId}/assetGroups/${assetGroupId}/assetGroupAssets/${field_type}~${asset_resource_name.split('/').pop()}`,
+      remove: `customers/${customerId}/assetGroups/${assetGroupId}/assetGroupAssets/${field_type}~${assetId}`,
     },
   }]);
 
@@ -454,10 +462,17 @@ async function handleReplaceAsset(
   if (!text || typeof text !== 'string') return { body: { error: 'Missing text' }, status: 400 };
   if (!old_asset_resource_name) return { body: { error: 'Missing old_asset_resource_name' }, status: 400 };
 
+  // Valida shape del resource_name antes de construir el compound
+  const oldAssetIdMatch = String(old_asset_resource_name).match(/^customers\/\d+\/assets\/(\d+)$/);
+  if (!oldAssetIdMatch) {
+    return { body: { error: `old_asset_resource_name shape inválido: "${old_asset_resource_name}". Esperado: customers/{cid}/assets/{id}` }, status: 400 };
+  }
+  const oldAssetId = oldAssetIdMatch[1];
+
   // Sufijo único para el asset temp (mismo patrón uniforme que el resto del archivo)
   const assetTempId = -1 * ((Date.now() % 1_000) * 1000 + Math.floor(Math.random() * 1000));
 
-  const oldAssetGroupAssetResource = `customers/${customerId}/assetGroups/${assetGroupId}/assetGroupAssets/${field_type}~${String(old_asset_resource_name).split('/').pop()}`;
+  const oldAssetGroupAssetResource = `customers/${customerId}/assetGroups/${assetGroupId}/assetGroupAssets/${field_type}~${oldAssetId}`;
   const newAssetResource = `customers/${customerId}/assets/${assetTempId}`;
 
   const mutateOps: any[] = [

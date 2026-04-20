@@ -6,6 +6,9 @@ const API_URL = ((import.meta.env.VITE_API_URL as string) || '').trim();
 interface ApiResponse<T = any> {
   data: T | null;
   error: string | null;
+  warnings?: string[];
+  rate_limited?: boolean;
+  retry_after_seconds?: number | null;
 }
 
 /**
@@ -91,11 +94,17 @@ export async function callApi<T = any>(
       return {
         data: null,
         error: `${errorMsg}${details}`,
+        rate_limited: errorData.rate_limited || response.status === 429,
+        retry_after_seconds: errorData.retry_after_seconds ?? null,
       };
     }
 
     const data = await response.json();
-    return { data, error: null };
+    return {
+      data,
+      error: null,
+      warnings: Array.isArray(data?.warnings) ? data.warnings : undefined,
+    };
   } catch (err: any) {
     if (err.name === 'AbortError') {
       return { data: null, error: 'La solicitud tardó demasiado. Inténtalo de nuevo.' };

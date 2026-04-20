@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -219,43 +219,57 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
   const [editAssetText, setEditAssetText] = useState('');
   const [editAssetLoading, setEditAssetLoading] = useState(false);
 
+  // Lock para evitar fetchs paralelos (poll + manual + focus handler pueden pisarse)
+  const fetchingRef = useRef(false);
+
   const fetchAssetGroups = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!opts?.silent) setLoading(true);
-    setRefreshing(true);
-    const { data, error } = await callApi('manage-google-pmax', {
-      body: { action: 'list_asset_groups', connection_id: connectionId },
-    });
+    if (fetchingRef.current) return; // uno ya está en vuelo — skip
+    fetchingRef.current = true;
+    try {
+      if (!opts?.silent) setLoading(true);
+      setRefreshing(true);
+      const { data, error } = await callApi('manage-google-pmax', {
+        body: { action: 'list_asset_groups', connection_id: connectionId },
+      });
 
-    setRefreshing(false);
-    if (error) {
-      if (!opts?.silent) toast.error('Error cargando grupos de recursos: ' + error);
+      setRefreshing(false);
+      if (error) {
+        if (!opts?.silent) toast.error('Error cargando grupos de recursos: ' + error);
+        setLoading(false);
+        return;
+      }
+
+      const groups: AssetGroup[] = data?.asset_groups || [];
+      setAssetGroups(groups);
       setLoading(false);
-      return;
+
+      // Limpiar pending groups cuyo nombre+campaña ya apareció en el fetch real
+      // o que ya superaron el TTL (timeout — Google no procesó aún).
+      // Match robusto: normaliza whitespace/case porque Google a veces reformatea el name.
+      const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+      setPendingGroups(prev => {
+        const kept: PendingGroup[] = [];
+        const expired: PendingGroup[] = [];
+        for (const p of prev) {
+          const matched = groups.some(g =>
+            g.campaign_id === p.campaign_id &&
+            normalize(g.name) === normalize(p.name)
+          );
+          if (matched) continue;
+          const aged = Date.now() - p.__createdAt > PENDING_TTL_MS;
+          if (aged) expired.push(p); else kept.push(p);
+        }
+        if (expired.length > 0) {
+          expired.forEach(p => toast.warning(
+            `"${p.name}" aún no aparece en Google tras 2 min. Verificalo directamente en Google Ads.`,
+            { duration: 8_000 }
+          ));
+        }
+        return kept;
+      });
+    } finally {
+      fetchingRef.current = false;
     }
-
-    const groups: AssetGroup[] = data?.asset_groups || [];
-    setAssetGroups(groups);
-    setLoading(false);
-
-    // Limpiar pending groups cuyo nombre+campaña ya apareció en el fetch real
-    // o que ya superaron el TTL (timeout — Google no procesó aún).
-    setPendingGroups(prev => {
-      const kept: PendingGroup[] = [];
-      const expired: PendingGroup[] = [];
-      for (const p of prev) {
-        const matched = groups.some(g => g.name === p.name && g.campaign_id === p.campaign_id);
-        if (matched) continue; // apareció en Google → drop
-        const aged = Date.now() - p.__createdAt > PENDING_TTL_MS;
-        if (aged) expired.push(p); else kept.push(p);
-      }
-      if (expired.length > 0) {
-        expired.forEach(p => toast.warning(
-          `"${p.name}" aún no aparece en Google tras 2 min. Verificalo directamente en Google Ads.`,
-          { duration: 8_000 }
-        ));
-      }
-      return kept;
-    });
   }, [connectionId]);
 
   // Auto-refresh: al mount + interval (rápido si hay pending, lento si no) + al volver a la tab.
@@ -290,6 +304,24 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     return () => clearInterval(interval);
   }, [fetchAssetGroups, pendingGroups.length, isVisible]);
 
+  // Fetch directo (sin toggle) — usado después de add/remove/replace de assets
+  // para refrescar el detalle sin cerrar+abrir el grupo (evita flash UI).
+  const refreshGroupDetail = async (groupId: string) => {
+    setDetailLoading(prev => ({ ...prev, [groupId]: true }));
+    const { data, error } = await callApi('manage-google-pmax', {
+      body: { action: 'get_asset_group_detail', connection_id: connectionId, asset_group_id: groupId },
+    });
+    setDetailLoading(prev => ({ ...prev, [groupId]: false }));
+    if (error) {
+      toast.error('Error cargando detalle: ' + error);
+      return;
+    }
+    setGroupDetails(prev => ({
+      ...prev,
+      [groupId]: { assets: data?.assets || {}, count: data?.asset_count || 0 },
+    }));
+  };
+
   const toggleGroup = async (groupId: string) => {
     if (expandedGroup === groupId) {
       setExpandedGroup(null);
@@ -300,22 +332,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
 
     // Fetch details if not cached
     if (!groupDetails[groupId]) {
-      setDetailLoading(prev => ({ ...prev, [groupId]: true }));
-      const { data, error } = await callApi('manage-google-pmax', {
-        body: { action: 'get_asset_group_detail', connection_id: connectionId, asset_group_id: groupId },
-      });
-
-      setDetailLoading(prev => ({ ...prev, [groupId]: false }));
-
-      if (error) {
-        toast.error('Error cargando detalle: ' + error);
-        return;
-      }
-
-      setGroupDetails(prev => ({
-        ...prev,
-        [groupId]: { assets: data?.assets || {}, count: data?.asset_count || 0 },
-      }));
+      await refreshGroupDetail(groupId);
     }
   };
 
@@ -431,14 +448,9 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     setAddAssetOpen(false);
     setNewAsset({ field_type: 'HEADLINE', text: '' });
 
-    // Refresh details
-    setGroupDetails(prev => {
-      const copy = { ...prev };
-      delete copy[addAssetGroupId];
-      return copy;
-    });
+    // Refresh inline (sin toggle) si el AG está expandido
     if (expandedGroup === addAssetGroupId) {
-      toggleGroup(addAssetGroupId);
+      await refreshGroupDetail(addAssetGroupId);
     }
   };
 
@@ -499,6 +511,9 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     setSteveOptions(data?.options || []);
     setSteveReasoning(data?.reasoning || null);
     setSteveMaxChars(data?.max_chars || 90);
+    // Surface warnings del backend (ej: brief del cliente no disponible)
+    const warns = (data as any)?.warnings;
+    if (Array.isArray(warns)) warns.forEach((w: string) => toast.warning(w));
   };
 
   const generateSteveImage = async (fieldType: string, intent: string) => {
@@ -640,13 +655,8 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
         return;
       }
       toast.success('Imagen agregada');
-      setGroupDetails(prev => {
-        const copy = { ...prev };
-        delete copy[groupId];
-        return copy;
-      });
       if (expandedGroup === groupId) {
-        toggleGroup(groupId);
+        await refreshGroupDetail(groupId);
       }
     } finally {
       setUploadingFor(null);
@@ -698,14 +708,8 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
       return;
     }
     toast.success('Asset actualizado');
-    // Refresh detail
-    setGroupDetails(prev => {
-      const copy = { ...prev };
-      delete copy[editAssetGroupId];
-      return copy;
-    });
     if (expandedGroup === editAssetGroupId) {
-      toggleGroup(editAssetGroupId);
+      await refreshGroupDetail(editAssetGroupId);
     }
     setEditAssetOpen(false);
   };
@@ -816,14 +820,8 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
         }
       }
       toast.success('Asset agregado por Steve');
-      // Refresh detail
-      setGroupDetails(prev => {
-        const copy = { ...prev };
-        delete copy[steveGroupId];
-        return copy;
-      });
       if (expandedGroup === steveGroupId) {
-        toggleGroup(steveGroupId);
+        await refreshGroupDetail(steveGroupId);
       }
       setSteveOpen(false);
     } finally {
@@ -847,13 +845,8 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     }
 
     toast.success('Asset eliminado');
-    // Refresh
-    setGroupDetails(prev => {
-      const copy = { ...prev };
-      delete copy[groupId];
-      return copy;
-    });
-    toggleGroup(groupId);
+    // Refresh inline sin toggle (evita flash UI de cerrar+abrir el AG)
+    await refreshGroupDetail(groupId);
   };
 
 
@@ -940,7 +933,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                     {adStrengthLabels[group.ad_strength] || group.ad_strength}
                   </Badge>
                   <Badge variant="outline" className={group.status === 'ENABLED' ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'}>
-                    {group.status === 'ENABLED' ? 'Activo' : group.status}
+                    {group.status === 'ENABLED' ? 'Activo' : group.status === 'PAUSED' ? 'Pausado' : group.status === 'REMOVED' ? 'Eliminado' : group.status}
                   </Badge>
                 </button>
                 {!isPending && (

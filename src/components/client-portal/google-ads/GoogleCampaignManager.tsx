@@ -841,6 +841,12 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       return;
     }
 
+    // Surface warnings del backend (ej: schedule query falló)
+    const warns = (data as any)?.warnings;
+    if (Array.isArray(warns)) {
+      warns.forEach((w: string) => toast.warning(w));
+    }
+
     const s = data?.settings || {};
     // Extraer IDs desde los recursos geoTargetConstants/{id} y languageConstants/{id}
     const locationIds = Array.isArray(s.locations)
@@ -1210,9 +1216,12 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       const validSitelinks = wizardData.sitelinks.filter(sl => sl.text.trim() && sl.url.trim());
       if (validSitelinks.length > 0) payload.sitelinks = validSitelinks;
 
-      // Search themes
+      // Search themes: split por \n (newline) para preservar comas dentro de themes legítimos.
+      // Fallback a coma si el user pegó una lista comma-separated (retrocompat).
       if (wizardData.search_themes) {
-        payload.search_themes = wizardData.search_themes.split(',').map(t => t.trim()).filter(Boolean);
+        const raw = wizardData.search_themes;
+        const separator = raw.includes('\n') ? '\n' : ',';
+        payload.search_themes = raw.split(separator).map(t => t.trim()).filter(Boolean);
       }
 
       // Acquisition mode (Capa 1: clientes nuevos vs todos)
@@ -1305,8 +1314,9 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   const fetchBudgetRecommendation = async () => {
     setBudgetLoading(true);
     setBudgetOptions(null);
+    const themesSeparator = wizardData.search_themes.includes('\n') ? '\n' : ',';
     const themes = wizardData.search_themes
-      ? wizardData.search_themes.split(',').map(t => t.trim()).filter(Boolean)
+      ? wizardData.search_themes.split(themesSeparator).map(t => t.trim()).filter(Boolean)
       : [];
     const { data, error } = await callApi('manage-google-campaign', {
       body: {
@@ -2505,7 +2515,27 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 <select
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   value={wizardData.channel_type}
-                  onChange={e => setWizardData(prev => ({ ...prev, channel_type: e.target.value }))}
+                  onChange={e => setWizardData(prev => {
+                    // Al cambiar channel_type, limpiar assets específicos del canal anterior
+                    // (ej: PMAX→SEARCH pierde images, SEARCH→PMAX no tiene, pero si PMAX→SHOPPING
+                    // tampoco mantiene las mismas assets). Evita estado stale al ir/volver.
+                    const next = { ...prev, channel_type: e.target.value };
+                    if (prev.channel_type === 'PERFORMANCE_MAX' && e.target.value !== 'PERFORMANCE_MAX') {
+                      return {
+                        ...next,
+                        images_landscape: [],
+                        images_square: [],
+                        images_portrait: [],
+                        images_logo: [],
+                        images_landscape_logo: [],
+                        youtube_urls: [],
+                        search_themes: '',
+                        audience_signals: [],
+                        call_to_action: '',
+                      };
+                    }
+                    return next;
+                  })}
                 >
                   <option value="SEARCH">Search</option>
                   <option value="PERFORMANCE_MAX">Performance Max</option>
@@ -2934,13 +2964,14 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                       Sugerir con AI
                     </Button>
                   </div>
-                  <Input
+                  <Textarea
                     value={wizardData.search_themes}
                     onChange={e => setWizardData(prev => ({ ...prev, search_themes: e.target.value }))}
-                    placeholder="zapatos, zapatillas deportivas, calzado online"
+                    placeholder={`Uno por línea — ej:\ncomida para perros, gatos\nalimento natural sin químicos\nproductos para mascotas en Santiago`}
+                    rows={4}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Separados por comas (max 25). Google los usa como punto de partida, no como restricciones.
+                    Uno por línea (max 25). Los themes pueden contener comas. Google los usa como punto de partida, no como restricciones.
                   </p>
                 </div>
               )}
@@ -3098,9 +3129,22 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                   {hasCustomerMatch === false && (wizardData.acquisition_mode === 'BID_HIGHER' || wizardData.acquisition_mode === 'TARGET_ALL_EQUALLY') && (
                     <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                      <span className="break-words">
-                        El account no tiene Customer Match activa. El modo "<strong>{wizardData.acquisition_mode === 'BID_HIGHER' ? 'Priorizar nuevos' : 'Nuevos y antiguos'}</strong>" se degradará a "Sin prioridad" al crear la campaña.
-                      </span>
+                      <div className="break-words space-y-1">
+                        <p>
+                          El account no tiene Customer Match activa. El modo "<strong>{wizardData.acquisition_mode === 'BID_HIGHER' ? 'Priorizar nuevos' : 'Nuevos y antiguos'}</strong>" se degradará a "Sin prioridad" al crear la campaña.
+                        </p>
+                        <a
+                          href="https://ads.google.com/aw/audiences"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 underline font-medium hover:no-underline"
+                        >
+                          Crear lista de clientes en Google Ads →
+                        </a>
+                        <p className="text-[11px] opacity-80">
+                          Después de crear la lista, esperá 24-48h a que Google la procese y volvé a crear la campaña.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>

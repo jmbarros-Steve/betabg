@@ -280,6 +280,7 @@ async function handleGetSettings(
 
   // Query schedule (opcional): intentamos leer start_date/end_date en un query
   // aislado. Si falla, continuamos sin schedule.
+  const warnings: string[] = [];
   let start_date: string | undefined;
   let end_date: string | undefined;
   try {
@@ -292,9 +293,12 @@ async function handleGetSettings(
     if (scheduleResult.ok && scheduleResult.data?.[0]?.campaign) {
       start_date = scheduleResult.data[0].campaign.startDate;
       end_date = scheduleResult.data[0].campaign.endDate;
+    } else if (!scheduleResult.ok) {
+      warnings.push('Fechas de la campaña no disponibles (Google rechazó el query)');
     }
   } catch (err: any) {
     console.warn('[handleGetSettings] schedule query failed, continuing:', err?.message);
+    warnings.push('Fechas de la campaña no disponibles');
   }
 
   // Query 2 (EXTENDED): bid sub-messages — solo pedimos el sub-message que
@@ -404,6 +408,7 @@ async function handleGetSettings(
         locations,
         languages,
       },
+      warnings: warnings.length > 0 ? warnings : undefined,
     },
     status: 200,
   };
@@ -3239,6 +3244,7 @@ async function handleSuggestAssetContent(
   // Load brief (minimal)
   let briefContext = '';
   let campaignContext = '';
+  const warnings: string[] = [];
   // Defense-in-depth: valida UUID antes de interpolar en PostgREST
   if (client_id && UUID_RX.test(String(client_id).trim())) {
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -3264,6 +3270,7 @@ async function handleSuggestAssetContent(
         }
       } catch (err: any) {
         console.warn('[suggest_asset_content] brief fetch failed:', err.message);
+        warnings.push('Brief del cliente no disponible — Steve va a usar contexto genérico');
       }
     }
   }
@@ -3281,9 +3288,12 @@ async function handleSuggestAssetContent(
         const ag = r.data[0].assetGroup;
         const ca = r.data[0].campaign;
         campaignContext = `Campaña "${ca?.name}" (${ca?.advertisingChannelType}), grupo "${ag?.name}"`;
+      } else if (!r.ok) {
+        warnings.push('Contexto del grupo de recursos no disponible');
       }
     } catch (err: any) {
       console.warn('[suggest_asset_content] ag context fetch failed:', err.message);
+      warnings.push('Contexto del grupo de recursos no disponible');
     }
   }
 
@@ -3379,6 +3389,7 @@ Responde SOLO en JSON válido, sin markdown:
         max_chars: spec.max,
         options,
         reasoning,
+        warnings: warnings.length > 0 ? warnings : undefined,
       },
       status: 200,
     };

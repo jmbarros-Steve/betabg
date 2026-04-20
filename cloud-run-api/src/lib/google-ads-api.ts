@@ -25,6 +25,66 @@ export interface GoogleAdsContext {
   isLeadsie: boolean;
 }
 
+// ─── Rate limit helpers ──────────────────────────────────────────────
+
+// Parsea "Retry in NNNN seconds" del mensaje de error de Google.
+export function parseRetryAfterSeconds(errorText: string): number | null {
+  const m = errorText.match(/Retry in (\d+) seconds/i);
+  if (m) return Number(m[1]);
+  return null;
+}
+
+// Formatea segundos a una etiqueta legible (ej: "17h 5m").
+export function formatRetryAfter(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+// ─── Idempotency key ─────────────────────────────────────────────────
+// Map en memoria: body-hash → inflight Promise. TTL 60s. Si 2 requests con
+// mismo body llegan en <60s, comparten resultado (safe double-click protection).
+// NOTA: per-process, NO distribuido (OK para un solo Cloud Run instance por ahora).
+
+type InflightEntry = { promise: Promise<any>; expiresAt: number };
+const inflightMutates = new Map<string, InflightEntry>();
+const IDEMPOTENCY_TTL_MS = 60_000;
+
+export function hashBody(customerId: string, mutateOperations: any[]): string {
+  // Hash simple: customerId + JSON del body. No cryptographic, solo dedup.
+  try {
+    const body = JSON.stringify(mutateOperations);
+    let hash = 0;
+    const composite = `${customerId}:${body}`;
+    for (let i = 0; i < composite.length; i++) {
+      hash = ((hash << 5) - hash) + composite.charCodeAt(i);
+      hash |= 0;
+    }
+    return `m:${hash}`;
+  } catch {
+    return `m:${Date.now()}-${Math.random()}`;
+  }
+}
+
+function cleanExpiredInflight() {
+  const now = Date.now();
+  for (const [key, entry] of inflightMutates.entries()) {
+    if (entry.expiresAt < now) inflightMutates.delete(key);
+  }
+}
+
+// Detecta rate limit (429 o RESOURCE_EXHAUSTED en body) y retorna error enriquecido.
+function buildRateLimitError(status: number, errorText: string): { ok: false; error: string; rate_limited: true; retry_after_seconds: number | null } | null {
+  const isRateLimit = status === 429 || /RESOURCE_EXHAUSTED|Too many requests|Quota exceeded/i.test(errorText);
+  if (!isRateLimit) return null;
+  const retryAfterSeconds = parseRetryAfterSeconds(errorText);
+  const retryLabel = retryAfterSeconds ? formatRetryAfter(retryAfterSeconds) : 'unos minutos';
+  const error = `Google Ads está saturado (cap diario de 15.000 operaciones). Retry en ${retryLabel}. Pedí Standard Access al developer token para quitar el límite.`;
+  return { ok: false, error, rate_limited: true, retry_after_seconds: retryAfterSeconds };
+}
+
 // ─── googleAdsQuery ──────────────────────────────────────────────────
 
 export async function googleAdsQuery(
@@ -33,7 +93,7 @@ export async function googleAdsQuery(
   developerToken: string,
   loginCustomerId: string,
   query: string
-): Promise<{ ok: boolean; data?: any[]; error?: string }> {
+): Promise<{ ok: boolean; data?: any[]; error?: string; rate_limited?: boolean; retry_after_seconds?: number | null }> {
   const makeRequest = async (loginId: string) => {
     return fetch(`${GOOGLE_ADS_API}/customers/${customerId}/googleAds:searchStream`, {
       method: 'POST',
@@ -60,6 +120,8 @@ export async function googleAdsQuery(
   if (!response.ok) {
     const errorText = await response.text();
     console.error(`[google-ads-api] GAQL error (${response.status}):`, errorText.slice(0, 500));
+    const rateLimitErr = buildRateLimitError(response.status, errorText);
+    if (rateLimitErr) return rateLimitErr;
     return { ok: false, error: `Google Ads API error (${response.status})` };
   }
 
@@ -89,7 +151,37 @@ export async function googleAdsMutate(
   developerToken: string,
   loginCustomerId: string,
   mutateOperations: any[]
-): Promise<{ ok: boolean; data?: any; error?: string }> {
+): Promise<{ ok: boolean; data?: any; error?: string; rate_limited?: boolean; retry_after_seconds?: number | null }> {
+  // Idempotency check: si ya hay un request inflight con el mismo body, reusamos
+  // su Promise (evita doble-click / retry accidental del cliente).
+  cleanExpiredInflight();
+  const idempotencyKey = hashBody(customerId, mutateOperations);
+  const existing = inflightMutates.get(idempotencyKey);
+  if (existing) {
+    console.warn(`[google-ads-api] Dedup: reusing inflight mutate (key=${idempotencyKey})`);
+    return existing.promise;
+  }
+
+  const promise = googleAdsMutateCore(customerId, accessToken, developerToken, loginCustomerId, mutateOperations);
+  inflightMutates.set(idempotencyKey, { promise, expiresAt: Date.now() + IDEMPOTENCY_TTL_MS });
+
+  try {
+    return await promise;
+  } finally {
+    // Eliminar del map apenas termine para permitir reintentos genuinos del user.
+    // El TTL es solo safety net si algo queda colgado.
+    inflightMutates.delete(idempotencyKey);
+  }
+}
+
+// Core logic separada para permitir envolverla con idempotency dedup.
+async function googleAdsMutateCore(
+  customerId: string,
+  accessToken: string,
+  developerToken: string,
+  loginCustomerId: string,
+  mutateOperations: any[]
+): Promise<{ ok: boolean; data?: any; error?: string; rate_limited?: boolean; retry_after_seconds?: number | null }> {
   const makeRequest = async (loginId: string) => {
     return fetch(`${GOOGLE_ADS_API}/customers/${customerId}/googleAds:mutate`, {
       method: 'POST',
@@ -123,6 +215,9 @@ export async function googleAdsMutate(
       operationCount: mutateOperations.length,
       operationTypes: mutateOperations.map((op: any) => Object.keys(op)[0]),
     }));
+    // Rate limit: retorna error enriquecido con retry_after + mensaje legible
+    const rateLimitErr = buildRateLimitError(response.status, errorText);
+    if (rateLimitErr) return rateLimitErr;
     let errorMessage = `Google Ads API error (${response.status})`;
     try {
       const errJson = JSON.parse(errorText);
