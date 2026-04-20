@@ -7,6 +7,7 @@ type Action =
   | 'create_asset_group'
   | 'add_asset'
   | 'remove_asset'
+  | 'replace_asset'
   | 'update_asset_group'
   | 'remove_asset_group'
   | 'add_audience_signal';
@@ -250,7 +251,7 @@ async function handleAddAsset(
   // Google resuelve temp IDs per-mutate, pero el name del asset (que lleva
   // este ID) sí puede colisionar en logs/audit si dos requests pegan al
   // mismo tiempo. Date.now() da un sufijo razonablemente único.
-  const assetTempId = -1 * (Date.now() % 1_000_000);
+  const assetTempId = -1 * (((Date.now() % 1_000) * 1000 + Math.floor(Math.random() * 1000)));
 
   // Sanitiza image_name: strip newlines + cap 120 chars (Google Asset.name
   // limit=128, dejamos margen para sufijo).
@@ -437,6 +438,63 @@ async function handleRemoveAssetGroup(
   return { body: { success: true, asset_group_id: assetGroupId, status: 'REMOVED' }, status: 200 };
 }
 
+// Reemplaza un text asset atómicamente: 1 mutate con create + remove.
+// Si algo falla, Google revierte TODO (no quedan orphans como en el flow
+// sequential del commit anterior).
+async function handleReplaceAsset(
+  customerId: string,
+  assetGroupId: string,
+  accessToken: string,
+  developerToken: string,
+  loginCustomerId: string,
+  data: Record<string, any>
+): Promise<{ body: any; status: number }> {
+  const { field_type, text, old_asset_resource_name } = data;
+  if (!field_type) return { body: { error: 'Missing field_type' }, status: 400 };
+  if (!text || typeof text !== 'string') return { body: { error: 'Missing text' }, status: 400 };
+  if (!old_asset_resource_name) return { body: { error: 'Missing old_asset_resource_name' }, status: 400 };
+
+  // Sufijo único para el asset temp (mismo patrón uniforme que el resto del archivo)
+  const assetTempId = -1 * ((Date.now() % 1_000) * 1000 + Math.floor(Math.random() * 1000));
+
+  const oldAssetGroupAssetResource = `customers/${customerId}/assetGroups/${assetGroupId}/assetGroupAssets/${field_type}~${String(old_asset_resource_name).split('/').pop()}`;
+  const newAssetResource = `customers/${customerId}/assets/${assetTempId}`;
+
+  const mutateOps: any[] = [
+    {
+      assetOperation: {
+        create: {
+          resourceName: newAssetResource,
+          type: 'TEXT',
+          textAsset: { text },
+        },
+      },
+    },
+    {
+      assetGroupAssetOperation: {
+        create: {
+          asset: newAssetResource,
+          assetGroup: `customers/${customerId}/assetGroups/${assetGroupId}`,
+          fieldType: field_type,
+        },
+      },
+    },
+    {
+      assetGroupAssetOperation: {
+        remove: oldAssetGroupAssetResource,
+      },
+    },
+  ];
+
+  const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, mutateOps);
+
+  if (!result.ok) {
+    return { body: { error: 'Failed to replace asset', details: result.error }, status: 502 };
+  }
+
+  return { body: { success: true, asset_group_id: assetGroupId, field_type }, status: 200 };
+}
+
 // --- Add Audience Signal a un AG existente ---
 // Soporta 3 modos (mismo patrón que el wizard PMAX al crear):
 // a) existing_audience_resource — linkea Audience ya existente en customer
@@ -465,7 +523,7 @@ async function handleAddAudienceSignal(
 
   const mutateOps: any[] = [];
   const assetGroupResource = `customers/${customerId}/assetGroups/${assetGroupId}`;
-  const uniqueSuffix = ` ${Date.now() % 1_000_000}`;
+  const uniqueSuffix = ` ${((Date.now() % 1_000) * 1000 + Math.floor(Math.random() * 1000))}`;
 
   // Path (a): audience ya existente
   if (existing_audience_resource && typeof existing_audience_resource === 'string') {
@@ -480,7 +538,7 @@ async function handleAddAudienceSignal(
   }
   // Path (b): wrap user_list
   else if (existing_user_list && typeof existing_user_list === 'string') {
-    const audTempId = -1 * (Date.now() % 1_000_000);
+    const audTempId = -1 * (((Date.now() % 1_000) * 1000 + Math.floor(Math.random() * 1000)));
     const audResource = `customers/${customerId}/audiences/${audTempId}`;
     const audNameBase = (typeof rawName === 'string' && rawName.trim()) ? rawName.trim().slice(0, 40) : 'Audiencia PMAX';
     mutateOps.push({
@@ -528,20 +586,28 @@ async function handleAddAudienceSignal(
     if (validAges.length) {
       const ageSegments = validAges.filter((r: string) => r !== 'AGE_RANGE_UNDETERMINED').map((r: string) => AGE_MAP[r]).filter(Boolean);
       const includeUndet = validAges.includes('AGE_RANGE_UNDETERMINED');
-      const ageDim: any = {};
-      if (ageSegments.length) ageDim.ageRanges = ageSegments;
-      if (includeUndet) ageDim.includeUndetermined = true;
-      if (ageSegments.length || includeUndet) dimensions.push({ age: ageDim });
+      // Google v23 rechaza `age` dimension con SOLO includeUndetermined (sin ageRanges array).
+      // Requiere al menos un segmento concreto.
+      if (ageSegments.length) {
+        const ageDim: any = { ageRanges: ageSegments };
+        if (includeUndet) ageDim.includeUndetermined = true;
+        dimensions.push({ age: ageDim });
+      }
     }
     if (validGenders.length) dimensions.push({ gender: { genders: validGenders } });
     if (validParental.length) dimensions.push({ parentalStatus: { parentalStatuses: validParental } });
     if (validIncomes.length) dimensions.push({ householdIncome: { incomeRanges: validIncomes } });
 
     if (dimensions.length === 0) {
-      return { body: { error: 'Debés proveer al menos una dimensión (ages, genders, parental_statuses o income_ranges) o existing_audience_resource / existing_user_list' }, status: 400 };
+      return {
+        body: {
+          error: 'Necesitás al menos una dimensión válida. Si solo elegiste AGE_RANGE_UNDETERMINED, agrega un rango concreto (18-24, 25-34, etc.) — Google v23 no acepta age dimension con solo Undetermined.',
+        },
+        status: 400,
+      };
     }
 
-    const audTempId = -1 * (Date.now() % 1_000_000);
+    const audTempId = -1 * (((Date.now() % 1_000) * 1000 + Math.floor(Math.random() * 1000)));
     const audResource = `customers/${customerId}/audiences/${audTempId}`;
     const audNameBase = (typeof rawName === 'string' && rawName.trim()) ? rawName.trim().slice(0, 40) : 'Audiencia PMAX';
     mutateOps.push({
@@ -583,7 +649,7 @@ export async function manageGooglePmax(c: Context) {
 
     const validActions: Action[] = [
       'list_asset_groups', 'get_asset_group_detail',
-      'create_asset_group', 'add_asset', 'remove_asset', 'update_asset_group', 'remove_asset_group',
+      'create_asset_group', 'add_asset', 'remove_asset', 'replace_asset', 'update_asset_group', 'remove_asset_group',
       'add_audience_signal',
     ];
 
@@ -592,7 +658,7 @@ export async function manageGooglePmax(c: Context) {
     }
 
     // Actions that require asset_group_id
-    const needsAssetGroupId: Action[] = ['get_asset_group_detail', 'add_asset', 'remove_asset', 'update_asset_group', 'remove_asset_group', 'add_audience_signal'];
+    const needsAssetGroupId: Action[] = ['get_asset_group_detail', 'add_asset', 'remove_asset', 'replace_asset', 'update_asset_group', 'remove_asset_group', 'add_audience_signal'];
     if (needsAssetGroupId.includes(action) && !asset_group_id) {
       return c.json({ error: `Missing asset_group_id for action "${action}"` }, 400);
     }
@@ -627,6 +693,9 @@ export async function manageGooglePmax(c: Context) {
         break;
       case 'remove_asset':
         result = await handleRemoveAsset(ctx.customerId, asset_group_id!, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, data || {});
+        break;
+      case 'replace_asset':
+        result = await handleReplaceAsset(ctx.customerId, asset_group_id!, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, data || {});
         break;
       case 'update_asset_group':
         result = await handleUpdateAssetGroup(ctx.customerId, asset_group_id!, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, data || {});

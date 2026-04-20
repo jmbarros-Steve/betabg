@@ -678,35 +678,26 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     }
 
     setEditAssetLoading(true);
-    // Paso 1: add nuevo
-    const { error: addError } = await callApi('manage-google-pmax', {
+    // Replace atómico: 1 mutate con create+remove. Si falla, Google revierte
+    // todo — no quedan duplicados como el flujo sequential anterior.
+    const { error } = await callApi('manage-google-pmax', {
       body: {
-        action: 'add_asset',
+        action: 'replace_asset',
         connection_id: connectionId,
         asset_group_id: editAssetGroupId,
-        data: { field_type: editAssetFieldType, text: trimmed },
-      },
-    });
-    if (addError) {
-      setEditAssetLoading(false);
-      toast.error('Error agregando nueva versión: ' + addError);
-      return;
-    }
-    // Paso 2: remove viejo
-    const { error: removeError } = await callApi('manage-google-pmax', {
-      body: {
-        action: 'remove_asset',
-        connection_id: connectionId,
-        asset_group_id: editAssetGroupId,
-        data: { asset_resource_name: editAssetOld.resource_name, field_type: editAssetFieldType },
+        data: {
+          field_type: editAssetFieldType,
+          text: trimmed,
+          old_asset_resource_name: editAssetOld.resource_name,
+        },
       },
     });
     setEditAssetLoading(false);
-    if (removeError) {
-      toast.warning(`Nueva versión agregada, pero no se pudo eliminar la vieja: ${removeError}. Eliminala manualmente.`);
-    } else {
-      toast.success('Asset actualizado');
+    if (error) {
+      toast.error('Error actualizando asset: ' + error);
+      return;
     }
+    toast.success('Asset actualizado');
     // Refresh detail
     setGroupDetails(prev => {
       const copy = { ...prev };
@@ -1224,7 +1215,15 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
       />
 
       {/* Add Asset Dialog */}
-      <Dialog open={addAssetOpen} onOpenChange={setAddAssetOpen}>
+      <Dialog open={addAssetOpen} onOpenChange={(open) => {
+        if (!open && !addAssetLoading) {
+          setAddAssetOpen(false);
+          setAddAssetGroupId(null);
+          setNewAsset({ field_type: 'HEADLINE', text: '' });
+        } else if (open) {
+          setAddAssetOpen(true);
+        }
+      }}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Agregar Asset</DialogTitle>
@@ -1308,7 +1307,19 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
       </Dialog>
 
       {/* Steve AI Suggest Dialog — modo texto (options), CTA (enum), imagen (preview) */}
-      <Dialog open={steveOpen} onOpenChange={(open) => { if (!open && !steveAdding) setSteveOpen(open); }}>
+      <Dialog open={steveOpen} onOpenChange={(open) => {
+        if (!open && !steveAdding) {
+          setSteveOpen(false);
+          // Reset para evitar estado stale al reabrir con otro AG/field
+          setSteveGroupId(null);
+          setSteveOptions([]);
+          setSteveReasoning(null);
+          setSteveSelectedIdx(null);
+          setSteveUserIntent('');
+          setSteveImageUrl(null);
+          setSteveImageVariations([]);
+        }
+      }}>
         <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1479,8 +1490,15 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
         </DialogContent>
       </Dialog>
 
-      {/* Edit Text Asset Dialog — remove old + add new (Asset inmutable en v23) */}
-      <Dialog open={editAssetOpen} onOpenChange={(open) => { if (!open && !editAssetLoading) setEditAssetOpen(open); }}>
+      {/* Edit Text Asset Dialog — replace_asset atómico en v23 */}
+      <Dialog open={editAssetOpen} onOpenChange={(open) => {
+        if (!open && !editAssetLoading) {
+          setEditAssetOpen(false);
+          setEditAssetGroupId(null);
+          setEditAssetOld(null);
+          setEditAssetText('');
+        }
+      }}>
         <DialogContent className="sm:max-w-[440px]">
           <DialogHeader>
             <DialogTitle>Editar {fieldTypeLabels[editAssetFieldType] || editAssetFieldType}</DialogTitle>
@@ -1522,7 +1540,15 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
       </Dialog>
 
       {/* Audience Signal Dialog — agregar a un AG existente */}
-      <Dialog open={audienceOpen} onOpenChange={(open) => { if (!open && !audienceLoading) setAudienceOpen(open); }}>
+      <Dialog open={audienceOpen} onOpenChange={(open) => {
+        if (!open && !audienceLoading) {
+          setAudienceOpen(false);
+          setAudienceGroupId(null);
+          setAudienceName('Audiencia PMAX');
+          setAudienceAges([]);
+          setAudienceGenders([]);
+        }
+      }}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">

@@ -1346,30 +1346,47 @@ async function handleCreateCampaign(
       : [];
     // Cross-validate selected SKUs against the client's actual catalog (shopify_products)
     // — evita que el body inyecte SKUs que no pertenecen al cliente / campaña zombie.
-    if (merchant_center_id && validSelectedIds.length > 0 && clientIdForValidation && UUID_RX.test(String(clientIdForValidation))) {
-      const supabaseUrl = process.env.SUPABASE_URL;
-      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (supabaseUrl && supabaseKey) {
-        try {
-          // Use PostgREST "in.(...)" — quote each ID to be safe
-          const idList = validSelectedIds.slice(0, 500).map(id => `"${id.replace(/"/g, '')}"`).join(',');
-          const res = await fetch(
-            `${supabaseUrl}/rest/v1/shopify_products?client_id=eq.${String(clientIdForValidation).trim()}&product_id=in.(${encodeURIComponent(idList)})&select=product_id&limit=500`,
-            { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }, signal: AbortSignal.timeout(5_000) }
-          );
-          if (res.ok) {
-            const rows = await res.json() as any[];
-            const ownedSet = new Set(rows.map((r: any) => String(r.product_id)));
-            const before = validSelectedIds.length;
-            validSelectedIds = validSelectedIds.filter(id => ownedSet.has(id));
-            const dropped = before - validSelectedIds.length;
-            if (dropped > 0) {
-              console.warn(`[manage-google-campaign] selected_product_ids: dropped ${dropped} SKU(s) not owned by client ${clientIdForValidation}`);
+    // FAIL-SAFE: si la validación no puede ejecutarse (Supabase no configurado,
+    // fetch falla, res.ok=false), FORZAMOS validSelectedIds=[] y dropeamos el
+    // LGF. Better safe than leak — el user puede re-intentar.
+    if (merchant_center_id && validSelectedIds.length > 0) {
+      let validated = false;
+      if (clientIdForValidation && UUID_RX.test(String(clientIdForValidation))) {
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (supabaseUrl && supabaseKey) {
+          try {
+            const idList = validSelectedIds.slice(0, 500).map(id => `"${id.replace(/"/g, '')}"`).join(',');
+            const res = await fetch(
+              `${supabaseUrl}/rest/v1/shopify_products?client_id=eq.${String(clientIdForValidation).trim()}&product_id=in.(${encodeURIComponent(idList)})&select=product_id&limit=500`,
+              { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }, signal: AbortSignal.timeout(5_000) }
+            );
+            if (res.ok) {
+              const rows = await res.json() as any[];
+              const ownedSet = new Set(rows.map((r: any) => String(r.product_id)));
+              const before = validSelectedIds.length;
+              validSelectedIds = validSelectedIds.filter(id => ownedSet.has(id));
+              const dropped = before - validSelectedIds.length;
+              if (dropped > 0) {
+                console.warn(`[manage-google-campaign] selected_product_ids: dropped ${dropped} SKU(s) not owned by client ${clientIdForValidation}`);
+              }
+              validated = true;
+            } else {
+              console.warn(`[manage-google-campaign] selected_product_ids validation HTTP ${res.status} — fail-safe dropeo LGF`);
             }
+          } catch (err: any) {
+            console.warn('[manage-google-campaign] selected_product_ids validation failed:', err.message, '— fail-safe dropeo LGF');
           }
-        } catch (err: any) {
-          console.warn('[manage-google-campaign] selected_product_ids validation failed:', err.message);
+        } else {
+          console.warn('[manage-google-campaign] Supabase not configured — fail-safe dropeo LGF');
         }
+      } else {
+        console.warn('[manage-google-campaign] clientId no válido para LGF validation — fail-safe dropeo LGF');
+      }
+
+      if (!validated) {
+        // No pudimos confirmar ownership → NO creamos LGF (cross-tenant safety)
+        validSelectedIds = [];
       }
     }
     if (merchant_center_id && validSelectedIds.length > 0) {
@@ -1497,7 +1514,7 @@ async function handleCreateCampaign(
         // Sufijo único SIEMPRE para evitar colisión "An audience with this name already exists":
         // Google Ads exige unicidad del Audience.name a nivel customer. Aunque el user provea
         // un nombre, lo truncamos a 40 chars y le anexamos timestamp corto.
-        const uniqueSuffix = ` ${Date.now() % 1_000_000}`;
+        const uniqueSuffix = ` ${((Date.now() % 1_000) * 1000 + Math.floor(Math.random() * 1000))}`;
         const audNameBase = (typeof as.name === 'string' && as.name.trim()) ? as.name.trim().slice(0, 40) : 'Audiencia PMAX';
         mutateOps.push({
           audienceOperation: {
@@ -1565,10 +1582,12 @@ async function handleCreateCampaign(
           .map((r: string) => AGE_MAP[r])
           .filter(Boolean);
         const includeUndet = validAges.includes('AGE_RANGE_UNDETERMINED');
-        const ageDim: any = {};
-        if (ageSegments.length) ageDim.ageRanges = ageSegments;
-        if (includeUndet) ageDim.includeUndetermined = true;
-        if (ageSegments.length || includeUndet) dimensions.push({ age: ageDim });
+        // Google v23 rechaza age dimension con SOLO includeUndetermined (sin ageRanges array).
+        if (ageSegments.length) {
+          const ageDim: any = { ageRanges: ageSegments };
+          if (includeUndet) ageDim.includeUndetermined = true;
+          dimensions.push({ age: ageDim });
+        }
       }
       if (validGenders.length) dimensions.push({ gender: { genders: validGenders } });
       if (validParental.length) dimensions.push({ parentalStatus: { parentalStatuses: validParental } });
@@ -1579,7 +1598,7 @@ async function handleCreateCampaign(
         const audResource = `customers/${customerId}/audiences/${audTempId}`;
         // Sufijo único SIEMPRE para evitar colisión "An audience with this name already exists":
         // Google Ads exige unicidad del Audience.name a nivel customer.
-        const uniqueSuffix = ` ${Date.now() % 1_000_000}`;
+        const uniqueSuffix = ` ${((Date.now() % 1_000) * 1000 + Math.floor(Math.random() * 1000))}`;
         const audNameBase = (typeof audName === 'string' && audName.trim()) ? audName.trim().slice(0, 40) : 'Audiencia PMAX';
         // Audience op FIRST so it appears in the batch before the AssetGroupSignal that references it (clarity)
         mutateOps.push({
@@ -1926,14 +1945,16 @@ async function handleGetBudgetRecommendation(
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    if (supabaseUrl && supabaseKey && anthropicKey) {
+    // Defense-in-depth: valida UUID antes de interpolar en PostgREST
+    if (supabaseUrl && supabaseKey && anthropicKey && client_id && UUID_RX.test(String(client_id).trim())) {
       try {
         const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
+        const safeClientId = String(client_id).trim();
 
         const [finRes, bpRes, shopRes] = await Promise.all([
-          fetch(`${supabaseUrl}/rest/v1/client_financial_config?client_id=eq.${client_id}&select=*&limit=1`, { headers, signal: AbortSignal.timeout(5_000) }),
-          fetch(`${supabaseUrl}/rest/v1/buyer_personas?client_id=eq.${client_id}&select=persona_data&limit=1`, { headers, signal: AbortSignal.timeout(5_000) }),
-          fetch(`${supabaseUrl}/rest/v1/shopify_products?client_id=eq.${client_id}&select=price&not.price=is.null&limit=100`, { headers, signal: AbortSignal.timeout(5_000) }),
+          fetch(`${supabaseUrl}/rest/v1/client_financial_config?client_id=eq.${safeClientId}&select=*&limit=1`, { headers, signal: AbortSignal.timeout(5_000) }),
+          fetch(`${supabaseUrl}/rest/v1/buyer_personas?client_id=eq.${safeClientId}&select=persona_data&limit=1`, { headers, signal: AbortSignal.timeout(5_000) }),
+          fetch(`${supabaseUrl}/rest/v1/shopify_products?client_id=eq.${safeClientId}&select=price&not.price=is.null&limit=100`, { headers, signal: AbortSignal.timeout(5_000) }),
         ]);
 
         const fin = finRes.ok ? ((await finRes.json() as any[])?.[0] || null) : null;
@@ -2371,15 +2392,17 @@ async function handleGetRecommendations(
 
   // Fetch brand brief from Supabase (if client_id provided)
   let briefContext = '';
-  if (client_id) {
+  // Defense-in-depth: valida UUID antes de interpolar en PostgREST
+  if (client_id && UUID_RX.test(String(client_id).trim())) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const safeClientId = String(client_id).trim();
     if (supabaseUrl && supabaseKey) {
       const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
       try {
         // 1) Fetch buyer_personas — contains the actual brief Q&A responses
         const bpRes = await fetch(
-          `${supabaseUrl}/rest/v1/buyer_personas?client_id=eq.${client_id}&select=persona_data&limit=1`,
+          `${supabaseUrl}/rest/v1/buyer_personas?client_id=eq.${safeClientId}&select=persona_data&limit=1`,
           { headers, signal: AbortSignal.timeout(5_000) }
         );
         if (bpRes.ok) {
@@ -2404,7 +2427,7 @@ async function handleGetRecommendations(
 
         // 2) Fetch brand_research — google_ads_strategy has ad copies & keywords
         const brRes = await fetch(
-          `${supabaseUrl}/rest/v1/brand_research?client_id=eq.${client_id}&select=research_type,research_data&research_type=in.(google_ads_strategy,competitive_analysis,keywords)&order=created_at.desc&limit=3`,
+          `${supabaseUrl}/rest/v1/brand_research?client_id=eq.${safeClientId}&select=research_type,research_data&research_type=in.(google_ads_strategy,competitive_analysis,keywords)&order=created_at.desc&limit=3`,
           { headers, signal: AbortSignal.timeout(5_000) }
         );
         if (brRes.ok) {
@@ -3216,14 +3239,16 @@ async function handleSuggestAssetContent(
   // Load brief (minimal)
   let briefContext = '';
   let campaignContext = '';
-  if (client_id) {
+  // Defense-in-depth: valida UUID antes de interpolar en PostgREST
+  if (client_id && UUID_RX.test(String(client_id).trim())) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const safeClientId = String(client_id).trim();
     if (supabaseUrl && supabaseKey) {
       try {
         const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
         const bpRes = await fetch(
-          `${supabaseUrl}/rest/v1/buyer_personas?client_id=eq.${client_id}&select=persona_data&limit=1`,
+          `${supabaseUrl}/rest/v1/buyer_personas?client_id=eq.${safeClientId}&select=persona_data&limit=1`,
           { headers, signal: AbortSignal.timeout(5_000) }
         );
         if (bpRes.ok) {

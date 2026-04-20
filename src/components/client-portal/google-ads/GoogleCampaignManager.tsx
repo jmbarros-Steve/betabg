@@ -1424,6 +1424,8 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       landscape: `Foto publicitaria horizontal panorámica de producto para banner de Google Ads. Negocio: ${wizardData.business_name || 'marca'}. Aspecto ratio 1.91:1, 1200x628px.`,
       square: `Foto publicitaria cuadrada de producto para Google Ads. Negocio: ${wizardData.business_name || 'marca'}. Aspecto ratio 1:1, 1200x1200px.`,
       portrait: `Foto publicitaria vertical de producto para Google Ads móvil. Negocio: ${wizardData.business_name || 'marca'}. Aspecto ratio 4:5, 960x1200px.`,
+      logo: `Logo de la marca ${wizardData.business_name || ''}, fondo transparente o blanco, centrado, 1200x1200px, crisp, high-resolution.`,
+      landscape_logo: `Logo horizontal de la marca ${wizardData.business_name || ''}, fondo blanco o transparente, 1200x300px, wide format.`,
     };
 
     // Priorizar imágenes de productos seleccionados (catalog MC enriched con Shopify image_url)
@@ -3241,6 +3243,27 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 aspectHint="1:1 — min 128x128"
                 required
               />
+              {/* AI generate for logo (Gemini con brand reference) */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-blue-500 gap-1"
+                  onClick={() => generateAiImage('logo', 'ai_logo')}
+                  disabled={aiImageLoading.ai_logo}
+                >
+                  {aiImageLoading.ai_logo ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                  Generar con AI
+                </Button>
+                {aiImagePreviews.ai_logo && (
+                  <div className="flex items-center gap-2">
+                    <img src={aiImagePreviews.ai_logo} alt="AI preview" className="w-14 h-14 rounded border object-cover" />
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => acceptAiImage('ai_logo', 'images_logo')}>Usar</Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => generateAiImage('logo', 'ai_logo')}>Regenerar</Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setAiImagePreviews(p => { const n = { ...p }; delete n.ai_logo; return n; })}><X className="w-3 h-3" /></Button>
+                  </div>
+                )}
+              </div>
               <details className="border rounded-lg">
                 <summary className="p-3 text-sm font-medium cursor-pointer hover:bg-muted/30">
                   Imagenes opcionales (Portrait + Logo Landscape)
@@ -3254,7 +3277,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                     aspectHint="4:5 — rec. 960x1200"
                   />
                   {/* AI generate for portrait */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -3281,6 +3304,28 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                     maxFiles={5}
                     aspectHint="4:1 — rec. 1200x300"
                   />
+                  {/* AI generate for landscape_logo — backend hace letterbox automático si hay brand logo */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-blue-500 gap-1"
+                      onClick={() => generateAiImage('landscape_logo', 'ai_landscape_logo')}
+                      disabled={aiImageLoading.ai_landscape_logo}
+                      title="Si el cliente tiene logo, Steve lo adapta automáticamente a 1200x300 sin costo"
+                    >
+                      {aiImageLoading.ai_landscape_logo ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                      Generar con AI
+                    </Button>
+                    {aiImagePreviews.ai_landscape_logo && (
+                      <div className="flex items-center gap-2">
+                        <img src={aiImagePreviews.ai_landscape_logo} alt="AI preview" className="w-24 h-6 rounded border object-contain bg-muted/20" />
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => acceptAiImage('ai_landscape_logo', 'images_landscape_logo')}>Usar</Button>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => generateAiImage('landscape_logo', 'ai_landscape_logo')}>Regenerar</Button>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setAiImagePreviews(p => { const n = { ...p }; delete n.ai_landscape_logo; return n; })}><X className="w-3 h-3" /></Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </details>
             </div>
