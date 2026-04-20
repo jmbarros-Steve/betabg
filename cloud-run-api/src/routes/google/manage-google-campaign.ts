@@ -1292,10 +1292,65 @@ async function handleCreateCampaign(
   const languageCount = mutateOps.filter((op: any) => op.campaignCriterionOperation?.create?.language).length;
   console.log(`[manage-google-campaign] Creating ${channelType} campaign "${name}" with ${mutateOps.length} ops — headlines:${headlineCount} desc:${descCount} longHl:${longHlCount} bizName:${bizNameCount} images:${imgCount2} videos:${youtube_video_ids?.length || 0} sitelinks:${sitelinkCount} locations:${locationCount} languages:${languageCount}`);
 
-  const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, mutateOps);
+  // Split en 2 batches para evitar el bug de Google Ads con temp IDs altos en
+  // parent_listing_group_filter + asset_group_signal.asset_group.
+  // Batch 1: core (campaign, assetGroup, assets, criteria, sitelinks).
+  // Batch 2: listing_group_filter tree + audience ops + asset_group_signals (referencian el
+  //          asset_group real, con temp IDs renumerados a -1..-10 fresh).
+  const SECONDARY_OP_KEYS = ['assetGroupListingGroupFilterOperation', 'assetGroupSignalOperation', 'audienceOperation'];
+  const isSecondaryOp = (op: any) => SECONDARY_OP_KEYS.some(k => op[k]);
+  const primaryOps = mutateOps.filter(op => !isSecondaryOp(op));
+  const secondaryOpsRaw = mutateOps.filter(isSecondaryOp);
+
+  const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, primaryOps);
 
   if (!result.ok) {
     return { body: { error: `Failed to create campaign: ${result.error}` }, status: 502 };
+  }
+
+  // Extract real resource names for campaign + assetGroup from primary response
+  let realAssetGroup = '';
+  let realCampaign = '';
+  const primaryResponses: any[] = Array.isArray((result.data as any)?.mutateOperationResponses)
+    ? (result.data as any).mutateOperationResponses
+    : [];
+  for (const r of primaryResponses) {
+    const ag = r?.assetGroupResult?.resourceName || r?.asset_group_result?.resource_name;
+    const cp = r?.campaignResult?.resourceName || r?.campaign_result?.resource_name;
+    if (ag && !realAssetGroup) realAssetGroup = ag;
+    if (cp && !realCampaign) realCampaign = cp;
+  }
+
+  // Batch 2: secondary ops con resource names reales + temp IDs renumerados bajos
+  let secondaryWarning: string | null = null;
+  if (secondaryOpsRaw.length > 0 && realAssetGroup) {
+    // Renumerar todos los temp IDs negativos del JSON a -1, -2, -3... fresh
+    // (match solo dentro de resource names: customers/X/YYY/-NNN)
+    const idMap = new Map<string, string>();
+    let freshId = -1;
+    let jsonStr = JSON.stringify(secondaryOpsRaw).replace(
+      /(customers\/\d+\/\w+\/)(-\d+)/g,
+      (_m: string, prefix: string, oldId: string) => {
+        if (!idMap.has(oldId)) {
+          idMap.set(oldId, String(freshId--));
+        }
+        return prefix + idMap.get(oldId);
+      }
+    );
+    // Reemplazar la referencia al temp assetGroup (-3 o el que quedó tras renumerar) por el real
+    const tempAssetGroupRef = `customers/${customerId}/assetGroups/${idMap.get('-3') || '-3'}`;
+    jsonStr = jsonStr.split(tempAssetGroupRef).join(realAssetGroup);
+
+    const secondaryOps = JSON.parse(jsonStr);
+    console.log(`[manage-google-campaign] secondary batch: ${secondaryOps.length} ops, renumbered ${idMap.size} temp IDs to fresh range`);
+
+    const secondaryResult = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, secondaryOps);
+    if (!secondaryResult.ok) {
+      secondaryWarning = `Campaña creada OK, pero ${secondaryOpsRaw.length} operaciones secundarias (listing group filter / audience signals) fallaron: ${secondaryResult.error}. Podés agregar esos productos/audiencias manualmente en Google Ads.`;
+      console.warn('[manage-google-campaign] secondary mutate failed:', secondaryResult.error);
+    } else {
+      console.log(`[manage-google-campaign] secondary mutate OK: ${secondaryOps.length} ops applied`);
+    }
   }
 
   // Post-create: si se pidió acquisition mode (BID_HIGHER / TARGET_ALL_EQUALLY) y la verificación de
@@ -1357,7 +1412,7 @@ async function handleCreateCampaign(
       channel_type: channelType,
       status: 'PAUSED',
       data: result.data,
-      warnings: acquisitionWarning ? [acquisitionWarning] : [],
+      warnings: [acquisitionWarning, secondaryWarning].filter(Boolean),
       effective_acquisition_mode: effectiveAcquisitionMode,
     },
     status: 200,
