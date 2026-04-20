@@ -66,8 +66,12 @@ async function handleResume(
   return { body: { success: true, campaign_id: campaignId, status: 'ENABLED' }, status: 200 };
 }
 
-// Soft-delete: cambia status a REMOVED. Google Ads oculta la campaña de queries normales
-// (filtro `status != 'REMOVED'`) pero preserva el historial de métricas.
+// Soft-delete de campañas via CampaignOperation.remove (no update).
+// Google Ads v23 NO acepta `update` con status='REMOVED' para campañas — devuelve
+// "Enum value 'REMOVED' cannot be used". El patrón oficial es pasar el resource_name
+// como valor del campo `remove`. Internamente Google lo marca como status=REMOVED
+// y preserva el historial de métricas. Queda oculto de GAQL por el filtro
+// `status != 'REMOVED'` que ya tienen todas las queries del módulo.
 async function handleRemove(
   customerId: string,
   campaignId: string,
@@ -79,11 +83,7 @@ async function handleRemove(
 
   const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, [{
     campaignOperation: {
-      update: {
-        resourceName: `customers/${customerId}/campaigns/${campaignId}`,
-        status: 'REMOVED',
-      },
-      updateMask: 'status',
+      remove: `customers/${customerId}/campaigns/${campaignId}`,
     },
   }]);
 
