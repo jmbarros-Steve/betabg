@@ -252,12 +252,19 @@ async function handleGetSettings(
   developerToken: string,
   loginCustomerId: string
 ): Promise<{ body: any; status: number }> {
+  // Query 1: campaign base settings (incluye bid strategy targets)
   const query = `
     SELECT campaign.id, campaign.name, campaign.status,
            campaign.bidding_strategy_type,
+           campaign.target_cpa.target_cpa_micros,
+           campaign.target_roas.target_roas,
+           campaign.maximize_conversions.target_cpa_micros,
+           campaign.maximize_conversion_value.target_roas,
+           campaign.manual_cpc.enhanced_cpc_enabled,
            campaign.network_settings.target_google_search,
            campaign.network_settings.target_search_network,
            campaign.network_settings.target_content_network,
+           campaign.network_settings.target_partner_search_network,
            campaign.geo_target_type_setting.positive_geo_target_type,
            campaign.geo_target_type_setting.negative_geo_target_type,
            campaign.start_date, campaign.end_date,
@@ -275,6 +282,53 @@ async function handleGetSettings(
   const row = result.data[0];
   const c = row.campaign;
 
+  // Query 2: campaign_criterion (locations + languages)
+  const criteriaQuery = `
+    SELECT campaign_criterion.criterion_id, campaign_criterion.type,
+           campaign_criterion.negative,
+           campaign_criterion.location.geo_target_constant,
+           campaign_criterion.language.language_constant
+    FROM campaign_criterion
+    WHERE campaign.id = ${campaignId}
+      AND campaign_criterion.status != 'REMOVED'
+      AND campaign_criterion.type IN ('LOCATION', 'LANGUAGE')
+  `;
+  const critResult = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, criteriaQuery);
+  const locations: Array<{ criterion_id: string; geo_target_constant: string; negative: boolean }> = [];
+  const languages: Array<{ criterion_id: string; language_constant: string }> = [];
+  if (critResult.ok && critResult.data) {
+    for (const r of critResult.data as any[]) {
+      const cc = r.campaignCriterion;
+      if (cc?.type === 'LOCATION' && cc?.location?.geoTargetConstant) {
+        locations.push({
+          criterion_id: String(cc.criterionId),
+          geo_target_constant: cc.location.geoTargetConstant,
+          negative: !!cc.negative,
+        });
+      } else if (cc?.type === 'LANGUAGE' && cc?.language?.languageConstant) {
+        languages.push({
+          criterion_id: String(cc.criterionId),
+          language_constant: cc.language.languageConstant,
+        });
+      }
+    }
+  }
+
+  // Extraer target de la bid strategy activa.
+  // Google Ads v23: los targets viven en distintas sub-mensajes según el type.
+  const bidType = c?.biddingStrategyType;
+  let target_cpa_micros: number | undefined;
+  let target_roas: number | undefined;
+  if (bidType === 'TARGET_CPA') {
+    target_cpa_micros = Number(c?.targetCpa?.targetCpaMicros || 0) || undefined;
+  } else if (bidType === 'MAXIMIZE_CONVERSIONS') {
+    target_cpa_micros = Number(c?.maximizeConversions?.targetCpaMicros || 0) || undefined;
+  } else if (bidType === 'TARGET_ROAS') {
+    target_roas = Number(c?.targetRoas?.targetRoas || 0) || undefined;
+  } else if (bidType === 'MAXIMIZE_CONVERSION_VALUE') {
+    target_roas = Number(c?.maximizeConversionValue?.targetRoas || 0) || undefined;
+  }
+
   return {
     body: {
       success: true,
@@ -282,15 +336,21 @@ async function handleGetSettings(
         id: c?.id,
         name: c?.name,
         status: c?.status,
-        bidding_strategy_type: c?.biddingStrategyType,
+        bidding_strategy_type: bidType,
+        target_cpa_micros,
+        target_roas,
+        enhanced_cpc_enabled: c?.manualCpc?.enhancedCpcEnabled,
         target_google_search: c?.networkSettings?.targetGoogleSearch,
         target_search_network: c?.networkSettings?.targetSearchNetwork,
         target_content_network: c?.networkSettings?.targetContentNetwork,
+        target_partner_search_network: c?.networkSettings?.targetPartnerSearchNetwork,
         positive_geo_target_type: c?.geoTargetTypeSetting?.positiveGeoTargetType,
         negative_geo_target_type: c?.geoTargetTypeSetting?.negativeGeoTargetType,
         start_date: c?.startDate,
         end_date: c?.endDate,
         channel_type: c?.advertisingChannelType,
+        locations,
+        languages,
       },
     },
     status: 200,
@@ -308,9 +368,52 @@ async function handleUpdateSettings(
   const updateFields: Record<string, any> = {};
   const updateMaskParts: string[] = [];
 
+  if (data.name) {
+    updateFields.name = data.name;
+    updateMaskParts.push('name');
+  }
+
+  // Status: ENABLED / PAUSED. REMOVED va por handleRemove (operation.remove).
+  if (data.status && (data.status === 'ENABLED' || data.status === 'PAUSED')) {
+    updateFields.status = data.status;
+    updateMaskParts.push('status');
+  }
+
+  // Bid strategy. v23 usa sub-mensajes por tipo (target_cpa, target_roas, etc.)
+  // Según qué type pida el user, seteamos el sub-mensaje correcto y el mask.
   if (data.bidding_strategy_type) {
     updateFields.biddingStrategyType = data.bidding_strategy_type;
     updateMaskParts.push('bidding_strategy_type');
+
+    const type = data.bidding_strategy_type;
+    if (type === 'TARGET_CPA') {
+      const cpa = Number(data.target_cpa_micros);
+      if (!Number.isFinite(cpa) || cpa <= 0) {
+        return { body: { error: 'target_cpa_micros required and must be > 0 for TARGET_CPA' }, status: 400 };
+      }
+      updateFields.targetCpa = { targetCpaMicros: String(Math.round(cpa)) };
+      updateMaskParts.push('target_cpa.target_cpa_micros');
+    } else if (type === 'TARGET_ROAS') {
+      const roas = Number(data.target_roas);
+      if (!Number.isFinite(roas) || roas <= 0) {
+        return { body: { error: 'target_roas required and must be > 0 for TARGET_ROAS' }, status: 400 };
+      }
+      updateFields.targetRoas = { targetRoas: roas };
+      updateMaskParts.push('target_roas.target_roas');
+    } else if (type === 'MAXIMIZE_CONVERSIONS') {
+      if (data.target_cpa_micros !== undefined && data.target_cpa_micros !== null && Number(data.target_cpa_micros) > 0) {
+        updateFields.maximizeConversions = { targetCpaMicros: String(data.target_cpa_micros) };
+        updateMaskParts.push('maximize_conversions.target_cpa_micros');
+      }
+    } else if (type === 'MAXIMIZE_CONVERSION_VALUE') {
+      if (data.target_roas !== undefined && data.target_roas !== null && Number(data.target_roas) > 0) {
+        updateFields.maximizeConversionValue = { targetRoas: Number(data.target_roas) };
+        updateMaskParts.push('maximize_conversion_value.target_roas');
+      }
+    } else if (type === 'MANUAL_CPC') {
+      updateFields.manualCpc = { enhancedCpcEnabled: !!data.enhanced_cpc_enabled };
+      updateMaskParts.push('manual_cpc.enhanced_cpc_enabled');
+    }
   }
 
   if (data.network_settings) {
@@ -327,12 +430,21 @@ async function handleUpdateSettings(
       ns.targetContentNetwork = data.network_settings.target_content_network;
       updateMaskParts.push('network_settings.target_content_network');
     }
+    if (data.network_settings.target_partner_search_network !== undefined) {
+      ns.targetPartnerSearchNetwork = data.network_settings.target_partner_search_network;
+      updateMaskParts.push('network_settings.target_partner_search_network');
+    }
     if (Object.keys(ns).length) updateFields.networkSettings = ns;
   }
 
-  if (data.name) {
-    updateFields.name = data.name;
-    updateMaskParts.push('name');
+  // Schedule: start_date / end_date (YYYY-MM-DD). end_date puede ser null para quitarla.
+  if (data.start_date) {
+    updateFields.startDate = data.start_date;
+    updateMaskParts.push('start_date');
+  }
+  if (data.end_date !== undefined) {
+    updateFields.endDate = data.end_date || null;
+    updateMaskParts.push('end_date');
   }
 
   if (updateMaskParts.length === 0) {
@@ -354,6 +466,102 @@ async function handleUpdateSettings(
   }
 
   return { body: { success: true, campaign_id: campaignId, updated_fields: updateMaskParts }, status: 200 };
+}
+
+// Diff-apply para locations/languages:
+// El front manda la lista completa deseada (array de IDs). Comparamos con la
+// actual y emitimos create/remove de campaign_criterion en un solo mutate batch.
+// Esto evita tener que tocar un endpoint por operación y mantiene la vista
+// consistente con el estado en Google Ads.
+async function handleUpdateCriteria(
+  customerId: string,
+  campaignId: string,
+  accessToken: string,
+  developerToken: string,
+  loginCustomerId: string,
+  data: Record<string, any>
+): Promise<{ body: any; status: number }> {
+  const type: 'LOCATION' | 'LANGUAGE' = data.criterion_type;
+  if (type !== 'LOCATION' && type !== 'LANGUAGE') {
+    return { body: { error: 'Invalid criterion_type. Use LOCATION or LANGUAGE.' }, status: 400 };
+  }
+  const desiredIds: string[] = Array.isArray(data.ids)
+    ? Array.from(new Set(data.ids.map((x: any) => String(x))))
+    : [];
+
+  // Fetch actuales del tipo. NOTA: solo consideramos positivos aquí — las
+  // criterias negativas (exclude locations) viven aparte y se preservan intactas.
+  // Sin este filtro, al guardar positivos el diff borraría cualquier exclusión
+  // geográfica existente silenciosamente.
+  const critQuery = `
+    SELECT campaign_criterion.criterion_id, campaign_criterion.resource_name,
+           campaign_criterion.negative,
+           campaign_criterion.location.geo_target_constant,
+           campaign_criterion.language.language_constant
+    FROM campaign_criterion
+    WHERE campaign.id = ${campaignId}
+      AND campaign_criterion.status != 'REMOVED'
+      AND campaign_criterion.type = '${type}'
+      AND campaign_criterion.negative = FALSE
+  `;
+  const critResult = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, critQuery);
+  if (!critResult.ok) {
+    return { body: { error: 'Failed to fetch current criteria', details: critResult.error }, status: 502 };
+  }
+
+  const current: Array<{ resource_name: string; id: string }> = [];
+  for (const r of (critResult.data || []) as any[]) {
+    const cc = r.campaignCriterion;
+    if (!cc || cc.negative) continue; // belt-and-suspenders tras GAQL filter
+    if (type === 'LOCATION' && cc.location?.geoTargetConstant) {
+      const geoId = String(cc.location.geoTargetConstant).split('/').pop() || '';
+      current.push({ resource_name: cc.resourceName, id: geoId });
+    } else if (type === 'LANGUAGE' && cc.language?.languageConstant) {
+      const langId = String(cc.language.languageConstant).split('/').pop() || '';
+      current.push({ resource_name: cc.resourceName, id: langId });
+    }
+  }
+
+  const currentIds = new Set(current.map(c => c.id));
+  const desiredIdSet = new Set(desiredIds);
+  const toAdd = desiredIds.filter(id => !currentIds.has(id));
+  const toRemoveResourceNames = current.filter(c => !desiredIdSet.has(c.id)).map(c => c.resource_name);
+
+  if (toAdd.length === 0 && toRemoveResourceNames.length === 0) {
+    return { body: { success: true, campaign_id: campaignId, added: 0, removed: 0, noop: true }, status: 200 };
+  }
+
+  const operations: any[] = [];
+  for (const id of toAdd) {
+    const criterion: Record<string, any> = {
+      campaign: `customers/${customerId}/campaigns/${campaignId}`,
+    };
+    if (type === 'LOCATION') {
+      criterion.location = { geoTargetConstant: `geoTargetConstants/${id}` };
+    } else {
+      criterion.language = { languageConstant: `languageConstants/${id}` };
+    }
+    operations.push({ campaignCriterionOperation: { create: criterion } });
+  }
+  for (const rn of toRemoveResourceNames) {
+    operations.push({ campaignCriterionOperation: { remove: rn } });
+  }
+
+  const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, operations);
+  if (!result.ok) {
+    return { body: { error: 'Failed to update criteria', details: result.error }, status: 502 };
+  }
+
+  return {
+    body: {
+      success: true,
+      campaign_id: campaignId,
+      criterion_type: type,
+      added: toAdd.length,
+      removed: toRemoveResourceNames.length,
+    },
+    status: 200,
+  };
 }
 
 // --- Fase 1: Ad Group CRUD ---
@@ -2870,14 +3078,218 @@ async function handleListImageAssets(
   return { body: { success: true, assets, count: assets.length }, status: 200 };
 }
 
+// --- Sugerencia de asset individual con Steve AI (scorecard accionable) ---
+// Recibe asset_group_id (opcional, solo para contexto de campaña), field_type, client_id.
+// Retorna N opciones de texto ya formateadas para el field_type (respetando límites).
+// Reusa el patrón de brief loading del handleGetRecommendations pero en una versión
+// compacta: solo buyer_personas.raw_responses (17 Q&A) — suficiente para guiar tono.
+async function handleSuggestAssetContent(
+  customerId: string,
+  accessToken: string,
+  developerToken: string,
+  loginCustomerId: string,
+  data: Record<string, any>
+): Promise<{ body: any; status: number }> {
+  const { field_type, client_id, asset_group_id, user_intent, count = 5 } = data;
+  if (!field_type) {
+    return { body: { error: 'Missing field_type' }, status: 400 };
+  }
+
+  const TEXT_FIELDS: Record<string, { max: number; label: string; minCount: number }> = {
+    HEADLINE:       { max: 30, label: 'Headline corto', minCount: 3 },
+    LONG_HEADLINE:  { max: 90, label: 'Headline largo', minCount: 1 },
+    DESCRIPTION:    { max: 90, label: 'Descripción', minCount: 2 },
+    BUSINESS_NAME:  { max: 25, label: 'Nombre del negocio', minCount: 1 },
+  };
+  const CTA_ENUMS = [
+    'SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'SUBSCRIBE', 'BOOK_NOW',
+    'GET_QUOTE', 'CONTACT_US', 'APPLY_NOW', 'DOWNLOAD', 'ORDER_NOW', 'BUY_NOW',
+  ];
+
+  // CTA es enum fijo — no necesita IA
+  if (field_type === 'CALL_TO_ACTION_SELECTION') {
+    return {
+      body: {
+        success: true,
+        field_type,
+        source: 'enum',
+        options: CTA_ENUMS.map(v => ({ value: v, text: v })),
+      },
+      status: 200,
+    };
+  }
+
+  // Imágenes/videos: no es texto → el front usa /api/ai/generate-image para imágenes.
+  const spec = TEXT_FIELDS[field_type];
+  if (!spec) {
+    return {
+      body: {
+        error: 'field_type no soportado para sugerencia de texto',
+        details: 'Use CALL_TO_ACTION_SELECTION (enum) o genere imágenes con /api/ai/generate-image',
+      },
+      status: 400,
+    };
+  }
+
+  // Load brief (minimal)
+  let briefContext = '';
+  let campaignContext = '';
+  if (client_id) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (supabaseUrl && supabaseKey) {
+      try {
+        const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
+        const bpRes = await fetch(
+          `${supabaseUrl}/rest/v1/buyer_personas?client_id=eq.${client_id}&select=persona_data&limit=1`,
+          { headers, signal: AbortSignal.timeout(5_000) }
+        );
+        if (bpRes.ok) {
+          const rows = await bpRes.json() as any[];
+          const pd = rows?.[0]?.persona_data;
+          if (pd && Array.isArray(pd.raw_responses)) {
+            briefContext = pd.raw_responses
+              .filter((r: any) => typeof r === 'string' && r.trim())
+              .map((r: string) => r.trim())
+              .join('\n')
+              .slice(0, 3000);
+          }
+        }
+      } catch (err: any) {
+        console.warn('[suggest_asset_content] brief fetch failed:', err.message);
+      }
+    }
+  }
+
+  // Campaign/asset_group context (opcional, para orientar el tono sin ser invasivo)
+  if (asset_group_id) {
+    try {
+      const q = `
+        SELECT asset_group.name, campaign.name, campaign.advertising_channel_type
+        FROM asset_group
+        WHERE asset_group.id = ${String(asset_group_id).replace(/[^0-9]/g, '')}
+      `;
+      const r = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, q);
+      if (r.ok && r.data?.[0]) {
+        const ag = r.data[0].assetGroup;
+        const ca = r.data[0].campaign;
+        campaignContext = `Campaña "${ca?.name}" (${ca?.advertisingChannelType}), grupo "${ag?.name}"`;
+      }
+    } catch (err: any) {
+      console.warn('[suggest_asset_content] ag context fetch failed:', err.message);
+    }
+  }
+
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    return { body: { error: 'ANTHROPIC_API_KEY not configured' }, status: 500 };
+  }
+
+  const n = Math.max(spec.minCount, Math.min(Number(count) || 5, 10));
+  const prompt = `Eres Steve, experto en copywriting para Google Ads Performance Max.
+${campaignContext ? `\nContexto de la campaña: ${campaignContext}\n` : ''}
+${briefContext ? `\n## BRIEF DEL CLIENTE (usa como base)\n${briefContext}\n` : ''}
+${user_intent ? `\n## OBJETIVO DE LA CAMPAÑA (palabras del usuario)\n${user_intent}\n` : ''}
+${!briefContext && !user_intent ? '\nNo hay brief disponible, genera textos genéricos profesionales.\n' : ''}
+
+Genera ${n} opciones distintas de "${spec.label}" para Google Ads PMAX.
+
+REGLAS ESTRICTAS:
+- Cada texto MAXIMO ${spec.max} caracteres (cuenta espacios). Si supera ${spec.max}, es INVALIDO.
+- Variados: distintos ángulos (beneficio, urgencia, curiosidad, prueba social)
+- En español neutro LATAM
+- Respeta la marca y tono del brief${briefContext ? '' : ' (o del contexto)'}
+- No inventes precios, descuentos ni promesas específicas que no estén en el brief
+
+Responde SOLO en JSON válido, sin markdown:
+{ "options": [{"text": "...", "angle": "beneficio|urgencia|curiosidad|prueba_social|otro"}, ...], "reasoning": "1 línea" }`;
+
+  // Llama a Claude una vez y devuelve options + reasoning parseados.
+  // Devuelve options=[] si el parse falla (para poder reintentar sin abortar).
+  const callClaude = async (userPrompt: string): Promise<{ options: Array<{ text: string; angle: string | null }>; reasoning: string | null; parseError?: boolean }> => {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+
+    const result = await response.json() as any;
+    let text = result?.content?.[0]?.text || '{}';
+    text = text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return { options: [], reasoning: null, parseError: true };
+    }
+
+    const rawOptions = Array.isArray(parsed.options) ? parsed.options : [];
+    const options = rawOptions
+      .map((o: any) => ({
+        text: typeof o?.text === 'string' ? o.text.trim().slice(0, spec.max) : '',
+        angle: typeof o?.angle === 'string' ? o.angle : null,
+      }))
+      .filter((o: any) => o.text.length > 0);
+
+    return { options, reasoning: parsed.reasoning || null };
+  };
+
+  try {
+    const first = await callClaude(prompt);
+    let options = first.options;
+    let reasoning = first.reasoning;
+
+    // Si la IA devolvió menos del mínimo esperado, reintenta una vez pidiendo
+    // las que faltan. Agrega ~1-2s de latencia en el peor caso pero asegura
+    // una UX mínima (el scorecard muestra un dialog utilizable).
+    if (options.length < spec.minCount && !first.parseError) {
+      const need = spec.minCount - options.length;
+      const retryPrompt = `${prompt}\n\nNOTA: Anteriormente generaste solo ${options.length} opciones. Genera ${need} más, distintas a éstas:\n${options.map((o, i) => `${i + 1}. ${o.text}`).join('\n')}`;
+      const retry = await callClaude(retryPrompt);
+      options = [...options, ...retry.options].slice(0, n);
+      if (!reasoning && retry.reasoning) reasoning = retry.reasoning;
+    }
+
+    if (first.parseError && options.length === 0) {
+      return { body: { error: 'Failed to parse AI response' }, status: 502 };
+    }
+
+    return {
+      body: {
+        success: true,
+        field_type,
+        source: 'ai',
+        max_chars: spec.max,
+        options,
+        reasoning,
+      },
+      status: 200,
+    };
+  } catch (err: any) {
+    console.error('[suggest_asset_content] error:', err);
+    return { body: { error: 'AI request failed', details: err.message }, status: 502 };
+  }
+}
+
 // --- Main handler ---
 
 type AllActions = Action
   | 'check_write_access'
-  | 'get_settings' | 'update_settings'
+  | 'get_settings' | 'update_settings' | 'update_criteria'
   | 'list_ad_groups' | 'create_ad_group' | 'update_ad_group' | 'pause_ad_group' | 'enable_ad_group'
   | 'create_campaign'
   | 'get_recommendations'
+  | 'suggest_asset_content'
   | 'list_merchant_centers'
   | 'get_budget_recommendation'
   | 'list_image_assets'
@@ -2902,10 +3314,11 @@ export async function manageGoogleCampaign(c: Context) {
     const validActions: AllActions[] = [
       'pause', 'resume', 'remove', 'update_budget', 'list_details',
       'check_write_access',
-      'get_settings', 'update_settings',
+      'get_settings', 'update_settings', 'update_criteria',
       'list_ad_groups', 'create_ad_group', 'update_ad_group', 'pause_ad_group', 'enable_ad_group',
       'create_campaign',
       'get_recommendations',
+      'suggest_asset_content',
       'list_merchant_centers',
       'get_budget_recommendation',
       'list_image_assets',
@@ -2920,7 +3333,7 @@ export async function manageGoogleCampaign(c: Context) {
     // Actions that require campaign_id
     const needsCampaignId: AllActions[] = [
       'pause', 'resume', 'remove', 'update_budget',
-      'get_settings', 'update_settings',
+      'get_settings', 'update_settings', 'update_criteria',
       'list_ad_groups', 'create_ad_group',
     ];
     if (needsCampaignId.includes(action) && !campaign_id) {
@@ -2976,6 +3389,9 @@ export async function manageGoogleCampaign(c: Context) {
       case 'update_settings':
         result = await handleUpdateSettings(ctx.customerId, campaign_id!, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, data || {});
         break;
+      case 'update_criteria':
+        result = await handleUpdateCriteria(ctx.customerId, campaign_id!, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, data || {});
+        break;
       case 'list_ad_groups':
         result = await handleListAdGroups(ctx.customerId, campaign_id!, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId);
         break;
@@ -2996,6 +3412,9 @@ export async function manageGoogleCampaign(c: Context) {
         break;
       case 'get_recommendations':
         result = await handleGetRecommendations(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, { ...(data || {}), client_id: ctx.clientId });
+        break;
+      case 'suggest_asset_content':
+        result = await handleSuggestAssetContent(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, { ...(data || {}), client_id: ctx.clientId });
         break;
       case 'list_merchant_centers':
         result = await handleListMerchantCenters(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId);

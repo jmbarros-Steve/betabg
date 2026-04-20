@@ -7,7 +7,8 @@ type Action =
   | 'create_asset_group'
   | 'add_asset'
   | 'remove_asset'
-  | 'update_asset_group';
+  | 'update_asset_group'
+  | 'remove_asset_group';
 
 interface RequestBody {
   action: Action;
@@ -233,7 +234,7 @@ async function handleAddAsset(
   loginCustomerId: string,
   data: Record<string, any>
 ): Promise<{ body: any; status: number }> {
-  const { field_type, text, image_data, image_name, youtube_video_id } = data;
+  const { field_type, text, image_data, image_name, youtube_video_id, cta_enum } = data;
 
   if (!field_type) return { body: { error: 'Missing field_type' }, status: 400 };
 
@@ -264,6 +265,18 @@ async function handleAddAsset(
           resourceName: `customers/${customerId}/assets/${assetTempId}`,
           type: 'YOUTUBE_VIDEO',
           youtubeVideoAsset: { youtubeVideoId: youtube_video_id },
+        },
+      },
+    });
+  } else if (field_type === 'CALL_TO_ACTION_SELECTION') {
+    if (!cta_enum) return { body: { error: 'Missing cta_enum (ej: SHOP_NOW, LEARN_MORE, ...)' }, status: 400 };
+    // v23: callToActionAsset con enum (no textAsset) — ver memory sesión 20/04
+    mutateOps.push({
+      assetOperation: {
+        create: {
+          resourceName: `customers/${customerId}/assets/${assetTempId}`,
+          type: 'CALL_TO_ACTION',
+          callToActionAsset: { callToAction: cta_enum },
         },
       },
     });
@@ -337,6 +350,12 @@ async function handleUpdateAssetGroup(
   loginCustomerId: string,
   data: Record<string, any>
 ): Promise<{ body: any; status: number }> {
+  // v23 rechaza update status='REMOVED' — redirigir a remove operation.
+  if (data.status === 'REMOVED') {
+    console.warn('[manage-google-pmax] deprecated: use action=remove_asset_group instead of update_asset_group{status:REMOVED}');
+    return handleRemoveAssetGroup(customerId, assetGroupId, accessToken, developerToken, loginCustomerId);
+  }
+
   const updateFields: Record<string, any> = {};
   const updateMaskParts: string[] = [];
 
@@ -374,6 +393,32 @@ async function handleUpdateAssetGroup(
   return { body: { success: true, asset_group_id: assetGroupId }, status: 200 };
 }
 
+// Soft-delete de asset groups via AssetGroupOperation.remove (no update).
+// Igual que Campaign en v23, el patrón oficial es pasar el resource_name como
+// valor del campo `remove`. Un update con status='REMOVED' falla con
+// "Enum value 'REMOVED' cannot be used" (mismo comportamiento que Campaign v23).
+// Google marca el asset group como REMOVED internamente y queda oculto del
+// GAQL por el filtro `asset_group.status != 'REMOVED'`.
+async function handleRemoveAssetGroup(
+  customerId: string,
+  assetGroupId: string,
+  accessToken: string,
+  developerToken: string,
+  loginCustomerId: string
+): Promise<{ body: any; status: number }> {
+  const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, [{
+    assetGroupOperation: {
+      remove: `customers/${customerId}/assetGroups/${assetGroupId}`,
+    },
+  }]);
+
+  if (!result.ok) {
+    return { body: { error: 'Failed to remove asset group', details: result.error }, status: 502 };
+  }
+
+  return { body: { success: true, asset_group_id: assetGroupId, status: 'REMOVED' }, status: 200 };
+}
+
 // --- Main handler ---
 
 export async function manageGooglePmax(c: Context) {
@@ -386,7 +431,7 @@ export async function manageGooglePmax(c: Context) {
 
     const validActions: Action[] = [
       'list_asset_groups', 'get_asset_group_detail',
-      'create_asset_group', 'add_asset', 'remove_asset', 'update_asset_group',
+      'create_asset_group', 'add_asset', 'remove_asset', 'update_asset_group', 'remove_asset_group',
     ];
 
     if (!validActions.includes(action)) {
@@ -394,7 +439,7 @@ export async function manageGooglePmax(c: Context) {
     }
 
     // Actions that require asset_group_id
-    const needsAssetGroupId: Action[] = ['get_asset_group_detail', 'add_asset', 'remove_asset', 'update_asset_group'];
+    const needsAssetGroupId: Action[] = ['get_asset_group_detail', 'add_asset', 'remove_asset', 'update_asset_group', 'remove_asset_group'];
     if (needsAssetGroupId.includes(action) && !asset_group_id) {
       return c.json({ error: `Missing asset_group_id for action "${action}"` }, 400);
     }
@@ -432,6 +477,9 @@ export async function manageGooglePmax(c: Context) {
         break;
       case 'update_asset_group':
         result = await handleUpdateAssetGroup(ctx.customerId, asset_group_id!, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId, data || {});
+        break;
+      case 'remove_asset_group':
+        result = await handleRemoveAssetGroup(ctx.customerId, asset_group_id!, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId);
         break;
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };

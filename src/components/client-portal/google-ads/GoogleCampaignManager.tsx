@@ -508,6 +508,10 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   const [createAgOpen, setCreateAgOpen] = useState(false);
   const [createAgCampaignId, setCreateAgCampaignId] = useState<string>('');
 
+  // Delete asset group dialog (reemplaza window.confirm)
+  const [deleteAgTarget, setDeleteAgTarget] = useState<{ campaignId: string; id: string; name: string } | null>(null);
+  const [deleteAgLoading, setDeleteAgLoading] = useState(false);
+
   // Create ad group dialog
   const [createAdGroupOpen, setCreateAdGroupOpen] = useState(false);
   const [createAdGroupCampaignId, setCreateAdGroupCampaignId] = useState<string | null>(null);
@@ -835,38 +839,152 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       return;
     }
 
-    setSettingsData(data?.settings || {});
+    const s = data?.settings || {};
+    // Extraer IDs desde los recursos geoTargetConstants/{id} y languageConstants/{id}
+    const locationIds = Array.isArray(s.locations)
+      ? s.locations
+          .filter((l: any) => !l.negative)
+          .map((l: any) => String(l.geo_target_constant || '').split('/').pop())
+          .filter(Boolean)
+      : [];
+    const languageIds = Array.isArray(s.languages)
+      ? s.languages.map((l: any) => String(l.language_constant || '').split('/').pop()).filter(Boolean)
+      : [];
+    setSettingsData({
+      ...s,
+      // UI-friendly: target_cpa en moneda account (no micros)
+      target_cpa_micros: s.target_cpa_micros ? Number(s.target_cpa_micros) / 1_000_000 : '',
+      target_roas: s.target_roas ? Number(s.target_roas) : '',
+      selected_location_ids: locationIds,
+      selected_language_ids: languageIds,
+      __originalLocationIds: locationIds,
+      __originalLanguageIds: languageIds,
+    });
   };
 
   const handleSaveSettings = async () => {
     if (!settingsCampaign || !settingsData) return;
+
+    // Validación frontend: TARGET_CPA y TARGET_ROAS requieren valor > 0.
+    const bidType = settingsData.bidding_strategy_type;
+    if (bidType === 'TARGET_CPA') {
+      const cpa = Number(settingsData.target_cpa_micros);
+      if (!Number.isFinite(cpa) || cpa <= 0) {
+        toast.error('CPA objetivo requerido (> 0) para estrategia CPA objetivo');
+        return;
+      }
+    }
+    if (bidType === 'TARGET_ROAS') {
+      const roas = Number(settingsData.target_roas);
+      if (!Number.isFinite(roas) || roas <= 0) {
+        toast.error('ROAS objetivo requerido (> 0) para estrategia ROAS objetivo');
+        return;
+      }
+    }
+
     setSettingsSaving(true);
 
-    const { error } = await callApi('manage-google-campaign', {
+    // Construir payload update_settings solo con campos que aplican según bid strategy.
+    // network_settings solo es editable en SEARCH (PMAX/SHOPPING/DISPLAY los rechaza).
+    const isSearch = settingsData.channel_type === 'SEARCH';
+    const settingsPayload: Record<string, any> = {
+      status: settingsData.status,
+      bidding_strategy_type: bidType,
+      start_date: settingsData.start_date || undefined,
+      end_date: settingsData.end_date === '' ? null : settingsData.end_date,
+    };
+    if (isSearch) {
+      settingsPayload.network_settings = {
+        target_google_search: settingsData.target_google_search,
+        target_search_network: settingsData.target_search_network,
+        target_content_network: settingsData.target_content_network,
+        target_partner_search_network: settingsData.target_partner_search_network,
+      };
+    }
+    if (bidType === 'TARGET_CPA' || bidType === 'MAXIMIZE_CONVERSIONS') {
+      if (settingsData.target_cpa_micros !== undefined && settingsData.target_cpa_micros !== '') {
+        settingsPayload.target_cpa_micros = Math.round(Number(settingsData.target_cpa_micros) * 1_000_000);
+      }
+    }
+    if (bidType === 'TARGET_ROAS' || bidType === 'MAXIMIZE_CONVERSION_VALUE') {
+      if (settingsData.target_roas !== undefined && settingsData.target_roas !== '') {
+        settingsPayload.target_roas = Number(settingsData.target_roas);
+      }
+    }
+    if (bidType === 'MANUAL_CPC') {
+      settingsPayload.enhanced_cpc_enabled = !!settingsData.enhanced_cpc_enabled;
+    }
+
+    // Best-effort sequential saves. Tracking qué quedó guardado vs falló
+    // para reportar al user un toast claro en vez de "error" genérico.
+    const results: Array<{ step: string; ok: boolean; error?: string }> = [];
+
+    const { error: settingsError } = await callApi('manage-google-campaign', {
       body: {
         action: 'update_settings',
         connection_id: connectionId,
         campaign_id: settingsCampaign.id,
-        data: {
-          bidding_strategy_type: settingsData.bidding_strategy_type,
-          network_settings: {
-            target_google_search: settingsData.target_google_search,
-            target_search_network: settingsData.target_search_network,
-            target_content_network: settingsData.target_content_network,
-          },
-        },
+        data: settingsPayload,
       },
     });
+    results.push({ step: 'Configuración', ok: !settingsError, error: settingsError || undefined });
+
+    // Locations + Languages via update_criteria (diff-apply).
+    // Intentamos ambos aunque uno falle, para que el user vea el estado completo.
+    const originalLocationIds: string[] = settingsData.__originalLocationIds || [];
+    const originalLanguageIds: string[] = settingsData.__originalLanguageIds || [];
+    const desiredLocationIds: string[] = settingsData.selected_location_ids || [];
+    const desiredLanguageIds: string[] = settingsData.selected_language_ids || [];
+    const locationsChanged =
+      originalLocationIds.length !== desiredLocationIds.length ||
+      originalLocationIds.some(id => !desiredLocationIds.includes(id));
+    const languagesChanged =
+      originalLanguageIds.length !== desiredLanguageIds.length ||
+      originalLanguageIds.some(id => !desiredLanguageIds.includes(id));
+
+    if (locationsChanged) {
+      const { error } = await callApi('manage-google-campaign', {
+        body: {
+          action: 'update_criteria',
+          connection_id: connectionId,
+          campaign_id: settingsCampaign.id,
+          data: { criterion_type: 'LOCATION', ids: desiredLocationIds },
+        },
+      });
+      results.push({ step: 'Ubicaciones', ok: !error, error: error || undefined });
+    }
+    if (languagesChanged) {
+      const { error } = await callApi('manage-google-campaign', {
+        body: {
+          action: 'update_criteria',
+          connection_id: connectionId,
+          campaign_id: settingsCampaign.id,
+          data: { criterion_type: 'LANGUAGE', ids: desiredLanguageIds },
+        },
+      });
+      results.push({ step: 'Idiomas', ok: !error, error: error || undefined });
+    }
 
     setSettingsSaving(false);
 
-    if (error) {
-      toast.error('Error guardando settings: ' + error);
+    // Reportar resultado granular
+    const failed = results.filter(r => !r.ok);
+    const succeeded = results.filter(r => r.ok);
+    if (failed.length === 0) {
+      toast.success('Configuración actualizada');
+      setSettingsCampaign(null);
+      fetchCampaigns();
       return;
     }
-
-    toast.success('Configuracion actualizada');
-    setSettingsCampaign(null);
+    if (succeeded.length === 0) {
+      toast.error(`Error: ${failed.map(f => `${f.step} (${f.error})`).join(', ')}`);
+      return;
+    }
+    // Algunos OK, algunos fallaron — dejar el dialog abierto para retry del user.
+    toast.warning(
+      `Guardado parcial — OK: ${succeeded.map(s => s.step).join(', ')}. Falló: ${failed.map(f => `${f.step} (${f.error})`).join(', ')}`,
+      { duration: 10_000 }
+    );
     fetchCampaigns();
   };
 
@@ -948,21 +1066,30 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     await refreshAssetGroupsForCampaign(campaignId);
   };
 
-  const handleAssetGroupDelete = async (campaignId: string, ag: { id: string; name: string }) => {
-    const ok = window.confirm(`¿Eliminar el grupo de recursos "${ag.name}"? Esta acción no se puede deshacer.`);
-    if (!ok) return;
-    setAssetGroupActionLoading(prev => ({ ...prev, [ag.id]: true }));
+  const handleAssetGroupDelete = (campaignId: string, ag: { id: string; name: string }) => {
+    setDeleteAgTarget({ campaignId, id: ag.id, name: ag.name });
+  };
+
+  const confirmAssetGroupDelete = async () => {
+    if (!deleteAgTarget) return;
+    const { campaignId, id, name } = deleteAgTarget;
+    setDeleteAgLoading(true);
+    setAssetGroupActionLoading(prev => ({ ...prev, [id]: true }));
     const { error } = await callApi('manage-google-pmax', {
       body: {
-        action: 'update_asset_group',
+        action: 'remove_asset_group',
         connection_id: connectionId,
-        asset_group_id: ag.id,
-        data: { status: 'REMOVED' },
+        asset_group_id: id,
       },
     });
-    setAssetGroupActionLoading(prev => ({ ...prev, [ag.id]: false }));
-    if (error) { toast.error('Error: ' + error); return; }
+    setAssetGroupActionLoading(prev => ({ ...prev, [id]: false }));
+    setDeleteAgLoading(false);
+    if (error) {
+      toast.error(`Error eliminando "${name}": ` + error);
+      return;
+    }
     toast.success('Grupo de recursos eliminado');
+    setDeleteAgTarget(null);
     await refreshAssetGroupsForCampaign(campaignId);
   };
 
@@ -2076,10 +2203,10 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       </Dialog>
 
       {/* ─── Settings Dialog ────────────────────────────────────────── */}
-      <Dialog open={!!settingsCampaign} onOpenChange={() => setSettingsCampaign(null)}>
-        <DialogContent className="sm:max-w-[500px]">
+      <Dialog open={!!settingsCampaign} onOpenChange={(open) => { if (!open && !settingsSaving) setSettingsCampaign(null); }}>
+        <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Configuracion de Campana</DialogTitle>
+            <DialogTitle>Configuración de Campaña</DialogTitle>
           </DialogHeader>
           {settingsLoading ? (
             <div className="flex items-center gap-2 py-8 justify-center text-muted-foreground">
@@ -2087,13 +2214,26 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
               Cargando...
             </div>
           ) : settingsData ? (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <p className="text-sm text-muted-foreground truncate">{settingsCampaign?.name}</p>
 
+              {/* Estado */}
+              <div className="flex items-center justify-between border rounded-md p-3">
+                <div>
+                  <Label className="text-sm">Estado de la campaña</Label>
+                  <p className="text-xs text-muted-foreground">Activar o pausar</p>
+                </div>
+                <Switch
+                  checked={settingsData.status === 'ENABLED'}
+                  onCheckedChange={val => setSettingsData((p: any) => ({ ...p, status: val ? 'ENABLED' : 'PAUSED' }))}
+                />
+              </div>
+
+              {/* Bid strategy + targets */}
               <div className="space-y-2">
                 <Label>Estrategia de puja</Label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={settingsData.bidding_strategy_type || ''}
                   onChange={e => setSettingsData((p: any) => ({ ...p, bidding_strategy_type: e.target.value }))}
                 >
@@ -2101,46 +2241,176 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                     <option key={bs.value} value={bs.value}>{bs.label}</option>
                   ))}
                 </select>
+
+                {(settingsData.bidding_strategy_type === 'TARGET_CPA' ||
+                  settingsData.bidding_strategy_type === 'MAXIMIZE_CONVERSIONS') && (
+                  <div className="space-y-1 pt-1">
+                    <Label className="text-xs">CPA objetivo {settingsData.bidding_strategy_type === 'MAXIMIZE_CONVERSIONS' ? '(opcional)' : ''}</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={settingsData.target_cpa_micros ?? ''}
+                      onChange={e => setSettingsData((p: any) => ({ ...p, target_cpa_micros: e.target.value }))}
+                      placeholder="Ej: 15.00 (moneda de la cuenta)"
+                    />
+                  </div>
+                )}
+                {(settingsData.bidding_strategy_type === 'TARGET_ROAS' ||
+                  settingsData.bidding_strategy_type === 'MAXIMIZE_CONVERSION_VALUE') && (
+                  <div className="space-y-1 pt-1">
+                    <Label className="text-xs">ROAS objetivo {settingsData.bidding_strategy_type === 'MAXIMIZE_CONVERSION_VALUE' ? '(opcional)' : ''}</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={settingsData.target_roas ?? ''}
+                      onChange={e => setSettingsData((p: any) => ({ ...p, target_roas: e.target.value }))}
+                      placeholder="Ej: 4.0 (4x retorno)"
+                    />
+                  </div>
+                )}
+                {settingsData.bidding_strategy_type === 'MANUAL_CPC' && (
+                  <div className="flex items-center justify-between pt-1">
+                    <Label className="text-xs">Enhanced CPC</Label>
+                    <Switch
+                      checked={!!settingsData.enhanced_cpc_enabled}
+                      onCheckedChange={val => setSettingsData((p: any) => ({ ...p, enhanced_cpc_enabled: val }))}
+                    />
+                  </div>
+                )}
               </div>
 
-              {settingsData.channel_type === 'SEARCH' && (
-                <div className="space-y-3">
-                  <Label>Redes</Label>
+              {/* Networks: solo SEARCH los acepta todos. PMAX/SHOPPING/DISPLAY son read-only. */}
+              {(() => {
+                const channel = settingsData.channel_type || '';
+                const canEdit = channel === 'SEARCH';
+                if (!canEdit) {
+                  return (
+                    <div className="space-y-2">
+                      <Label>Redes</Label>
+                      <div className="rounded-md border border-muted bg-muted/20 p-3 text-xs text-muted-foreground">
+                        Las redes de {channel || 'esta campaña'} son automáticas y no se pueden editar desde acá.
+                        {channel === 'PERFORMANCE_MAX' && ' PMAX combina Search + Display + YouTube + Gmail + Shopping según optimización de Google.'}
+                        {channel === 'SHOPPING' && ' Shopping aparece en Search + la pestaña Shopping.'}
+                        {channel === 'DISPLAY' && ' Display aparece en la Red de Display de Google.'}
+                      </div>
+                    </div>
+                  );
+                }
+                return (
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Google Search</span>
-                      <Switch
-                        checked={settingsData.target_google_search ?? true}
-                        onCheckedChange={val => setSettingsData((p: any) => ({ ...p, target_google_search: val }))}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Red de busqueda</span>
-                      <Switch
-                        checked={settingsData.target_search_network ?? true}
-                        onCheckedChange={val => setSettingsData((p: any) => ({ ...p, target_search_network: val }))}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Red de display</span>
-                      <Switch
-                        checked={settingsData.target_content_network ?? false}
-                        onCheckedChange={val => setSettingsData((p: any) => ({ ...p, target_content_network: val }))}
-                      />
+                    <Label>Redes</Label>
+                    <div className="space-y-2 border rounded-md p-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">Google Search</span>
+                        <Switch
+                          checked={settingsData.target_google_search ?? true}
+                          onCheckedChange={val => setSettingsData((p: any) => ({ ...p, target_google_search: val }))}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">Red de búsqueda (partners)</span>
+                        <Switch
+                          checked={settingsData.target_search_network ?? true}
+                          onCheckedChange={val => setSettingsData((p: any) => ({ ...p, target_search_network: val }))}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">Red de display</span>
+                        <Switch
+                          checked={settingsData.target_content_network ?? false}
+                          onCheckedChange={val => setSettingsData((p: any) => ({ ...p, target_content_network: val }))}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">Partner search network</span>
+                        <Switch
+                          checked={settingsData.target_partner_search_network ?? false}
+                          onCheckedChange={val => setSettingsData((p: any) => ({ ...p, target_partner_search_network: val }))}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
-              {settingsData.start_date && (
-                <p className="text-xs text-muted-foreground">
-                  Inicio: {settingsData.start_date} {settingsData.end_date ? `| Fin: ${settingsData.end_date}` : ''}
-                </p>
-              )}
+              {/* Ubicaciones */}
+              <div className="space-y-2">
+                <Label>Ubicaciones</Label>
+                <div className="grid grid-cols-2 gap-2 border rounded-md p-3">
+                  {locationOptions.map(loc => {
+                    const selected = (settingsData.selected_location_ids || []).includes(loc.id);
+                    return (
+                      <label key={loc.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={e => {
+                            setSettingsData((p: any) => {
+                              const ids: string[] = p.selected_location_ids || [];
+                              const next = e.target.checked ? [...ids, loc.id] : ids.filter(i => i !== loc.id);
+                              return { ...p, selected_location_ids: next };
+                            });
+                          }}
+                        />
+                        {loc.label}
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">Agrega o quita países. Se aplica al guardar.</p>
+              </div>
+
+              {/* Idiomas */}
+              <div className="space-y-2">
+                <Label>Idiomas</Label>
+                <div className="grid grid-cols-2 gap-2 border rounded-md p-3">
+                  {languageOptions.map(lang => {
+                    const selected = (settingsData.selected_language_ids || []).includes(lang.id);
+                    return (
+                      <label key={lang.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={e => {
+                            setSettingsData((p: any) => {
+                              const ids: string[] = p.selected_language_ids || [];
+                              const next = e.target.checked ? [...ids, lang.id] : ids.filter(i => i !== lang.id);
+                              return { ...p, selected_language_ids: next };
+                            });
+                          }}
+                        />
+                        {lang.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Schedule */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Fecha de inicio</Label>
+                  <Input
+                    type="date"
+                    value={settingsData.start_date || ''}
+                    onChange={e => setSettingsData((p: any) => ({ ...p, start_date: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Fecha de fin (opcional)</Label>
+                  <Input
+                    type="date"
+                    value={settingsData.end_date || ''}
+                    onChange={e => setSettingsData((p: any) => ({ ...p, end_date: e.target.value }))}
+                  />
+                </div>
+              </div>
             </div>
           ) : null}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSettingsCampaign(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setSettingsCampaign(null)} disabled={settingsSaving}>Cancelar</Button>
             <Button onClick={handleSaveSettings} disabled={settingsSaving}>
               {settingsSaving && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
               Guardar
@@ -3379,6 +3649,32 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           refreshAssetGroupsForCampaign(campaign_id);
         }}
       />
+
+      {/* Eliminar Grupo de recursos (PMAX) — reemplaza window.confirm */}
+      <Dialog open={!!deleteAgTarget} onOpenChange={(open) => { if (!open && !deleteAgLoading) setDeleteAgTarget(null); }}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Eliminar grupo de recursos</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm">
+              ¿Seguro que quieres eliminar <strong>"{deleteAgTarget?.name}"</strong>?
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Google Ads lo marcará como removido y quedará oculto del panel. Esta acción no se puede deshacer.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteAgTarget(null)} disabled={deleteAgLoading}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmAssetGroupDelete} disabled={deleteAgLoading}>
+              {deleteAgLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

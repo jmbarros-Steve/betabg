@@ -29,6 +29,7 @@ import {
   Play,
   Pencil,
   Trash2,
+  Sparkles,
 } from 'lucide-react';
 import CreateAssetGroupDialog from './CreateAssetGroupDialog';
 
@@ -163,6 +164,25 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
   const [addAssetGroupId, setAddAssetGroupId] = useState<string | null>(null);
   const [addAssetLoading, setAddAssetLoading] = useState(false);
   const [newAsset, setNewAsset] = useState({ field_type: 'HEADLINE', text: '' });
+
+  // Rename / Delete dialogs (reemplazan window.prompt / window.confirm)
+  const [renameTarget, setRenameTarget] = useState<AssetGroup | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameLoading, setRenameLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<AssetGroup | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Steve AI suggest dialog (scorecard accionable)
+  const [steveOpen, setSteveOpen] = useState(false);
+  const [steveGroupId, setSteveGroupId] = useState<string | null>(null);
+  const [steveField, setSteveField] = useState<string>('HEADLINE');
+  const [steveUserIntent, setSteveUserIntent] = useState('');
+  const [steveLoading, setSteveLoading] = useState(false);
+  const [steveAdding, setSteveAdding] = useState(false);
+  const [steveOptions, setSteveOptions] = useState<Array<{ text: string; angle?: string | null }>>([]);
+  const [steveReasoning, setSteveReasoning] = useState<string | null>(null);
+  const [steveSelectedIdx, setSteveSelectedIdx] = useState<number | null>(null);
+  const [steveMaxChars, setSteveMaxChars] = useState<number>(90);
 
   const fetchAssetGroups = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -311,16 +331,46 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     );
   };
 
-  const handleRename = async (group: AssetGroup) => {
-    const newName = window.prompt('Nuevo nombre del grupo de recursos:', group.name);
-    if (!newName || newName.trim() === '' || newName === group.name) return;
-    await handleUpdateAssetGroup(group.id, { name: newName.trim() }, 'Nombre actualizado');
+  const handleRename = (group: AssetGroup) => {
+    setRenameTarget(group);
+    setRenameValue(group.name);
   };
 
-  const handleDelete = async (group: AssetGroup) => {
-    const ok = window.confirm(`¿Eliminar el grupo de recursos "${group.name}"? Esta acción no se puede deshacer.`);
-    if (!ok) return;
-    await handleUpdateAssetGroup(group.id, { status: 'REMOVED' }, 'Grupo de recursos eliminado');
+  const confirmRename = async () => {
+    if (!renameTarget) return;
+    const trimmed = renameValue.trim();
+    if (trimmed === '' || trimmed === renameTarget.name) {
+      setRenameTarget(null);
+      return;
+    }
+    setRenameLoading(true);
+    const ok = await handleUpdateAssetGroup(renameTarget.id, { name: trimmed }, 'Nombre actualizado');
+    setRenameLoading(false);
+    if (ok) setRenameTarget(null);
+  };
+
+  const handleDelete = (group: AssetGroup) => {
+    setDeleteTarget(group);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    const { error } = await callApi('manage-google-pmax', {
+      body: {
+        action: 'remove_asset_group',
+        connection_id: connectionId,
+        asset_group_id: deleteTarget.id,
+      },
+    });
+    setDeleteLoading(false);
+    if (error) {
+      toast.error('Error eliminando grupo de recursos: ' + error);
+      return;
+    }
+    toast.success('Grupo de recursos eliminado');
+    setDeleteTarget(null);
+    fetchAssetGroups({ silent: true });
   };
 
   const handleAddAsset = async () => {
@@ -355,6 +405,105 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
     if (expandedGroup === addAssetGroupId) {
       toggleGroup(addAssetGroupId);
     }
+  };
+
+  // Steve AI suggest: abre dialog y pide sugerencias al backend.
+  const openSteveSuggest = async (groupId: string, fieldType: string) => {
+    setSteveGroupId(groupId);
+    setSteveField(fieldType);
+    setSteveOptions([]);
+    setSteveReasoning(null);
+    setSteveSelectedIdx(null);
+    setSteveUserIntent('');
+    setSteveOpen(true);
+
+    if (fieldType === 'CALL_TO_ACTION_SELECTION') {
+      // CTA: enum fijo, no llama IA
+      const CTA = ['SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'SUBSCRIBE', 'BOOK_NOW',
+                   'GET_QUOTE', 'CONTACT_US', 'APPLY_NOW', 'DOWNLOAD', 'ORDER_NOW', 'BUY_NOW'];
+      setSteveOptions(CTA.map(v => ({ text: v, angle: null })));
+      setSteveMaxChars(40);
+      return;
+    }
+
+    setSteveLoading(true);
+    const { data, error } = await callApi('manage-google-campaign', {
+      body: {
+        action: 'suggest_asset_content',
+        connection_id: connectionId,
+        data: { asset_group_id: groupId, field_type: fieldType, count: 5 },
+      },
+    });
+    setSteveLoading(false);
+
+    if (error) {
+      toast.error('Steve no pudo sugerir: ' + error);
+      return;
+    }
+    setSteveOptions(data?.options || []);
+    setSteveReasoning(data?.reasoning || null);
+    setSteveMaxChars(data?.max_chars || 90);
+  };
+
+  const requestSteveSuggestions = async () => {
+    if (!steveGroupId) return;
+    setSteveLoading(true);
+    const { data, error } = await callApi('manage-google-campaign', {
+      body: {
+        action: 'suggest_asset_content',
+        connection_id: connectionId,
+        data: {
+          asset_group_id: steveGroupId,
+          field_type: steveField,
+          count: 5,
+          user_intent: steveUserIntent || undefined,
+        },
+      },
+    });
+    setSteveLoading(false);
+    if (error) {
+      toast.error('Steve no pudo sugerir: ' + error);
+      return;
+    }
+    setSteveOptions(data?.options || []);
+    setSteveReasoning(data?.reasoning || null);
+    setSteveMaxChars(data?.max_chars || 90);
+    setSteveSelectedIdx(null);
+  };
+
+  const steveAddSelected = async () => {
+    if (!steveGroupId || steveSelectedIdx === null) return;
+    const option = steveOptions[steveSelectedIdx];
+    if (!option?.text) return;
+
+    setSteveAdding(true);
+    const isCta = steveField === 'CALL_TO_ACTION_SELECTION';
+    const { error } = await callApi('manage-google-pmax', {
+      body: {
+        action: 'add_asset',
+        connection_id: connectionId,
+        asset_group_id: steveGroupId,
+        data: isCta
+          ? { field_type: steveField, cta_enum: option.text }
+          : { field_type: steveField, text: option.text.slice(0, steveMaxChars) },
+      },
+    });
+    setSteveAdding(false);
+    if (error) {
+      toast.error('Error agregando asset: ' + error);
+      return;
+    }
+    toast.success('Asset agregado por Steve');
+    // Refresh detail
+    setGroupDetails(prev => {
+      const copy = { ...prev };
+      delete copy[steveGroupId];
+      return copy;
+    });
+    if (expandedGroup === steveGroupId) {
+      toggleGroup(steveGroupId);
+    }
+    setSteveOpen(false);
   };
 
   const handleRemoveAsset = async (groupId: string, asset: AssetDetail) => {
@@ -538,6 +687,8 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                                 <ul className="space-y-1 text-xs">
                                   {missing.slice(0, 6).map(m => {
                                     const canAddInline = TEXT_ADDABLE_FIELDS.has(m.fieldType);
+                                    const canSteveText = canAddInline; // text fields: HEADLINE, LONG_HEADLINE, DESCRIPTION, BUSINESS_NAME
+                                    const canSteveCta = m.fieldType === 'CALL_TO_ACTION_SELECTION';
                                     return (
                                     <li key={m.fieldType} className="flex items-center justify-between gap-2">
                                       <span className="flex items-center gap-1.5">
@@ -546,22 +697,34 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                                           {m.label}: <span className="font-medium">{m.current}/{m.recommended}</span>
                                         </span>
                                       </span>
-                                      {canAddInline ? (
-                                        <button
-                                          className="text-blue-600 hover:underline"
-                                          onClick={() => {
-                                            setAddAssetGroupId(group.id);
-                                            setNewAsset({ field_type: m.fieldType, text: '' });
-                                            setAddAssetOpen(true);
-                                          }}
-                                        >
-                                          + Agregar
-                                        </button>
-                                      ) : (
-                                        <span className="text-muted-foreground/60 text-[11px]" title="Por ahora solo texto se agrega desde acá. Imágenes/videos: agregalos desde Google Ads.">
-                                          desde Google Ads
-                                        </span>
-                                      )}
+                                      <span className="flex items-center gap-2">
+                                        {(canSteveText || canSteveCta) && (
+                                          <button
+                                            className="text-primary hover:underline flex items-center gap-1"
+                                            onClick={() => openSteveSuggest(group.id, m.fieldType)}
+                                            title="Deja que Steve sugiera según tu brief"
+                                          >
+                                            <Sparkles className="w-3 h-3" />
+                                            Steve sugiere
+                                          </button>
+                                        )}
+                                        {canAddInline ? (
+                                          <button
+                                            className="text-blue-600 hover:underline"
+                                            onClick={() => {
+                                              setAddAssetGroupId(group.id);
+                                              setNewAsset({ field_type: m.fieldType, text: '' });
+                                              setAddAssetOpen(true);
+                                            }}
+                                          >
+                                            + Manual
+                                          </button>
+                                        ) : !canSteveCta && (
+                                          <span className="text-muted-foreground/60 text-[11px]" title="Imágenes/videos: agregalos desde Google Ads.">
+                                            desde Google Ads
+                                          </span>
+                                        )}
+                                      </span>
                                     </li>
                                     );
                                   })}
@@ -706,6 +869,173 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
             <Button onClick={handleAddAsset} disabled={addAssetLoading || !newAsset.text}>
               {addAssetLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
               Agregar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Asset Group Dialog */}
+      <Dialog open={!!renameTarget} onOpenChange={(open) => { if (!open && !renameLoading) setRenameTarget(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Renombrar grupo de recursos</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="ag-rename-input">Nombre</Label>
+            <Input
+              id="ag-rename-input"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              maxLength={120}
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter' && !renameLoading) confirmRename(); }}
+            />
+            <p className="text-xs text-muted-foreground">{renameValue.length}/120 chars</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameTarget(null)} disabled={renameLoading}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmRename}
+              disabled={renameLoading || renameValue.trim() === '' || renameValue === renameTarget?.name}
+            >
+              {renameLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Steve AI Suggest Dialog */}
+      <Dialog open={steveOpen} onOpenChange={(open) => { if (!open && !steveAdding) setSteveOpen(open); }}>
+        <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" />
+              Steve sugiere: {fieldTypeLabels[steveField] || steveField}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {steveField !== 'CALL_TO_ACTION_SELECTION' && (
+              <div className="space-y-1">
+                <Label className="text-xs">¿Algo específico que deba enfatizar? (opcional)</Label>
+                <Textarea
+                  value={steveUserIntent}
+                  onChange={e => setSteveUserIntent(e.target.value)}
+                  placeholder="Ej: queremos destacar el envío gratis, o foco en mujeres 25-40..."
+                  maxLength={300}
+                  rows={2}
+                />
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">{steveUserIntent.length}/300</p>
+                  <Button size="sm" variant="outline" onClick={requestSteveSuggestions} disabled={steveLoading}>
+                    {steveLoading ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+                    Regenerar
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {steveLoading ? (
+              <div className="flex items-center gap-2 py-8 justify-center text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Steve está pensando...
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label className="text-xs">Elige una opción (editable)</Label>
+                <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                  {steveOptions.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Sin sugerencias. Prueba dando contexto arriba y Regenerar.
+                    </p>
+                  )}
+                  {steveOptions.map((opt, idx) => {
+                    const selected = steveSelectedIdx === idx;
+                    return (
+                      <div
+                        key={idx}
+                        className={`border rounded-md p-2 cursor-pointer transition-colors ${
+                          selected ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+                        }`}
+                        onClick={() => setSteveSelectedIdx(idx)}
+                      >
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="radio"
+                            checked={selected}
+                            onChange={() => setSteveSelectedIdx(idx)}
+                            className="mt-1"
+                          />
+                          <div className="flex-1 space-y-1">
+                            {selected ? (
+                              <Input
+                                value={opt.text}
+                                maxLength={steveMaxChars}
+                                onChange={e => {
+                                  const v = e.target.value;
+                                  setSteveOptions(prev => prev.map((o, i) => i === idx ? { ...o, text: v } : o));
+                                }}
+                                onClick={e => e.stopPropagation()}
+                              />
+                            ) : (
+                              <p className="text-sm">{opt.text}</p>
+                            )}
+                            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                              {opt.angle && <span className="uppercase">{opt.angle}</span>}
+                              <span>{opt.text.length}/{steveMaxChars} chars</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {steveReasoning && (
+                  <p className="text-[11px] text-muted-foreground italic pt-2 border-t border-border/50">
+                    Steve: {steveReasoning}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSteveOpen(false)} disabled={steveAdding}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={steveAddSelected}
+              disabled={steveAdding || steveLoading || steveSelectedIdx === null}
+            >
+              {steveAdding && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Agregar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Asset Group Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !deleteLoading) setDeleteTarget(null); }}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Eliminar grupo de recursos</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm">
+              ¿Seguro que quieres eliminar <strong>"{deleteTarget?.name}"</strong>?
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Google Ads lo marcará como removido y quedará oculto del panel. Esta acción no se puede deshacer.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleteLoading}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={deleteLoading}>
+              {deleteLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Eliminar
             </Button>
           </DialogFooter>
         </DialogContent>
