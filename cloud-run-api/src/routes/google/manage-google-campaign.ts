@@ -1064,8 +1064,10 @@ async function handleCreateCampaign(
       }
     }
     if (merchant_center_id && validSelectedIds.length > 0) {
-      const rootLgfTempId = tempId--;
-      const rootLgfResource = `customers/${customerId}/assetGroupListingGroupFilters/${rootLgfTempId}`;
+      // LGF resource name en v23 tiene formato compuesto {assetGroupId}~{filterId}.
+      // Temp ID plano '-1' es rechazado. Usamos sentinel 'AGTEMP~-1' que post-primary
+      // se reemplaza por '{realAssetGroupId}~-1' (real asset group + temp filter).
+      const rootLgfResource = `customers/${customerId}/assetGroupListingGroupFilters/AGTEMP~-1`;
       const assetGroupResource = `customers/${customerId}/assetGroups/-3`;
       // Root subdivision node
       mutateOps.push({
@@ -1353,8 +1355,17 @@ async function handleCreateCampaign(
     const tempAssetGroupRef = `customers/${customerId}/assetGroups/${idMap.get('-3') || '-3'}`;
     jsonStr = jsonStr.split(tempAssetGroupRef).join(realAssetGroup);
 
+    // LGF resource names usan formato compuesto {assetGroupId}~{filterId} en v23.
+    // Reemplazamos el sentinel 'AGTEMP~' por '{realAssetGroupId}~' ahora que tenemos el real.
+    const realAssetGroupId = realAssetGroup.split('/').pop() || '';
+    if (/^\d+$/.test(realAssetGroupId)) {
+      jsonStr = jsonStr.split('AGTEMP~').join(`${realAssetGroupId}~`);
+    } else {
+      console.warn(`[manage-google-campaign] LGF: no se pudo extraer assetGroupId numérico de '${realAssetGroup}' — skip sentinel rewrite`);
+    }
+
     const secondaryOps = JSON.parse(jsonStr);
-    console.log(`[manage-google-campaign] secondary batch: ${secondaryOps.length} ops, renumbered ${idMap.size} temp IDs to fresh range`);
+    console.log(`[manage-google-campaign] secondary batch: ${secondaryOps.length} ops, renumbered ${idMap.size} temp IDs to fresh range, LGF assetGroupId=${realAssetGroupId}`);
 
     // AssetGroupListingGroupFilter en Google Ads API v23:
     // - Un SUBDIVISION DEBE tener su child "everything else" (catch-all UNIT_EXCLUDED con
