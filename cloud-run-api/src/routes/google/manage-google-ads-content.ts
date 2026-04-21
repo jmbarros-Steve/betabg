@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { googleAdsQuery, googleAdsMutate, resolveConnectionAndToken } from '../../lib/google-ads-api.js';
 
-type Action = 'list_rsa' | 'create_rsa' | 'pause_ad' | 'enable_ad' | 'list_ad_groups';
+type Action = 'list_rsa' | 'create_rsa' | 'replace_rsa' | 'remove_rsa' | 'pause_ad' | 'enable_ad' | 'list_ad_groups';
 
 interface RequestBody {
   action: Action;
@@ -112,51 +112,50 @@ async function handleListRSA(
   return { body: { success: true, ads }, status: 200 };
 }
 
-async function handleCreateRSA(
-  customerId: string, accessToken: string, developerToken: string,
-  loginCustomerId: string, data: Record<string, any>
-): Promise<{ body: any; status: number }> {
-  const { ad_group_id, headlines, descriptions, final_urls, path1, path2 } = data;
+// Helper compartido entre create_rsa y replace_rsa. Valida límites Google
+// (3-15 headlines, 2-4 descriptions, 30/90 chars) + construye el shape v23
+// con pinnedField (omitido si no hay pin — NO enviar 'UNSPECIFIED' string).
+// Pin enum válido: HEADLINE_1 | HEADLINE_2 | HEADLINE_3 | DESCRIPTION_1 | DESCRIPTION_2
+const VALID_PIN_ENUMS = new Set(['HEADLINE_1', 'HEADLINE_2', 'HEADLINE_3', 'DESCRIPTION_1', 'DESCRIPTION_2']);
 
-  if (!ad_group_id) return { body: { error: 'Missing ad_group_id' }, status: 400 };
-  if (!validateNumericId(ad_group_id)) return { body: { error: 'ad_group_id must be numeric' }, status: 400 };
+function validateRSAPayload(data: Record<string, any>): { ok: false; error: string } | { ok: true; adBody: any } {
+  const { headlines, descriptions, final_urls, path1, path2 } = data;
+
   if (!headlines || !Array.isArray(headlines) || headlines.length < 3 || headlines.length > 15) {
-    return { body: { error: 'headlines must be an array of 3-15 items' }, status: 400 };
+    return { ok: false, error: 'headlines must be an array of 3-15 items' };
   }
   if (!descriptions || !Array.isArray(descriptions) || descriptions.length < 2 || descriptions.length > 4) {
-    return { body: { error: 'descriptions must be an array of 2-4 items' }, status: 400 };
+    return { ok: false, error: 'descriptions must be an array of 2-4 items' };
   }
   if (!final_urls || !Array.isArray(final_urls) || final_urls.length === 0) {
-    return { body: { error: 'At least one final_url is required' }, status: 400 };
+    return { ok: false, error: 'At least one final_url is required' };
   }
 
-  // Validate char limits
   for (const h of headlines) {
     const text = typeof h === 'string' ? h : h.text;
-    if (!text || text.length > 30) {
-      return { body: { error: `Headline "${text}" exceeds 30 character limit` }, status: 400 };
-    }
+    if (!text || typeof text !== 'string') return { ok: false, error: 'Headline text missing' };
+    if (text.length > 30) return { ok: false, error: `Headline "${text}" exceeds 30 character limit` };
   }
   for (const d of descriptions) {
     const text = typeof d === 'string' ? d : d.text;
-    if (!text || text.length > 90) {
-      return { body: { error: `Description exceeds 90 character limit` }, status: 400 };
-    }
+    if (!text || typeof text !== 'string') return { ok: false, error: 'Description text missing' };
+    if (text.length > 90) return { ok: false, error: `Description exceeds 90 character limit` };
   }
 
   const formattedHeadlines = headlines.map((h: any) => {
     const obj: any = { text: typeof h === 'string' ? h : h.text };
-    if (h.pinned_field) obj.pinnedField = h.pinned_field;
+    // Solo setear pinnedField si es un enum válido — nunca UNSPECIFIED ni empty
+    const pin = h.pinned_field;
+    if (pin && typeof pin === 'string' && VALID_PIN_ENUMS.has(pin)) obj.pinnedField = pin;
     return obj;
   });
 
   const formattedDescriptions = descriptions.map((d: any) => {
     const obj: any = { text: typeof d === 'string' ? d : d.text };
-    if (d.pinned_field) obj.pinnedField = d.pinned_field;
+    const pin = d.pinned_field;
+    if (pin && typeof pin === 'string' && VALID_PIN_ENUMS.has(pin)) obj.pinnedField = pin;
     return obj;
   });
-
-  const adGroupResource = `customers/${customerId}/adGroups/${ad_group_id}`;
 
   const adBody: any = {
     responsiveSearchAd: {
@@ -166,14 +165,31 @@ async function handleCreateRSA(
     finalUrls: final_urls,
   };
 
-  if (path1) adBody.responsiveSearchAd.path1 = path1.slice(0, 15);
-  if (path2) adBody.responsiveSearchAd.path2 = path2.slice(0, 15);
+  if (path1 && typeof path1 === 'string') adBody.responsiveSearchAd.path1 = path1.slice(0, 15);
+  if (path2 && typeof path2 === 'string') adBody.responsiveSearchAd.path2 = path2.slice(0, 15);
+
+  return { ok: true, adBody };
+}
+
+async function handleCreateRSA(
+  customerId: string, accessToken: string, developerToken: string,
+  loginCustomerId: string, data: Record<string, any>
+): Promise<{ body: any; status: number }> {
+  const { ad_group_id } = data;
+
+  if (!ad_group_id) return { body: { error: 'Missing ad_group_id' }, status: 400 };
+  if (!validateNumericId(ad_group_id)) return { body: { error: 'ad_group_id must be numeric' }, status: 400 };
+
+  const validation = validateRSAPayload(data);
+  if (!validation.ok) return { body: { error: validation.error }, status: 400 };
+
+  const adGroupResource = `customers/${customerId}/adGroups/${ad_group_id}`;
 
   const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, [{
     adGroupAdOperation: {
       create: {
         adGroup: adGroupResource,
-        ad: adBody,
+        ad: validation.adBody,
         status: 'ENABLED',
       },
     },
@@ -181,6 +197,77 @@ async function handleCreateRSA(
 
   if (!result.ok) return { body: { error: 'Failed to create RSA', details: result.error }, status: 502 };
   return { body: { success: true, message: 'RSA created successfully' }, status: 200 };
+}
+
+// Replace atómico: 1 mutate con create + remove. Google v23 default
+// partialFailure=false garantiza rollback si una op falla (verificado por Isidora).
+// NO usa temp IDs (distinto de LGF PMAX) — son 2 ops independientes.
+async function handleReplaceRSA(
+  customerId: string, accessToken: string, developerToken: string,
+  loginCustomerId: string, data: Record<string, any>
+): Promise<{ body: any; status: number }> {
+  const { ad_group_id, old_ad_resource_name } = data;
+
+  if (!ad_group_id) return { body: { error: 'Missing ad_group_id' }, status: 400 };
+  if (!validateNumericId(ad_group_id)) return { body: { error: 'ad_group_id must be numeric' }, status: 400 };
+  if (!old_ad_resource_name || typeof old_ad_resource_name !== 'string') {
+    return { body: { error: 'Missing old_ad_resource_name' }, status: 400 };
+  }
+
+  // Valida shape: customers/{cid}/adGroupAds/{adGroupId}~{adId}
+  const compoundMatch = old_ad_resource_name.match(/^customers\/\d+\/adGroupAds\/\d+~\d+$/);
+  if (!compoundMatch) {
+    return { body: { error: `old_ad_resource_name shape inválido: ${old_ad_resource_name}. Esperado: customers/{cid}/adGroupAds/{adGroupId}~{adId}` }, status: 400 };
+  }
+
+  const validation = validateRSAPayload(data);
+  if (!validation.ok) return { body: { error: validation.error }, status: 400 };
+
+  const adGroupResource = `customers/${customerId}/adGroups/${ad_group_id}`;
+
+  const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, [
+    {
+      adGroupAdOperation: {
+        create: {
+          adGroup: adGroupResource,
+          ad: validation.adBody,
+          status: 'ENABLED',
+        },
+      },
+    },
+    {
+      adGroupAdOperation: {
+        remove: old_ad_resource_name,
+      },
+    },
+  ]);
+
+  if (!result.ok) return { body: { error: 'Failed to replace RSA', details: result.error }, status: 502 };
+  return { body: { success: true, message: 'RSA replaced atomically' }, status: 200 };
+}
+
+// Remove RSA: operation.remove con resource_name compound validado.
+async function handleRemoveRSA(
+  customerId: string, accessToken: string, developerToken: string,
+  loginCustomerId: string, data: Record<string, any>
+): Promise<{ body: any; status: number }> {
+  const { ad_resource_name } = data;
+  if (!ad_resource_name || typeof ad_resource_name !== 'string') {
+    return { body: { error: 'Missing ad_resource_name' }, status: 400 };
+  }
+  const compoundMatch = ad_resource_name.match(/^customers\/\d+\/adGroupAds\/\d+~\d+$/);
+  if (!compoundMatch) {
+    return { body: { error: `ad_resource_name shape inválido: ${ad_resource_name}` }, status: 400 };
+  }
+
+  const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, [{
+    adGroupAdOperation: {
+      remove: ad_resource_name,
+    },
+  }]);
+
+  if (!result.ok) return { body: { error: 'Failed to remove RSA', details: result.error }, status: 502 };
+  return { body: { success: true, message: 'RSA removed' }, status: 200 };
 }
 
 async function handlePauseEnableAd(
@@ -268,7 +355,7 @@ export async function manageGoogleAdsContent(c: Context) {
     if (!action) return c.json({ error: 'Missing required field: action' }, 400);
     if (!connection_id) return c.json({ error: 'Missing required field: connection_id' }, 400);
 
-    const validActions: Action[] = ['list_rsa', 'create_rsa', 'pause_ad', 'enable_ad', 'list_ad_groups'];
+    const validActions: Action[] = ['list_rsa', 'create_rsa', 'replace_rsa', 'remove_rsa', 'pause_ad', 'enable_ad', 'list_ad_groups'];
     if (!validActions.includes(action)) {
       return c.json({ error: `Invalid action: ${action}. Valid: ${validActions.join(', ')}` }, 400);
     }
@@ -290,6 +377,12 @@ export async function manageGoogleAdsContent(c: Context) {
         break;
       case 'create_rsa':
         result = await handleCreateRSA(customerId, accessToken, developerToken, loginCustomerId, data || {});
+        break;
+      case 'replace_rsa':
+        result = await handleReplaceRSA(customerId, accessToken, developerToken, loginCustomerId, data || {});
+        break;
+      case 'remove_rsa':
+        result = await handleRemoveRSA(customerId, accessToken, developerToken, loginCustomerId, data || {});
         break;
       case 'pause_ad':
         result = await handlePauseEnableAd(customerId, accessToken, developerToken, loginCustomerId, data || {}, 'PAUSED');

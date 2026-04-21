@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Link2, BarChart3, FileText, Megaphone, Zap, KeyRound, Type, Puzzle, Target, Lock, Rocket } from 'lucide-react';
+import { Link2, BarChart3, FileText, Megaphone, Zap, KeyRound, Type, Puzzle, Target, Lock, Rocket, Search } from 'lucide-react';
 import GoogleAnalyticsDashboard from './GoogleAnalyticsDashboard';
 import GoogleAccountInfo from './GoogleAccountInfo';
 import GoogleCampaignManager from './GoogleCampaignManager';
@@ -13,6 +13,7 @@ import GoogleAdManager from './GoogleAdManager';
 import GoogleExtensionManager from './GoogleExtensionManager';
 import GoogleConversionSetup from './GoogleConversionSetup';
 import GooglePmaxManager from './GooglePmaxManager';
+import GoogleAdGroupsSearchManager from './GoogleAdGroupsSearchManager';
 import { GoogleAdsGenerator } from '@/components/client-portal/GoogleAdsGenerator';
 import { PlanGate } from '@/components/client-portal/PlanGate';
 import { useUserPlan } from '@/hooks/useUserPlan';
@@ -21,7 +22,7 @@ interface GoogleAdsTabProps {
   clientId: string;
 }
 
-type SubTab = 'analytics' | 'campaigns' | 'pmax' | 'keywords' | 'ads' | 'extensions' | 'conversions' | 'rules' | 'copys';
+type SubTab = 'analytics' | 'campaigns' | 'pmax' | 'search-adgroups' | 'keywords' | 'ads' | 'extensions' | 'conversions' | 'rules' | 'copys';
 
 /** Sub-tabs that require a specific plan */
 const SUB_TAB_FEATURE: Partial<Record<SubTab, string>> = {
@@ -98,6 +99,7 @@ export default function GoogleAdsTab({ clientId }: GoogleAdsTabProps) {
     { key: 'analytics', label: 'Analiticas', icon: <BarChart3 className="w-4 h-4" /> },
     { key: 'campaigns', label: 'Campanas', icon: <Megaphone className="w-4 h-4" /> },
     { key: 'pmax', label: 'Grupos de recursos PMAX', icon: <Rocket className="w-4 h-4" /> },
+    { key: 'search-adgroups', label: 'Ad Groups Search', icon: <Search className="w-4 h-4" /> },
     { key: 'keywords', label: 'Keywords', icon: <KeyRound className="w-4 h-4" /> },
     { key: 'ads', label: 'Anuncios', icon: <Type className="w-4 h-4" /> },
     { key: 'extensions', label: 'Extensiones', icon: <Puzzle className="w-4 h-4" /> },
@@ -155,6 +157,12 @@ export default function GoogleAdsTab({ clientId }: GoogleAdsTabProps) {
       )}
       {subTab === 'pmax' && (
         <GooglePmaxManager
+          connectionId={connectionId}
+          clientId={clientId}
+        />
+      )}
+      {subTab === 'search-adgroups' && (
+        <GoogleAdGroupsSearchManager
           connectionId={connectionId}
           clientId={clientId}
         />
