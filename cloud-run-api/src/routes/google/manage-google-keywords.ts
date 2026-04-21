@@ -529,19 +529,39 @@ async function handleGetAdGroupDetail(
         AND ad_group_ad.ad.type = 'RESPONSIVE_SEARCH_AD'
         AND ad_group_ad.status != 'REMOVED'
     `),
-    googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, `
-      SELECT
+    // Extensions: Google v23 rechaza el SELECT combinado con call_asset/price_asset
+    // cuando el ad_group_asset incluye otros types. Dividimos en queries por field_type
+    // y las corremos en paralelo — si una falla, warnings[] lo indica pero el resto carga.
+    (async () => {
+      const baseSel = `
         ad_group_asset.resource_name, ad_group_asset.field_type, ad_group_asset.status,
-        asset.resource_name, asset.type, asset.name,
-        asset.sitelink_asset.link_text, asset.sitelink_asset.description1, asset.sitelink_asset.description2,
-        asset.callout_asset.callout_text,
-        asset.structured_snippet_asset.header, asset.structured_snippet_asset.values,
-        asset.call_asset.phone_number,
-        asset.price_asset.type
-      FROM ad_group_asset
-      WHERE ad_group.id = ${adGroupId}
-        AND ad_group_asset.status != 'REMOVED'
-    `),
+        asset.resource_name, asset.type, asset.name
+      `;
+      const queries = [
+        { ft: 'SITELINK', sel: `${baseSel}, asset.sitelink_asset.link_text, asset.sitelink_asset.description1, asset.sitelink_asset.description2` },
+        { ft: 'CALLOUT', sel: `${baseSel}, asset.callout_asset.callout_text` },
+        { ft: 'STRUCTURED_SNIPPET', sel: `${baseSel}, asset.structured_snippet_asset.header, asset.structured_snippet_asset.values` },
+      ];
+      const results = await Promise.all(queries.map(q =>
+        googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, `
+          SELECT ${q.sel}
+          FROM ad_group_asset
+          WHERE ad_group.id = ${adGroupId}
+            AND ad_group_asset.field_type = '${q.ft}'
+            AND ad_group_asset.status != 'REMOVED'
+        `)
+      ));
+      const merged: any[] = [];
+      let anyFail = false;
+      let lastError = '';
+      for (const r of results) {
+        if (r.ok && Array.isArray(r.data)) merged.push(...r.data);
+        else { anyFail = true; lastError = r.error || ''; }
+      }
+      return anyFail && merged.length === 0
+        ? { ok: false, error: lastError, data: undefined }
+        : { ok: true, data: merged };
+    })(),
   ]);
 
   if (!kwRes.ok) warnings.push('Keywords no disponibles: ' + (kwRes.error || 'error'));
@@ -593,7 +613,7 @@ async function handleGetAdGroupDetail(
 
   // Extensions agrupadas por field_type
   const extensions: Record<string, any[]> = {
-    SITELINK: [], CALLOUT: [], STRUCTURED_SNIPPET: [], CALL: [], PRICE: [],
+    SITELINK: [], CALLOUT: [], STRUCTURED_SNIPPET: [],
   };
   for (const row of extRes.data || []) {
     const ft = row.adGroupAsset?.fieldType;
@@ -614,8 +634,6 @@ async function handleGetAdGroupDetail(
       snippet: row.asset?.structuredSnippetAsset
         ? { header: row.asset.structuredSnippetAsset.header, values: row.asset.structuredSnippetAsset.values }
         : undefined,
-      phone_number: row.asset?.callAsset?.phoneNumber,
-      price_type: row.asset?.priceAsset?.type,
     });
   }
 
