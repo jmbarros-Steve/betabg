@@ -103,13 +103,14 @@ const statusColors: Record<string, string> = {
   REMOVED: 'bg-red-500/10 text-red-500 border-red-500/20',
 };
 
+// TARGET_CPA y TARGET_ROAS standard están deprecated por Google en cuentas con portfolio
+// bid strategies. Se usan las variantes MAXIMIZE_* con target_cpa/target_roas opcional
+// como soft target — mismo comportamiento, sin bloqueo.
 const bidStrategies = [
-  { value: 'MAXIMIZE_CONVERSIONS', label: 'Maximizar conversiones' },
+  { value: 'MAXIMIZE_CONVERSIONS', label: 'Maximizar conversiones (CPA opcional)' },
+  { value: 'MAXIMIZE_CONVERSION_VALUE', label: 'Maximizar valor (ROAS opcional)' },
   { value: 'MAXIMIZE_CLICKS', label: 'Maximizar clics' },
-  { value: 'TARGET_CPA', label: 'CPA objetivo' },
-  { value: 'TARGET_ROAS', label: 'ROAS objetivo' },
   { value: 'MANUAL_CPC', label: 'CPC manual' },
-  { value: 'MAXIMIZE_CONVERSION_VALUE', label: 'Maximizar valor' },
 ];
 
 const locationOptions = [
@@ -530,8 +531,6 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   const [wizardLoading, setWizardLoading] = useState(false);
   const [wizardProgress, setWizardProgress] = useState('');
   const [steveBusy, setSteveBusy] = useState<null | 'keywords' | 'headlines' | 'descriptions'>(null);
-  const [diagnoseLoading, setDiagnoseLoading] = useState(false);
-  const [diagnoseResult, setDiagnoseResult] = useState<any>(null);
   const [wizardData, setWizardData] = useState({
     name: '',
     channel_type: 'SEARCH',
@@ -2767,77 +2766,6 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 </div>
               )}
 
-              {(wizardData.bid_strategy === 'TARGET_CPA' || wizardData.bid_strategy === 'TARGET_ROAS') && (
-                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300 space-y-2">
-                  <div>
-                    <strong>⚠️ Estrategia estricta:</strong> Google puede rechazar {wizardData.bid_strategy === 'TARGET_CPA' ? 'CPA objetivo' : 'ROAS objetivo'} si la cuenta no tiene value tracking en sus conversiones o pide Portfolio Bid Strategy.
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs gap-1.5"
-                      disabled={diagnoseLoading}
-                      onClick={async () => {
-                        setDiagnoseLoading(true);
-                        try {
-                          const { data, error } = await callApi('manage-google-campaign', {
-                            body: { action: 'diagnose_bid_strategy', connection_id: connectionId, data: { client_id: clientId } },
-                          });
-                          if (error) { toast.error('Diagnóstico: ' + error); return; }
-                          setDiagnoseResult(data?.diagnosis || null);
-                        } finally {
-                          setDiagnoseLoading(false);
-                        }
-                      }}
-                    >
-                      {diagnoseLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
-                      {diagnoseLoading ? 'Diagnosticando...' : 'Diagnosticar cuenta'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => setWizardData(prev => ({
-                        ...prev,
-                        bid_strategy: wizardData.bid_strategy === 'TARGET_CPA' ? 'MAXIMIZE_CONVERSIONS' : 'MAXIMIZE_CONVERSION_VALUE',
-                      }))}
-                    >
-                      Cambiar a {wizardData.bid_strategy === 'TARGET_CPA' ? 'Maximizar conversiones' : 'Maximizar valor'}
-                    </Button>
-                  </div>
-                  {diagnoseResult && (
-                    <div className="mt-2 rounded border border-amber-600/30 bg-background/60 p-2 text-[11px] space-y-1.5 text-foreground">
-                      <div className="grid grid-cols-2 gap-1">
-                        <div>Conversiones 30d: <strong>{diagnoseResult.total_conversions_30d?.toFixed(1) || 0}</strong></div>
-                        <div>Valor 30d: <strong>${diagnoseResult.total_conversions_value_30d?.toFixed(2) || 0}</strong></div>
-                        <div>Value tracking: <strong>{diagnoseResult.has_value_tracking ? 'Sí' : 'No'}</strong></div>
-                        <div>Portfolios: <strong>{diagnoseResult.portfolio_strategies?.length || 0}</strong></div>
-                        <div>Cross-account: <strong>{diagnoseResult.cross_account_conversion_tracking ? 'Sí' : 'No'}</strong></div>
-                        <div>Tracking: <strong>{diagnoseResult.account_conversion_tracking_status || 'N/A'}</strong></div>
-                      </div>
-                      {diagnoseResult.blockers?.length > 0 && (
-                        <div>
-                          <div className="font-semibold text-red-600 dark:text-red-400">Blockers:</div>
-                          <ul className="list-disc ml-4 space-y-0.5">
-                            {diagnoseResult.blockers.map((b: string, i: number) => <li key={i}>{b}</li>)}
-                          </ul>
-                        </div>
-                      )}
-                      {diagnoseResult.recommendations?.length > 0 && (
-                        <div>
-                          <div className="font-semibold">Recomendaciones:</div>
-                          <ul className="list-disc ml-4 space-y-0.5">
-                            {diagnoseResult.recommendations.map((r: string, i: number) => <li key={i}>{r}</li>)}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
               </div>
 
               {wizardData.channel_type === 'SEARCH' && (
