@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Link2, BarChart3, FileText, Megaphone, Zap, Target, Lock, Rocket, Search } from 'lucide-react';
+import { Link2, BarChart3, FileText, Megaphone, Zap, Target, Lock, Rocket, Search, ShoppingCart } from 'lucide-react';
 import GoogleAnalyticsDashboard from './GoogleAnalyticsDashboard';
 import GoogleAccountInfo from './GoogleAccountInfo';
 import GoogleCampaignManager from './GoogleCampaignManager';
@@ -13,6 +13,7 @@ import GoogleConversionSetup from './GoogleConversionSetup';
 import GooglePmaxManager from './GooglePmaxManager';
 import GoogleAdGroupsSearchManager from './GoogleAdGroupsSearchManager';
 import GoogleSearchTermsManager from './GoogleSearchTermsManager';
+import GoogleShoppingManager from './GoogleShoppingManager';
 import { GoogleAdsGenerator } from '@/components/client-portal/GoogleAdsGenerator';
 import { PlanGate } from '@/components/client-portal/PlanGate';
 import { useUserPlan } from '@/hooks/useUserPlan';
@@ -21,7 +22,7 @@ interface GoogleAdsTabProps {
   clientId: string;
 }
 
-type SubTab = 'analytics' | 'campaigns' | 'pmax' | 'search-adgroups' | 'search-terms' | 'keywords' | 'ads' | 'extensions' | 'conversions' | 'rules' | 'copys';
+type SubTab = 'analytics' | 'campaigns' | 'pmax' | 'search-adgroups' | 'search-terms' | 'shopping' | 'keywords' | 'ads' | 'extensions' | 'conversions' | 'rules' | 'copys';
 
 /** Sub-tabs that require a specific plan */
 const SUB_TAB_FEATURE: Partial<Record<SubTab, string>> = {
@@ -100,6 +101,7 @@ export default function GoogleAdsTab({ clientId }: GoogleAdsTabProps) {
     { key: 'pmax', label: 'Grupos de recursos PMAX', icon: <Rocket className="w-4 h-4" /> },
     { key: 'search-adgroups', label: 'Ad Groups Search', icon: <Search className="w-4 h-4" /> },
     { key: 'search-terms', label: 'Search Terms', icon: <Search className="w-4 h-4" /> },
+    { key: 'shopping', label: 'Shopping', icon: <ShoppingCart className="w-4 h-4" /> },
     // Keywords/Anuncios/Extensiones removidos — todo unificado en "Ad Groups Search"
     // Los componentes legacy (GoogleKeywordManager, GoogleAdManager, GoogleExtensionManager)
     // siguen en el código pero ya no aparecen en el menú.
@@ -169,6 +171,12 @@ export default function GoogleAdsTab({ clientId }: GoogleAdsTabProps) {
       )}
       {subTab === 'search-terms' && (
         <GoogleSearchTermsManager
+          connectionId={connectionId}
+          clientId={clientId}
+        />
+      )}
+      {subTab === 'shopping' && (
+        <GoogleShoppingManager
           connectionId={connectionId}
           clientId={clientId}
         />

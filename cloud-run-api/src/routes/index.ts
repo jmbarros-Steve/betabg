@@ -73,6 +73,7 @@ import { manageGoogleAdsContent } from './google/manage-google-ads-content.js';
 import { manageGoogleExtensions } from './google/manage-google-extensions.js';
 import { manageGoogleConversions } from './google/manage-google-conversions.js';
 import { manageGooglePmax } from './google/manage-google-pmax.js';
+import { manageGoogleShopping } from './google/manage-google-shopping.js';
 
 // Phase 3: Other
 import { storePlatformConnection } from './utilities/store-platform-connection.js';
@@ -434,6 +435,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/manage-google-extensions', authMiddleware, manageGoogleExtensions);
   app.post('/api/manage-google-conversions', authMiddleware, manageGoogleConversions);
   app.post('/api/manage-google-pmax', authMiddleware, manageGooglePmax);
+  app.post('/api/manage-google-shopping', authMiddleware, manageGoogleShopping);
   app.post('/api/store-platform-connection', authMiddleware, storePlatformConnection);
 
   // ============================================================
