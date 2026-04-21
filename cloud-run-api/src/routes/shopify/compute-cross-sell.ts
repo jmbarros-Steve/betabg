@@ -77,7 +77,7 @@ export async function computeCrossSell(c: Context) {
       'Content-Type': 'application/json',
     };
 
-    const SHOPIFY_API_VERSION = '2025-01';
+    const SHOPIFY_API_VERSION = '2026-04';
 
     // Paginated fetch helper
     async function fetchAllPages<T>(initialUrl: string, key: string): Promise<T[]> {

@@ -203,7 +203,7 @@ export async function shopifySessionValidate(c: Context) {
         installed: false,
         requiresOAuth: true,
         message: 'Shop not connected to Steve. Please install the app first.',
-        installUrl: `${process.env.SUPABASE_URL}/functions/v1/shopify-install?shop=${shopDomain}`
+        installUrl: `${process.env.SELF_URL || 'https://steve-api-850416724643.us-central1.run.app'}/api/shopify-install?shop=${shopDomain}`
       });
     }
 

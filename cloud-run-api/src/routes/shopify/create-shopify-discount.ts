@@ -104,7 +104,7 @@ export async function createShopifyDiscount(c: Context) {
         },
       };
 
-      const res = await fetch(`https://${shopDomain}/admin/api/2024-01/graphql.json`, {
+      const res = await fetch(`https://${shopDomain}/admin/api/2026-04/graphql.json`, {
         method: 'POST',
         headers: { 'X-Shopify-Access-Token': tokenData, 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: freeShippingMutation, variables: freeShippingVars }),
@@ -175,7 +175,7 @@ export async function createShopifyDiscount(c: Context) {
       },
     };
 
-    const shopifyResponse = await fetch(`https://${shopDomain}/admin/api/2024-01/graphql.json`, {
+    const shopifyResponse = await fetch(`https://${shopDomain}/admin/api/2026-04/graphql.json`, {
       method: 'POST',
       headers: { 'X-Shopify-Access-Token': tokenData, 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: mutation, variables }),

@@ -78,7 +78,7 @@ export async function storeShopifyToken(c: Context) {
     let shopName = '';
     try {
       const verifyRes = await fetch(
-        `https://${normalizedDomain}/admin/api/2024-01/shop.json`,
+        `https://${normalizedDomain}/admin/api/2026-04/shop.json`,
         {
           headers: {
             'X-Shopify-Access-Token': trimmedToken,

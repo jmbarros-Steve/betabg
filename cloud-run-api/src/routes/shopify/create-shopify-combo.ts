@@ -130,7 +130,7 @@ ${products.map((p: any) => `  <li><strong>${p.title}</strong> — $${Math.round(
       },
     };
 
-    const createUrl = `https://${cleanStoreUrl}/admin/api/2025-01/products.json`;
+    const createUrl = `https://${cleanStoreUrl}/admin/api/2026-04/products.json`;
     const res = await fetch(createUrl, {
       method: 'POST',
       headers,

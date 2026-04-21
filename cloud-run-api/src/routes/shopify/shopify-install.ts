@@ -238,8 +238,8 @@ export async function shopifyInstall(c: Context) {
     });
     const state = btoa(statePayload);
 
-    // Build Shopify OAuth URL
-    const scopes = 'read_orders,read_analytics,write_discounts,read_discounts,read_checkouts,read_products,read_customers,write_script_tags';
+    // Build Shopify OAuth URL — scopes MUST match exactly what's configured in Partner Dashboard
+    const scopes = 'read_analytics,read_checkouts,read_customers,read_discounts,write_discounts,read_fulfillments,write_inventory,read_inventory,read_orders,read_products,write_products,write_script_tags';
 
     // Derive the callback URL — fix protocol for Cloud Run (behind HTTPS LB)
     const rawUrl = new URL(c.req.url);

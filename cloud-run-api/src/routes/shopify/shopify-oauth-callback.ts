@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-const SHOPIFY_API_VERSION = '2025-01';
+const SHOPIFY_API_VERSION = '2026-04';
 
 function generatePassword(length = 16): string {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
@@ -167,7 +167,7 @@ async function resolveShopifyCredentials(
  * NO auth middleware — uses Shopify HMAC verification (GET) and state/nonce CSRF protection.
  */
 export async function shopifyOauthCallback(c: Context) {
-  const frontendUrl = process.env.FRONTEND_URL || 'https://betabgnuevosupa-git-main-jmbarros-steves-projects.vercel.app';
+  const frontendUrl = process.env.FRONTEND_URL || 'https://betabgnuevosupa.vercel.app';
 
   try {
     const isDirectRedirect = c.req.method === 'GET';

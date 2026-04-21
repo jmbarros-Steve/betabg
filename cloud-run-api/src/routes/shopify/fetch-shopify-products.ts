@@ -171,7 +171,7 @@ export async function fetchShopifyProducts(c: Context) {
     const cleanStoreUrl = store_url.replace(/^https?:\/\//, '');
 
     // Fetch products from Shopify (including body_html for SEO analysis)
-    const shopifyUrl = `https://${cleanStoreUrl}/admin/api/2024-01/products.json?limit=250&fields=id,title,handle,status,variants,images,product_type,body_html`;
+    const shopifyUrl = `https://${cleanStoreUrl}/admin/api/2026-04/products.json?limit=250&fields=id,title,handle,status,variants,images,product_type,body_html`;
 
     console.log('[fetch-shopify-products] Fetching from:', cleanStoreUrl);
 
@@ -209,7 +209,7 @@ export async function fetchShopifyProducts(c: Context) {
       for (let i = 0; i < inventoryItemIds.length; i += batchSize) {
         const batchIds = inventoryItemIds.slice(i, i + batchSize).join(',');
         if (!batchIds) continue;
-        const invUrl = `https://${cleanStoreUrl}/admin/api/2024-01/inventory_items.json?ids=${batchIds}`;
+        const invUrl = `https://${cleanStoreUrl}/admin/api/2026-04/inventory_items.json?ids=${batchIds}`;
 
         const invController = new AbortController();
         const invTimeout = setTimeout(() => invController.abort(), 30_000);

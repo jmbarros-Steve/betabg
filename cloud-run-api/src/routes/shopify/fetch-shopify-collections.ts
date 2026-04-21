@@ -50,7 +50,7 @@ export async function fetchShopifyCollections(c: Context) {
 
     // If collectionId provided, fetch products in that collection
     if (collectionId) {
-      const productsUrl = `https://${shopDomain}/admin/api/2024-01/collections/${collectionId}/products.json?limit=250&fields=id,title,handle,images,variants`;
+      const productsUrl = `https://${shopDomain}/admin/api/2026-04/collections/${collectionId}/products.json?limit=250&fields=id,title,handle,images,variants`;
       const res = await fetch(productsUrl, { headers: shopifyHeaders });
 
       if (!res.ok) {
@@ -74,8 +74,8 @@ export async function fetchShopifyCollections(c: Context) {
 
     // Otherwise, list all collections (custom + smart)
     const [customRes, smartRes] = await Promise.all([
-      fetch(`https://${shopDomain}/admin/api/2024-01/custom_collections.json?limit=250&fields=id,title,handle,image,products_count`, { headers: shopifyHeaders }),
-      fetch(`https://${shopDomain}/admin/api/2024-01/smart_collections.json?limit=250&fields=id,title,handle,image,products_count`, { headers: shopifyHeaders }),
+      fetch(`https://${shopDomain}/admin/api/2026-04/custom_collections.json?limit=250&fields=id,title,handle,image,products_count`, { headers: shopifyHeaders }),
+      fetch(`https://${shopDomain}/admin/api/2026-04/smart_collections.json?limit=250&fields=id,title,handle,image,products_count`, { headers: shopifyHeaders }),
     ]);
 
     const customData: any = customRes.ok ? await customRes.json() : { custom_collections: [] };

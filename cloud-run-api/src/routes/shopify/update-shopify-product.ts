@@ -110,7 +110,7 @@ export async function updateShopifyProduct(c: Context) {
         productPayload.product.variants = [{ id: variant_id, price: String(price) }];
       }
 
-      const productUrl = `https://${cleanStoreUrl}/admin/api/2024-01/products/${productId}.json`;
+      const productUrl = `https://${cleanStoreUrl}/admin/api/2026-04/products/${productId}.json`;
       const productRes = await fetch(productUrl, {
         method: 'PUT',
         headers,
@@ -132,7 +132,7 @@ export async function updateShopifyProduct(c: Context) {
     // === Update inventory quantity ===
     if (inventory_quantity !== undefined && inventory_item_id) {
       // First, get available locations
-      const locationsUrl = `https://${cleanStoreUrl}/admin/api/2024-01/locations.json`;
+      const locationsUrl = `https://${cleanStoreUrl}/admin/api/2026-04/locations.json`;
       const locationsRes = await fetch(locationsUrl, { headers });
 
       if (!locationsRes.ok) {
@@ -146,7 +146,7 @@ export async function updateShopifyProduct(c: Context) {
         return c.json({ error: 'No locations found' }, 500);
       }
 
-      const inventoryUrl = `https://${cleanStoreUrl}/admin/api/2024-01/inventory_levels/set.json`;
+      const inventoryUrl = `https://${cleanStoreUrl}/admin/api/2026-04/inventory_levels/set.json`;
       const inventoryRes = await fetch(inventoryUrl, {
         method: 'POST',
         headers,

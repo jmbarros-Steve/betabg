@@ -99,7 +99,7 @@ export async function fetchShopifyAnalytics(c: Context) {
       ? Math.ceil((new Date().getTime() - sinceDate.getTime()) / (1000 * 60 * 60 * 24))
       : daysBack;
 
-    const SHOPIFY_API_VERSION = '2025-01';
+    const SHOPIFY_API_VERSION = '2026-04';
 
     // Paginated fetch helper — follows Shopify's Link header pagination
     async function fetchAllPages<T>(initialUrl: string, key: string): Promise<T[]> {

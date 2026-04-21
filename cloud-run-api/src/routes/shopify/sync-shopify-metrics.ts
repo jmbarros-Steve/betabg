@@ -126,7 +126,7 @@ export async function syncShopifyMetrics(c: Context) {
     const cleanStoreUrl = store_url.replace(/^https?:\/\//, '');
     console.log('Fetching orders from Shopify:', cleanStoreUrl);
 
-    const SHOPIFY_API_VERSION = '2025-01';
+    const SHOPIFY_API_VERSION = '2026-04';
     const shopifyHeaders = {
       'X-Shopify-Access-Token': decryptedToken,
       'Content-Type': 'application/json',

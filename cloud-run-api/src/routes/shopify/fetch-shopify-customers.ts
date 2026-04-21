@@ -85,7 +85,7 @@ export async function fetchShopifyCustomers(c: Context) {
 
     // === ACTION: customer orders ===
     if (action === 'orders' && customerId) {
-      const ordersUrl = `https://${cleanStoreUrl}/admin/api/2024-01/customers/${customerId}/orders.json?limit=50&status=any`;
+      const ordersUrl = `https://${cleanStoreUrl}/admin/api/2026-04/customers/${customerId}/orders.json?limit=50&status=any`;
       const ordersRes = await fetch(ordersUrl, { headers });
 
       if (!ordersRes.ok) {
@@ -112,7 +112,7 @@ export async function fetchShopifyCustomers(c: Context) {
     }
 
     // === ACTION: list customers ===
-    const customersUrl = `https://${cleanStoreUrl}/admin/api/2024-01/customers.json?limit=250&order=last_order_date+DESC`;
+    const customersUrl = `https://${cleanStoreUrl}/admin/api/2026-04/customers.json?limit=250&order=last_order_date+DESC`;
     const customersRes = await fetch(customersUrl, { headers });
 
     if (!customersRes.ok) {
