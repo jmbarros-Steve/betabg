@@ -84,38 +84,40 @@ export async function shopifyInstall(c: Context) {
     let shopifyClientSecret: string = '';
 
     if (perClientId) {
-      // Per-client mode: look up credentials from platform_connections
-      const { data: conn, error: connError } = await supabaseAdmin
+      // Per-client mode (custom app): intenta credenciales del cliente; si no hay, cae al modo centralizado (public app).
+      const { data: conn } = await supabaseAdmin
         .from('platform_connections')
         .select('shopify_client_id, shopify_client_secret_encrypted')
         .eq('client_id', perClientId)
         .eq('platform', 'shopify')
-        .single();
+        .maybeSingle();
 
-      if (connError || !conn?.shopify_client_id || !conn?.shopify_client_secret_encrypted) {
-        console.error('Per-client Shopify credentials not found for client:', perClientId);
-        return c.html(
-          '<html><body><h1>Error</h1><p>Shopify credentials not found for this client. Please configure them first.</p></body></html>',
-          400,
-        );
+      if (conn?.shopify_client_id && conn?.shopify_client_secret_encrypted) {
+        const { data: decryptedSecret, error: decryptError } = await supabaseAdmin
+          .rpc('decrypt_platform_token', { encrypted_token: conn.shopify_client_secret_encrypted });
+
+        if (!decryptError && decryptedSecret) {
+          shopifyClientId = conn.shopify_client_id;
+          shopifyClientSecret = decryptedSecret;
+          console.log('Using per-client (custom app) Shopify credentials for client:', perClientId);
+        } else {
+          console.warn('Per-client creds present but decrypt failed; falling back to centralized:', decryptError);
+        }
+      } else {
+        console.log('No per-client Shopify creds for client', perClientId, '— using centralized env vars (public app).');
       }
 
-      shopifyClientId = conn.shopify_client_id;
-
-      // Decrypt the client secret
-      const { data: decryptedSecret, error: decryptError } = await supabaseAdmin
-        .rpc('decrypt_platform_token', { encrypted_token: conn.shopify_client_secret_encrypted });
-
-      if (decryptError || !decryptedSecret) {
-        console.error('Error decrypting Shopify client secret:', decryptError);
-        return c.html(
-          '<html><body><h1>Error</h1><p>Error decrypting Shopify credentials</p></body></html>',
-          500,
-        );
+      // Fallback centralizado (public app del App Store)
+      if (!shopifyClientId || !shopifyClientSecret) {
+        shopifyClientId = process.env.SHOPIFY_CLIENT_ID || '';
+        shopifyClientSecret = process.env.SHOPIFY_CLIENT_SECRET || '';
+        if (!shopifyClientId || !shopifyClientSecret) {
+          return c.html(
+            '<html><body><h1>Error</h1><p>Shopify credentials not configured. Please set up your Shopify connection in Steve first.</p></body></html>',
+            400,
+          );
+        }
       }
-
-      shopifyClientSecret = decryptedSecret;
-      console.log('Using per-client Shopify credentials for client:', perClientId);
     } else {
       // No client_id param — try looking up by shop_domain first (install-link flow)
       let foundByShop = false;
