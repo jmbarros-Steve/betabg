@@ -1799,6 +1799,15 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   // Wizard step helpers
   const isPmax = wizardData.channel_type === 'PERFORMANCE_MAX';
   const isSearchWizard = wizardData.channel_type === 'SEARCH';
+  const isShoppingWizard = wizardData.channel_type === 'SHOPPING';
+
+  // Auto-cargar Merchant Centers cuando el user entra a PMAX o SHOPPING
+  useEffect(() => {
+    if ((isPmax || isShoppingWizard) && merchantCenters.length === 0 && !merchantLoading && connectionId) {
+      fetchMerchantCenters();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPmax, isShoppingWizard, connectionId]);
   // PMAX: 6 steps · SEARCH: 5 (Basic/Config/Ad Group/Keywords/RSA) · otros: 3
   const totalSteps = isPmax ? 6 : isSearchWizard ? 5 : 3;
 
@@ -2799,14 +2808,29 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
 
               {wizardData.channel_type === 'SHOPPING' && (
                 <div className="space-y-2">
-                  <Label>Merchant Center ID *</Label>
-                  <Input
-                    value={wizardData.merchant_center_id}
-                    onChange={e => setWizardData(prev => ({ ...prev, merchant_center_id: e.target.value }))}
-                    placeholder="123456789"
-                  />
+                  <Label className="flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5" />
+                    Merchant Center <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="flex gap-2">
+                    <select
+                      className="flex h-10 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      value={wizardData.merchant_center_id}
+                      onChange={e => setWizardData(prev => ({ ...prev, merchant_center_id: e.target.value }))}
+                    >
+                      <option value="">{merchantLoading ? 'Cargando...' : 'Elegí un Merchant Center...'}</option>
+                      {merchantCenters.map(mc => (
+                        <option key={mc.id} value={mc.id}>{mc.name} ({mc.id})</option>
+                      ))}
+                    </select>
+                    <Button variant="outline" size="sm" onClick={fetchMerchantCenters} disabled={merchantLoading}>
+                      {merchantLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                    </Button>
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    El Merchant Center debe estar vinculado a tu cuenta Google Ads.
+                    {merchantCenters.length === 0 && !merchantLoading
+                      ? 'No hay Merchant Centers linkeados. Linkealo desde Google Ads → Settings → Linked accounts.'
+                      : `${merchantCenters.length} Merchant Center${merchantCenters.length !== 1 ? 's' : ''} linkeado${merchantCenters.length !== 1 ? 's' : ''} a esta cuenta.`}
                   </p>
                 </div>
               )}
