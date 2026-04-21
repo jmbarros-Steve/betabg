@@ -842,6 +842,8 @@ async function handleCreateCampaign(
     merchant_center_id,
     // Bid strategy targets (opcionales según bidStrategy)
     target_cpa_micros, target_roas,
+    // Portfolio Bid Strategy (opcional) — si se provee, reemplaza el standard bidding
+    bidding_strategy_resource,
     // Client ID (inyectado por dispatcher, ownership-validated)
     client_id: clientIdForValidation,
   } = data;
@@ -890,13 +892,20 @@ async function handleCreateCampaign(
     containsEuPoliticalAdvertising: 'DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING',
   };
 
-  // Bid strategy sub-message (v23 requiere el objeto, no solo el enum).
-  // MANUAL_CPC/MANUAL_CPM pueden ir solo con biddingStrategyType.
-  // TARGET_CPA / TARGET_ROAS requieren target obligatorio.
-  // MAXIMIZE_* aceptan target opcional.
-  const roasNum = Number(target_roas);
-  const cpaNum = Number(target_cpa_micros);
-  if (bidStrategy === 'TARGET_CPA') {
+  // Portfolio Bid Strategy: si el user eligió una portfolio, referenciarla directo.
+  // Esto reemplaza el standard bidding y es obligatorio en cuentas MCC con portfolios
+  // forzadas. El `biddingStrategy` field en v23 acepta el resource_name del portfolio.
+  if (bidding_strategy_resource && /^customers\/\d+\/biddingStrategies\/\d+$/.test(String(bidding_strategy_resource))) {
+    delete campaignCreate.biddingStrategyType;
+    campaignCreate.biddingStrategy = String(bidding_strategy_resource);
+  } else {
+    // Bid strategy sub-message (v23 requiere el objeto, no solo el enum).
+    // MANUAL_CPC/MANUAL_CPM pueden ir solo con biddingStrategyType.
+    // TARGET_CPA / TARGET_ROAS requieren target obligatorio.
+    // MAXIMIZE_* aceptan target opcional.
+    const roasNum = Number(target_roas);
+    const cpaNum = Number(target_cpa_micros);
+    if (bidStrategy === 'TARGET_CPA') {
     if (!cpaNum || cpaNum <= 0) {
       return { body: { error: 'target_cpa_micros required and must be > 0 for TARGET_CPA' }, status: 400 };
     }
@@ -915,6 +924,7 @@ async function handleCreateCampaign(
     delete campaignCreate.biddingStrategyType;
     campaignCreate.maximizeConversionValue = roasNum > 0 ? { targetRoas: roasNum } : {};
   }
+  } // cierre del else (bloque Portfolio vs Standard)
 
   // Geo target type setting (how to match locations)
   campaignCreate.geoTargetTypeSetting = {
@@ -3136,6 +3146,44 @@ async function handleListAudiences(
 // --- Diagnose why TARGET_ROAS / TARGET_CPA might be rejected on create ---
 // Revisa: Portfolio bid strategies activas, conversion actions con value tracking,
 // account-level conversion tracking settings, recent conversion volume.
+// --- List Portfolio Bid Strategies activas en la cuenta ---
+// Útil cuando la cuenta tiene portfolios y el user quiere referenciarlas en vez de
+// crear standard bidding strategies (que Google bloquea en cuentas con portfolios).
+async function handleListPortfolioBidStrategies(
+  customerId: string,
+  accessToken: string,
+  developerToken: string,
+  loginCustomerId: string
+): Promise<{ body: any; status: number }> {
+  const gaql = `
+    SELECT bidding_strategy.id, bidding_strategy.resource_name, bidding_strategy.name,
+           bidding_strategy.type, bidding_strategy.status,
+           bidding_strategy.target_roas.target_roas,
+           bidding_strategy.target_cpa.target_cpa_micros,
+           bidding_strategy.maximize_conversion_value.target_roas,
+           bidding_strategy.maximize_conversions.target_cpa_micros
+    FROM bidding_strategy
+    WHERE bidding_strategy.status = 'ENABLED'
+  `;
+  const r = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, gaql);
+  if (!r.ok) {
+    return { body: { error: 'Failed to fetch portfolio bid strategies', details: r.error }, status: 502 };
+  }
+  const strategies = (r.data || []).map((row: any) => {
+    const bs = row.biddingStrategy || {};
+    return {
+      id: String(bs.id),
+      resource_name: bs.resourceName,
+      name: bs.name,
+      type: bs.type,
+      status: bs.status,
+      target_roas: bs.targetRoas?.targetRoas || bs.maximizeConversionValue?.targetRoas || null,
+      target_cpa_micros: bs.targetCpa?.targetCpaMicros || bs.maximizeConversions?.targetCpaMicros || null,
+    };
+  });
+  return { body: { success: true, strategies, count: strategies.length }, status: 200 };
+}
+
 async function handleDiagnoseBidStrategy(
   customerId: string,
   accessToken: string,
@@ -3849,7 +3897,8 @@ type AllActions = Action
   | 'list_image_assets'
   | 'list_catalog_products'
   | 'list_audiences'
-  | 'diagnose_bid_strategy';
+  | 'diagnose_bid_strategy'
+  | 'list_portfolio_bid_strategies';
 
 export async function manageGoogleCampaign(c: Context) {
   try {
@@ -3881,6 +3930,7 @@ export async function manageGoogleCampaign(c: Context) {
       'list_audiences',
       'diagnose_bid_strategy',
       'suggest_extension_content',
+      'list_portfolio_bid_strategies',
     ];
 
     if (!validActions.includes(action)) {
@@ -3993,6 +4043,9 @@ export async function manageGoogleCampaign(c: Context) {
         break;
       case 'suggest_extension_content':
         result = await handleSuggestExtensionContent({ ...(data || {}), client_id: ctx.clientId });
+        break;
+      case 'list_portfolio_bid_strategies':
+        result = await handleListPortfolioBidStrategies(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId);
         break;
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };

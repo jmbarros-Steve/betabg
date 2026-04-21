@@ -538,6 +538,8 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     bid_strategy: 'MAXIMIZE_CONVERSIONS',
     target_cpa_micros: '',
     target_roas: '',
+    // Portfolio Bid Strategy (resource_name) — si se elige, ignora bid_strategy standard
+    bidding_strategy_resource: '',
     target_google_search: true,
     target_search_network: true,
     target_content_network: false,
@@ -604,6 +606,8 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   const [budgetLoading, setBudgetLoading] = useState(false);
   const [merchantCenters, setMerchantCenters] = useState<Array<{ id: string; name: string; status: string }>>([]);
   const [merchantLoading, setMerchantLoading] = useState(false);
+  const [portfolios, setPortfolios] = useState<Array<{ id: string; resource_name: string; name: string; type: string; target_roas: number | null; target_cpa_micros: string | null }>>([]);
+  const [portfoliosLoading, setPortfoliosLoading] = useState(false);
 
   // AI image generation
   const [aiImageLoading, setAiImageLoading] = useState<Record<string, boolean>>({});
@@ -1197,14 +1201,19 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       ad_group_name: wizardData.ad_group_name || 'Ad Group 1',
     };
 
-    // Bid strategy targets
-    const cpaVal = Number(wizardData.target_cpa_micros);
-    if (cpaVal > 0 && (wizardData.bid_strategy === 'TARGET_CPA' || wizardData.bid_strategy === 'MAXIMIZE_CONVERSIONS')) {
-      payload.target_cpa_micros = Math.round(cpaVal * 1_000_000);
-    }
-    const roasVal = Number(wizardData.target_roas);
-    if (roasVal > 0 && (wizardData.bid_strategy === 'TARGET_ROAS' || wizardData.bid_strategy === 'MAXIMIZE_CONVERSION_VALUE')) {
-      payload.target_roas = roasVal;
+    // Portfolio Bid Strategy (prioridad — reemplaza standard bidding)
+    if (wizardData.bidding_strategy_resource) {
+      payload.bidding_strategy_resource = wizardData.bidding_strategy_resource;
+    } else {
+      // Standard bidding targets (solo si NO hay portfolio)
+      const cpaVal = Number(wizardData.target_cpa_micros);
+      if (cpaVal > 0 && (wizardData.bid_strategy === 'TARGET_CPA' || wizardData.bid_strategy === 'MAXIMIZE_CONVERSIONS')) {
+        payload.target_cpa_micros = Math.round(cpaVal * 1_000_000);
+      }
+      const roasVal = Number(wizardData.target_roas);
+      if (roasVal > 0 && (wizardData.bid_strategy === 'TARGET_ROAS' || wizardData.bid_strategy === 'MAXIMIZE_CONVERSION_VALUE')) {
+        payload.target_roas = roasVal;
+      }
     }
 
     // Location targeting
@@ -1363,7 +1372,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     setWizardStep(1);
     setWizardData({
       name: '', channel_type: 'SEARCH', daily_budget: '', bid_strategy: 'MAXIMIZE_CONVERSIONS',
-      target_cpa_micros: '', target_roas: '',
+      target_cpa_micros: '', target_roas: '', bidding_strategy_resource: '',
       target_google_search: true, target_search_network: true, target_content_network: false,
       start_date: '', end_date: '', ad_group_name: 'Ad Group 1', ad_group_cpc_bid_micros: '',
       final_urls: '', business_name: '', headlines: [''], long_headlines: [''], descriptions: [''],
@@ -1415,6 +1424,19 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       return;
     }
     setMerchantCenters(data?.merchant_centers || []);
+  };
+
+  const fetchPortfolios = async () => {
+    setPortfoliosLoading(true);
+    const { data, error } = await callApi('manage-google-campaign', {
+      body: { action: 'list_portfolio_bid_strategies', connection_id: connectionId },
+    });
+    setPortfoliosLoading(false);
+    if (error) {
+      // No toast — silent fail si la cuenta no tiene portfolios (común)
+      return;
+    }
+    setPortfolios(data?.strategies || []);
   };
 
   const handleApplyRecommendation = (rec: any) => {
@@ -1812,6 +1834,14 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPmax, isShoppingWizard, connectionId]);
+
+  // Auto-cargar Portfolios cuando se abre el wizard (silent — si no hay, no pasa nada)
+  useEffect(() => {
+    if (wizardOpen && portfolios.length === 0 && !portfoliosLoading && connectionId) {
+      fetchPortfolios();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wizardOpen, connectionId]);
 
   // Auto-switch bid strategy a válida si el user entra a SHOPPING con una incompatible
   useEffect(() => {
@@ -2730,12 +2760,40 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 <div className="text-sm font-semibold flex items-center gap-2">
                   <DollarSign className="w-4 h-4" /> Estrategia & Presupuesto
                 </div>
+              {/* Portfolio Bid Strategy selector — priority sobre standard */}
+              {portfolios.length > 0 && (
+                <div className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-3">
+                  <Label className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-primary" />
+                    Usar Portfolio Bid Strategy <span className="text-muted-foreground font-normal">(recomendado para tu cuenta)</span>
+                  </Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={wizardData.bidding_strategy_resource}
+                    onChange={e => setWizardData(prev => ({ ...prev, bidding_strategy_resource: e.target.value }))}
+                  >
+                    <option value="">No usar portfolio — elegir estrategia standard abajo</option>
+                    {portfolios.map(p => (
+                      <option key={p.id} value={p.resource_name}>
+                        {p.name} · {p.type}
+                        {p.target_roas ? ` · ROAS ${p.target_roas.toFixed(1)}x` : ''}
+                        {p.target_cpa_micros ? ` · CPA $${(Number(p.target_cpa_micros) / 1_000_000).toFixed(2)}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-muted-foreground">
+                    Tu cuenta tiene {portfolios.length} portfolio{portfolios.length !== 1 ? 's' : ''} activa{portfolios.length !== 1 ? 's' : ''}. Elegí una para que la campaña la use directamente (evita el rechazo que Google hace a standard bidding en cuentas con portfolios).
+                  </p>
+                </div>
+              )}
+
               <div className="space-y-2">
-                <Label>Estrategia de puja</Label>
+                <Label>Estrategia de puja {wizardData.bidding_strategy_resource ? <span className="text-muted-foreground font-normal">(ignorado — usás portfolio)</span> : ''}</Label>
                 {/* Select nativo: Radix Portal falla dentro del Dialog con overflow-y-auto del wizard */}
                 <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
                   value={wizardData.bid_strategy}
+                  disabled={!!wizardData.bidding_strategy_resource}
                   onChange={e => setWizardData(prev => ({ ...prev, bid_strategy: e.target.value }))}
                 >
                   {bidStrategies
