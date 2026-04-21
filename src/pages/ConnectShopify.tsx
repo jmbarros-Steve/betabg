@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,14 @@ import { Store, ArrowRight, Shield, Zap, CheckCircle, Lock, User } from 'lucide-
 import logo from '@/assets/logo.jpg';
 import logoShopify from '@/assets/logo-shopify-clean.png';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const API_BASE = (import.meta.env.VITE_API_URL as string) || 'https://steve-api-850416724643.us-central1.run.app';
+
+function buildInstallUrl(domain: string, host?: string | null): string {
+  const url = new URL(`${API_BASE}/api/shopify-install`);
+  url.searchParams.set('shop', domain);
+  if (host) url.searchParams.set('host', host);
+  return url.toString();
+}
 
 const steps = [
   {
@@ -34,41 +41,50 @@ const features = [
   'Integración con Klaviyo y Meta Ads',
 ];
 
+function normalizeShopDomain(input: string): string {
+  let domain = input.trim().toLowerCase();
+  domain = domain.replace(/^https?:\/\//, '');
+  domain = domain.replace(/\/+$/, '');
+  domain = domain.replace(/\/admin.*$/, '');
+  if (!domain.includes('.myshopify.com')) {
+    domain = `${domain}.myshopify.com`;
+  }
+  return domain;
+}
+
+const SHOP_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/;
+
 export default function ConnectShopify() {
   const [shopDomain, setShopDomain] = useState('');
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [error, setError] = useState('');
 
+  // Auto-redirect: si llegamos con ?shop=... (caso Preferences URL desde admin de
+  // Shopify, o install link directo), saltamos el formulario y vamos al OAuth.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shopParam = params.get('shop');
+    const hostParam = params.get('host');
+    if (!shopParam) return;
+
+    const domain = normalizeShopDomain(shopParam);
+    if (!SHOP_REGEX.test(domain)) {
+      setError(`Dominio inválido en la URL: ${shopParam}`);
+      return;
+    }
+    setIsRedirecting(true);
+    window.location.href = buildInstallUrl(domain, hostParam);
+  }, []);
+
   const handleConnect = () => {
     setError('');
-
-    // Clean up the shop domain input
-    let domain = shopDomain.trim().toLowerCase();
-
-    // Remove protocol if present
-    domain = domain.replace(/^https?:\/\//, '');
-    // Remove trailing slashes
-    domain = domain.replace(/\/+$/, '');
-    // Remove /admin or similar paths
-    domain = domain.replace(/\/admin.*$/, '');
-
-    // Add .myshopify.com if not present
-    if (!domain.includes('.myshopify.com')) {
-      domain = `${domain}.myshopify.com`;
-    }
-
-    // Validate format
-    const shopRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/;
-    if (!shopRegex.test(domain)) {
+    const domain = normalizeShopDomain(shopDomain);
+    if (!SHOP_REGEX.test(domain)) {
       setError('Ingresa un dominio válido, ej: mi-tienda.myshopify.com');
       return;
     }
-
     setIsRedirecting(true);
-
-    // Redirect to the shopify-install edge function which handles the OAuth flow
-    const installUrl = `${SUPABASE_URL}/functions/v1/shopify-install?shop=${encodeURIComponent(domain)}`;
-    window.location.href = installUrl;
+    window.location.href = buildInstallUrl(domain);
   };
 
   return (

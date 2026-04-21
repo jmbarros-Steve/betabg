@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShopifyCustomAppWizard } from './ShopifyCustomAppWizard';
+import { ShopifyConnectDialog } from './ShopifyConnectDialog';
 import { useRetrySync } from './useRetrySync';
 
 const META_APP_ID = '1994525824461583';
@@ -662,15 +662,11 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
         </DialogContent>
       </Dialog>
 
-      {/* Shopify Custom App Wizard */}
-      <ShopifyCustomAppWizard
+      {/* Shopify OAuth directo (App Store flow) */}
+      <ShopifyConnectDialog
         open={showShopifyWizard}
         onClose={() => setShowShopifyWizard(false)}
         clientId={clientId}
-        onConnected={() => {
-          fetchConnections();
-          setShowShopifyWizard(false);
-        }}
       />
 
       {/* Meta BM Partner Setup (Leadsie) */}
