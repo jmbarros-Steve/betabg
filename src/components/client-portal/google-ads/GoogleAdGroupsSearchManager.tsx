@@ -250,6 +250,10 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
   const [plannerMinVolume, setPlannerMinVolume] = useState<number>(0);
   const [plannerMaxCompetition, setPlannerMaxCompetition] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('HIGH');
 
+  // Steve AI for extensions
+  const [extSteveLoading, setExtSteveLoading] = useState(false);
+  const [extSteveOptions, setExtSteveOptions] = useState<any[]>([]);
+
   // Create Ad Group dialog
   const [searchCampaigns, setSearchCampaigns] = useState<Array<{ id: string; name: string; status: string }>>([]);
   const [createAgOpen, setCreateAgOpen] = useState(false);
@@ -441,7 +445,52 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
     setExtSitelinkText(''); setExtSitelinkDesc1(''); setExtSitelinkDesc2(''); setExtSitelinkUrl('');
     setExtCalloutText('');
     setExtSnippetHeader('Types'); setExtSnippetValues(['', '', '']);
+    setExtSteveOptions([]);
     setExtOpen(true);
+  };
+
+  const suggestExtContent = async () => {
+    if (extSteveLoading) return;
+    setExtSteveLoading(true);
+    try {
+      const extTypeMap: Record<string, string> = { SITELINK: 'SITELINK', CALLOUT: 'CALLOUT', SNIPPET: 'SNIPPET' };
+      const { data, error } = await callApi('manage-google-campaign', {
+        body: {
+          action: 'suggest_extension_content',
+          connection_id: connectionId,
+          data: {
+            ext_type: extTypeMap[extType],
+            client_id: clientId,
+            snippet_header: extType === 'SNIPPET' ? extSnippetHeader : undefined,
+            count: extType === 'SITELINK' ? 4 : 6,
+          },
+        },
+      });
+      if (error) { toast.error('Steve: ' + error); return; }
+      const opts = data?.options || [];
+      if (opts.length === 0) { toast.warning('Steve no devolvió opciones — intentá de nuevo'); return; }
+      setExtSteveOptions(opts);
+      toast.success(`${opts.length} sugerencias generadas`);
+    } finally {
+      setExtSteveLoading(false);
+    }
+  };
+
+  const applyExtOption = (opt: any) => {
+    if (extType === 'SITELINK') {
+      setExtSitelinkText(opt.link_text || '');
+      setExtSitelinkDesc1(opt.description1 || '');
+      setExtSitelinkDesc2(opt.description2 || '');
+    } else if (extType === 'CALLOUT') {
+      setExtCalloutText(opt.text || '');
+    } else {
+      // SNIPPET: merge in non-empty slots
+      const newValues = [...extSnippetValues];
+      const emptyIdx = newValues.findIndex(v => !v);
+      if (emptyIdx >= 0) newValues[emptyIdx] = opt.text || '';
+      else newValues.push(opt.text || '');
+      setExtSnippetValues(newValues);
+    }
   };
 
   const submitExtension = async () => {
@@ -1319,7 +1368,7 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
                 <button
                   key={t}
                   className={`px-3 py-1.5 text-xs border-b-2 ${extType === t ? 'border-primary text-primary font-medium' : 'border-transparent text-muted-foreground'}`}
-                  onClick={() => setExtType(t)}
+                  onClick={() => { setExtType(t); setExtSteveOptions([]); }}
                 >
                   {t === 'SITELINK' ? 'Sitelink' : t === 'CALLOUT' ? 'Callout' : 'Snippet'}
                 </button>
@@ -1339,6 +1388,44 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
                   Toda la campaña
                 </label>
               </div>
+            </div>
+
+            {/* Steve AI */}
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-2.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-primary" />
+                  Steve AI — genera sugerencias con el brief del cliente
+                </span>
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={extSteveLoading || (extType === 'SNIPPET' && !extSnippetHeader)} onClick={suggestExtContent}>
+                  {extSteveLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                  {extSteveLoading ? 'Generando...' : 'Steve genera'}
+                </Button>
+              </div>
+              {extSteveOptions.length > 0 && (
+                <div className="max-h-[200px] overflow-y-auto space-y-1">
+                  {extSteveOptions.map((opt, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => applyExtOption(opt)}
+                      className="w-full text-left p-1.5 rounded border border-border bg-background hover:bg-primary/10 text-xs transition"
+                    >
+                      {extType === 'SITELINK' ? (
+                        <div>
+                          <div className="font-medium">{opt.link_text}</div>
+                          {(opt.description1 || opt.description2) && (
+                            <div className="text-[10px] text-muted-foreground">{opt.description1}{opt.description2 ? ` · ${opt.description2}` : ''}</div>
+                          )}
+                        </div>
+                      ) : (
+                        <div>{opt.text}</div>
+                      )}
+                    </button>
+                  ))}
+                  <p className="text-[10px] text-muted-foreground text-center pt-1">Click en una opción para aplicarla al formulario</p>
+                </div>
+              )}
             </div>
 
             {/* Fields por tipo */}

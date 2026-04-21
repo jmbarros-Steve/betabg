@@ -3617,6 +3617,149 @@ Responde SOLO en JSON válido, sin markdown:
   }
 }
 
+// --- Suggest Extension Content (Steve AI para Sitelinks / Callouts / Snippets) ---
+async function handleSuggestExtensionContent(
+  data: Record<string, any>
+): Promise<{ body: any; status: number }> {
+  const { ext_type, client_id, snippet_header, user_intent, count } = data;
+  if (!ext_type || !['SITELINK', 'CALLOUT', 'SNIPPET'].includes(ext_type)) {
+    return { body: { error: 'ext_type inválido. Usa SITELINK | CALLOUT | SNIPPET' }, status: 400 };
+  }
+  if (ext_type === 'SNIPPET' && !snippet_header) {
+    return { body: { error: 'snippet_header requerido para SNIPPET' }, status: 400 };
+  }
+
+  // Load brief (minimal)
+  let briefContext = '';
+  const warnings: string[] = [];
+  if (client_id && UUID_RX.test(String(client_id).trim())) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const safeClientId = String(client_id).trim();
+    if (supabaseUrl && supabaseKey) {
+      try {
+        const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
+        const bpRes = await fetch(
+          `${supabaseUrl}/rest/v1/buyer_personas?client_id=eq.${safeClientId}&select=persona_data&limit=1`,
+          { headers, signal: AbortSignal.timeout(5_000) }
+        );
+        if (bpRes.ok) {
+          const rows = await bpRes.json() as any[];
+          const pd = rows?.[0]?.persona_data;
+          if (pd && Array.isArray(pd.raw_responses)) {
+            briefContext = pd.raw_responses.filter((r: any) => typeof r === 'string' && r.trim()).join('\n').slice(0, 3000);
+          }
+        }
+      } catch (err: any) {
+        warnings.push('Brief del cliente no disponible — Steve va a usar contexto genérico');
+      }
+    }
+  }
+
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) return { body: { error: 'ANTHROPIC_API_KEY not configured' }, status: 500 };
+
+  const n = Math.max(3, Math.min(Number(count) || 5, 10));
+  let prompt = '';
+  if (ext_type === 'SITELINK') {
+    prompt = `Eres Steve, experto en Google Ads. Genera ${n} sitelinks distintos.
+${briefContext ? `\n## BRIEF DEL CLIENTE\n${briefContext}\n` : ''}
+${user_intent ? `\n## INTENT\n${user_intent}\n` : ''}
+
+Cada sitelink apunta a una sección relevante del sitio (ej. "Envío Gratis", "Ofertas", "Cómo comprar", "Tallas", "Soporte").
+
+REGLAS:
+- link_text: MAX 25 chars
+- description1: MAX 35 chars (opcional pero recomendado)
+- description2: MAX 35 chars (opcional)
+- Sin URLs (el usuario las completa)
+- Variados: cobertura de distintas secciones del sitio
+
+JSON válido, sin markdown:
+{ "options": [{"link_text": "...", "description1": "...", "description2": "..."}, ...] }`;
+  } else if (ext_type === 'CALLOUT') {
+    prompt = `Eres Steve, experto en Google Ads. Genera ${n} callouts distintos.
+${briefContext ? `\n## BRIEF DEL CLIENTE\n${briefContext}\n` : ''}
+${user_intent ? `\n## INTENT\n${user_intent}\n` : ''}
+
+Un callout es una frase corta de valor (ej. "Envío gratis", "Garantía 30 días", "Atención 24/7", "Pago seguro").
+
+REGLAS:
+- MAX 25 chars cada uno
+- Sin promesas inventadas (no precios ni descuentos específicos que no estén en el brief)
+- Variados
+
+JSON válido, sin markdown:
+{ "options": [{"text": "..."}, ...] }`;
+  } else {
+    prompt = `Eres Steve, experto en Google Ads. Genera ${n} values para un structured snippet.
+${briefContext ? `\n## BRIEF DEL CLIENTE\n${briefContext}\n` : ''}
+${user_intent ? `\n## INTENT\n${user_intent}\n` : ''}
+
+Header fijo: "${snippet_header}" (ej. si es "Types", los values son tipos de productos/servicios).
+
+REGLAS:
+- MAX 25 chars cada value
+- Coherentes con el header
+- Específicos al cliente según el brief
+
+JSON válido, sin markdown:
+{ "options": [{"text": "..."}, ...] }`;
+  }
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+
+    const result = await response.json() as any;
+    let text = result?.content?.[0]?.text || '{}';
+    text = text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+
+    let parsed: any;
+    try { parsed = JSON.parse(text); } catch {
+      return { body: { error: 'Failed to parse AI response' }, status: 502 };
+    }
+
+    const rawOptions = Array.isArray(parsed.options) ? parsed.options : [];
+    let options: any[] = [];
+    if (ext_type === 'SITELINK') {
+      options = rawOptions
+        .map((o: any) => ({
+          link_text: typeof o?.link_text === 'string' ? o.link_text.trim().slice(0, 25) : '',
+          description1: typeof o?.description1 === 'string' ? o.description1.trim().slice(0, 35) : '',
+          description2: typeof o?.description2 === 'string' ? o.description2.trim().slice(0, 35) : '',
+        }))
+        .filter((o: any) => o.link_text.length > 0);
+    } else {
+      options = rawOptions
+        .map((o: any) => ({
+          text: typeof o?.text === 'string' ? o.text.trim().slice(0, 25) : '',
+        }))
+        .filter((o: any) => o.text.length > 0);
+    }
+
+    return {
+      body: { success: true, ext_type, source: 'ai', options, warnings: warnings.length > 0 ? warnings : undefined },
+      status: 200,
+    };
+  } catch (err: any) {
+    console.error('[suggest_extension_content] error:', err);
+    return { body: { error: 'AI request failed', details: err.message }, status: 502 };
+  }
+}
+
 // --- Main handler ---
 
 type AllActions = Action
@@ -3626,6 +3769,7 @@ type AllActions = Action
   | 'create_campaign'
   | 'get_recommendations'
   | 'suggest_asset_content'
+  | 'suggest_extension_content'
   | 'list_merchant_centers'
   | 'get_budget_recommendation'
   | 'list_image_assets'
@@ -3662,6 +3806,7 @@ export async function manageGoogleCampaign(c: Context) {
       'list_catalog_products',
       'list_audiences',
       'diagnose_bid_strategy',
+      'suggest_extension_content',
     ];
 
     if (!validActions.includes(action)) {
@@ -3771,6 +3916,9 @@ export async function manageGoogleCampaign(c: Context) {
         break;
       case 'diagnose_bid_strategy':
         result = await handleDiagnoseBidStrategy(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId);
+        break;
+      case 'suggest_extension_content':
+        result = await handleSuggestExtensionContent({ ...(data || {}), client_id: ctx.clientId });
         break;
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };
