@@ -965,6 +965,23 @@ export async function manageGoogleKeywords(c: Context) {
       return c.json(result.body, result.status as any);
     }
 
+    // list_pending_suggestions y reject_suggestion no requieren Google connection
+    // (solo lectura/escritura a Supabase search_terms_suggestions).
+    if (action === 'list_pending_suggestions') {
+      const user = c.get('user') as { id?: string } | undefined;
+      if (!user?.id) return c.json({ error: 'Unauthorized' }, 401);
+      const clientId = (data as any)?.client_id;
+      const result = await handleListPendingSuggestions(clientId, data || {});
+      return c.json(result.body, result.status as any);
+    }
+    if (action === 'reject_suggestion') {
+      const user = c.get('user') as { id?: string } | undefined;
+      if (!user?.id) return c.json({ error: 'Unauthorized' }, 401);
+      const clientId = (data as any)?.client_id;
+      const result = await handleRejectSuggestion(user.id, clientId, data || {});
+      return c.json(result.body, result.status as any);
+    }
+
     // Validate numeric IDs to prevent GAQL injection
     if (!validateNumericId(campaign_id)) return c.json({ error: 'campaign_id must be numeric' }, 400);
     if (!validateNumericId(ad_group_id)) return c.json({ error: 'ad_group_id must be numeric' }, 400);
@@ -1016,6 +1033,12 @@ export async function manageGoogleKeywords(c: Context) {
       case 'remove_negative_keyword':
         result = await handleRemoveNegativeKeyword(customerId, accessToken, developerToken, loginCustomerId, data || {});
         break;
+      case 'apply_suggestion': {
+        const user = c.get('user') as { id?: string } | undefined;
+        if (!user?.id) { result = { body: { error: 'Unauthorized' }, status: 401 }; break; }
+        result = await handleApplySuggestion(customerId, accessToken, developerToken, loginCustomerId, ctx.clientId, data || {});
+        break;
+      }
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };
     }
