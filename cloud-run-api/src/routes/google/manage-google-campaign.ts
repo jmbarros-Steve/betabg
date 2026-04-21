@@ -1705,6 +1705,13 @@ async function handleCreateCampaign(
     if (errStr.includes('INVALID_ARGUMENT') && errStr.includes('budget')) {
       return { body: { error: `Presupuesto inválido. Verificá que daily_budget sea un número positivo en la moneda de la cuenta.` }, status: 400 };
     }
+    // TARGET_ROAS / TARGET_CPA rechazados — value tracking o requisitos no cumplidos
+    if (errStr.includes('target_roas') && errStr.includes('not allowed for the given context')) {
+      return { body: { error: `Google rechazó "ROAS objetivo". Causas comunes: (1) las conversiones de la cuenta no tienen value tracking configurado (necesitan valor numérico, no solo count), (2) pocas conversiones recientes con valor, (3) requiere Portfolio Bid Strategy. Fix rápido: usá "Maximizar valor" con ROAS opcional — Google optimiza hacia ese ROAS igual, pero sin este bloqueo.` }, status: 400 };
+    }
+    if (errStr.includes('target_cpa') && errStr.includes('not allowed for the given context')) {
+      return { body: { error: `Google rechazó "CPA objetivo". Causas comunes: conversiones insuficientes recientes, o config que requiere Portfolio Bid Strategy. Fix rápido: usá "Maximizar conversiones" con CPA opcional.` }, status: 400 };
+    }
     return { body: { error: `Failed to create campaign: ${result.error}` }, status: 502 };
   }
 
@@ -3052,6 +3059,167 @@ async function handleListAudiences(
   return { body: { success: true, ...out, count: out.audiences.length + out.user_lists.length }, status: 200 };
 }
 
+// --- Diagnose why TARGET_ROAS / TARGET_CPA might be rejected on create ---
+// Revisa: Portfolio bid strategies activas, conversion actions con value tracking,
+// account-level conversion tracking settings, recent conversion volume.
+async function handleDiagnoseBidStrategy(
+  customerId: string,
+  accessToken: string,
+  developerToken: string,
+  loginCustomerId: string
+): Promise<{ body: any; status: number }> {
+  const diagnosis: {
+    portfolio_strategies: any[];
+    conversion_actions: any[];
+    has_value_tracking: boolean;
+    total_conversions_30d: number;
+    total_conversions_value_30d: number;
+    account_conversion_tracking_status: string | null;
+    cross_account_conversion_tracking: boolean;
+    blockers: string[];
+    recommendations: string[];
+  } = {
+    portfolio_strategies: [],
+    conversion_actions: [],
+    has_value_tracking: false,
+    total_conversions_30d: 0,
+    total_conversions_value_30d: 0,
+    account_conversion_tracking_status: null,
+    cross_account_conversion_tracking: false,
+    blockers: [],
+    recommendations: [],
+  };
+
+  // 1) Portfolio bid strategies activas
+  try {
+    const gaql = `
+      SELECT bidding_strategy.id, bidding_strategy.name, bidding_strategy.type,
+             bidding_strategy.status, bidding_strategy.target_roas.target_roas,
+             bidding_strategy.target_cpa.target_cpa_micros
+      FROM bidding_strategy
+      WHERE bidding_strategy.status != 'REMOVED'
+      LIMIT 50
+    `;
+    const r = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, gaql);
+    if (r.ok && Array.isArray(r.data)) {
+      for (const row of r.data) {
+        const bs = row.biddingStrategy || {};
+        diagnosis.portfolio_strategies.push({
+          id: bs.id,
+          name: bs.name,
+          type: bs.type,
+          status: bs.status,
+          target_roas: bs.targetRoas?.targetRoas || null,
+          target_cpa_micros: bs.targetCpa?.targetCpaMicros || null,
+        });
+      }
+    }
+  } catch (err: any) {
+    console.warn('[diagnose] portfolio strategies failed:', err?.message);
+  }
+
+  // 2) Conversion actions con value tracking
+  try {
+    const gaql = `
+      SELECT conversion_action.id, conversion_action.name, conversion_action.status,
+             conversion_action.category, conversion_action.type,
+             conversion_action.value_settings.default_value,
+             conversion_action.value_settings.always_use_default_value,
+             conversion_action.primary_for_goal,
+             conversion_action.include_in_conversions_metric,
+             conversion_action.counting_type
+      FROM conversion_action
+      WHERE conversion_action.status = 'ENABLED'
+      LIMIT 50
+    `;
+    const r = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, gaql);
+    if (r.ok && Array.isArray(r.data)) {
+      for (const row of r.data) {
+        const ca = row.conversionAction || {};
+        const vs = ca.valueSettings || {};
+        const hasValue = Number(vs.defaultValue || 0) > 0 || vs.alwaysUseDefaultValue === false;
+        if (hasValue) diagnosis.has_value_tracking = true;
+        diagnosis.conversion_actions.push({
+          id: ca.id,
+          name: ca.name,
+          category: ca.category,
+          type: ca.type,
+          primary_for_goal: ca.primaryForGoal,
+          include_in_conversions_metric: ca.includeInConversionsMetric,
+          default_value: vs.defaultValue || null,
+          always_use_default_value: vs.alwaysUseDefaultValue,
+          has_value_tracking: hasValue,
+        });
+      }
+    }
+  } catch (err: any) {
+    console.warn('[diagnose] conversion actions failed:', err?.message);
+  }
+
+  // 3) Volumen de conversiones últimos 30d (customer-level)
+  try {
+    const gaql = `
+      SELECT metrics.conversions, metrics.conversions_value
+      FROM customer
+      WHERE segments.date DURING LAST_30_DAYS
+    `;
+    const r = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, gaql);
+    if (r.ok && Array.isArray(r.data) && r.data.length > 0) {
+      const m = r.data[0].metrics || {};
+      diagnosis.total_conversions_30d = Number(m.conversions || 0);
+      diagnosis.total_conversions_value_30d = Number(m.conversionsValue || 0);
+    }
+  } catch (err: any) {
+    console.warn('[diagnose] conversions metrics failed:', err?.message);
+  }
+
+  // 4) Customer-level conversion tracking settings
+  try {
+    const gaql = `
+      SELECT customer.conversion_tracking_setting.conversion_tracking_status,
+             customer.conversion_tracking_setting.cross_account_conversion_tracking_id
+      FROM customer
+      LIMIT 1
+    `;
+    const r = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, gaql);
+    if (r.ok && Array.isArray(r.data) && r.data.length > 0) {
+      const cts = r.data[0].customer?.conversionTrackingSetting || {};
+      diagnosis.account_conversion_tracking_status = cts.conversionTrackingStatus || null;
+      diagnosis.cross_account_conversion_tracking = Boolean(cts.crossAccountConversionTrackingId);
+    }
+  } catch (err: any) {
+    console.warn('[diagnose] conversion tracking settings failed:', err?.message);
+  }
+
+  // 5) Deducir blockers + recomendaciones
+  if (diagnosis.account_conversion_tracking_status && diagnosis.account_conversion_tracking_status !== 'CONVERSION_TRACKING_MANAGED_BY_SELF' && diagnosis.account_conversion_tracking_status !== 'CONVERSION_TRACKING_MANAGED_BY_GOOGLE_ADS_CROSS_ACCOUNT') {
+    diagnosis.blockers.push(`Conversion tracking status: ${diagnosis.account_conversion_tracking_status} (debería ser MANAGED_BY_SELF o CROSS_ACCOUNT).`);
+  }
+  if (diagnosis.cross_account_conversion_tracking) {
+    diagnosis.blockers.push('La cuenta usa cross-account conversion tracking (MCC). TARGET_ROAS standard puede requerir portfolio bid strategy en este contexto.');
+    diagnosis.recommendations.push('Probá "Maximizar valor" con target_roas opcional — Google optimiza al mismo objetivo sin el bloqueo de portfolio.');
+  }
+  if (!diagnosis.has_value_tracking) {
+    diagnosis.blockers.push('Ninguna conversion action tiene value tracking (default_value > 0). TARGET_ROAS necesita valor numérico.');
+    diagnosis.recommendations.push('Configurá default_value en al menos una conversion action, o usá "Maximizar valor" que acepta value dinámico.');
+  }
+  if (diagnosis.total_conversions_30d < 15) {
+    diagnosis.blockers.push(`Solo ${diagnosis.total_conversions_30d.toFixed(1)} conversiones en 30 días (se recomiendan ≥15 para estrategias value-based).`);
+  }
+  if (diagnosis.total_conversions_value_30d === 0 && diagnosis.total_conversions_30d > 0) {
+    diagnosis.blockers.push('Las conversiones registradas tienen valor 0 — TARGET_ROAS requiere ingresos reales trackeados.');
+  }
+  const activePortfolios = diagnosis.portfolio_strategies.filter(p => p.status === 'ENABLED');
+  if (activePortfolios.length > 0) {
+    diagnosis.recommendations.push(`Encontré ${activePortfolios.length} portfolio bid strategies activas. Si tu cuenta está forzada a portfolio, podés referenciar una en la campaña en vez de usar standard.`);
+  }
+  if (diagnosis.blockers.length === 0) {
+    diagnosis.recommendations.push('No detecté blockers claros. El rechazo de TARGET_ROAS puede ser por policy temporal o límite de experimentación. Reintentá o usá "Maximizar valor" como fallback.');
+  }
+
+  return { body: { success: true, diagnosis }, status: 200 };
+}
+
 // --- List catalog products directly from Merchant Center via Google Ads API `shopping_product` ---
 // Fallback a shopify_products si el MC no tiene productos o falla la query.
 async function handleListCatalogProducts(
@@ -3462,7 +3630,8 @@ type AllActions = Action
   | 'get_budget_recommendation'
   | 'list_image_assets'
   | 'list_catalog_products'
-  | 'list_audiences';
+  | 'list_audiences'
+  | 'diagnose_bid_strategy';
 
 export async function manageGoogleCampaign(c: Context) {
   try {
@@ -3492,6 +3661,7 @@ export async function manageGoogleCampaign(c: Context) {
       'list_image_assets',
       'list_catalog_products',
       'list_audiences',
+      'diagnose_bid_strategy',
     ];
 
     if (!validActions.includes(action)) {
@@ -3598,6 +3768,9 @@ export async function manageGoogleCampaign(c: Context) {
         break;
       case 'list_audiences':
         result = await handleListAudiences(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId);
+        break;
+      case 'diagnose_bid_strategy':
+        result = await handleDiagnoseBidStrategy(ctx.customerId, ctx.accessToken, ctx.developerToken, ctx.loginCustomerId);
         break;
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };
