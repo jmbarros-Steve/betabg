@@ -1710,24 +1710,62 @@ async function handleCreateCampaign(
 
   let result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, primaryOps);
 
-  // Auto-retry: si Google rechaza target_roas/target_cpa por Portfolio Bid Strategy activa
-  // en la cuenta (bloqueo común en MCC), reintentar quitando el soft target. El bidding
-  // sigue siendo MAXIMIZE_CONVERSION_VALUE/MAXIMIZE_CONVERSIONS — solo pierde el ceiling.
+  // Auto-retry cascada: Portfolio Bid Strategy activa puede bloquear progresivamente
+  // varias bidding strategies standard. Cascada de fallbacks hasta encontrar una que Google acepte.
   let autoRetryWarning = '';
+
+  // Helper: limpia todos los sub-messages de bidding del campaignCreate
+  const clearBiddingFields = () => {
+    delete campaignCreate.biddingStrategyType;
+    delete campaignCreate.maximizeConversions;
+    delete campaignCreate.maximizeConversionValue;
+    delete campaignCreate.targetSpend;
+    delete campaignCreate.targetCpa;
+    delete campaignCreate.targetRoas;
+    delete campaignCreate.manualCpc;
+  };
+
+  // Retry #1: quitar soft target (target_roas/target_cpa)
   if (!result.ok) {
     const errStr = String(result.error || '');
-    const targetRoasBlocked = errStr.includes('target_roas') && errStr.includes('not allowed for the given context');
-    const targetCpaBlocked = errStr.includes('target_cpa') && errStr.includes('not allowed for the given context');
-
+    const targetRoasBlocked = errStr.includes('target_roas') && errStr.includes('not allowed');
+    const targetCpaBlocked = errStr.includes('target_cpa') && errStr.includes('not allowed');
     if (targetRoasBlocked && campaignCreate.maximizeConversionValue?.targetRoas) {
-      console.log('[manage-google-campaign] Auto-retry: removing targetRoas (portfolio bid strategy blocking)');
+      console.log('[manage-google-campaign] Auto-retry #1: removing targetRoas');
       campaignCreate.maximizeConversionValue = {};
-      autoRetryWarning = `ROAS objetivo rechazado por Google (cuenta tiene Portfolio Bid Strategy activa que bloquea target_roas standard). Campaña creada con "Maximizar valor" sin target fijo — Google optimiza automáticamente hacia ROAS alto.`;
+      autoRetryWarning = `ROAS objetivo rechazado por Portfolio Bid Strategy de la cuenta. Campaña creada sin target.`;
       result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, primaryOps);
     } else if (targetCpaBlocked && campaignCreate.maximizeConversions?.targetCpaMicros) {
-      console.log('[manage-google-campaign] Auto-retry: removing targetCpa (portfolio bid strategy blocking)');
+      console.log('[manage-google-campaign] Auto-retry #1: removing targetCpa');
       campaignCreate.maximizeConversions = {};
-      autoRetryWarning = `CPA objetivo rechazado por Google (cuenta tiene Portfolio Bid Strategy activa). Campaña creada con "Maximizar conversiones" sin CPA target.`;
+      autoRetryWarning = `CPA objetivo rechazado por Portfolio Bid Strategy. Campaña creada sin target.`;
+      result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, primaryOps);
+    }
+  }
+
+  // Retry #2: maximize_conversion_value/maximize_conversions vacíos también rechazados → fallback a TargetSpend
+  if (!result.ok) {
+    const errStr = String(result.error || '');
+    const valueStrategyBlocked = (errStr.includes('maximize_conversion_value') || errStr.includes('maximize_conversions'))
+      && errStr.includes('not allowed');
+    if (valueStrategyBlocked) {
+      console.log('[manage-google-campaign] Auto-retry #2: fallback to TargetSpend (maximize clicks)');
+      clearBiddingFields();
+      campaignCreate.targetSpend = {};
+      autoRetryWarning = `La cuenta tiene Portfolio Bid Strategy que bloquea bidding value-based standard. Campaña creada con "Maximizar clics" como fallback — cambialo manualmente en Google Ads a tu portfolio si querés.`;
+      result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, primaryOps);
+    }
+  }
+
+  // Retry #3: TargetSpend también bloqueado → fallback absoluto a Manual CPC
+  if (!result.ok) {
+    const errStr = String(result.error || '');
+    const spendBlocked = errStr.includes('target_spend') && errStr.includes('not allowed');
+    if (spendBlocked) {
+      console.log('[manage-google-campaign] Auto-retry #3: fallback to ManualCpc');
+      clearBiddingFields();
+      campaignCreate.manualCpc = { enhancedCpcEnabled: false };
+      autoRetryWarning = `Portfolio Bid Strategy bloqueó TODAS las strategies automáticas. Campaña creada con "CPC manual" — obligatorio cambiar a tu portfolio en Google Ads antes de activarla.`;
       result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, primaryOps);
     }
   }
