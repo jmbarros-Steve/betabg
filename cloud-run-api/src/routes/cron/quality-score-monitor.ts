@@ -109,8 +109,9 @@ export async function qualityScoreMonitor(c: Context) {
           else totalKeywordsSnapshotted += snapshots.length;
         }
 
-        // 3) Detectar caídas vs hace 7 días
+        // 3) Detectar caídas vs hace 7 días + escribir qa_log para alerts (B2)
         const criterionIds = snapshots.map(s => s.criterion_id);
+        const alerts: any[] = [];
         if (criterionIds.length > 0) {
           const { data: oldSnapshots } = await supabase
             .from('keyword_quality_score_history')
@@ -126,8 +127,48 @@ export async function qualityScoreMonitor(c: Context) {
 
           for (const snap of snapshots) {
             const old = oldMap.get(snap.criterion_id);
-            if (old && snap.quality_score <= old.qs - 2) totalDrops++;
-            if (snap.quality_score < 4) totalLowQs++;
+            const drop = old ? old.qs - snap.quality_score : 0;
+            const dropDetected = drop >= 2;
+            const lowQs = snap.quality_score < 4;
+
+            if (dropDetected) totalDrops++;
+            if (lowQs) totalLowQs++;
+
+            // B2: alert qa_log cuando hay drop significativo O QS crítico
+            if (dropDetected || lowQs) {
+              const severity = snap.quality_score < 3 || drop >= 4 ? 'critical' : 'warning';
+              const summary = lowQs
+                ? `QS bajo (${snap.quality_score}/10) en keyword "${snap.keyword_text}"`
+                : `QS bajó ${drop}pt en keyword "${snap.keyword_text}" (${old!.qs} → ${snap.quality_score})`;
+              alerts.push({
+                source: 'quality-score-monitor',
+                severity,
+                category: 'google_ads.quality_score',
+                client_id: conn.client_id,
+                summary,
+                details: {
+                  campaign_id: snap.campaign_id,
+                  ad_group_id: snap.ad_group_id,
+                  criterion_id: snap.criterion_id,
+                  keyword: snap.keyword_text,
+                  current_qs: snap.quality_score,
+                  previous_qs: old?.qs || null,
+                  drop_pts: drop,
+                  expected_ctr: snap.expected_ctr,
+                  ad_relevance: snap.ad_relevance,
+                  landing_page_experience: snap.landing_page_experience,
+                },
+                created_at: new Date().toISOString(),
+              });
+            }
+          }
+
+          // Bulk insert en qa_log si hay alerts
+          if (alerts.length > 0) {
+            const { error: logErr } = await supabase.from('qa_log').insert(alerts);
+            if (logErr) {
+              errors.push(`conn ${conn.id}: qa_log insert failed (${logErr.message})`);
+            }
           }
         }
       } catch (err: any) {

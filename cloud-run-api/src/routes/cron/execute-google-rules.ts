@@ -129,6 +129,25 @@ export async function executeGoogleRulesCron(c: Context) {
         }
         condition.value = conditionValue;
 
+        // Keyword-scope branch (Tier 3 backlog B1) — itera keywords, no campaigns
+        if (condition.scope === 'keyword') {
+          const customerId = conn.account_id;
+          const kwResult = await executeKeywordScopeRule(
+            supabase, rule, condition,
+            customerId, accessToken, developerToken, loginCustomerId,
+            connectionId
+          );
+          totalExecuted += kwResult.executed;
+          if (kwResult.executed > 0) {
+            const currentCount = (rule.trigger_count as number) || 0;
+            await supabase.from('google_automated_rules').update({
+              last_triggered_at: new Date().toISOString(),
+              trigger_count: currentCount + 1,
+            }).eq('id', rule.id).eq('trigger_count', currentCount);
+          }
+          continue; // skip el flujo campaign-scope normal
+        }
+
         // Filter metrics by time window
         const windowDays = getWindowDays(condition.timeWindow);
         const sinceDate = new Date(Date.now() - windowDays * 86400000).toISOString().split('T')[0];
@@ -407,8 +426,169 @@ function aggregateMetric(rows: any[], metric: string): number {
 function evaluateCondition(value: number, operator: string, threshold: number): boolean {
   switch (operator) {
     case 'GREATER_THAN': return value > threshold;
+    case 'GREATER_THAN_OR_EQUAL': return value >= threshold;
     case 'LESS_THAN': return value < threshold;
+    case 'LESS_THAN_OR_EQUAL': return value <= threshold;
     case 'EQUALS': return Math.abs(value - threshold) < 0.01;
     default: return false;
   }
+}
+
+// --- Keyword-scope rule execution (Tier 3 backlog B1) ---
+//
+// Cuando rule.condition.scope === 'keyword', NO iteramos campaigns — iteramos
+// keywords via GAQL keyword_view con window + agregación por criterion_id.
+// Actions soportadas: PAUSE_KEYWORD, INCREASE_BID, DECREASE_BID.
+// Llamamos Google Ads API en vivo (no hay tabla de keyword_metrics diaria).
+//
+// Costo: 1 query GAQL adicional por rule keyword-scope + N mutates según keywords que triggerean.
+// Para cuotas de dev token "Basic" (15k ops/día), diseño defensivo:
+// solo procesamos las 500 keywords de mayor cost del customer (limit).
+export async function executeKeywordScopeRule(
+  supabase: any,
+  rule: any,
+  condition: any,
+  customerId: string,
+  accessToken: string,
+  developerToken: string,
+  loginCustomerId: string,
+  connectionId: string
+): Promise<{ evaluated: number; executed: number }> {
+  const windowDays = getWindowDays(condition.timeWindow);
+  const dateClause = windowDays === 7 ? 'LAST_7_DAYS' : windowDays === 14 ? 'LAST_14_DAYS' : windowDays === 30 ? 'LAST_30_DAYS' : 'LAST_7_DAYS';
+
+  // GAQL: keyword_view últimos N días, agregado per-criterion via segments.date
+  const query = `
+    SELECT
+      ad_group_criterion.criterion_id,
+      ad_group_criterion.resource_name,
+      ad_group_criterion.keyword.text,
+      ad_group_criterion.keyword.match_type,
+      ad_group_criterion.status,
+      ad_group_criterion.cpc_bid_micros,
+      ad_group.id, ad_group.name,
+      campaign.id, campaign.name,
+      metrics.impressions, metrics.clicks, metrics.conversions, metrics.cost_micros, metrics.ctr
+    FROM keyword_view
+    WHERE campaign.advertising_channel_type = 'SEARCH'
+      AND campaign.status != 'REMOVED'
+      AND ad_group.status != 'REMOVED'
+      AND ad_group_criterion.status = 'ENABLED'
+      AND ad_group_criterion.negative = FALSE
+      AND segments.date DURING ${dateClause}
+  `;
+
+  const result = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, query);
+  if (!result.ok) {
+    console.warn(`[execute-google-rules] keyword-scope GAQL failed: ${result.error}`);
+    return { evaluated: 0, executed: 0 };
+  }
+
+  // Agregar por criterion_id
+  const kwMap = new Map<string, any>();
+  for (const row of result.data || []) {
+    const cid = String(row.adGroupCriterion?.criterionId);
+    if (!kwMap.has(cid)) {
+      kwMap.set(cid, {
+        criterion_id: cid,
+        resource_name: row.adGroupCriterion?.resourceName,
+        keyword_text: row.adGroupCriterion?.keyword?.text,
+        match_type: row.adGroupCriterion?.keyword?.matchType,
+        cpc_bid_micros: Number(row.adGroupCriterion?.cpcBidMicros || 0),
+        ad_group_id: String(row.adGroup?.id),
+        ad_group_name: row.adGroup?.name,
+        campaign_id: String(row.campaign?.id),
+        campaign_name: row.campaign?.name,
+        impressions: 0, clicks: 0, conversions: 0, cost_micros: 0,
+      });
+    }
+    const kw = kwMap.get(cid)!;
+    kw.impressions += Number(row.metrics?.impressions || 0);
+    kw.clicks += Number(row.metrics?.clicks || 0);
+    kw.conversions += Number(row.metrics?.conversions || 0);
+    kw.cost_micros += Number(row.metrics?.costMicros || 0);
+  }
+
+  let evaluated = 0, executed = 0;
+  const actionType = rule.action?.type || rule.action?.actionType;
+
+  // Limit: procesar max 500 keywords (protege cuota dev token)
+  const keywords = Array.from(kwMap.values())
+    .sort((a, b) => b.cost_micros - a.cost_micros)
+    .slice(0, 500);
+
+  for (const kw of keywords) {
+    evaluated++;
+    // Calcular métrica según condition.metric
+    let metricValue = 0;
+    switch (condition.metric) {
+      case 'spend': metricValue = kw.cost_micros / 1_000_000; break;
+      case 'impressions': metricValue = kw.impressions; break;
+      case 'clicks': metricValue = kw.clicks; break;
+      case 'conversions': metricValue = kw.conversions; break;
+      case 'cpa': metricValue = kw.conversions > 0 ? (kw.cost_micros / 1_000_000) / kw.conversions : 0; break;
+      case 'ctr': metricValue = kw.impressions > 0 ? (kw.clicks / kw.impressions) * 100 : 0; break;
+      default: continue; // Unknown metric
+    }
+
+    if (!evaluateCondition(metricValue, condition.operator, condition.value)) continue;
+
+    let executedOk = false;
+    let execDetails = '';
+    try {
+      if (actionType === 'PAUSE_KEYWORD') {
+        const resp = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, [{
+          adGroupCriterionOperation: {
+            update: { resourceName: kw.resource_name, status: 'PAUSED' },
+            updateMask: 'status',
+          },
+        }]);
+        executedOk = resp.ok;
+        execDetails = executedOk ? `Keyword "${kw.keyword_text}" paused (${condition.metric}=${metricValue.toFixed(2)})` : `Pause failed: ${resp.error}`;
+      } else if (actionType === 'INCREASE_BID' || actionType === 'DECREASE_BID') {
+        const pct = rule.action?.percentage || 10;
+        const multiplier = actionType === 'INCREASE_BID' ? (1 + pct / 100) : (1 - pct / 100);
+        const newBidMicros = Math.round(kw.cpc_bid_micros * multiplier).toString();
+        if (kw.cpc_bid_micros > 0) {
+          const resp = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, [{
+            adGroupCriterionOperation: {
+              update: { resourceName: kw.resource_name, cpcBidMicros: newBidMicros },
+              updateMask: 'cpc_bid_micros',
+            },
+          }]);
+          executedOk = resp.ok;
+          const direction = actionType === 'INCREASE_BID' ? 'increased' : 'decreased';
+          execDetails = executedOk ? `Keyword "${kw.keyword_text}" bid ${direction} by ${pct}% (was ${(kw.cpc_bid_micros / 1e6).toFixed(2)})` : `Bid update failed: ${resp.error}`;
+        } else {
+          execDetails = 'Skipped: cpc_bid_micros is 0 (uses ad_group default)';
+        }
+      } else {
+        execDetails = `Unknown keyword-scope action: ${actionType}`;
+      }
+    } catch (err: any) {
+      execDetails = `Execution error: ${err.message}`;
+    }
+
+    await supabase.from('google_rule_execution_log').insert({
+      rule_id: rule.id,
+      client_id: rule.client_id,
+      campaign_id: kw.campaign_id,
+      campaign_name: kw.campaign_name,
+      action_type: actionType,
+      details: `[keyword-scope] ${execDetails}`,
+      metrics_snapshot: {
+        scope: 'keyword',
+        keyword: kw.keyword_text,
+        ad_group_id: kw.ad_group_id,
+        metric: condition.metric,
+        value: metricValue,
+        threshold: condition.value,
+      },
+      executed_at: new Date().toISOString(),
+    });
+
+    if (executedOk) executed++;
+  }
+
+  return { evaluated, executed };
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { callApi } from '@/lib/api';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -216,6 +217,10 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
   const [editRsaPath2, setEditRsaPath2] = useState('');
   const [editRsaLoading, setEditRsaLoading] = useState(false);
 
+  // QS insights (B3): lee keyword_quality_score_history — top 5 keywords low QS + drops recientes
+  const [qsAlerts, setQsAlerts] = useState<Array<{ keyword: string; current: number; previous: number | null; drop: number; ad_group_name?: string }>>([]);
+  const [qsOpen, setQsOpen] = useState(false);
+
   // Keyword Planner dialog (Tier 3 — Google Ads keyword_plan_idea_service)
   const [plannerOpen, setPlannerOpen] = useState(false);
   const [plannerAgId, setPlannerAgId] = useState<string | null>(null);
@@ -223,6 +228,9 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
   const [plannerLoading, setPlannerLoading] = useState(false);
   const [plannerAdding, setPlannerAdding] = useState(false);
   const [plannerIdeas, setPlannerIdeas] = useState<Array<{ text: string; avg_monthly_searches: number; competition: string; competition_index: number; cpc_low_micros: number; cpc_high_micros: number; _selected?: boolean; _match_type?: string }>>([]);
+  // B4: filters client-side (sin nuevo fetch)
+  const [plannerMinVolume, setPlannerMinVolume] = useState<number>(0);
+  const [plannerMaxCompetition, setPlannerMaxCompetition] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('HIGH');
 
   // Create RSA dialog (same fields, but via create_rsa action)
   const [createRsaOpen, setCreateRsaOpen] = useState(false);
@@ -258,6 +266,48 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
   }, [connectionId]);
 
   useEffect(() => { fetchAdGroups(); }, [fetchAdGroups]);
+
+  // B3: Cargar QS alerts (low QS + drops recientes) — últimos 7 días del cron
+  useEffect(() => {
+    async function loadQsAlerts() {
+      const today = new Date().toISOString().slice(0, 10);
+      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+      // Fetch últimos snapshots del cliente (orden por score asc — más críticos primero)
+      const { data, error } = await supabase
+        .from('keyword_quality_score_history')
+        .select('criterion_id, keyword_text, quality_score, snapshot_date, ad_group_id')
+        .eq('client_id', clientId)
+        .gte('snapshot_date', weekAgo)
+        .order('snapshot_date', { ascending: false })
+        .limit(500);
+      if (error || !data) return;
+
+      // Agrupar por criterion_id: snapshot más reciente (today) + hace 7 días (weekAgo)
+      const grouped = new Map<string, { current?: any; previous?: any }>();
+      for (const row of data as any[]) {
+        const e = grouped.get(row.criterion_id) || {};
+        if (row.snapshot_date === today && !e.current) e.current = row;
+        else if (row.snapshot_date === weekAgo && !e.previous) e.previous = row;
+        else if (!e.current) e.current = row; // fallback al más reciente
+        grouped.set(row.criterion_id, e);
+      }
+
+      const alerts: Array<{ keyword: string; current: number; previous: number | null; drop: number; ad_group_name?: string }> = [];
+      for (const [, v] of grouped) {
+        if (!v.current) continue;
+        const current = v.current.quality_score;
+        const previous = v.previous?.quality_score ?? null;
+        const drop = previous ? previous - current : 0;
+        if (current < 5 || drop >= 2) {
+          alerts.push({ keyword: v.current.keyword_text, current, previous, drop });
+        }
+      }
+      // Ordenar: primero los críticos (lower QS), luego mayor drop
+      alerts.sort((a, b) => (a.current - b.current) || (b.drop - a.drop));
+      setQsAlerts(alerts.slice(0, 20));
+    }
+    loadQsAlerts();
+  }, [clientId]);
 
   const refreshDetail = async (agId: string) => {
     setDetailLoading(p => ({ ...p, [agId]: true }));
@@ -583,6 +633,53 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
 
   return (
     <div className="space-y-4">
+      {/* QS insights banner (B3) */}
+      {qsAlerts.length > 0 && (
+        <Card className="border-2 border-yellow-500/40 bg-yellow-500/5">
+          <div className="p-3 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">
+                  Quality Score: {qsAlerts.length} keyword{qsAlerts.length !== 1 ? 's' : ''} con alertas
+                </p>
+                <button
+                  className="text-xs underline text-yellow-700 dark:text-yellow-400"
+                  onClick={() => setQsOpen(o => !o)}
+                >
+                  {qsOpen ? 'Ocultar' : 'Ver detalle'}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                QS &lt; 5 (crítico) o bajó ≥2 puntos en los últimos 7 días. Revisá ad relevance + landing page + expected CTR.
+              </p>
+              {qsOpen && (
+                <div className="mt-2 max-h-[220px] overflow-y-auto space-y-1">
+                  {qsAlerts.map((a, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs p-1.5 bg-background rounded">
+                      <Badge variant="outline" className={a.current < 4 ? 'bg-red-500/10 text-red-600' : a.current < 6 ? 'bg-yellow-500/10 text-yellow-600' : 'bg-green-500/10 text-green-700'}>
+                        QS {a.current}/10
+                      </Badge>
+                      <span className="flex-1 truncate">{a.keyword}</span>
+                      {a.drop > 0 && (
+                        <Badge variant="outline" className="bg-red-500/10 text-red-600">
+                          ↓ {a.drop} pts
+                        </Badge>
+                      )}
+                      {a.previous !== null && (
+                        <span className="text-muted-foreground/70 text-[10px]">
+                          hace 7d: {a.previous}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
@@ -1090,10 +1187,51 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
               </div>
             ) : plannerIdeas.length > 0 ? (
               <div>
+                {/* B4: Filters client-side */}
+                <div className="flex gap-2 flex-wrap mb-2 p-2 bg-muted/20 rounded">
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-[11px]">Volumen mínimo</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      className="h-7 w-24 text-xs"
+                      value={plannerMinVolume}
+                      onChange={e => setPlannerMinVolume(Number(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-[11px]">Competencia máx</Label>
+                    <select
+                      className="h-7 rounded border border-input bg-background px-2 text-xs"
+                      value={plannerMaxCompetition}
+                      onChange={e => setPlannerMaxCompetition(e.target.value as any)}
+                    >
+                      <option value="LOW">Solo LOW</option>
+                      <option value="MEDIUM">LOW + MEDIUM</option>
+                      <option value="HIGH">Todas</option>
+                    </select>
+                  </div>
+                </div>
+
+                {(() => {
+                  const competitionRank: Record<string, number> = { LOW: 1, MEDIUM: 2, HIGH: 3, UNSPECIFIED: 4 };
+                  const maxRank = competitionRank[plannerMaxCompetition];
+                  const visibleIdeas = plannerIdeas.filter(i =>
+                    i.avg_monthly_searches >= plannerMinVolume &&
+                    (competitionRank[i.competition] ?? 4) <= maxRank
+                  );
+                  return (
+                <>
                 <div className="flex items-center justify-between mb-2">
-                  <Label className="text-xs">{plannerIdeas.filter(i => i._selected).length} / {plannerIdeas.length} seleccionadas</Label>
-                  <button className="text-[11px] underline" onClick={() => setPlannerIdeas(prev => prev.map(i => ({ ...i, _selected: !prev.every(x => x._selected) })))}>
-                    Seleccionar todas
+                  <Label className="text-xs">
+                    {plannerIdeas.filter(i => i._selected).length} / {visibleIdeas.length} seleccionadas
+                    {visibleIdeas.length < plannerIdeas.length && <span className="text-muted-foreground/70 ml-1">({plannerIdeas.length - visibleIdeas.length} filtradas)</span>}
+                  </Label>
+                  <button className="text-[11px] underline" onClick={() => {
+                    const allSelected = visibleIdeas.every(v => v._selected);
+                    setPlannerIdeas(prev => prev.map(i => visibleIdeas.includes(i) ? { ...i, _selected: !allSelected } : i));
+                  }}>
+                    Seleccionar visibles
                   </button>
                 </div>
                 <div className="border rounded max-h-[380px] overflow-y-auto">
@@ -1109,7 +1247,9 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
                       </tr>
                     </thead>
                     <tbody>
-                      {plannerIdeas.map((idea, idx) => (
+                      {visibleIdeas.map((idea) => {
+                        const idx = plannerIdeas.indexOf(idea);
+                        return (
                         <tr key={idx} className="border-t hover:bg-muted/20">
                           <td className="p-1.5">
                             <input type="checkbox" checked={!!idea._selected} onChange={e => setPlannerIdeas(prev => prev.map((i, j) => j === idx ? { ...i, _selected: e.target.checked } : i))} />
@@ -1132,10 +1272,14 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
                             </select>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
+                </>
+                  );
+                })()}
               </div>
             ) : (
               <p className="text-xs text-muted-foreground text-center py-6">Pegá keywords semilla y click "Buscar ideas"</p>
