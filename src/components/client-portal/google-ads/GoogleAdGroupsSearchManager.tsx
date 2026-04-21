@@ -221,6 +221,24 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
   const [qsAlerts, setQsAlerts] = useState<Array<{ keyword: string; current: number; previous: number | null; drop: number; ad_group_name?: string }>>([]);
   const [qsOpen, setQsOpen] = useState(false);
 
+  // Extensions create dialog (unificado en card Extensions)
+  const [extOpen, setExtOpen] = useState(false);
+  const [extAgId, setExtAgId] = useState<string | null>(null);
+  const [extCampaignId, setExtCampaignId] = useState<string | null>(null);
+  const [extType, setExtType] = useState<'SITELINK' | 'CALLOUT' | 'SNIPPET'>('SITELINK');
+  const [extScope, setExtScope] = useState<'ad_group' | 'campaign'>('ad_group');
+  const [extLoading, setExtLoading] = useState(false);
+  // Sitelink fields
+  const [extSitelinkText, setExtSitelinkText] = useState('');
+  const [extSitelinkDesc1, setExtSitelinkDesc1] = useState('');
+  const [extSitelinkDesc2, setExtSitelinkDesc2] = useState('');
+  const [extSitelinkUrl, setExtSitelinkUrl] = useState('');
+  // Callout fields
+  const [extCalloutText, setExtCalloutText] = useState('');
+  // Snippet fields (header enum whitelist Google Ads)
+  const [extSnippetHeader, setExtSnippetHeader] = useState<string>('Types');
+  const [extSnippetValues, setExtSnippetValues] = useState<string[]>(['', '', '']);
+
   // Keyword Planner dialog (Tier 3 — Google Ads keyword_plan_idea_service)
   const [plannerOpen, setPlannerOpen] = useState(false);
   const [plannerAgId, setPlannerAgId] = useState<string | null>(null);
@@ -402,6 +420,82 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
     else if (failed > 0) toast.error(`${failed} keyword(s) fallaron`);
     if (expandedId === kwSuggestAgId) await refreshDetail(kwSuggestAgId);
     setKwSuggestOpen(false);
+  };
+
+  // ── Extensions (create unificado) ────────────────────────────────────
+  const openExtensionCreate = (agId: string, campaignId: string) => {
+    setExtAgId(agId);
+    setExtCampaignId(campaignId);
+    setExtType('SITELINK');
+    setExtScope('ad_group');
+    setExtSitelinkText(''); setExtSitelinkDesc1(''); setExtSitelinkDesc2(''); setExtSitelinkUrl('');
+    setExtCalloutText('');
+    setExtSnippetHeader('Types'); setExtSnippetValues(['', '', '']);
+    setExtOpen(true);
+  };
+
+  const submitExtension = async () => {
+    if (!extAgId || !extCampaignId) return;
+    setExtLoading(true);
+    try {
+      // Step 1: crear el asset según type
+      let createAction = '';
+      let createData: any = {};
+      if (extType === 'SITELINK') {
+        const text = extSitelinkText.trim();
+        const url = extSitelinkUrl.trim();
+        if (!text || !url) { toast.error('Link text y final URL son obligatorios'); return; }
+        if (text.length > 25) { toast.error('Link text máx 25 chars'); return; }
+        createAction = 'create_sitelink';
+        createData = {
+          link_text: text.slice(0, 25),
+          description1: extSitelinkDesc1.trim().slice(0, 35) || undefined,
+          description2: extSitelinkDesc2.trim().slice(0, 35) || undefined,
+          final_urls: [url],
+        };
+      } else if (extType === 'CALLOUT') {
+        const text = extCalloutText.trim();
+        if (!text) { toast.error('Callout text obligatorio'); return; }
+        if (text.length > 25) { toast.error('Callout máx 25 chars'); return; }
+        createAction = 'create_callout';
+        createData = { callout_text: text.slice(0, 25) };
+      } else if (extType === 'SNIPPET') {
+        const values = extSnippetValues.map(v => v.trim()).filter(v => v.length > 0 && v.length <= 25);
+        if (values.length < 3) { toast.error('Structured snippet requiere al menos 3 valores'); return; }
+        createAction = 'create_snippet';
+        createData = { header: extSnippetHeader, values };
+      }
+
+      const createRes = await callApi('manage-google-extensions', {
+        body: { action: createAction, connection_id: connectionId, data: createData },
+      });
+      if (createRes.error || !createRes.data?.asset_id) {
+        toast.error('Error creando asset: ' + (createRes.error || 'sin asset_id'));
+        return;
+      }
+      const assetId = String(createRes.data.asset_id);
+
+      // Step 2: linkear al ad_group o campaign
+      const linkData: any = {
+        asset_id: assetId,
+        field_type: extType === 'SNIPPET' ? 'STRUCTURED_SNIPPET' : extType,
+      };
+      if (extScope === 'ad_group') linkData.ad_group_id = extAgId;
+      else linkData.campaign_id = extCampaignId;
+
+      const linkRes = await callApi('manage-google-extensions', {
+        body: { action: 'link_asset', connection_id: connectionId, data: linkData },
+      });
+      if (linkRes.error) {
+        toast.warning(`Asset creado pero no se pudo linkear: ${linkRes.error}. Podés linkearlo manualmente desde Google Ads.`);
+      } else {
+        toast.success(`${extType === 'SITELINK' ? 'Sitelink' : extType === 'CALLOUT' ? 'Callout' : 'Snippet'} creado y linkeado al ${extScope === 'ad_group' ? 'ad group' : 'campaign'}`);
+      }
+      if (expandedId === extAgId) await refreshDetail(extAgId);
+      setExtOpen(false);
+    } finally {
+      setExtLoading(false);
+    }
   };
 
   // ── Keyword Planner (Tier 3) ──────────────────────────────────────────
@@ -924,9 +1018,14 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
                                 ))}
                               </ul>
                             )}
-                            <p className="text-[11px] text-muted-foreground">
-                              Para crear extensions usá la tab <strong>Extensiones</strong> (lista + formulario por tipo).
-                            </p>
+                            <div className="flex gap-1.5 pt-1">
+                              <button
+                                className="text-[11px] flex items-center gap-1 px-2 py-0.5 rounded border border-border hover:border-primary/60"
+                                onClick={() => openExtensionCreate(ag.id, ag.campaign_id)}
+                              >
+                                <Plus className="w-3 h-3" /> Crear extension
+                              </button>
+                            </div>
                           </div>
                         );
                       })()}
@@ -1152,6 +1251,122 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
             <Button onClick={submitCreateRsa} disabled={createRsaLoading}>
               {createRsaLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
               Crear RSA
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Crear Extension (sitelink / callout / snippet) */}
+      <Dialog open={extOpen} onOpenChange={o => {
+        if (!o && !extLoading) {
+          setExtOpen(false);
+          setExtAgId(null);
+          setExtCampaignId(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[520px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Crear Extension</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            {/* Tabs tipo */}
+            <div className="flex gap-1 border-b">
+              {(['SITELINK', 'CALLOUT', 'SNIPPET'] as const).map(t => (
+                <button
+                  key={t}
+                  className={`px-3 py-1.5 text-xs border-b-2 ${extType === t ? 'border-primary text-primary font-medium' : 'border-transparent text-muted-foreground'}`}
+                  onClick={() => setExtType(t)}
+                >
+                  {t === 'SITELINK' ? 'Sitelink' : t === 'CALLOUT' ? 'Callout' : 'Snippet'}
+                </button>
+              ))}
+            </div>
+
+            {/* Scope selector */}
+            <div className="space-y-1">
+              <Label className="text-xs">Scope (a qué aplica)</Label>
+              <div className="flex gap-3 text-xs">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input type="radio" checked={extScope === 'ad_group'} onChange={() => setExtScope('ad_group')} />
+                  Solo este Ad Group
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input type="radio" checked={extScope === 'campaign'} onChange={() => setExtScope('campaign')} />
+                  Toda la campaña
+                </label>
+              </div>
+            </div>
+
+            {/* Fields por tipo */}
+            {extType === 'SITELINK' && (
+              <div className="space-y-2">
+                <div>
+                  <Label className="text-xs">Texto visible (max 25) *</Label>
+                  <Input value={extSitelinkText} onChange={e => setExtSitelinkText(e.target.value)} maxLength={25} placeholder="Ej: Envío Gratis" />
+                  <p className="text-[10px] text-muted-foreground">{extSitelinkText.length}/25</p>
+                </div>
+                <div>
+                  <Label className="text-xs">Final URL *</Label>
+                  <Input value={extSitelinkUrl} onChange={e => setExtSitelinkUrl(e.target.value)} placeholder="https://..." type="url" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Description 1 (max 35)</Label>
+                    <Input value={extSitelinkDesc1} onChange={e => setExtSitelinkDesc1(e.target.value)} maxLength={35} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Description 2 (max 35)</Label>
+                    <Input value={extSitelinkDesc2} onChange={e => setExtSitelinkDesc2(e.target.value)} maxLength={35} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {extType === 'CALLOUT' && (
+              <div>
+                <Label className="text-xs">Callout text (max 25) *</Label>
+                <Input value={extCalloutText} onChange={e => setExtCalloutText(e.target.value)} maxLength={25} placeholder="Ej: Atención 24/7" />
+                <p className="text-[10px] text-muted-foreground">{extCalloutText.length}/25</p>
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Tip: callouts son frases cortas de valor (envío gratis, garantía, soporte). Agregá varias para armar un set.
+                </p>
+              </div>
+            )}
+
+            {extType === 'SNIPPET' && (
+              <div className="space-y-2">
+                <div>
+                  <Label className="text-xs">Header *</Label>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={extSnippetHeader} onChange={e => setExtSnippetHeader(e.target.value)}>
+                    {['Brands', 'Courses', 'Degree programs', 'Destinations', 'Featured hotels', 'Insurance coverage', 'Models', 'Neighborhoods', 'Service catalog', 'Shows', 'Styles', 'Types'].map(h => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-muted-foreground">Google requiere uno de esos headers fijos.</p>
+                </div>
+                <div>
+                  <Label className="text-xs">Values (mín 3, max 25 chars cada uno) *</Label>
+                  {extSnippetValues.map((v, idx) => (
+                    <div key={idx} className="flex gap-1 mt-1">
+                      <Input value={v} onChange={e => setExtSnippetValues(prev => prev.map((x, i) => i === idx ? e.target.value : x))} maxLength={25} placeholder={`Value ${idx + 1}`} />
+                      <span className="text-[10px] text-muted-foreground w-10 pt-2.5">{v.length}/25</span>
+                      <Button variant="ghost" size="sm" className="h-10 px-1" onClick={() => setExtSnippetValues(prev => prev.filter((_, i) => i !== idx))}>
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  {extSnippetValues.length < 10 && (
+                    <Button variant="ghost" size="sm" className="text-xs mt-1" onClick={() => setExtSnippetValues(prev => [...prev, ''])}>
+                      <Plus className="w-3 h-3 mr-1" /> Agregar value
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExtOpen(false)} disabled={extLoading}>Cancelar</Button>
+            <Button onClick={submitExtension} disabled={extLoading}>
+              {extLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Crear
             </Button>
           </DialogFooter>
         </DialogContent>

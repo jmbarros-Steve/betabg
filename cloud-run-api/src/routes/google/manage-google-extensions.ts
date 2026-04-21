@@ -236,34 +236,69 @@ async function handleCreateCall(
   return { body: { success: true, message: 'Call extension created', asset_id: assetId, linked_campaign: campaign_id || null }, status: 200 };
 }
 
+// Link asset — soporta XOR campaign_id OR ad_group_id (scope flexible).
+// Para campaign: crea campaignAssetOperation. Para ad_group: crea adGroupAssetOperation.
 async function handleLinkAsset(
   customerId: string, accessToken: string, developerToken: string,
   loginCustomerId: string, data: Record<string, any>
 ): Promise<{ body: any; status: number }> {
-  const { campaign_id, asset_id, field_type } = data;
-  if (!campaign_id || !asset_id || !field_type) {
-    return { body: { error: 'Missing required fields: campaign_id, asset_id, field_type' }, status: 400 };
-  }
-  if (!validateNumericId(campaign_id)) return { body: { error: 'campaign_id must be numeric' }, status: 400 };
-  if (!validateNumericId(asset_id)) return { body: { error: 'asset_id must be numeric' }, status: 400 };
+  const { campaign_id, ad_group_id, asset_id, asset_resource_name, field_type } = data;
 
-  const validFieldTypes = ['SITELINK', 'CALLOUT', 'STRUCTURED_SNIPPET', 'CALL'];
+  // Aceptar asset_resource_name como alternativa a asset_id (extraer ID)
+  let effectiveAssetId = asset_id;
+  if (!effectiveAssetId && asset_resource_name && typeof asset_resource_name === 'string') {
+    const m = asset_resource_name.match(/^customers\/\d+\/assets\/(\d+)$/);
+    if (m) effectiveAssetId = m[1];
+  }
+  if (!effectiveAssetId) {
+    return { body: { error: 'Missing asset_id or asset_resource_name' }, status: 400 };
+  }
+  if (!field_type) return { body: { error: 'Missing field_type' }, status: 400 };
+  if (!validateNumericId(effectiveAssetId)) return { body: { error: 'asset_id must be numeric' }, status: 400 };
+
+  // XOR: exactamente uno de campaign_id o ad_group_id
+  const hasCampaign = !!campaign_id;
+  const hasAdGroup = !!ad_group_id;
+  if (hasCampaign === hasAdGroup) {
+    return { body: { error: 'Provide exactly ONE of campaign_id or ad_group_id (XOR)' }, status: 400 };
+  }
+  if (hasCampaign && !validateNumericId(campaign_id)) return { body: { error: 'campaign_id must be numeric' }, status: 400 };
+  if (hasAdGroup && !validateNumericId(ad_group_id)) return { body: { error: 'ad_group_id must be numeric' }, status: 400 };
+
+  const validFieldTypes = ['SITELINK', 'CALLOUT', 'STRUCTURED_SNIPPET', 'CALL', 'PRICE'];
   if (!validFieldTypes.includes(field_type)) {
     return { body: { error: `Invalid field_type. Valid: ${validFieldTypes.join(', ')}` }, status: 400 };
   }
 
-  const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, [{
-    campaignAssetOperation: {
-      create: {
-        campaign: `customers/${customerId}/campaigns/${campaign_id}`,
-        asset: `customers/${customerId}/assets/${asset_id}`,
-        fieldType: field_type,
-      },
-    },
-  }]);
+  const assetResource = `customers/${customerId}/assets/${effectiveAssetId}`;
+
+  const operation: any = hasCampaign
+    ? {
+        campaignAssetOperation: {
+          create: {
+            campaign: `customers/${customerId}/campaigns/${campaign_id}`,
+            asset: assetResource,
+            fieldType: field_type,
+          },
+        },
+      }
+    : {
+        adGroupAssetOperation: {
+          create: {
+            adGroup: `customers/${customerId}/adGroups/${ad_group_id}`,
+            asset: assetResource,
+            fieldType: field_type,
+          },
+        },
+      };
+
+  const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, [operation]);
 
   if (!result.ok) return { body: { error: 'Failed to link asset', details: result.error }, status: 502 };
-  return { body: { success: true, message: 'Asset linked to campaign' }, status: 200 };
+  return {
+    body: { success: true, scope: hasCampaign ? 'campaign' : 'ad_group', scope_id: hasCampaign ? campaign_id : ad_group_id },
+    status: 200,
+  };
 }
 
 async function handleUnlinkAsset(
