@@ -98,6 +98,10 @@ export default function GoogleConversionSetup({ connectionId, clientId }: Google
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
+  // Tracking wizard (Tier 3)
+  const [trackingInfo, setTrackingInfo] = useState<any>(null);
+  const [trackingLoading, setTrackingLoading] = useState(false);
+
   // Create dialog
   const [createOpen, setCreateOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -116,7 +120,19 @@ export default function GoogleConversionSetup({ connectionId, clientId }: Google
     setLoading(false);
   }, [connectionId]);
 
-  useEffect(() => { fetchConversions(); }, [fetchConversions]);
+  const checkTracking = useCallback(async () => {
+    setTrackingLoading(true);
+    const { data, error } = await callApi('manage-google-conversions', {
+      body: { action: 'check_tracking', connection_id: connectionId },
+    });
+    setTrackingLoading(false);
+    if (error) { toast.error('Error verificando tracking: ' + error); return; }
+    setTrackingInfo(data);
+    const warns = (data as any)?.warnings;
+    if (Array.isArray(warns)) warns.forEach((w: string) => toast.warning(w));
+  }, [connectionId]);
+
+  useEffect(() => { fetchConversions(); checkTracking(); }, [fetchConversions, checkTracking]);
 
   const handleToggle = async (conv: ConversionAction) => {
     const newStatus = conv.status === 'ENABLED' ? 'PAUSED' : 'ENABLED';
@@ -211,6 +227,64 @@ export default function GoogleConversionSetup({ connectionId, clientId }: Google
           </Button>
         </div>
       </div>
+
+      {/* Tracking wizard banner (Tier 3) */}
+      {trackingInfo && (
+        <Card className={`border-2 ${
+          trackingInfo.has_gtag && trackingInfo.active_conversion_count > 0
+            ? 'border-green-500/40 bg-green-500/5'
+            : trackingInfo.has_gtag || trackingInfo.has_gtm || trackingInfo.has_ga4
+            ? 'border-yellow-500/40 bg-yellow-500/5'
+            : 'border-red-500/40 bg-red-500/5'
+        }`}>
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              {trackingInfo.has_gtag && trackingInfo.active_conversion_count > 0 ? (
+                <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
+              ) : (
+                <Target className="w-5 h-5 text-yellow-600 shrink-0" />
+              )}
+              <div className="flex-1">
+                <p className="text-sm font-medium">
+                  {trackingInfo.has_gtag && trackingInfo.active_conversion_count > 0
+                    ? '✅ Conversion tracking completo'
+                    : trackingInfo.has_gtag || trackingInfo.has_gtm || trackingInfo.has_ga4
+                    ? '⚠️ Tags parciales — falta configurar conversion actions'
+                    : '❌ Sin tracking detectado'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">{trackingInfo.recommendation}</p>
+                {trackingInfo.detected_tags && trackingInfo.detected_tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {trackingInfo.detected_tags.map((tag: string, i: number) => (
+                      <Badge key={i} variant="outline" className="bg-background text-[10px]">{tag}</Badge>
+                    ))}
+                  </div>
+                )}
+                {trackingInfo.website_url && (
+                  <p className="text-[11px] text-muted-foreground mt-1.5">
+                    Verificado en: <a href={trackingInfo.website_url} target="_blank" rel="noreferrer" className="underline">{trackingInfo.website_url}</a>
+                  </p>
+                )}
+                {!trackingInfo.has_gtag && !trackingInfo.has_gtm && !trackingInfo.has_ga4 && (
+                  <div className="mt-2 p-2 bg-background rounded text-[11px] space-y-1">
+                    <p className="font-medium">Cómo instalar el tag de Google Ads:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 text-muted-foreground">
+                      <li>Google Ads → Tools → Conversions → +Nueva acción</li>
+                      <li>Elegí "Website" → URL de tu página → configurá la conversión</li>
+                      <li>Google te da un tag <code className="bg-muted px-1 rounded">gtag('config', 'AW-XXXXX')</code></li>
+                      <li>Pegalo en el <code className="bg-muted px-1 rounded">&lt;head&gt;</code> de tu sitio (via GTM o directo)</li>
+                      <li>Espera 24h y volvé a chequear acá</li>
+                    </ol>
+                  </div>
+                )}
+              </div>
+              <Button size="sm" variant="outline" onClick={checkTracking} disabled={trackingLoading}>
+                {trackingLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary bar */}
       {conversions.length > 0 && (

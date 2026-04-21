@@ -1,12 +1,38 @@
 import { Context } from 'hono';
 import { googleAdsQuery, googleAdsMutate, resolveConnectionAndToken } from '../../lib/google-ads-api.js';
+import { getSupabaseAdmin } from '../../lib/supabase.js';
 
-type Action = 'list' | 'create' | 'update';
+type Action = 'list' | 'create' | 'update' | 'check_tracking';
 
 interface RequestBody {
   action: Action;
   connection_id: string;
   data?: Record<string, any>;
+}
+
+// --- SSRF-safe host validator (copiado de manage-google-campaign para aislar deps) ---
+function isPublicHost(urlStr: string): boolean {
+  try {
+    const u = new URL(urlStr);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+    const host = u.hostname.toLowerCase();
+    if (!host || host.includes(':')) return false;
+    const isIpv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(host);
+    if (isIpv4) {
+      const p = host.split('.').map(Number);
+      if (p.some(n => n < 0 || n > 255)) return false;
+      if (p[0] === 10 || p[0] === 127 || p[0] === 0) return false;
+      if (p[0] === 169 && p[1] === 254) return false;
+      if (p[0] === 172 && p[1] >= 16 && p[1] <= 31) return false;
+      if (p[0] === 192 && p[1] === 168) return false;
+      if (p[0] >= 224) return false;
+      return true;
+    }
+    if (host === 'localhost') return false;
+    if (host.endsWith('.internal') || host.endsWith('.local') || host.endsWith('.localhost')) return false;
+    if (!host.includes('.')) return false;
+    return true;
+  } catch { return false; }
 }
 
 // --- Action handlers ---
@@ -181,6 +207,136 @@ async function handleUpdate(
   return { body: { success: true, conversion_action_id, updated: masks }, status: 200 };
 }
 
+// --- Check Tracking (Tier 3 wizard) ---
+// Detecta si el website del cliente tiene gtag, GTM o ga4 instalado.
+// Hace fetch al homepage del client y parsea HTML.
+// Devuelve: { has_gtag, has_gtm, has_ga4, gtag_id?, gtm_id?, ga4_id?, website_url, detected_tags[] }
+async function handleCheckTracking(
+  clientId: string, customerId: string, accessToken: string, developerToken: string, loginCustomerId: string
+): Promise<{ body: any; status: number }> {
+  const supabase = getSupabaseAdmin();
+  const warnings: string[] = [];
+
+  // 1) Fetch website_url del cliente
+  const { data: clientRow } = await supabase
+    .from('clients')
+    .select('website_url')
+    .eq('id', clientId)
+    .maybeSingle();
+
+  const websiteUrl = clientRow?.website_url?.trim();
+  if (!websiteUrl) {
+    return {
+      body: {
+        success: true,
+        has_gtag: false, has_gtm: false, has_ga4: false,
+        website_url: null,
+        detected_tags: [],
+        message: 'El cliente no tiene website_url configurado. Agregalo en Configuración del cliente primero.',
+      },
+      status: 200,
+    };
+  }
+
+  const fullUrl = /^https?:\/\//i.test(websiteUrl) ? websiteUrl : `https://${websiteUrl}`;
+  if (!isPublicHost(fullUrl)) {
+    return { body: { error: 'URL no es pública (bloqueada por SSRF check)' }, status: 400 };
+  }
+
+  // 2) Fetch homepage + parse tags
+  let html = '';
+  try {
+    const resp = await fetch(fullUrl, {
+      signal: AbortSignal.timeout(10_000),
+      redirect: 'follow',
+      headers: { 'User-Agent': 'Steve-Ads/1.0 (+https://steve.cl)' },
+    });
+    if (!resp.ok) {
+      warnings.push(`Fetch failed HTTP ${resp.status}`);
+      html = '';
+    } else {
+      if (resp.url && !isPublicHost(resp.url)) {
+        return { body: { error: 'Redirect to non-public host blocked' }, status: 400 };
+      }
+      html = await resp.text();
+    }
+  } catch (err: any) {
+    warnings.push(`Fetch error: ${err.message}`);
+  }
+
+  // 3) Detectar tags
+  const detected_tags: string[] = [];
+  let gtagId: string | null = null;
+  let gtmId: string | null = null;
+  let ga4Id: string | null = null;
+
+  // gtag (Google Ads conversion tag): gtag('config', 'AW-XXXXXXXXX')
+  const gtagMatch = html.match(/gtag\s*\(\s*['"]config['"]\s*,\s*['"](AW-[0-9]+)['"]/);
+  if (gtagMatch) {
+    gtagId = gtagMatch[1];
+    detected_tags.push(`Google Ads tag: ${gtagId}`);
+  }
+  // GTM: GTM-XXXXXXX in script src OR iframe src
+  const gtmMatch = html.match(/['"]((GTM-[A-Z0-9]+))['"]/) || html.match(/id=(GTM-[A-Z0-9]+)/);
+  if (gtmMatch) {
+    gtmId = gtmMatch[1];
+    detected_tags.push(`Google Tag Manager: ${gtmId}`);
+  }
+  // GA4: gtag('config', 'G-XXXXXXXXXX')
+  const ga4Match = html.match(/gtag\s*\(\s*['"]config['"]\s*,\s*['"](G-[A-Z0-9]+)['"]/);
+  if (ga4Match) {
+    ga4Id = ga4Match[1];
+    detected_tags.push(`Google Analytics 4: ${ga4Id}`);
+  }
+
+  // 4) Cross-check con conversion_actions activas en Google Ads
+  let active_conversion_count = 0;
+  try {
+    const query = `
+      SELECT conversion_action.id, conversion_action.status, metrics.all_conversions
+      FROM conversion_action
+      WHERE conversion_action.status = 'ENABLED'
+    `;
+    const gResult = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, query);
+    if (gResult.ok) {
+      active_conversion_count = (gResult.data || []).length;
+    } else {
+      warnings.push('No se pudo obtener conversion_actions del account');
+    }
+  } catch (err: any) {
+    warnings.push(`Query conversion_actions falló: ${err.message}`);
+  }
+
+  // 5) Verdict
+  const has_any = !!gtagId || !!gtmId || !!ga4Id;
+  let recommendation = '';
+  if (!has_any) {
+    recommendation = 'Sin tags detectados. Instalá el tag de Google Ads (AW-XXXXX) en tu website para trackear conversions.';
+  } else if (active_conversion_count === 0) {
+    recommendation = 'Tag instalado pero sin conversion_actions activas en Google Ads. Creá una acción de conversión primero.';
+  } else {
+    recommendation = `Tag OK + ${active_conversion_count} conversion action(s) activa(s). Sistema completo.`;
+  }
+
+  return {
+    body: {
+      success: true,
+      website_url: fullUrl,
+      has_gtag: !!gtagId,
+      has_gtm: !!gtmId,
+      has_ga4: !!ga4Id,
+      gtag_id: gtagId,
+      gtm_id: gtmId,
+      ga4_id: ga4Id,
+      detected_tags,
+      active_conversion_count,
+      recommendation,
+      warnings: warnings.length > 0 ? warnings : undefined,
+    },
+    status: 200,
+  };
+}
+
 // --- Main handler ---
 
 export async function manageGoogleConversions(c: Context) {
@@ -191,7 +347,7 @@ export async function manageGoogleConversions(c: Context) {
     if (!action) return c.json({ error: 'Missing required field: action' }, 400);
     if (!connection_id) return c.json({ error: 'Missing required field: connection_id' }, 400);
 
-    const validActions: Action[] = ['list', 'create', 'update'];
+    const validActions: Action[] = ['list', 'create', 'update', 'check_tracking'];
     if (!validActions.includes(action)) {
       return c.json({ error: `Invalid action: ${action}. Valid: ${validActions.join(', ')}` }, 400);
     }
@@ -216,6 +372,9 @@ export async function manageGoogleConversions(c: Context) {
         break;
       case 'update':
         result = await handleUpdate(customerId, accessToken, developerToken, loginCustomerId, data || {});
+        break;
+      case 'check_tracking':
+        result = await handleCheckTracking(ctx.clientId, customerId, accessToken, developerToken, loginCustomerId);
         break;
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };

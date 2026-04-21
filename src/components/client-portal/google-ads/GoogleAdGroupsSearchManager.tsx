@@ -30,6 +30,7 @@ import {
   Pause,
   Play,
   AlertCircle,
+  TrendingUp,
 } from 'lucide-react';
 
 interface AdGroup {
@@ -215,6 +216,14 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
   const [editRsaPath2, setEditRsaPath2] = useState('');
   const [editRsaLoading, setEditRsaLoading] = useState(false);
 
+  // Keyword Planner dialog (Tier 3 — Google Ads keyword_plan_idea_service)
+  const [plannerOpen, setPlannerOpen] = useState(false);
+  const [plannerAgId, setPlannerAgId] = useState<string | null>(null);
+  const [plannerSeed, setPlannerSeed] = useState('');
+  const [plannerLoading, setPlannerLoading] = useState(false);
+  const [plannerAdding, setPlannerAdding] = useState(false);
+  const [plannerIdeas, setPlannerIdeas] = useState<Array<{ text: string; avg_monthly_searches: number; competition: string; competition_index: number; cpc_low_micros: number; cpc_high_micros: number; _selected?: boolean; _match_type?: string }>>([]);
+
   // Create RSA dialog (same fields, but via create_rsa action)
   const [createRsaOpen, setCreateRsaOpen] = useState(false);
   const [createRsaAgId, setCreateRsaAgId] = useState<string | null>(null);
@@ -342,6 +351,55 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
     else if (failed > 0) toast.error(`${failed} keyword(s) fallaron`);
     if (expandedId === kwSuggestAgId) await refreshDetail(kwSuggestAgId);
     setKwSuggestOpen(false);
+  };
+
+  // ── Keyword Planner (Tier 3) ──────────────────────────────────────────
+  const openKeywordPlanner = (agId: string) => {
+    setPlannerAgId(agId);
+    setPlannerOpen(true);
+    setPlannerIdeas([]);
+    setPlannerSeed('');
+  };
+
+  const runKeywordPlanner = async () => {
+    if (!plannerAgId) return;
+    const seeds = plannerSeed.split('\n').map(s => s.trim()).filter(s => s.length > 0 && s.length <= 80);
+    if (seeds.length === 0) { toast.error('Pegá al menos una keyword semilla'); return; }
+    setPlannerLoading(true);
+    const { data, error } = await callApi('manage-google-keywords', {
+      body: {
+        action: 'search_keyword_ideas',
+        connection_id: connectionId,
+        data: { seed_keywords: seeds.slice(0, 20) },
+      },
+    });
+    setPlannerLoading(false);
+    if (error) { toast.error('Keyword Planner: ' + error); return; }
+    const ideas = (data?.ideas || []).map((i: any) => ({ ...i, _selected: false, _match_type: 'BROAD' }));
+    setPlannerIdeas(ideas);
+    if (ideas.length === 0) toast.warning('Sin ideas retornadas — probá con otras semillas');
+  };
+
+  const applyPlannerSelected = async () => {
+    if (!plannerAgId) return;
+    const selected = plannerIdeas.filter(i => i._selected);
+    if (selected.length === 0) { toast.error('Seleccioná al menos una'); return; }
+    setPlannerAdding(true);
+    let ok = 0, fail = 0;
+    for (const idea of selected) {
+      const { error } = await callApi('manage-google-keywords', {
+        body: {
+          action: 'add_keyword', connection_id: connectionId,
+          data: { ad_group_id: plannerAgId, keyword_text: idea.text, match_type: idea._match_type || 'BROAD' },
+        },
+      });
+      if (error) fail++; else ok++;
+    }
+    setPlannerAdding(false);
+    if (ok > 0) toast.success(`${ok} keyword(s) agregada(s)${fail > 0 ? `, ${fail} fallaron` : ''}`);
+    else toast.error(`Todas fallaron (${fail})`);
+    if (expandedId === plannerAgId) await refreshDetail(plannerAgId);
+    setPlannerOpen(false);
   };
 
   // ── Manual add keyword ────────────────────────────────────────────────
@@ -628,6 +686,9 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
                               </button>
                               <button className="text-[11px] flex items-center gap-1 px-2 py-0.5 rounded border hover:border-primary/60" onClick={() => { setAddNegAgId(ag.id); setAddNegCampaignId(ag.campaign_id); setAddNegScope('ad_group'); setAddNegOpen(true); }}>
                                 <X className="w-3 h-3" /> Negative
+                              </button>
+                              <button className="text-[11px] flex items-center gap-1 px-2 py-0.5 rounded border hover:border-primary/60" onClick={() => openKeywordPlanner(ag.id)} title="Buscar ideas en Google Keyword Planner">
+                                <TrendingUp className="w-3 h-3" /> Planner
                               </button>
                             </div>
                           </div>
@@ -993,6 +1054,98 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
             <Button onClick={submitCreateRsa} disabled={createRsaLoading}>
               {createRsaLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
               Crear RSA
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Keyword Planner (Tier 3) */}
+      <Dialog open={plannerOpen} onOpenChange={o => { if (!o && !plannerAdding) { setPlannerOpen(false); setPlannerAgId(null); setPlannerIdeas([]); setPlannerSeed(''); } }}>
+        <DialogContent className="sm:max-w-[680px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-primary" /> Keyword Planner</DialogTitle>
+            <p className="text-[11px] text-muted-foreground">Google sugiere keywords relacionadas con volumen, competencia y CPC estimado.</p>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Keywords semilla (una por línea, max 20)</Label>
+              <Textarea
+                value={plannerSeed}
+                onChange={e => setPlannerSeed(e.target.value)}
+                rows={3}
+                placeholder={`alimento perros\ncomida natural para perros\nperros santiago`}
+              />
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-muted-foreground">Por defecto busca en español, Chile. El backend ajusta según configuración.</p>
+                <Button size="sm" variant="outline" onClick={runKeywordPlanner} disabled={plannerLoading}>
+                  {plannerLoading ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+                  Buscar ideas
+                </Button>
+              </div>
+            </div>
+
+            {plannerLoading ? (
+              <div className="flex items-center gap-2 py-8 justify-center text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" /> Google está procesando...
+              </div>
+            ) : plannerIdeas.length > 0 ? (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-xs">{plannerIdeas.filter(i => i._selected).length} / {plannerIdeas.length} seleccionadas</Label>
+                  <button className="text-[11px] underline" onClick={() => setPlannerIdeas(prev => prev.map(i => ({ ...i, _selected: !prev.every(x => x._selected) })))}>
+                    Seleccionar todas
+                  </button>
+                </div>
+                <div className="border rounded max-h-[380px] overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/30 sticky top-0">
+                      <tr>
+                        <th className="p-1.5 w-8"></th>
+                        <th className="p-1.5 text-left">Keyword</th>
+                        <th className="p-1.5 text-right">Volumen/mes</th>
+                        <th className="p-1.5 text-center">Competencia</th>
+                        <th className="p-1.5 text-right">CPC (low-high)</th>
+                        <th className="p-1.5 text-center">Match</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {plannerIdeas.map((idea, idx) => (
+                        <tr key={idx} className="border-t hover:bg-muted/20">
+                          <td className="p-1.5">
+                            <input type="checkbox" checked={!!idea._selected} onChange={e => setPlannerIdeas(prev => prev.map((i, j) => j === idx ? { ...i, _selected: e.target.checked } : i))} />
+                          </td>
+                          <td className="p-1.5">{idea.text}</td>
+                          <td className="p-1.5 text-right">{idea.avg_monthly_searches.toLocaleString()}</td>
+                          <td className="p-1.5 text-center">
+                            <Badge variant="outline" className={`text-[9px] ${idea.competition === 'LOW' ? 'bg-green-500/10 text-green-700' : idea.competition === 'HIGH' ? 'bg-red-500/10 text-red-600' : 'bg-yellow-500/10 text-yellow-600'}`}>
+                              {idea.competition}
+                            </Badge>
+                          </td>
+                          <td className="p-1.5 text-right text-muted-foreground">
+                            {(idea.cpc_low_micros / 1_000_000).toFixed(2)} - {(idea.cpc_high_micros / 1_000_000).toFixed(2)}
+                          </td>
+                          <td className="p-1.5 text-center">
+                            <select className="text-[10px] bg-background border rounded px-1 py-0.5" value={idea._match_type || 'BROAD'} onChange={e => setPlannerIdeas(prev => prev.map((i, j) => j === idx ? { ...i, _match_type: e.target.value } : i))}>
+                              <option value="BROAD">BROAD</option>
+                              <option value="PHRASE">PHRASE</option>
+                              <option value="EXACT">EXACT</option>
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-6">Pegá keywords semilla y click "Buscar ideas"</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPlannerOpen(false)} disabled={plannerAdding}>Cancelar</Button>
+            <Button onClick={applyPlannerSelected} disabled={plannerAdding || plannerLoading || plannerIdeas.filter(i => i._selected).length === 0}>
+              {plannerAdding && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Agregar seleccionadas
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -14,9 +14,10 @@ type Action =
   | 'add_negative_keyword'
   | 'remove_negative_keyword'
   | 'suggest_keywords'
-  | 'list_pending_suggestions'   // NUEVA (Tier 2): leer sugerencias pending del cron
-  | 'apply_suggestion'            // NUEVA: aprobar y aplicar una sugerencia
-  | 'reject_suggestion';          // NUEVA: rechazar sin aplicar
+  | 'list_pending_suggestions'
+  | 'apply_suggestion'
+  | 'reject_suggestion'
+  | 'search_keyword_ideas';       // NUEVA (Tier 3): Keyword Planner
 
 interface RequestBody {
   action: Action;
@@ -938,6 +939,114 @@ async function handleRejectSuggestion(
   return { body: { success: true, suggestion_id }, status: 200 };
 }
 
+// --- Keyword Planner (Tier 3) ---
+// Endpoint: keywordPlanIdeas:generateKeywordIdeas (v23)
+// Devuelve ideas de keywords con volumen, competition, CPC.
+// Defaults: language=1003 (español), geo=[2152 Chile] si no se especifica.
+async function handleSearchKeywordIdeas(
+  customerId: string, accessToken: string, developerToken: string, loginCustomerId: string,
+  data: Record<string, any>
+): Promise<{ body: any; status: number }> {
+  const { seed_keywords, seed_url, language_id, geo_target_ids } = data;
+
+  const seedKw: string[] = Array.isArray(seed_keywords)
+    ? seed_keywords.filter((k: any) => typeof k === 'string' && k.trim().length > 0 && k.length <= 80).slice(0, 20)
+    : [];
+  const seedUrl = typeof seed_url === 'string' && seed_url.startsWith('http') ? seed_url : undefined;
+
+  if (seedKw.length === 0 && !seedUrl) {
+    return { body: { error: 'Provide seed_keywords[] or seed_url' }, status: 400 };
+  }
+
+  const language = String(language_id || '1003'); // 1003 = español
+  const geoIds: string[] = Array.isArray(geo_target_ids) && geo_target_ids.length > 0
+    ? geo_target_ids.map((g: any) => String(g)).filter((g: string) => /^\d+$/.test(g))
+    : ['2152']; // Chile por defecto
+
+  // Construir keyword_seed o url_seed según corresponda
+  const requestBody: any = {
+    language: `languageConstants/${language}`,
+    geoTargetConstants: geoIds.map(id => `geoTargetConstants/${id}`),
+    keywordPlanNetwork: 'GOOGLE_SEARCH',
+    includeAdultKeywords: false,
+    pageSize: 100,
+  };
+  if (seedKw.length > 0 && seedUrl) {
+    requestBody.keywordAndUrlSeed = { url: seedUrl, keywords: seedKw };
+  } else if (seedKw.length > 0) {
+    requestBody.keywordSeed = { keywords: seedKw };
+  } else if (seedUrl) {
+    requestBody.urlSeed = { url: seedUrl };
+  }
+
+  const url = `https://googleads.googleapis.com/v23/customers/${customerId}:generateKeywordIdeas`;
+  let response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'developer-token': developerToken,
+      'login-customer-id': loginCustomerId,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  // MCC fallback: si da 403, reintentar con el customerId propio como login
+  if (response.status === 403 && loginCustomerId !== customerId) {
+    console.warn(`[search_keyword_ideas] MCC ${loginCustomerId} denied, retrying with ${customerId}`);
+    await response.text().catch(() => {});
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'developer-token': developerToken,
+        'login-customer-id': customerId,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(30_000),
+    });
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`[search_keyword_ideas] Error ${response.status}:`, errorText.slice(0, 500));
+    return { body: { error: 'Failed to fetch keyword ideas', details: `HTTP ${response.status}` }, status: 502 };
+  }
+
+  const result = await response.json() as any;
+  const rawIdeas = Array.isArray(result?.results) ? result.results : [];
+
+  // Normalizar shape: text + avgMonthlySearches + competition + cpc low/high
+  const ideas = rawIdeas.slice(0, 100).map((idea: any) => {
+    const metrics = idea.keywordIdeaMetrics || {};
+    return {
+      text: idea.text || '',
+      avg_monthly_searches: Number(metrics.avgMonthlySearches || 0),
+      competition: metrics.competition || 'UNSPECIFIED',  // LOW / MEDIUM / HIGH
+      competition_index: Number(metrics.competitionIndex || 0),
+      cpc_low_micros: Number(metrics.lowTopOfPageBidMicros || 0),
+      cpc_high_micros: Number(metrics.highTopOfPageBidMicros || 0),
+    };
+  }).filter((i: any) => i.text.length > 0 && i.text.length <= 80);
+
+  // Sort: volumen desc
+  ideas.sort((a: any, b: any) => b.avg_monthly_searches - a.avg_monthly_searches);
+
+  return {
+    body: {
+      success: true,
+      ideas,
+      count: ideas.length,
+      seed_summary: seedKw.length > 0 ? `keywords: ${seedKw.join(', ').slice(0, 100)}` : `url: ${seedUrl}`,
+      language_id: language,
+      geo_target_ids: geoIds,
+    },
+    status: 200,
+  };
+}
+
 // --- Main handler ---
 
 export async function manageGoogleKeywords(c: Context) {
@@ -953,6 +1062,8 @@ export async function manageGoogleKeywords(c: Context) {
       'list_keywords', 'add_keyword', 'update_keyword', 'remove_keyword',
       'list_search_terms', 'add_negative_keyword', 'remove_negative_keyword',
       'suggest_keywords',
+      'list_pending_suggestions', 'apply_suggestion', 'reject_suggestion',
+      'search_keyword_ideas',
     ];
     if (!validActions.includes(action)) {
       return c.json({ error: `Invalid action: ${action}. Valid: ${validActions.join(', ')}` }, 400);
@@ -1039,6 +1150,9 @@ export async function manageGoogleKeywords(c: Context) {
         result = await handleApplySuggestion(customerId, accessToken, developerToken, loginCustomerId, ctx.clientId, data || {});
         break;
       }
+      case 'search_keyword_ideas':
+        result = await handleSearchKeywordIdeas(customerId, accessToken, developerToken, loginCustomerId, data || {});
+        break;
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };
     }

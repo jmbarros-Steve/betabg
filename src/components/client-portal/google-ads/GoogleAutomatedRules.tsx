@@ -113,6 +113,27 @@ const PRESETS = [
     condition: { metric: 'ctr', operator: 'LESS_THAN', value: 1.0, timeWindow: 'LAST_7_DAYS' },
     action: { type: 'SEND_NOTIFICATION' },
   },
+  // ─── Search-specific presets (Tier 3) ─────────────────────────────────
+  {
+    name: '[Search] Pausar keyword si CPA > $15,000 CLP (7d)',
+    condition: { metric: 'cpa', operator: 'GREATER_THAN', value: 15000, timeWindow: 'LAST_7_DAYS', scope: 'keyword' },
+    action: { type: 'PAUSE_KEYWORD' },
+  },
+  {
+    name: '[Search] Reducir bid 15% si CTR < 0.5% (14d)',
+    condition: { metric: 'ctr', operator: 'LESS_THAN', value: 0.5, timeWindow: 'LAST_14_DAYS', scope: 'keyword' },
+    action: { type: 'DECREASE_BID', percentage: 15 },
+  },
+  {
+    name: '[Search] Aumentar bid 10% si conversions >= 3 AND CPA OK (14d)',
+    condition: { metric: 'conversions', operator: 'GREATER_THAN_OR_EQUAL', value: 3, timeWindow: 'LAST_14_DAYS', scope: 'keyword' },
+    action: { type: 'INCREASE_BID', percentage: 10 },
+  },
+  {
+    name: '[Search] Notificar si impression_share < 40% (7d)',
+    condition: { metric: 'impression_share', operator: 'LESS_THAN', value: 40, timeWindow: 'LAST_7_DAYS' },
+    action: { type: 'SEND_NOTIFICATION' },
+  },
 ];
 
 const actionLabels: Record<string, string> = {
@@ -120,6 +141,9 @@ const actionLabels: Record<string, string> = {
   INCREASE_BUDGET: 'Aumentar Budget',
   DECREASE_BUDGET: 'Reducir Budget',
   SEND_NOTIFICATION: 'Notificar',
+  PAUSE_KEYWORD: 'Pausar Keyword',
+  INCREASE_BID: 'Aumentar Bid',
+  DECREASE_BID: 'Reducir Bid',
 };
 
 export default function GoogleAutomatedRules({ connectionId, clientId }: GoogleAutomatedRulesProps) {

@@ -148,6 +148,7 @@ import { performanceTrackerMeta } from './cron/performance-tracker-meta.js';
 import { executeMetaRulesCron } from './cron/execute-meta-rules.js';
 import { executeGoogleRulesCron } from './cron/execute-google-rules.js';
 import { searchTermsReview } from './cron/search-terms-review.js';
+import { qualityScoreMonitor } from './cron/quality-score-monitor.js';
 import { taskPrioritizer } from './cron/task-prioritizer.js';
 import { taskCompleted } from './cron/task-completed.js';
 import { detectiveVisual } from './cron/detective-visual.js';
@@ -582,6 +583,7 @@ export function registerRoutes(app: Hono) {
   cron.post('/execute-meta-rules', executeMetaRulesCron);
   cron.post('/execute-google-rules', executeGoogleRulesCron);
   cron.post('/search-terms-review', searchTermsReview);
+  cron.post('/quality-score-monitor', qualityScoreMonitor);
   cron.post('/task-prioritizer', taskPrioritizer);
   cron.post('/detective-visual', detectiveVisual);
   cron.post('/prospect-followup', prospectFollowup);
