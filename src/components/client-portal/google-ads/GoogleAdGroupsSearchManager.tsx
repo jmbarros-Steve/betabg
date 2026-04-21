@@ -268,15 +268,16 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
   useEffect(() => { fetchAdGroups(); }, [fetchAdGroups]);
 
   // B3: Cargar QS alerts (low QS + drops recientes) — últimos 7 días del cron
+  // Filter por connection_id para no mezclar alerts si el cliente tiene multiple Google accounts
   useEffect(() => {
     async function loadQsAlerts() {
       const today = new Date().toISOString().slice(0, 10);
       const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-      // Fetch últimos snapshots del cliente (orden por score asc — más críticos primero)
       const { data, error } = await supabase
         .from('keyword_quality_score_history')
         .select('criterion_id, keyword_text, quality_score, snapshot_date, ad_group_id')
         .eq('client_id', clientId)
+        .eq('connection_id', connectionId)
         .gte('snapshot_date', weekAgo)
         .order('snapshot_date', { ascending: false })
         .limit(500);
@@ -307,7 +308,7 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
       setQsAlerts(alerts.slice(0, 20));
     }
     loadQsAlerts();
-  }, [clientId]);
+  }, [clientId, connectionId]);
 
   const refreshDetail = async (agId: string) => {
     setDetailLoading(p => ({ ...p, [agId]: true }));
@@ -1228,6 +1229,7 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
                     {visibleIdeas.length < plannerIdeas.length && <span className="text-muted-foreground/70 ml-1">({plannerIdeas.length - visibleIdeas.length} filtradas)</span>}
                   </Label>
                   <button className="text-[11px] underline" onClick={() => {
+                    if (visibleIdeas.length === 0) return;
                     const allSelected = visibleIdeas.every(v => v._selected);
                     setPlannerIdeas(prev => prev.map(i => visibleIdeas.includes(i) ? { ...i, _selected: !allSelected } : i));
                   }}>

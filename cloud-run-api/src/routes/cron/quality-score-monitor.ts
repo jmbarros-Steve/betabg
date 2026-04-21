@@ -134,19 +134,20 @@ export async function qualityScoreMonitor(c: Context) {
             if (dropDetected) totalDrops++;
             if (lowQs) totalLowQs++;
 
-            // B2: alert qa_log cuando hay drop significativo O QS crítico
+            // B2: alert qa_log — schema real: {check_type, status, details, detected_by, shop_id}
+            // (Isidora W6 review: corregido shape match con anomaly-detector.ts + predictive-alerts.ts)
             if (dropDetected || lowQs) {
-              const severity = snap.quality_score < 3 || drop >= 4 ? 'critical' : 'warning';
+              const status = snap.quality_score < 3 || drop >= 4 ? 'fail' : 'warn';
               const summary = lowQs
                 ? `QS bajo (${snap.quality_score}/10) en keyword "${snap.keyword_text}"`
                 : `QS bajó ${drop}pt en keyword "${snap.keyword_text}" (${old!.qs} → ${snap.quality_score})`;
               alerts.push({
-                source: 'quality-score-monitor',
-                severity,
-                category: 'google_ads.quality_score',
-                client_id: conn.client_id,
-                summary,
-                details: {
+                check_type: 'quality_score_drop',
+                status,
+                detected_by: 'quality-score-monitor',
+                shop_id: conn.client_id,
+                details: JSON.stringify({
+                  summary,
                   campaign_id: snap.campaign_id,
                   ad_group_id: snap.ad_group_id,
                   criterion_id: snap.criterion_id,
@@ -157,8 +158,7 @@ export async function qualityScoreMonitor(c: Context) {
                   expected_ctr: snap.expected_ctr,
                   ad_relevance: snap.ad_relevance,
                   landing_page_experience: snap.landing_page_experience,
-                },
-                created_at: new Date().toISOString(),
+                }),
               });
             }
           }
