@@ -250,6 +250,14 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
   const [plannerMinVolume, setPlannerMinVolume] = useState<number>(0);
   const [plannerMaxCompetition, setPlannerMaxCompetition] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('HIGH');
 
+  // Create Ad Group dialog
+  const [searchCampaigns, setSearchCampaigns] = useState<Array<{ id: string; name: string; status: string }>>([]);
+  const [createAgOpen, setCreateAgOpen] = useState(false);
+  const [createAgCampaignId, setCreateAgCampaignId] = useState<string>('');
+  const [createAgName, setCreateAgName] = useState('');
+  const [createAgCpcBid, setCreateAgCpcBid] = useState('');
+  const [createAgLoading, setCreateAgLoading] = useState(false);
+
   // Create RSA dialog (same fields, but via create_rsa action)
   const [createRsaOpen, setCreateRsaOpen] = useState(false);
   const [createRsaAgId, setCreateRsaAgId] = useState<string | null>(null);
@@ -275,6 +283,8 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
       }
       const ags: AdGroup[] = data?.ad_groups || [];
       setAdGroups(ags);
+      const sc = (data as any)?.search_campaigns;
+      if (Array.isArray(sc)) setSearchCampaigns(sc);
       const warns = (data as any)?.warnings;
       if (Array.isArray(warns)) warns.forEach((w: string) => toast.warning(w));
       setLoading(false);
@@ -718,6 +728,38 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
     return (data?.options || []).map((o: any) => o.text).filter(Boolean);
   };
 
+  // ── Create Ad Group ───────────────────────────────────────────────────
+  const openCreateAg = () => {
+    setCreateAgCampaignId(searchCampaigns[0]?.id || '');
+    setCreateAgName('');
+    setCreateAgCpcBid('');
+    setCreateAgOpen(true);
+  };
+  const handleCreateAg = async () => {
+    if (!createAgCampaignId || !createAgName.trim()) {
+      toast.error('Campaña y nombre son requeridos');
+      return;
+    }
+    setCreateAgLoading(true);
+    try {
+      const payload: Record<string, any> = { name: createAgName.trim() };
+      const cpc = Number(createAgCpcBid);
+      if (cpc > 0) payload.cpc_bid_micros = Math.round(cpc * 1_000_000);
+      const { error } = await callApi('manage-google-campaign', {
+        body: { action: 'create_ad_group', connection_id: connectionId, campaign_id: createAgCampaignId, data: payload },
+      });
+      if (error) {
+        toast.error('Error creando ad group: ' + error);
+        return;
+      }
+      toast.success('Ad group creado');
+      setCreateAgOpen(false);
+      await fetchAdGroups();
+    } finally {
+      setCreateAgLoading(false);
+    }
+  };
+
   // ── Filter by campaign ────────────────────────────────────────────────
   const campaignOptions = Array.from(new Map(adGroups.map(ag => [ag.campaign_id, ag.campaign_name])).entries());
   const visibleAdGroups = filterCampaign ? adGroups.filter(ag => ag.campaign_id === filterCampaign) : adGroups;
@@ -795,6 +837,10 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
           <Button variant="outline" size="sm" onClick={() => fetchAdGroups()} disabled={refreshing}>
             <RefreshCw className={`w-4 h-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
             Refrescar
+          </Button>
+          <Button size="sm" onClick={openCreateAg} disabled={searchCampaigns.length === 0}>
+            <Plus className="w-4 h-4 mr-1" />
+            Crear Ad Group
           </Button>
         </div>
       </div>
@@ -1583,6 +1629,48 @@ export default function GoogleAdGroupsSearchManager({ connectionId, clientId }: 
             <Button onClick={submitEditRsa} disabled={editRsaLoading}>
               {editRsaLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
               Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Ad Group dialog */}
+      <Dialog open={createAgOpen} onOpenChange={(open) => { if (!createAgLoading) setCreateAgOpen(open); }}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Crear Ad Group</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">Se crea en la campaña Search seleccionada. Después podés agregar Keywords / RSA / Extensions.</p>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Campaña Search</Label>
+              <select
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={createAgCampaignId}
+                onChange={e => setCreateAgCampaignId(e.target.value)}
+              >
+                {searchCampaigns.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} {c.status !== 'ENABLED' ? `(${c.status})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label>Nombre del ad group</Label>
+              <Input value={createAgName} onChange={e => setCreateAgName(e.target.value)} placeholder="Ej: Zapatillas running" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">CPC máximo (USD) — opcional</Label>
+              <Input type="number" step="0.01" min="0" value={createAgCpcBid} onChange={e => setCreateAgCpcBid(e.target.value)} placeholder="Ej: 1.50" />
+              <p className="text-[11px] text-muted-foreground">Si la campaña usa Maximizar conversiones/valor, este CPC no se aplica.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateAgOpen(false)} disabled={createAgLoading}>Cancelar</Button>
+            <Button onClick={handleCreateAg} disabled={createAgLoading || !createAgName.trim() || !createAgCampaignId}>
+              {createAgLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Crear
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -469,7 +469,28 @@ async function handleListSearchAdGroups(
 
   ad_groups.sort((a, b) => b.cost_micros - a.cost_micros);
 
-  return { body: { success: true, ad_groups, warnings: warnings.length > 0 ? warnings : undefined }, status: 200 };
+  // Query 3: lista de todas las campañas Search (incluye las sin ad groups, para poder crear)
+  const search_campaigns: Array<{ id: string; name: string; status: string }> = [];
+  try {
+    const campQuery = `
+      SELECT campaign.id, campaign.name, campaign.status
+      FROM campaign
+      WHERE campaign.advertising_channel_type = 'SEARCH'
+        AND campaign.status != 'REMOVED'
+      ORDER BY campaign.name
+    `;
+    const campResult = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, campQuery);
+    if (campResult.ok && Array.isArray(campResult.data)) {
+      for (const row of campResult.data) {
+        const c = row.campaign || {};
+        if (c.id) search_campaigns.push({ id: String(c.id), name: c.name || '(sin nombre)', status: c.status });
+      }
+    }
+  } catch (err: any) {
+    warnings.push('No se pudo listar campañas Search: ' + err?.message);
+  }
+
+  return { body: { success: true, ad_groups, search_campaigns, warnings: warnings.length > 0 ? warnings : undefined }, status: 200 };
 }
 
 // --- Orquestador: get_ad_group_detail (keywords + RSAs + extensions en paralelo) ---

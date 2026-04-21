@@ -1,5 +1,79 @@
 # Andrés W3 — Journal de Aprendizaje
 
+## Sesión 20/04/2026 noche — Bid strategy cleanup Search wizard (5 commits, 2 deploys)
+
+### Contexto
+JM creando Search tras unificación "Ad Groups Search" (commit dd4e01a4). Cascada de errores
+de bidding strategy en v23 por varios bugs. Revision final: steve-api-00591-zxs.
+
+### Commits
+1. `bc39985d` — **Bidding strategy sub-message para TODOS los channel types**
+   Antes solo PMAX aplicaba `maximizeConversionValue:{}` / `targetCpa:{...}` etc. SEARCH
+   mandaba solo `biddingStrategyType: enum` → Google v23 rechaza con "required field
+   campaign_bidding_strategy was not present". Unifiqué la lógica antes del `campaignOps.push`
+   en `handleCreateCampaign` para que TODOS los types borren el enum y seteen el sub-message
+   correcto según strategy (TARGET_CPA/TARGET_ROAS obligatorio, MAXIMIZE_* opcional).
+2. `07ea933f` — **Wizard inputs condicionales para target_cpa/target_roas**
+   Añadí 2 inputs condicionales en Step 2 del wizard + campos en wizardData inicial + payload
+   al crear campaña. Muestra "obligatorio" o "opcional" en el label según strategy.
+3. `1fa1e131` — **Loading state visible en botones Steve del wizard Search**
+   JM: "cuando está generando las keywords/headlines no aparece Steve está creando". Un estado
+   único `steveBusy: null | 'keywords' | 'headlines' | 'descriptions'` con try/finally.
+   Loader2 + texto "Steve está generando..." + disabled para evitar doble click.
+4. `854ea80b` — **Endpoint diagnose_bid_strategy** (idea JM: "opción 2")
+   Cuando Google seguía rechazando TARGET_ROAS con "not allowed for the given context" aun con
+   cuenta de años + value tracking, agregué este endpoint que corre 4 GAQL en paralelo:
+   - `bidding_strategy` status != REMOVED (portfolios activos con sus targets)
+   - `conversion_action` ENABLED con value_settings (detecta value tracking real)
+   - `customer` metrics DURING LAST_30_DAYS (volumen + valor 30d)
+   - `customer.conversion_tracking_setting` (status + cross-account flag)
+   Infiere blockers + recomendaciones. UI imprime el resultado inline en el wizard.
+5. `88e7f146` — **Removido TARGET_CPA/TARGET_ROAS del dropdown**
+   JM: "entonces elimina la opción de ROAS objetivo y que quede solo max valor po". Simplificación
+   final: el dropdown solo ofrece estrategias que funcionan en todos los contextos:
+   `MAXIMIZE_CONVERSIONS` (CPA opcional), `MAXIMIZE_CONVERSION_VALUE` (ROAS opcional),
+   `MAXIMIZE_CLICKS`, `MANUAL_CPC`. Labels ahora incluyen "(CPA opcional)" / "(ROAS opcional)"
+   para que el user entienda sin leer docs. Backend `diagnose_bid_strategy` queda disponible
+   por si se usa en Settings después.
+
+### Lecciones críticas aprendidas
+
+#### TARGET_CPA/TARGET_ROAS standard son deprecated de facto en v23 cuando hay portfolios
+El diagnóstico reveló cuenta de JM con 3210 conversiones 30d, $140M valor, value tracking ON,
+CONVERSION_TRACKING_MANAGED_BY_SELF, y **1 portfolio bid strategy activa**. Causa del rechazo:
+Google v23 no deja standard TARGET_ROAS conviviendo con portfolios existentes en algunas
+configs MCC. "The operation is not allowed for the given context" es críptico — el user no puede
+inferirlo.
+
+**Conclusión UX:** no ofrecer estrategias que pueden fallar por razones invisibles al user. Las
+variantes MAXIMIZE_* con target opcional (soft target) son funcionalmente equivalentes, más
+permisivas, y Google las recomienda hoy. Removerlas del dropdown ahorra soporte.
+
+#### El sub-message de bidding strategy es OBLIGATORIO en v23 (no basta con el enum)
+Error "required field was not present (campaign_bidding_strategy)" aparece cuando mandás
+`biddingStrategyType: 'MAXIMIZE_CONVERSION_VALUE'` sin también `maximizeConversionValue: {}`.
+En v23 el enum es readonly/computed y Google infiere el type del sub-message. Solo
+MANUAL_CPC/MANUAL_CPM permiten venir "pelados" con solo el enum. El patrón correcto:
+```ts
+delete campaignCreate.biddingStrategyType;
+campaignCreate.maximizeConversionValue = roasNum > 0 ? { targetRoas: roasNum } : {};
+```
+
+#### Loading state en botones de AI es NO NEGOCIABLE
+JM reportó frustración por botones "Steve sugiere/genera" que parecían no hacer nada durante
+2-8s hasta que aparecía el resultado. Mismo patrón ya estaba en PMAX. Moraleja: cada botón
+que dispara llamada async > 500ms necesita Loader2 + disabled + texto explícito del verbo
+en progreso ("generando", "creando", "analizando"). El clic sin feedback inmediato erosiona
+confianza rápido.
+
+### Follow-ups
+- Settings Dialog podría exponer `diagnose_bid_strategy` cuando el user edita bid strategy
+  post-creación (dejar el backend útil en vez de muerto).
+- Selector de Portfolio Bid Strategies si algún user quiere forzar usar uno existente (endpoint
+  ya devuelve portfolio_strategies).
+
+---
+
 ## Sesión 21-22/04/2026 — PMAX cleanup marathon (27+ commits, 11 deploys Cloud Run)
 
 ### Contexto
