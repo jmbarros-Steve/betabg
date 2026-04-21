@@ -139,10 +139,11 @@ async function handleCreateSitelink(
   if (description1 && description1.length > 35) return { body: { error: 'description1 max 35 characters' }, status: 400 };
   if (description2 && description2.length > 35) return { body: { error: 'description2 max 35 characters' }, status: 400 };
 
+  // v23: finalUrls vive en el Asset padre, NO dentro de sitelinkAsset.
   const asset: any = {
+    finalUrls: Array.isArray(final_urls) ? final_urls : [final_urls],
     sitelinkAsset: {
       linkText: link_text,
-      finalUrls: Array.isArray(final_urls) ? final_urls : [final_urls],
     },
   };
   if (description1) asset.sitelinkAsset.description1 = description1;
