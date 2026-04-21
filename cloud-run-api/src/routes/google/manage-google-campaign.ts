@@ -1708,23 +1708,43 @@ async function handleCreateCampaign(
   const primaryOps = mutateOps.filter(op => !isSecondaryOp(op));
   const secondaryOpsRaw = mutateOps.filter(isSecondaryOp);
 
-  const result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, primaryOps);
+  let result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, primaryOps);
+
+  // Auto-retry: si Google rechaza target_roas/target_cpa por Portfolio Bid Strategy activa
+  // en la cuenta (bloqueo común en MCC), reintentar quitando el soft target. El bidding
+  // sigue siendo MAXIMIZE_CONVERSION_VALUE/MAXIMIZE_CONVERSIONS — solo pierde el ceiling.
+  let autoRetryWarning = '';
+  if (!result.ok) {
+    const errStr = String(result.error || '');
+    const targetRoasBlocked = errStr.includes('target_roas') && errStr.includes('not allowed for the given context');
+    const targetCpaBlocked = errStr.includes('target_cpa') && errStr.includes('not allowed for the given context');
+
+    if (targetRoasBlocked && campaignCreate.maximizeConversionValue?.targetRoas) {
+      console.log('[manage-google-campaign] Auto-retry: removing targetRoas (portfolio bid strategy blocking)');
+      campaignCreate.maximizeConversionValue = {};
+      autoRetryWarning = `ROAS objetivo rechazado por Google (cuenta tiene Portfolio Bid Strategy activa que bloquea target_roas standard). Campaña creada con "Maximizar valor" sin target fijo — Google optimiza automáticamente hacia ROAS alto.`;
+      result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, primaryOps);
+    } else if (targetCpaBlocked && campaignCreate.maximizeConversions?.targetCpaMicros) {
+      console.log('[manage-google-campaign] Auto-retry: removing targetCpa (portfolio bid strategy blocking)');
+      campaignCreate.maximizeConversions = {};
+      autoRetryWarning = `CPA objetivo rechazado por Google (cuenta tiene Portfolio Bid Strategy activa). Campaña creada con "Maximizar conversiones" sin CPA target.`;
+      result = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, primaryOps);
+    }
+  }
 
   if (!result.ok) {
     const errStr = String(result.error || '');
-    // Traducir errores comunes de Google a mensajes claros
     if (errStr.includes('name is already assigned') || errStr.toLowerCase().includes('duplicate name')) {
       return { body: { error: `Ya existe una campaña con el nombre "${name}" en tu cuenta de Google Ads. Cambialo y volvé a intentar.` }, status: 400 };
     }
     if (errStr.includes('INVALID_ARGUMENT') && errStr.includes('budget')) {
       return { body: { error: `Presupuesto inválido. Verificá que daily_budget sea un número positivo en la moneda de la cuenta.` }, status: 400 };
     }
-    // TARGET_ROAS / TARGET_CPA rechazados — value tracking o requisitos no cumplidos
     if (errStr.includes('target_roas') && errStr.includes('not allowed for the given context')) {
-      return { body: { error: `Google rechazó "ROAS objetivo". Causas comunes: (1) las conversiones de la cuenta no tienen value tracking configurado (necesitan valor numérico, no solo count), (2) pocas conversiones recientes con valor, (3) requiere Portfolio Bid Strategy. Fix rápido: usá "Maximizar valor" con ROAS opcional — Google optimiza hacia ese ROAS igual, pero sin este bloqueo.` }, status: 400 };
+      return { body: { error: `Google rechazó target_roas aún sin target. La cuenta probablemente requiere Portfolio Bid Strategy. Contactá a Andrés W3 para crear una portfolio reutilizable con ROAS objetivo.` }, status: 400 };
     }
     if (errStr.includes('target_cpa') && errStr.includes('not allowed for the given context')) {
-      return { body: { error: `Google rechazó "CPA objetivo". Causas comunes: conversiones insuficientes recientes, o config que requiere Portfolio Bid Strategy. Fix rápido: usá "Maximizar conversiones" con CPA opcional.` }, status: 400 };
+      return { body: { error: `Google rechazó target_cpa aún sin target. Requiere Portfolio Bid Strategy.` }, status: 400 };
     }
     return { body: { error: `Failed to create campaign: ${result.error}` }, status: 502 };
   }
@@ -1916,7 +1936,7 @@ async function handleCreateCampaign(
       campaign_id: campaignIdExtracted,
       ad_group_id: adGroupIdExtracted,
       data: result.data,
-      warnings: [acquisitionWarning, secondaryWarning].filter(Boolean),
+      warnings: [acquisitionWarning, secondaryWarning, autoRetryWarning].filter(Boolean),
       effective_acquisition_mode: effectiveAcquisitionMode,
     },
     status: 200,
