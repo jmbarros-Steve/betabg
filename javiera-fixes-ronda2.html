@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Javiera W12 - Fixes Ronda 2 - Evidencia QA</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
+  .header { text-align: center; margin-bottom: 32px; padding: 24px; background: linear-gradient(135deg, #1e293b, #334155); border-radius: 16px; border: 1px solid #475569; }
+  .header h1 { font-size: 28px; color: #f8fafc; margin-bottom: 8px; }
+  .header .subtitle { color: #94a3b8; font-size: 14px; }
+  .stats { display: flex; gap: 16px; justify-content: center; margin: 16px 0; flex-wrap: wrap; }
+  .stat { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px 20px; text-align: center; min-width: 120px; }
+  .stat .num { font-size: 28px; font-weight: bold; }
+  .stat .label { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+  .stat.green .num { color: #4ade80; }
+  .stat.yellow .num { color: #facc15; }
+  .stat.red .num { color: #f87171; }
+  .stat.blue .num { color: #60a5fa; }
+  .fix-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
+  .fix-header { padding: 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+  .fix-header:hover { background: #334155; }
+  .severity { padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+  .severity.critical { background: #991b1b; color: #fca5a5; }
+  .severity.high { background: #92400e; color: #fcd34d; }
+  .severity.medium { background: #1e3a5f; color: #93c5fd; }
+  .severity.low { background: #14532d; color: #86efac; }
+  .fix-title { font-weight: 600; color: #f1f5f9; flex: 1; }
+  .fix-file { font-size: 12px; color: #64748b; font-family: monospace; }
+  .fix-body { padding: 0 16px 16px; display: none; }
+  .fix-body.open { display: block; }
+  .diff { background: #0f172a; border-radius: 8px; padding: 12px; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; line-height: 1.6; overflow-x: auto; margin: 8px 0; }
+  .diff .del { color: #f87171; background: rgba(248, 113, 113, 0.1); display: block; }
+  .diff .add { color: #4ade80; background: rgba(74, 222, 128, 0.1); display: block; }
+  .diff .ctx { color: #64748b; display: block; }
+  .explanation { color: #94a3b8; font-size: 13px; line-height: 1.5; margin: 8px 0; padding: 8px 12px; border-left: 3px solid #475569; }
+  .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-left: 8px; }
+  .badge.done { background: #166534; color: #86efac; }
+  .badge.skipped { background: #78350f; color: #fcd34d; }
+  .section-title { font-size: 18px; color: #f1f5f9; margin: 24px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #334155; }
+  .tsc-check { background: #14532d; border: 1px solid #166534; border-radius: 12px; padding: 16px; text-align: center; margin-top: 24px; }
+  .tsc-check .icon { font-size: 36px; }
+  .tsc-check .text { color: #86efac; font-weight: 600; margin-top: 8px; }
+  .never-touch { background: #7f1d1d; border: 1px solid #991b1b; border-radius: 12px; padding: 16px; margin: 16px 0; }
+  .never-touch h3 { color: #fca5a5; margin-bottom: 8px; }
+  .never-touch p { color: #fecaca; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Javiera W12 - QA Fixes Ronda 2</h1>
+  <div class="subtitle">Steve Ads (betabg) - 10 abril 2026 - Bugs #1-#16 aplicados</div>
+  <div class="stats">
+    <div class="stat green"><div class="num">12</div><div class="label">Fixes Aplicados</div></div>
+    <div class="stat yellow"><div class="num">2</div><div class="label">Skipped (arquitectural)</div></div>
+    <div class="stat red"><div class="num">2</div><div class="label">Excluidos (steve-chat)</div></div>
+    <div class="stat blue"><div class="num">10</div><div class="label">Archivos Editados</div></div>
+  </div>
+</div>
+
+<div class="never-touch">
+  <h3>ZONA PROHIBIDA - NUNCA TOCAR</h3>
+  <p><code>cloud-run-api/src/routes/ai/steve-chat.ts</code> - Bug #2 (Opus post-brief timeout) y Bug #12 (smart rule filtering) excluidos por orden directa de JM. Solo se tocan con solicitud directa.</p>
+</div>
+
+<h2 class="section-title">Fixes de Ronda 1 (ya aplicados antes)</h2>
+
+<div class="fix-card">
+  <div class="fix-header" onclick="this.nextElementSibling.classList.toggle('open')">
+    <span class="severity critical">CRITICAL</span>
+    <span class="fix-title">Bug #6 - meeting-reminder.ts: loop infinito de spam WhatsApp</span>
+    <span class="badge done">DONE</span>
+  </div>
+  <div class="fix-body">
+    <div class="fix-file">cloud-run-api/src/routes/cron/meeting-reminder.ts</div>
+    <div class="explanation">
+      Si el update de wa_prospects fallaba, el prospect nunca se marcaba como reminder_sent=true, causando re-envio cada 30 min. Tambien migrado a isValidCronSecret() para auth timing-safe.
+    </div>
+    <div class="diff">
+<span class="del">- const cronSecret = c.req.header('X-Cron-Secret');</span>
+<span class="del">- if (cronSecret !== process.env.CRON_SECRET) {</span>
+<span class="add">+ import { isValidCronSecret } from '../../lib/cron-auth.js';</span>
+<span class="add">+ if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {</span>
+<span class="ctx">  // + Error checks on ALL 3 wa_messages inserts</span>
+<span class="ctx">  // + Error checks on ALL 3 wa_prospects updates</span>
+<span class="add">+ const { error: updateErr1 } = await supabase.from('wa_prospects').update({...})</span>
+<span class="add">+ if (updateErr1) console.error(...);</span>
+    </div>
+  </div>
+</div>
+
+<div class="fix-card">
+  <div class="fix-header" onclick="this.nextElementSibling.classList.toggle('open')">
+    <span class="severity high">HIGH</span>
+    <span class="fix-title">Bug #7 - steve-wa-chat.ts: mensajes WA perdidos silenciosamente</span>
+    <span class="badge done">DONE</span>
+  </div>
+  <div class="fix-body">
+    <div class="fix-file">cloud-run-api/src/routes/whatsapp/steve-wa-chat.ts:480-499, 946</div>
+    <div class="explanation">
+      wa_messages insert y wa_conversations upsert sin error check. strategist_history era fire-and-forget con .then().catch(). Ahora todo es await con error logging.
+    </div>
+    <div class="diff">
+<span class="del">- await supabase.from('wa_messages').insert({...});</span>
+<span class="add">+ const { error: msgInsertErr } = await supabase.from('wa_messages').insert({...});</span>
+<span class="add">+ if (msgInsertErr) console.error(...);</span>
+<span class="ctx">  ---</span>
+<span class="del">- supabase.from('wa_prospects').update({strategist_history:...}).then(()=>{}).catch(()=>{});</span>
+<span class="add">+ const { error: stratErr } = await supabase.from('wa_prospects').update({strategist_history:...});</span>
+<span class="add">+ if (stratErr) console.error(...);</span>
+    </div>
+  </div>
+</div>
+
+<div class="fix-card">
+  <div class="fix-header" onclick="this.nextElementSibling.classList.toggle('open')">
+    <span class="severity high">HIGH</span>
+    <span class="fix-title">Bug #8 - meta-oauth-callback.ts: replay attack con nonce reutilizable</span>
+    <span class="badge done">DONE</span>
+  </div>
+  <div class="fix-body">
+    <div class="fix-file">cloud-run-api/src/routes/oauth/meta-oauth-callback.ts:40-41</div>
+    <div class="explanation">
+      State nonce validado pero nunca eliminado de oauth_states. Un atacante con el code podia reutilizar el nonce. Ahora se elimina despues de validar.
+    </div>
+    <div class="diff">
+<span class="ctx">  if (!stateCheck) { return c.json({ error: 'Invalid state' }, 403); }</span>
+<span class="add">+ // Delete used nonce to prevent replay attacks</span>
+<span class="add">+ await supabase.from('oauth_states').delete().eq('id', stateCheck.id);</span>
+    </div>
+  </div>
+</div>
+
+<h2 class="section-title">Fixes de Ronda 2 (aplicados ahora)</h2>
+
+<div class="fix-card">
+  <div class="fix-header" onclick="this.nextElementSibling.classList.toggle('open')">
+    <span class="severity critical">CRITICAL</span>
+    <span class="fix-title">Bug #3 - google-ads-oauth-callback.ts: conexion muere en 1 hora sin refresh_token</span>
+    <span class="badge done">DONE</span>
+  </div>
+  <div class="fix-body">
+    <div class="fix-file">cloud-run-api/src/routes/oauth/google-ads-oauth-callback.ts:97</div>
+    <div class="explanation">
+      Si Google no devuelve refresh_token (porque el usuario ya autorizo antes), se guardaba null. El access_token expira en 1h y la conexion muere sin forma de renovar. Ahora se rechaza con error claro pidiendo reconectar.
+    </div>
+    <div class="diff">
+<span class="del">- if (!tokenData.refresh_token) {</span>
+<span class="del">-   console.warn('[google-ads-oauth] No refresh_token received...');</span>
+<span class="del">- }</span>
+<span class="add">+ if (!refreshToken) {</span>
+<span class="add">+   console.error('[google-ads-oauth] No refresh_token received...');</span>
+<span class="add">+   return c.json({</span>
+<span class="add">+     error: 'Google did not return a refresh token...',</span>
+<span class="add">+     hint: 'Try revoking access at myaccount.google.com/permissions...',</span>
+<span class="add">+   }, 400);</span>
+<span class="add">+ }</span>
+    </div>
+  </div>
+</div>
+
+<div class="fix-card">
+  <div class="fix-header" onclick="this.nextElementSibling.classList.toggle('open')">
+    <span class="severity critical">CRITICAL</span>
+    <span class="fix-title">Bug #5 - social-post-generator.ts: nightGame variable estancada</span>
+    <span class="badge done">DONE</span>
+  </div>
+  <div class="fix-body">
+    <div class="fix-file">cloud-run-api/src/routes/cron/social-post-generator.ts:55, 147-161, 300</div>
+    <div class="explanation">
+      `nightGame` era const del find() inicial (undefined). Cuando se creaba un new night game, la variable seguia undefined. La linea 300 `if (nightGame)` nunca entraba, asi que confession_post_id nunca se guardaba. Ahora se usa `currentNightGame` (let) que se actualiza al crear el juego.
+    </div>
+    <div class="diff">
+<span class="del">- if (chileHour >= 1 && chileHour < 5 && !nightGame && ...) {</span>
+<span class="add">+ let currentNightGame = nightGame;</span>
+<span class="add">+ if (chileHour >= 1 && chileHour < 5 && !currentNightGame && ...) {</span>
+<span class="ctx">    if (nightId) {</span>
+<span class="add">+     currentNightGame = { id: nightId, config: {...} };</span>
+<span class="ctx">    }</span>
+<span class="ctx">  }</span>
+<span class="ctx">  ...</span>
+<span class="del">- if (postType === 'night_confession' && nightGame) {</span>
+<span class="add">+ if (postType === 'night_confession' && currentNightGame) {</span>
+    </div>
+  </div>
+</div>
+
+<div class="fix-card">
+  <div class="fix-header" onclick="this.nextElementSibling.classList.toggle('open')">
+    <span class="severity high">HIGH</span>
+    <span class="fix-title">Bug #9 - swarm-research.ts: JSON.parse sin try/catch en fallback (x2)</span>
+    <span class="badge done">DONE</span>
+  </div>
+  <div class="fix-body">
+    <div class="fix-file">cloud-run-api/src/routes/cron/swarm-research.ts:349, 498</div>
+    <div class="explanation">
+      Cuando el primer JSON.parse falla, el fallback regex extrae un match y hace JSON.parse(match[0]) SIN try/catch. Si el regex captura JSON malformado, el swarm entero crashea. Ahora ambos fallbacks estan envueltos en try/catch.
+    </div>
+    <div class="diff">
+<span class="ctx">  // generateQuestions() fallback:</span>
+<span class="del">-   const parsed = JSON.parse(match[0]);</span>
+<span class="add">+   try {</span>
+<span class="add">+     const parsed = JSON.parse(match[0]);</span>
+<span class="add">+     if (Array.isArray(parsed)) return parsed.slice(0, 10);</span>
+<span class="add">+   } catch { /* fallback also failed */ }</span>
+<span class="ctx">  // synthesizeInsights() fallback: same pattern</span>
+    </div>
+  </div>
+</div>
+
+<div class="fix-card">
+  <div class="fix-header" onclick="this.nextElementSibling.classList.toggle('open')">
+    <span class="severity high">HIGH</span>
+    <span class="fix-title">Bug #10+#11 - wolf-night-mode.ts: Apify sin validar + Math.min(Infinity)</span>
+    <span class="badge done">DONE</span>
+  </div>
+  <div class="fix-body">
+    <div class="fix-file">cloud-run-api/src/routes/cron/wolf-night-mode.ts:88, 128-131</div>
+    <div class="explanation">
+      (1) Apify status check no validaba statusRes.ok, si la API devuelve 500 se parseaba como JSON y crasheaba. (2) Si no habia precios validos, `Math.min(...[])` = Infinity, generando hallazgos falsos "cambio de $Infinity". (3) Cron auth migrado a isValidCronSecret. Ahora se valida statusRes.ok, se filtran precios vacios, y auth es timing-safe.
+    </div>
+    <div class="diff">
+<span class="del">- const cronSecret = c.req.header('X-Cron-Secret')?.trim();</span>
+<span class="del">- if (!expected || cronSecret !== expected) {</span>
+<span class="add">+ const { isValidCronSecret } = await import('../../lib/cron-auth.js');</span>
+<span class="add">+ if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {</span>
+<span class="ctx">  ---</span>
+<span class="add">+ if (!statusRes.ok) { status = 'FAILED'; break; }</span>
+<span class="ctx">  ---</span>
+<span class="del">- Math.min(...newPrices.map(Number).filter(n => n > 0))</span>
+<span class="add">+ const validPrices = newPrices.map(Number).filter(n => n > 0);</span>
+<span class="add">+ validPrices.length >= 2 ? `$${Math.min(...validPrices)}...` : ''</span>
+    </div>
+  </div>
+</div>
+
+<div class="fix-card">
+  <div class="fix-header" onclick="this.nextElementSibling.classList.toggle('open')">
+    <span class="severity high">HIGH</span>
+    <span class="fix-title">Bug #13 - flow-webhooks.ts: timing-unsafe cron auth (winback + birthday)</span>
+    <span class="badge done">DONE</span>
+  </div>
+  <div class="fix-body">
+    <div class="fix-file">cloud-run-api/src/routes/email/flow-webhooks.ts:733, 828</div>
+    <div class="explanation">
+      Winback y birthday crons usaban `cronSecret !== expected` (comparacion vulnerable a timing attack). Migrado a `isValidCronSecret()` que usa `crypto.timingSafeEqual()`.
+    </div>
+    <div class="diff">
+<span class="add">+ import { isValidCronSecret } from '../../lib/cron-auth.js';</span>
+<span class="ctx">  // emailFlowCronWinback:</span>
+<span class="del">- if (!expected || cronSecret !== expected) {</span>
+<span class="add">+ if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {</span>
+<span class="ctx">  // emailFlowCronBirthday: same change</span>
+    </div>
+  </div>
+</div>
+
+<div class="fix-card">
+  <div class="fix-header" onclick="this.nextElementSibling.classList.toggle('open')">
+    <span class="severity medium">MEDIUM</span>
+    <span class="fix-title">Bug #15 - ClientPortal.tsx: ?tab= ignorado despues de OAuth redirect</span>
+    <span class="badge done">DONE</span>
+  </div>
+  <div class="fix-body">
+    <div class="fix-file">src/pages/ClientPortal.tsx:1, 70, 207</div>
+    <div class="explanation">
+      Despues de conectar Meta/Google OAuth, el redirect vuelve a /portal?tab=connections pero resolveDefaultTab() nunca leia el search param. El usuario siempre caia en el tab default (metrics/steve). Ahora lee ?tab= y lo usa como override.
+    </div>
+    <div class="diff">
+<span class="add">+ import { useSearchParams } from 'react-router-dom';</span>
+<span class="add">+ const [searchParams] = useSearchParams();</span>
+<span class="ctx">  // Inside resolveDefaultTab():</span>
+<span class="add">+ const urlTab = searchParams.get('tab') as TabType | null;</span>
+<span class="add">+ if (urlTab && validTabs.has(urlTab)) {</span>
+<span class="add">+   setActiveTab(urlTab);</span>
+<span class="add">+   return;</span>
+<span class="add">+ }</span>
+    </div>
+  </div>
+</div>
+
+<div class="fix-card">
+  <div class="fix-header" onclick="this.nextElementSibling.classList.toggle('open')">
+    <span class="severity medium">MEDIUM</span>
+    <span class="fix-title">Bug #16 - DashboardStats.tsx: creditos sin filtrar por usuario</span>
+    <span class="badge done">DONE</span>
+  </div>
+  <div class="fix-body">
+    <div class="fix-file">src/components/dashboard/DashboardStats.tsx:22-25</div>
+    <div class="explanation">
+      La query de client_credits no filtraba por userId, mostrando totales de TODOS los clientes del sistema. Ahora primero obtiene los client IDs del usuario, luego filtra creditos por esos IDs.
+    </div>
+    <div class="diff">
+<span class="del">- const [clientsRes, creditsRes] = await Promise.all([</span>
+<span class="del">-   supabase.from('clients').select('id').eq('client_user_id', userId),</span>
+<span class="del">-   supabase.from('client_credits').select('creditos_disponibles, creditos_usados'),</span>
+<span class="del">- ]);</span>
+<span class="add">+ const clientsRes = await supabase.from('clients').select('id').eq('client_user_id', userId);</span>
+<span class="add">+ const clientIds = (clientsRes.data || []).map(c => c.id);</span>
+<span class="add">+ let creditsRes = { data: [] };</span>
+<span class="add">+ if (clientIds.length > 0) {</span>
+<span class="add">+   creditsRes = await supabase.from('client_credits')</span>
+<span class="add">+     .select('creditos_disponibles, creditos_usados')</span>
+<span class="add">+     .in('client_id', clientIds);</span>
+<span class="add">+ }</span>
+    </div>
+  </div>
+</div>
+
+<h2 class="section-title">Bugs Skipped (no afectan funcionamiento actual)</h2>
+
+<div class="fix-card">
+  <div class="fix-header" onclick="this.nextElementSibling.classList.toggle('open')">
+    <span class="severity critical">CRITICAL</span>
+    <span class="fix-title">Bug #1 - send-campaign.ts: zombie campaign (detached Promise)</span>
+    <span class="badge skipped">SKIPPED</span>
+  </div>
+  <div class="fix-body">
+    <div class="fix-file">cloud-run-api/src/routes/whatsapp/send-campaign.ts:216</div>
+    <div class="explanation">
+      El envio de campana corre en un Promise.resolve().then() detached. Si Cloud Run recicla la instancia mid-send, la campana queda stuck en 'sending' para siempre. Requiere cambio arquitectural (Cloud Tasks, Pub/Sub, o pg_boss). El codigo ya tiene: dedup de doble-envio, progress tracking cada 10 msgs, credit refund en finally. Se necesita un cron de recovery de zombies como solucion intermedia.
+    </div>
+  </div>
+</div>
+
+<div class="fix-card">
+  <div class="fix-header" onclick="this.nextElementSibling.classList.toggle('open')">
+    <span class="severity low">LOW</span>
+    <span class="fix-title">Bug #4 - manage-meta-campaign.ts: createAdForAdset usa image_url</span>
+    <span class="badge skipped">SKIPPED</span>
+  </div>
+  <div class="fix-body">
+    <div class="fix-file">cloud-run-api/src/routes/meta/manage-meta-campaign.ts:1162</div>
+    <div class="explanation">
+      createAdForAdset pasa image_url directamente en link_data en vez de subir la imagen y usar image_hash. JM confirmo que "ese funcionaba" - Meta acepta image_url en link_data en la mayoria de casos. Baja prioridad.
+    </div>
+  </div>
+</div>
+
+<div class="tsc-check">
+  <div class="icon">&#10003;</div>
+  <div class="text">TypeScript Compilation: CLEAN (backend + frontend, 0 errores)</div>
+</div>
+
+<div style="text-align: center; margin-top: 24px; color: #64748b; font-size: 12px;">
+  Javiera W12 - QA Agent - Steve Ads - 10/04/2026
+</div>
+
+<script>
+// Auto-open first fix in each section
+document.querySelectorAll('.section-title').forEach(title => {
+  const next = title.nextElementSibling;
+  if (next && next.querySelector('.fix-body')) {
+    next.querySelector('.fix-body').classList.add('open');
+  }
+});
+</script>
+</body>
+</html>

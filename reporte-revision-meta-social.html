@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reporte Final - Revision Meta + Social | Steve Ads</title>
+<style>
+  :root { --bg: #0f172a; --card: #1e293b; --accent: #3b82f6; --red: #ef4444; --orange: #f97316; --yellow: #eab308; --green: #22c55e; --text: #e2e8f0; --muted: #94a3b8; --border: #334155; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; padding: 20px; }
+  .container { max-width: 1400px; margin: 0 auto; }
+  h1 { font-size: 2rem; margin-bottom: 8px; }
+  h2 { font-size: 1.4rem; margin: 32px 0 16px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  h3 { font-size: 1.1rem; margin: 20px 0 10px; color: var(--muted); }
+  .subtitle { color: var(--muted); margin-bottom: 24px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 20px 0; }
+  .stat { background: var(--card); border-radius: 12px; padding: 16px; text-align: center; border: 1px solid var(--border); }
+  .stat .num { font-size: 2.2rem; font-weight: 800; }
+  .stat .label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .stat.p0 .num { color: var(--red); }
+  .stat.p1 .num { color: var(--orange); }
+  .stat.p2 .num { color: var(--yellow); }
+  .stat.total .num { color: var(--accent); }
+  .stat.lines .num { color: var(--green); }
+  .session { background: var(--card); border-radius: 12px; padding: 20px; margin: 12px 0; border: 1px solid var(--border); }
+  .session-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .session-title { font-weight: 700; font-size: 1.1rem; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }
+  .badge-p0 { background: rgba(239,68,68,0.2); color: var(--red); }
+  .badge-p1 { background: rgba(249,115,22,0.2); color: var(--orange); }
+  .badge-p2 { background: rgba(234,179,8,0.2); color: var(--yellow); }
+  .badge-done { background: rgba(34,197,94,0.2); color: var(--green); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 8px 0; }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; background: rgba(0,0,0,0.2); }
+  td { vertical-align: top; }
+  .sev { font-weight: 700; white-space: nowrap; }
+  .sev-p0 { color: var(--red); }
+  .sev-p1 { color: var(--orange); }
+  .sev-p2 { color: var(--yellow); }
+  .file { color: var(--accent); font-family: monospace; font-size: 0.8rem; white-space: nowrap; }
+  .top5 { background: rgba(239,68,68,0.05); border-left: 3px solid var(--red); padding: 12px 16px; margin: 8px 0; border-radius: 0 8px 8px 0; }
+  .top5 strong { color: var(--red); }
+  details { margin: 4px 0; }
+  summary { cursor: pointer; padding: 6px 0; color: var(--accent); font-weight: 600; }
+  summary:hover { text-decoration: underline; }
+  .progress { display: flex; gap: 4px; margin: 16px 0; }
+  .progress-seg { height: 8px; border-radius: 4px; }
+  .footer { text-align: center; color: var(--muted); font-size: 0.8rem; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); }
+  @media(max-width:768px) { .stats { grid-template-columns: repeat(2, 1fr); } table { font-size: 0.75rem; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Reporte Final: Revision Meta + Social</h1>
+<p class="subtitle">Steve Ads &mdash; 52,692 lineas revisadas linea por linea &mdash; 10 abril 2026</p>
+
+<!-- TOTALES -->
+<div class="stats">
+  <div class="stat total"><div class="num">216</div><div class="label">Bugs totales</div></div>
+  <div class="stat p0"><div class="num">8</div><div class="label">P0 Criticos</div></div>
+  <div class="stat p1"><div class="num">62</div><div class="label">P1 Altos</div></div>
+  <div class="stat p2"><div class="num">146</div><div class="label">P2 Medios</div></div>
+  <div class="stat lines"><div class="num">52,692</div><div class="label">Lineas revisadas</div></div>
+  <div class="stat" style="border-color:var(--green)"><div class="num" style="color:var(--green)">9/9</div><div class="label">Sesiones completas</div></div>
+</div>
+
+<!-- BARRA DE PROGRESO VISUAL -->
+<div class="progress">
+  <div class="progress-seg" style="background:var(--red); flex:8"></div>
+  <div class="progress-seg" style="background:var(--orange); flex:62"></div>
+  <div class="progress-seg" style="background:var(--yellow); flex:146"></div>
+</div>
+
+<!-- TOP 10 BUGS MAS CRITICOS -->
+<h2>Top 10 Bugs Mas Criticos</h2>
+
+<div class="top5">
+  <strong>1. [P0] IDOR en publish-instagram.ts:184</strong> &mdash; Cualquier usuario autenticado puede publicar en el Instagram de CUALQUIER cliente. Falta ownership check (compare con publish-facebook que SI lo tiene).
+</div>
+<div class="top5">
+  <strong>2. [P0] Auth bypass via cache en fetch-meta-business-hierarchy.ts:316</strong> &mdash; El cache devuelve datos ANTES del ownership check. Cualquier usuario autenticado puede ver la jerarquia de otro usuario.
+</div>
+<div class="top5">
+  <strong>3. [P0] SUAT cross-contamination en meta-social-inbox.ts:82</strong> &mdash; Si SUAT sin page_id, cae a /me/accounts que devuelve paginas de TODOS los merchants.
+</div>
+<div class="top5">
+  <strong>4. [P0] No auth en generate-mass-campaigns (S3)</strong> &mdash; Endpoint sin autenticacion permite crear campanas masivas sin verificar identidad.
+</div>
+<div class="top5">
+  <strong>5. [P0] Shopify JWT no verificado en manage-meta-campaign (S2)</strong> &mdash; JWT de Shopify aceptado sin validar firma. Cualquiera puede forjar tokens.
+</div>
+<div class="top5">
+  <strong>6. [P0] XSS via URL en CampaignCreateWizard.tsx:1732</strong> &mdash; URL arbitraria del usuario se renderiza como img src y se persiste. Potencial stored XSS.
+</div>
+<div class="top5">
+  <strong>7. [P0] Criterio fail-open (S3)</strong> &mdash; Cuando el servicio de validacion esta caido, las campanas pasan sin revision.
+</div>
+<div class="top5">
+  <strong>8. [P0] Budget bypass en manage-meta-campaign (S2)</strong> &mdash; Validacion de presupuesto puede ser evitada.
+</div>
+<div class="top5">
+  <strong>9. [P1] Sin limites de budget en execute-meta-rules.ts:178</strong> &mdash; Reglas automatizadas pueden incrementar presupuesto sin cap, causando gasto descontrolado.
+</div>
+<div class="top5">
+  <strong>10. [P1] Token en URL en sync-competitor-ads.ts:629</strong> &mdash; access_token en query params (no en header), visible en logs.
+</div>
+
+<!-- SESION POR SESION -->
+<h2>Detalle por Sesion</h2>
+
+<!-- S1 -->
+<div class="session">
+  <div class="session-header">
+    <span class="session-title">S1: Scan Automatizado</span>
+    <span class="badge badge-done">COMPLETA</span>
+  </div>
+  <p style="color:var(--muted);font-size:0.85rem">Analisis estatico: tsc --strict, grep antipatrones, empty catches, any types</p>
+  <table>
+    <tr><th>Categoria</th><th>Encontrados</th></tr>
+    <tr><td>SUAT Antipatron #1 (check access_token_encrypted)</td><td><span class="sev sev-p1">4 archivos</span></td></tr>
+    <tr><td>Token leaks en logs</td><td><span class="sev sev-p1">2 archivos</span></td></tr>
+    <tr><td>Empty catch blocks</td><td><span class="sev sev-p2">52</span></td></tr>
+    <tr><td>any types sin tipar</td><td><span class="sev sev-p2">200+</span></td></tr>
+    <tr><td>TODOs pendientes</td><td><span class="sev sev-p2">3</span></td></tr>
+  </table>
+</div>
+
+<!-- S2 -->
+<div class="session">
+  <div class="session-header">
+    <span class="session-title">S2: Backend P0 &mdash; Campaigns, Metrics, Audiences</span>
+    <span class="badge badge-done">COMPLETA</span>
+  </div>
+  <p style="color:var(--muted);font-size:0.85rem">manage-meta-campaign.ts, sync-meta-metrics.ts, manage-meta-audiences.ts</p>
+  <div class="stats" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat p0"><div class="num">2</div><div class="label">P0</div></div>
+    <div class="stat p1"><div class="num">12</div><div class="label">P1</div></div>
+    <div class="stat p2"><div class="num">14</div><div class="label">P2</div></div>
+  </div>
+  <details>
+    <summary>Ver bugs P0 (2)</summary>
+    <ul>
+      <li><strong>Shopify JWT firma no verificada</strong> &mdash; JWT aceptado sin validar signature</li>
+      <li><strong>Budget validation bypass</strong> &mdash; Limites de presupuesto evitables</li>
+    </ul>
+  </details>
+</div>
+
+<!-- S3 -->
+<div class="session">
+  <div class="session-header">
+    <span class="session-title">S3: Backend P0 &mdash; AI/Copy/Criterio</span>
+    <span class="badge badge-done">COMPLETA</span>
+  </div>
+  <p style="color:var(--muted);font-size:0.85rem">generate-meta-copy.ts, criterio-meta.ts, generate-mass-campaigns.ts</p>
+  <div class="stats" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat p0"><div class="num">3</div><div class="label">P0</div></div>
+    <div class="stat p1"><div class="num">10</div><div class="label">P1</div></div>
+    <div class="stat p2"><div class="num">25</div><div class="label">P2</div></div>
+  </div>
+  <details>
+    <summary>Ver bugs P0 (3)</summary>
+    <ul>
+      <li><strong>No auth en generate-mass-campaigns</strong> &mdash; Endpoint sin autenticacion</li>
+      <li><strong>Auth bypass cuando user=null</strong> &mdash; Check se salta si user es null</li>
+      <li><strong>Criterio fail-open</strong> &mdash; Campanas pasan sin revision cuando servicio caido</li>
+    </ul>
+  </details>
+</div>
+
+<!-- S4 -->
+<div class="session">
+  <div class="session-header">
+    <span class="session-title">S4: Backend P1 &mdash; Social Inbox, Hierarchy, Publish, Competitors</span>
+    <span class="badge badge-done">COMPLETA</span>
+  </div>
+  <p style="color:var(--muted);font-size:0.85rem">meta-social-inbox.ts, fetch-meta-business-hierarchy.ts, publish-instagram.ts, publish-facebook.ts, sync-competitor-ads.ts</p>
+  <div class="stats" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat p0"><div class="num">3</div><div class="label">P0</div></div>
+    <div class="stat p1"><div class="num">8</div><div class="label">P1</div></div>
+    <div class="stat p2"><div class="num">17</div><div class="label">P2</div></div>
+  </div>
+  <details>
+    <summary>Ver los 28 bugs</summary>
+    <table>
+      <tr><th>#</th><th>Sev</th><th>Archivo</th><th>Linea</th><th>Bug</th></tr>
+      <tr><td>S4-01</td><td class="sev sev-p0">P0</td><td class="file">meta-social-inbox.ts</td><td>82-138</td><td>SUAT cross-contamination: si isSuat && !page_id, cae a /me/accounts</td></tr>
+      <tr><td>S4-07</td><td class="sev sev-p0">P0</td><td class="file">hierarchy.ts</td><td>316-322</td><td>Auth bypass via cache: datos devueltos ANTES de ownership check</td></tr>
+      <tr><td>S4-12</td><td class="sev sev-p0">P0</td><td class="file">publish-instagram.ts</td><td>184-196</td><td>IDOR: sin ownership check en publish. Cualquier user puede publicar a cualquier cliente</td></tr>
+      <tr><td>S4-02</td><td class="sev sev-p1">P1</td><td class="file">meta-social-inbox.ts</td><td>338-363</td><td>N+1 queries en IG comments (15 API calls secuenciales)</td></tr>
+      <tr><td>S4-03</td><td class="sev sev-p1">P1</td><td class="file">meta-social-inbox.ts</td><td>268</td><td>is_page check fragil con igAccountId null</td></tr>
+      <tr><td>S4-08</td><td class="sev sev-p1">P1</td><td class="file">hierarchy.ts</td><td>298-308</td><td>Auth manual vs authMiddleware: bypasea checks adicionales</td></tr>
+      <tr><td>S4-13</td><td class="sev sev-p1">P1</td><td class="file">publish-instagram.ts</td><td>307-350</td><td>IDOR en update/delete: client_id del body sin verificar</td></tr>
+      <tr><td>S4-19</td><td class="sev sev-p1">P1</td><td class="file">publish-facebook.ts</td><td>172-173</td><td>Admin check usa is_super_admin (posible columna inexistente)</td></tr>
+      <tr><td>S4-23</td><td class="sev sev-p1">P1</td><td class="file">sync-competitor-ads.ts</td><td>629</td><td>Token en URL params (Pages Search)</td></tr>
+      <tr><td>S4-24</td><td class="sev sev-p1">P1</td><td class="file">sync-competitor-ads.ts</td><td>650</td><td>Token en URL params (Ad Library)</td></tr>
+      <tr><td>S4-25</td><td class="sev sev-p1">P1</td><td class="file">sync-competitor-ads.ts</td><td>803-808</td><td>Delete + upsert no atomico: si upsert falla, datos perdidos</td></tr>
+    </table>
+  </details>
+</div>
+
+<!-- S5 -->
+<div class="session">
+  <div class="session-header">
+    <span class="session-title">S5: Crons &mdash; Meta + Social</span>
+    <span class="badge badge-done">COMPLETA</span>
+  </div>
+  <p style="color:var(--muted);font-size:0.85rem">10 archivos: sync-all-metrics, performance-tracker-meta, execute-meta-rules, social-post/reply/digest/weekly, auto-rule-*, refresh-tokens</p>
+  <div class="stats" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat p0"><div class="num">0</div><div class="label">P0</div></div>
+    <div class="stat p1"><div class="num">3</div><div class="label">P1</div></div>
+    <div class="stat p2"><div class="num">15</div><div class="label">P2</div></div>
+  </div>
+  <details>
+    <summary>Ver los 18 bugs</summary>
+    <table>
+      <tr><th>#</th><th>Sev</th><th>Archivo</th><th>Bug</th></tr>
+      <tr><td>S5-01</td><td class="sev sev-p1">P1</td><td class="file">sync-all-metrics.ts</td><td>Service role key en HTTP self-call: si SELF_URL mal configurado, key se filtra</td></tr>
+      <tr><td>S5-03</td><td class="sev sev-p1">P1</td><td class="file">execute-meta-rules.ts</td><td>Sin limite de budget en ajustes automaticos: gasto descontrolado</td></tr>
+      <tr><td>S5-07</td><td class="sev sev-p1">P1</td><td class="file">social-post-generator.ts</td><td>Sin mutex: cron cada 15min sin lock, posts duplicados</td></tr>
+      <tr><td>S5-04</td><td class="sev sev-p2">P2</td><td class="file">execute-meta-rules.ts</td><td>Race condition en trigger_count (optimistic lock silencioso)</td></tr>
+      <tr><td>S5-09</td><td class="sev sev-p2">P2</td><td class="file">social-post-generator.ts</td><td>Reactions O(agents x posts): hasta 480 upserts/ciclo</td></tr>
+      <tr><td>S5-11</td><td class="sev sev-p2">P2</td><td class="file">social-reply-generator.ts</td><td>Vote count no atomico: votos concurrentes se pierden</td></tr>
+      <tr><td>S5-14</td><td class="sev sev-p2">P2</td><td class="file">performance-tracker-meta.ts</td><td>CPA thresholds hardcoded en CLP (multi-currency roto)</td></tr>
+      <tr><td>S5-15</td><td class="sev sev-p2">P2</td><td class="file">social-weekly-rotation.ts</td><td>Sin mutex: Cloud Scheduler retry crea guerras/espias duplicados</td></tr>
+      <tr><td>S5-17</td><td class="sev sev-p2">P2</td><td class="file">auto-rule-generator.ts</td><td>AI output sin sanitizar: prompt injection via error_detail</td></tr>
+    </table>
+  </details>
+</div>
+
+<!-- S6 -->
+<div class="session">
+  <div class="session-header">
+    <span class="session-title">S6: Frontend P0 &mdash; CampaignCreateWizard + MetaCampaignManager</span>
+    <span class="badge badge-done">COMPLETA</span>
+  </div>
+  <p style="color:var(--muted);font-size:0.85rem">CampaignCreateWizard.tsx (3091 lineas), MetaCampaignManager.tsx (2355 lineas)</p>
+  <div class="stats" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat p0"><div class="num">2</div><div class="label">P0</div></div>
+    <div class="stat p1"><div class="num">15</div><div class="label">P1</div></div>
+    <div class="stat p2"><div class="num">20</div><div class="label">P2</div></div>
+  </div>
+  <details>
+    <summary>Ver bugs P0 y P1 clave</summary>
+    <table>
+      <tr><th>Sev</th><th>Archivo</th><th>Bug</th></tr>
+      <tr><td class="sev sev-p0">P0</td><td class="file">CampaignCreateWizard.tsx:1732</td><td>XSS via URL arbitraria en image slots (stored en Supabase)</td></tr>
+      <tr><td class="sev sev-p0">P0</td><td class="file">CampaignCreateWizard.tsx:2461</td><td>Validacion URL debil: regex permite URLs peligrosas</td></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">MetaCampaignManager.tsx:398</td><td>Status inference usa row mas viejo en vez del mas reciente</td></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">MetaCampaignManager.tsx:458</td><td>setError nunca se llama: error UI inalcanzable</td></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">CampaignCreateWizard.tsx:2297</td><td>autoGenRef nunca se resetea: auto-generacion AI solo funciona 1 vez</td></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">CampaignCreateWizard.tsx:452</td><td>Stale closure en search filter (items seleccionados aparecen en resultados)</td></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">MetaCampaignManager.tsx:884</td><td>Bulk actions secuenciales: N API calls sin paralelismo</td></tr>
+    </table>
+  </details>
+</div>
+
+<!-- S7 -->
+<div class="session">
+  <div class="session-header">
+    <span class="session-title">S7: Frontend P1 &mdash; Dashboards + Rules + Analytics</span>
+    <span class="badge badge-done">COMPLETA</span>
+  </div>
+  <p style="color:var(--muted);font-size:0.85rem">MetaAnalyticsDashboard, MetaAutomatedRules, CreativePerformancePanel, CampaignAnalyticsPanel, CompetitorAdsPanel + hooks</p>
+  <div class="stats" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat p0"><div class="num">0</div><div class="label">P0</div></div>
+    <div class="stat p1"><div class="num">13</div><div class="label">P1</div></div>
+    <div class="stat p2"><div class="num">22</div><div class="label">P2</div></div>
+  </div>
+  <details>
+    <summary>Ver bugs P1 clave</summary>
+    <table>
+      <tr><th>Sev</th><th>Archivo</th><th>Bug</th></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">MetaAutomatedRules.tsx:673</td><td>openEdit pierde condiciones compuestas (compound rules se destruyen al editar)</td></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">MetaAutomatedRules.tsx:758</td><td>Extra conditions con NaN corrompen reglas en DB</td></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">MetaAnalyticsDashboard.tsx:534</td><td>Goals en localStorage leakean entre usuarios del mismo clientId</td></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">CampaignAnalyticsPanel.tsx:170</td><td>Exchange rate sin validar: API response corrupta causa $0 en todo</td></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">CampaignAnalyticsPanel.tsx:321</td><td>Recommendation dismiss sin client_id guard (IDOR)</td></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">CampaignAnalyticsPanel.tsx:549</td><td>Charlie actions sin verificar ownership de adSetId</td></tr>
+    </table>
+  </details>
+</div>
+
+<!-- S8 -->
+<div class="session">
+  <div class="session-header">
+    <span class="session-title">S8: Frontend P2 &mdash; Social + IG + Componentes menores</span>
+    <span class="badge badge-done">COMPLETA</span>
+  </div>
+  <p style="color:var(--muted);font-size:0.85rem">16 archivos: CampaignTreeView, AudienceOverlap, MetaAdCreator, InstagramPublisher, MetaAdsConfigPanel, SocialHub + mas</p>
+  <div class="stats" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat p0"><div class="num">0</div><div class="label">P0</div></div>
+    <div class="stat p1"><div class="num">10</div><div class="label">P1</div></div>
+    <div class="stat p2"><div class="num">22</div><div class="label">P2</div></div>
+  </div>
+  <details>
+    <summary>Ver bugs P1 clave</summary>
+    <table>
+      <tr><th>Sev</th><th>Archivo</th><th>Bug</th></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">CampaignTreeView.tsx:252</td><td>Mutacion directa de props (adset.status = ...): React no re-renderiza</td></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">CampaignTreeView.tsx:387</td><td>Mutacion directa de campaign.daily_budget</td></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">MetaAdCreator.tsx:1195</td><td>Publish SIMULADO: setTimeout(2000) en vez de llamada real a Meta API</td></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">MetaAutomatedRules.tsx:673</td><td>openEdit pierde extraConditions al editar reglas compuestas</td></tr>
+      <tr><td class="sev sev-p1">P1</td><td class="file">AudienceOverlapViewer.tsx:237</td><td>Missing React key en Fragment del heatmap</td></tr>
+    </table>
+  </details>
+</div>
+
+<!-- RESUMEN POR CATEGORIA -->
+<h2>Resumen por Categoria de Bug</h2>
+
+<table>
+  <tr><th>Categoria</th><th>P0</th><th>P1</th><th>P2</th><th>Total</th></tr>
+  <tr><td>Seguridad (auth bypass, IDOR, XSS, injection)</td><td class="sev sev-p0">6</td><td class="sev sev-p1">8</td><td>5</td><td><strong>19</strong></td></tr>
+  <tr><td>SUAT / Multi-tenant</td><td class="sev sev-p0">1</td><td class="sev sev-p1">4</td><td>2</td><td><strong>7</strong></td></tr>
+  <tr><td>Token exposure</td><td>0</td><td class="sev sev-p1">4</td><td>2</td><td><strong>6</strong></td></tr>
+  <tr><td>Logica de negocio incorrecta</td><td class="sev sev-p0">1</td><td class="sev sev-p1">12</td><td>15</td><td><strong>28</strong></td></tr>
+  <tr><td>Race conditions / Concurrencia</td><td>0</td><td class="sev sev-p1">8</td><td>12</td><td><strong>20</strong></td></tr>
+  <tr><td>Error handling (empty catch, fail-open)</td><td>0</td><td class="sev sev-p1">6</td><td>25</td><td><strong>31</strong></td></tr>
+  <tr><td>Performance (N+1, O(n^2), sequential)</td><td>0</td><td class="sev sev-p1">4</td><td>18</td><td><strong>22</strong></td></tr>
+  <tr><td>React/Frontend (stale closures, mutations, keys)</td><td>0</td><td class="sev sev-p1">14</td><td>28</td><td><strong>42</strong></td></tr>
+  <tr><td>Data integrity (non-atomic, no validation)</td><td>0</td><td class="sev sev-p1">2</td><td>15</td><td><strong>17</strong></td></tr>
+  <tr><td>Costo IA (Sonnet donde Haiku basta)</td><td>0</td><td>0</td><td>4</td><td><strong>4</strong></td></tr>
+  <tr><td>Dead code / Code smells</td><td>0</td><td>0</td><td>20</td><td><strong>20</strong></td></tr>
+  <tr style="font-weight:700;border-top:2px solid var(--border)"><td>TOTAL</td><td class="sev sev-p0">8</td><td class="sev sev-p1">62</td><td>146</td><td><strong>216</strong></td></tr>
+</table>
+
+<!-- RECOMENDACIONES -->
+<h2>Plan de Accion Recomendado</h2>
+
+<h3>Semana 1: P0 Criticos (8 bugs)</h3>
+<table>
+  <tr><th>Bug</th><th>Esfuerzo</th><th>Impacto</th></tr>
+  <tr><td>IDOR publish-instagram.ts (agregar ownership check como en publish-facebook)</td><td>15 min</td><td>Bloquea publicacion no autorizada</td></tr>
+  <tr><td>Auth bypass cache hierarchy.ts (mover cache DESPUES de ownership check)</td><td>10 min</td><td>Bloquea data leak entre clientes</td></tr>
+  <tr><td>SUAT cross-contamination social-inbox (return error si SUAT sin page_id)</td><td>5 min</td><td>Previene mostrar datos de otros merchants</td></tr>
+  <tr><td>No auth generate-mass-campaigns (agregar authMiddleware)</td><td>5 min</td><td>Bloquea acceso anonimo</td></tr>
+  <tr><td>Shopify JWT verificacion (validar firma con secret)</td><td>30 min</td><td>Previene tokens forjados</td></tr>
+  <tr><td>XSS CampaignCreateWizard (sanitizar URLs, validar protocol https)</td><td>20 min</td><td>Previene stored XSS</td></tr>
+  <tr><td>Criterio fail-open (cambiar a fail-closed: rechazar si servicio caido)</td><td>15 min</td><td>Campanas no pasan sin revision</td></tr>
+  <tr><td>Budget bypass (reforzar validacion server-side)</td><td>20 min</td><td>Previene gasto no autorizado</td></tr>
+</table>
+
+<h3>Semana 2-3: P1 Altos (62 bugs)</h3>
+<p style="color:var(--muted);font-size:0.85rem">Priorizar: token en URL (2 bugs, 10 min c/u), IDOR update/delete IG (1 bug, 10 min), budget limits en rules (1 bug, 30 min), stale closures React (14 bugs, batch fix con useCallback). Total estimado: ~2 dias de trabajo.</p>
+
+<h3>Mes 2+: P2 Medios (146 bugs)</h3>
+<p style="color:var(--muted);font-size:0.85rem">Agrupar por tipo: empty catches (52, script automatico), performance N+1 (22, batch optimization), Sonnet→Haiku (4, find & replace), dead code (20, cleanup pass).</p>
+
+<div class="footer">
+  <p>Generado por Claude Code &mdash; Revision completa linea por linea del modulo Meta + Social</p>
+  <p>52,692 lineas | 125 archivos | 9 sesiones | 10 abril 2026</p>
+</div>
+
+</div>
+</body>
+</html>

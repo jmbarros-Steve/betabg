@@ -1,5 +1,80 @@
 # Isidora W6 — Journal de Aprendizaje (Code Reviewer)
 
+## Sesión 22/04/2026 — Auditoría exhaustiva PMAX + 4 rondas review sobre Andrés W3
+
+### Contexto
+Cierre del módulo PMAX con marathon de features + bugfixes. JM pidió auditoría completa
+para detectar fallas latentes antes de declarar PMAX cerrado. 4 rondas de review.
+
+### Ronda 1 — Settings Dialog v2 + Steve AI scorecard (APROBADO CON FOLLOW-UPS)
+Revisión inicial del handleGetSettings split + handleSuggestAssetContent + Scorecard UI.
+Fallas críticas:
+1. **Negative locations se borraban** — `handleUpdateCriteria` fetchaba TODAS las LOCATION
+   (incluso negative=true) y las comparaba contra `desiredIds` solo-positivos → exclusiones
+   geográficas se perdían silenciosamente. Fix: `AND campaign_criterion.negative = FALSE`.
+2. **TARGET_CPA / TARGET_ROAS aceptaban 0** — si el user cambiaba a TARGET_CPA sin valor,
+   backend seteaba targetCpaMicros: "0" → Google rechazaba. Fix: guard `> 0` required en
+   ambos (frontend validation + backend 400).
+3. **Dedup IDs** — sugerí `Array.from(new Set(ids))` en update_criteria.
+
+### Ronda 2 — Steve genera imágenes (APROBADO)
+Verificaciones: urlToBase64 contract OK, CORS OK, tamaño base64 dentro de 5MB Google limit,
+double-click safety OK.
+
+### Ronda 3 — Auditoría exhaustiva PMAX (VEREDICTO "NO CERRAR" hasta fix de 3)
+Auditoría en background cubriendo backend + frontend + shared lib + generate-image. Output:
+
+**6 fallas críticas (3 bloqueantes):**
+1. Edit text asset — silent duplicate sin rollback (add+remove sequential, si remove falla
+   queda duplicado). Fix: migrar a 1 mutate atómico con create+link+remove.
+2. `addAssetGroupId` stale en Dialog reabierto (bug race condition).
+3. Audience demographics AGE_RANGE_UNDETERMINED-only → dimension vacía que Google rechaza.
+4. Cross-request collision en `Date.now() % 1_000_000` (100% colisión en mismo ms).
+5. Cross-tenant leak en LGF (Supabase query falla silenciosa → IDs sin validar pasan al mutate).
+6. UUID validation débil en 3 paths (client_id interpolado sin UUID_RX check).
+
+**10 fallas menores:** fetchAssetGroups sin lock, addAssetLoading dialog escape, status PAUSED
+sin traducir, handleRemoveAsset con toggleGroup (flash UI), isPmax mid-wizard state leak,
+PENDING_TTL match frágil, remove_asset regex, search_themes split por coma, acquisition warning
+sin link, DB check race.
+
+**3 patrones recurrentes:** silent `console.warn` en catches críticos (sin surface al user),
+optimistic updates sin reconciliation, estado residual en Dialogs reabiertos.
+
+**5 recomendaciones hardening:** atomicidad edit asset, idempotency key, rate limit awareness,
+E2E testing PMAX, warnings surface uniforme.
+
+### Ronda 4 — Review final post-fixes (APROBADO PARA DEPLOY)
+Andrés aplicó las 6 críticas + 10 menores + 3 hardening pragmáticos + feature wizard
+variaciones logo. Verifiqué:
+- `googleAdsMutate` default partial_failure=false → replace_asset atómico real (todo o nada).
+- Age dimension solo pushea si ageSegments.length > 0 (AGE_RANGE_UNDETERMINED-only arrojaría
+  error 400 claro al user).
+- LGF fail-safe: flag `validated=false` default, solo true si res.ok. 4 paths dropean.
+- 4 Dialogs resetean state al cerrar (add, steve, editAsset, audience).
+- Sufijo random: `(Date.now() % 1_000) * 1000 + random(1000)` → 0.1% colisión.
+- UUID_RX en handleGetBudgetRecommendation, handleGetRecommendations, handleSuggestAssetContent
+  con `safeClientId` (trimmed) en todos los fetches.
+- formatPrompts en wizard con logo + landscape_logo. Botones step 4 llaman generateAiImage
+  para los 5 formats.
+
+### Ronda 5 — Review 13 items cleanup (APROBADO + 2 observaciones backlog)
+Verificaciones finales del bloque de cleanup:
+1. Idempotency dedup con limpieza correcta en finally + TTL 60s safety net. hashBody djb2-ish
+   32-bit con ventana de colisión en ms — aceptable, post-deploy migrar a SHA1 si aparece
+   dedup fantasma.
+2. Warnings surface end-to-end verificado (backend → api.ts → toast.warning).
+3. Rate limit retorno compatible con ApiResponse del frontend.
+4. refreshGroupDetail: si falla, no deja state stale en loading=true. Observación: no hay
+   feedback visual persistente si fetch falla (UX minor backlog).
+5. 12 tests vitest passing para parseRetryAfterSeconds / formatRetryAfter / hashBody.
+6. call_to_action field type-safe al limpiar al cambiar channel_type.
+
+### Patrón adoptado: validación empírica rigurosa + fallback conservador
+Consolidado del Ronda 3 audit: priorizar detectar **silent failures** (catch sin surface),
+**race conditions** (state stale, double-click, optimistic divergente) y **cross-tenant leaks**
+(validación de ownership debe FALLAR SAFE, no FAIL OPEN).
+
 ## Sesión 20/04/2026 PM — 5 cross-reviews a Andrés W3 (proto v23 PMAX E2E)
 
 ### Regla adoptada: validación empírica para cambios en APIs externas

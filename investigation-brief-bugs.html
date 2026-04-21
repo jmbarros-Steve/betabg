@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Investigacion Completa — Brief Bugs (Dia 5, 21/04)</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2a2d3a;
+    --accent: #6366f1;
+    --accent-light: #818cf8;
+    --red: #ef4444;
+    --red-bg: #1c1215;
+    --orange: #f97316;
+    --orange-bg: #1c1712;
+    --yellow: #eab308;
+    --yellow-bg: #1c1b12;
+    --green: #22c55e;
+    --green-bg: #121c15;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --code-bg: #12141c;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 2rem;
+  }
+  .container { max-width: 1200px; margin: 0 auto; }
+
+  h1 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--accent), var(--accent-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { color: var(--text-muted); margin-bottom: 2rem; font-size: 0.95rem; }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+  }
+  .summary-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    text-align: center;
+  }
+  .summary-card .number {
+    font-size: 2rem;
+    font-weight: 700;
+  }
+  .summary-card .label {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+  }
+  .critical .number { color: var(--red); }
+  .high .number { color: var(--orange); }
+  .medium .number { color: var(--yellow); }
+  .low .number { color: var(--green); }
+
+  .bug-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+  }
+  .bug-header {
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+  }
+  .bug-header:hover { background: rgba(99, 102, 241, 0.05); }
+  .bug-id {
+    background: var(--accent);
+    color: white;
+    font-weight: 700;
+    font-size: 0.8rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .bug-title { font-weight: 600; font-size: 1.05rem; flex: 1; }
+  .severity {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .severity-critical { background: var(--red-bg); color: var(--red); border: 1px solid var(--red); }
+  .severity-high { background: var(--orange-bg); color: var(--orange); border: 1px solid var(--orange); }
+  .severity-medium { background: var(--yellow-bg); color: var(--yellow); border: 1px solid var(--yellow); }
+  .severity-low { background: var(--green-bg); color: var(--green); border: 1px solid var(--green); }
+
+  .bug-body { padding: 1.5rem; display: none; }
+  .bug-card.open .bug-body { display: block; }
+  .bug-card.open .bug-header { background: rgba(99, 102, 241, 0.08); }
+  .chevron {
+    transition: transform 0.2s;
+    color: var(--text-muted);
+    font-size: 1.2rem;
+  }
+  .bug-card.open .chevron { transform: rotate(90deg); }
+
+  .section-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-light);
+    margin-bottom: 0.5rem;
+    margin-top: 1.25rem;
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  .description { color: var(--text-muted); margin-bottom: 0.5rem; }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    margin: 0.5rem 0;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+  code {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+  }
+  .inline-code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+  }
+
+  .file-ref {
+    color: var(--accent-light);
+    font-family: monospace;
+    font-size: 0.85rem;
+    background: rgba(99, 102, 241, 0.1);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    display: inline-block;
+    margin: 0.15rem 0;
+  }
+
+  .flow-diagram {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin: 0.5rem 0;
+    font-family: monospace;
+    font-size: 0.85rem;
+    white-space: pre;
+    overflow-x: auto;
+    line-height: 1.6;
+  }
+
+  .fix-card {
+    background: rgba(34, 197, 94, 0.05);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 0.5rem 0;
+  }
+  .fix-card h4 {
+    color: var(--green);
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .impact-list {
+    list-style: none;
+    padding: 0;
+  }
+  .impact-list li {
+    padding: 0.35rem 0;
+    padding-left: 1.5rem;
+    position: relative;
+    color: var(--text-muted);
+  }
+  .impact-list li::before {
+    content: ">";
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-weight: bold;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    margin-right: 0.35rem;
+    font-weight: 500;
+  }
+  .tag-backend { background: rgba(99, 102, 241, 0.15); color: var(--accent-light); }
+  .tag-frontend { background: rgba(234, 179, 8, 0.15); color: var(--yellow); }
+  .tag-infra { background: rgba(249, 115, 22, 0.15); color: var(--orange); }
+  .tag-api { background: rgba(34, 197, 94, 0.15); color: var(--green); }
+
+  .expand-all {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 0.5rem 1.25rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 1.5rem;
+  }
+  .expand-all:hover { background: var(--accent-light); }
+
+  .priority-matrix {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  .priority-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+  }
+  .priority-box h3 {
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+  .priority-box ul {
+    list-style: none;
+    padding: 0;
+  }
+  .priority-box ul li {
+    padding: 0.3rem 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+
+  @media (max-width: 768px) {
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+    .priority-matrix { grid-template-columns: 1fr; }
+    body { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Investigacion Completa — Brief Bugs</h1>
+<p class="subtitle">Sprint Dia 5 (21/04) &middot; Bastian W24 &middot; 9 bugs investigados &middot; Generado 2026-04-13</p>
+
+<div class="summary-grid">
+  <div class="summary-card critical">
+    <div class="number">3</div>
+    <div class="label">Criticos</div>
+  </div>
+  <div class="summary-card high">
+    <div class="number">3</div>
+    <div class="label">Alta Prioridad</div>
+  </div>
+  <div class="summary-card medium">
+    <div class="number">2</div>
+    <div class="label">Media</div>
+  </div>
+  <div class="summary-card low">
+    <div class="number">1</div>
+    <div class="label">Baja</div>
+  </div>
+</div>
+
+<button class="expand-all" onclick="toggleAll()">Expandir / Colapsar Todo</button>
+
+<!-- ========== BUG 1 ========== -->
+<div class="bug-card">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="bug-id">BUG-01</span>
+    <span class="bug-title">Pregunta duplicada al avanzar</span>
+    <span class="tag tag-backend">Backend</span>
+    <span class="severity severity-critical">Critico</span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="bug-body">
+    <div class="section-title">Sintoma</div>
+    <p class="description">Cuando Steve avanza de una pregunta a la siguiente, el usuario ve la misma pregunta DOS veces: una al final del mensaje de Steve (texto parcial) y otra completa debajo.</p>
+
+    <div class="section-title">Root Cause</div>
+    <p class="description">La logica de <code class="inline-code">implicitAdvanceDetected</code> (safety net agregado el 13/04) trunca el texto del AI cuando detecta que escribio la siguiente pregunta sin <code class="inline-code">[AVANZAR]</code>, pero el truncado no siempre limpia todo el texto. Luego, el append deterministico agrega la pregunta completa de nuevo.</p>
+
+    <div class="flow-diagram">AI genera: "Excelente! [eval] Pregunta 3: Como defines..."
+                  |
+      implicitAdvance detecta "Pregunta 3: Como defines"
+                  |
+      Trunca en indexOf("Como defines") → queda "Excelente! [eval] Pregunta 3: "
+                  |
+      hasAdvanced = true → append deterministico agrega:
+      "-- Intro Steve -- Pregunta 3: Como defines tu audiencia?"
+                  |
+      RESULTADO: "Excelente! [eval] Pregunta 3: \n-- Intro Steve -- Pregunta 3: Como defines..."
+                  ↑ DUPLICADO</div>
+
+    <div class="section-title">Archivos Involucrados</div>
+    <p><span class="file-ref">cloud-run-api/src/routes/ai/steve-chat.ts:2070-2093</span></p>
+    <pre>// Safety net: lineas 2070-2090
+let implicitAdvanceDetected = false;
+if (!assistantMessage.includes('[AVANZAR]') && !isRejection && !isLastQuestion) {
+  const nextBriefQ = BRAND_BRIEF_QUESTIONS[currentQuestionIndex + 1];
+  if (nextBriefQ) {
+    const nextQSignature = nextBriefQ.question.substring(0, 50);
+    const nextIntroSignature = (nextBriefQ.steveIntro || '').substring(0, 30);
+    if (assistantMessage.includes(nextQSignature) || ...) {
+      implicitAdvanceDetected = true;
+      // PROBLEMA: trunca pero puede dejar texto parcial
+      const truncIdx = introIdx !== -1 ? introIdx : sigIdx;
+      if (truncIdx > 0) {
+        assistantMessage = assistantMessage.substring(0, truncIdx).trim();
+      }
+    }
+  }
+}</pre>
+
+    <div class="section-title">Fix Propuesto</div>
+    <div class="fix-card">
+      <h4>Opcion A: Truncar agresivamente</h4>
+      <p class="description">Buscar CUALQUIER fragmento de la siguiente pregunta (no solo los primeros 50 chars) y truncar ANTES de cualquier coincidencia. Tambien buscar el steveIntro y keywords como "Pregunta X:".</p>
+      <pre>// Buscar multiples signatures para truncar mas agresivamente
+const patterns = [
+  nextBriefQ.question.substring(0, 50),
+  nextBriefQ.question.substring(0, 30),
+  (nextBriefQ.steveIntro || '').substring(0, 30),
+  `Pregunta ${currentQuestionIndex + 2}`,  // "Pregunta 3:"
+  `pregunta ${currentQuestionIndex + 2}`,
+];
+const truncIdx = Math.min(...patterns
+  .map(p => p ? assistantMessage.indexOf(p) : -1)
+  .filter(i => i > 0));
+if (truncIdx < Infinity) {
+  assistantMessage = assistantMessage.substring(0, truncIdx).trim();
+}</pre>
+    </div>
+    <div class="fix-card">
+      <h4>Opcion B: Forzar [AVANZAR] al truncar</h4>
+      <p class="description">Si se detecta implicitAdvance, insertar <code class="inline-code">[AVANZAR]</code> al final del texto truncado. Asi el flujo normal de append funciona sin ambiguedad.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ========== BUG 2 ========== -->
+<div class="bug-card">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="bug-id">BUG-02</span>
+    <span class="bug-title">Q16 da error al generar el brief</span>
+    <span class="tag tag-backend">Backend</span>
+    <span class="tag tag-frontend">Frontend</span>
+    <span class="severity severity-critical">Critico</span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="bug-body">
+    <div class="section-title">Sintoma</div>
+    <p class="description">Al responder Q16 (ultima pregunta), Steve da error al generar el brief automaticamente. Pero si el usuario va al tab Brief y clickea "Generar brief", funciona correctamente.</p>
+
+    <div class="section-title">Root Causes (4 issues)</div>
+
+    <p style="color: var(--red); font-weight: 600; margin-top: 0.75rem;">1. Parametros faltantes en triggerAnalysisChain</p>
+    <p class="description">SteveChat.tsx llama <code class="inline-code">analyze-brand-strategy</code> SIN <code class="inline-code">fase_negocio</code> ni <code class="inline-code">presupuesto_ads</code>, que SI envia BrandBriefView.tsx. El endpoint espera estos campos para contextualizar los prompts AI.</p>
+    <p><span class="file-ref">src/components/client-portal/SteveChat.tsx:607-609</span> — falta fase_negocio, presupuesto_ads</p>
+    <p><span class="file-ref">src/components/client-portal/BrandBriefView.tsx:1577-1579</span> — version correcta con ambos params</p>
+    <pre>// SteveChat.tsx (ROTO) - linea 607
+const { data: strategyData, error: strategyErr } = await callApi('analyze-brand-strategy', {
+  body: { client_id: cId, research: researchData.research },
+});
+
+// BrandBriefView.tsx (FUNCIONA) - linea 1577
+const briefFase = (briefData as any)?.fase_negocio || '';
+const briefPresupuesto = (briefData as any)?.presupuesto_ads || '';
+const { data: strategyData, error: strategyErr } = await callApi('analyze-brand-strategy', {
+  body: { client_id: clientId, research, fase_negocio: briefFase, presupuesto_ads: briefPresupuesto },
+});</pre>
+
+    <p style="color: var(--orange); font-weight: 600; margin-top: 0.75rem;">2. Timeout insuficiente (90s)</p>
+    <p class="description"><code class="inline-code">callApi()</code> tiene timeout default de 90s. El endpoint <code class="inline-code">analyze-brand-strategy</code> ejecuta 12 requests AI en paralelo (Wave 1: 3 Opus ~40s, Wave 2: 9 Sonnet ~30-40s). Con retries por rate limiting (429/529), supera facilmente 90s.</p>
+    <p><span class="file-ref">src/lib/api.ts:49</span> — timeout default 90000ms</p>
+
+    <p style="color: var(--orange); font-weight: 600; margin-top: 0.75rem;">3. Sin retry en fase de estrategia</p>
+    <p class="description">Si analyze-brand-strategy falla, SteveChat muestra toast de error y termina. No hay boton de reintentar ni retry automatico.</p>
+    <p><span class="file-ref">src/components/client-portal/SteveChat.tsx:610-620</span></p>
+
+    <p style="color: var(--yellow); font-weight: 600; margin-top: 0.75rem;">4. No carga brief data antes de la estrategia</p>
+    <p class="description"><code class="inline-code">triggerAnalysisChain()</code> no hace fetch de buyer_personas antes de llamar al endpoint. No tiene acceso a fase_negocio/presupuesto_ads porque nunca los carga.</p>
+
+    <div class="section-title">Secuencia del Error</div>
+    <div class="flow-diagram">Q16 respondida → steve-chat.ts retorna is_complete=true
+    → SteveChat.tsx llama triggerAnalysisChain(clientId)
+    → Phase 1: analyze-brand-research OK ✓
+    → Phase 2: analyze-brand-strategy SIN fase_negocio/presupuesto ✗
+    → 12 AI requests en paralelo → rate limits → retries
+    → Timeout 90s alcanzado → AbortError
+    → Toast "Error en la estrategia" → sin retry</div>
+
+    <div class="section-title">Fix Propuesto</div>
+    <div class="fix-card">
+      <h4>Fix completo (3 cambios)</h4>
+      <pre>// 1. Cargar buyer_personas en triggerAnalysisChain (SteveChat.tsx)
+const { data: bp } = await supabase
+  .from('buyer_personas').select('persona_data')
+  .eq('client_id', cId).maybeSingle();
+const briefData = bp?.persona_data || {};
+const fase = briefData.fase_negocio || '';
+const presupuesto = briefData.presupuesto_ads || '';
+
+// 2. Pasar parametros al endpoint
+const { data: strategyData, error: strategyErr } = await callApi(
+  'analyze-brand-strategy', {
+    body: { client_id: cId, research, fase_negocio: fase, presupuesto_ads: presupuesto },
+    timeoutMs: 180000,  // 3. 180s en vez de 90s
+  }
+);</pre>
+    </div>
+  </div>
+</div>
+
+<!-- ========== BUG 3 ========== -->
+<div class="bug-card">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="bug-id">BUG-03</span>
+    <span class="bug-title">Secciones del brief sin analisis real</span>
+    <span class="tag tag-backend">Backend</span>
+    <span class="tag tag-api">API</span>
+    <span class="severity severity-critical">Critico</span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="bug-body">
+    <div class="section-title">Sintoma</div>
+    <p class="description">Varias secciones del brief muestran texto generico/placeholder en vez de analisis basado en datos reales de la marca. Secciones afectadas: propuesta de valor, estrategia creativa de competidores, keywords, SEO.</p>
+
+    <div class="section-title">Root Cause: Falla silenciosa en scraping (Apify)</div>
+    <p class="description">El endpoint <code class="inline-code">analyze-brand-research</code> usa Apify para scrapear el sitio web del cliente y competidores. Cuando Apify falla (timeout, sitio protegido, JS-heavy), el error se traga silenciosamente y el pipeline continua con data vacia. Claude entonces genera texto placeholder porque no tiene datos reales.</p>
+
+    <div class="section-title">Cadena de Falla</div>
+    <div class="flow-diagram">1. analyze-brand-research llama Apify para scrapear URLs
+2. Apify timeout / blocked / JS-render fail
+3. El codigo NO verifica resp.ok ni lanza error
+4. research_data queda vacio: { website: null, competitors: [] }
+5. analyze-brand-strategy recibe data vacia
+6. Claude genera placeholder: "La marca se posiciona como..."
+7. BrandBriefView renderiza texto sin datos → parece vacio/generico</div>
+
+    <p><span class="file-ref">cloud-run-api/src/routes/ai/analyze-brand-research.ts</span> — no verifica resp.ok</p>
+
+    <div class="section-title">Problemas Especificos</div>
+    <ul class="impact-list">
+      <li>No hay verificacion <code class="inline-code">resp.ok</code> despues del fetch a Apify</li>
+      <li>No hay fallback a Firecrawl cuando Apify falla (FIRECRAWL_API_KEY existe en env pero no se usa)</li>
+      <li>Sitios con Cloudflare/JS-heavy bloquean Apify consistentemente</li>
+      <li>No hay logging del contenido scrapeado → imposible debuggear sin reproducir</li>
+      <li>Cada falla de scraping cascadea a TODAS las secciones que dependen de datos web</li>
+    </ul>
+
+    <div class="section-title">Secciones Afectadas por Scraping Vacio</div>
+    <ul class="impact-list">
+      <li><strong>SEO y Keywords</strong> — sin datos del sitio, no puede analizar keywords</li>
+      <li><strong>Propuesta de Valor</strong> — sin contenido real, genera texto generico</li>
+      <li><strong>Competidores</strong> — sin scraping de competidores, no hay estrategia creativa</li>
+      <li><strong>Tono de Voz</strong> — sin texto real del sitio, no puede inferir tono</li>
+    </ul>
+
+    <div class="section-title">Fix Propuesto</div>
+    <div class="fix-card">
+      <h4>Implementar Firecrawl como fallback</h4>
+      <pre>// En analyze-brand-research.ts
+async function scrapeUrl(url: string): Promise&lt;string&gt; {
+  // Intento 1: Apify
+  try {
+    const apifyResult = await scrapeWithApify(url);
+    if (apifyResult && apifyResult.length > 200) return apifyResult;
+  } catch (e) { console.log('[scrape] Apify failed:', e.message); }
+
+  // Intento 2: Firecrawl (fallback)
+  try {
+    const fcResult = await scrapeWithFirecrawl(url);
+    if (fcResult && fcResult.length > 200) return fcResult;
+  } catch (e) { console.log('[scrape] Firecrawl failed:', e.message); }
+
+  // Intento 3: fetch basico (ultimo recurso)
+  const resp = await fetch(url, { headers: { 'User-Agent': '...' } });
+  return await resp.text();
+}</pre>
+    </div>
+  </div>
+</div>
+
+<!-- ========== BUG 4 ========== -->
+<div class="bug-card">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="bug-id">BUG-04</span>
+    <span class="bug-title">Tono de voz no aparece en el brief</span>
+    <span class="tag tag-frontend">Frontend</span>
+    <span class="severity severity-high">Alta</span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="bug-body">
+    <div class="section-title">Sintoma</div>
+    <p class="description">La seccion de "Tono de Voz" aparece vacia o con datos genericos en BrandBriefView.</p>
+
+    <div class="section-title">Root Cause</div>
+    <p class="description">No existe funcion de normalizacion para <code class="inline-code">brand_identity</code> en BrandBriefView.tsx. Las demas secciones tienen sus funciones <code class="inline-code">normalize*</code> que transforman la data cruda del API en formato renderizable, pero brand_identity/tono de voz se renderiza directamente sin normalizacion.</p>
+
+    <div class="section-title">Evidencia</div>
+    <p><span class="file-ref">src/components/client-portal/BrandBriefView.tsx</span></p>
+    <ul class="impact-list">
+      <li>Existe <code class="inline-code">normalizeAudienceData()</code> para audiencia</li>
+      <li>Existe <code class="inline-code">normalizeCompetitorData()</code> para competidores</li>
+      <li>Existe <code class="inline-code">normalizeKeywords()</code> para keywords</li>
+      <li><strong>NO existe</strong> <code class="inline-code">normalizeBrandIdentity()</code> para tono de voz</li>
+      <li>El campo <code class="inline-code">tone_of_voice</code> del API viene como string narrativo, no como objeto estructurado</li>
+    </ul>
+
+    <div class="section-title">Fix Propuesto</div>
+    <div class="fix-card">
+      <h4>Crear normalizeBrandIdentity()</h4>
+      <p class="description">Funcion que parsee el texto narrativo de tone_of_voice y lo estructure en: tono principal, adjetivos, do's, don'ts, ejemplos.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ========== BUG 5 ========== -->
+<div class="bug-card">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="bug-id">BUG-05</span>
+    <span class="bug-title">SEO: scraping falla silenciosamente</span>
+    <span class="tag tag-backend">Backend</span>
+    <span class="tag tag-api">API</span>
+    <span class="severity severity-high">Alta</span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="bug-body">
+    <div class="section-title">Sintoma</div>
+    <p class="description">La seccion SEO del brief aparece vacia o con datos genericos. El analisis SEO requiere datos del sitio web real.</p>
+
+    <div class="section-title">Root Cause</div>
+    <p class="description">Mismo root cause que BUG-03 (scraping Apify). El analisis SEO depende 100% de tener contenido real scrapeado del sitio web del cliente. Cuando Apify falla, no hay datos para analizar meta tags, estructura H1-H6, contenido, etc.</p>
+
+    <div class="section-title">Impacto</div>
+    <ul class="impact-list">
+      <li>Sin scraping → sin meta tags, titles, headers, contenido</li>
+      <li>Claude genera recomendaciones SEO genericas sin datos reales</li>
+      <li>Keywords sin fundamento en contenido existente</li>
+      <li>Oportunidades SEO inventadas en vez de basadas en gaps reales</li>
+    </ul>
+
+    <div class="section-title">Fix</div>
+    <p class="description">Resuelto con BUG-03 (fallback Firecrawl). Adicionalmente, el scraper deberia extraer especificamente meta tags, H1-H6, y contenido principal para alimentar la seccion SEO.</p>
+  </div>
+</div>
+
+<!-- ========== BUG 6 ========== -->
+<div class="bug-card">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="bug-id">BUG-06</span>
+    <span class="bug-title">Keywords incompletos en el PDF</span>
+    <span class="tag tag-frontend">Frontend</span>
+    <span class="severity severity-high">Alta</span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="bug-body">
+    <div class="section-title">Sintoma</div>
+    <p class="description">La seccion de keywords en el PDF exportado sale incompleta o vacia, aunque en la vista web se muestran parcialmente.</p>
+
+    <div class="section-title">Root Cause</div>
+    <p class="description">La funcion <code class="inline-code">renderKeywordPhases()</code> referenciada en <code class="inline-code">briefPdfSections.ts</code> no existe o no esta implementada correctamente. El PDF usa un pipeline diferente al HTML para renderizar secciones.</p>
+
+    <div class="section-title">Archivos</div>
+    <p><span class="file-ref">src/components/client-portal/BrandBriefView.tsx</span> — vista HTML de keywords (parcial)</p>
+    <p><span class="file-ref">src/components/client-portal/briefPdfSections.ts</span> — pipeline PDF (renderKeywordPhases missing)</p>
+
+    <div class="section-title">Detalle</div>
+    <ul class="impact-list">
+      <li><code class="inline-code">briefPdfSections.ts</code> tiene las funciones que generan HTML para cada seccion del PDF</li>
+      <li>La seccion keywords requiere <code class="inline-code">renderKeywordPhases()</code> para fases de keywords (awareness, consideration, conversion)</li>
+      <li>Esta funcion falta o no maneja el formato de datos que entrega el backend</li>
+      <li>La vista web renderiza keywords de forma diferente (JSX directo) y no pasa por la misma logica</li>
+    </ul>
+
+    <div class="section-title">Fix Propuesto</div>
+    <div class="fix-card">
+      <h4>Implementar renderKeywordPhases() en briefPdfSections.ts</h4>
+      <p class="description">Crear la funcion que transforme los datos de keywords normalizados en HTML compatible con html2canvas/jsPDF. Debe manejar las 3 fases (awareness, consideration, conversion) con sus respectivas keywords.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ========== BUG 7 ========== -->
+<div class="bug-card">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="bug-id">BUG-07</span>
+    <span class="bug-title">Sin estrategia creativa de competidores</span>
+    <span class="tag tag-backend">Backend</span>
+    <span class="severity severity-medium">Media</span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="bug-body">
+    <div class="section-title">Sintoma</div>
+    <p class="description">La seccion de analisis competitivo no muestra estrategia creativa de los competidores. Solo lista nombres sin analisis real de su comunicacion visual/copy.</p>
+
+    <div class="section-title">Root Cause</div>
+    <p class="description">Derivado de BUG-03 (falla de scraping). Sin datos scrapeados de los sitios de competidores, Claude no puede analizar su estrategia creativa, posicionamiento visual, tono, ni patrones de comunicacion.</p>
+
+    <div class="section-title">Cadena</div>
+    <div class="flow-diagram">URLs de competidores (de Q7) → Apify scrape → FALLA silenciosa
+→ competitor_data = [] → Claude: "No se encontro informacion"
+→ BrandBriefView: seccion competidores vacia</div>
+
+    <div class="section-title">Fix</div>
+    <p class="description">Resuelto con BUG-03. Adicionalmente, cuando el scraping falla para competidores, deberia intentar al menos buscar sus redes sociales (Meta Ad Library) para tener datos minimos de estrategia creativa.</p>
+  </div>
+</div>
+
+<!-- ========== BUG 8 ========== -->
+<div class="bug-card">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="bug-id">BUG-08</span>
+    <span class="bug-title">Propuesta de valor vacia en el PDF</span>
+    <span class="tag tag-frontend">Frontend</span>
+    <span class="tag tag-backend">Backend</span>
+    <span class="severity severity-medium">Media</span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="bug-body">
+    <div class="section-title">Sintoma</div>
+    <p class="description">La seccion "Propuesta de Valor" en el PDF exportado aparece vacia o con placeholder. En la vista web puede mostrar algo parcial.</p>
+
+    <div class="section-title">Root Cause (doble)</div>
+    <ul class="impact-list">
+      <li><strong>Backend:</strong> Scraping vacio (BUG-03) → Claude no tiene datos para derivar propuesta de valor real</li>
+      <li><strong>Frontend:</strong> El pipeline PDF no renderiza correctamente esta seccion — posible mismatch entre el key del JSON de estrategia y lo que busca briefPdfSections.ts</li>
+    </ul>
+
+    <div class="section-title">Fix</div>
+    <p class="description">Parte backend resuelta con BUG-03. Parte frontend: verificar que <code class="inline-code">briefPdfSections.ts</code> busque el key correcto en strategy_data para propuesta de valor (puede ser "value_proposition", "propuesta_valor", o anidado dentro de otra seccion).</p>
+  </div>
+</div>
+
+<!-- ========== BUG 9 ========== -->
+<div class="bug-card">
+  <div class="bug-header" onclick="toggle(this)">
+    <span class="bug-id">BUG-09</span>
+    <span class="bug-title">Mapa perceptual es solo texto</span>
+    <span class="tag tag-frontend">Frontend</span>
+    <span class="severity severity-low">Baja</span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="bug-body">
+    <div class="section-title">Sintoma</div>
+    <p class="description">El mapa perceptual (posicionamiento de marca vs competidores en 2 ejes) se muestra como texto plano con coordenadas, en vez de un grafico visual tipo scatter plot.</p>
+
+    <div class="section-title">Root Cause</div>
+    <p class="description">BrandBriefView.tsx renderiza el mapa perceptual como texto porque no hay componente SVG/chart implementado. El backend devuelve coordenadas (x, y) para cada marca en los ejes del mapa, pero el frontend solo los muestra como lista de texto.</p>
+
+    <div class="section-title">Estado Actual</div>
+    <ul class="impact-list">
+      <li>Backend devuelve: <code class="inline-code">{ brands: [{ name, x, y }], axis_x: "Precio", axis_y: "Calidad" }</code></li>
+      <li>Frontend renderiza: "Marca A: (0.3, 0.7) | Marca B: (0.8, 0.2)"</li>
+      <li>No hay libreria de graficos (Recharts, D3, etc.) instalada en el proyecto</li>
+      <li>El componente ideal seria un SVG inline con ejes y puntos posicionados</li>
+    </ul>
+
+    <div class="section-title">Fix Propuesto</div>
+    <div class="fix-card">
+      <h4>SVG Scatter Plot inline</h4>
+      <p class="description">Crear un componente React <code class="inline-code">PerceptualMap.tsx</code> que renderice un SVG con:</p>
+      <ul class="impact-list">
+        <li>Ejes X/Y con labels del backend</li>
+        <li>Puntos posicionados por coordenadas normalizadas (0-1)</li>
+        <li>Labels de marca en cada punto</li>
+        <li>Sin dependencia externa — SVG puro, compatible con html2canvas para PDF</li>
+      </ul>
+      <pre>&lt;svg viewBox="0 0 400 400"&gt;
+  {/* Ejes */}
+  &lt;line x1="50" y1="350" x2="380" y2="350" stroke="#555" /&gt;
+  &lt;line x1="50" y1="350" x2="50" y2="20" stroke="#555" /&gt;
+  {/* Labels ejes */}
+  &lt;text x="200" y="390"&gt;{axis_x}&lt;/text&gt;
+  &lt;text x="15" y="200" transform="rotate(-90,15,200)"&gt;{axis_y}&lt;/text&gt;
+  {/* Puntos */}
+  {brands.map(b =&gt; (
+    &lt;g key={b.name}&gt;
+      &lt;circle cx={50 + b.x * 330} cy={350 - b.y * 330} r="6" fill="#6366f1" /&gt;
+      &lt;text x={55 + b.x * 330} y={345 - b.y * 330}&gt;{b.name}&lt;/text&gt;
+    &lt;/g&gt;
+  ))}
+&lt;/svg&gt;</pre>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PRIORITY MATRIX ========== -->
+<h2 style="margin-top: 2.5rem; margin-bottom: 1rem; font-size: 1.3rem;">Matriz de Prioridades</h2>
+
+<div class="priority-matrix">
+  <div class="priority-box" style="border-color: var(--red);">
+    <h3 style="color: var(--red);">P0 — Arreglar ahora</h3>
+    <ul>
+      <li><strong>BUG-01</strong> Pregunta duplicada — afecta UX de todos los briefs</li>
+      <li><strong>BUG-02</strong> Q16 error — bloquea generacion automatica</li>
+      <li><strong>BUG-03</strong> Scraping falla silenciosa — cascadea a 4+ secciones</li>
+    </ul>
+  </div>
+  <div class="priority-box" style="border-color: var(--orange);">
+    <h3 style="color: var(--orange);">P1 — Esta semana</h3>
+    <ul>
+      <li><strong>BUG-04</strong> Tono de voz normalization</li>
+      <li><strong>BUG-05</strong> SEO (resuelto con BUG-03)</li>
+      <li><strong>BUG-06</strong> Keywords en PDF</li>
+    </ul>
+  </div>
+  <div class="priority-box" style="border-color: var(--yellow);">
+    <h3 style="color: var(--yellow);">P2 — Proxima semana</h3>
+    <ul>
+      <li><strong>BUG-07</strong> Competidor creativa (resuelto con BUG-03)</li>
+      <li><strong>BUG-08</strong> Propuesta valor PDF</li>
+    </ul>
+  </div>
+  <div class="priority-box" style="border-color: var(--green);">
+    <h3 style="color: var(--green);">P3 — Backlog</h3>
+    <ul>
+      <li><strong>BUG-09</strong> Mapa perceptual SVG (nice to have)</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ========== DEPENDENCY GRAPH ========== -->
+<h2 style="margin-top: 2rem; margin-bottom: 1rem; font-size: 1.3rem;">Dependencias entre Bugs</h2>
+<div class="flow-diagram" style="font-size: 0.9rem;">
+  BUG-03 (Scraping) ──────┬──> BUG-05 (SEO)
+                           ├──> BUG-07 (Competidores)
+                           ├──> BUG-08 (Propuesta de valor)
+                           └──> BUG-04 (Tono de voz — parcial)
+
+  BUG-01 (Duplicada)       → Independiente
+  BUG-02 (Q16 error)       → Independiente
+  BUG-06 (Keywords PDF)    → Independiente (frontend)
+  BUG-09 (Mapa perceptual) → Independiente (frontend)
+
+  ★ Arreglar BUG-03 resuelve/mejora 4 bugs automaticamente
+</div>
+
+<p style="color: var(--text-muted); margin-top: 2rem; font-size: 0.85rem; text-align: center;">
+  Investigacion generada por Bastian W24 · Claude Code · 2026-04-13
+</p>
+
+</div>
+
+<script>
+function toggle(header) {
+  header.parentElement.classList.toggle('open');
+}
+function toggleAll() {
+  const cards = document.querySelectorAll('.bug-card');
+  const allOpen = [...cards].every(c => c.classList.contains('open'));
+  cards.forEach(c => {
+    if (allOpen) c.classList.remove('open');
+    else c.classList.add('open');
+  });
+}
+</script>
+</body>
+</html>

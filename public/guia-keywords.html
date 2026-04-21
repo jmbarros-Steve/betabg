@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Ads — Guia Modulo Keywords Google Ads</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0f; color: #e2e2e8; line-height: 1.6; }
+  .container { max-width: 900px; margin: 0 auto; padding: 40px 24px; }
+  h1 { font-size: 2rem; font-weight: 700; margin-bottom: 8px; color: #fff; }
+  h1 span { color: #6366f1; }
+  .subtitle { color: #9ca3af; font-size: 1.1rem; margin-bottom: 40px; }
+  h2 { font-size: 1.4rem; font-weight: 600; color: #fff; margin: 40px 0 16px; padding-bottom: 8px; border-bottom: 1px solid #1e1e2e; }
+  h3 { font-size: 1.1rem; font-weight: 600; color: #c4b5fd; margin: 24px 0 12px; }
+  p { margin-bottom: 12px; color: #d1d5db; }
+  .card { background: #111118; border: 1px solid #1e1e2e; border-radius: 12px; padding: 24px; margin: 16px 0; }
+  .card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .card-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
+  .card-title { font-size: 1.15rem; font-weight: 600; color: #fff; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+  .badge-blue { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
+  .badge-purple { background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.25); }
+  .badge-orange { background: rgba(249,115,22,0.15); color: #fb923c; border: 1px solid rgba(249,115,22,0.25); }
+  .badge-green { background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
+  .badge-red { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+  .badge-yellow { background: rgba(234,179,8,0.15); color: #facc15; border: 1px solid rgba(234,179,8,0.25); }
+  ul { margin: 8px 0 16px 20px; }
+  li { margin-bottom: 6px; color: #d1d5db; }
+  li strong { color: #e5e7eb; }
+  .flow { display: flex; flex-direction: column; gap: 0; }
+  .flow-step { display: flex; align-items: flex-start; gap: 16px; position: relative; padding: 16px 0; }
+  .flow-step:not(:last-child)::after { content: ''; position: absolute; left: 19px; top: 52px; bottom: 0; width: 2px; background: #2e2e3e; }
+  .flow-number { width: 40px; height: 40px; border-radius: 50%; background: #1e1b4b; border: 2px solid #4f46e5; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #a5b4fc; flex-shrink: 0; font-size: 0.9rem; }
+  .flow-content { flex: 1; }
+  .flow-content strong { color: #fff; }
+  .table-demo { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.85rem; }
+  .table-demo th { text-align: left; padding: 10px 12px; background: #16161f; color: #9ca3af; font-weight: 500; border-bottom: 1px solid #2e2e3e; }
+  .table-demo td { padding: 10px 12px; border-bottom: 1px solid #1a1a25; }
+  .table-demo tr:hover { background: rgba(99,102,241,0.05); }
+  .table-demo .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .highlight-red { background: rgba(239,68,68,0.08); }
+  .action-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; border: 1px solid #2e2e3e; background: #111118; color: #9ca3af; }
+  .tip { background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.2); border-radius: 8px; padding: 16px; margin: 16px 0; }
+  .tip::before { content: '💡'; margin-right: 8px; }
+  .warning { background: rgba(234,179,8,0.08); border: 1px solid rgba(234,179,8,0.2); border-radius: 8px; padding: 16px; margin: 16px 0; }
+  .warning::before { content: '⚠️'; margin-right: 8px; }
+  .diagram { background: #0d0d14; border: 1px solid #1e1e2e; border-radius: 8px; padding: 20px; margin: 16px 0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; color: #a5b4fc; overflow-x: auto; white-space: pre; line-height: 1.8; }
+  .section-divider { height: 1px; background: linear-gradient(90deg, transparent, #4f46e5, transparent); margin: 48px 0; }
+  .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin: 16px 0; }
+  .status-card { background: #111118; border: 1px solid #1e1e2e; border-radius: 10px; padding: 16px; }
+  .status-card .label { font-size: 0.8rem; color: #6b7280; margin-bottom: 4px; }
+  .status-card .value { font-size: 1.5rem; font-weight: 700; color: #fff; }
+  .status-card .detail { font-size: 0.75rem; color: #9ca3af; margin-top: 4px; }
+  .verified { color: #4ade80; }
+  .verified::before { content: '✓ '; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Google Ads <span>Keywords</span></h1>
+  <p class="subtitle">Modulo de gestion de palabras clave y terminos de busqueda — Steve Ads</p>
+
+  <!-- Status de endpoints -->
+  <h2>Estado de los Endpoints</h2>
+  <div class="status-grid">
+    <div class="status-card">
+      <div class="label">list_ad_groups</div>
+      <div class="value verified">OK</div>
+      <div class="detail">Retorna ad groups de TODAS las campanas (Search, Shopping, Display)</div>
+    </div>
+    <div class="status-card">
+      <div class="label">list_keywords</div>
+      <div class="value verified">OK</div>
+      <div class="detail">Ultimos 30 dias, agregado por keyword, con conversion a CLP</div>
+    </div>
+    <div class="status-card">
+      <div class="label">update_keyword</div>
+      <div class="value verified">OK</div>
+      <div class="detail">Pausa/Activa via Google Ads Mutate API — cambio en tiempo real</div>
+    </div>
+    <div class="status-card">
+      <div class="label">remove_keyword</div>
+      <div class="value verified">OK</div>
+      <div class="detail">Elimina de Google Ads permanentemente via Mutate API</div>
+    </div>
+    <div class="status-card">
+      <div class="label">add_keyword</div>
+      <div class="value verified">OK</div>
+      <div class="detail">Crea keyword en Google Ads con match type y CPC bid opcional</div>
+    </div>
+    <div class="status-card">
+      <div class="label">add_negative_keyword</div>
+      <div class="value verified">OK</div>
+      <div class="detail">Agrega negativa a nivel de campana</div>
+    </div>
+  </div>
+
+  <div class="tip">
+    Todos los endpoints usan <strong>MCC retry automatico</strong>: si el login con la cuenta MCC (7637776643) falla con 403, reintenta directamente con el Customer ID (9936646550). Esto funciona correctamente en produccion.
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- Arquitectura -->
+  <h2>Arquitectura del Modulo</h2>
+  <div class="diagram">
+┌─────────────────────────────┐
+│  GoogleKeywordManager.tsx   │  ← Frontend React
+│  (Tab Keywords + Tab Search)│
+└──────────┬──────────────────┘
+           │ callApi('manage-google-keywords', { action, ... })
+           ▼
+┌─────────────────────────────────────┐
+│  manage-google-keywords.ts          │  ← Backend Cloud Run (Hono)
+│                                     │
+│  7 acciones:                        │
+│  ├─ list_ad_groups    → GAQL SELECT │
+│  ├─ list_keywords     → GAQL SELECT │
+│  ├─ list_search_terms → GAQL SELECT │
+│  ├─ add_keyword       → Mutate API  │
+│  ├─ update_keyword    → Mutate API  │  ← Pausar / Activar / Cambiar bid
+│  ├─ remove_keyword    → Mutate API  │  ← Eliminar keyword
+│  └─ add_negative_keyword → Mutate   │
+└──────────┬──────────────────────────┘
+           │ Google Ads API v23 (searchStream + mutate)
+           ▼
+┌─────────────────────────────┐
+│  Google Ads Account         │
+│  Customer: 9936646550       │
+│  MCC: 7637776643            │
+└─────────────────────────────┘</div>
+
+  <div class="section-divider"></div>
+
+  <!-- TAB 1: Keywords -->
+  <h2>Tab 1: Keywords — Tus Palabras Clave</h2>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(99,102,241,0.15);">🎯</div>
+      <div class="card-title">Que son las Keywords?</div>
+    </div>
+    <p>Son las <strong>palabras que TU configuraste</strong> en Google Ads para que tus anuncios aparezcan cuando alguien busca esos terminos. Tu controlas cuales son, cuanto pagas, y si estan activas o no.</p>
+  </div>
+
+  <h3>Columnas de la tabla</h3>
+  <table class="table-demo">
+    <thead>
+      <tr>
+        <th>Columna</th>
+        <th>Que muestra</th>
+        <th>Por que importa</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Keyword</strong></td>
+        <td>Texto de la palabra clave</td>
+        <td>Lo que activa tu anuncio</td>
+      </tr>
+      <tr>
+        <td><strong>Ubicacion</strong></td>
+        <td>Campana → Ad Group</td>
+        <td>Donde esta asignada la keyword</td>
+      </tr>
+      <tr>
+        <td><strong>Match Type</strong></td>
+        <td><span class="badge badge-blue">EXACT</span> <span class="badge badge-purple">PHRASE</span> <span class="badge badge-orange">BROAD</span></td>
+        <td>Que tan estricta es la coincidencia</td>
+      </tr>
+      <tr>
+        <td><strong>Estado</strong></td>
+        <td><span class="badge badge-green">Activa</span> o <span class="badge badge-yellow">Pausada</span></td>
+        <td>Si esta generando trafico o no</td>
+      </tr>
+      <tr>
+        <td><strong>CPC Bid</strong></td>
+        <td>Maximo a pagar por click (CLP)</td>
+        <td>Controla cuanto gastas por click</td>
+      </tr>
+      <tr>
+        <td><strong>QS</strong></td>
+        <td>Quality Score (1-10)</td>
+        <td><span class="verified" style="color:#4ade80">7-10 bueno</span> / <span style="color:#facc15">4-6 ok</span> / <span style="color:#f87171">1-3 malo</span></td>
+      </tr>
+      <tr>
+        <td><strong>Clicks / Impr / CTR</strong></td>
+        <td>Rendimiento de trafico</td>
+        <td>Cuanta gente ve y hace click</td>
+      </tr>
+      <tr>
+        <td><strong>Costo</strong></td>
+        <td>Gasto total en CLP (30 dias)</td>
+        <td>Cuanta plata se fue en esta keyword</td>
+      </tr>
+      <tr>
+        <td><strong>Conversiones</strong></td>
+        <td>Acciones completadas</td>
+        <td>Lo que realmente importa: ventas, leads, etc.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Match Types — Explicacion visual</h3>
+  <div class="card">
+    <table class="table-demo">
+      <thead>
+        <tr><th>Tipo</th><th>Tu keyword</th><th>Activa con...</th><th>NO activa con...</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge badge-blue">EXACT</span></td>
+          <td>[zapatos deportivos]</td>
+          <td>"zapatos deportivos", "zapato deportivo"</td>
+          <td>"comprar zapatos deportivos baratos"</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-purple">PHRASE</span></td>
+          <td>"zapatos deportivos"</td>
+          <td>"comprar zapatos deportivos", "zapatos deportivos baratos"</td>
+          <td>"deportivos zapatos" (orden cambiado)</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-orange">BROAD</span></td>
+          <td>zapatos deportivos</td>
+          <td>"zapatillas para correr", "calzado sport", "tenis running"</td>
+          <td>Casi todo activa (Google decide)</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="warning">
+      <strong>BROAD es peligroso</strong> — Google interpreta muy ampliamente y puedes gastar plata en busquedas irrelevantes. Usa Exact o Phrase siempre que puedas.
+    </div>
+  </div>
+
+  <h3>Acciones sobre keywords</h3>
+  <div class="card">
+    <ul>
+      <li><strong>⏸ Pausar / ▶ Activar</strong> — Cambia el estado en Google Ads en tiempo real. Si pausas, la keyword deja de activar anuncios inmediatamente. Si activas, vuelve a funcionar. <span class="badge badge-green">Cambio bidireccional</span></li>
+      <li><strong>💲 Editar Bid</strong> — Cambia el CPC maximo. Se actualiza directamente en Google Ads via Mutate API.</li>
+      <li><strong>🗑 Eliminar</strong> — Borra la keyword permanentemente de Google Ads. <span class="badge badge-red">Irreversible</span>. El sistema pide confirmacion antes de ejecutar.</li>
+    </ul>
+    <div class="tip">
+      Tanto Pausar/Activar como Eliminar se ejecutan <strong>directamente en Google Ads</strong> via la Mutate API. No es un cambio local — el efecto es inmediato en tu cuenta de Google Ads.
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- TAB 2: Search Terms -->
+  <h2>Tab 2: Terminos de Busqueda — Lo que la Gente Realmente Busca</h2>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(139,92,246,0.15);">🔍</div>
+      <div class="card-title">Que son los Terminos de Busqueda?</div>
+    </div>
+    <p>Son las <strong>busquedas REALES que la gente escribio en Google</strong> y que activaron tus anuncios. Google te muestra esta info para que veas que esta funcionando y que no.</p>
+    <p>Ejemplo: tu keyword es <span class="badge badge-purple">"zapatos deportivos"</span> pero alguien busco <em>"zapatos deportivos baratos santiago"</em>. Ese es el termino de busqueda.</p>
+  </div>
+
+  <h3>Ejemplo de tabla</h3>
+  <table class="table-demo">
+    <thead>
+      <tr><th>Termino</th><th>Campana</th><th class="num">Clicks</th><th class="num">Costo</th><th class="num">Conv</th><th>Accion</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>zapatos deportivos mujer</td>
+        <td style="color:#9ca3af;font-size:0.8rem">Campana Calzado</td>
+        <td class="num">45</td>
+        <td class="num">$12.500</td>
+        <td class="num">3</td>
+        <td><span class="action-btn">—</span></td>
+      </tr>
+      <tr>
+        <td>zapatillas running nike</td>
+        <td style="color:#9ca3af;font-size:0.8rem">Campana Calzado</td>
+        <td class="num">32</td>
+        <td class="num">$9.800</td>
+        <td class="num">2</td>
+        <td><span class="action-btn">—</span></td>
+      </tr>
+      <tr class="highlight-red">
+        <td>zapatos gratis chile <span class="badge badge-red">sin conv</span></td>
+        <td style="color:#9ca3af;font-size:0.8rem">Campana Calzado</td>
+        <td class="num">28</td>
+        <td class="num" style="color:#f87171">$8.200</td>
+        <td class="num" style="color:#f87171">0</td>
+        <td><span class="action-btn" style="color:#f87171;border-color:rgba(239,68,68,0.3)">🚫 Negar</span></td>
+      </tr>
+      <tr class="highlight-red">
+        <td>reparar zapatos santiago <span class="badge badge-red">sin conv</span></td>
+        <td style="color:#9ca3af;font-size:0.8rem">Campana Calzado</td>
+        <td class="num">15</td>
+        <td class="num" style="color:#f87171">$6.100</td>
+        <td class="num" style="color:#f87171">0</td>
+        <td><span class="action-btn" style="color:#f87171;border-color:rgba(239,68,68,0.3)">🚫 Negar</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(239,68,68,0.15);">🚫</div>
+      <div class="card-title">Keywords Negativas</div>
+    </div>
+    <p>Cuando ves un termino con <strong>alto costo y 0 conversiones</strong> (filas rojas), puedes agregarlo como <strong>keyword negativa</strong>. Esto le dice a Google: "NO muestres mi anuncio cuando alguien busque esto".</p>
+    <p>Resultado: <strong>dejas de gastar plata en busquedas que no convierten</strong>.</p>
+    <p>La negativa se agrega directamente a la campana en Google Ads via Mutate API.</p>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- Flujo de uso -->
+  <h2>Flujo de Trabajo Recomendado</h2>
+
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-number">1</div>
+      <div class="flow-content">
+        <strong>Revisa Terminos de Busqueda</strong>
+        <p>Ve al tab "Terminos de Busqueda". Busca filas rojas (alto costo, 0 conversiones). Son plata botada.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-number">2</div>
+      <div class="flow-content">
+        <strong>Agrega Negativos</strong>
+        <p>Click en 🚫 en cada termino malo. Selecciona match type (EXACT recomendado). Esto detiene el gasto inmediatamente.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-number">3</div>
+      <div class="flow-content">
+        <strong>Revisa Keywords</strong>
+        <p>Ve al tab "Keywords". Ordena por costo. Busca keywords con mucho gasto y pocas/cero conversiones.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-number">4</div>
+      <div class="flow-content">
+        <strong>Pausa o Ajusta</strong>
+        <p>Pausa keywords malas (⏸). Baja el bid (💲) de keywords caras. Elimina (🗑) las que nunca van a funcionar.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-number">5</div>
+      <div class="flow-content">
+        <strong>Agrega Keywords Nuevas</strong>
+        <p>Basado en terminos de busqueda que SI convierten, agrega nuevas keywords con match type EXACT o PHRASE.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- Flujo agregar keyword -->
+  <h2>Como Agregar una Keyword</h2>
+
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-number">1</div>
+      <div class="flow-content">
+        <strong>Click "Agregar Keyword"</strong>
+        <p>Boton azul arriba a la derecha en el tab Keywords.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-number">2</div>
+      <div class="flow-content">
+        <strong>Selecciona Campana</strong>
+        <p>Elige en que campana quieres poner la keyword. El sistema carga las campanas automaticamente.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-number">3</div>
+      <div class="flow-content">
+        <strong>Selecciona Ad Group</strong>
+        <p>Se filtran los ad groups de esa campana. Elige donde va la keyword.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-number">4</div>
+      <div class="flow-content">
+        <strong>Escribe la Keyword + Match Type</strong>
+        <p>Escribe el texto. Elige EXACT (recomendado), PHRASE, o BROAD.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-number">5</div>
+      <div class="flow-content">
+        <strong>CPC Bid (opcional)</strong>
+        <p>Si quieres controlar cuanto pagas por click, pon un valor. Si no, Google usa el bid del ad group.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- Estructura Google Ads -->
+  <h2>Estructura de Google Ads</h2>
+  <div class="diagram">
+Cuenta Google Ads (9936646550)
+│
+├── 📁 Campana "Calzado Deportivo"        ← Presupuesto diario, tipo (Search/Shopping)
+│   ├── 📂 Ad Group "Zapatillas Running"  ← Agrupa keywords + anuncios
+│   │   ├── 🎯 Keyword: [zapatillas running]     EXACT
+│   │   ├── 🎯 Keyword: "zapatos para correr"    PHRASE
+│   │   └── 📢 Anuncio: "Las mejores zapatillas..."
+│   │
+│   └── 📂 Ad Group "Zapatos Casual"
+│       ├── 🎯 Keyword: [zapatos casual hombre]  EXACT
+│       └── 📢 Anuncio: "Zapatos casual desde..."
+│
+├── 📁 Campana "Accesorios"
+│   └── 📂 Ad Group "Mochilas"
+│       ├── 🎯 Keyword: [mochilas deportivas]     EXACT
+│       └── 🚫 Negativa: "mochilas gratis"
+│
+└── 📁 Campana "Shopping"                 ← Ahora tambien visible!
+    └── 📂 Ad Group "Todos los productos"</div>
+
+  <div class="tip">
+    <strong>Antes:</strong> el modulo solo mostraba campanas tipo SEARCH. <strong>Ahora:</strong> muestra TODAS las campanas (Search, Shopping, Display) para que puedas gestionar keywords en cualquier campana.
+  </div>
+
+  <div class="section-divider"></div>
+
+  <div style="text-align:center;padding:40px 0;color:#6b7280;font-size:0.85rem;">
+    Steve Ads — Modulo Keywords Google Ads<br>
+    Endpoints verificados en produccion via Cloud Run logs
+  </div>
+
+</div>
+</body>
+</html>

@@ -32,6 +32,7 @@ import { ShopifyConnectDialog } from './ShopifyConnectDialog';
 import { useRetrySync } from './useRetrySync';
 
 const META_APP_ID = '1994525824461583';
+const API_BASE = (import.meta.env.VITE_API_URL as string) || 'https://steve-api-850416724643.us-central1.run.app';
 
 interface ClientPortalConnectionsProps {
   clientId: string;

@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Javiera QA - Steve Ads Full Audit</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0f0f13; --surface: #1a1a24; --surface2: #22223a; --border: #2d2d4a;
+    --text: #e4e4ed; --text2: #9494b8; --accent: #a78bfa; --accent2: #7c3aed;
+    --meta: #3b82f6; --klaviyo: #10b981; --shopify: #84cc16; --google: #f59e0b;
+    --ai: #a78bfa; --qa: #f43f5e; --auth: #6366f1; --email: #ec4899;
+    --wa: #22c55e; --social: #06b6d4; --general: #64748b; --infra: #f97316;
+    --billing: #eab308; --crm: #8b5cf6; --competitor: #ef4444; --content: #14b8a6;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; line-height: 1.5; }
+
+  /* Header */
+  .header { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%); padding: 32px 40px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+  .header h1 { font-size: 28px; font-weight: 800; background: linear-gradient(135deg, #a78bfa, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header p { color: var(--text2); margin-top: 4px; font-size: 14px; }
+  .header-row { display: flex; justify-content: space-between; align-items: center; }
+  .header-badge { background: var(--qa); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+
+  /* Search */
+  .search-bar { margin: 20px 40px 0; }
+  .search-bar input { width: 100%; padding: 12px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-size: 15px; outline: none; transition: border-color .2s; }
+  .search-bar input:focus { border-color: var(--accent); }
+  .search-bar input::placeholder { color: var(--text2); }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; padding: 24px 40px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; text-align: center; transition: transform .15s; }
+  .stat:hover { transform: translateY(-2px); }
+  .stat-number { font-size: 36px; font-weight: 800; }
+  .stat-label { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+
+  /* Nav */
+  .nav { display: flex; gap: 8px; padding: 16px 40px; overflow-x: auto; position: sticky; top: 108px; z-index: 99; background: var(--bg); border-bottom: 1px solid var(--border); }
+  .nav button { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text2); cursor: pointer; font-size: 13px; white-space: nowrap; transition: all .15s; }
+  .nav button:hover, .nav button.active { background: var(--accent2); color: white; border-color: var(--accent2); }
+
+  /* Sections */
+  .content { padding: 24px 40px 60px; }
+  .section { margin-bottom: 40px; display: none; }
+  .section.active { display: block; }
+  .section-title { font-size: 22px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
+  .section-title .count { background: var(--surface2); padding: 2px 10px; border-radius: 20px; font-size: 13px; color: var(--text2); }
+
+  /* Module badge */
+  .module-badge { display: inline-block; padding: 2px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+  .mod-meta { background: rgba(59,130,246,.15); color: var(--meta); }
+  .mod-klaviyo { background: rgba(16,185,129,.15); color: var(--klaviyo); }
+  .mod-shopify { background: rgba(132,204,22,.15); color: var(--shopify); }
+  .mod-google { background: rgba(245,158,11,.15); color: var(--google); }
+  .mod-ai { background: rgba(167,139,250,.15); color: var(--ai); }
+  .mod-qa { background: rgba(244,63,94,.15); color: var(--qa); }
+  .mod-auth { background: rgba(99,102,241,.15); color: var(--auth); }
+  .mod-email { background: rgba(236,72,153,.15); color: var(--email); }
+  .mod-wa { background: rgba(34,197,94,.15); color: var(--wa); }
+  .mod-social { background: rgba(6,182,212,.15); color: var(--social); }
+  .mod-general { background: rgba(100,116,139,.15); color: var(--general); }
+  .mod-infra { background: rgba(249,115,22,.15); color: var(--infra); }
+  .mod-billing { background: rgba(234,179,8,.15); color: var(--billing); }
+  .mod-crm { background: rgba(139,92,246,.15); color: var(--crm); }
+  .mod-competitor { background: rgba(239,68,68,.15); color: var(--competitor); }
+  .mod-content { background: rgba(20,184,166,.15); color: var(--content); }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; padding: 10px 16px; background: var(--surface2); color: var(--text2); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; position: sticky; top: 155px; z-index: 10; }
+  tbody td { padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+  tbody tr { transition: background .1s; }
+  tbody tr:hover { background: var(--surface); }
+  .path { color: var(--text2); font-family: 'JetBrains Mono', monospace; font-size: 12px; word-break: break-all; }
+  .desc { max-width: 400px; }
+  .schedule { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); background: rgba(167,139,250,.1); padding: 2px 8px; border-radius: 4px; }
+
+  /* Module group */
+  .module-group { margin-bottom: 24px; }
+  .module-group-header { font-size: 16px; font-weight: 600; padding: 12px 16px; background: var(--surface); border-radius: 12px 12px 0 0; border: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+  .module-group-header:hover { background: var(--surface2); }
+  .module-group-header .arrow { transition: transform .2s; }
+  .module-group-header.collapsed .arrow { transform: rotate(-90deg); }
+  .module-group-body { border: 1px solid var(--border); border-top: none; border-radius: 0 0 12px 12px; overflow: hidden; }
+  .module-group-header.collapsed + .module-group-body { display: none; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .header, .stats, .nav, .content { padding-left: 16px; padding-right: 16px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    table { font-size: 12px; }
+    thead th, tbody td { padding: 8px; }
+  }
+
+  .highlight { background: rgba(167,139,250,.3); border-radius: 2px; }
+
+  .watermark { text-align: center; padding: 40px; color: var(--text2); font-size: 12px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-row">
+    <div>
+      <h1>Javiera QA - Steve Ads Full Audit</h1>
+      <p>Proyecto: betabg | 10 Abril 2026 | Audit completo de arquitectura</p>
+    </div>
+    <span class="header-badge">JAVIERA W12</span>
+  </div>
+</div>
+
+<div class="search-bar">
+  <input type="text" id="globalSearch" placeholder="Buscar en todo... (edge functions, crons, tablas, componentes, integraciones)" oninput="filterAll(this.value)">
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat-number" style="color:var(--accent)">65</div><div class="stat-label">Edge Functions</div></div>
+  <div class="stat"><div class="stat-number" style="color:var(--infra)">47</div><div class="stat-label">Crons Activos</div></div>
+  <div class="stat"><div class="stat-number" style="color:var(--meta)">96</div><div class="stat-label">Tablas DB</div></div>
+  <div class="stat"><div class="stat-number" style="color:var(--shopify)">434</div><div class="stat-label">Archivos TS/TSX</div></div>
+  <div class="stat"><div class="stat-number" style="color:var(--email)">38</div><div class="stat-label">Paginas/Rutas</div></div>
+  <div class="stat"><div class="stat-number" style="color:var(--qa)">190+</div><div class="stat-label">Integraciones</div></div>
+</div>
+
+<div class="nav">
+  <button class="active" onclick="showSection('edge')">Edge Functions</button>
+  <button onclick="showSection('crons')">Crons</button>
+  <button onclick="showSection('tables')">Tablas DB</button>
+  <button onclick="showSection('pages')">Paginas & Rutas</button>
+  <button onclick="showSection('components')">Componentes</button>
+  <button onclick="showSection('hooks')">Hooks & Utils</button>
+  <button onclick="showSection('integrations')">Integraciones</button>
+  <button onclick="showSection('env')">Env Vars</button>
+  <button onclick="showSection('cloudrun')">Cloud Run API</button>
+</div>
+
+<div class="content">
+
+<!-- EDGE FUNCTIONS -->
+<div class="section active" id="section-edge">
+  <div class="section-title">Edge Functions <span class="count">65 funciones</span></div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-auth">AUTH</span> Auth (5)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Funcion</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>admin-create-client</td><td class="desc">Crea nuevo cliente via super admin con user, role, y client record</td></tr>
+      <tr><td>admin-create-user</td><td class="desc">Crea super admin user con email confirmation y service role key validation</td></tr>
+      <tr><td>admin-delete-clients</td><td class="desc">Borrado en cascada del cliente y datos relacionados (10+ tablas)</td></tr>
+      <tr><td>create-client-user</td><td class="desc">Crea portal access user para cliente existente con limpieza de huerfanos</td></tr>
+      <tr><td>self-signup</td><td class="desc">Self-service user registration via admin API</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-meta">META ADS</span> Meta Ads (3)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Funcion</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>fetch-campaign-adsets</td><td class="desc">Fetch Meta ad sets con insights 30 dias (spend, impressions, clicks, conversions, ROAS)</td></tr>
+      <tr><td>sync-campaign-metrics</td><td class="desc">Sync Meta campaign metrics con conversion CLP currency</td></tr>
+      <tr><td>sync-competitor-ads</td><td class="desc">Ad Library sync con 3 estrategias (cached page_id, Pages Search, fallback)</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-google">GOOGLE ADS</span> Google Ads (2)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Funcion</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>google-ads-oauth-callback</td><td class="desc">OAuth token exchange, customer account enumeration, connection storage</td></tr>
+      <tr><td>sync-google-ads-metrics</td><td class="desc">Google Ads GAQL sync (impressions, clicks, cost_micros, conversions)</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-shopify">SHOPIFY</span> Shopify (11)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Funcion</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>create-shopify-discount</td><td class="desc">Crea codigos de descuento via GraphQL mutation</td></tr>
+      <tr><td>fetch-shopify-analytics</td><td class="desc">Orders/checkout analysis, top SKUs, channel attribution, UTM</td></tr>
+      <tr><td>fetch-shopify-collections</td><td class="desc">Lista custom/smart collections con product counts</td></tr>
+      <tr><td>fetch-shopify-products</td><td class="desc">Full product catalog con variants, costs via inventory_items</td></tr>
+      <tr><td>shopify-data-verify</td><td class="desc">Compara Steve metrics vs Shopify API, detecta mismatches &gt;10%</td></tr>
+      <tr><td>shopify-fulfillment-webhooks</td><td class="desc">HMAC-verified webhook para orders fulfilled/cancelled</td></tr>
+      <tr><td>shopify-gdpr-webhooks</td><td class="desc">GDPR compliance handler con cascading delete (14+ tablas)</td></tr>
+      <tr><td>shopify-install</td><td class="desc">OAuth initiation con HMAC, nonce, redirect a Shopify</td></tr>
+      <tr><td>shopify-oauth-callback</td><td class="desc">OAuth callback con HMAC, state validation (CSRF), webhook registration</td></tr>
+      <tr><td>shopify-session-validate</td><td class="desc">Session token HMAC-SHA256 verification con magic link</td></tr>
+      <tr><td>sync-shopify-metrics</td><td class="desc">Shopify orders sync (30 dias) con daily metrics upsert</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-klaviyo">KLAVIYO</span> Klaviyo (8)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Funcion</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>fetch-klaviyo-top-products</td><td class="desc">Events API querying (Ordered/Viewed products) con Shopify enrichment</td></tr>
+      <tr><td>import-klaviyo-templates</td><td class="desc">Pagina templates, sort by date, fetch HTML top 10, extrae colores</td></tr>
+      <tr><td>klaviyo-manage-flows</td><td class="desc">Routes: list_flows, get_flow_detail, create_flow, get_flow_metrics</td></tr>
+      <tr><td>klaviyo-push-emails</td><td class="desc">Push email plans como campaigns completas con scheduling</td></tr>
+      <tr><td>klaviyo-smart-format</td><td class="desc">Claude Sonnet HTML email conversion para Klaviyo</td></tr>
+      <tr><td>store-klaviyo-connection</td><td class="desc">Valida Klaviyo API key, encrypta via RPC, upserts connection</td></tr>
+      <tr><td>sync-klaviyo-metrics</td><td class="desc">Parallelized fetch (flows, campaigns, lists, segments, metrics)</td></tr>
+      <tr><td>upload-klaviyo-drafts</td><td class="desc">Crea Klaviyo template + campaign con scheduling</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-email">EMAIL</span> Email (4)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Funcion</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>generate-mass-campaigns</td><td class="desc">Email content blocks generation (header, text, button, product, coupon)</td></tr>
+      <tr><td>parse-email-html</td><td class="desc">Claude Sonnet parsea email HTML en typed block JSON</td></tr>
+      <tr><td>steve-email-content</td><td class="desc">Multi-action: generate_subject, generate_copy, analyze_content, ab_variants</td></tr>
+      <tr><td>steve-send-time-analysis</td><td class="desc">Klaviyo send-time heatmap 7x24 grid con best/worst slots</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-ai">AI/STEVE</span> AI & Steve Brain (16)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Funcion</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>analyze-ad-image</td><td class="desc">Claude Opus vision analysis de imagenes para performance marketing</td></tr>
+      <tr><td>analyze-brand (DEPRECATED)</td><td class="desc">Returns 410 Gone</td></tr>
+      <tr><td>analyze-brand-research</td><td class="desc">Phase 1 brand analysis con Apify web scraping, competitor detection</td></tr>
+      <tr><td>analyze-brand-strategy</td><td class="desc">Phase 2 con 12 analisis Claude paralelos (SWOT, wave-based rate limiting)</td></tr>
+      <tr><td>check-video-status</td><td class="desc">Polls Replicate para video generation status</td></tr>
+      <tr><td>generate-brief-visual</td><td class="desc">Director creative brief con angle-specific rules y reference images</td></tr>
+      <tr><td>generate-campaign-recommendations</td><td class="desc">Benchmark-based + AI recommendations (CTR, CPC, ROAS, CPM)</td></tr>
+      <tr><td>generate-copy</td><td class="desc">10 copy variations por angle (Sabri Suby + Russell Brunson)</td></tr>
+      <tr><td>generate-google-copy</td><td class="desc">Google Ads RSA generation (15 headlines, 4 descriptions)</td></tr>
+      <tr><td>generate-image</td><td class="desc">Gemini Imagen 4 Fast image generation (2 credits)</td></tr>
+      <tr><td>generate-video</td><td class="desc">Replicate Kling AI video generation (10 credits, 9:16)</td></tr>
+      <tr><td>learn-from-source</td><td class="desc">Duplicate check + queue insertion para learning pipeline</td></tr>
+      <tr><td>process-queue-item</td><td class="desc">Learning queue processing (YouTube/URLs), chunking 50KB</td></tr>
+      <tr><td>process-transcription</td><td class="desc">Transcription chunking 50K chars, rule extraction via Claude</td></tr>
+      <tr><td>steve-bulk-analyze</td><td class="desc">Two-action: analyze + generate subjects + schedule</td></tr>
+      <tr><td>steve-chat</td><td class="desc">Brand brief Q&A chatbot con 15 preguntas guiadas</td></tr>
+      <tr><td>steve-strategy</td><td class="desc">Strategic consulting chatbot con Steve persona</td></tr>
+      <tr><td>train-steve</td><td class="desc">Knowledge extraction via Claude con category detection</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-qa">QA/CHINO</span> QA & El Chino (4)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Funcion</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>criterio-setup</td><td class="desc">One-time setup: criterio_rules y criterio_results tables</td></tr>
+      <tr><td>evaluate-rules</td><td class="desc">Rules evaluation engine con weighted scoring (blockers, score &gt;= 60)</td></tr>
+      <tr><td>juez-nocturno</td><td class="desc">QA judge con 50-question golden dataset, auto-learning</td></tr>
+      <tr><td>shopify-data-verify</td><td class="desc">Compara Steve vs Shopify API (7 dias), detecta mismatches &gt;10%</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-general">GENERAL</span> General & Billing (12)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Funcion</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>chonga-support</td><td class="desc">English Bulldog support chatbot via Claude Haiku</td></tr>
+      <tr><td>export-all-data</td><td class="desc">Full database dump de 40+ tablas con pagination</td></tr>
+      <tr><td>export-database</td><td class="desc">Secure export con x-export-key header validation</td></tr>
+      <tr><td>health-check</td><td class="desc">Monitoreo de 60+ endpoints, slow detection (&gt;3s), auto-restart</td></tr>
+      <tr><td>store-platform-connection</td><td class="desc">Stores encrypted platform connections (shopify, meta, google)</td></tr>
+      <tr><td>stripe-checkout</td><td class="desc">Crea Stripe checkout session para subscriptions</td></tr>
+      <tr><td>stripe-portal</td><td class="desc">Stripe billing portal para management</td></tr>
+      <tr><td>stripe-webhook</td><td class="desc">Webhook handler para checkout.completed, subscription updated/deleted</td></tr>
+    </tbody></table></div>
+  </div>
+</div>
+
+<!-- CRONS -->
+<div class="section" id="section-crons">
+  <div class="section-title">Crons Activos <span class="count">47 en Cloud Scheduler + 23 endpoints adicionales</span></div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>Cada Minuto / Cada Pocos Minutos (5)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Cron</th><th>Schedule</th><th>Modulo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>wa-action-processor</td><td><span class="schedule">* * * * *</span></td><td><span class="module-badge mod-wa">WA</span></td><td>Procesa pending WhatsApp actions y mensajes</td></tr>
+      <tr><td>skyvern-dispatcher</td><td><span class="schedule">*/2 * * * *</span></td><td><span class="module-badge mod-infra">INFRA</span></td><td>Dispatch RPA/automation tasks (PENDIENTE: endpoint eliminado)</td></tr>
+      <tr><td>chino-fixer</td><td><span class="schedule">*/10 * * * *</span></td><td><span class="module-badge mod-qa">QA</span></td><td>Auto-fix detected QA issues sin aprobacion</td></tr>
+      <tr><td>steve-content-hunter</td><td><span class="schedule">*/20 * * * *</span></td><td><span class="module-badge mod-ai">AI</span></td><td>Discover y process content sources para Steve</td></tr>
+      <tr><td>chino-patrol</td><td><span class="schedule">*/30 * * * *</span></td><td><span class="module-badge mod-qa">QA</span></td><td>QA detection pipeline (El Chino piloto automatico)</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>Cada Hora / Pocas Horas (8)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Cron</th><th>Schedule</th><th>Modulo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>task-prioritizer</td><td><span class="schedule">0 * * * *</span></td><td><span class="module-badge mod-infra">INFRA</span></td><td>Re-rank y prioriza pending tasks</td></tr>
+      <tr><td>abandoned-cart-wa</td><td><span class="schedule">0 * * * *</span></td><td><span class="module-badge mod-wa">WA</span></td><td>WhatsApp reminders para abandoned carts</td></tr>
+      <tr><td>steve-agent-loop</td><td><span class="schedule">0 */2 * * *</span></td><td><span class="module-badge mod-ai">AI</span></td><td>Main Steve AI brain loop - decision making</td></tr>
+      <tr><td>swarm-research</td><td><span class="schedule">0 */2 * * *</span></td><td><span class="module-badge mod-ai">AI</span></td><td>Research aggregation (95% failure rate!)</td></tr>
+      <tr><td>prospect-followup</td><td><span class="schedule">0 */4 * * *</span></td><td><span class="module-badge mod-crm">CRM</span></td><td>Auto-send follow-up messages</td></tr>
+      <tr><td>error-budget</td><td><span class="schedule">0 */4 * * *</span></td><td><span class="module-badge mod-infra">INFRA</span></td><td>Calculate SLO error budgets</td></tr>
+      <tr><td>onboarding-wa</td><td><span class="schedule">0 */4 * * *</span></td><td><span class="module-badge mod-wa">WA</span></td><td>WhatsApp onboarding messages</td></tr>
+      <tr><td>sync-all-metrics</td><td><span class="schedule">0 */6 * * *</span></td><td><span class="module-badge mod-meta">METRICS</span></td><td>Master sync: Meta, Shopify, Google, Klaviyo</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>Diarios (18)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Cron</th><th>Schedule</th><th>Modulo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>chino-report</td><td><span class="schedule">0 0,6,12,18 * * *</span></td><td><span class="module-badge mod-qa">QA</span></td><td>QA report summary 4x al dia</td></tr>
+      <tr><td>wolf-night-mode</td><td><span class="schedule">0 3 * * *</span></td><td><span class="module-badge mod-infra">INFRA</span></td><td>Night mode automations & cleanup</td></tr>
+      <tr><td>auto-brief-generator</td><td><span class="schedule">0 7 * * *</span></td><td><span class="module-badge mod-ai">AI</span></td><td>Generate daily brief para clientes</td></tr>
+      <tr><td>changelog-watcher</td><td><span class="schedule">0 7 * * *</span></td><td><span class="module-badge mod-infra">INFRA</span></td><td>Monitor platform changelogs</td></tr>
+      <tr><td>performance-tracker-meta</td><td><span class="schedule">0 8 * * *</span></td><td><span class="module-badge mod-meta">META</span></td><td>Meta Ads performance metrics tracking</td></tr>
+      <tr><td>detective-visual</td><td><span class="schedule">0 8,10,12,14,16,18,20 * * *</span></td><td><span class="module-badge mod-qa">QA</span></td><td>Visual quality detection 7x al dia</td></tr>
+      <tr><td>auto-learning-digest</td><td><span class="schedule">0 9 * * *</span></td><td><span class="module-badge mod-ai">AI</span></td><td>Daily summary pending knowledge approvals</td></tr>
+      <tr><td>execute-meta-rules</td><td><span class="schedule">0 9 * * *</span></td><td><span class="module-badge mod-meta">META</span></td><td>Execute all active Meta automated rules</td></tr>
+      <tr><td>wolf-morning-send</td><td><span class="schedule">0 9 * * *</span></td><td><span class="module-badge mod-infra">INFRA</span></td><td>Morning messages & notifications</td></tr>
+      <tr><td>performance-evaluator</td><td><span class="schedule">0 10 * * *</span></td><td><span class="module-badge mod-meta">META</span></td><td>Evaluate campaign performance</td></tr>
+      <tr><td>fatigue-detector</td><td><span class="schedule">0 11 * * *</span></td><td><span class="module-badge mod-meta">META</span></td><td>Detect audience fatigue signals</td></tr>
+      <tr><td>prospect-email-nurture</td><td><span class="schedule">0 13 * * *</span></td><td><span class="module-badge mod-crm">CRM</span></td><td>Nurture emails to prospects</td></tr>
+      <tr><td>churn-detector</td><td><span class="schedule">0 14 * * *</span></td><td><span class="module-badge mod-crm">CRM</span></td><td>Identify churning clients/campaigns</td></tr>
+      <tr><td>predictive-alerts</td><td><span class="schedule">0 */6 * * *</span></td><td><span class="module-badge mod-infra">INFRA</span></td><td>Generate anomaly predictions</td></tr>
+      <tr><td>reconciliation</td><td><span class="schedule">0 */6 * * *</span></td><td><span class="module-badge mod-infra">INFRA</span></td><td>Reconcile data across platforms</td></tr>
+      <tr><td>sales-learning-loop</td><td><span class="schedule">0 20 * * *</span></td><td><span class="module-badge mod-crm">CRM</span></td><td>Sales team learning & recommendations</td></tr>
+      <tr><td>anomaly-detector</td><td><span class="schedule">0 22 * * *</span></td><td><span class="module-badge mod-infra">INFRA</span></td><td>Detect metric anomalies y outliers</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>Semanales (8)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Cron</th><th>Schedule</th><th>Modulo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>funnel-diagnosis</td><td><span class="schedule">0 5 * * 1</span></td><td><span class="module-badge mod-meta">META</span></td><td>Weekly funnel analysis (Lunes)</td></tr>
+      <tr><td>competitor-spy</td><td><span class="schedule">0 6 * * 1</span></td><td><span class="module-badge mod-competitor">COMP</span></td><td>Competitor ad tracking (Lunes)</td></tr>
+      <tr><td>weekly-report</td><td><span class="schedule">0 11 * * 1</span></td><td><span class="module-badge mod-general">GENERAL</span></td><td>Weekly business summary (Lunes)</td></tr>
+      <tr><td>root-cause-analysis</td><td><span class="schedule">0 2 * * 0</span></td><td><span class="module-badge mod-qa">QA</span></td><td>Sunday RCA for failures</td></tr>
+      <tr><td>steve-discoverer</td><td><span class="schedule">0 2 * * 0</span></td><td><span class="module-badge mod-ai">AI</span></td><td>Discover new knowledge (Domingo)</td></tr>
+      <tr><td>rule-calibrator</td><td><span class="schedule">0 3 * * 0</span></td><td><span class="module-badge mod-meta">META</span></td><td>Calibrate automated rules (Domingo)</td></tr>
+      <tr><td>steve-prompt-evolver</td><td><span class="schedule">0 3 * * 0</span></td><td><span class="module-badge mod-ai">AI</span></td><td>Evolve Steve prompts (Domingo)</td></tr>
+      <tr><td>revenue-attribution</td><td><span class="schedule">0 4 * * 0</span></td><td><span class="module-badge mod-billing">BILLING</span></td><td>Calculate revenue attribution (Domingo)</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>Mensuales (4)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Cron</th><th>Schedule</th><th>Modulo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>knowledge-dedup</td><td><span class="schedule">0 6 1 * *</span></td><td><span class="module-badge mod-ai">AI</span></td><td>Deduplicate Steve knowledge (1ro del mes)</td></tr>
+      <tr><td>cross-client-learning</td><td><span class="schedule">0 3 1 * *</span></td><td><span class="module-badge mod-ai">AI</span></td><td>Cross-client learning aggregation</td></tr>
+      <tr><td>knowledge-decay</td><td><span class="schedule">0 4 1 * *</span></td><td><span class="module-badge mod-ai">AI</span></td><td>Mark stale knowledge as decayed</td></tr>
+      <tr><td>knowledge-consolidator</td><td><span class="schedule">0 5 1 * *</span></td><td><span class="module-badge mod-ai">AI</span></td><td>Consolidate knowledge (1ro del mes)</td></tr>
+    </tbody></table></div>
+  </div>
+</div>
+
+<!-- TABLES -->
+<div class="section" id="section-tables">
+  <div class="section-title">Tablas de Base de Datos <span class="count">96 tablas</span></div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-auth">AUTH</span> Auth & Core (6)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Tabla</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>clients</td><td>Client accounts con billing info, brand identity</td></tr>
+      <tr><td>user_roles</td><td>User permission assignments (admin, super_admin)</td></tr>
+      <tr><td>user_subscriptions</td><td>Subscription plan assignments</td></tr>
+      <tr><td>subscription_plans</td><td>Available subscription tiers</td></tr>
+      <tr><td>platform_connections</td><td>OAuth/API connections (Meta, Google, Shopify)</td></tr>
+      <tr><td>oauth_states</td><td>OAuth state validation</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-meta">META ADS</span> Meta Ads (9)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Tabla</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>meta_campaigns</td><td>Campaign definitions con status, budget, dates</td></tr>
+      <tr><td>meta_automated_rules</td><td>Auto-optimization rules</td></tr>
+      <tr><td>meta_rule_execution_log</td><td>Execution history de reglas</td></tr>
+      <tr><td>ad_creatives</td><td>Ad creative definitions</td></tr>
+      <tr><td>ad_assets</td><td>Image/video assets</td></tr>
+      <tr><td>ad_references</td><td>Saved Meta copy templates</td></tr>
+      <tr><td>orphan_meta_connections</td><td>Conexiones huerfanas</td></tr>
+      <tr><td>facebook_scheduled_posts</td><td>Posts schedulados en Facebook</td></tr>
+      <tr><td>instagram_scheduled_posts</td><td>Posts schedulados en Instagram</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-email">EMAIL</span> Email Marketing (20)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Tabla</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>email_campaigns</td><td>Blast campaigns con audience, HTML, scheduling</td></tr>
+      <tr><td>email_subscribers</td><td>Contact database con subscription status</td></tr>
+      <tr><td>email_flows</td><td>Automated workflows (welcome, abandoned cart)</td></tr>
+      <tr><td>email_flow_enrollments</td><td>Subscriber enrollment state en flows</td></tr>
+      <tr><td>email_events</td><td>Tracking events (open, click, bounce)</td></tr>
+      <tr><td>email_templates</td><td>Reusable HTML templates</td></tr>
+      <tr><td>email_domains</td><td>SMTP domain authentication</td></tr>
+      <tr><td>email_lists</td><td>Segmented contact lists</td></tr>
+      <tr><td>email_list_members</td><td>Subscriber→list membership</td></tr>
+      <tr><td>email_ab_tests</td><td>A/B test configurations</td></tr>
+      <tr><td>email_forms</td><td>Embedded signup forms</td></tr>
+      <tr><td>email_send_queue</td><td>Queue para enviar campaigns</td></tr>
+      <tr><td>email_send_settings</td><td>Per-campaign sending config</td></tr>
+      <tr><td>email_universal_blocks</td><td>Reusable blocks drag-drop editor</td></tr>
+      <tr><td>email_industry_benchmarks</td><td>Industry metrics benchmarks</td></tr>
+      <tr><td>saved_meta_copies</td><td>Saved Facebook/Instagram copy</td></tr>
+      <tr><td>saved_google_copies</td><td>Saved Google Ads copy</td></tr>
+      <tr><td>klaviyo_email_plans</td><td>Monthly planned email volumes</td></tr>
+      <tr><td>campaign_metrics</td><td>Campaign performance metrics</td></tr>
+      <tr><td>adset_metrics</td><td>Ad set level metrics</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-wa">WHATSAPP</span> WhatsApp & CRM (14)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Tabla</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>wa_prospects</td><td>Sales prospects (BANT scoring, deals)</td></tr>
+      <tr><td>wa_conversations</td><td>Chat threads con contactos</td></tr>
+      <tr><td>wa_messages</td><td>Individual messages</td></tr>
+      <tr><td>wa_campaigns</td><td>Broadcast campaigns</td></tr>
+      <tr><td>wa_automations</td><td>Trigger-based automation rules</td></tr>
+      <tr><td>wa_case_studies</td><td>Sales pitch materials</td></tr>
+      <tr><td>wa_pending_actions</td><td>To-dos from conversations</td></tr>
+      <tr><td>wa_credits</td><td>Message credit balance</td></tr>
+      <tr><td>wa_credit_transactions</td><td>Credit purchases/usage audit</td></tr>
+      <tr><td>wa_twilio_accounts</td><td>Twilio sub-account credentials</td></tr>
+      <tr><td>web_forms</td><td>Leadgen forms</td></tr>
+      <tr><td>web_form_submissions</td><td>Form submissions</td></tr>
+      <tr><td>proposals</td><td>Sales proposals</td></tr>
+      <tr><td>sales_tasks</td><td>Sales tasks CRM</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-ai">AI/STEVE</span> Steve AI Brain (16)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Tabla</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>steve_knowledge</td><td>Knowledge base rules del swarm</td></tr>
+      <tr><td>steve_knowledge_versions</td><td>Version history (approval workflow)</td></tr>
+      <tr><td>steve_sources</td><td>Preferred research sources</td></tr>
+      <tr><td>steve_episodic_memory</td><td>Event log</td></tr>
+      <tr><td>steve_working_memory</td><td>Temporary KV cache</td></tr>
+      <tr><td>steve_conversations</td><td>Chat history con Steve</td></tr>
+      <tr><td>steve_messages</td><td>Individual messages</td></tr>
+      <tr><td>steve_feedback</td><td>User corrections/feedback</td></tr>
+      <tr><td>steve_training_examples</td><td>Fine-tuning examples</td></tr>
+      <tr><td>steve_training_feedback</td><td>Training data quality feedback</td></tr>
+      <tr><td>steve_bugs</td><td>Bug reports</td></tr>
+      <tr><td>steve_ab_tests</td><td>A/B tests suggestions</td></tr>
+      <tr><td>steve_commitments</td><td>Pledges de Steve</td></tr>
+      <tr><td>steve_fix_queue</td><td>QA fixes pending approval (Chino)</td></tr>
+      <tr><td>steve_alerts</td><td>Alert thresholds</td></tr>
+      <tr><td>slo_config</td><td>SLO targets and thresholds</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-social">SOCIAL</span> Steve Social (9)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Tabla</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>social_posts</td><td>Feed posts de agentes internos</td></tr>
+      <tr><td>social_subscriptions</td><td>WhatsApp subscribers to digests</td></tr>
+      <tr><td>social_digests</td><td>Digest delivery logs</td></tr>
+      <tr><td>social_moderation_log</td><td>Moderation decisions</td></tr>
+      <tr><td>social_external_agents</td><td>External bots posting</td></tr>
+      <tr><td>social_reactions</td><td>Emoji reactions</td></tr>
+      <tr><td>social_game_state</td><td>Game mechanics</td></tr>
+      <tr><td>social_laws</td><td>Feed laws (constitution)</td></tr>
+      <tr><td>social_law_votes</td><td>Agent votes on laws</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-qa">QA</span> Creative & QA (10)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Tabla</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>creative_history</td><td>Ad creative angles tested</td></tr>
+      <tr><td>creative_analyses</td><td>Creative performance analysis</td></tr>
+      <tr><td>criterio_rules</td><td>Business rules para QA scoring</td></tr>
+      <tr><td>criterio_results</td><td>QA test execution results</td></tr>
+      <tr><td>qa_log</td><td>QA event log</td></tr>
+      <tr><td>chino_routine</td><td>El Chino automation routines</td></tr>
+      <tr><td>chino_reports</td><td>Daily QA reports</td></tr>
+      <tr><td>detective_log</td><td>Data quality issue logs</td></tr>
+      <tr><td>detective_runs</td><td>Data quality audit runs</td></tr>
+      <tr><td>product_alerts</td><td>Platform health alerts</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-shopify">SHOPIFY</span> Shopify (4) + <span class="module-badge mod-competitor">COMPETITOR</span> (4) + <span class="module-badge mod-billing">BILLING</span> (10) + Otros</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Tabla</th><th>Modulo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>shopify_products</td><td><span class="module-badge mod-shopify">SHOPIFY</span></td><td>Product catalog synced</td></tr>
+      <tr><td>shopify_abandoned_checkouts</td><td><span class="module-badge mod-shopify">SHOPIFY</span></td><td>Abandoned carts</td></tr>
+      <tr><td>platform_tokens</td><td><span class="module-badge mod-shopify">SHOPIFY</span></td><td>Encrypted API credentials</td></tr>
+      <tr><td>competitor_ads</td><td><span class="module-badge mod-competitor">COMP</span></td><td>Competitor ad copies scraped</td></tr>
+      <tr><td>competitor_tracking</td><td><span class="module-badge mod-competitor">COMP</span></td><td>Competitor tracking</td></tr>
+      <tr><td>brand_research</td><td><span class="module-badge mod-competitor">COMP</span></td><td>Competitive landscape</td></tr>
+      <tr><td>campaign_recommendations</td><td><span class="module-badge mod-competitor">COMP</span></td><td>AI recommendations</td></tr>
+      <tr><td>client_assets</td><td><span class="module-badge mod-billing">BILLING</span></td><td>Brand assets (logos, fonts)</td></tr>
+      <tr><td>client_credits</td><td><span class="module-badge mod-billing">BILLING</span></td><td>Credit balance</td></tr>
+      <tr><td>client_financial_config</td><td><span class="module-badge mod-billing">BILLING</span></td><td>Dynamic costs</td></tr>
+      <tr><td>credit_transactions</td><td><span class="module-badge mod-billing">BILLING</span></td><td>Credit audit log</td></tr>
+      <tr><td>campaign_month_plans</td><td><span class="module-badge mod-billing">BILLING</span></td><td>Monthly marketing calendar</td></tr>
+      <tr><td>merchant_onboarding</td><td><span class="module-badge mod-billing">BILLING</span></td><td>Onboarding workflow</td></tr>
+      <tr><td>time_entries</td><td><span class="module-badge mod-billing">BILLING</span></td><td>Time tracking</td></tr>
+      <tr><td>invoices</td><td><span class="module-badge mod-billing">BILLING</span></td><td>Invoices</td></tr>
+      <tr><td>tasks</td><td><span class="module-badge mod-infra">INFRA</span></td><td>General task tracking</td></tr>
+      <tr><td>backlog</td><td><span class="module-badge mod-infra">INFRA</span></td><td>Product backlog</td></tr>
+      <tr><td>agent_sessions</td><td><span class="module-badge mod-infra">INFRA</span></td><td>Agent activity logs</td></tr>
+      <tr><td>waitlist_leads</td><td><span class="module-badge mod-general">LANDING</span></td><td>Waitlist signups</td></tr>
+    </tbody></table></div>
+  </div>
+</div>
+
+<!-- PAGES -->
+<div class="section" id="section-pages">
+  <div class="section-title">Paginas & Rutas <span class="count">38 rutas</span></div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>Publicas (14)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Ruta</th><th>Archivo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>/steve, /</td><td class="path">src/pages/Steve.tsx</td><td>Landing page principal</td></tr>
+      <tr><td>/auth</td><td class="path">src/pages/Auth.tsx</td><td>Login/signup</td></tr>
+      <tr><td>/blog</td><td class="path">src/pages/Blog.tsx</td><td>Blog listing</td></tr>
+      <tr><td>/faq</td><td class="path">src/pages/FAQ.tsx</td><td>Preguntas frecuentes</td></tr>
+      <tr><td>/terminos</td><td class="path">src/pages/TermsOfService.tsx</td><td>Terminos de servicio</td></tr>
+      <tr><td>/privacidad</td><td class="path">src/pages/PrivacyPolicy.tsx</td><td>Politica de privacidad</td></tr>
+      <tr><td>/eliminacion-datos</td><td class="path">src/pages/DataDeletion.tsx</td><td>GDPR data deletion</td></tr>
+      <tr><td>/changelog</td><td class="path">src/pages/Changelog.tsx</td><td>Product changelog</td></tr>
+      <tr><td>/funcionalidades</td><td class="path">src/pages/Funcionalidades.tsx</td><td>Features showcase</td></tr>
+      <tr><td>/centro-estudios</td><td class="path">src/pages/CentroEstudios.tsx</td><td>Learning center</td></tr>
+      <tr><td>/social</td><td class="path">src/pages/SocialLanding.tsx</td><td>Social feature landing</td></tr>
+      <tr><td>/social/feed</td><td class="path">src/pages/SteveSocial.tsx</td><td>Social feed</td></tr>
+      <tr><td>/social/join</td><td class="path">src/pages/SocialJoin.tsx</td><td>Join community</td></tr>
+      <tr><td>/steve-info</td><td class="path">src/pages/SteveAppInfo.tsx</td><td>Steve AI info</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>App Principal (6)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Ruta</th><th>Archivo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>/dashboard</td><td class="path">src/pages/Dashboard.tsx</td><td>Admin dashboard home</td></tr>
+      <tr><td>/portal, /portal/:clientId</td><td class="path">src/pages/ClientPortal.tsx</td><td>Main client portal (30+ tabs)</td></tr>
+      <tr><td>/tutorial</td><td class="path">src/pages/Tutorial.tsx</td><td>Tutorial/onboarding</td></tr>
+      <tr><td>/documentacion</td><td class="path">src/pages/AppDocumentation.tsx</td><td>Internal API docs</td></tr>
+      <tr><td>/shopify</td><td class="path">src/pages/ShopifyApp.tsx</td><td>Shopify embedded app</td></tr>
+      <tr><td>/connect-shopify</td><td class="path">src/pages/ConnectShopify.tsx</td><td>Shopify OAuth setup</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>Admin (8)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Ruta</th><th>Archivo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>/admin/cerebro</td><td class="path">src/pages/AdminCerebro.tsx</td><td>QA/Chino control panel</td></tr>
+      <tr><td>/admin/skyvern</td><td class="path">src/pages/AdminSkyvern.tsx</td><td>Skyvern automation</td></tr>
+      <tr><td>/admin/planes</td><td class="path">src/pages/AdminPlanes.tsx</td><td>Plan management</td></tr>
+      <tr><td>/admin/swarm-sources</td><td class="path">src/pages/AdminSwarmSources.tsx</td><td>Swarm learning sources</td></tr>
+      <tr><td>/admin/organigrama</td><td class="path">src/pages/AdminOrganigrama.tsx</td><td>Team organization</td></tr>
+      <tr><td>/admin/waitlist</td><td class="path">src/pages/AdminWaitlist.tsx</td><td>Waitlist management</td></tr>
+      <tr><td>/admin/huerfanas-meta</td><td class="path">src/pages/AdminOrphanMetaConnections.tsx</td><td>Orphaned Meta connections</td></tr>
+      <tr><td>/entrada-secreta-jm</td><td class="path">src/pages/AdminBypass.tsx</td><td>Secret admin bypass (JM)</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>OAuth Callbacks (4) + Dinamicas (3)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Ruta</th><th>Archivo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>/oauth/meta/callback</td><td class="path">src/pages/OAuthMetaCallback.tsx</td><td>Meta OAuth</td></tr>
+      <tr><td>/oauth/shopify/callback</td><td class="path">src/pages/OAuthShopifyCallback.tsx</td><td>Shopify OAuth</td></tr>
+      <tr><td>/oauth/google-ads/callback</td><td class="path">src/pages/OAuthGoogleAdsCallback.tsx</td><td>Google Ads OAuth</td></tr>
+      <tr><td>/agendar/oauth-callback</td><td class="path">src/pages/OAuthCalendarCallback.tsx</td><td>Calendar OAuth</td></tr>
+      <tr><td>/agendar/:sellerId</td><td class="path">src/pages/Agendar.tsx</td><td>Calendar scheduling</td></tr>
+      <tr><td>/formulario/:formId</td><td class="path">src/pages/WebForm.tsx</td><td>Dynamic web forms</td></tr>
+      <tr><td>*</td><td class="path">src/pages/NotFound.tsx</td><td>404 catch-all</td></tr>
+    </tbody></table></div>
+  </div>
+</div>
+
+<!-- COMPONENTS -->
+<div class="section" id="section-components">
+  <div class="section-title">Componentes por Modulo <span class="count">~300 componentes</span></div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-meta">META ADS</span> Meta Ads (25 componentes)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Componente</th><th>Archivo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>MetaAdsManager</td><td class="path">meta-ads/MetaAdsManager.tsx</td><td>Meta ads hub principal</td></tr>
+      <tr><td>MetaCampaignManager</td><td class="path">meta-ads/MetaCampaignManager.tsx</td><td>Campaign CRUD (86KB)</td></tr>
+      <tr><td>CampaignCreateWizard</td><td class="path">meta-ads/CampaignCreateWizard.tsx</td><td>Campaign creation wizard (141KB!)</td></tr>
+      <tr><td>MetaAnalyticsDashboard</td><td class="path">meta-ads/MetaAnalyticsDashboard.tsx</td><td>Campaign analytics</td></tr>
+      <tr><td>MetaConnectionWizard</td><td class="path">meta-ads/MetaConnectionWizard.tsx</td><td>OAuth connection setup</td></tr>
+      <tr><td>MetaAudienceManager</td><td class="path">meta-ads/MetaAudienceManager.tsx</td><td>Audience CRUD</td></tr>
+      <tr><td>MetaAutomatedRules</td><td class="path">meta-ads/MetaAutomatedRules.tsx</td><td>Automated rules engine</td></tr>
+      <tr><td>MetaSocialInbox</td><td class="path">meta-ads/MetaSocialInbox.tsx</td><td>Comments/messages inbox</td></tr>
+      <tr><td>PixelSetupWizard</td><td class="path">meta-ads/PixelSetupWizard.tsx</td><td>Pixel setup</td></tr>
+      <tr><td>AudienceOverlapViewer</td><td class="path">meta-ads/AudienceOverlapViewer.tsx</td><td>Audience overlap</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-klaviyo">CAMPAIGN STUDIO</span> Campaign Studio / Klaviyo (34 componentes)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Componente</th><th>Subcarpeta</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>CampaignStudio</td><td>campaign-studio/</td><td>Root container</td></tr>
+      <tr><td>CampaignCreationWizard</td><td>create/</td><td>Multi-step campaign wizard</td></tr>
+      <tr><td>TemplateSelector</td><td>create/</td><td>Template selection</td></tr>
+      <tr><td>AIContentAssistant</td><td>create/</td><td>Claude AI content generator</td></tr>
+      <tr><td>TemplateBuilder</td><td>design/</td><td>Template designer</td></tr>
+      <tr><td>TemplatesPanel</td><td>templates/</td><td>Template library</td></tr>
+      <tr><td>ImportKlaviyoDialog</td><td>templates/</td><td>Import from Klaviyo</td></tr>
+      <tr><td>FlowsPanel</td><td>flows/</td><td>Flow list view</td></tr>
+      <tr><td>FlowWizard</td><td>flows/</td><td>Flow creation wizard</td></tr>
+      <tr><td>MonthlyCalendar</td><td>calendar/</td><td>Month view calendar</td></tr>
+      <tr><td>BulkUploadWizard</td><td>bulk/</td><td>CSV bulk upload</td></tr>
+      <tr><td>SteveKlaviyoChat</td><td>chat/</td><td>Klaviyo AI assistant</td></tr>
+      <tr><td>MetricsInsights</td><td>insights/</td><td>Campaign metrics</td></tr>
+      <tr><td>GrapesStudioEmailEditor</td><td>shared/</td><td>Grapes.js email editor</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-email">EMAIL</span> Email Marketing (30 componentes)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Componente</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>EmailMarketing</td><td>Root email hub</td></tr>
+      <tr><td>CampaignBuilder</td><td>Campaign creation (81KB)</td></tr>
+      <tr><td>FlowBuilder / FlowCanvas</td><td>Flow diagram builder</td></tr>
+      <tr><td>GrapesEmailEditor</td><td>Grapes.js email editor</td></tr>
+      <tr><td>UniversalBlocksPanel</td><td>Reusable email blocks</td></tr>
+      <tr><td>EmailAnalytics</td><td>Campaign analytics</td></tr>
+      <tr><td>ABTestResultsPanel</td><td>A/B test results</td></tr>
+      <tr><td>ClickHeatmapPanel</td><td>Click heatmap</td></tr>
+      <tr><td>SegmentBuilder</td><td>Audience segmentation</td></tr>
+      <tr><td>DeliverabilityDashboard</td><td>Deliverability metrics</td></tr>
+      <tr><td>RevenueAttributionPanel</td><td>Revenue tracking</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-general">METRICS</span> Metrics & Analytics (23 componentes)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Componente</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>MetricsCharts</td><td>Chart library</td></tr>
+      <tr><td>BoldMetricCard</td><td>KPI card layout</td></tr>
+      <tr><td>TrendAreaChart</td><td>Trend chart</td></tr>
+      <tr><td>TopCampaignsBarChart</td><td>Top performers</td></tr>
+      <tr><td>ConversionFunnelPanel</td><td>Conversion funnel</td></tr>
+      <tr><td>CohortAnalysisPanel</td><td>Cohort retention</td></tr>
+      <tr><td>ProfitLossPanel</td><td>P&L summary</td></tr>
+      <tr><td>BusinessHealthScore</td><td>Overall health KPI</td></tr>
+      <tr><td>SmartInsightsPanel</td><td>AI-generated insights</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-google">GOOGLE</span> Google Ads (11) + <span class="module-badge mod-wa">WA</span> WhatsApp (6) + <span class="module-badge mod-social">SOCIAL</span> (13)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Componente</th><th>Modulo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>GoogleAdsTab</td><td><span class="module-badge mod-google">GOOGLE</span></td><td>Google Ads hub</td></tr>
+      <tr><td>GoogleCampaignManager</td><td><span class="module-badge mod-google">GOOGLE</span></td><td>Campaign management</td></tr>
+      <tr><td>GoogleKeywordManager</td><td><span class="module-badge mod-google">GOOGLE</span></td><td>Keywords</td></tr>
+      <tr><td>GoogleAutomatedRules</td><td><span class="module-badge mod-google">GOOGLE</span></td><td>Automated rules</td></tr>
+      <tr><td>WhatsAppHub</td><td><span class="module-badge mod-wa">WA</span></td><td>WhatsApp hub</td></tr>
+      <tr><td>WAInbox</td><td><span class="module-badge mod-wa">WA</span></td><td>Message inbox</td></tr>
+      <tr><td>WACampaigns</td><td><span class="module-badge mod-wa">WA</span></td><td>Campaign management</td></tr>
+      <tr><td>WAAutomations</td><td><span class="module-badge mod-wa">WA</span></td><td>Automation flows</td></tr>
+      <tr><td>SocialFeed</td><td><span class="module-badge mod-social">SOCIAL</span></td><td>Main social feed</td></tr>
+      <tr><td>SocialLeaderboard</td><td><span class="module-badge mod-social">SOCIAL</span></td><td>Top contributors</td></tr>
+      <tr><td>SocialTrending</td><td><span class="module-badge mod-social">SOCIAL</span></td><td>Trending topics</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>Dashboard Admin (29) + Landing (20) + Academy (5)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Componente</th><th>Area</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>DashboardStats</td><td>Dashboard</td><td>KPI cards</td></tr>
+      <tr><td>ClientsPanel</td><td>Dashboard</td><td>List clients</td></tr>
+      <tr><td>FixApprovalPanel</td><td>Dashboard</td><td>Approve/reject Chino auto-fixes</td></tr>
+      <tr><td>ProspectsPanel / ProspectKanban</td><td>Dashboard</td><td>Sales CRM</td></tr>
+      <tr><td>SteveKnowledgePanel</td><td>Dashboard</td><td>Knowledge base</td></tr>
+      <tr><td>SteveTrainingPanel</td><td>Dashboard</td><td>Train Steve AI</td></tr>
+      <tr><td>SteveHero</td><td>Landing</td><td>Hero section</td></tr>
+      <tr><td>PricingSection</td><td>Landing</td><td>Pricing tiers</td></tr>
+      <tr><td>TestimonialsSection</td><td>Landing</td><td>Customer testimonials</td></tr>
+      <tr><td>CourseView / LessonPlayer</td><td>Academy</td><td>Learning platform</td></tr>
+    </tbody></table></div>
+  </div>
+</div>
+
+<!-- HOOKS & UTILS -->
+<div class="section" id="section-hooks">
+  <div class="section-title">Hooks & Utilidades <span class="count">13 hooks + 23 utils</span></div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>Custom React Hooks (13)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Hook</th><th>Archivo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>useAuth()</td><td class="path">src/hooks/useAuth.tsx</td><td>Auth state & login/logout</td></tr>
+      <tr><td>useUserRole()</td><td class="path">src/hooks/useUserRole.tsx</td><td>User permissions & role checks</td></tr>
+      <tr><td>useUserPlan()</td><td class="path">src/hooks/useUserPlan.tsx</td><td>Subscription plan level</td></tr>
+      <tr><td>useMetaScopes()</td><td class="path">src/hooks/useMetaScopes.tsx</td><td>Meta API permissions</td></tr>
+      <tr><td>useBriefContext()</td><td class="path">src/hooks/useBriefContext.tsx</td><td>Brand brief state</td></tr>
+      <tr><td>useShopifyAuthFetch()</td><td class="path">src/hooks/useShopifyAuthFetch.tsx</td><td>Authenticated Shopify requests</td></tr>
+      <tr><td>useShopifyConfig()</td><td class="path">src/hooks/useShopifyConfig.ts</td><td>Shopify store config</td></tr>
+      <tr><td>useShopifyPreviewProducts()</td><td class="path">src/hooks/useShopifyPreviewProducts.tsx</td><td>Product preview</td></tr>
+      <tr><td>useMetricTargets()</td><td class="path">src/hooks/useMetricTargets.ts</td><td>Metric configuration</td></tr>
+      <tr><td>useSecurityContext()</td><td class="path">src/hooks/useSecurityContext.tsx</td><td>Security audit context</td></tr>
+      <tr><td>useReveal()</td><td class="path">src/hooks/useReveal.ts</td><td>Text reveal animation</td></tr>
+      <tr><td>useToast()</td><td class="path">src/hooks/use-toast.ts</td><td>Toast notifications</td></tr>
+      <tr><td>useIsMobile()</td><td class="path">src/hooks/use-mobile.tsx</td><td>Mobile viewport detection</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>Lib Utilities (23)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Utilidad</th><th>Archivo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td>Utils</td><td class="path">src/lib/utils.ts</td><td>String/date/formatting helpers</td></tr>
+      <tr><td>API Client</td><td class="path">src/lib/api.ts</td><td>HTTP requests to backend</td></tr>
+      <tr><td>Sentry</td><td class="path">src/lib/sentry.ts</td><td>Error tracking config</td></tr>
+      <tr><td>Plan Features</td><td class="path">src/lib/plan-features.ts</td><td>Feature access by subscription</td></tr>
+      <tr><td>Metric Utils</td><td class="path">src/lib/metric-utils.ts</td><td>Metric calculation helpers</td></tr>
+      <tr><td>Chart Theme</td><td class="path">src/lib/chart-theme.ts</td><td>Chart.js theme</td></tr>
+      <tr><td>Password Validation</td><td class="path">src/lib/password-validation.ts</td><td>Password strength</td></tr>
+      <tr><td>Creative Context</td><td class="path">src/lib/creative-context.ts</td><td>Brand context for ads</td></tr>
+      <tr><td>Healing Locator</td><td class="path">src/lib/healing-locator.ts</td><td>QA error location</td></tr>
+      <tr><td>Dispatch</td><td class="path">src/lib/dispatch.ts</td><td>Redux-like dispatcher</td></tr>
+      <tr><td>Spec Generator</td><td class="path">src/lib/spec-generator.ts</td><td>AI spec generation</td></tr>
+      <tr><td>Task Creator</td><td class="path">src/lib/task-creator.ts</td><td>Task creation helper</td></tr>
+      <tr><td>Agent Map</td><td class="path">src/lib/agent-map.ts</td><td>Agent personality mapper</td></tr>
+      <tr><td>QA Trigger</td><td class="path">src/lib/qa-trigger.ts</td><td>Trigger QA workflow</td></tr>
+      <tr><td>Report PDF Renderer</td><td class="path">src/lib/report/report-pdf-renderer.ts</td><td>Render PDF reports</td></tr>
+      <tr><td>Report AI Insights</td><td class="path">src/lib/report/report-ai-insights.ts</td><td>Generate AI insights</td></tr>
+    </tbody></table></div>
+  </div>
+</div>
+
+<!-- INTEGRATIONS -->
+<div class="section" id="section-integrations">
+  <div class="section-title">Integraciones Externas <span class="count">18 plataformas, 190+ puntos</span></div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-meta">META</span> Meta/Facebook Graph API (23 archivos)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Archivo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td class="path">cloud-run-api/src/lib/meta-fetch.ts</td><td>Core fetch wrapper v21.0 con circuit breaker</td></tr>
+      <tr><td class="path">cloud-run-api/src/lib/meta-capi.ts</td><td>Conversions API server-side tracking</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/meta/manage-meta-campaign.ts</td><td>Campaign CRUD</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/meta/manage-meta-audiences.ts</td><td>Audience management + lookalikes</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/meta/sync-meta-metrics.ts</td><td>Metrics sync (impressions, spend, CTR)</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/meta/manage-meta-rules.ts</td><td>Auto-pause/scaling rules</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/meta/meta-targeting-search.ts</td><td>Interest/behavior targeting</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/meta/meta-social-inbox.ts</td><td>DM conversations</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span><span class="module-badge mod-ai">ANTHROPIC</span> Claude API (30 archivos)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Archivo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td class="path">cloud-run-api/src/lib/anthropic-fetch.ts</td><td>Core wrapper con retry y circuit breaker</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/ai/steve-chat.ts</td><td>Main conversational AI</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/ai/steve-strategy.ts</td><td>Strategy generation</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/ai/generate-meta-copy.ts</td><td>Meta ad copy variants</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/ai/criterio-meta.ts</td><td>Automated review Meta ads</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/ai/criterio-email.ts</td><td>Automated review emails</td></tr>
+      <tr><td class="path">cloud-run-api/src/chino/fix-generator.ts</td><td>QA fix generation</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>Otras: <span class="module-badge mod-shopify">Shopify</span> <span class="module-badge mod-klaviyo">Klaviyo</span> <span class="module-badge mod-google">Google</span> <span class="module-badge mod-wa">Twilio</span> + Resend, Stripe, Replicate, Apify, Firecrawl, GitHub</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Plataforma</th><th>Archivos</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td><span class="module-badge mod-shopify">Shopify</span></td><td>33 archivos</td><td>REST + GraphQL API, OAuth, webhooks HMAC</td></tr>
+      <tr><td><span class="module-badge mod-klaviyo">Klaviyo</span></td><td>12 archivos</td><td>Campaigns, flows, metrics, templates</td></tr>
+      <tr><td><span class="module-badge mod-google">Google Ads</span></td><td>13 archivos</td><td>GAQL queries, campaign management, OAuth</td></tr>
+      <tr><td><span class="module-badge mod-wa">Twilio</span></td><td>13 archivos</td><td>WhatsApp Business API, SMS</td></tr>
+      <tr><td style="color:var(--general)">OpenAI</td><td>4 archivos</td><td>Whisper audio transcription</td></tr>
+      <tr><td style="color:var(--accent)">Gemini/Imagen 4</td><td>7 archivos</td><td>Image generation ($0.02/img)</td></tr>
+      <tr><td style="color:var(--text2)">Replicate</td><td>5 archivos</td><td>Kling video generation</td></tr>
+      <tr><td style="color:var(--email)">Resend</td><td>4 archivos</td><td>Email delivery</td></tr>
+      <tr><td style="color:var(--billing)">Stripe</td><td>3 edge functions</td><td>Payments & subscriptions</td></tr>
+      <tr><td style="color:var(--competitor)">Apify</td><td>6 archivos</td><td>Web scraping competitors</td></tr>
+      <tr><td style="color:var(--content)">Firecrawl</td><td>3 archivos</td><td>Web content extraction</td></tr>
+      <tr><td style="color:var(--infra)">GitHub</td><td>2 archivos</td><td>Auto-fix PRs via Chino</td></tr>
+      <tr><td style="color:var(--meta)">Leadsie</td><td>3 archivos</td><td>Meta BM partner webhooks</td></tr>
+      <tr><td style="color:var(--google)">Google Calendar</td><td>2 archivos</td><td>Booking integration</td></tr>
+    </tbody></table></div>
+  </div>
+</div>
+
+<!-- ENV VARS -->
+<div class="section" id="section-env">
+  <div class="section-title">Variables de Entorno <span class="count">Criticas para produccion</span></div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>Todas las ENV vars requeridas</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Variable</th><th>Modulo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td style="font-family:monospace;color:var(--meta)">META_APP_ID</td><td><span class="module-badge mod-meta">META</span></td><td>Facebook App ID</td></tr>
+      <tr><td style="font-family:monospace;color:var(--meta)">META_APP_SECRET</td><td><span class="module-badge mod-meta">META</span></td><td>Facebook App Secret</td></tr>
+      <tr><td style="font-family:monospace;color:var(--meta)">META_SYSTEM_TOKEN</td><td><span class="module-badge mod-meta">META</span></td><td>SUAT para Leadsie/BM partner</td></tr>
+      <tr><td style="font-family:monospace;color:var(--google)">GOOGLE_ADS_DEVELOPER_TOKEN</td><td><span class="module-badge mod-google">GOOGLE</span></td><td>Google Ads dev token</td></tr>
+      <tr><td style="font-family:monospace;color:var(--google)">GOOGLE_CLIENT_ID</td><td><span class="module-badge mod-google">GOOGLE</span></td><td>Google OAuth client</td></tr>
+      <tr><td style="font-family:monospace;color:var(--google)">GOOGLE_ADS_CLIENT_SECRET</td><td><span class="module-badge mod-google">GOOGLE</span></td><td>Google OAuth secret</td></tr>
+      <tr><td style="font-family:monospace;color:var(--shopify)">SHOPIFY_CLIENT_ID</td><td><span class="module-badge mod-shopify">SHOPIFY</span></td><td>Shopify app client</td></tr>
+      <tr><td style="font-family:monospace;color:var(--shopify)">SHOPIFY_CLIENT_SECRET</td><td><span class="module-badge mod-shopify">SHOPIFY</span></td><td>Shopify app secret</td></tr>
+      <tr><td style="font-family:monospace;color:var(--shopify)">SHOPIFY_WEBHOOK_SECRET</td><td><span class="module-badge mod-shopify">SHOPIFY</span></td><td>HMAC verification</td></tr>
+      <tr><td style="font-family:monospace;color:var(--wa)">TWILIO_ACCOUNT_SID</td><td><span class="module-badge mod-wa">TWILIO</span></td><td>Twilio account</td></tr>
+      <tr><td style="font-family:monospace;color:var(--wa)">TWILIO_AUTH_TOKEN</td><td><span class="module-badge mod-wa">TWILIO</span></td><td>Twilio auth</td></tr>
+      <tr><td style="font-family:monospace;color:var(--wa)">TWILIO_PHONE_NUMBER</td><td><span class="module-badge mod-wa">TWILIO</span></td><td>WhatsApp number</td></tr>
+      <tr><td style="font-family:monospace;color:var(--email)">RESEND_API_KEY</td><td><span class="module-badge mod-email">EMAIL</span></td><td>Email delivery</td></tr>
+      <tr><td style="font-family:monospace;color:var(--ai)">ANTHROPIC_API_KEY</td><td><span class="module-badge mod-ai">AI</span></td><td>Claude API</td></tr>
+      <tr><td style="font-family:monospace;color:var(--general)">OPENAI_API_KEY</td><td><span class="module-badge mod-ai">AI</span></td><td>Whisper transcription</td></tr>
+      <tr><td style="font-family:monospace;color:var(--ai)">GEMINI_API_KEY</td><td><span class="module-badge mod-ai">AI</span></td><td>Image generation</td></tr>
+      <tr><td style="font-family:monospace;color:var(--general)">REPLICATE_API_KEY</td><td><span class="module-badge mod-ai">AI</span></td><td>Video generation</td></tr>
+      <tr><td style="font-family:monospace;color:var(--competitor)">APIFY_TOKEN</td><td><span class="module-badge mod-competitor">COMP</span></td><td>Web scraping</td></tr>
+      <tr><td style="font-family:monospace;color:var(--content)">FIRECRAWL_API_KEY</td><td><span class="module-badge mod-general">GENERAL</span></td><td>Web extraction</td></tr>
+      <tr><td style="font-family:monospace;color:var(--infra)">ENCRYPTION_KEY</td><td><span class="module-badge mod-auth">AUTH</span></td><td>Token encryption</td></tr>
+      <tr><td style="font-family:monospace;color:var(--infra)">CRON_SECRET</td><td><span class="module-badge mod-infra">INFRA</span></td><td>Cron auth header</td></tr>
+      <tr><td style="font-family:monospace;color:var(--qa)">SENTRY_DSN</td><td><span class="module-badge mod-infra">INFRA</span></td><td>Error tracking</td></tr>
+      <tr><td style="font-family:monospace;color:var(--infra)">GITHUB_TOKEN</td><td><span class="module-badge mod-qa">QA</span></td><td>Chino code executor</td></tr>
+      <tr><td style="font-family:monospace;color:var(--billing)">STRIPE_SECRET_KEY</td><td><span class="module-badge mod-billing">BILLING</span></td><td>Stripe payments</td></tr>
+      <tr><td style="font-family:monospace;color:var(--billing)">STRIPE_WEBHOOK_SECRET</td><td><span class="module-badge mod-billing">BILLING</span></td><td>Webhook verification</td></tr>
+    </tbody></table></div>
+  </div>
+</div>
+
+<!-- CLOUD RUN API -->
+<div class="section" id="section-cloudrun">
+  <div class="section-title">Cloud Run API <span class="count">Estructura del backend</span></div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>Directorios de Rutas (200+ endpoints)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Directorio</th><th>Modulo</th><th>Archivos</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td class="path">cloud-run-api/src/routes/ai/</td><td><span class="module-badge mod-ai">AI</span></td><td>18</td><td>Anthropic, image/video gen, analysis</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/meta/</td><td><span class="module-badge mod-meta">META</span></td><td>20</td><td>Graph API campaigns, audiences, pixels, rules</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/google/</td><td><span class="module-badge mod-google">GOOGLE</span></td><td>8</td><td>Campaign management, metrics, rules</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/shopify/</td><td><span class="module-badge mod-shopify">SHOPIFY</span></td><td>20</td><td>Products, orders, webhooks</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/klaviyo/</td><td><span class="module-badge mod-klaviyo">KLAVIYO</span></td><td>11</td><td>Email campaigns, flows, metrics</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/whatsapp/</td><td><span class="module-badge mod-wa">WA</span></td><td>10</td><td>Messages, campaigns, webhooks</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/email/</td><td><span class="module-badge mod-email">EMAIL</span></td><td>21</td><td>Resend integration, campaigns</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/cron/</td><td><span class="module-badge mod-infra">CRON</span></td><td>84</td><td>Scheduled tasks, metrics sync</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/analytics/</td><td><span class="module-badge mod-competitor">ANALYTICS</span></td><td>5</td><td>Competitor ads, deep dive</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/oauth/</td><td><span class="module-badge mod-auth">OAUTH</span></td><td>3</td><td>Meta, Google Ads, Google Calendar</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/webhooks/</td><td><span class="module-badge mod-general">WEBHOOKS</span></td><td>2</td><td>Leadsie BM partner</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/public/</td><td><span class="module-badge mod-general">PUBLIC</span></td><td>2</td><td>Audit store, public rules</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/instagram/</td><td><span class="module-badge mod-meta">IG</span></td><td>2</td><td>Publish, insights</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/facebook/</td><td><span class="module-badge mod-meta">FB</span></td><td>2</td><td>Publish, insights</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/crm/</td><td><span class="module-badge mod-crm">CRM</span></td><td>8</td><td>Prospects, sales, web forms</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/social/</td><td><span class="module-badge mod-social">SOCIAL</span></td><td>8</td><td>Leaderboard, trending, feeds</td></tr>
+      <tr><td class="path">cloud-run-api/src/routes/utilities/</td><td><span class="module-badge mod-general">UTILS</span></td><td>20+</td><td>Copy gen, knowledge, QA</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <div class="module-group">
+    <div class="module-group-header" onclick="toggleGroup(this)"><span>Librerias Core (cloud-run-api/src/lib/)</span><span class="arrow">&#9660;</span></div>
+    <div class="module-group-body"><table><thead><tr><th>Archivo</th><th>Descripcion</th></tr></thead><tbody>
+      <tr><td class="path">anthropic-fetch.ts</td><td>Claude API wrapper con retry + circuit breaker</td></tr>
+      <tr><td class="path">meta-fetch.ts</td><td>Meta Graph API v21.0 con circuit breaker</td></tr>
+      <tr><td class="path">meta-capi.ts</td><td>Meta Conversions API (server-side events)</td></tr>
+      <tr><td class="path">meta-token-refresh.ts</td><td>Meta OAuth token refresh</td></tr>
+      <tr><td class="path">twilio-client.ts</td><td>Twilio SDK wrapper</td></tr>
+      <tr><td class="path">audio-transcriber.ts</td><td>OpenAI Whisper transcription</td></tr>
+      <tr><td class="path">shopify-credentials.ts</td><td>Shopify token management</td></tr>
+      <tr><td class="path">shopify-session.ts</td><td>Shopify session HMAC validation</td></tr>
+      <tr><td class="path">resolve-google-token.ts</td><td>Google token decryption</td></tr>
+      <tr><td class="path">github-client.ts</td><td>GitHub REST API (Chino auto-fix)</td></tr>
+      <tr><td class="path">send-alert-email.ts</td><td>Resend alert emails</td></tr>
+      <tr><td class="path">cron-auth.ts</td><td>X-Cron-Secret validation</td></tr>
+    </tbody></table></div>
+  </div>
+</div>
+
+</div>
+
+<div class="watermark">
+  Generado por <strong>Javiera W12 - QA</strong> | Steve Ads Full Audit | 10 Abril 2026<br>
+  betabg | React + Vite + TypeScript + Supabase + Cloud Run
+</div>
+
+<script>
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('section-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function toggleGroup(header) {
+  header.classList.toggle('collapsed');
+}
+
+function filterAll(query) {
+  if (!query) {
+    document.querySelectorAll('tbody tr').forEach(r => { r.style.display = ''; });
+    document.querySelectorAll('.module-group').forEach(g => { g.style.display = ''; });
+    return;
+  }
+  const q = query.toLowerCase();
+  // Show all sections when searching
+  document.querySelectorAll('.section').forEach(s => s.classList.add('active'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+
+  document.querySelectorAll('tbody tr').forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(q) ? '' : 'none';
+  });
+
+  // Hide empty groups
+  document.querySelectorAll('.module-group').forEach(group => {
+    const body = group.querySelector('.module-group-body');
+    if (!body) return;
+    const visibleRows = body.querySelectorAll('tbody tr:not([style*="display: none"])');
+    group.style.display = visibleRows.length > 0 ? '' : 'none';
+    // Expand matching groups
+    if (visibleRows.length > 0) {
+      group.querySelector('.module-group-header').classList.remove('collapsed');
+    }
+  });
+}
+</script>
+
+</body>
+</html>

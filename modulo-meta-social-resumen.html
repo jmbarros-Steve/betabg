@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steve Ads — Meta Ads + Social Module</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.6; }
+
+  .hero { background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 50%, #1a1040 100%); padding: 60px 24px 40px; text-align: center; border-bottom: 1px solid #334155; }
+  .hero h1 { font-size: 2.4rem; font-weight: 800; background: linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero .subtitle { color: #94a3b8; font-size: 1.1rem; margin-top: 8px; }
+  .hero .date { color: #64748b; font-size: 0.85rem; margin-top: 12px; }
+
+  .mega-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; max-width: 900px; margin: -30px auto 40px; padding: 0 24px; position: relative; z-index: 2; }
+  .mega-stat { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px 16px; text-align: center; }
+  .mega-stat .number { font-size: 2rem; font-weight: 800; color: #60a5fa; }
+  .mega-stat .label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+  .mega-stat.accent .number { color: #a78bfa; }
+  .mega-stat.pink .number { color: #f472b6; }
+  .mega-stat.green .number { color: #34d399; }
+  .mega-stat.orange .number { color: #fb923c; }
+  .mega-stat.yellow .number { color: #fbbf24; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px 60px; }
+
+  .section { margin-top: 48px; }
+  .section-title { font-size: 1.4rem; font-weight: 700; color: #f1f5f9; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
+  .section-title .icon { font-size: 1.6rem; }
+  .section-desc { color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; }
+  .card h3 { font-size: 1rem; font-weight: 600; color: #e2e8f0; margin-bottom: 4px; }
+  .card .card-meta { font-size: 0.8rem; color: #64748b; margin-bottom: 12px; }
+  .card .card-lines { font-size: 1.6rem; font-weight: 800; color: #60a5fa; }
+  .card .card-lines.purple { color: #a78bfa; }
+  .card .card-lines.pink { color: #f472b6; }
+  .card .card-lines.green { color: #34d399; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { text-align: left; padding: 10px 12px; background: #1e293b; color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; border-bottom: 1px solid #334155; }
+  td { padding: 8px 12px; border-bottom: 1px solid #1e293b; }
+  tr:hover td { background: #1e293b40; }
+  .table-wrap { background: #1e293b; border: 1px solid #334155; border-radius: 12px; overflow: hidden; }
+
+  .bar { height: 6px; border-radius: 3px; background: #334155; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; }
+  .bar-fill.blue { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+  .bar-fill.purple { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
+  .bar-fill.pink { background: linear-gradient(90deg, #db2777, #f472b6); }
+  .bar-fill.green { background: linear-gradient(90deg, #059669, #34d399); }
+  .bar-fill.orange { background: linear-gradient(90deg, #ea580c, #fb923c); }
+
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; }
+  .tag.blue { background: #1e3a5f; color: #60a5fa; }
+  .tag.purple { background: #2e1065; color: #a78bfa; }
+  .tag.pink { background: #500724; color: #f472b6; }
+  .tag.green { background: #064e3b; color: #34d399; }
+  .tag.orange { background: #431407; color: #fb923c; }
+  .tag.yellow { background: #422006; color: #fbbf24; }
+  .tag.gray { background: #1e293b; color: #94a3b8; }
+
+  .file-list { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center; }
+  .file-list .fname { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-list .flines { font-family: 'SF Mono', monospace; font-size: 0.8rem; color: #60a5fa; font-weight: 600; text-align: right; }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .split { grid-template-columns: 1fr; } }
+
+  .flow-diagram { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 16px; background: #0f172a; border-radius: 8px; margin: 12px 0; }
+  .flow-box { padding: 8px 14px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+  .flow-arrow { color: #475569; font-size: 1.2rem; }
+
+  .cron-schedule { font-family: 'SF Mono', monospace; font-size: 0.75rem; color: #a78bfa; background: #1e1b4b; padding: 2px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Meta Ads + Social Module</h1>
+  <p class="subtitle">Steve Ads Platform &mdash; Resumen completo del modulo</p>
+  <p class="date">Generado: 10 abril 2026 &bull; Repo: betabg</p>
+</div>
+
+<div class="mega-stats">
+  <div class="mega-stat">
+    <div class="number">52,692</div>
+    <div class="label">Lineas de codigo</div>
+  </div>
+  <div class="mega-stat accent">
+    <div class="number">125</div>
+    <div class="label">Archivos</div>
+  </div>
+  <div class="mega-stat pink">
+    <div class="number">25</div>
+    <div class="label">Tablas SQL</div>
+  </div>
+  <div class="mega-stat green">
+    <div class="number">43</div>
+    <div class="label">API Endpoints</div>
+  </div>
+  <div class="mega-stat orange">
+    <div class="number">8</div>
+    <div class="label">Crons</div>
+  </div>
+  <div class="mega-stat yellow">
+    <div class="number">3</div>
+    <div class="label">Webhooks</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ============ OVERVIEW ============ -->
+  <div class="section">
+    <h2 class="section-title"><span class="icon">&#128200;</span> Vista General</h2>
+    <p class="section-desc">El modulo cubre todo el ciclo: conectar Meta &rarr; crear campanas &rarr; medir resultados &rarr; optimizar con IA &rarr; espiar competencia &rarr; publicar en redes.</p>
+
+    <div class="split">
+      <div class="card">
+        <h3>Frontend</h3>
+        <p class="card-meta">React + TypeScript + Tailwind + shadcn/ui</p>
+        <div class="card-lines">32,878 lineas</div>
+        <p class="card-meta" style="margin-top:8px">63 archivos &bull; 7 secciones</p>
+        <div style="margin-top:12px">
+          <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#94a3b8;margin-bottom:4px"><span>meta-ads/ (core)</span><span>19,968</span></div>
+          <div class="bar"><div class="bar-fill blue" style="width:60.7%"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#94a3b8;margin:8px 0 4px"><span>Componentes standalone</span><span>7,284</span></div>
+          <div class="bar"><div class="bar-fill purple" style="width:22.1%"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#94a3b8;margin:8px 0 4px"><span>Social community</span><span>3,425</span></div>
+          <div class="bar"><div class="bar-fill pink" style="width:10.4%"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#94a3b8;margin:8px 0 4px"><span>Instagram + Hooks + Pages</span><span>2,201</span></div>
+          <div class="bar"><div class="bar-fill green" style="width:6.7%"></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Backend</h3>
+        <p class="card-meta">Hono + Node.js en Cloud Run + Edge Functions</p>
+        <div class="card-lines purple">19,814 lineas</div>
+        <p class="card-meta" style="margin-top:8px">62 archivos &bull; 12 secciones</p>
+        <div style="margin-top:12px">
+          <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#94a3b8;margin-bottom:4px"><span>routes/meta/ (core)</span><span>7,003</span></div>
+          <div class="bar"><div class="bar-fill blue" style="width:35.3%"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#94a3b8;margin:8px 0 4px"><span>Crons (meta + social)</span><span>4,386</span></div>
+          <div class="bar"><div class="bar-fill orange" style="width:22.1%"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#94a3b8;margin:8px 0 4px"><span>AI (copy + criterio)</span><span>1,859</span></div>
+          <div class="bar"><div class="bar-fill purple" style="width:9.4%"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#94a3b8;margin:8px 0 4px"><span>Edge Functions + Instagram + Social + etc</span><span>6,566</span></div>
+          <div class="bar"><div class="bar-fill green" style="width:33.1%"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TOP 10 LARGEST FILES ============ -->
+  <div class="section">
+    <h2 class="section-title"><span class="icon">&#128293;</span> Top 10 Archivos Mas Grandes</h2>
+    <p class="section-desc">Los monstruos del modulo. Estos 10 archivos suman 18,668 lineas (35% del total).</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Archivo</th><th>Tipo</th><th style="text-align:right">Lineas</th><th style="width:200px"></th></tr></thead>
+        <tbody>
+          <tr><td><code>CampaignCreateWizard.tsx</code></td><td><span class="tag blue">Frontend</span></td><td style="text-align:right;font-weight:700;color:#60a5fa">3,090</td><td><div class="bar"><div class="bar-fill blue" style="width:100%"></div></div></td></tr>
+          <tr><td><code>MetaCampaignManager.tsx</code></td><td><span class="tag blue">Frontend</span></td><td style="text-align:right;font-weight:700;color:#60a5fa">2,354</td><td><div class="bar"><div class="bar-fill blue" style="width:76%"></div></div></td></tr>
+          <tr><td><code>MetaAudienceManager.tsx</code></td><td><span class="tag blue">Frontend</span></td><td style="text-align:right;font-weight:700;color:#60a5fa">1,988</td><td><div class="bar"><div class="bar-fill blue" style="width:64%"></div></div></td></tr>
+          <tr><td><code>MetaAutomatedRules.tsx</code></td><td><span class="tag blue">Frontend</span></td><td style="text-align:right;font-weight:700;color:#60a5fa">1,986</td><td><div class="bar"><div class="bar-fill blue" style="width:64%"></div></div></td></tr>
+          <tr><td><code>manage-meta-campaign.ts</code></td><td><span class="tag purple">Backend</span></td><td style="text-align:right;font-weight:700;color:#a78bfa">1,717</td><td><div class="bar"><div class="bar-fill purple" style="width:56%"></div></div></td></tr>
+          <tr><td><code>MetaAnalyticsDashboard.tsx</code></td><td><span class="tag blue">Frontend</span></td><td style="text-align:right;font-weight:700;color:#60a5fa">1,627</td><td><div class="bar"><div class="bar-fill blue" style="width:53%"></div></div></td></tr>
+          <tr><td><code>generate-meta-copy.ts</code></td><td><span class="tag purple">Backend</span></td><td style="text-align:right;font-weight:700;color:#a78bfa">1,423</td><td><div class="bar"><div class="bar-fill purple" style="width:46%"></div></div></td></tr>
+          <tr><td><code>CampaignAnalyticsPanel.tsx</code></td><td><span class="tag blue">Frontend</span></td><td style="text-align:right;font-weight:700;color:#60a5fa">1,421</td><td><div class="bar"><div class="bar-fill blue" style="width:46%"></div></div></td></tr>
+          <tr><td><code>MetaAdsManager.tsx</code></td><td><span class="tag blue">Frontend</span></td><td style="text-align:right;font-weight:700;color:#60a5fa">1,351</td><td><div class="bar"><div class="bar-fill blue" style="width:44%"></div></div></td></tr>
+          <tr><td><code>SocialPublisher.tsx</code></td><td><span class="tag blue">Frontend</span></td><td style="text-align:right;font-weight:700;color:#60a5fa">1,207</td><td><div class="bar"><div class="bar-fill pink" style="width:39%"></div></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============ COMO FUNCIONA ============ -->
+  <div class="section">
+    <h2 class="section-title"><span class="icon">&#9881;&#65039;</span> Como Funciona (flujo simplificado)</h2>
+    <p class="section-desc">De conectar la cuenta a optimizar campanas con IA.</p>
+
+    <div class="card" style="margin-bottom:16px">
+      <h3>1. Conexion &mdash; OAuth o Leadsie</h3>
+      <div class="flow-diagram">
+        <div class="flow-box" style="background:#1e3a5f;color:#60a5fa">Usuario</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#2e1065;color:#a78bfa">MetaConnectionWizard</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#1e3a5f;color:#60a5fa">OAuth / Leadsie Webhook</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#064e3b;color:#34d399">platform_connections</div>
+      </div>
+      <p style="font-size:0.8rem;color:#94a3b8">El token se encripta y guarda. Para Leadsie (BM Partner), el SUAT vive en env var y los scopes se hardcodean.</p>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <h3>2. Sincronizar Metricas</h3>
+      <div class="flow-diagram">
+        <div class="flow-box" style="background:#422006;color:#fbbf24">Cron cada 6h</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#2e1065;color:#a78bfa">sync-all-metrics</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#1e3a5f;color:#60a5fa">Meta Graph API</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#064e3b;color:#34d399">campaign_metrics / adset_metrics</div>
+      </div>
+      <p style="font-size:0.8rem;color:#94a3b8">Trae spend, impressions, clicks, conversions de los ultimos 30 dias por campana y adset.</p>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <h3>3. Crear y Gestionar Campanas</h3>
+      <div class="flow-diagram">
+        <div class="flow-box" style="background:#1e3a5f;color:#60a5fa">CampaignCreateWizard</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#2e1065;color:#a78bfa">manage-meta-campaign</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#1e3a5f;color:#60a5fa">Meta Marketing API</div>
+      </div>
+      <p style="font-size:0.8rem;color:#94a3b8">Wizard de 5 pasos: objetivo &rarr; audiencia &rarr; presupuesto &rarr; creativos &rarr; revision. CRUD completo de campanas, adsets, ads.</p>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <h3>4. IA: Copies + Criterio + Reglas Automaticas</h3>
+      <div class="flow-diagram">
+        <div class="flow-box" style="background:#500724;color:#f472b6">generate-meta-copy</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#2e1065;color:#a78bfa">Claude / GPT</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#1e3a5f;color:#60a5fa">criterio-meta (493 reglas)</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#422006;color:#fbbf24">Reglas auto 9am</div>
+      </div>
+      <p style="font-size:0.8rem;color:#94a3b8">Steve genera copies, Criterio los puntua, y las reglas automaticas pausan/activan ads segun performance.</p>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <h3>5. Espiar Competencia</h3>
+      <div class="flow-diagram">
+        <div class="flow-box" style="background:#1e3a5f;color:#60a5fa">1 campo: "Nike"</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#2e1065;color:#a78bfa">resolvePageId</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#431407;color:#fb923c">Apify Scraper</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#064e3b;color:#34d399">competitor_ads + metricas</div>
+      </div>
+      <p style="font-size:0.8rem;color:#94a3b8">Input inteligente: nombre, @handle, o URL. El backend resuelve y trae ads con impressions, spend, reach via Apify.</p>
+    </div>
+
+    <div class="card">
+      <h3>6. Publicar en Instagram / Facebook</h3>
+      <div class="flow-diagram">
+        <div class="flow-box" style="background:#500724;color:#f472b6">SocialPublisher</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#2e1065;color:#a78bfa">publish-instagram / publish-facebook</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box" style="background:#1e3a5f;color:#60a5fa">Graph API</div>
+      </div>
+      <p style="font-size:0.8rem;color:#94a3b8">Publicacion directa o programada. Calendario visual. Metricas por post (reach, engagement, saves).</p>
+    </div>
+  </div>
+
+  <!-- ============ TABLAS ============ -->
+  <div class="section">
+    <h2 class="section-title"><span class="icon">&#128451;&#65039;</span> 25 Tablas de Supabase</h2>
+    <p class="section-desc">Organizadas por sub-modulo.</p>
+    <div class="card-grid">
+      <div class="card">
+        <h3>Meta Ads <span class="tag blue">8 tablas</span></h3>
+        <ul style="list-style:none;font-size:0.85rem;margin-top:8px">
+          <li><code>meta_campaigns</code> &mdash; campanas sincronizadas</li>
+          <li><code>campaign_metrics</code> &mdash; metricas diarias por campana</li>
+          <li><code>adset_metrics</code> &mdash; metricas por ad set</li>
+          <li><code>ad_creatives</code> &mdash; creativos de ads</li>
+          <li><code>ad_assets</code> &mdash; imagenes/videos subidos</li>
+          <li><code>saved_meta_copies</code> &mdash; copies generados por IA</li>
+          <li><code>meta_automated_rules</code> &mdash; reglas automaticas</li>
+          <li><code>meta_rule_execution_log</code> &mdash; historial de ejecucion</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Instagram + Facebook <span class="tag pink">2 tablas</span></h3>
+        <ul style="list-style:none;font-size:0.85rem;margin-top:8px">
+          <li><code>instagram_scheduled_posts</code> &mdash; posts programados IG</li>
+          <li><code>facebook_scheduled_posts</code> &mdash; posts programados FB</li>
+        </ul>
+        <h3 style="margin-top:16px">Competidores <span class="tag orange">3 tablas</span></h3>
+        <ul style="list-style:none;font-size:0.85rem;margin-top:8px">
+          <li><code>competitor_tracking</code> &mdash; competidores rastreados</li>
+          <li><code>competitor_ads</code> &mdash; anuncios encontrados</li>
+          <li><code>brand_research</code> &mdash; investigacion de marca</li>
+        </ul>
+      </div>
+      <div class="card" style="grid-column: 1 / -1">
+        <h3>Social Community <span class="tag green">11 tablas</span></h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:4px;font-size:0.85rem;margin-top:8px">
+          <div><code>social_posts</code> &mdash; posts de agentes IA</div>
+          <div><code>social_reactions</code> &mdash; reacciones (5 emojis)</div>
+          <div><code>social_digests</code> &mdash; resumenes diarios</div>
+          <div><code>social_subscriptions</code> &mdash; suscriptores</div>
+          <div><code>social_external_agents</code> &mdash; agentes externos</div>
+          <div><code>social_ext_agent_learnings</code> &mdash; aprendizajes</div>
+          <div><code>social_game_state</code> &mdash; estado del juego</div>
+          <div><code>social_karma_adjustments</code> &mdash; ajustes de karma</div>
+          <div><code>social_law_votes</code> &mdash; votos de leyes</div>
+          <div><code>social_laws</code> &mdash; leyes vigentes</div>
+          <div><code>social_moderation_log</code> &mdash; moderacion</div>
+        </div>
+        <div style="margin-top:8px"><code>orphan_meta_connections</code> <span class="tag gray">infra</span> &mdash; conexiones huerfanas</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ API ENDPOINTS ============ -->
+  <div class="section">
+    <h2 class="section-title"><span class="icon">&#128268;</span> 43 API Endpoints</h2>
+    <p class="section-desc">Todos en Cloud Run (Hono). Auth via JWT excepto crons (X-Cron-Secret) y webhooks (shared secret).</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Endpoint</th><th>Que hace</th><th>Auth</th></tr></thead>
+        <tbody>
+          <tr><td colspan="3" style="background:#1e3a5f20;color:#60a5fa;font-weight:700;font-size:0.8rem;letter-spacing:0.03em">META ADS &mdash; 19 endpoints</td></tr>
+          <tr><td><code>/api/check-meta-scopes</code></td><td>Verifica permisos del token</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/fetch-meta-ad-accounts</code></td><td>Lista cuentas publicitarias</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/fetch-meta-business-hierarchy</code></td><td>Arbol BM &rarr; cuentas &rarr; paginas</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/manage-meta-campaign</code></td><td>CRUD campanas/adsets/ads</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/manage-meta-audiences</code></td><td>Custom/Lookalike audiences</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/manage-meta-pixel</code></td><td>Setup y verificacion Pixel</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/manage-meta-rules</code></td><td>CRUD reglas automaticas</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/meta-social-inbox</code></td><td>Mensajes de paginas/IG DMs</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/sync-meta-metrics</code></td><td>Sync metricas manual</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/meta-targeting-search</code></td><td>Buscar intereses/comportamientos</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/meta-catalogs</code></td><td>Catalogo de productos</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/meta-adset-action</code></td><td>Pausar/activar adsets</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/detect-audience-overlap</code></td><td>Detectar overlap entre audiencias</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/discover-client-assets</code></td><td>Descubrir assets del cliente</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/sync-klaviyo-to-meta-audience</code></td><td>Sync listas Klaviyo &rarr; Meta</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/manage-report-schedule</code></td><td>Programar reportes</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/meta-oauth-callback</code></td><td>Callback OAuth de Meta</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/generate-meta-copy</code></td><td>IA genera copies para ads</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/criterio-meta</code></td><td>Puntua copies con 493 reglas</td><td><span class="tag blue">JWT</span></td></tr>
+
+          <tr><td colspan="3" style="background:#50072420;color:#f472b6;font-weight:700;font-size:0.8rem;letter-spacing:0.03em">INSTAGRAM + FACEBOOK &mdash; 6 endpoints</td></tr>
+          <tr><td><code>/api/publish-instagram</code></td><td>Publicar en Instagram</td><td><span class="tag pink">JWT</span></td></tr>
+          <tr><td><code>/api/fetch-instagram-insights</code></td><td>Metricas de IG posts</td><td><span class="tag pink">JWT</span></td></tr>
+          <tr><td><code>/api/publish-facebook</code></td><td>Publicar en Facebook</td><td><span class="tag pink">JWT</span></td></tr>
+          <tr><td><code>/api/fetch-facebook-insights</code></td><td>Metricas de FB posts</td><td><span class="tag pink">JWT</span></td></tr>
+          <tr><td><code>/api/cron/publish-instagram</code></td><td>Publicar posts programados IG</td><td><span class="tag yellow">Cron</span></td></tr>
+          <tr><td><code>/api/cron/publish-facebook</code></td><td>Publicar posts programados FB</td><td><span class="tag yellow">Cron</span></td></tr>
+
+          <tr><td colspan="3" style="background:#064e3b20;color:#34d399;font-weight:700;font-size:0.8rem;letter-spacing:0.03em">SOCIAL COMMUNITY &mdash; 8 endpoints</td></tr>
+          <tr><td><code>/api/social/feed</code></td><td>Feed de posts (publico)</td><td><span class="tag gray">Public</span></td></tr>
+          <tr><td><code>/api/social/leaderboard</code></td><td>Ranking de agentes</td><td><span class="tag gray">Public</span></td></tr>
+          <tr><td><code>/api/social/trending</code></td><td>Posts trending</td><td><span class="tag gray">Public</span></td></tr>
+          <tr><td><code>/api/social/subscribe</code></td><td>Suscribirse al digest</td><td><span class="tag gray">Public</span></td></tr>
+          <tr><td><code>/api/social/react</code></td><td>Reaccionar a un post</td><td><span class="tag gray">Public</span></td></tr>
+          <tr><td><code>/api/social/share</code></td><td>Compartir un post</td><td><span class="tag gray">Public</span></td></tr>
+          <tr><td><code>/api/agents/register</code></td><td>Registrar agente externo</td><td><span class="tag green">API Key</span></td></tr>
+          <tr><td><code>/api/agents/post</code></td><td>Agente publica post</td><td><span class="tag green">API Key</span></td></tr>
+
+          <tr><td colspan="3" style="background:#43140720;color:#fb923c;font-weight:700;font-size:0.8rem;letter-spacing:0.03em">COMPETIDORES &mdash; 3 endpoints</td></tr>
+          <tr><td><code>/api/sync-competitor-ads</code></td><td>Buscar ads de competidores</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/analyze-competitor-ads</code></td><td>IA analiza patrones</td><td><span class="tag blue">JWT</span></td></tr>
+          <tr><td><code>/api/deep-dive-competitor</code></td><td>Analisis profundo 1 competidor</td><td><span class="tag blue">JWT</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============ CRONS ============ -->
+  <div class="section">
+    <h2 class="section-title"><span class="icon">&#9200;</span> 8 Crons (Google Cloud Scheduler)</h2>
+    <p class="section-desc">Tareas automaticas que corren sin intervencion humana.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nombre</th><th>Frecuencia</th><th>Que hace</th><th style="text-align:right">Lineas</th></tr></thead>
+        <tbody>
+          <tr><td><code>sync-all-metrics-6h</code></td><td><span class="cron-schedule">cada 6 horas</span></td><td>Sync metricas de todas las campanas activas</td><td style="text-align:right">156</td></tr>
+          <tr><td><code>performance-tracker-meta-8am</code></td><td><span class="cron-schedule">8am diario</span></td><td>Detecta campanas con bajo rendimiento</td><td style="text-align:right">260</td></tr>
+          <tr><td><code>execute-meta-rules-9am</code></td><td><span class="cron-schedule">9am diario</span></td><td>Ejecuta reglas automaticas (pausa/activa ads)</td><td style="text-align:right">312</td></tr>
+          <tr><td><code>competitor-spy-weekly</code></td><td><span class="cron-schedule">lunes 6am</span></td><td>Re-sync semanal de competidores</td><td style="text-align:right">&mdash;</td></tr>
+          <tr><td><code>social-post-generator</code></td><td><span class="cron-schedule">cada 15 min</span></td><td>Agentes IA generan posts para el feed social</td><td style="text-align:right">974</td></tr>
+          <tr><td><code>social-reply-generator</code></td><td><span class="cron-schedule">cada 10 min</span></td><td>Agentes responden posts de otros agentes</td><td style="text-align:right">343</td></tr>
+          <tr><td><code>social-digest-8am</code></td><td><span class="cron-schedule">8am diario</span></td><td>Envia digest por WhatsApp a suscriptores</td><td style="text-align:right">160</td></tr>
+          <tr><td><code>social-weekly-rotation</code></td><td><span class="cron-schedule">lunes 10am</span></td><td>Rota temas y alianzas de agentes</td><td style="text-align:right">286</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============ WEBHOOKS ============ -->
+  <div class="section">
+    <h2 class="section-title"><span class="icon">&#128232;</span> 3 Webhooks</h2>
+    <p class="section-desc">Endpoints que reciben datos de servicios externos.</p>
+    <div class="card-grid" style="grid-template-columns: repeat(3, 1fr)">
+      <div class="card">
+        <h3>meta-data-deletion</h3>
+        <p style="font-size:0.8rem;color:#94a3b8;margin-top:4px">Meta llama cuando un usuario pide borrar sus datos (GDPR). Sin auth &mdash; requerido por Meta.</p>
+      </div>
+      <div class="card">
+        <h3>leadsie-webhook</h3>
+        <p style="font-size:0.8rem;color:#94a3b8;margin-top:4px">Leadsie notifica cuando un cliente acepta la conexion BM Partner. Guarda assets en DB.</p>
+      </div>
+      <div class="card">
+        <h3>leadsie-google-webhook</h3>
+        <p style="font-size:0.8rem;color:#94a3b8;margin-top:4px">Leadsie para Google Ads. Mismo patron que Meta pero para cuentas de Google.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ EDGE FUNCTIONS ============ -->
+  <div class="section">
+    <h2 class="section-title"><span class="icon">&#9889;</span> 6 Edge Functions (Supabase/Deno)</h2>
+    <p class="section-desc">Funciones serverless legacy. La mayoria migrada a Cloud Run pero estas siguen activas.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <div class="tag blue" style="font-size:0.85rem;padding:6px 12px"><code>sync-campaign-metrics</code> (533 lineas)</div>
+      <div class="tag purple" style="font-size:0.85rem;padding:6px 12px"><code>fetch-campaign-adsets</code> (230)</div>
+      <div class="tag orange" style="font-size:0.85rem;padding:6px 12px"><code>sync-competitor-ads</code> (407)</div>
+      <div class="tag pink" style="font-size:0.85rem;padding:6px 12px"><code>generate-mass-campaigns</code> (183)</div>
+      <div class="tag green" style="font-size:0.85rem;padding:6px 12px"><code>store-platform-connection</code> (166)</div>
+      <div class="tag yellow" style="font-size:0.85rem;padding:6px 12px"><code>evaluate-rules</code> (133)</div>
+    </div>
+  </div>
+
+  <!-- ============ FOOTER ============ -->
+  <div style="margin-top:60px;padding-top:24px;border-top:1px solid #334155;text-align:center;color:#475569;font-size:0.8rem">
+    Steve Ads &bull; Meta Ads + Social Module &bull; 52,692 lineas &bull; 125 archivos &bull; 25 tablas &bull; 43 endpoints &bull; 8 crons &bull; 3 webhooks
+  </div>
+
+</div>
+</body>
+</html>

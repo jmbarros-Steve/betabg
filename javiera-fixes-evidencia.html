@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Javiera W12 - Evidencia de Fixes Aplicados</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; background: #0a0a0f; color: #e0e0e0; padding: 20px; }
+  h1 { font-size: 1.8em; color: #a78bfa; margin-bottom: 5px; }
+  .subtitle { color: #6b7280; margin-bottom: 20px; font-size: 0.9em; }
+  .summary-bar { display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap; }
+  .summary-card { background: #1a1a2e; border-radius: 10px; padding: 15px 20px; flex: 1; min-width: 140px; border-left: 4px solid #a78bfa; }
+  .summary-card.green { border-left-color: #22c55e; }
+  .summary-card.red { border-left-color: #ef4444; }
+  .summary-card.yellow { border-left-color: #eab308; }
+  .summary-card .num { font-size: 2em; font-weight: bold; color: #fff; }
+  .summary-card .label { font-size: 0.8em; color: #9ca3af; }
+  .fix-group { margin-bottom: 30px; }
+  .fix-group h2 { color: #f0abfc; font-size: 1.2em; margin-bottom: 12px; border-bottom: 1px solid #2d2d44; padding-bottom: 8px; }
+  .fix-card { background: #12121f; border-radius: 8px; margin-bottom: 15px; overflow: hidden; border: 1px solid #2d2d44; }
+  .fix-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #1a1a2e; cursor: pointer; }
+  .fix-header:hover { background: #22223a; }
+  .fix-title { font-weight: bold; color: #e0e0e0; }
+  .fix-file { color: #60a5fa; font-size: 0.85em; }
+  .badge { padding: 3px 10px; border-radius: 20px; font-size: 0.75em; font-weight: bold; }
+  .badge.critical { background: #dc262622; color: #ef4444; border: 1px solid #ef444444; }
+  .badge.high { background: #f9731622; color: #fb923c; border: 1px solid #fb923c44; }
+  .badge.fixed { background: #22c55e22; color: #22c55e; border: 1px solid #22c55e44; }
+  .fix-body { padding: 15px; display: none; }
+  .fix-body.open { display: block; }
+  .code-block { background: #0d0d15; border-radius: 6px; padding: 12px; margin: 8px 0; overflow-x: auto; font-size: 0.82em; line-height: 1.5; border: 1px solid #1f1f33; }
+  .code-block .line-del { color: #f87171; background: #dc262615; display: block; padding: 1px 4px; }
+  .code-block .line-add { color: #4ade80; background: #22c55e15; display: block; padding: 1px 4px; }
+  .code-block .line-ctx { color: #9ca3af; display: block; padding: 1px 4px; }
+  .desc { color: #9ca3af; font-size: 0.9em; margin-bottom: 8px; line-height: 1.5; }
+  .impact { background: #1e1e33; padding: 8px 12px; border-radius: 6px; margin-top: 8px; font-size: 0.85em; border-left: 3px solid #a78bfa; }
+  .impact strong { color: #c4b5fd; }
+  .status-ok { color: #22c55e; }
+  .status-warn { color: #eab308; }
+  .ts-check { background: #0d2818; border: 1px solid #166534; border-radius: 8px; padding: 15px; margin: 20px 0; }
+  .ts-check h3 { color: #22c55e; margin-bottom: 5px; }
+  .footer { text-align: center; margin-top: 40px; color: #4b5563; font-size: 0.8em; }
+  .expand-all { background: #2d2d44; color: #a78bfa; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85em; margin-bottom: 15px; }
+  .expand-all:hover { background: #3d3d55; }
+  .files-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .file-tag { background: #1a1a2e; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; color: #60a5fa; }
+</style>
+</head>
+<body>
+
+<h1>Javiera W12 - Evidencia de Fixes Aplicados</h1>
+<p class="subtitle">QA Steve Ads - Fixes de bugs que rompen funcionalidad en produccion | 10 abril 2026</p>
+
+<div class="summary-bar">
+  <div class="summary-card green">
+    <div class="num">6</div>
+    <div class="label">Categorias de bugs fixeados</div>
+  </div>
+  <div class="summary-card green">
+    <div class="num">10</div>
+    <div class="label">Archivos modificados</div>
+  </div>
+  <div class="summary-card green">
+    <div class="num">23</div>
+    <div class="label">Edits aplicados</div>
+  </div>
+  <div class="summary-card green">
+    <div class="num status-ok">0</div>
+    <div class="label">Errores de compilacion</div>
+  </div>
+</div>
+
+<div class="ts-check">
+  <h3>TypeScript Compile Check: PASSED</h3>
+  <p style="color:#86efac; font-size:0.9em;">npx tsc --noEmit ejecutado sin errores. Todos los cambios compilan correctamente.</p>
+</div>
+
+<button class="expand-all" onclick="toggleAll()">Expandir/Colapsar Todo</button>
+
+<div class="files-list">
+  <span class="file-tag">execute-meta-rules.ts</span>
+  <span class="file-tag">execute-google-rules.ts</span>
+  <span class="file-tag">wolf-morning-send.ts</span>
+  <span class="file-tag">churn-detector.ts</span>
+  <span class="file-tag">onboarding-wa.ts</span>
+  <span class="file-tag">prospect-followup.ts</span>
+  <span class="file-tag">wa-action-processor.ts</span>
+  <span class="file-tag">edit-image-gemini.ts</span>
+  <span class="file-tag">sync-all-metrics.ts</span>
+</div>
+
+<!-- FIX 1: Mutex Lock -->
+<div class="fix-group">
+  <h2>1. Mutex Lock sin Error Check (CRITICAL)</h2>
+
+  <div class="fix-card">
+    <div class="fix-header" onclick="toggle(this)">
+      <div>
+        <span class="fix-title">execute-meta-rules.ts - Lock acquire unchecked</span><br>
+        <span class="fix-file">cloud-run-api/src/routes/cron/execute-meta-rules.ts:41-48</span>
+      </div>
+      <span class="badge fixed">FIXED</span>
+    </div>
+    <div class="fix-body">
+      <p class="desc">El upsert para adquirir el mutex lock no verificaba si habia un error. Si la DB rechazaba el upsert, el cron seguia ejecutando sin lock, permitiendo ejecuciones paralelas que duplican acciones en Google Ads/Meta.</p>
+      <div class="code-block">
+        <span class="line-ctx">  // Acquire lock</span>
+        <span class="line-del">- await supabase.from('steve_knowledge').upsert(</span>
+        <span class="line-add">+ const { error: lockErr } = await supabase.from('steve_knowledge').upsert(</span>
+        <span class="line-ctx">    { categoria: 'system', titulo: lockKey, ... },</span>
+        <span class="line-ctx">    { onConflict: 'categoria,titulo' },</span>
+        <span class="line-ctx">  );</span>
+        <span class="line-add">+ if (lockErr) {</span>
+        <span class="line-add">+   console.error('[execute-meta-rules] Failed to acquire lock:', lockErr);</span>
+        <span class="line-add">+   return c.json({ error: 'Failed to acquire lock' }, 500);</span>
+        <span class="line-add">+ }</span>
+      </div>
+      <div class="impact"><strong>Impacto:</strong> Previene ejecuciones paralelas del cron que podrian pausar/modificar campanas duplicadamente.</div>
+    </div>
+  </div>
+
+  <div class="fix-card">
+    <div class="fix-header" onclick="toggle(this)">
+      <div>
+        <span class="fix-title">execute-google-rules.ts - Lock acquire unchecked</span><br>
+        <span class="fix-file">cloud-run-api/src/routes/cron/execute-google-rules.ts:47-54</span>
+      </div>
+      <span class="badge fixed">FIXED</span>
+    </div>
+    <div class="fix-body">
+      <p class="desc">Mismo patron que execute-meta-rules. Sin verificar el error del upsert, el cron podia ejecutar sin mutex, duplicando mutaciones en Google Ads API.</p>
+      <div class="code-block">
+        <span class="line-del">- await supabase.from('steve_knowledge').upsert(</span>
+        <span class="line-add">+ const { error: lockErr } = await supabase.from('steve_knowledge').upsert(</span>
+        <span class="line-ctx">    { categoria: 'system', titulo: lockKey, ... },</span>
+        <span class="line-ctx">  );</span>
+        <span class="line-add">+ if (lockErr) {</span>
+        <span class="line-add">+   return c.json({ error: 'Failed to acquire lock' }, 500);</span>
+        <span class="line-add">+ }</span>
+      </div>
+      <div class="impact"><strong>Impacto:</strong> Mismo fix, previene duplicacion de acciones en Google Ads (pause, budget change).</div>
+    </div>
+  </div>
+</div>
+
+<!-- FIX 2: WA Messages Not Saved -->
+<div class="fix-group">
+  <h2>2. WA Messages Enviados pero No Guardados (HIGH)</h2>
+
+  <div class="fix-card">
+    <div class="fix-header" onclick="toggle(this)">
+      <div>
+        <span class="fix-title">wolf-morning-send.ts - wa_messages insert sin error check</span><br>
+        <span class="fix-file">cloud-run-api/src/routes/cron/wolf-morning-send.ts:117-128</span>
+      </div>
+      <span class="badge fixed">FIXED</span>
+    </div>
+    <div class="fix-body">
+      <p class="desc">Despues de enviar el WA via Twilio, el insert a wa_messages no verificaba errores. Si fallaba, el mensaje se enviaba pero no quedaba registrado — mensajes fantasma sin rastreo.</p>
+      <div class="code-block">
+        <span class="line-del">- await supabase.from('wa_messages').insert({</span>
+        <span class="line-add">+ const { error: insertErr } = await supabase.from('wa_messages').insert({</span>
+        <span class="line-ctx">    client_id: null, channel: 'prospect', ...</span>
+        <span class="line-ctx">  });</span>
+        <span class="line-add">+ if (insertErr) {</span>
+        <span class="line-add">+   console.error(`[wolf-morning] wa_messages insert failed:`, insertErr.message);</span>
+        <span class="line-add">+ }</span>
+      </div>
+      <div class="impact"><strong>Impacto:</strong> Mensajes WA enviados ahora SIEMPRE loguean si fallan al guardarse. Traceabilidad completa.</div>
+    </div>
+  </div>
+
+  <div class="fix-card">
+    <div class="fix-header" onclick="toggle(this)">
+      <div>
+        <span class="fix-title">churn-detector.ts - wa_messages insert sin error check</span><br>
+        <span class="fix-file">cloud-run-api/src/routes/cron/churn-detector.ts:150-162</span>
+      </div>
+      <span class="badge fixed">FIXED</span>
+    </div>
+    <div class="fix-body">
+      <p class="desc">Check-in messages de churn enviados a clientes inactivos no verificaban si se guardaron en la DB.</p>
+      <div class="code-block">
+        <span class="line-del">- await supabase.from('wa_messages').insert({ ... });</span>
+        <span class="line-add">+ const { error: insertErr } = await supabase.from('wa_messages').insert({ ... });</span>
+        <span class="line-add">+ if (insertErr) {</span>
+        <span class="line-add">+   console.error(`[churn-detector] wa_messages insert failed:`, insertErr.message);</span>
+        <span class="line-add">+ }</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="fix-card">
+    <div class="fix-header" onclick="toggle(this)">
+      <div>
+        <span class="fix-title">onboarding-wa.ts - wa_messages insert sin error check</span><br>
+        <span class="fix-file">cloud-run-api/src/routes/cron/onboarding-wa.ts:139-151</span>
+      </div>
+      <span class="badge fixed">FIXED</span>
+    </div>
+    <div class="fix-body">
+      <p class="desc">Mensajes de onboarding (recordatorios + felicitaciones) no verificaban si se guardaban.</p>
+      <div class="code-block">
+        <span class="line-del">- await supabase.from('wa_messages').insert({ ... });</span>
+        <span class="line-add">+ const { error: insertErr } = await supabase.from('wa_messages').insert({ ... });</span>
+        <span class="line-add">+ if (insertErr) {</span>
+        <span class="line-add">+   console.error(`[onboarding-wa] wa_messages insert failed:`, insertErr.message);</span>
+        <span class="line-add">+ }</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="fix-card">
+    <div class="fix-header" onclick="toggle(this)">
+      <div>
+        <span class="fix-title">prospect-followup.ts - resurrection wa_messages insert sin error check</span><br>
+        <span class="fix-file">cloud-run-api/src/routes/cron/prospect-followup.ts:337-349</span>
+      </div>
+      <span class="badge fixed">FIXED</span>
+    </div>
+    <div class="fix-body">
+      <p class="desc">Mensajes de "resurreccion" a prospectos ghosted no verificaban si se guardaron.</p>
+      <div class="code-block">
+        <span class="line-del">- await supabase.from('wa_messages').insert({ ... });</span>
+        <span class="line-add">+ const { error: insertErr } = await supabase.from('wa_messages').insert({ ... });</span>
+        <span class="line-add">+ if (insertErr) {</span>
+        <span class="line-add">+   console.error(`[prospect-followup] wa_messages resurrection insert failed:`, insertErr.message);</span>
+        <span class="line-add">+ }</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FIX 3: Timing-Unsafe Cron Auth -->
+<div class="fix-group">
+  <h2>3. Cron Auth Timing-Unsafe (HIGH)</h2>
+
+  <div class="fix-card">
+    <div class="fix-header" onclick="toggle(this)">
+      <div>
+        <span class="fix-title">wolf-morning-send.ts - !== en vez de timingSafeEqual</span><br>
+        <span class="fix-file">cloud-run-api/src/routes/cron/wolf-morning-send.ts:24-28</span>
+      </div>
+      <span class="badge fixed">FIXED</span>
+    </div>
+    <div class="fix-body">
+      <p class="desc">Usaba comparacion directa con !== para validar el cron secret. Vulnerable a timing attacks. Migrado a isValidCronSecret() que usa crypto.timingSafeEqual().</p>
+      <div class="code-block">
+        <span class="line-del">- const cronSecret = c.req.header('X-Cron-Secret')?.trim();</span>
+        <span class="line-del">- const expected = process.env.CRON_SECRET;</span>
+        <span class="line-del">- if (!expected || cronSecret !== expected) {</span>
+        <span class="line-add">+ if (!isValidCronSecret(c.req.header('X-Cron-Secret'))) {</span>
+        <span class="line-ctx">    return c.json({ error: 'Unauthorized' }, 401);</span>
+        <span class="line-ctx">  }</span>
+      </div>
+      <div class="impact"><strong>Impacto:</strong> Cierra vulnerabilidad de timing attack en autenticacion de cron.</div>
+    </div>
+  </div>
+</div>
+
+<!-- FIX 4: Credit Race Condition -->
+<div class="fix-group">
+  <h2>4. Race Condition en Creditos de Imagen (CRITICAL)</h2>
+
+  <div class="fix-card">
+    <div class="fix-header" onclick="toggle(this)">
+      <div>
+        <span class="fix-title">edit-image-gemini.ts - Imagen gratis si deduccion falla</span><br>
+        <span class="fix-file">cloud-run-api/src/routes/ai/edit-image-gemini.ts:296-310</span>
+      </div>
+      <span class="badge fixed">FIXED</span>
+    </div>
+    <div class="fix-body">
+      <p class="desc">Si la deduccion atomica de creditos fallaba (RPC error, creditos insuficientes), el endpoint devolvía la imagen GRATIS. Ahora se elimina la imagen del storage y retorna 402.</p>
+      <div class="code-block">
+        <span class="line-ctx">  const { data: deductResult, error: deductError } = await supabase</span>
+        <span class="line-ctx">    .rpc('deduct_credits', { p_client_id: clientId, p_amount: creditCost });</span>
+        <span class="line-ctx"></span>
+        <span class="line-ctx">  if (deductError || !deductResult?.[0]?.success) {</span>
+        <span class="line-del">-   console.error('[edit-image-gemini] Atomic credit deduction failed:', ...);</span>
+        <span class="line-del">-   // BEFORE: continued and returned the image anyway!</span>
+        <span class="line-add">+   console.error('[edit-image-gemini] Atomic credit deduction failed:', ...);</span>
+        <span class="line-add">+   await supabase.storage.from('client-assets').remove([storagePath]);</span>
+        <span class="line-add">+   return c.json({ error: 'NO_CREDITS', message: '...' }, 402);</span>
+        <span class="line-ctx">  }</span>
+      </div>
+      <div class="impact"><strong>Impacto:</strong> Cierra fuga de revenue. Los clientes ya no pueden obtener imagenes sin pagar creditos.</div>
+    </div>
+  </div>
+</div>
+
+<!-- FIX 5: Fetch Timeouts -->
+<div class="fix-group">
+  <h2>5. Fetch sin Timeout - Crons Colgados (HIGH)</h2>
+
+  <div class="fix-card">
+    <div class="fix-header" onclick="toggle(this)">
+      <div>
+        <span class="fix-title">7 archivos - AbortSignal.timeout() agregado a todos los fetch</span><br>
+        <span class="fix-file">wolf-morning, churn-detector, onboarding-wa, prospect-followup, wa-action-processor, edit-image-gemini, sync-all-metrics</span>
+      </div>
+      <span class="badge fixed">FIXED</span>
+    </div>
+    <div class="fix-body">
+      <p class="desc">Todos los fetch a APIs externas (Anthropic, Gemini, internal sync) no tenian timeout. En Cloud Run con max 300s, un fetch colgado bloquea el container completo.</p>
+      <div class="code-block">
+        <span class="line-ctx">  // Anthropic Haiku calls (7 crons):</span>
+        <span class="line-add">+ signal: AbortSignal.timeout(15_000),  // 15s</span>
+        <span class="line-ctx"></span>
+        <span class="line-ctx">  // Gemini image generation/editing (4 calls):</span>
+        <span class="line-add">+ signal: AbortSignal.timeout(60_000),  // 60s (images are heavier)</span>
+        <span class="line-ctx"></span>
+        <span class="line-ctx">  // Image download:</span>
+        <span class="line-add">+ signal: AbortSignal.timeout(15_000),  // 15s</span>
+        <span class="line-ctx"></span>
+        <span class="line-ctx">  // Internal sync calls (sync-all-metrics):</span>
+        <span class="line-add">+ signal: AbortSignal.timeout(120_000), // 120s (syncs are heavy)</span>
+      </div>
+      <div class="impact"><strong>Impacto:</strong> Previene containers colgados indefinidamente. 15 fetch calls ahora tienen timeout explicito.</div>
+    </div>
+  </div>
+</div>
+
+<!-- FIX 6: Crons Return 200 on Failure -->
+<div class="fix-group">
+  <h2>6. Crons Retornando 200 en Fallas (HIGH)</h2>
+
+  <div class="fix-card">
+    <div class="fix-header" onclick="toggle(this)">
+      <div>
+        <span class="fix-title">sync-all-metrics.ts - Retorna 200 cuando todo falla</span><br>
+        <span class="fix-file">cloud-run-api/src/routes/cron/sync-all-metrics.ts:142-149</span>
+      </div>
+      <span class="badge fixed">FIXED</span>
+    </div>
+    <div class="fix-body">
+      <p class="desc">Cuando TODAS las conexiones fallaban el sync, el cron retornaba HTTP 200. Cloud Scheduler no sabia que habia fallado, no reintentaba, y las metricas no se sincronizaban.</p>
+      <div class="code-block">
+        <span class="line-add">+ const allFailed = connections.length > 0 && succeeded === 0 && failed > 0;</span>
+        <span class="line-ctx">  return c.json({</span>
+        <span class="line-ctx">    total: connections.length,</span>
+        <span class="line-ctx">    succeeded, failed, results,</span>
+        <span class="line-del">- });</span>
+        <span class="line-add">+ }, allFailed ? 500 : 200);</span>
+      </div>
+      <div class="impact"><strong>Impacto:</strong> Cloud Scheduler ahora detecta fallas totales y puede reintentar automaticamente.</div>
+    </div>
+  </div>
+</div>
+
+<!-- RESUMEN FINAL -->
+<div style="background: #0d2818; border: 1px solid #166534; border-radius: 10px; padding: 20px; margin-top: 30px;">
+  <h2 style="color: #22c55e; margin-bottom: 10px;">Resumen de Fixes</h2>
+  <table style="width: 100%; border-collapse: collapse;">
+    <tr style="border-bottom: 1px solid #166534;">
+      <th style="text-align: left; padding: 8px; color: #86efac;">Categoria</th>
+      <th style="text-align: center; padding: 8px; color: #86efac;">Severidad</th>
+      <th style="text-align: center; padding: 8px; color: #86efac;">Archivos</th>
+      <th style="text-align: center; padding: 8px; color: #86efac;">Estado</th>
+    </tr>
+    <tr style="border-bottom: 1px solid #1a3a2a;">
+      <td style="padding: 8px;">Mutex lock sin error check</td>
+      <td style="padding: 8px; text-align: center; color: #ef4444;">CRITICAL</td>
+      <td style="padding: 8px; text-align: center;">2</td>
+      <td style="padding: 8px; text-align: center; color: #22c55e;">FIXED</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #1a3a2a;">
+      <td style="padding: 8px;">WA messages no guardados</td>
+      <td style="padding: 8px; text-align: center; color: #fb923c;">HIGH</td>
+      <td style="padding: 8px; text-align: center;">4</td>
+      <td style="padding: 8px; text-align: center; color: #22c55e;">FIXED</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #1a3a2a;">
+      <td style="padding: 8px;">Timing-unsafe cron auth</td>
+      <td style="padding: 8px; text-align: center; color: #fb923c;">HIGH</td>
+      <td style="padding: 8px; text-align: center;">1</td>
+      <td style="padding: 8px; text-align: center; color: #22c55e;">FIXED</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #1a3a2a;">
+      <td style="padding: 8px;">Credit race condition (imagenes gratis)</td>
+      <td style="padding: 8px; text-align: center; color: #ef4444;">CRITICAL</td>
+      <td style="padding: 8px; text-align: center;">1</td>
+      <td style="padding: 8px; text-align: center; color: #22c55e;">FIXED</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #1a3a2a;">
+      <td style="padding: 8px;">Fetch sin timeout (crons colgados)</td>
+      <td style="padding: 8px; text-align: center; color: #fb923c;">HIGH</td>
+      <td style="padding: 8px; text-align: center;">7</td>
+      <td style="padding: 8px; text-align: center; color: #22c55e;">FIXED</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px;">Crons retornando 200 en fallas</td>
+      <td style="padding: 8px; text-align: center; color: #fb923c;">HIGH</td>
+      <td style="padding: 8px; text-align: center;">1</td>
+      <td style="padding: 8px; text-align: center; color: #22c55e;">FIXED</td>
+    </tr>
+  </table>
+</div>
+
+<div style="background: #1a1a2e; border-radius: 10px; padding: 20px; margin-top: 20px;">
+  <h2 style="color: #a78bfa; margin-bottom: 10px;">Archivos Verificados Ya OK (no necesitaban fix)</h2>
+  <ul style="list-style: none; padding: 0; font-size: 0.9em;">
+    <li style="padding: 4px 0; color: #9ca3af;"><span style="color: #22c55e;">OK</span> wa-action-processor.ts - Ya tenia try/catch por accion + timeout 30s + saveOutboundMessage con error check</li>
+    <li style="padding: 4px 0; color: #9ca3af;"><span style="color: #22c55e;">OK</span> prospect-followup.ts - Ya tenia try/catch por prospecto + wa_messages error check en followups</li>
+    <li style="padding: 4px 0; color: #9ca3af;"><span style="color: #22c55e;">OK</span> meeting-reminder.ts - Ya tenia try/catch por prospecto</li>
+    <li style="padding: 4px 0; color: #9ca3af;"><span style="color: #22c55e;">OK</span> sync-all-metrics.ts - Ya tenia error check en lock acquire</li>
+    <li style="padding: 4px 0; color: #9ca3af;"><span style="color: #22c55e;">OK</span> auto-learning-digest.ts - try/catch global + qa_log insert en error</li>
+  </ul>
+</div>
+
+<div style="background: #1e1a0a; border: 1px solid #854d0e; border-radius: 10px; padding: 20px; margin-top: 20px;">
+  <h2 style="color: #eab308; margin-bottom: 10px;">Pendiente: Proximo Paso</h2>
+  <p style="color: #d4c28e; font-size: 0.9em;">
+    Estos fixes estan listos para deploy. Falta:<br>
+    1. <strong>git push</strong> (cuando JM lo autorice)<br>
+    2. <strong>gcloud run deploy</strong> del cloud-run-api<br>
+    3. Luego continuar con los ~100 hallazgos restantes (seguridad, dead code, performance, etc.)
+  </p>
+</div>
+
+<p class="footer">Javiera W12 - QA Steve Ads - Generado 10/04/2026 | TypeScript check: PASSED | 0 errores de compilacion</p>
+
+<script>
+function toggle(el) {
+  const body = el.nextElementSibling;
+  body.classList.toggle('open');
+}
+function toggleAll() {
+  const bodies = document.querySelectorAll('.fix-body');
+  const anyOpen = Array.from(bodies).some(b => b.classList.contains('open'));
+  bodies.forEach(b => {
+    if (anyOpen) b.classList.remove('open');
+    else b.classList.add('open');
+  });
+}
+</script>
+</body>
+</html>

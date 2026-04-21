@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan de Revision — Meta Ads + Social (9 Sesiones)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.6; }
+
+  .hero { background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 50%, #1a1040 100%); padding: 48px 24px 32px; text-align: center; border-bottom: 1px solid #334155; }
+  .hero h1 { font-size: 2rem; font-weight: 800; background: linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero .sub { color: #94a3b8; font-size: 1rem; margin-top: 6px; }
+  .hero .date { color: #64748b; font-size: 0.8rem; margin-top: 10px; }
+
+  .progress-bar { max-width: 700px; margin: 24px auto 0; display: flex; gap: 3px; height: 10px; border-radius: 5px; overflow: hidden; }
+  .progress-bar .seg { flex: 1; }
+  .seg.done { background: #22c55e; }
+  .seg.pending { background: #334155; }
+
+  .container { max-width: 1000px; margin: 0 auto; padding: 0 24px 60px; }
+
+  .session { margin-top: 40px; border: 1px solid #334155; border-radius: 16px; overflow: hidden; }
+  .session-header { padding: 20px 24px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #334155; }
+  .session-num { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 800; flex-shrink: 0; }
+  .session-header .info h2 { font-size: 1.1rem; font-weight: 700; }
+  .session-header .info p { font-size: 0.8rem; color: #94a3b8; }
+  .session-header .stats { margin-left: auto; text-align: right; }
+  .session-header .stats .big { font-size: 1.4rem; font-weight: 800; }
+  .session-header .stats .small { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; }
+
+  .session-body { padding: 20px 24px; background: #1e293b40; }
+
+  .s-blue .session-header { background: #172554; }
+  .s-blue .session-num { background: #1e3a8a; color: #60a5fa; }
+  .s-blue .stats .big { color: #60a5fa; }
+
+  .s-red .session-header { background: #450a0a; }
+  .s-red .session-num { background: #7f1d1d; color: #fca5a5; }
+  .s-red .stats .big { color: #fca5a5; }
+
+  .s-orange .session-header { background: #431407; }
+  .s-orange .session-num { background: #7c2d12; color: #fb923c; }
+  .s-orange .stats .big { color: #fb923c; }
+
+  .s-purple .session-header { background: #2e1065; }
+  .s-purple .session-num { background: #3b0764; color: #a78bfa; }
+  .s-purple .stats .big { color: #a78bfa; }
+
+  .s-pink .session-header { background: #500724; }
+  .s-pink .session-num { background: #831843; color: #f472b6; }
+  .s-pink .stats .big { color: #f472b6; }
+
+  .s-green .session-header { background: #052e16; }
+  .s-green .session-num { background: #14532d; color: #4ade80; }
+  .s-green .stats .big { color: #4ade80; }
+
+  .s-cyan .session-header { background: #083344; }
+  .s-cyan .session-num { background: #164e63; color: #22d3ee; }
+  .s-cyan .stats .big { color: #22d3ee; }
+
+  .s-yellow .session-header { background: #422006; }
+  .s-yellow .session-num { background: #713f12; color: #fbbf24; }
+  .s-yellow .stats .big { color: #fbbf24; }
+
+  .s-slate .session-header { background: #1e293b; }
+  .s-slate .session-num { background: #334155; color: #94a3b8; }
+  .s-slate .stats .big { color: #94a3b8; }
+
+  .file-grid { display: grid; grid-template-columns: 1fr auto auto; gap: 2px 16px; align-items: center; margin-top: 12px; }
+  .file-grid .fname { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; color: #cbd5e1; }
+  .file-grid .flines { font-family: 'SF Mono', monospace; font-size: 0.8rem; font-weight: 600; text-align: right; }
+  .file-grid .ftag { text-align: right; }
+
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.65rem; font-weight: 600; white-space: nowrap; }
+  .tag.p0 { background: #7f1d1d; color: #fca5a5; }
+  .tag.p1 { background: #7c2d12; color: #fdba74; }
+  .tag.p2 { background: #422006; color: #fde68a; }
+  .tag.blue { background: #1e3a5f; color: #60a5fa; }
+  .tag.purple { background: #2e1065; color: #a78bfa; }
+  .tag.pink { background: #500724; color: #f472b6; }
+  .tag.green { background: #064e3b; color: #34d399; }
+  .tag.gray { background: #1e293b; color: #94a3b8; }
+
+  .checklist { list-style: none; margin-top: 12px; }
+  .checklist li { padding: 6px 0; font-size: 0.85rem; display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid #334155; }
+  .checklist li:last-child { border-bottom: none; }
+  .check { width: 18px; height: 18px; border: 2px solid #475569; border-radius: 4px; flex-shrink: 0; margin-top: 2px; }
+
+  .risk-box { padding: 12px 16px; border-radius: 8px; margin-top: 12px; font-size: 0.8rem; }
+  .risk-box.high { background: #7f1d1d30; border: 1px solid #7f1d1d; color: #fca5a5; }
+  .risk-box.med { background: #7c2d1230; border: 1px solid #7c2d12; color: #fdba74; }
+  .risk-box.low { background: #052e1630; border: 1px solid #14532d; color: #4ade80; }
+  .risk-box.zero { background: #1e293b; border: 1px solid #334155; color: #94a3b8; }
+
+  .output-box { padding: 12px 16px; border-radius: 8px; background: #0f172a; border: 1px solid #334155; margin-top: 12px; font-size: 0.8rem; color: #94a3b8; }
+  .output-box strong { color: #e2e8f0; }
+
+  h3 { font-size: 0.9rem; font-weight: 600; color: #e2e8f0; margin-top: 16px; }
+  h3:first-child { margin-top: 0; }
+
+  .divider { height: 1px; background: #334155; margin: 16px 0; }
+
+  .footer { margin-top: 48px; padding: 24px; border-top: 1px solid #334155; text-align: center; color: #475569; font-size: 0.75rem; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Plan de Revision: Meta Ads + Social</h1>
+  <p class="sub">9 sesiones &bull; 52,692 lineas &bull; 125 archivos &bull; 0 roturas</p>
+  <p class="date">Steve Ads &bull; Abril 2026</p>
+  <div class="progress-bar">
+    <div class="seg pending"></div><div class="seg pending"></div><div class="seg pending"></div>
+    <div class="seg pending"></div><div class="seg pending"></div><div class="seg pending"></div>
+    <div class="seg pending"></div><div class="seg pending"></div><div class="seg pending"></div>
+  </div>
+  <p style="font-size:0.7rem;color:#475569;margin-top:6px">0 / 9 completadas</p>
+</div>
+
+<div class="container">
+
+  <!-- ==================== SESSION 1 ==================== -->
+  <div class="session s-blue">
+    <div class="session-header">
+      <div class="session-num">S1</div>
+      <div class="info">
+        <h2>Scan Automatizado + Mapa de Riesgo</h2>
+        <p>Fase 0 &mdash; Cero ediciones, solo diagnostico</p>
+      </div>
+      <div class="stats">
+        <div class="big">52,692</div>
+        <div class="small">lineas escaneadas</div>
+      </div>
+    </div>
+    <div class="session-body">
+      <h3>Que hago</h3>
+      <ul class="checklist">
+        <li><div class="check"></div><code>tsc --strict --noEmit</code> en frontend y backend &mdash; encontrar errores de tipo ocultos</li>
+        <li><div class="check"></div>Grep antipatrones criticos: <code>access_token_encrypted</code> sin <code>getTokenForConnection</code>, <code>/me/</code> con SUAT, tokens en logs</li>
+        <li><div class="check"></div>Buscar <code>any</code> peligrosos (en params de API, respuestas de Meta, datos de Supabase)</li>
+        <li><div class="check"></div>Imports muertos y exports no usados (dead code)</li>
+        <li><div class="check"></div>TODO/FIXME/HACK olvidados &mdash; clasificar por severidad</li>
+        <li><div class="check"></div>Secretos hardcodeados (grep tokens, keys, passwords en codigo fuente)</li>
+        <li><div class="check"></div>Generar <strong>Mapa de Riesgo</strong>: tabla con cada archivo, lineas, ultimo commit, riesgo (P0/P1/P2)</li>
+      </ul>
+
+      <div class="risk-box zero">
+        <strong>Riesgo de rotura: CERO</strong> &mdash; Solo lectura. No se edita ni un caracter.
+      </div>
+
+      <div class="output-box">
+        <strong>Output:</strong> HTML con mapa de riesgo por archivo, lista de hallazgos clasificados por severidad, y prioridad de revision para las siguientes sesiones.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SESSION 2 ==================== -->
+  <div class="session s-red">
+    <div class="session-header">
+      <div class="session-num">S2</div>
+      <div class="info">
+        <h2>Backend P0 &mdash; Lo Que Toca Plata</h2>
+        <p>manage-meta-campaign + sync-meta-metrics + meta-audiences</p>
+      </div>
+      <div class="stats">
+        <div class="big">2,720</div>
+        <div class="small">lineas</div>
+      </div>
+    </div>
+    <div class="session-body">
+      <h3>Archivos</h3>
+      <div class="file-grid">
+        <div class="fname">manage-meta-campaign.ts</div><div class="flines" style="color:#fca5a5">1,717</div><div class="ftag"><span class="tag p0">P0</span></div>
+        <div class="fname">manage-meta-audiences.ts</div><div class="flines" style="color:#fca5a5">560</div><div class="ftag"><span class="tag p0">P0</span></div>
+        <div class="fname">sync-meta-metrics.ts</div><div class="flines" style="color:#fca5a5">443</div><div class="ftag"><span class="tag p0">P0</span></div>
+      </div>
+
+      <h3>Que reviso</h3>
+      <ul class="checklist">
+        <li><div class="check"></div><strong>Validacion de budget</strong>: que no se pueda crear campana con presupuesto negativo o $0</li>
+        <li><div class="check"></div><strong>Error handling de Meta API</strong>: si Meta devuelve 400, no tragar el error silenciosamente</li>
+        <li><div class="check"></div><strong>Race conditions</strong>: dos clicks rapidos no deben crear 2 campanas</li>
+        <li><div class="check"></div><strong>Token SUAT vs OAuth</strong>: verificar que manage-campaign use getTokenForConnection correctamente</li>
+        <li><div class="check"></div><strong>Rollback parcial</strong>: si crear adset falla despues de crear campana, que no quede campana huerfana</li>
+        <li><div class="check"></div><strong>Metricas</strong>: verificar que sync-meta-metrics no sobreescriba datos buenos con nulls</li>
+        <li><div class="check"></div><strong>Audiencias</strong>: verificar que no se exponga data de un cliente a otro (multi-tenant)</li>
+      </ul>
+
+      <div class="risk-box high">
+        <strong>Riesgo de rotura: ALTO si se edita mal</strong> &mdash; Cada fix es atomico, con commit propio, tsc despues de cada cambio. Solo fixes concretos, no refactors.
+      </div>
+
+      <div class="output-box">
+        <strong>Output:</strong> Lista de bugs encontrados con fix aplicado. Commit por cada fix. Reporte de lo revisado vs lo que esta OK.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SESSION 3 ==================== -->
+  <div class="session s-red">
+    <div class="session-header">
+      <div class="session-num">S3</div>
+      <div class="info">
+        <h2>Backend P0 &mdash; IA + Copy Generation</h2>
+        <p>generate-meta-copy + criterio-meta + generate-mass-campaigns</p>
+      </div>
+      <div class="stats">
+        <div class="big">2,042</div>
+        <div class="small">lineas</div>
+      </div>
+    </div>
+    <div class="session-body">
+      <h3>Archivos</h3>
+      <div class="file-grid">
+        <div class="fname">generate-meta-copy.ts</div><div class="flines" style="color:#fca5a5">1,423</div><div class="ftag"><span class="tag p0">P0</span></div>
+        <div class="fname">criterio-meta.ts</div><div class="flines" style="color:#fca5a5">436</div><div class="ftag"><span class="tag p0">P0</span></div>
+        <div class="fname">generate-mass-campaigns (edge fn)</div><div class="flines" style="color:#fca5a5">183</div><div class="ftag"><span class="tag p1">P1</span></div>
+      </div>
+
+      <h3>Que reviso</h3>
+      <ul class="checklist">
+        <li><div class="check"></div><strong>Prompt injection</strong>: que el usuario no pueda inyectar instrucciones en los prompts de IA</li>
+        <li><div class="check"></div><strong>Costo</strong>: verificar que use Haiku donde dice Haiku, no Opus accidentalmente</li>
+        <li><div class="check"></div><strong>Timeout handling</strong>: si Claude/GPT tarda +30s, que no cuelgue al usuario</li>
+        <li><div class="check"></div><strong>Fallback</strong>: si la API de IA falla, que devuelva error claro, no crash</li>
+        <li><div class="check"></div><strong>Criterio reglas</strong>: verificar que las 493 reglas no tengan contradicciones</li>
+        <li><div class="check"></div><strong>Rate limits</strong>: que mass-campaigns no dispare 100 llamadas a Claude simultaneas</li>
+      </ul>
+
+      <div class="risk-box high">
+        <strong>Riesgo: ALTO</strong> &mdash; Errores aqui generan copies malos o costos inesperados de API.
+      </div>
+
+      <div class="output-box">
+        <strong>Output:</strong> Fixes de seguridad/prompts. Reporte de costos estimados por endpoint.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SESSION 4 ==================== -->
+  <div class="session s-orange">
+    <div class="session-header">
+      <div class="session-num">S4</div>
+      <div class="info">
+        <h2>Backend P1 &mdash; Social Inbox + Hierarchy + Resto</h2>
+        <p>Las rutas que manejan datos sensibles pero no mueven plata directa</p>
+      </div>
+      <div class="stats">
+        <div class="big">3,588</div>
+        <div class="small">lineas</div>
+      </div>
+    </div>
+    <div class="session-body">
+      <h3>Archivos</h3>
+      <div class="file-grid">
+        <div class="fname">meta-social-inbox.ts</div><div class="flines" style="color:#fb923c">755</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">fetch-meta-business-hierarchy.ts</div><div class="flines" style="color:#fb923c">563</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">publish-instagram.ts</div><div class="flines" style="color:#fb923c">565</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">publish-facebook.ts</div><div class="flines" style="color:#fb923c">448</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">sync-competitor-ads.ts</div><div class="flines" style="color:#fb923c">984</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">check-meta-scopes.ts + 6 mas</div><div class="flines" style="color:#fb923c">~273</div><div class="ftag"><span class="tag p2">P2</span></div>
+      </div>
+
+      <h3>Que reviso</h3>
+      <ul class="checklist">
+        <li><div class="check"></div><strong>Social Inbox</strong>: que mensajes de cliente A no se muestren a cliente B</li>
+        <li><div class="check"></div><strong>Business Hierarchy</strong>: confirmar hardening SUAT (antipatron #2 del memory)</li>
+        <li><div class="check"></div><strong>Publish IG/FB</strong>: que no publique dos veces si el cron corre doble</li>
+        <li><div class="check"></div><strong>Competitor Ads</strong>: verificar el nuevo flujo queries[] + resolvePageId funciona E2E</li>
+        <li><div class="check"></div><strong>OAuth callback</strong>: token storage seguro, no vulnerable a CSRF</li>
+        <li><div class="check"></div><strong>Libs</strong>: resolve-meta-token, meta-fetch, meta-capi &mdash; funciones compartidas criticas</li>
+      </ul>
+
+      <div class="risk-box med">
+        <strong>Riesgo: MEDIO</strong> &mdash; Privacy y data leaks, pero no afecta presupuestos directamente.
+      </div>
+
+      <div class="output-box">
+        <strong>Output:</strong> Fixes de multi-tenancy y seguridad. Verificacion E2E del flujo competitor ads nuevo.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SESSION 5 ==================== -->
+  <div class="session s-orange">
+    <div class="session-header">
+      <div class="session-num">S5</div>
+      <div class="info">
+        <h2>Crons &mdash; Lo Que Corre Solo</h2>
+        <p>14 crons (meta + social) que corren sin supervision humana</p>
+      </div>
+      <div class="stats">
+        <div class="big">4,386</div>
+        <div class="small">lineas</div>
+      </div>
+    </div>
+    <div class="session-body">
+      <h3>Archivos</h3>
+      <div class="file-grid">
+        <div class="fname">social-post-generator.ts</div><div class="flines" style="color:#fb923c">974</div><div class="ftag"><span class="tag p0">P0</span></div>
+        <div class="fname">reconciliation.ts</div><div class="flines" style="color:#fb923c">450</div><div class="ftag"><span class="tag p0">P0</span></div>
+        <div class="fname">social-reply-generator.ts</div><div class="flines" style="color:#fb923c">343</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">execute-meta-rules.ts</div><div class="flines" style="color:#fb923c">312</div><div class="ftag"><span class="tag p0">P0</span></div>
+        <div class="fname">fatigue-detector.ts</div><div class="flines" style="color:#fb923c">288</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">performance-evaluator.ts</div><div class="flines" style="color:#fb923c">284</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">social-weekly-rotation.ts</div><div class="flines" style="color:#fb923c">286</div><div class="ftag"><span class="tag p2">P2</span></div>
+        <div class="fname">performance-tracker-meta.ts</div><div class="flines" style="color:#fb923c">260</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">steve-content-hunter.ts</div><div class="flines" style="color:#fb923c">319</div><div class="ftag"><span class="tag p2">P2</span></div>
+        <div class="fname">social-digest-sender.ts + otros</div><div class="flines" style="color:#fb923c">~870</div><div class="ftag"><span class="tag p2">P2</span></div>
+      </div>
+
+      <h3>Que reviso por cada cron</h3>
+      <ul class="checklist">
+        <li><div class="check"></div><strong>Idempotencia</strong>: si corre 2 veces seguidas, no duplica datos ni acciones</li>
+        <li><div class="check"></div><strong>Timeout</strong>: si tarda mas del limite de Cloud Run (300s), no deja estado corrupto</li>
+        <li><div class="check"></div><strong>Error handling</strong>: fallo de 1 cliente no bloquea el procesamiento de los demas</li>
+        <li><div class="check"></div><strong>Rate limits</strong>: no dispara mas de N llamadas a Meta/Claude por ejecucion</li>
+        <li><div class="check"></div><strong>Logging</strong>: que se pueda debugear en Cloud Logging sin agregar console.log</li>
+        <li><div class="check"></div><strong>execute-meta-rules</strong>: verificar que la logica de pausa/activacion sea correcta y reversible</li>
+        <li><div class="check"></div><strong>social-post-generator</strong>: que no spamee el feed (max posts por hora)</li>
+      </ul>
+
+      <div class="risk-box med">
+        <strong>Riesgo: MEDIO-ALTO</strong> &mdash; Un cron roto se repite cada 10-15 min. El fix es pausar el cron en Cloud Scheduler si algo sale mal.
+      </div>
+
+      <div class="output-box">
+        <strong>Output:</strong> Reporte de idempotencia por cron. Fixes aplicados. Lista de crons que necesitan kill-switch.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SESSION 6 ==================== -->
+  <div class="session s-purple">
+    <div class="session-header">
+      <div class="session-num">S6</div>
+      <div class="info">
+        <h2>Frontend P0 &mdash; Wizard + Campaign Manager</h2>
+        <p>Los 2 archivos mas grandes y complejos del frontend</p>
+      </div>
+      <div class="stats">
+        <div class="big">5,444</div>
+        <div class="small">lineas</div>
+      </div>
+    </div>
+    <div class="session-body">
+      <h3>Archivos</h3>
+      <div class="file-grid">
+        <div class="fname">CampaignCreateWizard.tsx</div><div class="flines" style="color:#a78bfa">3,090</div><div class="ftag"><span class="tag p0">P0</span></div>
+        <div class="fname">MetaCampaignManager.tsx</div><div class="flines" style="color:#a78bfa">2,354</div><div class="ftag"><span class="tag p0">P0</span></div>
+      </div>
+
+      <h3>Que reviso</h3>
+      <ul class="checklist">
+        <li><div class="check"></div><strong>Estado imposible</strong>: loading=true + error=true al mismo tiempo, botones activos durante fetch</li>
+        <li><div class="check"></div><strong>Wizard steps</strong>: que no se pueda saltar un paso obligatorio, que "Atras" no pierda datos</li>
+        <li><div class="check"></div><strong>Doble submit</strong>: que el boton "Crear Campana" se deshabilite al click</li>
+        <li><div class="check"></div><strong>Memory leaks</strong>: useEffect sin cleanup, suscripciones abiertas, timers no cancelados</li>
+        <li><div class="check"></div><strong>Error boundary</strong>: si falla la API mid-wizard, el usuario no pierde todo lo que escribio</li>
+        <li><div class="check"></div><strong>Validacion client-side</strong>: budget, fechas, audiencia minima antes de enviar al backend</li>
+        <li><div class="check"></div><strong>UX muerta</strong>: botones que no hacen nada en edge cases (sin campanas, sin conexion)</li>
+      </ul>
+
+      <div class="risk-box med">
+        <strong>Riesgo: MEDIO</strong> &mdash; Frontend no puede romper datos, pero puede causar UX confusa o llamadas API innecesarias.
+      </div>
+
+      <div class="output-box">
+        <strong>Output:</strong> Fixes de UX y estado. Reporte de edge cases cubiertos vs no cubiertos.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SESSION 7 ==================== -->
+  <div class="session s-purple">
+    <div class="session-header">
+      <div class="session-num">S7</div>
+      <div class="info">
+        <h2>Frontend P1 &mdash; Dashboards + Audiences + Rules</h2>
+        <p>Los componentes de 1000-2000 lineas que muestran datos criticos</p>
+      </div>
+      <div class="stats">
+        <div class="big">8,777</div>
+        <div class="small">lineas</div>
+      </div>
+    </div>
+    <div class="session-body">
+      <h3>Archivos</h3>
+      <div class="file-grid">
+        <div class="fname">MetaAudienceManager.tsx</div><div class="flines" style="color:#a78bfa">1,988</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">MetaAutomatedRules.tsx</div><div class="flines" style="color:#a78bfa">1,986</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">MetaAnalyticsDashboard.tsx</div><div class="flines" style="color:#a78bfa">1,627</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">CampaignAnalyticsPanel.tsx</div><div class="flines" style="color:#a78bfa">1,421</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">MetaAdsManager.tsx</div><div class="flines" style="color:#a78bfa">1,351</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">MetaAdCreator.tsx</div><div class="flines" style="color:#a78bfa">1,332</div><div class="ftag"><span class="tag p1">P1</span></div>
+      </div>
+
+      <h3>Que reviso</h3>
+      <ul class="checklist">
+        <li><div class="check"></div><strong>Datos correctos</strong>: que el dashboard muestre las metricas del cliente correcto</li>
+        <li><div class="check"></div><strong>Formateo</strong>: numeros grandes (1,500,000 vs 1.5M), moneda correcta (CLP vs USD)</li>
+        <li><div class="check"></div><strong>Empty states</strong>: que pasa si no hay campanas, no hay metricas, no hay conexion</li>
+        <li><div class="check"></div><strong>Loading states</strong>: skeletons o spinners en cada fetch, no pantalla en blanco</li>
+        <li><div class="check"></div><strong>Reglas automaticas UI</strong>: que la UI de reglas refleje lo mismo que ejecuta el cron</li>
+        <li><div class="check"></div><strong>Re-renders</strong>: useMemo/useCallback donde corresponda en listas grandes</li>
+      </ul>
+
+      <div class="risk-box low">
+        <strong>Riesgo: BAJO</strong> &mdash; Fixes de UI no afectan datos. El peor caso es un re-render extra.
+      </div>
+
+      <div class="output-box">
+        <strong>Output:</strong> Fixes de UX/display. Lista de empty states faltantes. Performance notes.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SESSION 8 ==================== -->
+  <div class="session s-pink">
+    <div class="session-header">
+      <div class="session-num">S8</div>
+      <div class="info">
+        <h2>Frontend P2 &mdash; Social + IG + Componentes Chicos</h2>
+        <p>~50 archivos de menos de 700 lineas cada uno</p>
+      </div>
+      <div class="stats">
+        <div class="big">11,414</div>
+        <div class="small">lineas</div>
+      </div>
+    </div>
+    <div class="session-body">
+      <h3>Secciones</h3>
+      <div class="file-grid">
+        <div class="fname">components/social/ (13 archivos)</div><div class="flines" style="color:#f472b6">1,623</div><div class="ftag"><span class="tag p2">P2</span></div>
+        <div class="fname">client-portal/social/ (4 archivos)</div><div class="flines" style="color:#f472b6">1,802</div><div class="ftag"><span class="tag p2">P2</span></div>
+        <div class="fname">client-portal/instagram/ (2 archivos)</div><div class="flines" style="color:#f472b6">482</div><div class="ftag"><span class="tag p2">P2</span></div>
+        <div class="fname">SocialPublisher.tsx</div><div class="flines" style="color:#f472b6">1,207</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">InstagramPublisher.tsx</div><div class="flines" style="color:#f472b6">692</div><div class="ftag"><span class="tag p1">P1</span></div>
+        <div class="fname">CompetitorAdsPanel.tsx + DeepDive</div><div class="flines" style="color:#f472b6">1,405</div><div class="ftag"><span class="tag p2">P2</span></div>
+        <div class="fname">CopyGenerator + ContentCalendar + resto</div><div class="flines" style="color:#f472b6">~4,200</div><div class="ftag"><span class="tag p2">P2</span></div>
+      </div>
+
+      <h3>Que reviso</h3>
+      <ul class="checklist">
+        <li><div class="check"></div><strong>SocialPublisher</strong>: que preview de post sea fiel a lo que se publica</li>
+        <li><div class="check"></div><strong>InstagramPublisher</strong>: que soporte carousel, reels, stories correctamente</li>
+        <li><div class="check"></div><strong>Social Feed</strong>: que no haya XSS en posts de agentes (sanitizar HTML)</li>
+        <li><div class="check"></div><strong>Keys en map()</strong>: verificar que todos los .map() tengan keys unicos</li>
+        <li><div class="check"></div><strong>Consistencia</strong>: que CompetitorAdsPanel use el nuevo input unico (ya cambiado)</li>
+        <li><div class="check"></div><strong>Paginas</strong>: AdminOrphanMetaConnections, OAuthMetaCallback, Social pages</li>
+      </ul>
+
+      <div class="risk-box low">
+        <strong>Riesgo: BAJO</strong> &mdash; Componentes de presentacion. Fixes son cosmeticos.
+      </div>
+
+      <div class="output-box">
+        <strong>Output:</strong> Limpieza general. Fixes de XSS si hay. Consistencia visual.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SESSION 9 ==================== -->
+  <div class="session s-green">
+    <div class="session-header">
+      <div class="session-num">S9</div>
+      <div class="info">
+        <h2>Database + Edge Functions + Reporte Final</h2>
+        <p>25 tablas, 6 edge functions, RLS, indexes, y documento final</p>
+      </div>
+      <div class="stats">
+        <div class="big">25</div>
+        <div class="small">tablas + 6 edge fn</div>
+      </div>
+    </div>
+    <div class="session-body">
+      <h3>Database &mdash; Que reviso</h3>
+      <ul class="checklist">
+        <li><div class="check"></div><strong>RLS policies</strong>: cada tabla debe tener policy que filtre por client_id o user_id</li>
+        <li><div class="check"></div><strong>Tablas sin RLS</strong>: las social_* son publicas? verificar que no expongan data privada</li>
+        <li><div class="check"></div><strong>Indexes</strong>: campaign_metrics(client_id, date), competitor_ads(tracking_id), social_posts(created_at)</li>
+        <li><div class="check"></div><strong>Cascade deletes</strong>: borrar client &rarr; que pasa con sus campaign_metrics, competitor_tracking?</li>
+        <li><div class="check"></div><strong>Columnas nullable</strong>: campos que nunca deberian ser null pero lo permiten</li>
+        <li><div class="check"></div><strong>Orphan data</strong>: registros en campaign_metrics que apuntan a meta_campaigns que no existen</li>
+      </ul>
+
+      <h3>Edge Functions &mdash; Que reviso</h3>
+      <ul class="checklist">
+        <li><div class="check"></div><strong>Duplicacion</strong>: sync-campaign-metrics existe en Cloud Run Y en Edge Function &mdash; cual se usa?</li>
+        <li><div class="check"></div><strong>CORS</strong>: que las edge functions activas tengan CORS correcto</li>
+        <li><div class="check"></div><strong>Auth</strong>: que validen JWT internamente</li>
+        <li><div class="check"></div><strong>Dead functions</strong>: identificar cuales ya no se usan y marcar para borrar</li>
+      </ul>
+
+      <div class="divider"></div>
+
+      <h3>Reporte Final</h3>
+      <ul class="checklist">
+        <li><div class="check"></div>HTML consolidado con todos los hallazgos de las 9 sesiones</li>
+        <li><div class="check"></div>Lista de bugs encontrados y fixeados (con commits)</li>
+        <li><div class="check"></div>Lista de tech debt restante (no critico, para despues)</li>
+        <li><div class="check"></div>Scorecard de salud del modulo: seguridad, performance, UX, data integrity</li>
+        <li><div class="check"></div>Guardar en Notion + actualizar Supabase</li>
+      </ul>
+
+      <div class="risk-box low">
+        <strong>Riesgo: BAJO</strong> &mdash; SQL es read-only (SELECT para auditar). Solo se ejecutan ALTER/CREATE INDEX con confirmacion.
+      </div>
+
+      <div class="output-box">
+        <strong>Output:</strong> Reporte final HTML. Notion actualizado. Score de salud del modulo.
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== RESUMEN ==================== -->
+  <div class="session s-slate" style="margin-top:48px">
+    <div class="session-header">
+      <div class="session-num" style="font-size:1rem">&#128202;</div>
+      <div class="info">
+        <h2>Resumen del Plan</h2>
+        <p>9 sesiones ordenadas por riesgo de mayor a menor</p>
+      </div>
+    </div>
+    <div class="session-body">
+      <table style="width:100%;font-size:0.85rem">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Sesion</th>
+            <th>Tipo</th>
+            <th style="text-align:right">Lineas</th>
+            <th style="text-align:right">Archivos</th>
+            <th>Riesgo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>S1</strong></td><td>Scan automatizado + Mapa de riesgo</td><td><span class="tag gray">Read-only</span></td><td style="text-align:right">52,692</td><td style="text-align:right">125</td><td><span class="tag green">Cero</span></td></tr>
+          <tr><td><strong>S2</strong></td><td>Backend P0 &mdash; Campanas + Metricas</td><td><span class="tag p0">P0</span></td><td style="text-align:right">2,720</td><td style="text-align:right">3</td><td><span class="tag p0">Alto</span></td></tr>
+          <tr><td><strong>S3</strong></td><td>Backend P0 &mdash; IA + Copy</td><td><span class="tag p0">P0</span></td><td style="text-align:right">2,042</td><td style="text-align:right">3</td><td><span class="tag p0">Alto</span></td></tr>
+          <tr><td><strong>S4</strong></td><td>Backend P1 &mdash; Inbox + Hierarchy</td><td><span class="tag p1">P1</span></td><td style="text-align:right">3,588</td><td style="text-align:right">8</td><td><span class="tag p1">Medio</span></td></tr>
+          <tr><td><strong>S5</strong></td><td>Crons &mdash; Meta + Social</td><td><span class="tag p1">P1</span></td><td style="text-align:right">4,386</td><td style="text-align:right">14</td><td><span class="tag p1">Medio-Alto</span></td></tr>
+          <tr><td><strong>S6</strong></td><td>Frontend P0 &mdash; Wizard + Manager</td><td><span class="tag p0">P0</span></td><td style="text-align:right">5,444</td><td style="text-align:right">2</td><td><span class="tag p1">Medio</span></td></tr>
+          <tr><td><strong>S7</strong></td><td>Frontend P1 &mdash; Dashboards + Rules</td><td><span class="tag p1">P1</span></td><td style="text-align:right">8,777</td><td style="text-align:right">6</td><td><span class="tag green">Bajo</span></td></tr>
+          <tr><td><strong>S8</strong></td><td>Frontend P2 &mdash; Social + IG + Chicos</td><td><span class="tag p2">P2</span></td><td style="text-align:right">11,414</td><td style="text-align:right">~50</td><td><span class="tag green">Bajo</span></td></tr>
+          <tr><td><strong>S9</strong></td><td>Database + Edge Fn + Reporte Final</td><td><span class="tag gray">Audit</span></td><td style="text-align:right">25 tablas</td><td style="text-align:right">6 fn</td><td><span class="tag green">Bajo</span></td></tr>
+        </tbody>
+      </table>
+
+      <div class="risk-box zero" style="margin-top:16px">
+        <strong>Regla de oro</strong>: Cada fix va en commit atomico &rarr; <code>tsc --noEmit</code> + <code>vite build</code> despues de cada cambio &rarr; si algo falla, revert inmediato. NUNCA refactors, solo fixes concretos.
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Steve Ads &bull; Plan de Revision Meta Ads + Social &bull; 9 sesiones &bull; 52,692 lineas &bull; Abril 2026
+  </div>
+
+</div>
+</body>
+</html>

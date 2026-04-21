@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Javiera QA - Hallazgos 251K Lineas</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0f;--s1:#12121f;--s2:#1a1a2e;--s3:#22223a;--brd:#2a2a45;--tx:#e4e4ed;--tx2:#8888aa;--crit:#ff2d55;--high:#ff6b35;--med:#ffb800;--low:#4ecdc4;--info:#667eea;--accent:#a78bfa;--green:#22c55e}
+body{background:var(--bg);color:var(--tx);font-family:'Inter',-apple-system,sans-serif;line-height:1.6}
+a{color:var(--accent);text-decoration:none}
+
+.header{background:linear-gradient(135deg,#1a0a2e 0%,#2d1b4e 30%,#1a0a2e 60%,#0f1a2e 100%);padding:32px 40px;border-bottom:2px solid var(--crit);position:sticky;top:0;z-index:100}
+.header h1{font-size:32px;font-weight:900;color:var(--crit)}
+.header p{color:var(--tx2);font-size:14px;margin-top:4px}
+.header-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.header-stats{display:flex;gap:16px;flex-wrap:wrap}
+.h-stat{text-align:center;padding:8px 16px;border-radius:12px;border:1px solid var(--brd);background:var(--s1)}
+.h-stat .num{font-size:24px;font-weight:800}
+.h-stat .lab{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--tx2)}
+
+.search{padding:16px 40px;position:sticky;top:100px;z-index:99;background:var(--bg);border-bottom:1px solid var(--brd)}
+.search input{width:100%;padding:12px 20px;background:var(--s1);border:1px solid var(--brd);border-radius:12px;color:var(--tx);font-size:15px;outline:none}
+.search input:focus{border-color:var(--crit)}
+.filters{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.filters button{padding:6px 14px;border-radius:8px;border:1px solid var(--brd);background:var(--s1);color:var(--tx2);cursor:pointer;font-size:12px;transition:.15s}
+.filters button:hover,.filters button.active{border-color:var(--crit);color:var(--crit)}
+.filters .sev-crit{border-color:var(--crit);color:var(--crit)}
+.filters .sev-high{border-color:var(--high);color:var(--high)}
+.filters .sev-med{border-color:var(--med);color:var(--med)}
+.filters .sev-low{border-color:var(--low);color:var(--low)}
+
+.content{padding:24px 40px 80px}
+.cat{margin-bottom:32px}
+.cat-header{font-size:20px;font-weight:700;padding:16px 20px;background:var(--s1);border:1px solid var(--brd);border-radius:16px 16px 0 0;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.cat-header:hover{background:var(--s2)}
+.cat-header .arrow{transition:transform .2s;font-size:14px}
+.cat-header.collapsed .arrow{transform:rotate(-90deg)}
+.cat-body{border:1px solid var(--brd);border-top:none;border-radius:0 0 16px 16px;overflow:hidden}
+.cat-header.collapsed+.cat-body{display:none}
+
+.finding{padding:16px 20px;border-bottom:1px solid var(--brd);transition:background .1s}
+.finding:hover{background:var(--s1)}
+.finding:last-child{border-bottom:none}
+.f-header{display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap}
+.sev{padding:3px 10px;border-radius:6px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.sev-CRITICAL{background:rgba(255,45,85,.15);color:var(--crit);border:1px solid rgba(255,45,85,.3)}
+.sev-HIGH{background:rgba(255,107,53,.15);color:var(--high);border:1px solid rgba(255,107,53,.3)}
+.sev-MEDIUM{background:rgba(255,184,0,.15);color:var(--med);border:1px solid rgba(255,184,0,.3)}
+.sev-LOW{background:rgba(78,205,196,.15);color:var(--low);border:1px solid rgba(78,205,196,.3)}
+.sev-INFO{background:rgba(102,126,234,.15);color:var(--info);border:1px solid rgba(102,126,234,.3)}
+.f-file{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--tx2);word-break:break-all}
+.f-desc{font-size:14px;margin-bottom:8px}
+.f-code{background:var(--s2);border:1px solid var(--brd);border-radius:8px;padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;overflow-x:auto;white-space:pre-wrap;margin-top:8px;color:#c4b5fd}
+.f-fix{margin-top:8px;padding:8px 12px;background:rgba(34,197,94,.08);border-left:3px solid var(--green);border-radius:0 8px 8px 0;font-size:13px;color:var(--green)}
+.f-impact{font-size:12px;color:var(--tx2);margin-top:4px;font-style:italic}
+
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:32px}
+.summary-card{background:var(--s1);border:1px solid var(--brd);border-radius:16px;padding:20px;transition:transform .15s}
+.summary-card:hover{transform:translateY(-2px)}
+.summary-card h3{font-size:16px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.summary-card .items{font-size:13px;color:var(--tx2)}
+.summary-card .items li{margin-bottom:4px;list-style:none}
+.summary-card .items li::before{content:">";margin-right:8px;color:var(--crit)}
+
+.watermark{text-align:center;padding:40px;color:var(--tx2);font-size:12px;border-top:1px solid var(--brd)}
+
+.toc{background:var(--s1);border:1px solid var(--brd);border-radius:16px;padding:24px;margin-bottom:32px}
+.toc h2{font-size:18px;margin-bottom:12px;color:var(--crit)}
+.toc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:8px}
+.toc a{display:block;padding:8px 12px;border-radius:8px;font-size:13px;color:var(--tx2);transition:.15s}
+.toc a:hover{background:var(--s2);color:var(--tx)}
+.toc .count{float:right;color:var(--tx2)}
+
+@media(max-width:768px){.header,.search,.content{padding-left:16px;padding-right:16px}.header h1{font-size:24px}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-row">
+    <div>
+      <h1>JAVIERA QA - HALLAZGOS COMPLETOS</h1>
+      <p>251,670 lineas revisadas | 820 archivos | 10 Abril 2026 | Steve Ads (betabg)</p>
+    </div>
+    <div class="header-stats">
+      <div class="h-stat"><div class="num" style="color:var(--crit)">8</div><div class="lab">Critical</div></div>
+      <div class="h-stat"><div class="num" style="color:var(--high)">50</div><div class="lab">High</div></div>
+      <div class="h-stat"><div class="num" style="color:var(--med)">52</div><div class="lab">Medium</div></div>
+      <div class="h-stat"><div class="num" style="color:var(--low)">14</div><div class="lab">Low</div></div>
+      <div class="h-stat"><div class="num" style="color:var(--info)">2,966</div><div class="lab">any types</div></div>
+      <div class="h-stat"><div class="num" style="color:var(--info)">905</div><div class="lab">console.log</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="search">
+  <input type="text" id="searchInput" placeholder="Buscar hallazgos... (archivo, descripcion, severidad, codigo)" oninput="filterFindings(this.value)">
+  <div class="filters">
+    <button class="active" onclick="filterSev(this,'all')">Todos</button>
+    <button class="sev-crit" onclick="filterSev(this,'CRITICAL')">CRITICAL (8)</button>
+    <button class="sev-high" onclick="filterSev(this,'HIGH')">HIGH (50)</button>
+    <button class="sev-med" onclick="filterSev(this,'MEDIUM')">MEDIUM (52)</button>
+    <button class="sev-low" onclick="filterSev(this,'LOW')">LOW (14)</button>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc">
+  <h2>INDICE DE HALLAZGOS</h2>
+  <div class="toc-grid">
+    <a href="#sec-critical">1. CRITICAL - Arreglar YA <span class="count">8 hallazgos</span></a>
+    <a href="#sec-security">2. Seguridad <span class="count">28 hallazgos</span></a>
+    <a href="#sec-errors">3. Error Handling <span class="count">68 hallazgos</span></a>
+    <a href="#sec-performance">4. Performance <span class="count">28 hallazgos</span></a>
+    <a href="#sec-deadcode">5. Debug & Codigo Muerto <span class="count">905 console.log + 14 TODOs</span></a>
+    <a href="#sec-types">6. TypeScript & Types <span class="count">2,966 any + 20 catch vacios</span></a>
+    <a href="#sec-api">7. API Consistency <span class="count">67 hallazgos</span></a>
+    <a href="#sec-bigfiles">8. Archivos Monstruo <span class="count">57 archivos >500 lineas</span></a>
+  </div>
+</div>
+
+<!-- ===================== CRITICAL ===================== -->
+<div class="cat" id="sec-critical">
+  <div class="cat-header" onclick="this.classList.toggle('collapsed')">
+    <span style="color:var(--crit)">CRITICAL - ARREGLAR YA (8)</span>
+    <span class="arrow">&#9660;</span>
+  </div>
+  <div class="cat-body">
+
+    <div class="finding" data-sev="CRITICAL">
+      <div class="f-header"><span class="sev sev-CRITICAL">CRITICAL</span><span class="f-file">tests/load-test.js:35-36</span></div>
+      <div class="f-desc">Credenciales reales de usuario (email + password) hardcodeadas en archivo de test. Cualquiera con acceso al repo puede impersonar a este usuario.</div>
+      <div class="f-code">email: 'patricio.correa@jardindeeva.cl',
+password: 'Jardin2026'</div>
+      <div class="f-fix">FIX: Mover a env vars. Rotar la password inmediatamente.</div>
+    </div>
+
+    <div class="finding" data-sev="CRITICAL">
+      <div class="f-header"><span class="sev sev-CRITICAL">CRITICAL</span><span class="f-file">supabase/functions/admin-create-client/index.ts:24</span></div>
+      <div class="f-desc">Secret de admin hardcodeado en plaintext. Ademas la funcion dice "TEMPORARY: delete after use" pero sigue deployada con acciones peligrosas (reset_password, diagnostic dump, cleanup).</div>
+      <div class="f-code">if (secret !== 'setup-jardin-eva-2026')</div>
+      <div class="f-fix">FIX: Mover a env var. Borrar la funcion si ya no se necesita. Si se necesita, proteger con proper auth.</div>
+    </div>
+
+    <div class="finding" data-sev="CRITICAL">
+      <div class="f-header"><span class="sev sev-CRITICAL">CRITICAL</span><span class="f-file">supabase/functions/admin-create-client/index.ts:277</span></div>
+      <div class="f-desc">Password nueva retornada en la respuesta API. Si el response se loguea o intercepta, las credenciales quedan expuestas.</div>
+      <div class="f-code">return new Response(JSON.stringify({
+  success: true,
+  email: 'patricio.correa@jardindeeva.cl',
+  newPassword,
+  message: 'Contrasena actualizada'
+}))</div>
+      <div class="f-fix">FIX: Nunca retornar passwords en responses. Enviar por canal seguro (email cifrado, WA directo).</div>
+    </div>
+
+    <div class="finding" data-sev="CRITICAL">
+      <div class="f-header"><span class="sev sev-CRITICAL">CRITICAL</span><span class="f-file">cloud-run-api/src/routes/shopify/shopify-oauth-callback.ts:12 + supabase/functions/shopify-oauth-callback/index.ts:13</span></div>
+      <div class="f-desc">Passwords de usuario generadas con Math.random() que NO es criptograficamente seguro. Passwords predecibles permiten account takeover.</div>
+      <div class="f-code">password += chars.charAt(Math.floor(Math.random() * chars.length))</div>
+      <div class="f-fix">FIX: Reemplazar con crypto.getRandomValues() o crypto.randomUUID().</div>
+    </div>
+
+    <div class="finding" data-sev="CRITICAL">
+      <div class="f-header"><span class="sev sev-CRITICAL">CRITICAL</span><span class="f-file">cloud-run-api/src/routes/ai/edit-image-gemini.ts:296-301</span></div>
+      <div class="f-desc">Race condition en creditos: se verifican al inicio (linea 50) pero se deducen DESPUES de generar la imagen (linea 296). Dos requests concurrentes pueden pasar el check y generar imagenes gratis. Si la deduccion falla, la imagen ya fue entregada.</div>
+      <div class="f-code">// Credits checked at line 50-68
+// Image generated at line 200-280
+// Credits deducted at line 296 -- TOO LATE!
+const { error: deductError } = await supabase.rpc('deduct_credits', ...);
+if (deductError) { console.error(...) } // Only logged, not returned as error!</div>
+      <div class="f-fix">FIX: Deducir creditos ANTES de generar. Si falla la generacion, revertir creditos.</div>
+    </div>
+
+    <div class="finding" data-sev="CRITICAL">
+      <div class="f-header"><span class="sev sev-CRITICAL">CRITICAL</span><span class="f-file">cloud-run-api/src/routes/utilities/submit-correction.ts:70-153</span></div>
+      <div class="f-desc">5+ operaciones DB separadas (update wa_messages, insert steve_knowledge, insert steve_bugs, update orden) sin transaccion. Si algo falla a mitad, datos quedan inconsistentes.</div>
+      <div class="f-code">// Step 1: update wa_messages.metadata
+// Step 2: insert steve_knowledge (good example OR correction)
+// Step 3: insert steve_bugs
+// Step 4: boost/degrade existing rules
+// NO TRANSACTION wrapping any of this</div>
+      <div class="f-fix">FIX: Wrappear en una transaccion Supabase o usar un RPC que haga todo atomicamente.</div>
+    </div>
+
+    <div class="finding" data-sev="CRITICAL">
+      <div class="f-header"><span class="sev sev-CRITICAL">CRITICAL</span><span class="f-file">cloud-run-api/src/routes/utilities/export-all-data.ts:50</span></div>
+      <div class="f-desc">Dump de 37 tablas con select('*') sin limite ni paginacion. Puede hacer OOM en tablas grandes (campaign_metrics, wa_messages, steve_messages).</div>
+      <div class="f-code">for (const table of TABLES) {
+  const { data, error } = await supabase.from(table).select("*"); // NO LIMIT!
+}</div>
+      <div class="f-fix">FIX: Agregar .limit() y paginacion. Usar streaming o export-database.ts que si pagina.</div>
+    </div>
+
+    <div class="finding" data-sev="CRITICAL">
+      <div class="f-header"><span class="sev sev-CRITICAL">CRITICAL</span><span class="f-file">cloud-run-api/src/routes/analytics/sync-campaign-metrics.ts:79</span></div>
+      <div class="f-desc">Cron secret tiene fallback hardcodeado. Si la env var falta, cualquiera que sepa este valor puede ejecutar crons.</div>
+      <div class="f-code">process.env.CRON_SECRET || 'steve-cron-secret-2024'</div>
+      <div class="f-fix">FIX: Eliminar el fallback. Si no hay CRON_SECRET, el cron debe fallar, no aceptar un secreto conocido.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== SECURITY ===================== -->
+<div class="cat" id="sec-security">
+  <div class="cat-header" onclick="this.classList.toggle('collapsed')">
+    <span style="color:var(--high)">SEGURIDAD (28 hallazgos)</span>
+    <span class="arrow">&#9660;</span>
+  </div>
+  <div class="cat-body">
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">11+ archivos con dangerouslySetInnerHTML sin DOMPurify</span></div>
+      <div class="f-desc">XSS: Se renderiza HTML de Shopify, templates de email, y contenido de DB sin sanitizar. Ninguno usa DOMPurify.</div>
+      <div class="f-code">// ShopifyProductsPanel.tsx:688
+dangerouslySetInnerHTML={{ __html: descProduct.body_html || '' }}
+
+// EmailTemplateGallery.tsx:1485
+dangerouslySetInnerHTML={{ __html: previewTemplate.design_json }}
+
+// TemplatesPanel.tsx:136
+dangerouslySetInnerHTML={{ __html: html }}</div>
+      <div class="f-fix">FIX: npm install dompurify && DOMPurify.sanitize(html) en cada uso.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">cloud-run-api/src/routes/shopify/fetch-shopify-analytics.ts:418-421</span></div>
+      <div class="f-desc">ShopifyQL Injection: startDateParam y endDateParam vienen DIRECTO del request body y se interpolan en queries sin validacion.</div>
+      <div class="f-code">const { startDateParam, endDateParam } = await c.req.json();
+// ...
+`SINCE '${startDateParam}'`  // User input directly in query!
+`UNTIL '${endDateParam}'`</div>
+      <div class="f-fix">FIX: Validar formato de fecha con regex (YYYY-MM-DD) antes de interpolar.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">cloud-run-api/src/routes/index.ts:487-504</span></div>
+      <div class="f-desc">Endpoints publicos sin auth: /api/seed-email-templates y /api/seed-chino-checks pueden ser llamados por cualquiera.</div>
+      <div class="f-code">app.post('/api/seed-email-templates', async (c) => { ... }) // NO AUTH!
+app.post('/api/seed-chino-checks', async (c) => { ... })   // NO AUTH!</div>
+      <div class="f-fix">FIX: Agregar authMiddleware o cron secret validation.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">src/lib/dispatch.ts:33 + src/lib/qa-trigger.ts:109</span></div>
+      <div class="f-desc">Command injection: variables de DB/usuario se interpolan directamente en comandos tmux via exec(). Shell metacharacters pueden ejecutar codigo arbitrario.</div>
+      <div class="f-code">await execAsync(`tmux send-keys -t "steve:${agent.tmux_window}" "cat ${promptFile}" Enter`)</div>
+      <div class="f-fix">FIX: Sanitizar inputs o usar execFile() con argumentos como array.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">10 archivos con timing attacks en comparacion de secrets</span></div>
+      <div class="f-desc">8 crons + export-database + admin-create-client usan !== para comparar secrets. Vulnerable a timing attacks. Ya existe isValidCronSecret() con timingSafeEqual pero no lo usan.</div>
+      <div class="f-code">// wolf-night-mode.ts, knowledge-propagation-catchup.ts, meeting-reminder.ts,
+// restart-service.ts, wolf-morning-send.ts, sales-learning-loop.ts,
+// prospect-rotting-detector.ts, validate-contexts.ts
+if (!expected || cronSecret !== expected)  // TIMING UNSAFE!
+
+// export-database.ts:23 -- HIGH VALUE TARGET (full DB dump)
+if (!EXPORT_KEY || exportKey !== EXPORT_KEY)</div>
+      <div class="f-fix">FIX: Importar isValidCronSecret() de lib/cron-auth.ts en estos 10 archivos.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">47 Edge Functions con CORS: '*'</span></div>
+      <div class="f-desc">TODAS las Edge Functions usan Access-Control-Allow-Origin: *. El Cloud Run API si tiene whitelist correcta.</div>
+      <div class="f-code">// EVERY supabase/functions/*/index.ts:
+'Access-Control-Allow-Origin': '*'</div>
+      <div class="f-fix">FIX: Implementar whitelist de origenes (steve.cl, vercel.app) en las Edge Functions.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">cloud-run-api/src/routes/auth/self-signup.ts:15</span></div>
+      <div class="f-desc">Self-signup sin rate limiting. El codigo tiene un TODO que lo reconoce pero nunca se implemento. Permite brute-force de creacion de usuarios.</div>
+      <div class="f-code">// TODO: add rate limiting
+export async function selfSignup(c: Context) { ... }</div>
+      <div class="f-fix">FIX: Agregar rate limiting por IP (ej. 5 signups/hora).</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">7+ archivos con user IDs hardcodeados</span></div>
+      <div class="f-desc">UUID de JM (3d195082-...) hardcodeado en 7+ archivos como assigned_agent. Si el usuario cambia, todo se rompe.</div>
+      <div class="f-code">// steve-wa-chat.ts:895,1006,1607
+// merchant-wa.ts:297,483
+// churn-detector.ts:185
+// admin-create-client.ts:110
+assigned_agent: '3d195082-aa83-48c0-b514-a8052264a1e7'</div>
+      <div class="f-fix">FIX: Mover a env var ADMIN_USER_ID o lookup desde tabla de config.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">cloud-run-api/src/routes/utilities/check-video-status.ts:6</span></div>
+      <div class="f-desc">SSRF: predictionId del request body se interpola directamente en URL sin validacion. Puede contener slashes o query params.</div>
+      <div class="f-code">const { predictionId } = await c.req.json();
+// ...
+`https://api.replicate.com/v1/predictions/${predictionId}`</div>
+      <div class="f-fix">FIX: Validar que predictionId sea alfanumerico.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">src/components/dashboard/ClientsPanel.tsx:86</span></div>
+      <div class="f-desc">Passwords de clientes generadas con Math.random() en el panel de admin.</div>
+      <div class="f-code">password += chars.charAt(Math.floor(Math.random() * chars.length))</div>
+      <div class="f-fix">FIX: Usar crypto.getRandomValues().</div>
+    </div>
+
+    <div class="finding" data-sev="MEDIUM">
+      <div class="f-header"><span class="sev sev-MEDIUM">MEDIUM</span><span class="f-file">cloud-run-api/src/routes/shopify/shopify-oauth-callback.ts:40-42</span></div>
+      <div class="f-desc">Debug console.logs leakean HMAC secrets a stdout en produccion.</div>
+      <div class="f-code">console.log('[HMAC-DEBUG] message:', message);
+console.log('[HMAC-DEBUG] computed:', computed);
+console.log('[HMAC-DEBUG] received:', receivedHmac);</div>
+      <div class="f-fix">FIX: Eliminar estos 3 console.log inmediatamente.</div>
+    </div>
+
+    <div class="finding" data-sev="MEDIUM">
+      <div class="f-header"><span class="sev sev-MEDIUM">MEDIUM</span><span class="f-file">cloud-run-api/src/middleware/cors.ts:23</span></div>
+      <div class="f-desc">CORS acepta CUALQUIER origen localhost en produccion.</div>
+      <div class="f-code">origin.startsWith('http://localhost')</div>
+      <div class="f-fix">FIX: Limitar a localhost:5173 (Vite dev) o eliminar en produccion.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== ERROR HANDLING ===================== -->
+<div class="cat" id="sec-errors">
+  <div class="cat-header" onclick="this.classList.toggle('collapsed')">
+    <span style="color:var(--high)">ERROR HANDLING (68 hallazgos)</span>
+    <span class="arrow">&#9660;</span>
+  </div>
+  <div class="cat-body">
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">SISTEMICO: 90+ calls a Supabase sin check .error en crons</span></div>
+      <div class="f-desc">La gran mayoria de insert/update/upsert en los 56 archivos de cron NO chequean .error. Si una escritura DB falla, es invisible.</div>
+      <div class="f-code">// Patron repetido en casi todos los crons:
+await supabase.from('wa_messages').insert({ ... });  // No error check!
+await supabase.from('steve_knowledge').upsert({ ... }); // No error check!</div>
+      <div class="f-impact">Impacto: DATA_LOSS - mensajes enviados sin registro, knowledge perdido, locks que no funcionan</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">SISTEMICO: Todos los crons retornan 200 en fallo parcial</span></div>
+      <div class="f-desc">Todos los crons retornan { success: true, errors: N } con HTTP 200. Cloud Scheduler nunca reintenta. El error count queda enterrado en el response body que nadie lee.</div>
+      <div class="f-code">// sync-all-metrics.ts, performance-tracker-meta.ts, execute-meta-rules.ts,
+// wolf-morning-send.ts, prospect-followup.ts, churn-detector.ts, etc.
+return c.json({ success: true, errors: failedCount }); // HTTP 200!</div>
+      <div class="f-fix">FIX: Si errors > 50% de total, retornar HTTP 500 para que Cloud Scheduler reintente.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">SISTEMICO: ~45 fetch() sin timeout en 36 archivos de cron</span></div>
+      <div class="f-desc">Solo 7 de 56 crons usan AbortSignal.timeout(). Todos los demas pueden colgar indefinidamente si Anthropic, Apify, YouTube, etc. no responden.</div>
+      <div class="f-code">// steve-content-hunter.ts: 8 fetch sin timeout
+// prospect-followup.ts: 2 Anthropic calls sin timeout
+// swarm-research.ts: 3 fetch sin timeout (10 OpenAI en paralelo!)
+// steve-agent-loop.ts: 3 fetch sin timeout
+await fetch('https://api.anthropic.com/v1/messages', ...); // Can hang forever</div>
+      <div class="f-fix">FIX: Agregar signal: AbortSignal.timeout(30000) a todos los fetch externos.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">execute-meta-rules.ts:41 + execute-google-rules.ts:47</span></div>
+      <div class="f-desc">Lock acquire (mutex) sin check de error. Si el upsert falla, el cron procede SIN lock. Puede duplicar ejecucion de reglas que modifican budgets de Meta/Google Ads.</div>
+      <div class="f-code">await supabase.from('steve_knowledge').upsert({ ... }); // Lock acquire - NO ERROR CHECK!
+// Proceeds to modify campaign budgets without confirming lock was acquired</div>
+      <div class="f-fix">FIX: Chequear error como hace sync-all-metrics.ts:40-47.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">5 crons: sendWhatsApp fuera de try/catch</span></div>
+      <div class="f-desc">onboarding-wa, meeting-reminder (x3), auto-learning-digest, wa-action-processor (x5) llaman sendWhatsApp sin try/catch. Un numero invalido crashea el loop entero.</div>
+      <div class="f-code">// meeting-reminder.ts:79 - NO try/catch
+for (const reminder of reminders) {
+  await sendWhatsApp(`+${p.phone}`, msg); // If one fails, rest never sent
+}</div>
+      <div class="f-fix">FIX: Wrap cada sendWhatsApp individual en try/catch.</div>
+    </div>
+
+    <div class="finding" data-sev="MEDIUM">
+      <div class="f-header"><span class="sev sev-MEDIUM">MEDIUM</span><span class="f-file">15 catch blocks vacios (10 frontend + 5 backend)</span></div>
+      <div class="f-desc">catch(e) {} o catch(_) {} sin logging ni handling. Errores desaparecen silenciosamente.</div>
+      <div class="f-code">// MassCampaignsWizard.tsx:362, 512
+// BrandBriefView.tsx:784, 1545
+// BrandAssetUploader.tsx:369
+// process-queue-item.ts:48, 68, 321
+// analyze-brand-strategy/index.ts:589
+} catch (_) {}  // Error vanishes into the void</div>
+      <div class="f-fix">FIX: Al menos console.error o Sentry.captureException en cada catch.</div>
+    </div>
+
+    <div class="finding" data-sev="MEDIUM">
+      <div class="f-header"><span class="sev sev-MEDIUM">MEDIUM</span><span class="f-file">10 catch blocks que solo hacen console.log (errores tragados)</span></div>
+      <div class="f-desc">Errores de Google OAuth, Klaviyo templates, token refresh, etc. se logean pero no se manejan. La operacion parece exitosa cuando fallo.</div>
+      <div class="f-code">// resolve-google-token.ts:140 -- OAuth token refresh
+// google-ads-oauth-callback.ts:149 -- Customer detail fetch
+// import-klaviyo-templates.ts:123 -- Template fetch
+} catch (err) { console.log('Failed:', err); } // Returns success anyway</div>
+    </div>
+
+    <div class="finding" data-sev="MEDIUM">
+      <div class="f-header"><span class="sev sev-MEDIUM">MEDIUM</span><span class="f-file">5 race conditions confirmadas (read-then-write sin lock)</span></div>
+      <div class="f-desc">Counters incrementados con patron read-then-write: trigger_count en meta rules, votes en social_laws, total_rules_extracted en content-hunter, total_views/submissions en forms.</div>
+      <div class="f-code">// social-reply-generator.ts:78
+votes_for: (law as any).votes_for + 1  // Read old value, increment, write back
+// If two agents vote simultaneously, one vote is lost</div>
+      <div class="f-fix">FIX: Usar RPCs atomicos tipo increment_counter() o optimistic locking con version check.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== PERFORMANCE ===================== -->
+<div class="cat" id="sec-performance">
+  <div class="cat-header" onclick="this.classList.toggle('collapsed')">
+    <span style="color:var(--med)">PERFORMANCE (28 hallazgos)</span>
+    <span class="arrow">&#9660;</span>
+  </div>
+  <div class="cat-body">
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">supabase/functions/health-check/index.ts:193-265</span></div>
+      <div class="f-desc">N+1: 60 health checks HTTP secuenciales + 60 inserts individuales a DB. Total ~180 operaciones seriales.</div>
+      <div class="f-code">for (const ep of endpoints) {
+  const res = await fetch(ep.url, { ... }); // 60 sequential fetches!
+}
+for (const r of results) {
+  await supabase.from('criterio_results').insert({ ... }); // 60 sequential inserts!
+}</div>
+      <div class="f-fix">FIX: Promise.allSettled en batches de 10 para fetches. Bulk insert para DB.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">cloud-run-api/src/routes/cron/prospect-followup.ts:71-164</span></div>
+      <div class="f-desc">N+1: 3 awaits secuenciales por prospecto (2 queries DB + 1 Anthropic API) x 50 prospectos = 150 llamadas seriales.</div>
+      <div class="f-code">for (const prospect of prospects) {
+  const lastInbound = await supabase.from('wa_messages')...;  // Query 1
+  const lastOutbound = await supabase.from('wa_messages')...; // Query 2
+  const aiRes = await fetch('https://api.anthropic.com/...'); // API call
+}</div>
+      <div class="f-fix">FIX: Pre-fetch todos los mensajes con IN clause. Parallelizar Anthropic calls en batches.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">cloud-run-api/src/routes/whatsapp/send-campaign.ts:263-336</span></div>
+      <div class="f-desc">N+1: Insert individual de wa_messages por cada recipiente (hasta 500). Twilio es serial por rate limit, pero los DB inserts deberian ser bulk.</div>
+      <div class="f-code">for (const recipient of recipients) {
+  const msg = await subClient.messages.create({ ... }); // OK: rate limited
+  await supabase.from('wa_messages').insert({ ... });    // BAD: individual insert
+}</div>
+      <div class="f-fix">FIX: Acumular mensajes y hacer bulk insert cada 50.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">cloud-run-api/src/routes/meta/manage-meta-rules.ts:453</span></div>
+      <div class="f-desc">Query con .limit(50000) -- 50K filas de campaign_metrics cargadas en memoria.</div>
+      <div class="f-code">.limit(50000)</div>
+      <div class="f-fix">FIX: Usar agregacion SQL (SUM, AVG) en vez de cargar todo a memoria.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">5 setInterval sin clearInterval en backend</span></div>
+      <div class="f-desc">Rate limiters en steve-wa-chat, merchant-wa, booking-api, rate-limiter.ts, web-forms. Se crean al import del modulo y nunca se limpian. Los Maps internos crecen sin limite.</div>
+      <div class="f-code">// steve-wa-chat.ts:2017, merchant-wa.ts:45, booking-api.ts:33
+// rate-limiter.ts:16, web-forms.ts:146
+_rateLimitCleanupInterval = setInterval(() => { ... }, ...);
+// NEVER cleared. Maps grow unbounded.</div>
+      <div class="f-fix">FIX: Agregar maxSize a los Maps y/o clearInterval en graceful shutdown.</div>
+    </div>
+
+    <div class="finding" data-sev="MEDIUM">
+      <div class="f-header"><span class="sev sev-MEDIUM">MEDIUM</span><span class="f-file">src/components/dashboard/LearningQueue.tsx:83</span></div>
+      <div class="f-desc">Polling cada 3 segundos con select('*') en toda la tabla learning_queue. Extremadamente agresivo.</div>
+      <div class="f-code">pollRef.current = setInterval(fetchQueue, 3000); // Every 3 seconds!
+// fetchQueue does: supabase.from('learning_queue').select('*')</div>
+      <div class="f-fix">FIX: Usar Supabase Realtime subscriptions o polling cada 30s minimo.</div>
+    </div>
+
+    <div class="finding" data-sev="MEDIUM">
+      <div class="f-header"><span class="sev sev-MEDIUM">MEDIUM</span><span class="f-file">src/components/dashboard/SteveKnowledgePanel.tsx:664</span></div>
+      <div class="f-desc">Polling cada 30 segundos de TODA la tabla steve_knowledge + steve_bugs. Incluso cuando el tab esta en background.</div>
+      <div class="f-code">const interval = setInterval(fetchAll, 30000);
+// fetchAll: select('*') on steve_knowledge + select('*') on steve_bugs</div>
+      <div class="f-fix">FIX: Solo pollear cuando el tab esta visible (document.visibilityState).</div>
+    </div>
+
+    <div class="finding" data-sev="MEDIUM">
+      <div class="f-header"><span class="sev sev-MEDIUM">MEDIUM</span><span class="f-file">Queries .select('*') sin .limit() en multiples componentes</span></div>
+      <div class="f-desc">AdminSkyvern (3 queries), AcademyAdminPanel (4 queries), KlaviyoPlanner, etc. Todos hacen select('*') sin limite.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== DEBUG CODE ===================== -->
+<div class="cat" id="sec-deadcode">
+  <div class="cat-header" onclick="this.classList.toggle('collapsed')">
+    <span style="color:var(--med)">DEBUG & CODIGO MUERTO</span>
+    <span class="arrow">&#9660;</span>
+  </div>
+  <div class="cat-body">
+
+    <div class="finding" data-sev="INFO">
+      <div class="f-header"><span class="sev sev-INFO">INFO</span><span class="f-file">905 console.log en produccion</span></div>
+      <div class="f-desc">Distribucion: src/ 3, cloud-run-api/ 681, supabase/ 221. Top offenders:</div>
+      <div class="f-code">manage-meta-campaign.ts    44 console.log
+steve-wa-chat.ts           30 console.log
+shopify-oauth-callback.ts  22 console.log (3 son HMAC debug!)
+sync-competitor-ads.ts     19 console.log
+flow-engine.ts             18 console.log
+flow-webhooks.ts           17 console.log</div>
+      <div class="f-fix">Recomendacion: Migrar a structured logging (Pino/Winston). Eliminar los 3 HMAC debug ya.</div>
+    </div>
+
+    <div class="finding" data-sev="INFO">
+      <div class="f-header"><span class="sev sev-INFO">INFO</span><span class="f-file">1,314 console.error + 242 console.warn</span></div>
+      <div class="f-desc">Volumen alto sugiere necesidad de structured logging. Top: steve-wa-chat.ts (28 errors), manage-meta-campaign.ts (24), generate-meta-copy.ts (22).</div>
+    </div>
+
+    <div class="finding" data-sev="MEDIUM">
+      <div class="f-header"><span class="sev sev-MEDIUM">MEDIUM</span><span class="f-file">14 TODOs pendientes (3 son bugs conocidos)</span></div>
+      <div class="f-desc">Los mas importantes son bugs de race condition que nunca se arreglaron:</div>
+      <div class="f-code">// steve-wa-chat.ts:637 -- TODO Fix #49: non-atomic increment (race condition)
+// steve-wa-chat.ts:671 -- TODO Fix #49: message_count increment NOT atomic
+// send-campaign.ts:209 -- TODO Bug #99: detached Promise lost on recycle
+// abandoned-cart-wa.ts:230 -- TODO Bug #146: read-then-write non-atomic
+// merchant-wa.ts:261 -- TODO: Create increment_unread_count RPC</div>
+    </div>
+
+    <div class="finding" data-sev="LOW">
+      <div class="f-header"><span class="sev sev-LOW">LOW</span><span class="f-file">6 alert() en frontend</span></div>
+      <div class="f-desc">5 en BlockConfigPanel.tsx + 1 en CampaignBuilder.tsx. Deberian ser toasts de shadcn/ui.</div>
+      <div class="f-code">alert('La imagen no puede superar 5MB');
+alert('Formato no soportado. Usa JPG, PNG o WebP');
+alert('Sesion expirada');
+if (!name) { alert('Ingresa un nombre'); return; }</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== TYPESCRIPT ===================== -->
+<div class="cat" id="sec-types">
+  <div class="cat-header" onclick="this.classList.toggle('collapsed')">
+    <span style="color:var(--med)">TYPESCRIPT & TYPE SAFETY</span>
+    <span class="arrow">&#9660;</span>
+  </div>
+  <div class="cat-body">
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">2,966 usos de `any` en el codebase</span></div>
+      <div class="f-desc">Distribucion: src/ 821, cloud-run-api/ 1,963, supabase/ 182. Top 10 archivos:</div>
+      <div class="f-code">BrandBriefView.tsx          148 any
+api-compare.ts              58 any
+manage-meta-campaign.ts     54 any
+flow-webhooks.ts            48 any
+weekly-report.ts            37 any
+sync-klaviyo-metrics.ts     36 any
+steve-wa-brain.ts           34 any
+generate-meta-copy.ts       32 any
+klaviyo-manage-flows.ts     32 any
+steve-chat.ts               31 any</div>
+      <div class="f-impact">Riesgo: Crashes en runtime que TypeScript no puede prevenir.</div>
+    </div>
+
+    <div class="finding" data-sev="LOW">
+      <div class="f-header"><span class="sev sev-LOW">LOW</span><span class="f-file">1 @ts-ignore en todo el codebase</span></div>
+      <div class="f-desc">Solo uno! En BrandBriefView.tsx:1653 para jsPDF missing type. Bastante limpio.</div>
+      <div class="f-code">// @ts-ignore
+doc.GState({ opacity: 0.03 })</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== API CONSISTENCY ===================== -->
+<div class="cat" id="sec-api">
+  <div class="cat-header" onclick="this.classList.toggle('collapsed')">
+    <span style="color:var(--med)">API CONSISTENCY (67 hallazgos)</span>
+    <span class="arrow">&#9660;</span>
+  </div>
+  <div class="cat-body">
+
+    <div class="finding" data-sev="MEDIUM">
+      <div class="f-header"><span class="sev sev-MEDIUM">MEDIUM</span><span class="f-file">6+ patrones distintos de response format</span></div>
+      <div class="f-desc">No hay contrato estandar de API. Cada endpoint inventa su propio formato.</div>
+      <div class="f-code">// Patron 1: { success: true, ... }
+// Patron 2: { data: [...] }
+// Patron 3: { status: 'ok' }
+// Patron 4: { items: [...], stats: {...} }
+// Patron 5: raw object (no envelope)
+// Patron 6: { saved: true, rules: [...] }</div>
+      <div class="f-fix">FIX: Definir un ApiResponse&lt;T&gt; estandar y aplicar en todos los endpoints.</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">Errores retornados como HTTP 200</span></div>
+      <div class="f-desc">check-video-status retorna { status: 'failed' } con HTTP 200. check-meta-scopes retorna { error: '...' } con HTTP 200 explicito.</div>
+      <div class="f-code">// check-video-status.ts:71
+return c.json({ status: 'failed', error: 'Video generation failed' }); // HTTP 200!
+
+// check-meta-scopes.ts:67
+return c.json({ error: 'Failed to resolve token', ...}, 200); // Explicit 200 for error!</div>
+    </div>
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">Input validation ausente en multiples endpoints</span></div>
+      <div class="f-desc">request body se usa directo sin validar: generate-mass-campaigns (no valida campaign object), chonga-support (messages array directo a Anthropic sin limit), parse-email-html (sin size limit).</div>
+      <div class="f-code">// chonga-support.ts:35 -- array goes straight to Anthropic
+const { messages } = await c.req.json();
+// Could pass 10,000 messages = $$$$ in API costs</div>
+    </div>
+
+    <div class="finding" data-sev="MEDIUM">
+      <div class="f-header"><span class="sev sev-MEDIUM">MEDIUM</span><span class="f-file">snake_case vs camelCase mezclados (60/40)</span></div>
+      <div class="f-desc">Shopify responses: algunos snake_case (value_type, usage_limit), otros camelCase (avgMargin, productCount). Sin convencion.</div>
+    </div>
+
+    <div class="finding" data-sev="MEDIUM">
+      <div class="f-header"><span class="sev sev-MEDIUM">MEDIUM</span><span class="f-file">401 vs 403 incorrectos</span></div>
+      <div class="f-desc">creative-review-feed, train-steve, export-all-data retornan 403 (Forbidden) cuando no hay usuario autenticado. Deberia ser 401 (Unauthorized).</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== BIG FILES ===================== -->
+<div class="cat" id="sec-bigfiles">
+  <div class="cat-header" onclick="this.classList.toggle('collapsed')">
+    <span style="color:var(--med)">ARCHIVOS MONSTRUO (57 archivos >500 lineas)</span>
+    <span class="arrow">&#9660;</span>
+  </div>
+  <div class="cat-body">
+
+    <div class="finding" data-sev="HIGH">
+      <div class="f-header"><span class="sev sev-HIGH">HIGH</span><span class="f-file">Top 20 archivos mas grandes</span></div>
+      <div class="f-desc">Estos archivos necesitan refactoring urgente. BrandBriefView es un monstruo de 5,387 lineas.</div>
+      <div class="f-code"> 5,387  BrandBriefView.tsx
+ 3,090  meta-ads/CampaignCreateWizard.tsx
+ 2,670  lib/steve-wa-brain.ts
+ 2,354  meta-ads/MetaCampaignManager.tsx
+ 2,268  ai/steve-chat.ts
+ 2,038  chino/checks/data-quality.ts
+ 2,023  whatsapp/steve-wa-chat.ts
+ 1,988  meta-ads/MetaAudienceManager.tsx
+ 1,986  meta-ads/MetaAutomatedRules.tsx
+ 1,896  integrations/supabase/types.ts (auto-gen, skip)
+ 1,866  email/CampaignBuilder.tsx
+ 1,861  KlaviyoPlanner.tsx
+ 1,745  email/emailTemplates.ts
+ 1,717  meta/manage-meta-campaign.ts
+ 1,627  meta-ads/MetaAnalyticsDashboard.tsx
+ 1,615  campaign-studio/bulk/BulkUploadWizard.tsx
+ 1,610  email/EmailTemplateGallery.tsx
+ 1,589  google-ads/GoogleAnalyticsDashboard.tsx
+ 1,461  lib/report/report-pdf-renderer.ts
+ 1,449  supabase/functions/steve-chat/index.ts</div>
+    </div>
+
+  </div>
+</div>
+
+</div>
+
+<div class="watermark">
+  <strong>JAVIERA W12 - QA AGENT</strong> | Steve Ads Full Code Audit | 251,670 lineas revisadas | 10 Abril 2026<br>
+  8 CRITICAL | 50 HIGH | 52 MEDIUM | 14 LOW | 2,966 any types | 905 console.log
+</div>
+
+<script>
+let currentSev = 'all';
+
+function filterSev(btn, sev) {
+  currentSev = sev;
+  document.querySelectorAll('.filters button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+function filterFindings(query) {
+  applyFilters(query);
+}
+
+function applyFilters(query) {
+  const q = (query || document.getElementById('searchInput').value || '').toLowerCase();
+  document.querySelectorAll('.finding').forEach(f => {
+    const matchSev = currentSev === 'all' || f.dataset.sev === currentSev;
+    const matchText = !q || f.textContent.toLowerCase().includes(q);
+    f.style.display = (matchSev && matchText) ? '' : 'none';
+  });
+  // Show/hide empty categories
+  document.querySelectorAll('.cat').forEach(cat => {
+    const body = cat.querySelector('.cat-body');
+    if (!body) return;
+    const visible = body.querySelectorAll('.finding:not([style*="display: none"])');
+    cat.style.display = visible.length > 0 ? '' : 'none';
+  });
+}
+</script>
+
+</body>
+</html>

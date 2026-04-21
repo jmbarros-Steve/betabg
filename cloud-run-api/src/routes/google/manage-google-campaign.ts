@@ -840,6 +840,8 @@ async function handleCreateCampaign(
     selected_product_ids,
     // Shopping / Merchant Center
     merchant_center_id,
+    // Bid strategy targets (opcionales según bidStrategy)
+    target_cpa_micros, target_roas,
     // Client ID (inyectado por dispatcher, ownership-validated)
     client_id: clientIdForValidation,
   } = data;
@@ -887,6 +889,32 @@ async function handleCreateCampaign(
     biddingStrategyType: bidStrategy,
     containsEuPoliticalAdvertising: 'DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING',
   };
+
+  // Bid strategy sub-message (v23 requiere el objeto, no solo el enum).
+  // MANUAL_CPC/MANUAL_CPM pueden ir solo con biddingStrategyType.
+  // TARGET_CPA / TARGET_ROAS requieren target obligatorio.
+  // MAXIMIZE_* aceptan target opcional.
+  const roasNum = Number(target_roas);
+  const cpaNum = Number(target_cpa_micros);
+  if (bidStrategy === 'TARGET_CPA') {
+    if (!cpaNum || cpaNum <= 0) {
+      return { body: { error: 'target_cpa_micros required and must be > 0 for TARGET_CPA' }, status: 400 };
+    }
+    delete campaignCreate.biddingStrategyType;
+    campaignCreate.targetCpa = { targetCpaMicros: String(cpaNum) };
+  } else if (bidStrategy === 'TARGET_ROAS') {
+    if (!roasNum || roasNum <= 0) {
+      return { body: { error: 'target_roas required and must be > 0 for TARGET_ROAS' }, status: 400 };
+    }
+    delete campaignCreate.biddingStrategyType;
+    campaignCreate.targetRoas = { targetRoas: roasNum };
+  } else if (bidStrategy === 'MAXIMIZE_CONVERSIONS') {
+    delete campaignCreate.biddingStrategyType;
+    campaignCreate.maximizeConversions = cpaNum > 0 ? { targetCpaMicros: String(cpaNum) } : {};
+  } else if (bidStrategy === 'MAXIMIZE_CONVERSION_VALUE') {
+    delete campaignCreate.biddingStrategyType;
+    campaignCreate.maximizeConversionValue = roasNum > 0 ? { targetRoas: roasNum } : {};
+  }
 
   // Geo target type setting (how to match locations)
   campaignCreate.geoTargetTypeSetting = {
@@ -981,15 +1009,7 @@ async function handleCreateCampaign(
 
   // PMAX: campaign + asset group + assets
   if (channelType === 'PERFORMANCE_MAX') {
-    // PMAX requires bidding strategy object, not just type
-    const pmaxStrategy = bidStrategy || 'MAXIMIZE_CONVERSION_VALUE';
-    delete campaignCreate.biddingStrategyType;
-    if (pmaxStrategy === 'MAXIMIZE_CONVERSIONS' || pmaxStrategy === 'TARGET_CPA') {
-      campaignCreate.maximizeConversions = {};
-    } else {
-      campaignCreate.maximizeConversionValue = {};
-    }
-
+    // Bidding strategy sub-message ya aplicado arriba (bloque unificado).
     // Disable Brand Guidelines (requires CampaignAsset logo+name which we add in Phase 2)
     campaignCreate.brandGuidelinesEnabled = false;
 

@@ -1,5 +1,116 @@
 # Andrés W3 — Journal de Aprendizaje
 
+## Sesión 21-22/04/2026 — PMAX cleanup marathon (27+ commits, 11 deploys Cloud Run)
+
+### Contexto
+Cierre del módulo PMAX con features nuevas + 6 críticas de Isidora + 13 items cleanup post-audit
++ 4 hotfixes reportados por JM en vivo. Revision final: steve-api-00579-djj.
+
+### Features entregadas
+1. **remove_asset_group v23** — `assetGroupOperation.remove` con resource_name (patrón igual al
+   fix 02cb0a5d de Campaign — v23 rechaza `update status=REMOVED` para ambos resources).
+2. **Dialogs rename/delete AG + delete campaign** — reemplazo de `window.prompt`/`window.confirm`
+   con loading guards en onOpenChange + reset state al cerrar.
+3. **Settings Dialog v2 completo** — split en 4 queries (core + bid condicional por type +
+   network solo SEARCH + schedule opcional + criteria). Fix para 400 con `start_date`/`end_date`
+   (v23 los rechaza en query unificado). Toasts diferenciados success/partial/error.
+4. **Scorecard AG accionable** — botón "Steve sugiere/genera" en cada item faltante.
+   Texto via Claude Haiku 4.5 con brief. Imágenes via Gemini Imagen 4.0-fast.
+   CTA enum fijo (11 opciones). YOUTUBE_VIDEO delega a Google Ads UI.
+5. **Audience Signal para AG existente** — nueva action `add_audience_signal` con 3 paths
+   (existing_audience / existing_user_list / demographics). Sufijo único en Audience.name.
+6. **Landscape logo automático** — letterbox sharp 1200×300 cuando hay `brandCtx.logoUrl`.
+   0 costo, instantáneo, fiel al logo. Bypass cuando `use_brand_logo_reference=true`.
+7. **Variaciones del logo con Gemini** — 3 paralelas con logo como referencia + prompt
+   dedicado para logos (NO fotografía).
+8. **replace_asset atómico** — 1 mutate con create+link+remove (rollback auto si falla).
+9. **Edit assets desde UI** — botón Pencil en text assets del detalle AG.
+10. **Subir imágenes en cada sección AG** — file picker + "Steve" button per field_type.
+11. **Rate limit 429 awareness** — parseRetryAfterSeconds + formatRetryAfter + toast claro
+    "Google saturado. Retry en 17h 5m".
+12. **Warnings surface uniforme** — `warnings: string[]` en response, toast.warning frontend.
+13. **Idempotency key con Map TTL** — hashBody(customerId, ops) dedupea doble-click.
+14. **Wizard variaciones Logo + Landscape Logo** — botones "Generar con AI" en step 4 PMAX.
+
+### Lecciones críticas aprendidas
+
+#### Asset duplicate "across mutates cannot have different asset level fields"
+Google v23 dedupea image assets por **bytes del data**, no por name. Si 2 imágenes tienen bytes
+idénticos (mismo archivo subido 2x, o auto-fit con sharp produce output igual), Google rechaza
+el batch con ese error críptico + cascada de "Resource was not found" en los 30+ assetGroupAssetOperation.create posteriores.
+
+**Fix:** dedupe backend por SHA1(data). Map<hash, assetResource>: si ya vimos ese data,
+reusamos el mismo temp resource (solo 1 assetOperation.create) pero agregamos múltiples
+links si los field_type difieren. `(asset+field_type)` también dedupeado.
+
+#### `campaign.start_date` / `campaign.end_date` rechazados en query unificado (v23)
+Google v23 responde `Unrecognized fields in the query` para esos 2 campos cuando viajan
+junto a otros en SELECT, A PESAR DE ESTAR EN DOCS OFICIALES. Fix: query aislado con try/catch
+para schedule, cae en warnings sin bloquear el resto.
+
+#### `network_settings` NO editable fuera de SEARCH
+PMAX/SHOPPING/DISPLAY rechazan edición de `target_google_search/content_network/etc`. El
+frontend ahora oculta los switches para no-SEARCH + backend hardening: fetch `channel_type`
+y drop `network_settings` del payload si aplica.
+
+#### Radix Select falla dentro de Dialog con `overflow-y-auto`
+En el wizard Dialog + Settings Dialog, los `<Select>` de shadcn (Radix Portal) no abren
+el popover. Fix: revertir a `<select>` nativo estilizado con las mismas clases Tailwind.
+Los 5 selects del wizard + 1 de Settings ahora son nativos.
+
+#### AGE_RANGE_UNDETERMINED-only → dimension vacía
+v23 rechaza `age` dimension con solo `includeUndetermined` sin `ageRanges` array. Fix:
+validar que `ageSegments.length > 0` antes de push. Aplicado en 2 paths (wizard path c +
+handleAddAudienceSignal).
+
+#### Cross-tenant leak en LGF validation
+Si la query Supabase de ownership (selected_product_ids) falla por timeout/500, el catch
+anterior solo logueaba y seguía con IDs sin validar. Fix fail-safe: flag `validated=false`
+default, solo true si `res.ok`. Si falla → `validSelectedIds = []` + dropea LGF.
+
+#### Gemini prompt para logos ≠ fotos de producto
+`promptFinal` siempre terminaba con "Canon EOS R5, real skin texture, genuine facial
+expressions" — para logos Gemini ignoraba la referencia y generaba caras humanas.
+Fix: promptFinal condicional por `isLogoFormat`. Logos reciben "Clean vector-style graphic.
+NO human figures. NO photographic elements. Preserve the EXACT symbol and typography."
+
+#### Audience.name colisión "already exists"
+Google Ads exige unicidad del Audience.name a nivel customer. Usar `as.name` tal cual del
+user provoca colisión al re-crear. Fix: sufijo único SIEMPRE con randomness
+`(Date.now() % 1_000) * 1000 + Math.floor(Math.random() * 1000)` — reduce colisión en
+mismo ms de 100% a 0.1%.
+
+#### List AGs de campañas REMOVED causa "Asset group cannot be mutated for removed campaign"
+`list_asset_groups` solo filtraba `asset_group.status != 'REMOVED'`. Si la campaña padre
+estaba REMOVED, sus AGs aparecían en UI pero cualquier mutate fallaba. Fix: agregar
+`AND campaign.status != 'REMOVED'` al GAQL.
+
+#### Rate limit 429 = developer token "Basic" cap 15k ops/día
+JM lo sufrió en vivo. Retry_after típico 17h. Standard Access da 15M/día. Backend ahora
+detecta `RESOURCE_EXHAUSTED` + parsea retry_after + devuelve mensaje legible al frontend.
+
+### Commits del bloque (27+)
+fbd93b7e (Settings v2 + Steve AI scorecard) · 1016b06b (AGs huérfanos) · 45882a79 (Steve
+imágenes + reorder wizard) · 546725c0 (cierre consistencia) · ef5b65bb / 5ce0d9bc (selects
+nativos) · 12a60b03 (Audience.name sufijo único) · cc9de363 (Audience Signal AG + letterbox
++ variaciones) · 82e8c23b (split get_settings + edit asset) · 726d5d16 (start_date opcional)
+· 5654b2f8 (mostrar todos los missing) · c0d0b790 (upload imagen en AG) · fa06116a (6
+críticas) · 3a036421 (13 items cleanup) · 36e39c91 / 24cd7edd (Settings select + Textarea
+import) · ce8ff633 (variaciones logo con referencia) · 8d748d12 (dedupe images SHA1) ·
+82e3ed87 (prompt logos sin fotografía)
+
+### Cross-reviews Isidora (3 rondas grandes)
+1. Post-Settings v2 + Scorecard Steve → 2 críticas (negativas LGF, TARGET_CPA>0) → aplicadas
+2. Post-Steve imágenes + wizard reorder → APROBADO sin críticas
+3. Post-6 críticas → APROBADO PARA DEPLOY
+4. Auditoría exhaustiva PMAX → 6 críticas bloqueantes + 10 menores + 3 patrones + 5 hardening
+5. Post-13 items cleanup → APROBADO + 2 observaciones menores para backlog
+
+### Cierre
+PMAX listo para piloto. Pendientes post-cierre (no bloquean): E2E tests con mock Google Ads,
+SHA1 en lugar de djb2 para hashBody si aparece dedup fantasma, error retry UI en
+refreshGroupDetail.
+
 ## Sesión 09/04/2026 — Primera activación + Absorción conocimiento Leadsie
 
 ### Lo que aprendí de Felipe W2 sobre Leadsie/SUAT (3 sesiones: 06-08 abril)
