@@ -1688,17 +1688,20 @@ async function handleCreateCampaign(
     return { body: { error: `Failed to create campaign: ${result.error}` }, status: 502 };
   }
 
-  // Extract real resource names for campaign + assetGroup from primary response
+  // Extract real resource names for campaign + assetGroup + adGroup from primary response
   let realAssetGroup = '';
   let realCampaign = '';
+  let realAdGroup = ''; // Search crea adGroup en el primary batch (PMAX no)
   const primaryResponses: any[] = Array.isArray((result.data as any)?.mutateOperationResponses)
     ? (result.data as any).mutateOperationResponses
     : [];
   for (const r of primaryResponses) {
     const ag = r?.assetGroupResult?.resourceName || r?.asset_group_result?.resource_name;
     const cp = r?.campaignResult?.resourceName || r?.campaign_result?.resource_name;
+    const adg = r?.adGroupResult?.resourceName || r?.ad_group_result?.resource_name;
     if (ag && !realAssetGroup) realAssetGroup = ag;
     if (cp && !realCampaign) realCampaign = cp;
+    if (adg && !realAdGroup) realAdGroup = adg;
   }
 
   // Batch 2: secondary ops con resource names reales + temp IDs renumerados bajos
@@ -1858,12 +1861,19 @@ async function handleCreateCampaign(
     }
   }
 
+  // Extraer numeric IDs del resource_name (tail split) — frontend los usa
+  // para post-create actions (add keywords + RSA en Search).
+  const campaignIdExtracted = realCampaign ? realCampaign.split('/').pop() : null;
+  const adGroupIdExtracted = realAdGroup ? realAdGroup.split('/').pop() : null;
+
   return {
     body: {
       success: true,
       campaign_name: name,
       channel_type: channelType,
       status: 'PAUSED',
+      campaign_id: campaignIdExtracted,
+      ad_group_id: adGroupIdExtracted,
       data: result.data,
       warnings: [acquisitionWarning, secondaryWarning].filter(Boolean),
       effective_acquisition_mode: effectiveAcquisitionMode,

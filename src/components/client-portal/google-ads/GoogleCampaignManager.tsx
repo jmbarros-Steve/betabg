@@ -588,6 +588,11 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     user_intent: '' as string,
     // Productos del Merchant Center seleccionados (SKUs) — solo los que van a la campaña
     selected_product_ids: [] as string[],
+    // Search wizard (Tier 1 extensión)
+    search_keywords: [] as Array<{ text: string; match_type: string }>,
+    search_rsa_headlines: ['', '', ''] as string[],
+    search_rsa_descriptions: ['', ''] as string[],
+    search_rsa_final_url: '' as string,
   });
   const [budgetOptions, setBudgetOptions] = useState<any>(null);
   const [budgetLoading, setBudgetLoading] = useState(false);
@@ -1269,6 +1274,17 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       payload.merchant_center_id = wizardData.merchant_center_id || undefined;
     }
 
+    // Search: incluir keywords + RSA initial (se ejecutan después del campaign create)
+    const searchKeywordsToAdd = wizardData.channel_type === 'SEARCH'
+      ? wizardData.search_keywords.filter(k => k.text.trim().length > 0 && k.text.length <= 80)
+      : [];
+    const searchRsaHeadlines = wizardData.channel_type === 'SEARCH'
+      ? wizardData.search_rsa_headlines.filter(h => h.trim().length > 0 && h.length <= 30)
+      : [];
+    const searchRsaDescriptions = wizardData.channel_type === 'SEARCH'
+      ? wizardData.search_rsa_descriptions.filter(d => d.trim().length > 0 && d.length <= 90)
+      : [];
+
     const { data: createResp, error } = await callApi('manage-google-campaign', {
       body: {
         action: 'create_campaign',
@@ -1285,6 +1301,41 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     }
 
     toast.success('Campana creada en estado PAUSADA');
+
+    // Post-create Search: agregar keywords + RSA al ad_group recién creado
+    if (wizardData.channel_type === 'SEARCH' && createResp?.ad_group_id) {
+      const adGroupId = String(createResp.ad_group_id);
+      setWizardProgress('Agregando keywords...');
+      let kwAdded = 0, kwFailed = 0;
+      for (const kw of searchKeywordsToAdd) {
+        const { error: kwErr } = await callApi('manage-google-keywords', {
+          body: {
+            action: 'add_keyword', connection_id: connectionId,
+            data: { ad_group_id: adGroupId, keyword_text: kw.text, match_type: kw.match_type },
+          },
+        });
+        if (kwErr) kwFailed++; else kwAdded++;
+      }
+      if (kwAdded > 0) toast.success(`${kwAdded} keywords agregadas${kwFailed > 0 ? `, ${kwFailed} fallaron` : ''}`);
+
+      // RSA
+      if (searchRsaHeadlines.length >= 3 && searchRsaDescriptions.length >= 2 && wizardData.search_rsa_final_url) {
+        setWizardProgress('Creando RSA...');
+        const { error: rsaErr } = await callApi('manage-google-ads-content', {
+          body: {
+            action: 'create_rsa', connection_id: connectionId,
+            data: {
+              ad_group_id: adGroupId,
+              headlines: searchRsaHeadlines.map(h => ({ text: h })),
+              descriptions: searchRsaDescriptions.map(d => ({ text: d })),
+              final_urls: [wizardData.search_rsa_final_url.trim()],
+            },
+          },
+        });
+        if (rsaErr) toast.warning('RSA no se pudo crear: ' + rsaErr);
+        else toast.success('RSA creado');
+      }
+    }
     const warnings = Array.isArray(createResp?.warnings) ? createResp.warnings : [];
     for (const w of warnings) {
       if (typeof w === 'string' && w.trim()) toast.warning(w, { duration: 10_000 });
@@ -1307,6 +1358,8 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       merchant_center_id: '',
       acquisition_mode: '', audience_signals: [],
       user_intent: '', selected_product_ids: [],
+      search_keywords: [], search_rsa_headlines: ['', '', ''],
+      search_rsa_descriptions: ['', ''], search_rsa_final_url: '',
     });
     setBudgetOptions(null);
     fetchCampaigns();
@@ -1730,7 +1783,9 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
 
   // Wizard step helpers
   const isPmax = wizardData.channel_type === 'PERFORMANCE_MAX';
-  const totalSteps = isPmax ? 6 : 3;
+  const isSearchWizard = wizardData.channel_type === 'SEARCH';
+  // PMAX: 6 steps · SEARCH: 5 (Basic/Config/Ad Group/Keywords/RSA) · otros: 3
+  const totalSteps = isPmax ? 6 : isSearchWizard ? 5 : 3;
 
   const isStepValid = (step: number): boolean => {
     switch (step) {
@@ -1747,12 +1802,27 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           const validDescriptions = wizardData.descriptions.filter(d => d.trim()).length;
           return validHeadlines >= 3 && validLongHeadlines >= 1 && validDescriptions >= 2;
         }
+        if (isSearchWizard) return !!wizardData.ad_group_name.trim();
         return true;
-      case 4: // Images PMAX
+      case 4:
+        if (isSearchWizard) {
+          // Keywords iniciales opcionales pero recomendamos ≥1 con texto válido
+          const validKeywords = wizardData.search_keywords.filter(k => k.text.trim().length > 0 && k.text.length <= 80).length;
+          return validKeywords >= 1;
+        }
+        // PMAX step 4: imágenes
         return wizardData.images_landscape.length >= 1
           && wizardData.images_square.length >= 1
           && wizardData.images_logo.length >= 1;
-      case 5: // Videos + extras — todo opcional
+      case 5:
+        if (isSearchWizard) {
+          const headlines = wizardData.search_rsa_headlines.filter(h => h.trim().length > 0 && h.length <= 30);
+          const descriptions = wizardData.search_rsa_descriptions.filter(d => d.trim().length > 0 && d.length <= 90);
+          return headlines.length >= 3 && headlines.length <= 15
+            && descriptions.length >= 2 && descriptions.length <= 4
+            && !!wizardData.search_rsa_final_url.trim();
+        }
+        // PMAX step 5: videos opcionales
         return true;
       default:
         return true;
@@ -3537,6 +3607,220 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                   onChange={e => setWizardData(prev => ({ ...prev, ad_group_cpc_bid_micros: e.target.value }))}
                   placeholder="Ej: 1.50"
                 />
+              </div>
+            </div>
+          )}
+
+          {/* Step 4 SEARCH: Keywords iniciales */}
+          {wizardStep === 4 && isSearchWizard && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Keywords iniciales <span className="text-muted-foreground font-normal">(mínimo 5 recomendado)</span></Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 h-7 text-xs"
+                    onClick={async () => {
+                      const { data, error } = await callApi('manage-google-keywords', {
+                        body: {
+                          action: 'suggest_keywords',
+                          connection_id: connectionId,
+                          data: { client_id: clientId, user_intent: wizardData.user_intent || undefined, count: 12, match_type_default: 'BROAD' },
+                        },
+                      });
+                      if (error) { toast.error('Steve: ' + error); return; }
+                      const sugg = (data?.options || []).map((o: any) => ({ text: o.text, match_type: o.match_type || 'BROAD' }));
+                      setWizardData(prev => ({
+                        ...prev,
+                        search_keywords: [...prev.search_keywords, ...sugg].slice(0, 50),
+                      }));
+                      toast.success(`${sugg.length} keywords agregadas por Steve`);
+                    }}
+                  >
+                    <Sparkles className="w-3 h-3" /> Steve sugiere
+                  </Button>
+                </div>
+                {wizardData.search_keywords.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Sin keywords. Click "Steve sugiere" o agregá manual. Se crean como BROAD por defecto.
+                  </p>
+                )}
+                <div className="space-y-1 max-h-[320px] overflow-y-auto">
+                  {wizardData.search_keywords.map((kw, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <Input
+                        value={kw.text}
+                        onChange={e => setWizardData(prev => ({
+                          ...prev,
+                          search_keywords: prev.search_keywords.map((k, i) => i === idx ? { ...k, text: e.target.value } : k),
+                        }))}
+                        maxLength={80}
+                        placeholder="keyword..."
+                        className="flex-1"
+                      />
+                      <select
+                        className="h-10 rounded-md border border-input bg-background px-2 text-xs"
+                        value={kw.match_type}
+                        onChange={e => setWizardData(prev => ({
+                          ...prev,
+                          search_keywords: prev.search_keywords.map((k, i) => i === idx ? { ...k, match_type: e.target.value } : k),
+                        }))}
+                      >
+                        <option value="BROAD">BROAD</option>
+                        <option value="PHRASE">PHRASE</option>
+                        <option value="EXACT">EXACT</option>
+                      </select>
+                      <Button variant="ghost" size="sm" className="h-10 px-2" onClick={() => setWizardData(prev => ({
+                        ...prev,
+                        search_keywords: prev.search_keywords.filter((_, i) => i !== idx),
+                      }))}>
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => setWizardData(prev => ({
+                    ...prev,
+                    search_keywords: [...prev.search_keywords, { text: '', match_type: 'BROAD' }],
+                  }))}
+                >
+                  <Plus className="w-3 h-3 mr-1" /> Agregar manual
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 5 SEARCH: RSA (Responsive Search Ad) */}
+          {wizardStep === 5 && isSearchWizard && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Final URL <span className="text-red-500">*</span></Label>
+                <Input
+                  value={wizardData.search_rsa_final_url}
+                  onChange={e => setWizardData(prev => ({ ...prev, search_rsa_final_url: e.target.value }))}
+                  placeholder="https://..."
+                  type="url"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Headlines (3-15, max 30 chars) <span className="text-red-500">*</span></Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 h-7 text-xs"
+                    onClick={async () => {
+                      const { data, error } = await callApi('manage-google-campaign', {
+                        body: {
+                          action: 'suggest_asset_content',
+                          connection_id: connectionId,
+                          data: { client_id: clientId, field_type: 'HEADLINE', count: 10, user_intent: wizardData.user_intent || undefined },
+                        },
+                      });
+                      if (error) { toast.error('Steve: ' + error); return; }
+                      const texts = (data?.options || []).map((o: any) => o.text).filter(Boolean).slice(0, 15);
+                      if (texts.length > 0) {
+                        setWizardData(prev => ({ ...prev, search_rsa_headlines: texts }));
+                        toast.success(`${texts.length} headlines generados`);
+                      }
+                    }}
+                  >
+                    <Sparkles className="w-3 h-3" /> Steve genera
+                  </Button>
+                </div>
+                {wizardData.search_rsa_headlines.map((h, idx) => (
+                  <div key={idx} className="flex gap-1">
+                    <Input
+                      value={h}
+                      onChange={e => setWizardData(prev => ({
+                        ...prev,
+                        search_rsa_headlines: prev.search_rsa_headlines.map((v, i) => i === idx ? e.target.value : v),
+                      }))}
+                      maxLength={30}
+                      placeholder={`Headline ${idx + 1}`}
+                    />
+                    <span className="text-[10px] text-muted-foreground w-8 pt-2.5">{h.length}/30</span>
+                    <Button variant="ghost" size="sm" className="h-10 px-2" onClick={() => setWizardData(prev => ({
+                      ...prev,
+                      search_rsa_headlines: prev.search_rsa_headlines.filter((_, i) => i !== idx),
+                    }))}>
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+                {wizardData.search_rsa_headlines.length < 15 && (
+                  <Button variant="ghost" size="sm" className="text-xs" onClick={() => setWizardData(prev => ({
+                    ...prev,
+                    search_rsa_headlines: [...prev.search_rsa_headlines, ''],
+                  }))}>
+                    <Plus className="w-3 h-3 mr-1" /> Agregar headline
+                  </Button>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Descriptions (2-4, max 90 chars) <span className="text-red-500">*</span></Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 h-7 text-xs"
+                    onClick={async () => {
+                      const { data, error } = await callApi('manage-google-campaign', {
+                        body: {
+                          action: 'suggest_asset_content',
+                          connection_id: connectionId,
+                          data: { client_id: clientId, field_type: 'DESCRIPTION', count: 4, user_intent: wizardData.user_intent || undefined },
+                        },
+                      });
+                      if (error) { toast.error('Steve: ' + error); return; }
+                      const texts = (data?.options || []).map((o: any) => o.text).filter(Boolean).slice(0, 4);
+                      if (texts.length > 0) {
+                        setWizardData(prev => ({ ...prev, search_rsa_descriptions: texts }));
+                        toast.success(`${texts.length} descriptions generados`);
+                      }
+                    }}
+                  >
+                    <Sparkles className="w-3 h-3" /> Steve genera
+                  </Button>
+                </div>
+                {wizardData.search_rsa_descriptions.map((d, idx) => (
+                  <div key={idx} className="flex gap-1">
+                    <Textarea
+                      rows={2}
+                      value={d}
+                      onChange={e => setWizardData(prev => ({
+                        ...prev,
+                        search_rsa_descriptions: prev.search_rsa_descriptions.map((v, i) => i === idx ? e.target.value : v),
+                      }))}
+                      maxLength={90}
+                      placeholder={`Description ${idx + 1}`}
+                    />
+                    <span className="text-[10px] text-muted-foreground w-8 pt-2.5">{d.length}/90</span>
+                    <Button variant="ghost" size="sm" className="h-auto px-2" onClick={() => setWizardData(prev => ({
+                      ...prev,
+                      search_rsa_descriptions: prev.search_rsa_descriptions.filter((_, i) => i !== idx),
+                    }))}>
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+                {wizardData.search_rsa_descriptions.length < 4 && (
+                  <Button variant="ghost" size="sm" className="text-xs" onClick={() => setWizardData(prev => ({
+                    ...prev,
+                    search_rsa_descriptions: [...prev.search_rsa_descriptions, ''],
+                  }))}>
+                    <Plus className="w-3 h-3 mr-1" /> Agregar description
+                  </Button>
+                )}
               </div>
             </div>
           )}
