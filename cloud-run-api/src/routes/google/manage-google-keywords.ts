@@ -533,7 +533,9 @@ async function handleGetAdGroupDetail(
     // cuando el ad_group_asset incluye otros types. Dividimos en queries por field_type
     // y las corremos en paralelo — si una falla, warnings[] lo indica pero el resto carga.
     (async () => {
+      // v23: ad_group.id debe estar en SELECT si se usa en WHERE
       const baseSel = `
+        ad_group.id,
         ad_group_asset.resource_name, ad_group_asset.field_type, ad_group_asset.status,
         asset.resource_name, asset.type, asset.name
       `;
@@ -652,8 +654,6 @@ async function handleGetAdGroupDetail(
         sitelinks: extensions.SITELINK.length,
         callouts: extensions.CALLOUT.length,
         snippets: extensions.STRUCTURED_SNIPPET.length,
-        calls: extensions.CALL.length,
-        prices: extensions.PRICE.length,
       },
       warnings: warnings.length > 0 ? warnings : undefined,
     },
