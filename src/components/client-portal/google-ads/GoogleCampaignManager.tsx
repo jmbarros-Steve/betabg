@@ -529,6 +529,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
   const [wizardStep, setWizardStep] = useState(1);
   const [wizardLoading, setWizardLoading] = useState(false);
   const [wizardProgress, setWizardProgress] = useState('');
+  const [steveBusy, setSteveBusy] = useState<null | 'keywords' | 'headlines' | 'descriptions'>(null);
   const [wizardData, setWizardData] = useState({
     name: '',
     channel_type: 'SEARCH',
@@ -3669,24 +3670,34 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                     variant="outline"
                     size="sm"
                     className="gap-1.5 h-7 text-xs"
+                    disabled={steveBusy === 'keywords'}
                     onClick={async () => {
-                      const { data, error } = await callApi('manage-google-keywords', {
-                        body: {
-                          action: 'suggest_keywords',
-                          connection_id: connectionId,
-                          data: { client_id: clientId, user_intent: wizardData.user_intent || undefined, count: 12, match_type_default: 'BROAD' },
-                        },
-                      });
-                      if (error) { toast.error('Steve: ' + error); return; }
-                      const sugg = (data?.options || []).map((o: any) => ({ text: o.text, match_type: o.match_type || 'BROAD' }));
-                      setWizardData(prev => ({
-                        ...prev,
-                        search_keywords: [...prev.search_keywords, ...sugg].slice(0, 50),
-                      }));
-                      toast.success(`${sugg.length} keywords agregadas por Steve`);
+                      setSteveBusy('keywords');
+                      try {
+                        const { data, error } = await callApi('manage-google-keywords', {
+                          body: {
+                            action: 'suggest_keywords',
+                            connection_id: connectionId,
+                            data: { client_id: clientId, user_intent: wizardData.user_intent || undefined, count: 12, match_type_default: 'BROAD' },
+                          },
+                        });
+                        if (error) { toast.error('Steve: ' + error); return; }
+                        const sugg = (data?.options || []).map((o: any) => ({ text: o.text, match_type: o.match_type || 'BROAD' }));
+                        setWizardData(prev => ({
+                          ...prev,
+                          search_keywords: [...prev.search_keywords, ...sugg].slice(0, 50),
+                        }));
+                        toast.success(`${sugg.length} keywords agregadas por Steve`);
+                      } finally {
+                        setSteveBusy(null);
+                      }
                     }}
                   >
-                    <Sparkles className="w-3 h-3" /> Steve sugiere
+                    {steveBusy === 'keywords' ? (
+                      <><Loader2 className="w-3 h-3 animate-spin" /> Steve está generando...</>
+                    ) : (
+                      <><Sparkles className="w-3 h-3" /> Steve sugiere</>
+                    )}
                   </Button>
                 </div>
                 {wizardData.search_keywords.length === 0 && (
@@ -3763,23 +3774,33 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                     variant="outline"
                     size="sm"
                     className="gap-1.5 h-7 text-xs"
+                    disabled={steveBusy === 'headlines'}
                     onClick={async () => {
-                      const { data, error } = await callApi('manage-google-campaign', {
-                        body: {
-                          action: 'suggest_asset_content',
-                          connection_id: connectionId,
-                          data: { client_id: clientId, field_type: 'HEADLINE', count: 10, user_intent: wizardData.user_intent || undefined },
-                        },
-                      });
-                      if (error) { toast.error('Steve: ' + error); return; }
-                      const texts = (data?.options || []).map((o: any) => o.text).filter(Boolean).slice(0, 15);
-                      if (texts.length > 0) {
-                        setWizardData(prev => ({ ...prev, search_rsa_headlines: texts }));
-                        toast.success(`${texts.length} headlines generados`);
+                      setSteveBusy('headlines');
+                      try {
+                        const { data, error } = await callApi('manage-google-campaign', {
+                          body: {
+                            action: 'suggest_asset_content',
+                            connection_id: connectionId,
+                            data: { client_id: clientId, field_type: 'HEADLINE', count: 10, user_intent: wizardData.user_intent || undefined },
+                          },
+                        });
+                        if (error) { toast.error('Steve: ' + error); return; }
+                        const texts = (data?.options || []).map((o: any) => o.text).filter(Boolean).slice(0, 15);
+                        if (texts.length > 0) {
+                          setWizardData(prev => ({ ...prev, search_rsa_headlines: texts }));
+                          toast.success(`${texts.length} headlines generados`);
+                        }
+                      } finally {
+                        setSteveBusy(null);
                       }
                     }}
                   >
-                    <Sparkles className="w-3 h-3" /> Steve genera
+                    {steveBusy === 'headlines' ? (
+                      <><Loader2 className="w-3 h-3 animate-spin" /> Steve está generando...</>
+                    ) : (
+                      <><Sparkles className="w-3 h-3" /> Steve genera</>
+                    )}
                   </Button>
                 </div>
                 {wizardData.search_rsa_headlines.map((h, idx) => (
@@ -3820,23 +3841,33 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                     variant="outline"
                     size="sm"
                     className="gap-1.5 h-7 text-xs"
+                    disabled={steveBusy === 'descriptions'}
                     onClick={async () => {
-                      const { data, error } = await callApi('manage-google-campaign', {
-                        body: {
-                          action: 'suggest_asset_content',
-                          connection_id: connectionId,
-                          data: { client_id: clientId, field_type: 'DESCRIPTION', count: 4, user_intent: wizardData.user_intent || undefined },
-                        },
-                      });
-                      if (error) { toast.error('Steve: ' + error); return; }
-                      const texts = (data?.options || []).map((o: any) => o.text).filter(Boolean).slice(0, 4);
-                      if (texts.length > 0) {
-                        setWizardData(prev => ({ ...prev, search_rsa_descriptions: texts }));
-                        toast.success(`${texts.length} descriptions generados`);
+                      setSteveBusy('descriptions');
+                      try {
+                        const { data, error } = await callApi('manage-google-campaign', {
+                          body: {
+                            action: 'suggest_asset_content',
+                            connection_id: connectionId,
+                            data: { client_id: clientId, field_type: 'DESCRIPTION', count: 4, user_intent: wizardData.user_intent || undefined },
+                          },
+                        });
+                        if (error) { toast.error('Steve: ' + error); return; }
+                        const texts = (data?.options || []).map((o: any) => o.text).filter(Boolean).slice(0, 4);
+                        if (texts.length > 0) {
+                          setWizardData(prev => ({ ...prev, search_rsa_descriptions: texts }));
+                          toast.success(`${texts.length} descriptions generados`);
+                        }
+                      } finally {
+                        setSteveBusy(null);
                       }
                     }}
                   >
-                    <Sparkles className="w-3 h-3" /> Steve genera
+                    {steveBusy === 'descriptions' ? (
+                      <><Loader2 className="w-3 h-3 animate-spin" /> Steve está generando...</>
+                    ) : (
+                      <><Sparkles className="w-3 h-3" /> Steve genera</>
+                    )}
                   </Button>
                 </div>
                 {wizardData.search_rsa_descriptions.map((d, idx) => (
