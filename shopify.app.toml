@@ -1,0 +1,33 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "4db46bda316bb4be6d939e72788de321"
+name = "Steve - AI Marketing Copilot"
+application_url = "https://steve-api-850416724643.us-central1.run.app/api/shopify-install"
+embedded = false
+handle = "steve-ads"
+
+[build]
+
+[webhooks]
+api_version = "2026-04"
+
+  [[webhooks.subscriptions]]
+  uri = "https://steve-api-850416724643.us-central1.run.app/api/shopify-gdpr-webhooks"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_analytics,read_checkouts,read_customers,read_discounts,write_discounts,read_fulfillments,write_inventory,read_inventory,read_orders,read_products,write_products,write_script_tags"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://steve-api-850416724643.us-central1.run.app/api/shopify-oauth-callback"
+]
+
+[pos]
+embedded = false
+
+[app_preferences]
+url = "https://betabgnuevosupa.vercel.app/connect-shopify"
