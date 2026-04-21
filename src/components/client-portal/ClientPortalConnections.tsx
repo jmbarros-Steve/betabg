@@ -167,7 +167,26 @@ export function ClientPortalConnections({ clientId, isAdmin = false }: ClientPor
     setShowMetaPartnerSetup(true);
   };
 
-  const handleConnectShopify = () => {
+  const handleConnectShopify = async () => {
+    // Si el cliente ya tiene shop_domain guardado → redirect directo al OAuth sin pedir input.
+    try {
+      const { data } = await supabase
+        .from('clients')
+        .select('shop_domain')
+        .eq('id', clientId)
+        .maybeSingle();
+      const shop = data?.shop_domain?.trim();
+      if (shop && /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/.test(shop)) {
+        const url = new URL(`${API_BASE}/api/shopify-install`);
+        url.searchParams.set('shop', shop);
+        url.searchParams.set('client_id', clientId);
+        window.location.href = url.toString();
+        return;
+      }
+    } catch (err) {
+      console.warn('[handleConnectShopify] lookup shop_domain failed:', err);
+    }
+    // Fallback: no tenemos shop_domain → abrir dialog para capturarlo.
     setShowShopifyWizard(true);
   };
 
