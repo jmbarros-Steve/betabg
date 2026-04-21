@@ -277,12 +277,13 @@ async function handleCreateShoppingCampaign(
     // NO advertisingChannelSubType para Standard Shopping (v23 deprecó Smart Shopping)
     status: 'PAUSED',
     campaignBudget: `customers/${customerId}/campaignBudgets/-1`,
+    // v23: campaign_priority vive DENTRO de shopping_setting (no top-level).
     shoppingSetting: {
       merchantId: String(merchant_center_id),
+      campaignPriority: Number(campaign_priority || 0),
       ...(feed_label ? { feedLabel: String(feed_label) } : {}),
       ...(enable_local_inventory_ads ? { enableLocalInventoryAds: true } : {}),
     },
-    campaignPriority: Number(campaign_priority || 0),
     networkSettings: {
       targetGoogleSearch: true,
       targetSearchNetwork: false,

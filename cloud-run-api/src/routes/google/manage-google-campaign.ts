@@ -943,8 +943,22 @@ async function handleCreateCampaign(
     if (!merchant_center_id) {
       return { body: { error: 'merchant_center_id is required for Shopping campaigns' }, status: 400 };
     }
+    // v23: Shopping NO acepta MAXIMIZE_CONVERSIONS como bid strategy.
+    // Válidos: MANUAL_CPC, MAXIMIZE_CLICKS (→ TargetSpend), MAXIMIZE_CONVERSION_VALUE, TARGET_SPEND.
+    if (bidStrategy === 'MAXIMIZE_CONVERSIONS' || bidStrategy === 'TARGET_CPA' || bidStrategy === 'TARGET_ROAS') {
+      return { body: { error: `Bid strategy "${bidStrategy}" no es válida para Shopping. Usá: MAXIMIZE_CLICKS, MAXIMIZE_CONVERSION_VALUE o MANUAL_CPC.` }, status: 400 };
+    }
+    // MAXIMIZE_CONVERSION_VALUE usa el sub-message ya seteado arriba.
+    // MAXIMIZE_CLICKS se expresa como TargetSpend en v23 — convertir si acaso.
+    if (bidStrategy === 'MAXIMIZE_CLICKS') {
+      delete campaignCreate.biddingStrategyType;
+      delete campaignCreate.maximizeConversions;
+      campaignCreate.targetSpend = {};
+    }
+    // v23: campaign_priority vive DENTRO de shopping_setting (no top-level).
     campaignCreate.shoppingSetting = {
       merchantId: String(merchant_center_id),
+      campaignPriority: Number(data.campaign_priority || 0),
     };
   }
 

@@ -590,6 +590,8 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     }>,
     // User intent — prompt libre que alimenta a TODOS los AI recomendadores
     user_intent: '' as string,
+    // Intent específico de productos — refina las sugerencias del catalog picker
+    product_intent: '' as string,
     // Productos del Merchant Center seleccionados (SKUs) — solo los que van a la campaña
     selected_product_ids: [] as string[],
     // Search wizard (Tier 1 extensión)
@@ -1372,7 +1374,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       search_themes: '', url_expansion_opt_out: false,
       merchant_center_id: '',
       acquisition_mode: '', audience_signals: [],
-      user_intent: '', selected_product_ids: [],
+      user_intent: '', product_intent: '', selected_product_ids: [],
       search_keywords: [], search_rsa_headlines: ['', '', ''],
       search_rsa_descriptions: ['', ''], search_rsa_final_url: '',
     });
@@ -1603,6 +1605,8 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     }
     setProductAiLoading(true);
     try {
+      // Preferir product_intent (específico) sobre user_intent (general) para la selección
+      const effectiveIntent = (wizardData.product_intent || '').trim() || wizardData.user_intent;
       const { data, error } = await callApi('manage-google-campaign', {
         body: {
           action: 'get_recommendations',
@@ -1610,7 +1614,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
           client_id: clientId,
           data: {
             recommendation_type: 'product_selection',
-            user_intent: wizardData.user_intent,
+            user_intent: effectiveIntent,
             products: catalogProducts.map(p => ({
               id: p.id,
               title: p.title,
@@ -1808,6 +1812,14 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPmax, isShoppingWizard, connectionId]);
+
+  // Auto-switch bid strategy a válida si el user entra a SHOPPING con una incompatible
+  useEffect(() => {
+    if (isShoppingWizard && ['MAXIMIZE_CONVERSIONS', 'TARGET_CPA', 'TARGET_ROAS'].includes(wizardData.bid_strategy)) {
+      setWizardData(prev => ({ ...prev, bid_strategy: 'MAXIMIZE_CONVERSION_VALUE' }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isShoppingWizard]);
   // PMAX: 6 steps · SEARCH: 5 (Basic/Config/Ad Group/Keywords/RSA) · otros: 3
   const totalSteps = isPmax ? 6 : isSearchWizard ? 5 : 3;
 
@@ -2726,9 +2738,15 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                   value={wizardData.bid_strategy}
                   onChange={e => setWizardData(prev => ({ ...prev, bid_strategy: e.target.value }))}
                 >
-                  {bidStrategies.map(bs => (
-                    <option key={bs.value} value={bs.value}>{bs.label}</option>
-                  ))}
+                  {bidStrategies
+                    .filter(bs => {
+                      // Shopping no acepta MAXIMIZE_CONVERSIONS standard
+                      if (isShoppingWizard && bs.value === 'MAXIMIZE_CONVERSIONS') return false;
+                      return true;
+                    })
+                    .map(bs => (
+                      <option key={bs.value} value={bs.value}>{bs.label}</option>
+                    ))}
                 </select>
                 <SteveRecommendation
                   connectionId={connectionId}
@@ -2863,9 +2881,26 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                 </div>
               )}
 
-              {/* Product selection panel — solo si hay MC linkeado */}
-              {isPmax && wizardData.merchant_center_id && (
-                <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
+              {/* Product selection panel — PMAX o SHOPPING con MC linkeado */}
+              {(isPmax || isShoppingWizard) && wizardData.merchant_center_id && (
+                <div className="space-y-3 rounded-md border border-border bg-muted/20 p-3">
+                  {/* Steve intent: qué productos promover */}
+                  <div className="space-y-1 rounded-md border border-primary/30 bg-primary/5 p-2.5">
+                    <Label className="text-xs flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-primary" />
+                      ¿En qué productos te enfocás?
+                    </Label>
+                    <Textarea
+                      rows={2}
+                      value={wizardData.product_intent}
+                      onChange={e => setWizardData(prev => ({ ...prev, product_intent: e.target.value }))}
+                      placeholder="Ej: solo comida natural para perros adultos · productos premium de pollo · liquidación de stock de invierno"
+                      className="text-xs"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Steve usa esto + el catálogo para recomendarte solo los productos relevantes. Si lo dejás vacío, usa el intent general.
+                    </p>
+                  </div>
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <Label>Productos del catálogo <span className="text-muted-foreground font-normal">({catalogProducts.length} cargados, {wizardData.selected_product_ids.length} seleccionados)</span></Label>
                     <div className="flex gap-1.5">
