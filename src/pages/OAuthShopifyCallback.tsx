@@ -53,6 +53,22 @@ export default function OAuthShopifyCallback() {
         if (tokenHash && email) {
           setUserEmail(email);
           setStatus('loading');
+
+          // Si YA hay sesión Steve activa, NO reemplazarla con la del magic link
+          // (evita que el user logueado sea lanzado a otra cuenta nueva).
+          const { data: { session: currentSession } } = await supabase.auth.getSession();
+          if (currentSession) {
+            console.log('[ShopifyCallback] Sesión activa detectada — mantenemos user', currentSession.user.email);
+            toast({
+              title: '¡Tienda conectada!',
+              description: `${store} se conectó. Sigues logueado como ${currentSession.user.email}.`,
+            });
+            setStatus('success');
+            setTimeout(() => navigate('/portal?tab=connections', { replace: true }), 1500);
+            return;
+          }
+
+          // No hay sesión activa (merchant nuevo o reviewer) — usar el magic link para loguear.
           try {
             const { error: verifyError } = await supabase.auth.verifyOtp({
               type: 'magiclink',
@@ -60,7 +76,6 @@ export default function OAuthShopifyCallback() {
             });
             if (verifyError) {
               console.error('[ShopifyCallback] verifyOtp failed:', verifyError);
-              // Fallback: send the merchant to /auth to recover by email
               toast({
                 title: '¡Tienda conectada!',
                 description: 'Inicia sesión para acceder a tu portal.',
