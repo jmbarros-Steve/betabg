@@ -534,6 +534,8 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     channel_type: 'SEARCH',
     daily_budget: '',
     bid_strategy: 'MAXIMIZE_CONVERSIONS',
+    target_cpa_micros: '',
+    target_roas: '',
     target_google_search: true,
     target_search_network: true,
     target_content_network: false,
@@ -1191,6 +1193,16 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
       ad_group_name: wizardData.ad_group_name || 'Ad Group 1',
     };
 
+    // Bid strategy targets
+    const cpaVal = Number(wizardData.target_cpa_micros);
+    if (cpaVal > 0 && (wizardData.bid_strategy === 'TARGET_CPA' || wizardData.bid_strategy === 'MAXIMIZE_CONVERSIONS')) {
+      payload.target_cpa_micros = Math.round(cpaVal * 1_000_000);
+    }
+    const roasVal = Number(wizardData.target_roas);
+    if (roasVal > 0 && (wizardData.bid_strategy === 'TARGET_ROAS' || wizardData.bid_strategy === 'MAXIMIZE_CONVERSION_VALUE')) {
+      payload.target_roas = roasVal;
+    }
+
     // Location targeting
     if (wizardData.locations.length > 0) {
       payload.locations = wizardData.locations;
@@ -1347,6 +1359,7 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
     setWizardStep(1);
     setWizardData({
       name: '', channel_type: 'SEARCH', daily_budget: '', bid_strategy: 'MAXIMIZE_CONVERSIONS',
+      target_cpa_micros: '', target_roas: '',
       target_google_search: true, target_search_network: true, target_content_network: false,
       start_date: '', end_date: '', ad_group_name: 'Ad Group 1', ad_group_cpc_bid_micros: '',
       final_urls: '', business_name: '', headlines: [''], long_headlines: [''], descriptions: [''],
@@ -2716,6 +2729,40 @@ export default function GoogleCampaignManager({ connectionId, clientId }: Google
                   onApply={handleApplyRecommendation}
                 />
               </div>
+
+              {(wizardData.bid_strategy === 'TARGET_CPA' || wizardData.bid_strategy === 'MAXIMIZE_CONVERSIONS') && (
+                <div className="space-y-1">
+                  <Label className="text-xs">
+                    CPA objetivo (USD) {wizardData.bid_strategy === 'MAXIMIZE_CONVERSIONS' ? '— opcional' : '— obligatorio'}
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Ej: 15.00"
+                    value={wizardData.target_cpa_micros ?? ''}
+                    onChange={e => setWizardData(prev => ({ ...prev, target_cpa_micros: e.target.value }))}
+                  />
+                  <p className="text-[11px] text-muted-foreground">Costo por conversión que estás dispuesto a pagar.</p>
+                </div>
+              )}
+
+              {(wizardData.bid_strategy === 'TARGET_ROAS' || wizardData.bid_strategy === 'MAXIMIZE_CONVERSION_VALUE') && (
+                <div className="space-y-1">
+                  <Label className="text-xs">
+                    ROAS objetivo {wizardData.bid_strategy === 'MAXIMIZE_CONVERSION_VALUE' ? '— opcional' : '— obligatorio'}
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    placeholder="Ej: 4 (= 400%)"
+                    value={wizardData.target_roas ?? ''}
+                    onChange={e => setWizardData(prev => ({ ...prev, target_roas: e.target.value }))}
+                  />
+                  <p className="text-[11px] text-muted-foreground">Retorno objetivo: 4 = $4 de ingresos por cada $1 gastado.</p>
+                </div>
+              )}
               </div>
 
               {wizardData.channel_type === 'SEARCH' && (
