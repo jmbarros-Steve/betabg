@@ -988,7 +988,9 @@ async function handleCreateCampaign(
   }
 
   // Language targeting criteria
-  if (languages?.length) {
+  // v23: Shopping campaigns NO aceptan language criterion — el idioma viene del feed_label
+  // del Merchant Center. Skip si channel=SHOPPING.
+  if (languages?.length && channelType !== 'SHOPPING') {
     for (const langId of languages) {
       mutateOps.push({
         campaignCriterionOperation: {
