@@ -621,6 +621,28 @@ export async function shopifyOauthCallback(c: Context) {
       });
     }
 
+    // Generate a one-time magic-link token_hash so the frontend can auto-login
+    // the merchant after the OAuth completes. This replaces the insecure temp_pass flow.
+    let tokenHash: string | null = null;
+    let authEmail = shopEmail;
+    try {
+      const { data: userData } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (userData?.user?.email) {
+        authEmail = userData.user.email;
+        const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'magiclink',
+          email: authEmail,
+        });
+        if (!linkError) {
+          tokenHash = (linkData as any)?.properties?.hashed_token ?? null;
+        } else {
+          console.warn('[shopify-oauth] generateLink error:', linkError);
+        }
+      }
+    } catch (err) {
+      console.warn('[shopify-oauth] Magic link generation failed (non-blocking):', err);
+    }
+
     // Redirect back to frontend
     if (isDirectRedirect) {
       const redirectUrl = new URL(`${frontendUrl}/oauth/shopify/callback`);
@@ -629,13 +651,14 @@ export async function shopifyOauthCallback(c: Context) {
       redirectUrl.searchParams.set('shop', normalizedShopDomain);
 
       if (isNewUser) {
-        redirectUrl.searchParams.set('email', shopEmail);
         redirectUrl.searchParams.set('new_user', 'true');
-        // SECURITY: Do NOT pass temp_pass in URL (visible in browser history, server logs, referrer headers).
-        // The user will use "forgot password" / password reset flow to set their own password.
+      }
+      if (tokenHash) {
+        redirectUrl.searchParams.set('token_hash', tokenHash);
+        redirectUrl.searchParams.set('email', authEmail);
       }
 
-      console.log('Standalone redirect to:', redirectUrl.toString());
+      console.log('Standalone redirect to:', redirectUrl.toString().replace(/token_hash=[^&]+/, 'token_hash=***'));
       return c.redirect(redirectUrl.toString(), 302);
     }
 
@@ -643,8 +666,8 @@ export async function shopifyOauthCallback(c: Context) {
       success: true,
       store_name: storeName,
       is_new_user: isNewUser,
-      user_email: shopEmail,
-      // SECURITY: temp_password removed from response — user should use password reset flow
+      user_email: authEmail,
+      token_hash: tokenHash,
     });
 
   } catch (error: any) {
@@ -669,12 +692,12 @@ async function registerWebhooks(c: Context, shopDomain: string, accessToken: str
   const fulfillmentWebhookUrl = `${requestOrigin}/api/shopify-fulfillment-webhooks`;
   const emailFlowWebhookUrl = `${requestOrigin}/api/email-flow-webhooks`;
 
+  // NOTE: GDPR compliance webhooks (customers/data_request, customers/redact,
+  // shop/redact) are NOT registered here — they're configured in Partner Dashboard
+  // → Compliance webhooks. Attempting to register them via API returns 404.
   const webhooksToRegister = [
-    // GDPR + app lifecycle (mandatory for Shopify App Store compliance)
+    // App lifecycle
     { topic: 'app/uninstalled', address: gdprWebhookUrl },
-    { topic: 'customers/data_request', address: gdprWebhookUrl },
-    { topic: 'customers/redact', address: gdprWebhookUrl },
-    { topic: 'shop/redact', address: gdprWebhookUrl },
     // Fulfillment
     { topic: 'orders/fulfilled', address: fulfillmentWebhookUrl },
     { topic: 'orders/partially_fulfilled', address: fulfillmentWebhookUrl },

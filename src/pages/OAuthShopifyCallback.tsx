@@ -47,25 +47,54 @@ export default function OAuthShopifyCallback() {
 
       if (success === 'true' && store) {
         setStoreName(store);
-        
-        // New user - auto-login with credentials
+
+        // Preferred flow: backend generated a magic-link token_hash — auto-login server-safe.
+        const tokenHash = searchParams.get('token_hash');
+        if (tokenHash && email) {
+          setUserEmail(email);
+          setStatus('loading');
+          try {
+            const { error: verifyError } = await supabase.auth.verifyOtp({
+              type: 'magiclink',
+              token_hash: tokenHash,
+            });
+            if (verifyError) {
+              console.error('[ShopifyCallback] verifyOtp failed:', verifyError);
+              // Fallback: send the merchant to /auth to recover by email
+              toast({
+                title: '¡Tienda conectada!',
+                description: 'Inicia sesión para acceder a tu portal.',
+              });
+              navigate(`/auth?redirect=/portal?tab=connections&store=${encodeURIComponent(store)}`);
+              return;
+            }
+            toast({
+              title: '¡Tienda conectada!',
+              description: `${store} está lista. Redirigiendo al portal...`,
+            });
+            setStatus('success');
+            setTimeout(() => navigate('/portal?tab=connections', { replace: true }), 1200);
+          } catch (e: any) {
+            console.error('[ShopifyCallback] verifyOtp exception:', e);
+            navigate(`/auth?redirect=/portal?tab=connections&store=${encodeURIComponent(store)}`);
+          }
+          return;
+        }
+
+        // Legacy temp_pass flow — kept for backward compat while any old redirect is in-flight.
         if (isNewUser && tempPass && email) {
           setUserEmail(email);
           setStatus('loading');
-          
           try {
             const { error: signInError } = await supabase.auth.signInWithPassword({
               email,
               password: tempPass,
             });
-
             if (signInError) {
               setCredentials({ email, password: tempPass });
               setStatus('new_user');
               return;
             }
-
-            // Shopify callback
             setStatus('tour');
           } catch (e: any) {
             setCredentials({ email, password: tempPass });
@@ -73,10 +102,9 @@ export default function OAuthShopifyCallback() {
           }
           return;
         }
-        
-        // Existing user - check if they have an active session
+
+        // Existing user with active session
         const { data: { session } } = await supabase.auth.getSession();
-        
         if (session) {
           setStatus('success');
           toast({
