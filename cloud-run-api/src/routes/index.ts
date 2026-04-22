@@ -27,6 +27,7 @@ import { steveEmailContent } from './ai/steve-email-content.js';
 import { steveSendTimeAnalysis } from './ai/steve-send-time-analysis.js';
 import { steveBulkAnalyze } from './ai/steve-bulk-analyze.js';
 import { generateMetaCopy } from './ai/generate-meta-copy.js';
+import { steveConfigureCampaign } from './ai/steve-configure-campaign.js';
 import { generateImage } from './ai/generate-image.js';
 import { generateVideo } from './ai/generate-video.js';
 import { generateVideoScript } from './ai/generate-video-script.js';
@@ -329,6 +330,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/steve-send-time-analysis', authMiddleware, steveSendTimeAnalysis);
   app.post('/api/steve-bulk-analyze', authMiddleware, steveBulkAnalyze);
   app.post('/api/generate-meta-copy', authMiddleware, generateMetaCopy);
+  app.post('/api/steve-configure-campaign', authMiddleware, steveConfigureCampaign);
   app.post('/api/generate-image', authMiddleware, generateImage);
   app.post('/api/generate-video', authMiddleware, generateVideo);
   app.post('/api/generate-video-script', authMiddleware, generateVideoScript);

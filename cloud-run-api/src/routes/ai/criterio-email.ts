@@ -179,8 +179,12 @@ function evaluateEmailRule(
 interface CriterioResult {
   can_publish: boolean;
   score: number;
-  reason: string;
-  failed_rules: Array<{ rule_id: string; severity: string; details: string }>;
+  reason?: string;
+  failed_rules: Array<{ rule_id: string; severity: string; details: string; actual_value?: string }>;
+  warnings?: Array<{ rule_id: string; severity: string; details: string; actual_value?: string }>;
+  skipped?: number;
+  blockers?: number;
+  failed?: number;
   [key: string]: any;
 }
 

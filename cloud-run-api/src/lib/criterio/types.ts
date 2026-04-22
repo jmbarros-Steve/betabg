@@ -20,6 +20,20 @@ export interface EvalResult {
   actual: string;
   expected: string;
   details: string | null;
+  /**
+   * If true, the rule was NOT applicable to this payload (e.g. the field
+   * didn't exist). The evaluator short-circuits and the caller should treat
+   * this result as a no-op: it doesn't count toward score, totals, blockers
+   * or persist to criterio_results.
+   */
+  skipped?: boolean;
+}
+
+export interface CriterioIssue {
+  rule_id: string;
+  severity: string;
+  details: string;
+  actual_value?: string;
 }
 
 export interface CriterioResponse {
@@ -29,8 +43,10 @@ export interface CriterioResponse {
   failed: number;
   blockers: number;
   can_publish: boolean;
-  reason: string;
-  failed_rules: Array<{ rule_id: string; severity: string; details: string }>;
+  reason?: string;
+  failed_rules: Array<CriterioIssue>;
+  warnings?: Array<CriterioIssue>;
+  skipped?: number;
 }
 
 // --- Check config types by check_type ---
@@ -43,15 +59,18 @@ export interface LengthConfig {
 
 export interface ForbiddenConfig {
   field: string;
-  words: string[];       // list of forbidden words/phrases
+  words?: string[];      // list of forbidden words/phrases
+  patterns?: string[];   // optional regex patterns (word_boundary-aware)
   source?: string;       // optional: "brand_research.competitors" to load dynamically
   case_sensitive?: boolean;
+  word_boundary?: boolean; // if true, match whole-words with \b (avoids "q" inside "que")
 }
 
 export interface RequiredConfig {
   field: string;         // field that must exist and not be empty
   contains?: string;     // optional substring that must be present
   source?: string;       // optional: dynamic source for the value to check
+  description?: string;
 }
 
 export interface RegexConfig {
@@ -59,6 +78,8 @@ export interface RegexConfig {
   pattern: string;       // regex pattern string
   flags?: string;        // regex flags (e.g. "gi")
   should_match?: boolean; // true = must match, false = must NOT match (default: false)
+  max_pct?: number;      // quota mode: max % of matches vs total letters (e.g. 30)
+  max_matches?: number;  // quota mode: max absolute number of matches (e.g. 2)
 }
 
 export interface RangeConfig {
@@ -66,6 +87,8 @@ export interface RangeConfig {
   min?: number;
   max?: number;
   unit?: string;         // display unit (e.g. "CLP", "px", "%")
+  skip_if_zero?: boolean; // true = treat 0 as "not using this dimension" (broad targeting)
+  description?: string;  // optional human-readable description
 }
 
 export interface ComparisonConfig {
@@ -94,10 +117,10 @@ export interface AiConfig {
 }
 
 export interface ExternalConfig {
-  service: 'languagetool' | 'vision' | 'ffmpeg';
+  service: 'languagetool' | 'spelling' | 'vision' | 'ffmpeg';
   field: string;
   language?: string;
-  check?: string;        // what to check (e.g. "blur", "logo", "text_overlay")
+  check?: string;        // what to check (e.g. "blur", "logo", "text_overlay", "no_watermark")
 }
 
 export interface ManualReviewConfig {

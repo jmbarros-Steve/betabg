@@ -56,6 +56,8 @@ interface ReviewStepProps {
   advFeatText?: boolean;
   advFeatOverlays?: boolean;
   advFeatTranslate?: boolean;
+  // Advantage+ Shopping Campaign (auto-detected by Meta based on 3 automation levers)
+  isAdvantageSales?: boolean;
   // Actions
   onPublish?: () => void;
   onSaveDraft?: () => void;
@@ -95,6 +97,7 @@ export default function ReviewStep(props: ReviewStepProps) {
     pageLabel, igLabel, publishToInstagram,
     urlTagsPreview,
     advFeatVisual, advFeatText, advFeatOverlays, advFeatTranslate,
+    isAdvantageSales,
     onPublish, onSaveDraft, submitting, savingDraft,
   } = props;
 
@@ -160,6 +163,22 @@ export default function ReviewStep(props: ReviewStepProps) {
               ))}
             </ul>
             <p className="text-[11px] text-red-600 ml-7">Vuelve al paso correspondiente para completar los datos faltantes.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Advantage+ Shopping badge */}
+      {isAdvantageSales && (
+        <Card className="border-green-400 bg-green-50">
+          <CardContent className="py-3 flex items-start gap-3">
+            <Rocket className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+            <div className="text-sm text-green-900">
+              <span className="font-semibold">Advantage+ Shopping Campaign</span>
+              <p className="text-xs text-green-800/80 mt-0.5">
+                Meta va a automatizar audiencia, ubicaciones y optimización de pujas.
+                Confirmaremos en la response el estado <code className="text-[10px] bg-white/50 px-1 rounded">ADVANTAGE_PLUS_SALES</code> devuelto por Meta.
+              </p>
+            </div>
           </CardContent>
         </Card>
       )}

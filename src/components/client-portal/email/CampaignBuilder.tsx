@@ -128,7 +128,13 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
 
   // CRITERIO pre-flight check
   const [criterioLoading, setCriterioLoading] = useState(false);
-  const [criterioResult, setCriterioResult] = useState<{ can_publish: boolean; score: number; reason: string; failed_rules: Array<{ rule_id: string; severity: string; details: string }> } | null>(null);
+  const [criterioResult, setCriterioResult] = useState<{
+    can_publish: boolean;
+    score: number;
+    reason?: string;
+    failed_rules: Array<{ rule_id: string; severity: string; details: string }>;
+    warnings?: Array<{ rule_id: string; severity: string; details: string }>;
+  } | null>(null);
 
   // Send/Schedule unified dialog
   const [showSendDialog, setShowSendDialog] = useState(false);
@@ -1591,10 +1597,21 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                     <p className="font-medium text-red-900">CRITERIO rechazó el email</p>
                   </div>
                   <p className="text-sm text-red-700">Score: {criterioResult.score}% — {criterioResult.reason}</p>
-                  {criterioResult.failed_rules?.length > 0 && (
+                  {/* Render BLOQUEAR (red) + Rechazar/Advertencia (yellow) side-by-side. */}
+                  {((criterioResult.failed_rules?.length ?? 0) + (criterioResult.warnings?.length ?? 0)) > 0 && (
                     <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                      {criterioResult.failed_rules.map((rule, i) => (
-                        <div key={i} className="text-xs p-2 rounded bg-red-100 text-red-800">
+                      {[
+                        ...(criterioResult.failed_rules || []),
+                        ...(criterioResult.warnings || []),
+                      ].map((rule, i) => (
+                        <div
+                          key={`${rule.rule_id}-${i}`}
+                          className={
+                            rule.severity === 'BLOQUEAR'
+                              ? 'text-xs p-2 rounded bg-red-100 text-red-800'
+                              : 'text-xs p-2 rounded bg-yellow-100 text-yellow-900'
+                          }
+                        >
                           <span className="font-medium">[{rule.severity}]</span> {rule.rule_id} — {rule.details || 'Regla no cumplida'}
                         </div>
                       ))}
@@ -1604,12 +1621,28 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
               )}
 
               {criterioResult && criterioResult.can_publish && (
-                <div className="flex items-center gap-3 p-4 rounded-lg bg-green-50 border border-green-200">
-                  <MailCheck className="w-5 h-5 text-green-600" />
-                  <div>
-                    <p className="font-medium text-green-900">CRITERIO aprobado — Score {criterioResult.score}%</p>
-                    <p className="text-sm text-green-700">El email cumple las reglas de calidad</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 p-4 rounded-lg bg-green-50 border border-green-200">
+                    <MailCheck className="w-5 h-5 text-green-600" />
+                    <div>
+                      <p className="font-medium text-green-900">CRITERIO aprobado — Score {criterioResult.score}%</p>
+                      <p className="text-sm text-green-700">El email cumple las reglas de calidad</p>
+                    </div>
                   </div>
+                  {/* Even when can_publish=true, Rechazar/Advertencia warnings should be surfaced in yellow. */}
+                  {(criterioResult.warnings?.length ?? 0) > 0 && (
+                    <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200 space-y-1.5 max-h-40 overflow-y-auto">
+                      <p className="text-xs font-medium text-yellow-900 mb-1">Advertencias (no bloquean publicación):</p>
+                      {criterioResult.warnings!.map((rule, i) => (
+                        <div
+                          key={`${rule.rule_id}-${i}`}
+                          className="text-xs p-2 rounded bg-yellow-100 text-yellow-900"
+                        >
+                          <span className="font-medium">[{rule.severity}]</span> {rule.rule_id} — {rule.details || 'Regla con observación'}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

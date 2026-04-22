@@ -6,6 +6,7 @@ import { checkRateLimit } from '../../lib/rate-limiter.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.js';
 import { buildCriterioRulesBlock } from '../../lib/criterio/rules-context.js';
+import { getCopyConstraintsBlock } from '../../lib/criterio-constraints.js';
 
 /**
  * Sanitize an object's string values recursively for prompt injection.
@@ -718,8 +719,16 @@ export async function generateMetaCopy(c: Context) {
     return c.json({ error: 'Missing client_id or clientId' }, 400);
   }
 
-  // Fetch CRITERIO quality rules once for all code paths
-  const criterioBlock = await buildCriterioRulesBlock(supabase, ['META COPY', 'META CREATIVE']);
+  // Fetch CRITERIO quality rules once for all code paths.
+  // Two complementary sources:
+  //  - criterioBlock: shared formatter that surfaces check_rule strings from META COPY + META CREATIVE.
+  //  - copyConstraintsBlock: Meta-Copy-specific translator of check_config → natural-language
+  //    restrictions so Claude passes CRITERIO on first shot (no self-rejection).
+  // Both are cheap (copyConstraintsBlock is in-memory cached with 5min TTL) and fail-open.
+  const [criterioBlock, copyConstraintsBlock] = await Promise.all([
+    buildCriterioRulesBlock(supabase, ['META COPY', 'META CREATIVE']),
+    getCopyConstraintsBlock(supabase),
+  ]);
 
   // Rate limit: 10 requests/minute per client
   const rl = checkRateLimit(resolvedClientId, 'generate-meta-copy');
@@ -829,7 +838,7 @@ export async function generateMetaCopy(c: Context) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
-        system: 'Eres un copywriter experto en Meta Ads. REGLA ABSOLUTA: TODO el copy que generes DEBE ser 100% específico para la marca y productos REALES del cliente. NUNCA inventes productos, industrias, o temas que no estén en los datos del cliente. Si no hay suficiente contexto, usa SOLO los datos que sí tienes. VARIEDAD: Usa un ángulo creativo DIFERENTE para cada headline (urgencia, social proof, transformación, curiosidad, oferta, behind-the-scenes, problema-solución, aspiracional, datos, storytelling, controversia, comparación).' + criterioBlock,
+        system: copyConstraintsBlock + 'Eres un copywriter experto en Meta Ads. REGLA ABSOLUTA: TODO el copy que generes DEBE ser 100% específico para la marca y productos REALES del cliente. NUNCA inventes productos, industrias, o temas que no estén en los datos del cliente. Si no hay suficiente contexto, usa SOLO los datos que sí tienes. VARIEDAD: Usa un ángulo creativo DIFERENTE para cada headline (urgencia, social proof, transformación, curiosidad, oferta, behind-the-scenes, problema-solución, aspiracional, datos, storytelling, controversia, comparación).' + criterioBlock,
         messages: [{ role: 'user', content: `${clientSection}${brandSection}${briefSection}${shopifySection}${bugSection}${knowledgeSection}${antiRepetition}${creativeCtx}\nREGLA ANTI-ALUCINACIÓN: SOLO escribe sobre los productos y marca listados arriba. NO inventes productos ni temas que no aparezcan en los datos del cliente.\n\n${sanitizeForPrompt(body.instruction, 2000)}` }],
       }),
     });
@@ -949,7 +958,7 @@ Responde SOLO en JSON válido sin markdown ni backticks:
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 4096,
-        system: 'Eres un copywriter experto. REGLA ABSOLUTA: NUNCA inventes productos, marcas o temas. SOLO usa los datos reales del cliente que aparecen en el prompt. NO hables de temas que no correspondan al negocio real del cliente. VARIEDAD: Cada variación DEBE usar un ángulo creativo DISTINTO (urgencia, social proof, transformación, curiosidad, problema-solución, aspiracional, datos, storytelling, etc.).' + criterioBlock,
+        system: copyConstraintsBlock + 'Eres un copywriter experto. REGLA ABSOLUTA: NUNCA inventes productos, marcas o temas. SOLO usa los datos reales del cliente que aparecen en el prompt. NO hables de temas que no correspondan al negocio real del cliente. VARIEDAD: Cada variación DEBE usar un ángulo creativo DISTINTO (urgencia, social proof, transformación, curiosidad, problema-solución, aspiracional, datos, storytelling, etc.).' + criterioBlock,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -1053,7 +1062,7 @@ ${adType === 'static'
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 4096,
-        system: 'Eres un director creativo experto en producción visual para Meta Ads. REGLA ABSOLUTA: Basa el brief visual SOLO en los productos y marca REALES del cliente. NUNCA inventes productos ni temas genéricos.' + criterioBlock,
+        system: copyConstraintsBlock + 'Eres un director creativo experto en producción visual para Meta Ads. REGLA ABSOLUTA: Basa el brief visual SOLO en los productos y marca REALES del cliente. NUNCA inventes productos ni temas genéricos.' + criterioBlock,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -1282,7 +1291,7 @@ ${shopifyProductsLegacy.map((p: any) => `- ${p.title} ($${Number(p.price).toLoca
   // D.4: Inject creative performance history
   const creativeCtxLegacy = await getCreativeContext(clientId, 'meta');
 
-  const systemPrompt = bugSectionLegacy + knowledgeSectionLegacy + criterioBlock + antiRepetitionLegacy + creativeCtxLegacy + clientHeaderLegacy + buildSystemPrompt(briefContext, adType, funnelStage, customPrompt, shopifyContextLegacy, brandContextLegacy);
+  const systemPrompt = copyConstraintsBlock + bugSectionLegacy + knowledgeSectionLegacy + criterioBlock + antiRepetitionLegacy + creativeCtxLegacy + clientHeaderLegacy + buildSystemPrompt(briefContext, adType, funnelStage, customPrompt, shopifyContextLegacy, brandContextLegacy);
 
   console.log('Generating copy with Sabri + Russell methodology for:', { clientId, adType, funnelStage });
 

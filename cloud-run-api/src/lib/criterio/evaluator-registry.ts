@@ -15,8 +15,8 @@ import { evaluateDbLookup } from './evaluators-data.js';
 import { evaluateAi } from './evaluators-ai.js';
 import { evaluateExternal } from './evaluators-external.js';
 
-type SyncEvaluator = (config: CheckConfig, data: Record<string, any>, context?: EvalContext) => EvalResult;
-type AsyncEvaluator = (config: CheckConfig, data: Record<string, any>, context?: EvalContext) => Promise<EvalResult>;
+type SyncEvaluator = (config: CheckConfig, data: Record<string, any>, context?: EvalContext, rule?: CriterioRule) => EvalResult;
+type AsyncEvaluator = (config: CheckConfig, data: Record<string, any>, context?: EvalContext, rule?: CriterioRule) => Promise<EvalResult>;
 type Evaluator = SyncEvaluator | AsyncEvaluator;
 
 // Registry: check_type → evaluator function
@@ -60,11 +60,14 @@ export async function evaluateWithRegistry(
   const config = rule.check_config || {};
 
   try {
-    const result = await evaluator(config, data, context);
+    const result = await evaluator(config, data, context, rule);
     return result;
   } catch (error) {
     console.error(`[criterio-registry] Error evaluating rule ${rule.id} (${checkType}):`, error);
-    // Fail-open: if evaluation crashes, pass the rule
+    // Registry-level catch: unexpected evaluator crash. AI + external
+    // evaluators already handle their own failures fail-closed; this path is
+    // for sync evaluators that throw unexpectedly. Keep fail-open here to
+    // avoid blocking on simple-evaluator bugs, but log loudly.
     return {
       passed: true,
       actual: `Eval error (fail-open): ${error instanceof Error ? error.message : 'Unknown'}`,

@@ -71,7 +71,7 @@ interface CampaignCreateWizardProps {
 }
 
 type StartLevel = 'campaign' | 'adset' | 'ad';
-type BudgetType = 'ABO' | 'CBO';
+type BudgetType = 'ABO' | 'CBO' | 'ADVANTAGE';
 type Objective = 'CONVERSIONS' | 'TRAFFIC' | 'AWARENESS' | 'ENGAGEMENT' | 'CATALOG';
 type WizardStep = 'select-campaign' | 'select-adset' | 'campaign-config' | 'adset-config' | 'funnel-stage' | 'angle-select' | 'creative-focus' | 'ad-creative' | 'review';
 type AdSetFormat = 'flexible' | 'carousel' | 'single';
@@ -327,22 +327,28 @@ function CampaignForm({
       </div>
 
       <div>
-        <Label>Tipo de presupuesto</Label>
-        <div className="flex gap-3 mt-2">
+        <Label>Tipo de campaña</Label>
+        <div className="grid grid-cols-3 gap-3 mt-2">
           {([
-            { key: 'ABO' as BudgetType, label: 'ABO', name: 'Tú controlas', desc: 'Tú defines cuánto gasta cada audiencia. Ideal para probar.' },
-            { key: 'CBO' as BudgetType, label: 'CBO', name: 'Meta controla', desc: 'Meta distribuye el dinero donde mejor funcione. Ideal para escalar.' },
+            { key: 'ABO' as BudgetType, label: 'ABO', name: 'Tú controlas', desc: 'Tú defines cuánto gasta cada audiencia. Ideal para probar.', badgeClass: 'bg-[#1E3A7B]/15 text-[#162D5F] border-[#2A4F9E]/30' },
+            { key: 'CBO' as BudgetType, label: 'CBO', name: 'Meta controla budget', desc: 'Meta distribuye el dinero donde mejor funcione. Ideal para escalar.', badgeClass: 'bg-purple-500/15 text-purple-700 border-purple-500/30' },
+            { key: 'ADVANTAGE' as BudgetType, label: 'Advantage+', name: 'Meta lo automatiza todo', desc: 'Ecommerce: Meta elige audiencia, placements y optimiza. Recomendado con catálogo.', badgeClass: 'bg-green-500/15 text-green-700 border-green-500/30' },
           ]).map((t) => (
             <button
               key={t.key}
               onClick={() => setBudgetType(t.key)}
-              className={`flex-1 flex flex-col items-center gap-1.5 p-4 rounded-lg border transition-all ${
+              className={`relative flex flex-col items-center gap-1.5 p-4 rounded-lg border transition-all ${
                 budgetType === t.key ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
               }`}
             >
-              <Badge className={`text-xs font-bold ${t.key === 'CBO' ? 'bg-purple-500/15 text-purple-700 border-purple-500/30' : 'bg-[#1E3A7B]/15 text-[#162D5F] border-[#2A4F9E]/30'}`}><JargonTooltip term={t.key} /></Badge>
-              <span className={`text-xs font-semibold ${budgetType === t.key ? 'text-foreground' : 'text-muted-foreground'}`}>{t.name}</span>
-              <span className="text-[10px] text-muted-foreground text-center">{t.desc}</span>
+              {t.key === 'ADVANTAGE' && (
+                <Sparkles className="absolute top-2 right-2 w-3.5 h-3.5 text-green-600" />
+              )}
+              <Badge className={`text-xs font-bold ${t.badgeClass}`}>
+                {t.key === 'ADVANTAGE' ? 'Advantage+' : <JargonTooltip term={t.key} />}
+              </Badge>
+              <span className={`text-xs font-semibold text-center ${budgetType === t.key ? 'text-foreground' : 'text-muted-foreground'}`}>{t.name}</span>
+              <span className="text-[10px] text-muted-foreground text-center leading-tight">{t.desc}</span>
             </button>
           ))}
         </div>
@@ -365,7 +371,7 @@ function CampaignForm({
         </Select>
       </div>
 
-      {budgetType === 'CBO' && (
+      {(budgetType === 'CBO' || budgetType === 'ADVANTAGE') && (
         <div>
           <Label>Presupuesto diario (CLP)</Label>
           <div className="flex gap-2 mt-1">
@@ -381,7 +387,9 @@ function CampaignForm({
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Meta distribuirá este presupuesto entre los Ad Sets automáticamente.
+            {budgetType === 'ADVANTAGE'
+              ? 'Meta distribuirá este presupuesto donde mejor funcione (placements, audiencia, creativos).'
+              : 'Meta distribuirá este presupuesto entre los Ad Sets automáticamente.'}
             {cboRecommended > 0 && (
               <span className="block mt-0.5">Recomendado: CPA ${cboCpa.toLocaleString('es-CL')} × 10 ÷ 7 = <span className="font-medium text-primary">${cboRecommended.toLocaleString('es-CL')}/día</span></span>
             )}
@@ -389,6 +397,22 @@ function CampaignForm({
               <span className="block mt-0.5">Fórmula Tichner: CPA × 10 ÷ 7 = presupuesto/día.</span>
             )}
           </p>
+        </div>
+      )}
+
+      {budgetType === 'ADVANTAGE' && (
+        <div className="space-y-2 p-3 rounded-lg border border-green-300 bg-green-50/50">
+          <div className="flex items-start gap-2">
+            <Sparkles className="w-4 h-4 text-green-600 mt-0.5" />
+            <div className="text-xs text-green-900">
+              <p className="font-semibold">Modo Advantage+ Shopping activado</p>
+              <p className="text-green-800/80 mt-1">
+                Steve configurará automáticamente: objetivo <strong>Conversiones</strong>,
+                audiencia <strong>amplia</strong> (Meta elige), todas las <strong>ubicaciones</strong>,
+                y estrategia de puja <strong>Lowest Cost</strong>. Solo configuras país, edad y género.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1101,6 +1125,19 @@ function AdSetForm({
             />
           </div>
         )}
+
+        {/* ── Live reach estimate ── */}
+        <ReachEstimateBanner
+          connectionId={connectionId}
+          targetCountries={targetCountries}
+          targetAgeMin={targetAgeMin}
+          targetAgeMax={targetAgeMax}
+          targetGender={targetGender}
+          targetInterests={targetInterests}
+          targetExcludeInterests={targetExcludeInterests}
+          targetLocations={targetLocations}
+          selectedAudienceIds={selectedAudienceIds}
+        />
       </div>
 
       {/* ═══════════ Pixel + Conversion event ═══════════ */}
@@ -2093,6 +2130,316 @@ function PreviewPanel({
 }
 
 // ---------------------------------------------------------------------------
+// Steve Quick Config — pre-wizard shortcut that prefills every step with AI
+// Goal: campaign creation in ≤2 min instead of 15-30 min.
+// ---------------------------------------------------------------------------
+
+interface SteveConfig {
+  campaign?: { name?: string; objective?: Objective; budgetType?: BudgetType; dailyBudget?: number };
+  adset?: { name?: string; audienceDesc?: string; targetCountries?: string[]; targetAgeMin?: number; targetAgeMax?: number; targetGender?: number; suggestedInterests?: Array<{ name: string; reason: string }> };
+  funnel?: { stage?: 'tofu' | 'mofu' | 'bofu'; angle?: string };
+  creative?: { headlines?: string[]; primaryTexts?: string[]; descriptions?: string[]; cta?: string; focusType?: 'product' | 'broad' };
+  reasoning?: string;
+}
+
+function SteveQuickConfig({
+  clientId,
+  onConfigured,
+}: {
+  clientId: string;
+  onConfigured: (config: SteveConfig) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [userHint, setUserHint] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState<ShopifyProduct[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string>('');
+  const [loadingProducts, setLoadingProducts] = useState(false);
+
+  useEffect(() => {
+    if (!expanded || products.length > 0) return;
+    setLoadingProducts(true);
+    (async () => {
+      try {
+        const { data: conn } = await supabase
+          .from('platform_connections')
+          .select('id')
+          .eq('client_id', clientId)
+          .eq('platform', 'shopify')
+          .limit(1)
+          .maybeSingle();
+        if (!conn?.id) return;
+        const { data } = await callApi('fetch-shopify-products', { body: { connectionId: conn.id } });
+        if (data?.products) {
+          setProducts(data.products.slice(0, 12).map((p: any) => ({
+            id: p.id,
+            title: p.title,
+            image: p.variants?.[0]?.image_url || p.image || '',
+            price: Number(p.variants?.[0]?.price) || 0,
+            product_type: p.product_type || '',
+          })));
+        }
+      } catch { /* no shopify */ }
+      finally { setLoadingProducts(false); }
+    })();
+  }, [expanded, clientId]);
+
+  const handleConfigure = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await callApi('steve-configure-campaign', {
+        body: {
+          client_id: clientId,
+          product_id: selectedProductId || undefined,
+          user_hint: userHint.trim() || undefined,
+        },
+      });
+      if (error) throw new Error(typeof error === 'string' ? error : 'Error configurando');
+      if (data?.config) onConfigured(data.config);
+    } catch (err: any) {
+      toast.error(err?.message || 'Steve no pudo configurar la campaña');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!expanded) {
+    return (
+      <button
+        onClick={() => setExpanded(true)}
+        className="w-full flex items-center gap-3 p-4 rounded-lg border-2 border-dashed border-primary/40 bg-gradient-to-r from-primary/5 to-green-500/5 hover:border-primary/70 hover:from-primary/10 hover:to-green-500/10 transition-all text-left"
+      >
+        <div className="shrink-0 w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center">
+          <Sparkles className="w-5 h-5 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground">🤖 Que Steve arme toda la campaña por ti</p>
+          <p className="text-xs text-muted-foreground mt-0.5">2 minutos en lugar de 15. Elige un producto y Steve configura objetivo, audiencia, ángulo, copy y creatividades.</p>
+        </div>
+        <ChevronRight className="w-5 h-5 text-primary shrink-0" />
+      </button>
+    );
+  }
+
+  return (
+    <Card className="border-primary/40 bg-gradient-to-br from-primary/5 to-green-500/5">
+      <CardContent className="py-5 space-y-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            <h3 className="font-semibold text-sm">Steve configura tu campaña</h3>
+          </div>
+          <button onClick={() => setExpanded(false)} className="text-xs text-muted-foreground hover:text-foreground">
+            Prefiero hacerlo manual
+          </button>
+        </div>
+
+        <div>
+          <Label className="text-xs">¿Qué producto promocionas? (opcional)</Label>
+          {loadingProducts ? (
+            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="w-3 h-3 animate-spin" /> Cargando productos…
+            </div>
+          ) : products.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 max-h-[180px] overflow-y-auto">
+              <button
+                type="button"
+                onClick={() => setSelectedProductId('')}
+                className={`flex flex-col items-center gap-1 p-2 rounded-md border text-xs transition-all ${
+                  selectedProductId === '' ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40'
+                }`}
+              >
+                <Palette className="w-5 h-5 text-muted-foreground" />
+                <span>Marca general</span>
+              </button>
+              {products.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedProductId(p.id)}
+                  className={`flex flex-col items-center gap-1 p-1.5 rounded-md border text-[10px] transition-all ${
+                    selectedProductId === p.id ? 'border-primary bg-primary/10 ring-1 ring-primary/30' : 'border-border hover:border-primary/40'
+                  }`}
+                >
+                  {p.image ? (
+                    <img src={p.image} alt={p.title} className="w-12 h-12 rounded object-cover" />
+                  ) : (
+                    <div className="w-12 h-12 rounded bg-muted flex items-center justify-center"><ShoppingBag className="w-4 h-4 text-muted-foreground" /></div>
+                  )}
+                  <span className="truncate max-w-full leading-tight">{p.title.slice(0, 30)}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground mt-1">No hay productos Shopify conectados. Steve armará campaña de marca.</p>
+          )}
+        </div>
+
+        <div>
+          <Label className="text-xs">¿Algo específico que Steve deba saber? (opcional)</Label>
+          <Textarea
+            value={userHint}
+            onChange={(e) => setUserHint(e.target.value)}
+            placeholder="Ej: 'Liquidación temporada', 'Lanzamiento nueva colección', 'Retargeting a los que abandonaron carrito'..."
+            className="mt-1 text-xs min-h-[60px]"
+          />
+        </div>
+
+        <Button
+          onClick={handleConfigure}
+          disabled={loading}
+          className="w-full bg-primary hover:bg-primary/90"
+          size="lg"
+        >
+          {loading ? (
+            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Steve está pensando…</>
+          ) : (
+            <><Sparkles className="w-4 h-4 mr-2" /> Configurar campaña con IA</>
+          )}
+        </Button>
+        <p className="text-[10px] text-muted-foreground text-center">
+          Steve llena objetivo, audiencia, ángulo y copy. Después revisas paso a paso y ajustas lo que quieras.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Reach estimate banner — live audience size from Meta /delivery_estimate
+// ---------------------------------------------------------------------------
+
+function ReachEstimateBanner({
+  connectionId,
+  targetCountries,
+  targetAgeMin, targetAgeMax, targetGender,
+  targetInterests, targetExcludeInterests,
+  targetLocations,
+  selectedAudienceIds,
+}: {
+  connectionId?: string;
+  targetCountries: string[];
+  targetAgeMin: number; targetAgeMax: number; targetGender: 0 | 1 | 2;
+  targetInterests: Array<{ id: string; name: string }>;
+  targetExcludeInterests: Array<{ id: string; name: string }>;
+  targetLocations: Array<{ key: string; name: string; type: string; country_name: string }>;
+  selectedAudienceIds: string[];
+}) {
+  const [loading, setLoading] = useState(false);
+  const [estimate, setEstimate] = useState<{ lower: number; upper: number; ready: boolean } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!connectionId) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const geo: Record<string, any> = {
+          countries: targetCountries.length > 0 ? targetCountries : ['CL'],
+        };
+        if (targetLocations.length > 0) {
+          const cities = targetLocations.filter(l => l.type === 'city').map(l => ({ key: l.key }));
+          const regions = targetLocations.filter(l => l.type === 'region').map(l => ({ key: l.key }));
+          if (cities.length > 0) geo.cities = cities;
+          if (regions.length > 0) geo.regions = regions;
+        }
+
+        const targeting: Record<string, any> = {
+          geo_locations: geo,
+          age_min: targetAgeMin,
+          age_max: targetAgeMax,
+        };
+        if (targetGender > 0) targeting.genders = [targetGender];
+        if (selectedAudienceIds.length > 0) {
+          targeting.custom_audiences = selectedAudienceIds.map(id => ({ id }));
+        }
+        if (targetInterests.length > 0) {
+          targeting.flexible_spec = [{
+            interests: targetInterests.map(i => ({ id: i.id, name: i.name })),
+          }];
+        }
+        if (targetExcludeInterests.length > 0) {
+          targeting.exclusions = {
+            interests: targetExcludeInterests.map(i => ({ id: i.id, name: i.name })),
+          };
+        }
+
+        const { data, error: err } = await callApi('manage-meta-campaign', {
+          body: {
+            action: 'reach_estimate',
+            connection_id: connectionId,
+            data: { targeting, optimization_goal: 'OFFSITE_CONVERSIONS' },
+          },
+        });
+        if (err) throw new Error(typeof err === 'string' ? err : 'Estimate failed');
+        setEstimate({
+          lower: data?.users_lower_bound || 0,
+          upper: data?.users_upper_bound || 0,
+          ready: !!data?.estimate_ready,
+        });
+      } catch (e: any) {
+        setError(e.message || 'No se pudo estimar');
+      } finally {
+        setLoading(false);
+      }
+    }, 500); // debounce 500ms
+
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [
+    connectionId,
+    targetCountries.join(','),
+    targetAgeMin, targetAgeMax, targetGender,
+    targetInterests.length,
+    targetExcludeInterests.length,
+    targetLocations.length,
+    selectedAudienceIds.length,
+  ]);
+
+  const fmt = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${Math.round(n / 1_000)}K` : String(n);
+
+  // Color coding: under 10K = red (too narrow), 10K-100K = yellow (niche), >100K = green (healthy).
+  const sizeLevel = estimate && estimate.upper >= 100_000 ? 'healthy' : estimate && estimate.upper >= 10_000 ? 'niche' : estimate ? 'narrow' : 'unknown';
+  const bg = sizeLevel === 'healthy' ? 'bg-green-50 border-green-300' : sizeLevel === 'niche' ? 'bg-yellow-50 border-yellow-300' : sizeLevel === 'narrow' ? 'bg-red-50 border-red-300' : 'bg-muted/30 border-border';
+  const txt = sizeLevel === 'healthy' ? 'text-green-800' : sizeLevel === 'niche' ? 'text-yellow-800' : sizeLevel === 'narrow' ? 'text-red-800' : 'text-muted-foreground';
+
+  return (
+    <div className={`mt-2 p-3 rounded-lg border ${bg}`}>
+      <div className="flex items-center gap-2">
+        <Users className={`w-4 h-4 ${txt}`} />
+        <Label className={`text-xs font-semibold ${txt}`}>Tamaño de audiencia estimado</Label>
+      </div>
+      {loading && (
+        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+          <Loader2 className="w-3 h-3 animate-spin" /> Calculando…
+        </p>
+      )}
+      {!loading && error && (
+        <p className="text-xs text-red-600 mt-1">{error}</p>
+      )}
+      {!loading && !error && estimate && (
+        <>
+          <p className={`text-lg font-bold mt-1 ${txt}`}>
+            {fmt(estimate.lower)} – {fmt(estimate.upper)} <span className="text-xs font-normal">personas</span>
+          </p>
+          {sizeLevel === 'narrow' && (
+            <p className="text-[11px] text-red-700 mt-1">⚠️ Audiencia muy chica (&lt;10K). Meta no va a poder optimizar. Amplía el targeting.</p>
+          )}
+          {sizeLevel === 'niche' && (
+            <p className="text-[11px] text-yellow-700 mt-1">Audiencia nicho. OK para retargeting, evita para prospecting.</p>
+          )}
+          {sizeLevel === 'healthy' && (
+            <p className="text-[11px] text-green-700 mt-1">✓ Tamaño saludable para que Meta optimice la entrega.</p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page + Instagram picker (step ad-creative)
 // ---------------------------------------------------------------------------
 
@@ -2520,6 +2867,19 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     if (ctxIgAccountId && !selectedInstagramUserId) setSelectedInstagramUserId(ctxIgAccountId);
   }, [ctxPageId, ctxIgAccountId]);
 
+  // Advantage+ Shopping Campaign: Meta auto-detects the mode when the 3 automation
+  // levers are all enabled (bid strategy, audience, placements). We enforce those
+  // defaults by clearing targeting/placement overrides when the user picks ADVANTAGE.
+  // Docs: developers.facebook.com/docs/marketing-api/advantage-campaigns/
+  useEffect(() => {
+    if (budgetType !== 'ADVANTAGE') return;
+    if (objective !== 'CONVERSIONS') setObjective('CONVERSIONS');
+    if (placementsMode !== 'advantage') setPlacementsMode('advantage');
+    if (selectedAudienceIds.length > 0) setSelectedAudienceIds([]);
+    if (targetInterests.length > 0) setTargetInterests([]);
+    if (targetExcludeInterests.length > 0) setTargetExcludeInterests([]);
+  }, [budgetType]);
+
   // Auto-generate campaign name: [Marca]-[OBJ]-[Audiencia]-[MesAño]
   // Audience detection order:
   //   1) custom/lookalike/saved audience selected in step 2 → LAL / RTG / CUSTOM / SAVED
@@ -2653,7 +3013,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     const nextStep = steps[stepIndex + 1]?.key;
     if (nextStep === 'review') {
       // Check for issues that require going back to a previous step
-      const hasBudget = budgetType === 'CBO' ? !!campBudget : !!adsetBudget;
+      // ABO uses adset-level budget; CBO and ADVANTAGE both use campaign-level budget.
+      const hasBudget = budgetType === 'ABO' ? !!adsetBudget : !!campBudget;
       const hasAudience = audienceDesc.trim() || selectedAudienceIds.length > 0;
       // Audience is OPTIONAL — broad targeting if empty
       if (!hasBudget && !existingAdsetId) {
@@ -2940,7 +3301,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           producto: campName?.split(' - ')[0] || 'Sin definir',
           metodologia: adSetFormat === 'flexible' ? 'DCT 3:2:2 (Charles Tichener)' : adSetFormat,
           plan_accion: {
-            tipo_campana: budgetType === 'ABO' ? 'ABO Testing' : 'CBO Escalamiento',
+            tipo_campana: budgetType === 'ABO' ? 'ABO Testing' : budgetType === 'ADVANTAGE' ? 'Advantage+ Shopping' : 'CBO Escalamiento',
             presupuesto_diario: adsetBudget || campBudget || '10000',
             duracion: '7 días sin tocar',
             regla_kill: 'Pausar si gasta 2x CPA sin conversión',
@@ -3033,11 +3394,17 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         creativeFeatures.image_text_translation = 'OPT_IN';
       }
 
+      const isAdvantage = budgetType === 'ADVANTAGE';
+
       const submitData: Record<string, any> = {
         name,
         objective: objMap[objective],
         status: 'PAUSED',
         billing_event: 'IMPRESSIONS',
+        // Advantage+ Shopping: Meta auto-detects this mode when the 3 automation
+        // levers are all ON (bid, audience, placements). We set the flag so the
+        // backend can validate the request shape and log the resulting advantage_state.
+        is_advantage_sales: isAdvantage,
         optimization_goal: ({
           TRAFFIC: 'LINK_CLICKS',
           CONVERSIONS: 'OFFSITE_CONVERSIONS',
@@ -3066,6 +3433,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         url_tags: urlTags || undefined,
         // Advantage+ Creative features
         creative_features: creativeFeatures,
+        // Angle + funnel stage — fed to CRITERIO R-008 (ángulo no repetido)
+        // and to creative_history tracking so future campaigns can learn from variety.
+        angle: selectedAngle || undefined,
+        funnel_stage: funnelStage || undefined,
       };
 
       // Use existing entities if selected
@@ -3084,9 +3455,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       // Budget + targeting (required by Meta for new ad sets)
       if (!existingAdsetId) {
         // CLP has no cents — Meta expects smallest currency unit (1 CLP = 1)
-        const budget = budgetType === 'CBO'
-          ? Number(campBudget)
-          : Number(adsetBudget);
+        // ABO uses adset-level budget; CBO and ADVANTAGE both use campaign-level budget.
+        const budget = budgetType === 'ABO'
+          ? Number(adsetBudget)
+          : Number(campBudget);
         submitData.daily_budget = budget || 10000;
 
         // Build targeting from wizard fields
@@ -3242,13 +3614,49 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         </div>
       </div>
 
-      {/* Pre-wizard: Level selector */}
+      {/* Pre-wizard: Level selector + "Steve configura todo" shortcut */}
       {!wizardStarted && (
-        <LevelSelector
-          level={level}
-          setLevel={setLevel}
-          onStart={() => setWizardStarted(true)}
-        />
+        <>
+          <SteveQuickConfig
+            clientId={clientId}
+            onConfigured={(config) => {
+              // Apply Steve's configuration to all wizard states
+              if (config.campaign) {
+                if (config.campaign.name) { setCampName(config.campaign.name); setCampNameEdited(true); }
+                if (config.campaign.objective) setObjective(config.campaign.objective);
+                if (config.campaign.budgetType) setBudgetType(config.campaign.budgetType);
+                if (config.campaign.dailyBudget) setCampBudget(String(config.campaign.dailyBudget));
+              }
+              if (config.adset) {
+                if (config.adset.name) setAdsetName(config.adset.name);
+                if (config.adset.audienceDesc) setAudienceDesc(config.adset.audienceDesc);
+                if (Array.isArray(config.adset.targetCountries)) setTargetCountries(config.adset.targetCountries);
+                if (typeof config.adset.targetAgeMin === 'number') setTargetAgeMin(config.adset.targetAgeMin);
+                if (typeof config.adset.targetAgeMax === 'number') setTargetAgeMax(config.adset.targetAgeMax);
+                if (typeof config.adset.targetGender === 'number') setTargetGender(config.adset.targetGender as 0 | 1 | 2);
+              }
+              if (config.funnel) {
+                if (config.funnel.stage) setFunnelStage(config.funnel.stage);
+                if (config.funnel.angle) setSelectedAngle(config.funnel.angle);
+              }
+              if (config.creative) {
+                if (Array.isArray(config.creative.headlines)) setHeadlines(config.creative.headlines);
+                if (Array.isArray(config.creative.primaryTexts)) setPrimaryTexts(config.creative.primaryTexts);
+                if (Array.isArray(config.creative.descriptions)) setDescriptions(config.creative.descriptions);
+                if (config.creative.cta) setCta(config.creative.cta);
+                if (config.creative.focusType) setFocusType(config.creative.focusType);
+              }
+              // Start the wizard — user lands on step 1 with everything prefilled.
+              setWizardStarted(true);
+              toast.success('Steve configuró todo. Revisa cada paso y ajusta lo que quieras.');
+            }}
+          />
+          <LevelSelector
+            level={level}
+            setLevel={setLevel}
+            onStart={() => setWizardStarted(true)}
+          />
+        </>
       )}
 
       {/* Wizard: Steps */}
@@ -3633,6 +4041,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                     advFeatText={advFeatText}
                     advFeatOverlays={advFeatOverlays}
                     advFeatTranslate={advFeatTranslate}
+                    isAdvantageSales={budgetType === 'ADVANTAGE'}
                     onPublish={handleSubmit}
                     onSaveDraft={handleSaveDraft}
                     submitting={submitting}

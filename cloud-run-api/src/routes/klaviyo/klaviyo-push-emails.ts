@@ -304,12 +304,22 @@ export async function klaviyoPushEmails(c: Context) {
             failed_rules: criterioResult.failed_rules,
           }, 422);
         }
-        // Collect warnings (passed but with low score or minor issues)
-        if (criterioResult.score < 80 || (criterioResult.failed_rules?.length ?? 0) > 0) {
+        // Collect warnings (passed but with low score or minor issues).
+        // With the new schema, `failed_rules` ONLY contains BLOQUEAR-severity
+        // issues; `warnings` contains Rechazar+Advertencia that don't block
+        // publication but the client should still see. JM: "Klaviyo DEBE
+        // avisarte de cosas problemáticas" → merge both here.
+        const totalIssues =
+          (criterioResult.failed_rules?.length ?? 0) +
+          (criterioResult.warnings?.length ?? 0);
+        if (criterioResult.score < 80 || totalIssues > 0) {
           criterioWarnings.push({
             email_subject: emailToCheck.subject,
             score: criterioResult.score,
-            warnings: criterioResult.failed_rules ?? [],
+            warnings: [
+              ...(criterioResult.failed_rules ?? []),
+              ...(criterioResult.warnings ?? []),
+            ],
           });
         }
       }

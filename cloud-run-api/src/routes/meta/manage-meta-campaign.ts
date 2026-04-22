@@ -9,7 +9,7 @@ import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v23.0';
 
-type Action = 'create' | 'create_322' | 'pause' | 'resume' | 'update' | 'update_budget' | 'duplicate' | 'archive' | 'get_ad_details' | 'update_ad';
+type Action = 'create' | 'create_322' | 'pause' | 'resume' | 'update' | 'update_budget' | 'duplicate' | 'archive' | 'get_ad_details' | 'update_ad' | 'reach_estimate';
 
 interface RequestBody {
   action: Action;
@@ -201,6 +201,11 @@ async function handleCreate(
     url_tags,
     // Advantage+ Creative: { image_touchups: 'OPT_IN', text_optimizations: 'OPT_OUT', ... }
     creative_features,
+    // Advantage+ Shopping Campaign flag. Meta auto-detects ADVANTAGE_PLUS_SALES when
+    // the 3 automation levers are enabled (bid strategy, audience, placements).
+    // We accept the flag to (a) enforce those levers and (b) log the resulting
+    // advantage_state after create. Docs: /docs/marketing-api/advantage-campaigns/
+    is_advantage_sales,
   } = data;
 
   // --- Early validations (before any Meta API calls) ---
@@ -321,9 +326,30 @@ async function handleCreate(
         console.log(`[manage-meta-campaign] Advantage+ forced age_max from ${originalAgeMax} to 65`);
       }
 
+      // Advantage+ Shopping: force the 3 automation levers regardless of what
+      // the caller sent — Meta requires all three to be ON for the campaign to
+      // qualify as ADVANTAGE_PLUS_SALES. Any manual override would degrade the
+      // campaign back to a regular one.
+      if (is_advantage_sales) {
+        targetingObj.targeting_automation = { advantage_audience: 1 };
+        // Strip any placement override — Advantage+ needs auto placements.
+        delete targetingObj.publisher_platforms;
+        delete targetingObj.facebook_positions;
+        delete targetingObj.instagram_positions;
+        delete targetingObj.audience_network_positions;
+        delete targetingObj.messenger_positions;
+        // Strip any custom audience / interest targeting — Advantage+ Sales
+        // only accepts geo_locations + age + gender + advantage_audience.
+        delete targetingObj.custom_audiences;
+        delete targetingObj.excluded_custom_audiences;
+        delete targetingObj.flexible_spec;
+        delete targetingObj.exclusions;
+        console.log('[manage-meta-campaign] Advantage+ Sales: forcing automation levers (placements auto, broad audience)');
+      }
+
       // Placements: Advantage+ Placements = omit these fields (Meta auto-selects).
       // If user provided explicit publisher_platforms, pass them + matching positions.
-      if (Array.isArray(publisher_platforms) && publisher_platforms.length > 0) {
+      if (!is_advantage_sales && Array.isArray(publisher_platforms) && publisher_platforms.length > 0) {
         targetingObj.publisher_platforms = publisher_platforms;
         if (publisher_platforms.includes('facebook') && Array.isArray(facebook_positions) && facebook_positions.length > 0) {
           targetingObj.facebook_positions = facebook_positions;
@@ -1479,6 +1505,61 @@ async function handleUpdateAd(
   };
 }
 
+// --- Reach estimate ---
+// GET /act_{id}/delivery_estimate with a targeting_spec returns estimated
+// audience size (users_lower_bound / users_upper_bound) for the given targeting,
+// without creating anything. We use it in the wizard to show a live "1.2M – 3.4M"
+// number as the user tweaks targeting. Also feeds rule R-036 (min 10K audience)
+// with a real number instead of 0.
+async function handleReachEstimate(
+  accountId: string,
+  accessToken: string,
+  data: Record<string, any>,
+): Promise<{ body: any; status: number }> {
+  const {
+    targeting,
+    optimization_goal = 'OFFSITE_CONVERSIONS',
+    currency = 'CLP',
+  } = data;
+
+  if (!targeting) {
+    return { body: { error: 'Missing targeting spec' }, status: 400 };
+  }
+
+  const targetingStr = typeof targeting === 'string' ? targeting : JSON.stringify(targeting);
+
+  // delivery_estimate is the modern endpoint; reachestimate is legacy but still
+  // works. Use delivery_estimate so we also get daily_outcomes_curve when budget
+  // is present.
+  const result = await metaApiRequest(
+    `act_${accountId}/delivery_estimate`,
+    accessToken,
+    'GET',
+    {
+      targeting_spec: targetingStr,
+      optimization_goal,
+      currency,
+    },
+  );
+
+  if (!result.ok) {
+    return { body: { error: 'Reach estimate failed', details: result.error }, status: 502 };
+  }
+
+  // Meta returns an array with one object inside data[]
+  const estimate = result.data?.data?.[0] || {};
+  return {
+    body: {
+      success: true,
+      estimate_ready: !!estimate.estimate_ready,
+      users_lower_bound: estimate.estimate_mau_lower_bound || estimate.estimate_dau || 0,
+      users_upper_bound: estimate.estimate_mau_upper_bound || estimate.estimate_dau || 0,
+      daily_outcomes_curve: estimate.daily_outcomes_curve || null,
+    },
+    status: 200,
+  };
+}
+
 // --- Main handler ---
 
 export async function manageMetaCampaign(c: Context) {
@@ -1510,7 +1591,7 @@ export async function manageMetaCampaign(c: Context) {
       return c.json({ error: 'Missing required field: connection_id' }, 400);
     }
 
-    const validActions: Action[] = ['create', 'create_322', 'pause', 'resume', 'update', 'update_budget', 'duplicate', 'archive', 'get_ad_details', 'update_ad'];
+    const validActions: Action[] = ['create', 'create_322', 'pause', 'resume', 'update', 'update_budget', 'duplicate', 'archive', 'get_ad_details', 'update_ad', 'reach_estimate'];
     if (!validActions.includes(action)) {
       return c.json({ error: `Invalid action: ${action}. Valid actions: ${validActions.join(', ')}` }, 400);
     }
@@ -1598,15 +1679,47 @@ export async function manageMetaCampaign(c: Context) {
     // CRITERIO pre-flight check: evaluate campaign data before creating in Meta
     if ((action === 'create' || action === 'create_322') && data) {
       try {
+        // Normalize the targeting payload so CRITERIO rules can read it.
+        // The wizard sends targeting in Graph API shape (geo_locations.countries,
+        // flexible_spec.interests, etc.) but CRITERIO rules were authored against
+        // a flat shape (targeting.countries, targeting.interests). Without this
+        // mapping, rules like R-034 "País Chile" and R-039 "Idioma español" fail
+        // even when the data is present. This is the Felipe W2 ↔ Isidora W6
+        // contract alignment identified in the 22/04/2026 rejection audit.
+        const rawTargeting = data.targeting
+          ? (typeof data.targeting === 'string' ? JSON.parse(data.targeting) : data.targeting)
+          : {};
+        const normalizedTargeting: Record<string, any> = {
+          ...rawTargeting,
+          countries: rawTargeting.countries
+            || rawTargeting.geo_locations?.countries
+            || [],
+          cities: rawTargeting.cities
+            || rawTargeting.geo_locations?.cities
+            || [],
+          // Wizard doesn't expose locales yet — default to Spanish for LATAM markets.
+          locales: rawTargeting.locales || ['es'],
+          // Flatten detailed targeting for the "min 2 intereses" rule.
+          interests: rawTargeting.interests
+            || rawTargeting.flexible_spec?.[0]?.interests
+            || [],
+        };
+
+        // R-023 "Variantes A/B deben diferir >30%" expects variant_a/variant_b
+        // fields; the wizard sends a `texts[]` array with N variants. Map the
+        // first two so the rule can evaluate.
+        const variantA = data.texts?.[0] || data.primary_text || '';
+        const variantB = data.texts?.[1] || '';
+
         const criterioResult = await criterioMeta(
           {
             primary_text: data.primary_text || (data.texts && data.texts[0]) || '',
             headline: data.headline || (data.headlines && data.headlines[0]) || '',
             description: data.description || (data.descriptions && data.descriptions[0]) || '',
-            targeting: data.targeting ? (typeof data.targeting === 'string' ? JSON.parse(data.targeting) : data.targeting) : undefined,
+            targeting: normalizedTargeting,
             daily_budget: data.daily_budget,
             placements: data.placements,
-            angle: data.angle,
+            angle: data.angle || 'unknown',
             theme: data.theme,
             product_ids: data.product_ids,
             creative_width: data.creative_width,
@@ -1618,6 +1731,8 @@ export async function manageMetaCampaign(c: Context) {
             currency: data.currency,
             objective: data.objective,
             monthly_revenue: data.monthly_revenue,
+            variant_a: variantA,
+            variant_b: variantB,
           },
           connection.client_id,
           connection.client_id
@@ -1736,6 +1851,10 @@ export async function manageMetaCampaign(c: Context) {
         result = await handleUpdateAd(accountId, campaign_id!, decryptedToken, data || {}, adPageId);
         break;
       }
+
+      case 'reach_estimate':
+        result = await handleReachEstimate(accountId, decryptedToken, data || {});
+        break;
 
       default:
         result = { body: { error: `Unhandled action: ${action}` }, status: 400 };

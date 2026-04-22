@@ -62,7 +62,11 @@ serve(async (req) => {
 
     const rulesMap = Object.fromEntries((rulesData ?? []).map((r: any) => [r.id, r]))
 
-    const inserts = rawResults.map((r: any) => ({
+    // Skipped results (rule not applicable to this payload) are NOT persisted
+    // to criterio_results to avoid polluting the table with noise.
+    const persistableResults = rawResults.filter((r: any) => !r.skipped)
+
+    const inserts = persistableResults.map((r: any) => ({
       rule_id: r.rule_id,
       shop_id: shop_id ?? null,
       entity_type,
@@ -74,11 +78,13 @@ serve(async (req) => {
       evaluated_by: organ?.toLowerCase() ?? 'unknown',
     }))
 
-    const { error: insertError } = await supabase
-      .from('criterio_results')
-      .insert(inserts)
+    if (inserts.length > 0) {
+      const { error: insertError } = await supabase
+        .from('criterio_results')
+        .insert(inserts)
 
-    if (insertError) throw insertError
+      if (insertError) throw insertError
+    }
 
     // Calcular score ponderado
     let totalWeight = 0
@@ -87,6 +93,10 @@ serve(async (req) => {
     const failedRules: any[] = []
 
     for (const r of rawResults) {
+      // Skipped rules (not applicable to the payload) don't count toward
+      // score, blockers, or failed/warnings — they're a no-op.
+      if (r.skipped) continue
+
       const rule = rulesMap[r.rule_id]
       const w = rule?.weight ?? 1
       totalWeight += w
@@ -104,16 +114,23 @@ serve(async (req) => {
     }
 
     const score = totalWeight > 0 ? Math.round((passedWeight / totalWeight) * 100) : 100
-    const can_publish = blockers === 0 && score >= 60
+    // Solo bloquean las reglas de severity BLOQUEAR. Las de 'Rechazar' y
+    // 'Advertencia' se devuelven como warnings para que el frontend las
+    // muestre al usuario sin impedir la publicación.
+    const can_publish = blockers === 0
+
+    const evaluatedResults = rawResults.filter((r: any) => !r.skipped)
 
     return new Response(JSON.stringify({
       score,
-      total: rawResults.length,
-      passed: rawResults.filter((r: any) => r.passed).length,
+      total: evaluatedResults.length,
+      passed: evaluatedResults.filter((r: any) => r.passed).length,
       failed: failedRules.length,
       blockers,
+      skipped: rawResults.length - evaluatedResults.length,
       can_publish,
-      failed_rules: failedRules,
+      failed_rules: failedRules.filter((r: any) => r.severity === 'BLOQUEAR'),
+      warnings: failedRules.filter((r: any) => r.severity !== 'BLOQUEAR'),
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
