@@ -3199,25 +3199,40 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     }
   }, [adSetFormat, selectedAngle, focusType, selectedProduct, cpaTarget, objective, audienceDesc, funnelStage, clientId]);
 
-  // Auto-generate copy + AI image when entering ad-creative step
+  // Auto-generate copy + AI image when entering ad-creative step.
+  // Copy and images are now independent: if the user pre-filled copy via Steve
+  // Quick Config, we still need to generate the images. Likewise if the user
+  // uploaded images manually, we can still generate copy.
   const autoGenRef = useRef(false);
   useEffect(() => {
-    if (currentStep !== 'ad-creative') return; // Don't reset autoGenRef on leave — preserve generated content
+    if (currentStep !== 'ad-creative') return;
     if (autoGenRef.current) return;
-    // Skip auto-generation if content already exists (user went back and returned)
-    const hasExistingContent = primaryTexts.some((t) => t.trim()) || headlines.some((h) => h.trim()) || images.some(Boolean);
-    if (hasExistingContent) { autoGenRef.current = true; return; }
     autoGenRef.current = true;
 
-    // Auto-generate copy first, then use it to generate a proper image via brief-visual
+    const hasCopy = primaryTexts.some((t) => t.trim()) && headlines.some((h) => h.trim());
+    const hasImages = images.some(Boolean);
+    if (hasCopy && hasImages) return; // Nothing to do — user filled everything manually.
+
     (async () => {
       setAutoGenerating(true);
-      setAutoGenProgress('Generando copies...');
-      // Step 1: Generate copy and get the result directly (don't rely on React state)
-      const copyResult = await handleGenerateCopy();
-      if (!copyResult) { setAutoGenerating(false); setAutoGenProgress(''); return; }
 
-      // Step 2: Generate images using brief-visual pipeline with the copy we just got
+      // Step 1: Generate copy only if missing. Otherwise use whatever is in state.
+      let copyResult: { texts: string[]; headlines: string[]; descriptions: string[] } | null;
+      if (!hasCopy) {
+        setAutoGenProgress('Generando copies...');
+        copyResult = await handleGenerateCopy();
+        if (!copyResult) { setAutoGenerating(false); setAutoGenProgress(''); return; }
+      } else {
+        copyResult = {
+          texts: primaryTexts.filter(Boolean),
+          headlines: headlines.filter(Boolean),
+          descriptions: descriptions.filter(Boolean),
+        };
+      }
+
+      // Step 2: Generate images only if missing.
+      if (hasImages) { setAutoGenerating(false); setAutoGenProgress(''); return; }
+
       setAutoGenProgress('Preparando brief visual...');
       try {
         const angleValue = selectedAngle || 'beneficios';
