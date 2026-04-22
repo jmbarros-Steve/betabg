@@ -2899,7 +2899,17 @@ function AdvancedPreviewButton({
   const [tab, setTab] = useState<'all' | 'facebook' | 'instagram' | 'other'>('all');
   const [error, setError] = useState<string | null>(null);
 
-  const canPreview = !!(connectionId && pageId && imageUrl && primaryText && headline);
+  // Meta /generatepreviews requires `link` in link_data — without it every
+  // placement returns "El campo 'link' es obligatorio". We expose the missing
+  // fields to the UI so the user knows what to complete before opening.
+  const missingFields: string[] = [];
+  if (!connectionId) missingFields.push('conexión Meta activa');
+  if (!pageId) missingFields.push('Página de Facebook');
+  if (!imageUrl) missingFields.push('imagen del anuncio');
+  if (!primaryText) missingFields.push('texto principal');
+  if (!headline) missingFields.push('titular');
+  if (!destinationUrl?.trim()) missingFields.push('URL de destino');
+  const canPreview = missingFields.length === 0;
 
   const loadPreviews = async () => {
     if (!connectionId || !pageId) return;
@@ -2948,12 +2958,18 @@ function AdvancedPreviewButton({
 
   return (
     <>
-      <div className="flex items-center justify-between p-4 rounded-lg border border-primary/30 bg-primary/5">
+      <div className={`flex items-center justify-between p-4 rounded-lg border ${canPreview ? 'border-primary/30 bg-primary/5' : 'border-yellow-300 bg-yellow-50'}`}>
         <div className="flex items-center gap-3">
-          <Maximize2 className="w-5 h-5 text-primary" />
+          <Maximize2 className={`w-5 h-5 ${canPreview ? 'text-primary' : 'text-yellow-600'}`} />
           <div>
             <p className="text-sm font-semibold">Vista previa avanzada</p>
-            <p className="text-[11px] text-muted-foreground">Revisa cómo se verá en las 13 ubicaciones reales de Meta.</p>
+            {canPreview ? (
+              <p className="text-[11px] text-muted-foreground">Revisa cómo se verá en las 13 ubicaciones reales de Meta.</p>
+            ) : (
+              <p className="text-[11px] text-yellow-800">
+                <strong>Completa primero:</strong> {missingFields.join(', ')}.
+              </p>
+            )}
           </div>
         </div>
         <Button
