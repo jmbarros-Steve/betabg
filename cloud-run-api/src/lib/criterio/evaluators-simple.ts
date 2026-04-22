@@ -95,6 +95,24 @@ export function evaluateForbidden(config: ForbiddenConfig, data: Record<string, 
 }
 
 export function evaluateRequired(config: RequiredConfig, data: Record<string, any>): EvalResult {
+  // Conditional rule: only enforce this requirement when another field has a
+  // specific value. Example: R-108 "DPA template limpio" only applies when
+  // creative_type === 'dpa'. For non-DPA creatives, skip entirely.
+  const conditionalField = (config as any).conditional_field;
+  const conditionalValue = (config as any).conditional_value;
+  if (conditionalField && conditionalValue !== undefined) {
+    const actualConditional = getNestedField(data, conditionalField);
+    if (actualConditional !== conditionalValue) {
+      return {
+        passed: true,
+        actual: `Not applicable (${conditionalField}=${actualConditional ?? 'absent'})`,
+        expected: `Only required when ${conditionalField}=${conditionalValue}`,
+        details: null,
+        skipped: true,
+      };
+    }
+  }
+
   const value = getNestedField(data, config.field);
   const exists = value != null && String(value).trim().length > 0;
 

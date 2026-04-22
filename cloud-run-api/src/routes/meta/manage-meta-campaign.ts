@@ -1613,6 +1613,11 @@ async function handleReachEstimate(
 // the iframe HTML that Meta will render in that placement. We loop over all
 // requested formats and return a map { [ad_format]: "<iframe ...>" } so the
 // frontend can build a grid like the Ads Manager "Vista previa avanzada".
+//
+// Important: Meta fetches the `picture` URL from its own servers to render the
+// preview. Supabase Storage occasionally rate-limits the 13 parallel pulls,
+// breaking some placements. We upload the image to /act/adimages first to get
+// an image_hash, which Meta already has on-disk and can render instantly.
 async function handleGeneratePreviews(
   accountId: string,
   accessToken: string,
@@ -1623,7 +1628,30 @@ async function handleGeneratePreviews(
     return { body: { error: 'Missing creative or ad_formats[]' }, status: 400 };
   }
 
-  const creativeStr = typeof creative === 'string' ? creative : JSON.stringify(creative);
+  // Parse creative, upload picture→hash if present, rebuild creative spec.
+  let creativeObj: any;
+  try {
+    creativeObj = typeof creative === 'string' ? JSON.parse(creative) : creative;
+  } catch {
+    return { body: { error: 'Invalid creative JSON' }, status: 400 };
+  }
+
+  const linkData = creativeObj?.object_story_spec?.link_data;
+  if (linkData?.picture && !linkData.image_hash) {
+    try {
+      const upload = await uploadImageFromUrl(accountId, accessToken, linkData.picture);
+      if (upload.ok && upload.hash) {
+        linkData.image_hash = upload.hash;
+        delete linkData.picture;
+      } else {
+        console.warn('[handleGeneratePreviews] image upload failed — falling back to picture URL');
+      }
+    } catch (e: any) {
+      console.warn('[handleGeneratePreviews] image upload threw:', e?.message);
+    }
+  }
+
+  const creativeStr = JSON.stringify(creativeObj);
 
   // Call generatepreviews in parallel for all formats (up to 14). Each call is
   // ~1-2s so serially it'd be 20+ seconds. Parallelism saves the user.
@@ -1803,6 +1831,14 @@ export async function manageMetaCampaign(c: Context) {
         const variantA = data.texts?.[0] || data.primary_text || '';
         const variantB = data.texts?.[1] || '';
 
+        // creative_type drives conditional CRITERIO rules (e.g. R-108 "DPA
+        // template limpio" only applies when creative_type === 'dpa'). Infer
+        // from the payload: catalog campaigns → 'dpa', else use ad_set_format.
+        const isDpaCreative = !!(data.product_catalog_id && data.product_set_id);
+        const creativeType = isDpaCreative
+          ? 'dpa'
+          : (data.ad_set_format === 'flexible' ? 'dct' : data.ad_set_format || 'single');
+
         const criterioResult = await criterioMeta(
           {
             primary_text: data.primary_text || (data.texts && data.texts[0]) || '',
@@ -1814,6 +1850,12 @@ export async function manageMetaCampaign(c: Context) {
             angle: data.angle || 'unknown',
             theme: data.theme,
             product_ids: data.product_ids,
+            creative_type: creativeType,
+            // DPA campaigns have the template validated upstream; if the
+            // catalog + product_set pair is present, the template is valid.
+            dpa_template_valid: isDpaCreative ? true : undefined,
+            product_catalog_id: data.product_catalog_id,
+            product_set_id: data.product_set_id,
             creative_width: data.creative_width,
             creative_height: data.creative_height,
             creative_format: data.creative_format,
