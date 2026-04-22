@@ -1927,11 +1927,22 @@ function AdFormMultiSlot({
                   <Maximize2 className="w-2.5 h-2.5" />
                 </button>
               )}
-              {img && images.length > 1 && (
+              {img && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); const next = images.filter((_, j) => j !== i); setImages(next); if (activeImageSlot >= next.length) setActiveImageSlot(Math.max(0, next.length - 1)); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Clear the slot in place instead of removing it — this
+                    // preserves the DCT 3:2:2 structure (3 images always) and
+                    // lets the user swap any image (generated or uploaded) via
+                    // any source tab (AI, upload, gallery, products, url).
+                    const next = [...images];
+                    next[i] = '';
+                    setImages(next);
+                    setActiveImageSlot(i);
+                  }}
                   className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5"
-                  aria-label="Eliminar imagen"
+                  aria-label="Vaciar slot"
+                  title="Vaciar para cambiar la imagen"
                 >
                   <X className="w-2 h-2" />
                 </button>
