@@ -1654,6 +1654,7 @@ function AdFormMultiSlot({
   destinationUrl, setDestinationUrl,
   generating,
   onGenerateCopy,
+  onAddVariations,
   productContext,
   focusType,
   selectedProduct,
@@ -1669,6 +1670,7 @@ function AdFormMultiSlot({
   destinationUrl: string; setDestinationUrl: (v: string) => void;
   generating: boolean;
   onGenerateCopy: () => void;
+  onAddVariations?: () => Promise<void>;
   productContext?: string;
   focusType: 'product' | 'broad';
   selectedProduct: ShopifyProduct | null;
@@ -1838,10 +1840,17 @@ function AdFormMultiSlot({
           <Badge variant="outline" className="text-xs">
             {adSetFormat === 'flexible' ? 'Flexible (DCT 3:2:2)' : adSetFormat === 'carousel' ? 'Carrusel' : 'Imagen Única'}
           </Badge>
-          <Button variant="outline" size="sm" onClick={onGenerateCopy} disabled={generating}>
-            {generating ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
-            Steve genera copy
-          </Button>
+          <div className="flex gap-1.5">
+            <Button variant="outline" size="sm" onClick={onGenerateCopy} disabled={generating}>
+              {generating ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+              Steve genera copy
+            </Button>
+            {onAddVariations && (primaryTexts.some((t) => t.trim()) || headlines.some((h) => h.trim())) && (
+              <Button variant="outline" size="sm" onClick={onAddVariations} disabled={generating} className="border-primary/30 text-primary">
+                <Plus className="w-3 h-3 mr-1" />+ Variaciones
+              </Button>
+            )}
+          </div>
         </div>
         {adSetFormat === 'flexible' && (
           <div className="flex items-start gap-2 p-2.5 rounded-md bg-[#F0F4FA] dark:bg-[#0A1628]/20 border border-[#B5C8E0] dark:border-[#132448]">
@@ -2582,6 +2591,271 @@ function PageAndInstagramPicker({
 // UTM Builder (step ad-creative)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Destination extras — Display link (caption) + Browser add-on (Click-to-Message)
+// ---------------------------------------------------------------------------
+
+function DestinationExtras({
+  displayLink, setDisplayLink,
+  browserAddon, setBrowserAddon,
+  destinationUrl,
+}: {
+  displayLink: string; setDisplayLink: (v: string) => void;
+  browserAddon: 'none' | 'messenger' | 'instagram' | 'whatsapp';
+  setBrowserAddon: (v: 'none' | 'messenger' | 'instagram' | 'whatsapp') => void;
+  destinationUrl: string;
+}) {
+  // Try to extract the domain from destinationUrl as the default display link.
+  const defaultDomain = (() => {
+    try {
+      if (!destinationUrl) return '';
+      const u = new URL(destinationUrl);
+      return u.hostname.replace(/^www\./, '');
+    } catch { return ''; }
+  })();
+
+  return (
+    <div className="space-y-3 p-4 rounded-lg border border-border/60 bg-muted/10">
+      <div className="flex items-center gap-2">
+        <LinkIcon className="w-4 h-4 text-primary" />
+        <Label className="text-sm font-semibold">Destino — opciones avanzadas</Label>
+      </div>
+
+      {/* Display link (caption) */}
+      <div>
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-medium text-muted-foreground">URL visible (enlace corto)</Label>
+          {!displayLink && defaultDomain && (
+            <button
+              type="button"
+              onClick={() => setDisplayLink(defaultDomain)}
+              className="text-[10px] text-primary hover:underline"
+            >
+              Usar {defaultDomain}
+            </button>
+          )}
+        </div>
+        <Input
+          value={displayLink}
+          onChange={(e) => setDisplayLink(e.target.value)}
+          placeholder={defaultDomain ? `ej: ${defaultDomain}` : 'ej: tienda.com'}
+          className="mt-1 h-9 text-xs"
+        />
+        <p className="text-[10px] text-muted-foreground mt-1">
+          Se muestra debajo del titular en lugar del link completo con UTMs. Meta API field: <code>caption</code>.
+        </p>
+      </div>
+
+      {/* Browser add-on: Click-to-Message apps */}
+      <div>
+        <Label className="text-xs font-medium text-muted-foreground">Complementos del navegador</Label>
+        <p className="text-[10px] text-muted-foreground mb-1.5">Agrega un botón flotante al sitio web para abrir conversación.</p>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setBrowserAddon('none')}
+            className={`flex items-start gap-2 p-2.5 rounded-md border text-left text-xs transition-all ${
+              browserAddon === 'none' ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+            }`}
+          >
+            <X className="w-3.5 h-3.5 mt-0.5 text-muted-foreground" />
+            <div>
+              <p className="font-medium">Ninguno</p>
+              <p className="text-[10px] text-muted-foreground">Usuario va directo al sitio web.</p>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setBrowserAddon('messenger')}
+            className={`flex items-start gap-2 p-2.5 rounded-md border text-left text-xs transition-all ${
+              browserAddon !== 'none' ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+            }`}
+          >
+            <Send className="w-3.5 h-3.5 mt-0.5 text-primary" />
+            <div>
+              <p className="font-medium">Apps de mensajes</p>
+              <p className="text-[10px] text-muted-foreground">Botón Messenger/IG/WhatsApp en el sitio.</p>
+            </div>
+          </button>
+        </div>
+        {browserAddon !== 'none' && (
+          <div className="mt-2 flex gap-1.5">
+            {(['messenger', 'instagram', 'whatsapp'] as const).map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setBrowserAddon(opt)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                  browserAddon === opt ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/30'
+                }`}
+              >
+                {opt === 'messenger' ? 'Messenger' : opt === 'instagram' ? 'Instagram' : 'WhatsApp'}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Advanced preview — opens modal with real iframes per placement from Meta
+// ---------------------------------------------------------------------------
+
+const AD_FORMATS: Array<{ key: string; label: string; group: string }> = [
+  { key: 'MOBILE_FEED_STANDARD', label: 'Feed Facebook', group: 'facebook' },
+  { key: 'DESKTOP_FEED_STANDARD', label: 'Feed Facebook (desktop)', group: 'facebook' },
+  { key: 'FACEBOOK_STORY_MOBILE', label: 'Story Facebook', group: 'facebook' },
+  { key: 'FACEBOOK_REELS_MOBILE', label: 'Reels Facebook', group: 'facebook' },
+  { key: 'MARKETPLACE_MOBILE', label: 'Marketplace', group: 'facebook' },
+  { key: 'RIGHT_COLUMN_STANDARD', label: 'Columna derecha', group: 'facebook' },
+  { key: 'INSTAGRAM_STANDARD', label: 'Feed Instagram', group: 'instagram' },
+  { key: 'INSTAGRAM_STORY', label: 'Story Instagram', group: 'instagram' },
+  { key: 'INSTAGRAM_REELS', label: 'Reels Instagram', group: 'instagram' },
+  { key: 'INSTAGRAM_EXPLORE_CONTEXTUAL', label: 'Explore Instagram', group: 'instagram' },
+  { key: 'INSTAGRAM_PROFILE_FEED', label: 'Feed de perfil', group: 'instagram' },
+  { key: 'AUDIENCE_NETWORK_OUTSTREAM_VIDEO', label: 'Audience Network', group: 'other' },
+  { key: 'MESSENGER_MOBILE_INBOX_MEDIA', label: 'Messenger', group: 'other' },
+];
+
+function AdvancedPreviewButton({
+  connectionId, pageId, igUserId,
+  primaryText, headline, description, imageUrl, cta, destinationUrl, displayLink,
+}: {
+  connectionId?: string;
+  pageId: string | null; igUserId: string | null;
+  primaryText: string; headline: string; description: string;
+  imageUrl: string; cta: string; destinationUrl: string; displayLink: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [previews, setPreviews] = useState<Record<string, string>>({});
+  const [tab, setTab] = useState<'all' | 'facebook' | 'instagram' | 'other'>('all');
+  const [error, setError] = useState<string | null>(null);
+
+  const canPreview = !!(connectionId && pageId && imageUrl && primaryText && headline);
+
+  const loadPreviews = async () => {
+    if (!connectionId || !pageId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const creative = {
+        object_story_spec: {
+          page_id: pageId,
+          ...(igUserId ? { instagram_user_id: igUserId } : {}),
+          link_data: {
+            link: destinationUrl,
+            message: primaryText,
+            name: headline,
+            ...(description ? { description } : {}),
+            ...(displayLink ? { caption: displayLink } : {}),
+            ...(imageUrl ? { picture: imageUrl } : {}),
+            call_to_action: { type: cta, value: { link: destinationUrl } },
+          },
+        },
+      };
+      const { data, error: err } = await callApi('manage-meta-campaign', {
+        body: {
+          action: 'generate_previews',
+          connection_id: connectionId,
+          data: {
+            creative,
+            ad_formats: AD_FORMATS.map(f => f.key),
+          },
+        },
+      });
+      if (err) throw new Error(typeof err === 'string' ? err : 'Preview failed');
+      setPreviews(data?.previews || {});
+    } catch (e: any) {
+      setError(e.message || 'Error al cargar previews');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open && Object.keys(previews).length === 0 && canPreview) loadPreviews();
+  }, [open]);
+
+  const filtered = tab === 'all' ? AD_FORMATS : AD_FORMATS.filter(f => f.group === tab);
+
+  return (
+    <>
+      <div className="flex items-center justify-between p-4 rounded-lg border border-primary/30 bg-primary/5">
+        <div className="flex items-center gap-3">
+          <Maximize2 className="w-5 h-5 text-primary" />
+          <div>
+            <p className="text-sm font-semibold">Vista previa avanzada</p>
+            <p className="text-[11px] text-muted-foreground">Revisa cómo se verá en las 13 ubicaciones reales de Meta.</p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setOpen(true)}
+          disabled={!canPreview}
+          className="border-primary/40"
+        >
+          Abrir
+        </Button>
+      </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <div className="space-y-3">
+            <div>
+              <h3 className="font-bold text-lg">Vista previa en todos los placements</h3>
+              <p className="text-xs text-muted-foreground">Ubicaciones reales de Meta renderizadas como se verán en producción.</p>
+            </div>
+            <div className="flex gap-2 border-b pb-2">
+              {(['all', 'facebook', 'instagram', 'other'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded ${
+                    tab === t ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {t === 'all' ? 'Todos' : t === 'facebook' ? 'Facebook' : t === 'instagram' ? 'Instagram' : 'Otros'}
+                </button>
+              ))}
+            </div>
+            {loading && (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                <span className="ml-3 text-sm text-muted-foreground">Generando previews con Meta…</span>
+              </div>
+            )}
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            {!loading && !error && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {filtered.map(fmt => {
+                  const iframe = previews[fmt.key];
+                  return (
+                    <div key={fmt.key} className="space-y-1">
+                      <p className="text-[11px] font-medium text-muted-foreground">{fmt.label}</p>
+                      <div className="border rounded bg-muted/20 min-h-[320px] flex items-center justify-center overflow-hidden">
+                        {iframe ? (
+                          <div className="w-full h-[320px]" dangerouslySetInnerHTML={{ __html: iframe }} />
+                        ) : (
+                          <p className="text-xs text-muted-foreground">Sin preview</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function UtmBuilder({
   destinationUrl,
   utmSource, setUtmSource,
@@ -2827,6 +3101,18 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [advFeatText, setAdvFeatText] = useState<boolean>(true);       // text_optimizations + text_formatting_optimization
   const [advFeatOverlays, setAdvFeatOverlays] = useState<boolean>(false); // image_templates + add_text_overlay
   const [advFeatTranslate, setAdvFeatTranslate] = useState<boolean>(false); // text_translation + image_text_translation
+
+  // ═══════════ URL visible (caption) + Complementos del navegador ═══════════
+  // Meta Ads Manager equivalents:
+  // - "Usar un enlace visible" → AdCreativeLinkData.caption (shown as display URL)
+  // - "Complementos del navegador" → Click-to-Message via call_to_action.type
+  const [displayLink, setDisplayLink] = useState<string>('');
+  const [browserAddon, setBrowserAddon] = useState<'none' | 'messenger' | 'instagram' | 'whatsapp'>('none');
+
+  // ═══════════ Catálogo Advantage+ vs Subida manual ═══════════
+  // Meta Ads Manager: "Origen del contenido". Only relevant when we have
+  // a catalog connected. Switches the creative path to product template.
+  const [contentSource, setContentSource] = useState<'manual' | 'advantage_catalog'>('manual');
 
   // Reset slot counts when format changes
   useEffect(() => {
@@ -3481,6 +3767,14 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         // and to creative_history tracking so future campaigns can learn from variety.
         angle: selectedAngle || undefined,
         funnel_stage: funnelStage || undefined,
+        // Display link shown under the headline in the ad (AdCreativeLinkData.caption).
+        display_link: displayLink.trim() || undefined,
+        // Browser add-on: Click-to-Message maps to specific call_to_action.type values
+        // on the Meta side. Default 'none' keeps the current CTA chosen by the user.
+        browser_addon: browserAddon !== 'none' ? browserAddon : undefined,
+        // Content source: 'advantage_catalog' uses product catalog template creative,
+        // 'manual' uses the uploaded images/text.
+        content_source: contentSource,
       };
 
       // Use existing entities if selected
@@ -3982,6 +4276,34 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                     destinationUrl={destinationUrl} setDestinationUrl={setDestinationUrl}
                     generating={generatingCopy}
                     onGenerateCopy={handleGenerateCopy}
+                    onAddVariations={async () => {
+                      // Generate 2 more variations and APPEND (not replace) to existing arrays.
+                      // Uses a different instruction so Claude gives genuinely different angles.
+                      const { data, error } = await callApi('generate-meta-copy', {
+                        body: {
+                          client_id: clientId,
+                          instruction: [
+                            `Genera 2 VARIACIONES ADICIONALES de copy para Meta Ads, con enfoques DISTINTOS a:`,
+                            `- Textos existentes: ${primaryTexts.filter(Boolean).join(' / ')}`,
+                            `- Titulares existentes: ${headlines.filter(Boolean).join(' / ')}`,
+                            `Objetivo: ${objective}. Funnel: ${funnelStage}. Ángulo: ${selectedAngle || 'variado'}.`,
+                            `Cada variación debe usar un ángulo creativo diferente (call out, bold statement, review, beneficio directo, pregunta, etc).`,
+                            `Responde SOLO con JSON: {"texts":["t1","t2"],"headlines":["h1","h2"],"descriptions":["d1","d2"]}`,
+                          ].join('\n'),
+                        },
+                      });
+                      if (error) { toast.error(typeof error === 'string' ? error : 'Error'); return; }
+                      try {
+                        const raw = data?.copy || data?.text || '';
+                        const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || '{}');
+                        if (Array.isArray(parsed.texts)) setPrimaryTexts(prev => [...prev.filter(Boolean), ...parsed.texts]);
+                        if (Array.isArray(parsed.headlines)) setHeadlines(prev => [...prev.filter(Boolean), ...parsed.headlines]);
+                        if (Array.isArray(parsed.descriptions)) setDescriptions(prev => [...prev.filter(Boolean), ...parsed.descriptions]);
+                        toast.success(`Steve sumó ${parsed.texts?.length || 0} variaciones más`);
+                      } catch {
+                        toast.error('Steve no devolvió JSON válido');
+                      }
+                    }}
                     productContext={focusType === 'product' && selectedProduct ? `Anuncio para producto "${selectedProduct.title}" (${selectedProduct.product_type || 'general'}). Ángulo: ${selectedAngle || 'general'}. Genera una imagen publicitaria profesional para Meta Ads.` : undefined}
                     focusType={focusType}
                     selectedProduct={selectedProduct}
@@ -4012,6 +4334,12 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   defaultIgName={ctxIgAccountName}
                 />
 
+                <DestinationExtras
+                  displayLink={displayLink} setDisplayLink={setDisplayLink}
+                  browserAddon={browserAddon} setBrowserAddon={setBrowserAddon}
+                  destinationUrl={destinationUrl}
+                />
+
                 <UtmBuilder
                   destinationUrl={destinationUrl}
                   utmSource={utmSource} setUtmSource={setUtmSource}
@@ -4019,6 +4347,19 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   utmCampaign={utmCampaign} setUtmCampaign={setUtmCampaign}
                   utmContent={utmContent} setUtmContent={setUtmContent}
                   utmTerm={utmTerm} setUtmTerm={setUtmTerm}
+                />
+
+                <AdvancedPreviewButton
+                  connectionId={ctxConnectionId}
+                  pageId={selectedPageId || ctxPageId || null}
+                  igUserId={publishToInstagram ? (selectedInstagramUserId || ctxIgAccountId || null) : null}
+                  primaryText={primaryTexts[0] || ''}
+                  headline={headlines[0] || ''}
+                  description={descriptions[0] || ''}
+                  imageUrl={images[0] || ''}
+                  cta={cta}
+                  destinationUrl={destinationUrl}
+                  displayLink={displayLink}
                 />
 
                 <AdvantageCreativeToggles

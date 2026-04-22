@@ -9,7 +9,7 @@ import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v23.0';
 
-type Action = 'create' | 'create_322' | 'pause' | 'resume' | 'update' | 'update_budget' | 'duplicate' | 'archive' | 'get_ad_details' | 'update_ad' | 'reach_estimate';
+type Action = 'create' | 'create_322' | 'pause' | 'resume' | 'update' | 'update_budget' | 'duplicate' | 'archive' | 'get_ad_details' | 'update_ad' | 'reach_estimate' | 'generate_previews';
 
 interface RequestBody {
   action: Action;
@@ -69,6 +69,37 @@ async function metaApiRequest(
   }
 
   return { ok: true, data: responseData };
+}
+
+// Build call_to_action object. When a browser_addon is chosen (Click-to-Message),
+// override the CTA type so Meta renders a chat button that opens the chosen app.
+// Meta maps these to specific CTA types for messaging apps:
+//   messenger  → MESSAGE_PAGE (Messenger) with link to m.me
+//   instagram  → INSTAGRAM_MESSAGE (IG Direct)
+//   whatsapp   → WHATSAPP_MESSAGE (WA Business)
+function buildCallToAction(
+  userCta: string,
+  link: string,
+  browserAddon?: string | null,
+  pageId?: string | null,
+): Record<string, any> {
+  if (!browserAddon || browserAddon === 'none') {
+    return { type: userCta || 'SHOP_NOW', value: { link } };
+  }
+  if (browserAddon === 'messenger') {
+    // MESSAGE_PAGE requires a page link; Meta falls back to m.me/{page}.
+    return {
+      type: 'MESSAGE_PAGE',
+      value: pageId ? { link: `https://m.me/${pageId}` } : { link },
+    };
+  }
+  if (browserAddon === 'instagram') {
+    return { type: 'INSTAGRAM_MESSAGE', value: { link } };
+  }
+  if (browserAddon === 'whatsapp') {
+    return { type: 'WHATSAPP_MESSAGE', value: { link } };
+  }
+  return { type: userCta || 'SHOP_NOW', value: { link } };
 }
 
 // --- Helper: upload image from URL to get image_hash ---
@@ -206,6 +237,12 @@ async function handleCreate(
     // We accept the flag to (a) enforce those levers and (b) log the resulting
     // advantage_state after create. Docs: /docs/marketing-api/advantage-campaigns/
     is_advantage_sales,
+    // Display link (AdCreativeLinkData.caption) — shown under the headline in
+    // place of the full URL with UTMs. Optional, defaults to domain of `link`.
+    display_link,
+    // Browser add-on: 'messenger' | 'instagram' | 'whatsapp' switches the CTA
+    // to Click-to-Message on that platform. 'none' keeps the chosen CTA.
+    browser_addon,
   } = data;
 
   // --- Early validations (before any Meta API calls) ---
@@ -768,14 +805,18 @@ async function handleCreate(
         description: allDescriptions.length > 0 ? allDescriptions[i % allDescriptions.length] : '',
       }));
 
+      const carouselLinkData: Record<string, any> = {
+        link: destUrl,
+        message: allTexts[0] || '',
+        child_attachments: childAttachments,
+        call_to_action: buildCallToAction(cta || 'SHOP_NOW', destUrl, browser_addon, pageId),
+      };
+      if (display_link && typeof display_link === 'string' && display_link.trim()) {
+        carouselLinkData.caption = display_link.trim();
+      }
       const carouselStorySpec: Record<string, any> = {
         page_id: pageId,
-        link_data: {
-          link: destUrl,
-          message: allTexts[0] || '',
-          child_attachments: childAttachments,
-          call_to_action: { type: cta || 'SHOP_NOW', value: { link: destUrl } },
-        },
+        link_data: carouselLinkData,
       };
       if (igUserId) carouselStorySpec.instagram_user_id = igUserId;
 
@@ -833,11 +874,16 @@ async function handleCreate(
           message: allTexts[0] || primary_text || '',
           name: allHeadlines[0] || headline || '',
           image_hash: upload.hash,
-          call_to_action: { type: cta, value: { link: destUrl } },
+          call_to_action: buildCallToAction(cta, destUrl, browser_addon, pageId),
         };
 
         if (allDescriptions[0] || description) {
           linkData.description = allDescriptions[0] || description;
+        }
+
+        // Display link (caption) — shown as readable URL under the title.
+        if (display_link && typeof display_link === 'string' && display_link.trim()) {
+          linkData.caption = display_link.trim();
         }
 
         const singleStorySpec: Record<string, any> = {
@@ -1562,6 +1608,50 @@ async function handleReachEstimate(
   };
 }
 
+// --- Ad Previews ---
+// GET /act_{id}/generatepreviews with a creative spec and an ad_format returns
+// the iframe HTML that Meta will render in that placement. We loop over all
+// requested formats and return a map { [ad_format]: "<iframe ...>" } so the
+// frontend can build a grid like the Ads Manager "Vista previa avanzada".
+async function handleGeneratePreviews(
+  accountId: string,
+  accessToken: string,
+  data: Record<string, any>,
+): Promise<{ body: any; status: number }> {
+  const { creative, ad_formats } = data;
+  if (!creative || !Array.isArray(ad_formats) || ad_formats.length === 0) {
+    return { body: { error: 'Missing creative or ad_formats[]' }, status: 400 };
+  }
+
+  const creativeStr = typeof creative === 'string' ? creative : JSON.stringify(creative);
+
+  // Call generatepreviews in parallel for all formats (up to 14). Each call is
+  // ~1-2s so serially it'd be 20+ seconds. Parallelism saves the user.
+  const settled = await Promise.allSettled(
+    ad_formats.slice(0, 14).map((fmt: string) =>
+      metaApiRequest(`act_${accountId}/generatepreviews`, accessToken, 'GET', {
+        ad_format: fmt,
+        creative: creativeStr,
+      }).then(r => ({ fmt, result: r })),
+    ),
+  );
+
+  const previews: Record<string, string> = {};
+  const errors: Record<string, string> = {};
+
+  for (const s of settled) {
+    if (s.status !== 'fulfilled') continue;
+    const { fmt, result } = s.value;
+    if (result.ok && result.data?.data?.[0]?.body) {
+      previews[fmt] = result.data.data[0].body;
+    } else if (!result.ok) {
+      errors[fmt] = result.error || 'Unknown';
+    }
+  }
+
+  return { body: { success: true, previews, errors }, status: 200 };
+}
+
 // --- Main handler ---
 
 export async function manageMetaCampaign(c: Context) {
@@ -1593,7 +1683,7 @@ export async function manageMetaCampaign(c: Context) {
       return c.json({ error: 'Missing required field: connection_id' }, 400);
     }
 
-    const validActions: Action[] = ['create', 'create_322', 'pause', 'resume', 'update', 'update_budget', 'duplicate', 'archive', 'get_ad_details', 'update_ad', 'reach_estimate'];
+    const validActions: Action[] = ['create', 'create_322', 'pause', 'resume', 'update', 'update_budget', 'duplicate', 'archive', 'get_ad_details', 'update_ad', 'reach_estimate', 'generate_previews'];
     if (!validActions.includes(action)) {
       return c.json({ error: `Invalid action: ${action}. Valid actions: ${validActions.join(', ')}` }, 400);
     }
@@ -1856,6 +1946,10 @@ export async function manageMetaCampaign(c: Context) {
 
       case 'reach_estimate':
         result = await handleReachEstimate(accountId, decryptedToken, data || {});
+        break;
+
+      case 'generate_previews':
+        result = await handleGeneratePreviews(accountId, decryptedToken, data || {});
         break;
 
       default:
