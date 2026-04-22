@@ -877,7 +877,36 @@ function AdSetForm({
 
       <div>
         <Label>Nombre del Ad Set</Label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="[Audiencia] - [Variable test]" className="mt-1" />
+        <div className="flex gap-2 mt-1">
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="[Audiencia] - [Variable test]" className="flex-1" />
+          <button
+            type="button"
+            onClick={() => {
+              // Auto-generate ad set name from audience + format + date.
+              // Pattern: [AudienciaCorta]-[Formato]-[MMMYY]
+              const audLower = audienceDesc.toLowerCase();
+              let audTag = '';
+              if (selectedAudienceIds.length > 0) {
+                if (audLower.includes('lookalike') || audLower.includes('similar')) audTag = 'LAL';
+                else if (audLower.includes('retarg') || audLower.includes('remarketing')) audTag = 'RTG';
+                else if (audLower.includes('saved') || audLower.includes('guardad')) audTag = 'SAVED';
+                else audTag = audienceDesc.substring(0, 12).replace(/\s+/g, '');
+              } else if (audienceDesc.trim()) {
+                audTag = audienceDesc.substring(0, 12).replace(/\s+/g, '');
+              } else {
+                audTag = 'Broad';
+              }
+              const fmtTag = adSetFormat === 'flexible' ? 'DCT' : adSetFormat === 'carousel' ? 'Carrusel' : 'Single';
+              const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+              const now = new Date();
+              const dateTag = `${months[now.getMonth()]}${String(now.getFullYear()).slice(-2)}`;
+              setName(`${audTag}-${fmtTag}-${dateTag}`);
+            }}
+            className="px-3 py-2 text-xs font-medium rounded-md border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors whitespace-nowrap"
+          >
+            <Sparkles className="w-3 h-3 inline mr-1" />Sugerir
+          </button>
+        </div>
       </div>
 
       {/* Audience selector — show real Meta audiences */}

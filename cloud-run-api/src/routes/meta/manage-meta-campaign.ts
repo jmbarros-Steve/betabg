@@ -1519,7 +1519,6 @@ async function handleReachEstimate(
   const {
     targeting,
     optimization_goal = 'OFFSITE_CONVERSIONS',
-    currency = 'CLP',
   } = data;
 
   if (!targeting) {
@@ -1531,6 +1530,10 @@ async function handleReachEstimate(
   // delivery_estimate is the modern endpoint; reachestimate is legacy but still
   // works. Use delivery_estimate so we also get daily_outcomes_curve when budget
   // is present.
+  //
+  // NOTE v23: `currency` is no longer a valid param on /delivery_estimate — Meta
+  // infers it from the ad account. Passing it raises (#100) "Param currency ...
+  // is not valid". The account's currency is used automatically.
   const result = await metaApiRequest(
     `act_${accountId}/delivery_estimate`,
     accessToken,
@@ -1538,7 +1541,6 @@ async function handleReachEstimate(
     {
       targeting_spec: targetingStr,
       optimization_goal,
-      currency,
     },
   );
 
