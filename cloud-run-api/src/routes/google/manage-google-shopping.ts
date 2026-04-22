@@ -500,7 +500,13 @@ async function handleListShoppingProducts(
 
   const result = await googleAdsQuery(customerId, accessToken, developerToken, loginCustomerId, gaql);
   if (!result.ok) {
-    // Fallback: si falla (common si MC no linkeado), devolver empty array con warning
+    // Distinguir entre "cuenta sin feed linkeado" (silent fallback) vs "error real" (502).
+    const errLower = (result.error || '').toLowerCase();
+    const isFeedIssue = errLower.includes('merchant') || errLower.includes('feed') || errLower.includes('shopping_product');
+    if (!isFeedIssue) {
+      return { body: { error: 'Failed to fetch shopping products', details: result.error }, status: 502 };
+    }
+    // Feed issue: silent fallback con warning para el frontend
     return {
       body: {
         success: true,
@@ -906,13 +912,27 @@ async function handleAddProductGroupSubdivision(
 
   const res2 = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, mutate2Ops);
   if (!res2.ok) {
-    // El SUBDIVISION quedó creado pero sin children — Google no lo acepta así.
-    // El frontend debe mostrar un warning y ofrecer reintentar.
+    // Rollback: el SUBDIVISION quedó sin children → Google no lo acepta ni se puede
+    // reconstruir el UNIT original. Intentamos borrar el SUBDIVISION para dejar el tree
+    // en estado limpio (el user deberá reintentar el subdivide).
+    console.warn('[manage-google-shopping] mutate 2 failed, attempting rollback of SUBDIVISION');
+    let rollbackOk = false;
+    try {
+      const rollbackRes = await googleAdsMutate(customerId, accessToken, developerToken, loginCustomerId, [{
+        adGroupCriterionOperation: { remove: newSubdivResource },
+      }]);
+      rollbackOk = rollbackRes.ok;
+    } catch (err: any) {
+      console.error('[manage-google-shopping] rollback error:', err?.message);
+    }
     return {
       body: {
-        error: 'El SUBDIVISION se creó pero fallaron los children. El tree quedó inconsistente — reintentá o remove el SUBDIVISION.',
+        error: rollbackOk
+          ? 'Falló la creación de children del subdivide. El tree se limpió automáticamente — reintentá.'
+          : 'Falló el subdivide Y el rollback — el tree quedó inconsistente. Entrá a Google Ads y borrá el SUBDIVISION huérfano manualmente.',
         details: res2.error,
         partial_subdivision: newSubdivResource,
+        rollback_performed: rollbackOk,
       },
       status: 502,
     };

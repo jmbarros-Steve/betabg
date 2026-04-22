@@ -147,6 +147,11 @@ export default function GoogleShoppingManager({ connectionId, clientId }: Props)
   const [negValue, setNegValue] = useState('');
   const [negLoading, setNegLoading] = useState(false);
 
+  // Remove confirm dialog (con listado de children en cascade si es SUBDIVISION)
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<{ resource: string; agId: string; label: string; cascadeChildren: string[] } | null>(null);
+  const [removeLoading, setRemoveLoading] = useState(false);
+
   const fetchCampaigns = useCallback(async (opts?: { silent?: boolean }) => {
     if (fetchingRef.current) return;
     fetchingRef.current = true;
@@ -402,14 +407,43 @@ export default function GoogleShoppingManager({ connectionId, clientId }: Props)
     }
   };
 
-  const removePG = async (resource: string) => {
-    if (!confirm('¿Eliminar este product group? Los children en cascade también se borran.')) return;
-    const { error } = await callApi('manage-google-shopping', {
-      body: { action: 'remove_product_group', connection_id: connectionId, data: { criterion_resource_name: resource } },
-    });
-    if (error) { toast.error('Error: ' + error); return; }
-    toast.success('Removido');
-    if (expandedId) fetchCampaignDetail(expandedId);
+  const openRemoveDialog = (agId: string, node: ProductGroup) => {
+    const pgs = productGroups[agId] || [];
+    // Encontrar children recursivos para mostrar el alcance del cascade
+    const cascadeLabels: string[] = [];
+    const collectChildren = (parentResource: string) => {
+      for (const pg of pgs) {
+        if (pg.parent_resource_name === parentResource) {
+          const label = pg.dimension === null
+            ? 'Everything else'
+            : `${DIMENSION_LABELS[pg.dimension] || pg.dimension}: ${pg.value}`;
+          cascadeLabels.push(label);
+          if (pg.type === 'SUBDIVISION') collectChildren(pg.resource_name);
+        }
+      }
+    };
+    if (node.type === 'SUBDIVISION') collectChildren(node.resource_name);
+    const nodeLabel = node.dimension === null
+      ? 'All products'
+      : `${DIMENSION_LABELS[node.dimension] || node.dimension}: ${node.value}`;
+    setRemoveTarget({ resource: node.resource_name, agId, label: nodeLabel, cascadeChildren: cascadeLabels });
+    setRemoveDialogOpen(true);
+  };
+
+  const confirmRemovePG = async () => {
+    if (!removeTarget) return;
+    setRemoveLoading(true);
+    try {
+      const { error } = await callApi('manage-google-shopping', {
+        body: { action: 'remove_product_group', connection_id: connectionId, data: { criterion_resource_name: removeTarget.resource } },
+      });
+      if (error) { toast.error('Error: ' + error); return; }
+      toast.success('Product group removido');
+      setRemoveDialogOpen(false);
+      if (expandedId) fetchCampaignDetail(expandedId);
+    } finally {
+      setRemoveLoading(false);
+    }
   };
 
   // ── Render helpers ────────────────────────────────────────────────────
@@ -475,7 +509,7 @@ export default function GoogleShoppingManager({ connectionId, clientId }: Props)
               </>
             )}
             {depth > 0 && (
-              <Button size="sm" variant="ghost" className="h-6 px-1 text-red-500" onClick={() => removePG(node.resource_name)} title="Eliminar">
+              <Button size="sm" variant="ghost" className="h-6 px-1 text-red-500" onClick={() => openRemoveDialog(agId, node)} title="Eliminar">
                 <Trash2 className="w-3 h-3" />
               </Button>
             )}
@@ -911,6 +945,41 @@ export default function GoogleShoppingManager({ connectionId, clientId }: Props)
             <Button onClick={submitNeg} disabled={negLoading}>
               {negLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
               Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove confirm dialog (con listado de children en cascade) */}
+      <Dialog open={removeDialogOpen} onOpenChange={o => { if (!removeLoading) setRemoveDialogOpen(o); }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader><DialogTitle>Eliminar product group</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm">
+              Vas a eliminar: <strong>{removeTarget?.label}</strong>
+            </p>
+            {removeTarget && removeTarget.cascadeChildren.length > 0 && (
+              <div className="rounded-md border border-red-500/30 bg-red-500/5 p-2.5 text-xs">
+                <p className="font-medium text-red-600 dark:text-red-400 mb-1">
+                  ⚠️ En cascade también se borran {removeTarget.cascadeChildren.length} items:
+                </p>
+                <ul className="list-disc ml-4 max-h-[180px] overflow-y-auto space-y-0.5">
+                  {removeTarget.cascadeChildren.slice(0, 20).map((l, i) => <li key={i}>{l}</li>)}
+                  {removeTarget.cascadeChildren.length > 20 && (
+                    <li className="text-muted-foreground">... y {removeTarget.cascadeChildren.length - 20} más</li>
+                  )}
+                </ul>
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              Esta acción no se puede deshacer. Si borrás el último UNIT del tree, el ad group deja de publicar.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveDialogOpen(false)} disabled={removeLoading}>Cancelar</Button>
+            <Button variant="destructive" onClick={confirmRemovePG} disabled={removeLoading}>
+              {removeLoading && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Eliminar
             </Button>
           </DialogFooter>
         </DialogContent>

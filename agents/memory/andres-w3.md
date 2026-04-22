@@ -1,5 +1,163 @@
 # Andrés W3 — Journal de Aprendizaje
 
+## Sesión 21/04/2026 — Módulo Shopping completo + Portfolio Bid Strategy (13 commits, 12 deploys)
+
+### Contexto
+Sesión maratónica: arranca fixeando Ad Groups Search (crear ad group + bugs de extensions
+GAQL en v23) y termina con el **módulo Shopping completo** (Tier 1+2+3+backlog) en
+producción + fix crítico del bloqueo Portfolio Bid Strategy. Revision final:
+`steve-api-00603-d86`.
+
+### Commits (orden cronológico)
+
+**Ad Groups Search polish:**
+1. `59b2e167` — **Crear Ad Group desde tab Ad Groups Search**. Backend `list_search_ad_groups`
+   ahora devuelve también `search_campaigns` (todas las SEARCH, incluso sin ad groups).
+   Frontend: botón + Dialog con selector de campaña + nombre + CPC opcional.
+2. `05d5f49f` — **Extensions GAQL dividido por field_type**. v23 rechaza SELECT combinado
+   con `asset.call_asset.phone_number` o `asset.price_asset.type` cuando el ad_group_asset
+   incluye otros field_types. Partí en 3 queries paralelas filtradas por SITELINK/CALLOUT/
+   STRUCTURED_SNIPPET — si una falla, las otras cargan igual.
+3. `85650820` — **Extensions GAQL requiere `ad_group.id` en SELECT cuando está en WHERE**
+   desde `ad_group_asset` (error `EXPECTED_REFERENCED_FIELD_IN_SELECT_CLAUSE`). También
+   `counts.calls` y `counts.prices` leían `.length` sobre keys eliminados del objeto
+   `extensions` → TypeError silencioso.
+4. `aa3bc911` — **Steve AI para crear extensions**. Nueva action `suggest_extension_content`
+   con prompts específicos por tipo (SITELINK devuelve `{link_text, description1,
+   description2}`; CALLOUT/SNIPPET devuelven `{text}`). Panel en el dialog con sugerencias
+   clickeables que autollenan.
+5. `db8b7204` — **Sitelink finalUrls en Asset padre**. v23 rechaza `finalUrls` dentro de
+   `sitelinkAsset` con "Unknown name". El proto oficial lo define en el Asset padre.
+
+**Módulo Shopping completo:**
+6. `2e2494b2` — **Módulo Shopping completo (Tier 1+2+3)**. Backend
+   `manage-google-shopping.ts` con 11 actions (~1000 líneas). Frontend
+   `GoogleShoppingManager.tsx` (~700 líneas). Tab nueva 🛒 Shopping en GoogleAdsTab.
+   Review completo de Isidora W6 aplicado (3 blockers + 5 major fixeados).
+7. `1e8769cf` — **Autofetch Merchant Centers en wizard Shopping** (wizard de Campañas
+   general, no el Shopping Manager). Antes pedía ID manual. Ahora: select con
+   `list_merchant_centers` + auto-fetch al entrar al step.
+8. `08c755dd` — **Shopping wizard completo + product intent**.
+   - `campaign_priority` movido DENTRO de `shoppingSetting` (v23 lo exige ahí).
+   - Rechazar MAXIMIZE_CONVERSIONS/TARGET_CPA/TARGET_ROAS en SHOPPING standard.
+   - Dropdown oculta opciones inválidas + auto-switch si entra con incompatible.
+   - Panel productos también para SHOPPING (antes solo PMAX).
+   - Campo nuevo `product_intent` ("¿En qué productos te enfocás?") que Steve usa para
+     filtrar sugerencias del catalog picker.
+
+**Portfolio Bid Strategy saga (5 commits):**
+9. `e1433c15` — **Auto-retry #1** cuando Google rechaza `target_roas`/`target_cpa` por
+   Portfolio activa: quita el soft target y reintenta.
+10. `f3786f83` — **Cascada 3 retries**:
+    - Retry 1: quita target_roas/target_cpa
+    - Retry 2: fallback a TargetSpend (Maximize Clicks)
+    - Retry 3: fallback absoluto a ManualCpc
+    Warning claro al user en cada caso.
+11. `57cbbf53` — **Skip language criterion en Shopping**. v23 rechaza
+    `campaignCriterionOperation.create.language` cuando channel=SHOPPING. El idioma viene
+    del `feed_label` del Merchant Center.
+12. `fe184cab` — **Wizard usa Portfolio Bid Strategy existente** (solución definitiva al
+    problema raíz). Nueva action `list_portfolio_bid_strategies`. `handleCreateCampaign`
+    acepta `bidding_strategy_resource` (resource_name) y lo setea como
+    `campaignCreate.biddingStrategy` en vez del sub-message standard. Frontend:
+    auto-fetch portfolios al abrir wizard, banner azul en Step 2 con dropdown, si se elige
+    portfolio el dropdown standard queda disabled.
+13. `ef0fa92e` — **Skip validación "standard bid" en Shopping si hay Portfolio**. La
+    validación que rechaza TARGET_ROAS/TARGET_CPA en Shopping solo aplica a strategies
+    standard. Si viene Portfolio, Google la referencia directo.
+
+### Módulo Shopping — detalle
+
+**Backend `manage-google-shopping.ts` (11 actions):**
+- `list_shopping_campaigns` — métricas 30d agregadas
+- `create_shopping_campaign` — campaign + adGroup + shoppingProductAd con shopping_setting
+  completo (merchantId, feedLabel, LIA, campaignPriority), bidding sub-message correcto v23
+- `list_shopping_ad_groups` / `list_product_groups` (tree completo con parent_resource_name)
+- `list_shopping_products` — del feed MC con status (ELIGIBLE/NOT_ELIGIBLE/PENDING/
+  ELIGIBLE_LIMITED), price_micros, image_link, category, product_type, custom_attributes
+- `update_product_group_bid` — update atómico del cpcBidMicros
+- `add_product_group_subdivision` — **el más complejo**: 2 mutates seriales porque v23 no
+  soporta temp IDs para adGroupCriterion. Mutate 1: remove UNIT parent + create SUBDIVISION
+  (preservando caseValue). Mutate 2: create N children UNIT + 1 catch-all (sin caseValue =
+  "Everything else").
+- `add_negative_product_group` — exclusiones con `negative: true` bajo un SUBDIVISION
+- `remove_product_group` (cascade a children)
+- `list_shopping_metrics_by_dimension` — `shopping_performance_view` con `segments.product_*`
+  (brand/type_l1/type_l2/category_level1-2/item_id/channel/condition). Mapeo explícito
+  gaql→camelKey para evitar bugs de conversión.
+- `suggest_shopping_structure` — **Steve AI**: analiza ROAS por brand vs product_type,
+  elige dimensión con más varianza (más oportunidad de bid diferenciado), propone
+  subdivisiones con bids 1.5x para top, 0.6x para bottom, catch-all con 0.8x.
+
+**Frontend `GoogleShoppingManager.tsx`:**
+- Lista campañas con ROAS coloreado (green ≥2x, yellow ≥1x, red <1x)
+- Expand → ad groups + product groups tree visual (SUBDIVISION 📁 / UNIT 📄 con indent)
+- Productos feed con thumbnail + status badges + alerta si hay NOT_ELIGIBLE
+- Métricas por dimensión con dropdown selector
+- Wizard 3 steps: nombre+budget · MC+priority+LIA · bidding+adGroup
+- Dialogs: editar bid, subdividir, excluir producto
+- Botón "Steve sugiere estructura" por ad group
+
+### Lecciones críticas aprendidas
+
+#### v23 GAQL: `EXPECTED_REFERENCED_FIELD_IN_SELECT_CLAUSE` en `ad_group_asset`
+Si tu WHERE usa `ad_group.id = X` desde `FROM ad_group_asset`, el `ad_group.id` DEBE estar
+en el SELECT también. No pasa en otros views (keyword_view lo infiere).
+
+#### v23 GAQL: Asset types no se pueden combinar en un SELECT desde `ad_group_asset`
+`asset.call_asset.phone_number` + `asset.price_asset.type` + `asset.sitelink_asset.*` en la
+misma query → rechazo. **Solución**: una query por field_type en paralelo.
+
+#### Sitelink `finalUrls` vive en Asset padre, no en `sitelinkAsset`
+El proto oficial lo define en Asset (es común a varios asset types). Fix eterno — este bug
+lo arrastraba desde sesiones anteriores.
+
+#### Shopping campaign restrictions v23
+1. `campaign_priority` vive DENTRO de `shopping_setting` (no top-level Campaign field).
+2. NO acepta MAXIMIZE_CONVERSIONS/TARGET_CPA/TARGET_ROAS standard.
+3. NO acepta `campaignCriterionOperation` con `language` (viene del `feed_label` del MC).
+4. MAXIMIZE_CLICKS se expresa como `TargetSpend{}` (sin target_spend_micros = behavior
+   "maximize clicks").
+5. `ShoppingProductAd` es `{}` vacío — los ads se generan del feed.
+6. Al crear ad group `SHOPPING_PRODUCT_ADS`, Google auto-crea un UNIT root "All products".
+7. Para subdividir: remove UNIT root + create SUBDIVISION + children UNIT en mutates seriales.
+8. listing_group dimensions correctas v23: `productBrand`, `productType.{level,value}`,
+   `productCondition.condition`, `productChannel.channel`, `productCustomAttribute.{index,
+   value}`, `productItemId.value`, `productBiddingCategory.{id,level}`.
+
+#### Portfolio Bid Strategy — causa raíz del "not allowed for given context"
+Cuentas MCC con **Portfolio Bid Strategies activas** (cualquiera) rechazan progresivamente
+todas las strategies standard value-based (no solo TARGET_ROAS — también MAXIMIZE_
+CONVERSION_VALUE vacío). **Solución definitiva**: listar portfolios con
+`list_portfolio_bid_strategies` y referenciar por resource_name en `campaignCreate.
+biddingStrategy`. Google acepta cualquier type interno de la portfolio (TARGET_ROAS/
+TARGET_CPA/etc). El cascade retry queda como safety net pero ya no es necesario en
+flow normal.
+
+#### Patrón para auto-retry resilientes
+Cuando Google rechaza con errores crípticos ("not allowed for given context"), la solución
+UX correcta es **cascade de fallbacks** con warnings claros al user:
+1. Quitar soft targets
+2. Fallback a strategy más permisiva (TargetSpend)
+3. Fallback absoluto (ManualCpc)
+
+Preferible que el user espere 2-3 retries transparentes a que vea un error crítico.
+
+#### `confirm()` nativo es antipatrón para destructive actions
+Isidora lo flageó en review del Shopping: `confirm('¿Eliminar product group?')` viola
+accesibilidad y UX. Debería ser Dialog con estado. En el Shopping Manager quedó como
+follow-up.
+
+### Follow-ups
+- Dialog para replace_product_group_tree (actualmente `confirm()` nativo)
+- Shopping Manager: botón para migrar campaña Shopping a PMAX
+- Settings Dialog podría exponer `diagnose_bid_strategy` + `list_portfolio_bid_strategies`
+  para cambiar la bid strategy de campañas existentes post-creación.
+- Local Inventory Ads: habilitarlo requiere config adicional en Merchant Center —
+  backend lo soporta pero UI podría validar prerequisitos.
+
+---
+
 ## Sesión 20/04/2026 noche — Bid strategy cleanup Search wizard (5 commits, 2 deploys)
 
 ### Contexto
