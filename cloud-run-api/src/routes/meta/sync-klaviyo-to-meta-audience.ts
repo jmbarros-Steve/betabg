@@ -4,7 +4,7 @@ import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { createHash } from 'crypto';
 
-const META_API_BASE = 'https://graph.facebook.com/v21.0';
+const META_API_BASE = 'https://graph.facebook.com/v23.0';
 const KLAVIYO_REVISION = '2024-10-15';
 
 /**

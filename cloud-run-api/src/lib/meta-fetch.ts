@@ -8,7 +8,7 @@
 
 import { canRequest, recordSuccess, recordFailure } from './circuit-breaker.js';
 
-const META_API_VERSION = 'v21.0';
+const META_API_VERSION = 'v23.0';
 const META_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 const CIRCUIT_SERVICE = 'meta-graph-api';
 

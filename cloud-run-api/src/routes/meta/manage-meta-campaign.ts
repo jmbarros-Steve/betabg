@@ -7,7 +7,7 @@ import { detectAngle } from '../../lib/angle-detector.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
-const META_API_BASE = 'https://graph.facebook.com/v21.0';
+const META_API_BASE = 'https://graph.facebook.com/v23.0';
 
 type Action = 'create' | 'create_322' | 'pause' | 'resume' | 'update' | 'update_budget' | 'duplicate' | 'archive' | 'get_ad_details' | 'update_ad';
 
@@ -186,6 +186,21 @@ async function handleCreate(
     // DPA / Catalog fields
     product_catalog_id,
     product_set_id,
+    // Explicit pixel + event (overrides auto-fetch)
+    pixel_id: explicitPixelId,
+    custom_event_type: explicitEventType,
+    // Placements (omit = Advantage+ placements auto)
+    publisher_platforms,
+    facebook_positions,
+    instagram_positions,
+    audience_network_positions,
+    messenger_positions,
+    // Explicit IG account for the creative (v23 replaces instagram_actor_id)
+    instagram_user_id: explicitIgUserId,
+    // UTM tags (string: "utm_source=...&utm_medium=...")
+    url_tags,
+    // Advantage+ Creative: { image_touchups: 'OPT_IN', text_optimizations: 'OPT_OUT', ... }
+    creative_features,
   } = data;
 
   // --- Early validations (before any Meta API calls) ---
@@ -305,6 +320,26 @@ async function handleCreate(
         warnings.push(`Advantage+ audience requires age_max >= 65. Your value (${originalAgeMax}) was adjusted to 65.`);
         console.log(`[manage-meta-campaign] Advantage+ forced age_max from ${originalAgeMax} to 65`);
       }
+
+      // Placements: Advantage+ Placements = omit these fields (Meta auto-selects).
+      // If user provided explicit publisher_platforms, pass them + matching positions.
+      if (Array.isArray(publisher_platforms) && publisher_platforms.length > 0) {
+        targetingObj.publisher_platforms = publisher_platforms;
+        if (publisher_platforms.includes('facebook') && Array.isArray(facebook_positions) && facebook_positions.length > 0) {
+          targetingObj.facebook_positions = facebook_positions;
+        }
+        if (publisher_platforms.includes('instagram') && Array.isArray(instagram_positions) && instagram_positions.length > 0) {
+          targetingObj.instagram_positions = instagram_positions;
+        }
+        if (publisher_platforms.includes('audience_network') && Array.isArray(audience_network_positions) && audience_network_positions.length > 0) {
+          targetingObj.audience_network_positions = audience_network_positions;
+        }
+        if (publisher_platforms.includes('messenger') && Array.isArray(messenger_positions) && messenger_positions.length > 0) {
+          targetingObj.messenger_positions = messenger_positions;
+        }
+        console.log(`[manage-meta-campaign] Manual placements: ${publisher_platforms.join(',')}`);
+      }
+
       adsetPayload.targeting = JSON.stringify(targetingObj);
     }
 
@@ -316,20 +351,30 @@ async function handleCreate(
       });
       console.log(`[manage-meta-campaign] DPA promoted_object: catalog=${product_catalog_id}, set=${product_set_id}`);
     } else if (optimization_goal === 'OFFSITE_CONVERSIONS') {
-      // For conversion-optimized ad sets, Meta requires a promoted_object with pixel_id
-      try {
-        const pixelResult = await metaApiRequest(`act_${accountId}/adspixels`, accessToken, 'GET', { fields: 'id,name', limit: '1' });
-        if (pixelResult.ok && pixelResult.data?.data?.[0]?.id) {
-          adsetPayload.promoted_object = JSON.stringify({
-            pixel_id: pixelResult.data.data[0].id,
-            custom_event_type: 'PURCHASE',
-          });
-          console.log(`[manage-meta-campaign] Using pixel ${pixelResult.data.data[0].id} for promoted_object`);
-        } else {
-          console.warn(`[manage-meta-campaign] No pixel found for account ${accountId}, conversion tracking may fail`);
+      // For conversion-optimized ad sets, Meta requires a promoted_object with pixel_id.
+      // Prefer explicit pixel_id from the wizard; fallback to first pixel on the account.
+      const eventType = explicitEventType || 'PURCHASE';
+      if (explicitPixelId) {
+        adsetPayload.promoted_object = JSON.stringify({
+          pixel_id: explicitPixelId,
+          custom_event_type: eventType,
+        });
+        console.log(`[manage-meta-campaign] Using explicit pixel ${explicitPixelId} with event ${eventType}`);
+      } else {
+        try {
+          const pixelResult = await metaApiRequest(`act_${accountId}/adspixels`, accessToken, 'GET', { fields: 'id,name', limit: '1' });
+          if (pixelResult.ok && pixelResult.data?.data?.[0]?.id) {
+            adsetPayload.promoted_object = JSON.stringify({
+              pixel_id: pixelResult.data.data[0].id,
+              custom_event_type: eventType,
+            });
+            console.log(`[manage-meta-campaign] Auto-picked pixel ${pixelResult.data.data[0].id} with event ${eventType}`);
+          } else {
+            console.warn(`[manage-meta-campaign] No pixel found for account ${accountId}, conversion tracking may fail`);
+          }
+        } catch (pixelErr: any) {
+          console.warn(`[manage-meta-campaign] Failed to fetch pixel: ${pixelErr?.message}`);
         }
-      } catch (pixelErr: any) {
-        console.warn(`[manage-meta-campaign] Failed to fetch pixel: ${pixelErr?.message}`);
       }
     }
 
@@ -371,38 +416,47 @@ async function handleCreate(
     console.log(`[manage-meta-campaign] Using existing ad set: ${adSetId}`);
   }
 
-  // Resolve instagram_actor_id for Instagram placements
-  let igActorId: string | null = null;
-  if (pageId) {
+  // Resolve instagram_user_id (v23 replaced instagram_actor_id).
+  // Prefer explicit value from the wizard; else derive from the Page's IG business account.
+  let igUserId: string | null = explicitIgUserId || null;
+  if (!igUserId && pageId) {
     try {
       const igResult = await metaApiRequest(pageId, accessToken, 'GET', {
         fields: 'instagram_business_account{id,username}',
       });
       if (igResult.ok && igResult.data?.instagram_business_account?.id) {
-        igActorId = igResult.data.instagram_business_account.id;
-        console.log(`[manage-meta-campaign] Resolved instagram_actor_id: ${igActorId} (${igResult.data.instagram_business_account.username || 'no username'})`);
+        igUserId = igResult.data.instagram_business_account.id;
+        console.log(`[manage-meta-campaign] Resolved instagram_user_id: ${igUserId} (${igResult.data.instagram_business_account.username || 'no username'})`);
       }
     } catch (err: any) {
-      console.warn(`[manage-meta-campaign] Failed to resolve IG actor for page ${pageId}:`, err.message);
+      console.warn(`[manage-meta-campaign] Failed to resolve IG user for page ${pageId}:`, err.message);
     }
   }
 
-  // Helper: create ad creative with retry (drops instagram_actor_id on failure)
-  // Uses a local copy of igActorId to avoid mutating the outer scope variable,
-  // which would break subsequent creative creation calls in the same request.
+  // Build degrees_of_freedom_spec from user-selected creative features (opt-in granular).
+  function buildDofSpec(): Record<string, any> | null {
+    if (!creative_features || typeof creative_features !== 'object') return null;
+    const entries = Object.entries(creative_features).filter(([, v]) => v === 'OPT_IN' || v === 'OPT_OUT');
+    if (entries.length === 0) return null;
+    const spec: Record<string, any> = {};
+    for (const [k, v] of entries) spec[k] = { enroll_status: v };
+    return { creative_features_spec: spec };
+  }
+  const dofSpec = buildDofSpec();
+
+  // Helper: create ad creative with retry (drops instagram_user_id on failure)
   async function createCreativeWithRetry(
     creativePayload: Record<string, any>,
     storySpecKey: string = 'object_story_spec'
   ): Promise<{ ok: boolean; data?: any; error?: string }> {
     const result = await metaApiRequest(`act_${accountId}/adcreatives`, accessToken, 'POST', creativePayload);
-    if (!result.ok && typeof result.error === 'string' && result.error.includes('instagram_actor_id') && igActorId) {
-      console.warn(`[manage-meta-campaign] Creative failed with instagram_actor_id, retrying without it`);
-      // Deep copy payload to avoid mutating the caller's object
+    if (!result.ok && typeof result.error === 'string' && /instagram_user_id|instagram_actor_id/i.test(result.error) && igUserId) {
+      console.warn(`[manage-meta-campaign] Creative failed with instagram_user_id, retrying without it`);
       const retryPayload = { ...creativePayload };
       const specStr = retryPayload[storySpecKey];
       if (specStr) {
         const spec = JSON.parse(specStr);
-        delete spec.instagram_actor_id;
+        delete spec.instagram_user_id;
         retryPayload[storySpecKey] = JSON.stringify(spec);
       }
       return metaApiRequest(`act_${accountId}/adcreatives`, accessToken, 'POST', retryPayload);
@@ -445,13 +499,14 @@ async function handleCreate(
       page_id: pageId,
       template_data: templateData,
     };
-    if (igActorId) dpaStorySpec.instagram_actor_id = igActorId;
+    if (igUserId) dpaStorySpec.instagram_user_id = igUserId;
 
     const dpaCreativePayload: Record<string, any> = {
       name: `${name} - DPA Creative`,
       object_story_spec: JSON.stringify(dpaStorySpec),
       product_set_id,
     };
+    if (dofSpec) dpaCreativePayload.degrees_of_freedom_spec = JSON.stringify(dofSpec);
 
     const dpaResult = await createCreativeWithRetry(dpaCreativePayload);
 
@@ -474,12 +529,15 @@ async function handleCreate(
     creativeId = dpaResult.data.id;
     console.log(`[manage-meta-campaign] DPA creative created: ${creativeId}`);
 
-    const adPayload = {
+    const adPayload: Record<string, any> = {
       name: `${name} - DPA Ad`,
       adset_id: adSetId,
       creative: JSON.stringify({ creative_id: creativeId }),
       status,
     };
+    if (url_tags && typeof url_tags === 'string' && url_tags.trim()) {
+      adPayload.url_tags = url_tags.trim();
+    }
 
     const adResult = await metaApiRequest(`act_${accountId}/ads`, accessToken, 'POST', adPayload);
 
@@ -611,15 +669,16 @@ async function handleCreate(
 
       console.log(`[manage-meta-campaign] DCT asset_feed_spec:`, JSON.stringify(assetFeedSpec));
 
-      // For DCT: object_story_spec only needs page_id + instagram_actor_id
+      // For DCT: object_story_spec only needs page_id + instagram_user_id (v23)
       const dctStorySpec: Record<string, any> = { page_id: pageId };
-      if (igActorId) dctStorySpec.instagram_actor_id = igActorId;
+      if (igUserId) dctStorySpec.instagram_user_id = igUserId;
 
       const creativePayload: Record<string, any> = {
         name: `${name} - DCT Creative`,
         asset_feed_spec: JSON.stringify(assetFeedSpec),
         object_story_spec: JSON.stringify(dctStorySpec),
       };
+      if (dofSpec) creativePayload.degrees_of_freedom_spec = JSON.stringify(dofSpec);
 
       const creativeResult = await createCreativeWithRetry(creativePayload);
 
@@ -692,12 +751,13 @@ async function handleCreate(
           call_to_action: { type: cta || 'SHOP_NOW', value: { link: destUrl } },
         },
       };
-      if (igActorId) carouselStorySpec.instagram_actor_id = igActorId;
+      if (igUserId) carouselStorySpec.instagram_user_id = igUserId;
 
-      const creativePayload = {
+      const creativePayload: Record<string, any> = {
         name: `${name} - Carousel Creative`,
         object_story_spec: JSON.stringify(carouselStorySpec),
       };
+      if (dofSpec) creativePayload.degrees_of_freedom_spec = JSON.stringify(dofSpec);
 
       const creativeResult = await createCreativeWithRetry(creativePayload);
 
@@ -758,12 +818,13 @@ async function handleCreate(
           page_id: pageId,
           link_data: linkData,
         };
-        if (igActorId) singleStorySpec.instagram_actor_id = igActorId;
+        if (igUserId) singleStorySpec.instagram_user_id = igUserId;
 
-        const creativePayload = {
+        const creativePayload: Record<string, any> = {
           name: `${name} - Creative`,
           object_story_spec: JSON.stringify(singleStorySpec),
         };
+        if (dofSpec) creativePayload.degrees_of_freedom_spec = JSON.stringify(dofSpec);
 
         console.log(`[manage-meta-campaign] Creating single-image ad creative for campaign ${campaignId}`);
 
@@ -792,12 +853,15 @@ async function handleCreate(
 
     // Step 3b: Create ad (same for all formats)
     if (creativeId) {
-      const adPayload = {
+      const adPayload: Record<string, any> = {
         name: allHeadlines[0] || headline || `${name} - Ad`,
         adset_id: adSetId,
         creative: JSON.stringify({ creative_id: creativeId }),
         status,
       };
+      if (url_tags && typeof url_tags === 'string' && url_tags.trim()) {
+        adPayload.url_tags = url_tags.trim();
+      }
 
       const adResult = await metaApiRequest(
         `act_${accountId}/ads`,

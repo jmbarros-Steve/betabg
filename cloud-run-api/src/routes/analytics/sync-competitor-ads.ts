@@ -624,7 +624,7 @@ export async function syncCompetitorAds(c: Context) {
     async function resolvePageId(searchQuery: string): Promise<{ pageId: string; pageName: string } | null> {
       if (!accessToken) return null;
       try {
-        const url = new URL('https://graph.facebook.com/v21.0/pages/search');
+        const url = new URL('https://graph.facebook.com/v23.0/pages/search');
         url.searchParams.set('access_token', accessToken);
         url.searchParams.set('q', searchQuery);
         url.searchParams.set('fields', 'id,name,verification_status');
@@ -646,7 +646,7 @@ export async function syncCompetitorAds(c: Context) {
     const AD_LIBRARY_COUNTRIES = '["CL","MX","CO","AR","PE","US"]';
 
     async function fetchAdLibrary(params: Record<string, string>): Promise<{ ads: AdLibraryAd[]; error?: string }> {
-      const url = new URL('https://graph.facebook.com/v21.0/ads_archive');
+      const url = new URL('https://graph.facebook.com/v23.0/ads_archive');
       url.searchParams.set('access_token', accessToken);
       url.searchParams.set('ad_type', 'ALL');
       url.searchParams.set('ad_reached_countries', AD_LIBRARY_COUNTRIES);

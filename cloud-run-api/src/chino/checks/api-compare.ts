@@ -34,7 +34,7 @@ async function fetchMetaApi(
   const timeout = setTimeout(() => controller.abort(), 30_000);
   const separator = endpoint.includes('?') ? '&' : '?';
   try {
-    return await fetch(`https://graph.facebook.com/v21.0/${endpoint}${separator}access_token=${token}`, {
+    return await fetch(`https://graph.facebook.com/v23.0/${endpoint}${separator}access_token=${token}`, {
       signal: controller.signal,
     });
   } finally {

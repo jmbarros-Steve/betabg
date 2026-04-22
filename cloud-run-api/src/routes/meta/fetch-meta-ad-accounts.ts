@@ -140,7 +140,7 @@ export async function fetchMetaAdAccounts(c: Context) {
 
     // First, check token permissions
     console.log('Checking token permissions...');
-    const permissionsUrl = new URL('https://graph.facebook.com/v21.0/me/permissions');
+    const permissionsUrl = new URL('https://graph.facebook.com/v23.0/me/permissions');
 
     const authHeaders = { Authorization: `Bearer ${decryptedToken}` };
 
@@ -201,7 +201,7 @@ export async function fetchMetaAdAccounts(c: Context) {
         return c.json({ error: 'SUAT connection missing account_id' }, 400);
       }
       const actId = scopedAccountId.startsWith('act_') ? scopedAccountId : `act_${scopedAccountId}`;
-      const directUrl = new URL(`https://graph.facebook.com/v21.0/${actId}`);
+      const directUrl = new URL(`https://graph.facebook.com/v23.0/${actId}`);
       directUrl.searchParams.set('fields', 'id,name,account_id,account_status,currency,timezone_name');
 
       console.log(`[ad-accounts] SUAT connection — fetching scoped account ${actId} directly`);
@@ -216,7 +216,7 @@ export async function fetchMetaAdAccounts(c: Context) {
       console.log(`[ad-accounts] SUAT: found ${allAccounts.length} scoped account(s)`);
     } else {
       // OAuth path: fetch from /me/adaccounts + /me/businesses
-      const accountsUrl = new URL('https://graph.facebook.com/v21.0/me/adaccounts');
+      const accountsUrl = new URL('https://graph.facebook.com/v23.0/me/adaccounts');
       accountsUrl.searchParams.set('fields', 'id,name,account_id,account_status,currency,timezone_name,business{id,name}');
       accountsUrl.searchParams.set('limit', '200');
 
@@ -250,7 +250,7 @@ export async function fetchMetaAdAccounts(c: Context) {
       console.log(`Found ${accountsData.data?.length || 0} ad accounts from /me/adaccounts`);
 
       // Also fetch accounts from Business Managers directly
-      const businessesUrl = new URL('https://graph.facebook.com/v21.0/me/businesses');
+      const businessesUrl = new URL('https://graph.facebook.com/v23.0/me/businesses');
       businessesUrl.searchParams.set('fields', 'id,name');
       businessesUrl.searchParams.set('limit', '50');
 
@@ -262,7 +262,7 @@ export async function fetchMetaAdAccounts(c: Context) {
         console.log(`Found ${businessesData.data?.length || 0} businesses`);
 
         for (const business of businessesData.data || []) {
-          const businessAdAccountsUrl = new URL(`https://graph.facebook.com/v21.0/${business.id}/owned_ad_accounts`);
+          const businessAdAccountsUrl = new URL(`https://graph.facebook.com/v23.0/${business.id}/owned_ad_accounts`);
           businessAdAccountsUrl.searchParams.set('fields', 'id,name,account_id,account_status,currency,timezone_name');
           businessAdAccountsUrl.searchParams.set('limit', '100');
 

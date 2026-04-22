@@ -387,7 +387,7 @@ async function check29_metaCampaignsNotInSteve(
     : `act_${merchant.account_id}`;
 
   const resp = await fetchWithTimeout(
-    `https://graph.facebook.com/v21.0/${accountId}/campaigns?fields=id,name,status&access_token=${token}`,
+    `https://graph.facebook.com/v23.0/${accountId}/campaigns?fields=id,name,status&access_token=${token}`,
     { method: 'GET' }
   );
   if (!resp.ok) throw new Error(`Meta API ${resp.status}: ${await resp.text()}`);
@@ -440,7 +440,7 @@ async function check30_steveCampaignsNotInMeta(
     : `act_${merchant.account_id}`;
 
   const resp = await fetchWithTimeout(
-    `https://graph.facebook.com/v21.0/${accountId}/campaigns?fields=id&access_token=${token}`,
+    `https://graph.facebook.com/v23.0/${accountId}/campaigns?fields=id&access_token=${token}`,
     { method: 'GET' }
   );
   if (!resp.ok) throw new Error(`Meta API ${resp.status}: ${await resp.text()}`);

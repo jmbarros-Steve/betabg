@@ -192,7 +192,7 @@ async function deleteFromShopify(storeUrl: string, token: string, priceRuleId: s
 
 async function createTestCampaignInMeta(token: string, accountId: string): Promise<string | null> {
   const res = await fetchWithTimeout(
-    `https://graph.facebook.com/v21.0/act_${accountId}/campaigns`,
+    `https://graph.facebook.com/v23.0/act_${accountId}/campaigns`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -217,7 +217,7 @@ async function createTestCampaignInMeta(token: string, accountId: string): Promi
 
 async function verifyCampaignExistsInMeta(token: string, campaignId: string): Promise<boolean> {
   const res = await fetchWithTimeout(
-    `https://graph.facebook.com/v21.0/${campaignId}?fields=name,status&access_token=${token}`,
+    `https://graph.facebook.com/v23.0/${campaignId}?fields=name,status&access_token=${token}`,
     {},
   );
   return res.ok;
@@ -225,7 +225,7 @@ async function verifyCampaignExistsInMeta(token: string, campaignId: string): Pr
 
 async function deleteFromMeta(token: string, campaignId: string): Promise<void> {
   await fetchWithTimeout(
-    `https://graph.facebook.com/v21.0/${campaignId}?access_token=${token}`,
+    `https://graph.facebook.com/v23.0/${campaignId}?access_token=${token}`,
     { method: 'DELETE' },
   );
 }

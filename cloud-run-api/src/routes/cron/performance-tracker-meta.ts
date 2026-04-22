@@ -16,7 +16,7 @@ import { isValidCronSecret } from '../../lib/cron-auth.js';
  * Auth: X-Cron-Secret header
  */
 
-const META_API_VERSION = 'v21.0';
+const META_API_VERSION = 'v23.0';
 
 interface MetricInsight {
   impressions?: string;

@@ -81,7 +81,7 @@ export async function fetchCampaignAdsets(c: Context) {
     try {
       const accountId = connection.account_id;
       if (accountId) {
-        const acctUrl = new URL(`https://graph.facebook.com/v21.0/act_${accountId.replace('act_', '')}`);
+        const acctUrl = new URL(`https://graph.facebook.com/v23.0/act_${accountId.replace('act_', '')}`);
         
         acctUrl.searchParams.set('fields', 'currency');
         const acctRes = await fetch(acctUrl.toString(), { headers: { Authorization: `Bearer ${decryptedToken}` } });
@@ -96,7 +96,7 @@ export async function fetchCampaignAdsets(c: Context) {
     }
 
     // Fetch ad sets for this campaign with insights
-    const adsetsUrl = new URL(`https://graph.facebook.com/v21.0/${campaign_id}/adsets`);
+    const adsetsUrl = new URL(`https://graph.facebook.com/v23.0/${campaign_id}/adsets`);
     adsetsUrl.searchParams.set('fields', 'id,name,status');
     adsetsUrl.searchParams.set('limit', '100');
 
@@ -114,7 +114,7 @@ export async function fetchCampaignAdsets(c: Context) {
 
     // Fetch insights for each adset
     for (const adset of rawAdsets) {
-      const insightsUrl = new URL(`https://graph.facebook.com/v21.0/${adset.id}/insights`);
+      const insightsUrl = new URL(`https://graph.facebook.com/v23.0/${adset.id}/insights`);
       insightsUrl.searchParams.set('fields', 'spend,impressions,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas');
       insightsUrl.searchParams.set('time_range', JSON.stringify({
         since: formatDate(startDate),

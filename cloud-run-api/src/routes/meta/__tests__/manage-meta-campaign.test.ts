@@ -78,7 +78,7 @@ function buildApp() {
 
 type FetchMockFn = (url: string, init?: RequestInit) => Promise<Response>;
 
-const META_API = 'https://graph.facebook.com/v21.0';
+const META_API = 'https://graph.facebook.com/v23.0';
 
 /** Create a mock Response */
 function metaOk(data: Record<string, any>) {

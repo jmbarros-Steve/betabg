@@ -2,7 +2,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
-const META_API_VERSION = 'v21.0';
+const META_API_VERSION = 'v23.0';
 const META_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
 
 interface Portfolio {

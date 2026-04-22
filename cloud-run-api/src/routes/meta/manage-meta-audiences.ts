@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
-const META_API_BASE = 'https://graph.facebook.com/v21.0';
+const META_API_BASE = 'https://graph.facebook.com/v23.0';
 
 type Action = 'create_custom' | 'create_lookalike' | 'create_retargeting' | 'delete' | 'list';
 
@@ -253,27 +253,55 @@ async function handleList(
 ): Promise<{ body: any; status: number }> {
   console.log(`[manage-meta-audiences] Listing audiences for account ${accountId}`);
 
-  const result = await metaApiRequest(
-    `act_${accountId}/customaudiences`,
-    accessToken,
-    'GET',
-    {
-      fields: 'id,name,subtype,approximate_count_lower_bound,approximate_count_upper_bound,delivery_status,description,time_created',
-      limit: '100',
-    }
-  );
+  // Fetch customaudiences (CUSTOM, LOOKALIKE, WEBSITE, ENGAGEMENT, ...) and
+  // saved_audiences (presets of targeting) in parallel — both are surfaced in the wizard.
+  const [customResult, savedResult] = await Promise.all([
+    metaApiRequest(
+      `act_${accountId}/customaudiences`,
+      accessToken,
+      'GET',
+      {
+        fields: 'id,name,subtype,approximate_count_lower_bound,approximate_count_upper_bound,delivery_status,description,time_created',
+        limit: '100',
+      }
+    ),
+    metaApiRequest(
+      `act_${accountId}/saved_audiences`,
+      accessToken,
+      'GET',
+      {
+        fields: 'id,name,description,sentence_lines,approximate_count_lower_bound,approximate_count_upper_bound,run_status,targeting',
+        limit: '100',
+      }
+    ),
+  ]);
 
-  if (!result.ok) {
-    return { body: { error: 'Failed to list audiences', details: result.error }, status: 502 };
+  if (!customResult.ok) {
+    return { body: { error: 'Failed to list audiences', details: customResult.error }, status: 502 };
   }
 
-  const audiences = result.data?.data || [];
-  console.log(`[manage-meta-audiences] Found ${audiences.length} audiences`);
+  const customAudiences = (customResult.data?.data || []).map((a: any) => ({ ...a, source: 'custom' }));
+  const savedAudiences = (savedResult.ok ? savedResult.data?.data || [] : []).map((a: any) => ({
+    id: a.id,
+    name: a.name,
+    subtype: 'SAVED',
+    source: 'saved',
+    description: a.description || (a.sentence_lines || []).join(' · '),
+    approximate_count_lower_bound: a.approximate_count_lower_bound,
+    approximate_count_upper_bound: a.approximate_count_upper_bound,
+    delivery_status: a.run_status,
+    targeting: a.targeting,
+  }));
+
+  const audiences = [...customAudiences, ...savedAudiences];
+  console.log(`[manage-meta-audiences] Found ${customAudiences.length} custom + ${savedAudiences.length} saved = ${audiences.length} audiences`);
 
   return {
     body: {
       success: true,
       audiences,
+      saved_audiences: savedAudiences,
+      custom_audiences: customAudiences,
     },
     status: 200
   };

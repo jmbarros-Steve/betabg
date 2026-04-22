@@ -78,7 +78,7 @@ async function checkMetaCampaigns(supabase: ReturnType<typeof getSupabaseAdmin>)
 
     try {
       const metaRes = await fetch(
-        `https://graph.facebook.com/v21.0/${adAccountId}/campaigns?fields=name,status,daily_budget,lifetime_budget&limit=50`,
+        `https://graph.facebook.com/v23.0/${adAccountId}/campaigns?fields=name,status,daily_budget,lifetime_budget&limit=50`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       if (!metaRes.ok) {

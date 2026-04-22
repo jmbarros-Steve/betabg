@@ -1,5 +1,5 @@
 /**
- * Contract tests for Meta Graph API v21.0.
+ * Contract tests for Meta Graph API v23.0.
  *
  * These tests verify that our MSW mocks return the exact shapes
  * our application code expects. If the real Meta API changes its
@@ -14,7 +14,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { server } from '../mocks/server.js';
 
-const META_BASE = 'https://graph.facebook.com/v21.0';
+const META_BASE = 'https://graph.facebook.com/v23.0';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 afterEach(() => server.resetHandlers());

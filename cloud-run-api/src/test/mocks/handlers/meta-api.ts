@@ -1,5 +1,5 @@
 /**
- * MSW handlers for the Meta Graph API (v21.0).
+ * MSW handlers for the Meta Graph API (v23.0).
  * Matches the response shapes expected by:
  *   - src/lib/meta-fetch.ts (metaApiFetch, metaApiJson, metaApiPaginateAll)
  *   - src/routes/meta/sync-meta-metrics.ts (MetaInsightsResponse)
@@ -11,7 +11,7 @@
  */
 import { http, HttpResponse } from 'msw';
 
-const BASE = 'https://graph.facebook.com/v21.0';
+const BASE = 'https://graph.facebook.com/v23.0';
 
 export const metaHandlers = [
   // ────────────────────────────────────────────────────────────

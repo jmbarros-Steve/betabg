@@ -37,6 +37,25 @@ interface ReviewStepProps {
   descriptions?: string[];
   adSetFormat?: string;
   selectedAngle?: string;
+  // Pixel + conversion event
+  pixelName?: string;
+  customEventType?: string;
+  // Placements
+  placementsMode?: 'advantage' | 'manual';
+  selectedPlatforms?: string[];
+  fbPositions?: string[];
+  igPositions?: string[];
+  // Page + IG
+  pageLabel?: string;
+  igLabel?: string;
+  publishToInstagram?: boolean;
+  // UTMs
+  urlTagsPreview?: string;
+  // Advantage+ Creative
+  advFeatVisual?: boolean;
+  advFeatText?: boolean;
+  advFeatOverlays?: boolean;
+  advFeatTranslate?: boolean;
   // Actions
   onPublish?: () => void;
   onSaveDraft?: () => void;
@@ -71,6 +90,11 @@ export default function ReviewStep(props: ReviewStepProps) {
     funnelStage,
     headline, primaryText, description, imageUrl, cta, destinationUrl, pageName,
     images, headlines, primaryTexts, descriptions, adSetFormat, selectedAngle,
+    pixelName, customEventType,
+    placementsMode, selectedPlatforms, fbPositions, igPositions,
+    pageLabel, igLabel, publishToInstagram,
+    urlTagsPreview,
+    advFeatVisual, advFeatText, advFeatOverlays, advFeatTranslate,
     onPublish, onSaveDraft, submitting, savingDraft,
   } = props;
 
@@ -271,6 +295,99 @@ export default function ReviewStep(props: ReviewStepProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Pixel + conversion event */}
+      {objective === 'CONVERSIONS' && (pixelName || customEventType) && (
+        <Card>
+          <CardContent className="py-3 space-y-1">
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold">Pixel y evento</span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+              <span className="text-muted-foreground">Pixel:</span>
+              <span className="font-medium truncate">{pixelName || 'Auto'}</span>
+              <span className="text-muted-foreground">Evento:</span>
+              <span className="font-medium">{customEventType || 'PURCHASE'}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Placements */}
+      <Card>
+        <CardContent className="py-3 space-y-1">
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-primary" />
+            <span className="text-sm font-semibold">Ubicaciones</span>
+            <Badge variant="outline" className="text-[9px]">
+              {placementsMode === 'manual' ? 'Manual' : 'Advantage+'}
+            </Badge>
+          </div>
+          {placementsMode === 'manual' ? (
+            <div className="text-xs space-y-0.5">
+              <div><span className="text-muted-foreground">Plataformas:</span> <span className="font-medium">{(selectedPlatforms || []).join(', ') || '—'}</span></div>
+              {(selectedPlatforms || []).includes('facebook') && (fbPositions?.length ?? 0) > 0 && (
+                <div><span className="text-muted-foreground">Facebook:</span> <span className="font-medium">{fbPositions!.join(', ')}</span></div>
+              )}
+              {(selectedPlatforms || []).includes('instagram') && (igPositions?.length ?? 0) > 0 && (
+                <div><span className="text-muted-foreground">Instagram:</span> <span className="font-medium">{igPositions!.join(', ')}</span></div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Meta elige automáticamente las mejores ubicaciones.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Page + Instagram */}
+      <Card>
+        <CardContent className="py-3 space-y-1">
+          <div className="flex items-center gap-2">
+            <Megaphone className="w-4 h-4 text-primary" />
+            <span className="text-sm font-semibold">Página e Instagram</span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+            <span className="text-muted-foreground">Página FB:</span>
+            <span className="font-medium truncate">{pageLabel || pageName || '—'}</span>
+            <span className="text-muted-foreground">Instagram:</span>
+            <span className="font-medium truncate">
+              {publishToInstagram ? (igLabel ? `@${igLabel}` : 'Sin IG vinculado') : 'Solo Facebook'}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* UTMs */}
+      {urlTagsPreview && (
+        <Card>
+          <CardContent className="py-3 space-y-1">
+            <div className="flex items-center gap-2">
+              <Info className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold">UTMs</span>
+            </div>
+            <p className="text-[11px] font-mono break-all p-2 rounded bg-muted/40 border border-border/60">{urlTagsPreview}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Advantage+ Creative */}
+      {(advFeatVisual || advFeatText || advFeatOverlays || advFeatTranslate) && (
+        <Card>
+          <CardContent className="py-3 space-y-1">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold">Advantage+ Creative</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 text-[11px]">
+              {advFeatVisual && <Badge variant="outline" className="border-primary/40 bg-primary/5">Mejoras visuales</Badge>}
+              {advFeatText && <Badge variant="outline" className="border-primary/40 bg-primary/5">Optimización texto</Badge>}
+              {advFeatOverlays && <Badge variant="outline" className="border-primary/40 bg-primary/5">Overlays</Badge>}
+              {advFeatTranslate && <Badge variant="outline" className="border-primary/40 bg-primary/5">Traducción</Badge>}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Ad creative review */}
       {(allPrimaryTexts.some(Boolean) || allHeadlines.some(Boolean) || allImages.some(Boolean)) && (

@@ -70,7 +70,7 @@ export async function metaOauthCallback(c: Context) {
 
     // Exchange code for short-lived token (POST body keeps secret out of URL/logs)
     console.log('Exchanging code for token...');
-    const tokenResponse = await fetch('https://graph.facebook.com/v21.0/oauth/access_token', {
+    const tokenResponse = await fetch('https://graph.facebook.com/v23.0/oauth/access_token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -93,7 +93,7 @@ export async function metaOauthCallback(c: Context) {
     const accessToken = tokenData.access_token;
 
     // Exchange for long-lived token (POST body keeps secret out of URL/logs)
-    const longLivedResponse = await fetch('https://graph.facebook.com/v21.0/oauth/access_token', {
+    const longLivedResponse = await fetch('https://graph.facebook.com/v23.0/oauth/access_token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -116,11 +116,11 @@ export async function metaOauthCallback(c: Context) {
 
     // Fetch businesses and ad accounts (Authorization header, not URL params)
     const [accountsResponse, businessesResponse] = await Promise.all([
-      fetch('https://graph.facebook.com/v21.0/me/adaccounts?fields=name,account_id,account_status', {
+      fetch('https://graph.facebook.com/v23.0/me/adaccounts?fields=name,account_id,account_status', {
         headers: { Authorization: `Bearer ${finalToken}` },
         signal: AbortSignal.timeout(15_000),
       }),
-      fetch('https://graph.facebook.com/v21.0/me/businesses?fields=id,name', {
+      fetch('https://graph.facebook.com/v23.0/me/businesses?fields=id,name', {
         headers: { Authorization: `Bearer ${finalToken}` },
         signal: AbortSignal.timeout(15_000),
       }),

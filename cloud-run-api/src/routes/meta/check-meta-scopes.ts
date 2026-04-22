@@ -68,7 +68,7 @@ export async function checkMetaScopes(c: Context) {
     }
 
     // Check permissions via Meta Graph API (token in header, not URL)
-    const permResponse = await fetch('https://graph.facebook.com/v21.0/me/permissions', {
+    const permResponse = await fetch('https://graph.facebook.com/v23.0/me/permissions', {
       headers: { Authorization: `Bearer ${decryptedToken}` },
       signal: AbortSignal.timeout(15_000),
     });

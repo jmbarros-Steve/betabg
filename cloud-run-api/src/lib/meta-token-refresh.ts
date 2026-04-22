@@ -2,7 +2,7 @@ import { getSupabaseAdmin } from './supabase.js';
 import { safeQuerySingleOrDefault } from './safe-supabase.js';
 import { getTokenForConnection } from './resolve-meta-token.js';
 
-const META_API_VERSION = 'v21.0';
+const META_API_VERSION = 'v23.0';
 const REFRESH_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function isTokenExpiredError(error: any): boolean {

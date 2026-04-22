@@ -735,6 +735,14 @@ function AdSetForm({
   targetInterests, setTargetInterests,
   targetExcludeInterests, setTargetExcludeInterests,
   targetLocations, setTargetLocations,
+  // Pixel + conversion event
+  objective, availablePixels, selectedPixelId, setSelectedPixelId,
+  customEventType, setCustomEventType,
+  // Placements
+  placementsMode, setPlacementsMode,
+  selectedPlatforms, setSelectedPlatforms,
+  fbPositions, setFbPositions,
+  igPositions, setIgPositions,
 }: {
   name: string; setName: (v: string) => void;
   audienceDesc: string; setAudienceDesc: (v: string) => void;
@@ -751,6 +759,14 @@ function AdSetForm({
   targetInterests: Array<{ id: string; name: string }>; setTargetInterests: (v: Array<{ id: string; name: string }>) => void;
   targetExcludeInterests: Array<{ id: string; name: string }>; setTargetExcludeInterests: (v: Array<{ id: string; name: string }>) => void;
   targetLocations: Array<{ key: string; name: string; type: string; country_name: string }>; setTargetLocations: (v: Array<{ key: string; name: string; type: string; country_name: string }>) => void;
+  objective: Objective;
+  availablePixels: Array<{ id: string; name: string; last_fired: string | null }>;
+  selectedPixelId: string; setSelectedPixelId: (v: string) => void;
+  customEventType: string; setCustomEventType: (v: string) => void;
+  placementsMode: 'advantage' | 'manual'; setPlacementsMode: (v: 'advantage' | 'manual') => void;
+  selectedPlatforms: string[]; setSelectedPlatforms: (v: string[]) => void;
+  fbPositions: string[]; setFbPositions: (v: string[]) => void;
+  igPositions: string[]; setIgPositions: (v: string[]) => void;
 }) {
   // Fetch available audiences from Meta
   const [metaAudiences, setMetaAudiences] = useState<MetaAudienceOption[]>([]);
@@ -1083,6 +1099,191 @@ function AdSetForm({
               placeholder="Excluir: competidores, temas no relevantes..."
               isExclusion
             />
+          </div>
+        )}
+      </div>
+
+      {/* ═══════════ Pixel + Conversion event ═══════════ */}
+      {objective === 'CONVERSIONS' && (
+        <div className="space-y-3 p-4 rounded-lg border border-border/60 bg-muted/10">
+          <div className="flex items-center gap-2">
+            <Target className="w-4 h-4 text-primary" />
+            <Label className="text-sm font-semibold">Pixel y evento de conversión</Label>
+          </div>
+          <div>
+            <Label className="text-xs font-medium text-muted-foreground">Pixel</Label>
+            {availablePixels.length === 0 ? (
+              <p className="text-xs text-muted-foreground mt-1">Se usará automáticamente el primer pixel de la cuenta.</p>
+            ) : availablePixels.length === 1 ? (
+              <div className="mt-1.5 p-2 rounded-md border border-border/60 bg-background text-xs flex items-center gap-2">
+                <span className="font-medium">{availablePixels[0].name}</span>
+                <span className="text-muted-foreground text-[10px]">ID {availablePixels[0].id}</span>
+              </div>
+            ) : (
+              <Select value={selectedPixelId} onValueChange={setSelectedPixelId}>
+                <SelectTrigger className="h-9 mt-1"><SelectValue placeholder="Elige un pixel" /></SelectTrigger>
+                <SelectContent>
+                  {availablePixels.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} {p.last_fired ? '' : '(sin datos)'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <div>
+            <Label className="text-xs font-medium text-muted-foreground">Evento que optimizarás</Label>
+            <Select value={customEventType} onValueChange={setCustomEventType}>
+              <SelectTrigger className="h-9 mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PURCHASE">Compra (PURCHASE)</SelectItem>
+                <SelectItem value="INITIATED_CHECKOUT">Checkout iniciado</SelectItem>
+                <SelectItem value="ADD_TO_CART">Agregar al carrito</SelectItem>
+                <SelectItem value="LEAD">Lead</SelectItem>
+                <SelectItem value="COMPLETE_REGISTRATION">Registro completado</SelectItem>
+                <SelectItem value="CONTACT">Contacto</SelectItem>
+                <SelectItem value="SUBSCRIBE">Suscripción</SelectItem>
+                <SelectItem value="VIEW_CONTENT">Ver contenido</SelectItem>
+                <SelectItem value="SEARCH">Búsqueda</SelectItem>
+                <SelectItem value="ADD_PAYMENT_INFO">Agregar pago</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground mt-1">Meta optimizará la entrega para personas más propensas a completar este evento.</p>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════ Placements / Ubicaciones ═══════════ */}
+      <div className="space-y-3 p-4 rounded-lg border border-border/60 bg-muted/10">
+        <div className="flex items-center gap-2">
+          <Layers className="w-4 h-4 text-primary" />
+          <Label className="text-sm font-semibold">Ubicaciones del anuncio</Label>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setPlacementsMode('advantage')}
+            className={`flex flex-col items-start gap-1 p-3 rounded-lg border text-left transition-all ${
+              placementsMode === 'advantage' ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+            }`}
+          >
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              <span className="text-sm font-semibold">Advantage+ (recomendado)</span>
+            </div>
+            <span className="text-xs text-muted-foreground">Meta elige automáticamente dónde mostrar según la performance.</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPlacementsMode('manual')}
+            className={`flex flex-col items-start gap-1 p-3 rounded-lg border text-left transition-all ${
+              placementsMode === 'manual' ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+            }`}
+          >
+            <div className="flex items-center gap-1.5">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-primary" />
+              <span className="text-sm font-semibold">Manual</span>
+            </div>
+            <span className="text-xs text-muted-foreground">Eliges exactamente en qué plataformas y posiciones aparece.</span>
+          </button>
+        </div>
+
+        {placementsMode === 'manual' && (
+          <div className="space-y-3 pt-2">
+            <div>
+              <Label className="text-xs font-medium text-muted-foreground">Plataformas</Label>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {([
+                  { id: 'facebook', label: 'Facebook' },
+                  { id: 'instagram', label: 'Instagram' },
+                  { id: 'audience_network', label: 'Audience Network' },
+                  { id: 'messenger', label: 'Messenger' },
+                ]).map(p => {
+                  const isSelected = selectedPlatforms.includes(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPlatforms(isSelected
+                          ? selectedPlatforms.filter(x => x !== p.id)
+                          : [...selectedPlatforms, p.id]);
+                      }}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                        isSelected ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/30'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {selectedPlatforms.includes('facebook') && (
+              <div>
+                <Label className="text-xs font-medium text-muted-foreground">Posiciones en Facebook</Label>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {([
+                    { id: 'feed', label: 'Feed' },
+                    { id: 'facebook_reels', label: 'Reels' },
+                    { id: 'story', label: 'Stories' },
+                    { id: 'marketplace', label: 'Marketplace' },
+                    { id: 'video_feeds', label: 'Video Feeds' },
+                    { id: 'search', label: 'Búsqueda' },
+                    { id: 'instream_video', label: 'In-stream video' },
+                    { id: 'right_hand_column', label: 'Columna derecha' },
+                    { id: 'profile_feed', label: 'Feed de perfil' },
+                  ]).map(p => {
+                    const isSelected = fbPositions.includes(p.id);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setFbPositions(isSelected ? fbPositions.filter(x => x !== p.id) : [...fbPositions, p.id])}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                          isSelected ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/30'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {selectedPlatforms.includes('instagram') && (
+              <div>
+                <Label className="text-xs font-medium text-muted-foreground">Posiciones en Instagram</Label>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {([
+                    { id: 'stream', label: 'Feed' },
+                    { id: 'reels', label: 'Reels' },
+                    { id: 'story', label: 'Stories' },
+                    { id: 'explore', label: 'Explore' },
+                    { id: 'explore_home', label: 'Explore home' },
+                    { id: 'profile_feed', label: 'Perfil' },
+                    { id: 'shop', label: 'Shop' },
+                  ]).map(p => {
+                    const isSelected = igPositions.includes(p.id);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setIgPositions(isSelected ? igPositions.filter(x => x !== p.id) : [...igPositions, p.id])}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                          isSelected ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/30'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1892,11 +2093,253 @@ function PreviewPanel({
 }
 
 // ---------------------------------------------------------------------------
+// Page + Instagram picker (step ad-creative)
+// ---------------------------------------------------------------------------
+
+interface BizGroup {
+  businessId: string;
+  businessName: string;
+  pages?: Array<{ id: string; name: string; igAccountId: string | null; igAccountName: string | null }>;
+}
+
+function PageAndInstagramPicker({
+  businessGroups,
+  selectedPageId, setSelectedPageId,
+  selectedInstagramUserId, setSelectedInstagramUserId,
+  publishToInstagram, setPublishToInstagram,
+  defaultPageId, defaultIgId, defaultIgName,
+}: {
+  businessGroups: BizGroup[];
+  selectedPageId: string; setSelectedPageId: (v: string) => void;
+  selectedInstagramUserId: string; setSelectedInstagramUserId: (v: string) => void;
+  publishToInstagram: boolean; setPublishToInstagram: (v: boolean) => void;
+  defaultPageId: string | null;
+  defaultIgId: string | null;
+  defaultIgName: string | null;
+}) {
+  // Flatten unique pages across all business groups (dedup by id)
+  const allPages = (() => {
+    const seen = new Set<string>();
+    const out: Array<{ id: string; name: string; igAccountId: string | null; igAccountName: string | null }> = [];
+    for (const g of businessGroups || []) {
+      for (const p of g.pages || []) {
+        if (!seen.has(p.id)) { seen.add(p.id); out.push(p); }
+      }
+    }
+    return out;
+  })();
+
+  const effectivePageId = selectedPageId || defaultPageId || '';
+  const currentPage = allPages.find(p => p.id === effectivePageId);
+  const effectiveIgId = selectedInstagramUserId || currentPage?.igAccountId || defaultIgId || '';
+  const igName = currentPage?.igAccountName || defaultIgName || null;
+
+  return (
+    <div className="space-y-3 p-4 rounded-lg border border-border/60 bg-muted/10">
+      <div className="flex items-center gap-2">
+        <Megaphone className="w-4 h-4 text-primary" />
+        <Label className="text-sm font-semibold">Página de Facebook e Instagram</Label>
+      </div>
+
+      {/* Page picker — single read-only display when only 1 option, dropdown otherwise */}
+      <div>
+        <Label className="text-xs font-medium text-muted-foreground">Página de Facebook</Label>
+        {allPages.length <= 1 ? (
+          <div className="mt-1.5 p-2 rounded-md border border-border/60 bg-background text-xs flex items-center gap-2">
+            <span className="font-medium">{currentPage?.name || 'Tu Página'}</span>
+            {effectivePageId && <span className="text-muted-foreground text-[10px]">ID {effectivePageId}</span>}
+          </div>
+        ) : (
+          <Select
+            value={effectivePageId}
+            onValueChange={(v) => {
+              setSelectedPageId(v);
+              const p = allPages.find(x => x.id === v);
+              if (p?.igAccountId) setSelectedInstagramUserId(p.igAccountId);
+              else setSelectedInstagramUserId('');
+            }}
+          >
+            <SelectTrigger className="h-9 mt-1"><SelectValue placeholder="Elige una página" /></SelectTrigger>
+            <SelectContent>
+              {allPages.map(p => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name} {p.igAccountName ? `· IG: @${p.igAccountName}` : '(sin IG)'}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      {/* Instagram account */}
+      <div>
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-medium text-muted-foreground">Cuenta de Instagram</Label>
+          <button
+            type="button"
+            onClick={() => setPublishToInstagram(!publishToInstagram)}
+            className={`text-[11px] font-medium px-2 py-0.5 rounded-full border transition-all ${
+              publishToInstagram ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'
+            }`}
+          >
+            {publishToInstagram ? 'Publicar en IG' : 'Solo Facebook'}
+          </button>
+        </div>
+        {publishToInstagram ? (
+          effectiveIgId ? (
+            <div className="mt-1.5 p-2 rounded-md border border-border/60 bg-background text-xs flex items-center gap-2">
+              <span className="font-medium">{igName ? `@${igName}` : 'Cuenta de Instagram'}</span>
+              <span className="text-muted-foreground text-[10px]">ID {effectiveIgId}</span>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground mt-1.5">Esta página no tiene Instagram vinculado. Conecta IG en Meta Business Suite o cambia a "Solo Facebook".</p>
+          )
+        ) : (
+          <p className="text-xs text-muted-foreground mt-1.5">El anuncio se publicará solo en Facebook. Quita el toggle para incluir IG.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// UTM Builder (step ad-creative)
+// ---------------------------------------------------------------------------
+
+function UtmBuilder({
+  destinationUrl,
+  utmSource, setUtmSource,
+  utmMedium, setUtmMedium,
+  utmCampaign, setUtmCampaign,
+  utmContent, setUtmContent,
+  utmTerm, setUtmTerm,
+}: {
+  destinationUrl: string;
+  utmSource: string; setUtmSource: (v: string) => void;
+  utmMedium: string; setUtmMedium: (v: string) => void;
+  utmCampaign: string; setUtmCampaign: (v: string) => void;
+  utmContent: string; setUtmContent: (v: string) => void;
+  utmTerm: string; setUtmTerm: (v: string) => void;
+}) {
+  const parts: string[] = [];
+  if (utmSource.trim()) parts.push(`utm_source=${utmSource.trim()}`);
+  if (utmMedium.trim()) parts.push(`utm_medium=${utmMedium.trim()}`);
+  if (utmCampaign.trim()) parts.push(`utm_campaign=${utmCampaign.trim()}`);
+  if (utmContent.trim()) parts.push(`utm_content=${utmContent.trim()}`);
+  if (utmTerm.trim()) parts.push(`utm_term=${utmTerm.trim()}`);
+  const urlTags = parts.join('&');
+  const joiner = destinationUrl.includes('?') ? '&' : '?';
+  const previewUrl = destinationUrl ? `${destinationUrl}${urlTags ? joiner + urlTags : ''}` : urlTags;
+
+  return (
+    <div className="space-y-3 p-4 rounded-lg border border-border/60 bg-muted/10">
+      <div className="flex items-center gap-2">
+        <LinkIcon className="w-4 h-4 text-primary" />
+        <Label className="text-sm font-semibold">UTMs (seguimiento)</Label>
+      </div>
+      <p className="text-[11px] text-muted-foreground">Meta expande los <code className="px-1 rounded bg-muted/50">{`{{macros}}`}</code> por click con el nombre real de la campaña, ad set y anuncio.</p>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs font-medium text-muted-foreground">utm_source</Label>
+          <Input value={utmSource} onChange={(e) => setUtmSource(e.target.value)} placeholder="facebook" className="mt-1 h-9 text-xs" />
+        </div>
+        <div>
+          <Label className="text-xs font-medium text-muted-foreground">utm_medium</Label>
+          <Input value={utmMedium} onChange={(e) => setUtmMedium(e.target.value)} placeholder="cpc" className="mt-1 h-9 text-xs" />
+        </div>
+        <div className="col-span-2">
+          <Label className="text-xs font-medium text-muted-foreground">utm_campaign</Label>
+          <Input value={utmCampaign} onChange={(e) => setUtmCampaign(e.target.value)} placeholder="{{campaign.name}}" className="mt-1 h-9 text-xs font-mono" />
+        </div>
+        <div>
+          <Label className="text-xs font-medium text-muted-foreground">utm_content</Label>
+          <Input value={utmContent} onChange={(e) => setUtmContent(e.target.value)} placeholder="{{ad.name}}" className="mt-1 h-9 text-xs font-mono" />
+        </div>
+        <div>
+          <Label className="text-xs font-medium text-muted-foreground">utm_term</Label>
+          <Input value={utmTerm} onChange={(e) => setUtmTerm(e.target.value)} placeholder="{{adset.name}}" className="mt-1 h-9 text-xs font-mono" />
+        </div>
+      </div>
+
+      {previewUrl && (
+        <div className="pt-2">
+          <Label className="text-[10px] text-muted-foreground">URL final (preview)</Label>
+          <p className="text-[11px] font-mono break-all mt-1 p-2 rounded bg-background border border-border/60">{previewUrl}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Advantage+ Creative toggles (step ad-creative)
+// ---------------------------------------------------------------------------
+
+function AdvantageCreativeToggles({
+  visual, setVisual,
+  text, setText,
+  overlays, setOverlays,
+  translate, setTranslate,
+}: {
+  visual: boolean; setVisual: (v: boolean) => void;
+  text: boolean; setText: (v: boolean) => void;
+  overlays: boolean; setOverlays: (v: boolean) => void;
+  translate: boolean; setTranslate: (v: boolean) => void;
+}) {
+  const toggles: Array<{ on: boolean; set: (v: boolean) => void; label: string; desc: string }> = [
+    { on: visual, set: setVisual, label: 'Mejoras visuales', desc: 'Meta ajusta luz, contraste y recorta automático a cada ubicación.' },
+    { on: text, set: setText, label: 'Optimización de texto', desc: 'Meta puede reordenar o reformatear tu copy para mejorar performance.' },
+    { on: overlays, set: setOverlays, label: 'Overlays + plantillas', desc: 'Meta superpone precios o CTAs sobre la imagen en feed (útil ecommerce).' },
+    { on: translate, set: setTranslate, label: 'Traducción automática', desc: 'Meta traduce el ad al idioma de cada viewer (útil LATAM multi-país).' },
+  ];
+
+  return (
+    <div className="space-y-3 p-4 rounded-lg border border-border/60 bg-muted/10">
+      <div className="flex items-center gap-2">
+        <Sparkles className="w-4 h-4 text-primary" />
+        <Label className="text-sm font-semibold">Advantage+ Creative</Label>
+      </div>
+      <p className="text-[11px] text-muted-foreground">Meta genera variantes automáticas de tu creativo. Activa solo las que te hagan sentido — Meta las aplica sin destruir el original.</p>
+      <div className="space-y-2">
+        {toggles.map((t, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => t.set(!t.on)}
+            className={`w-full flex items-start justify-between gap-3 p-2.5 rounded-md border text-left transition-all ${
+              t.on ? 'border-primary/40 bg-primary/5' : 'border-border hover:border-primary/30'
+            }`}
+          >
+            <div className="min-w-0">
+              <p className="text-xs font-semibold">{t.label}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{t.desc}</p>
+            </div>
+            <div className={`shrink-0 w-9 h-5 rounded-full transition-all relative ${t.on ? 'bg-primary' : 'bg-muted'}`}>
+              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${t.on ? 'left-[18px]' : 'left-0.5'}`} />
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
 export default function CampaignCreateWizard({ clientId, onBack, onComplete, startFrom = 'campaign' }: CampaignCreateWizardProps) {
-  const { connectionId: ctxConnectionId, pageId: ctxPageId, pageName } = useMetaBusiness();
+  const {
+    connectionId: ctxConnectionId,
+    pageId: ctxPageId,
+    pageName: ctxPageName,
+    igAccountId: ctxIgAccountId,
+    igAccountName: ctxIgAccountName,
+    pixelId: ctxPixelId,
+    businessGroups: ctxBusinessGroups,
+  } = useMetaBusiness();
+  const pageName = ctxPageName;
   const briefChips = useBriefContext(clientId);
 
   // Wizard navigation
@@ -1975,6 +2418,40 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [cta, setCta] = useState('SHOP_NOW');
   const [destinationUrl, setDestinationUrl] = useState('');
 
+  // ═══════════ Pixel + Conversion Event (step 2) ═══════════
+  const [availablePixels, setAvailablePixels] = useState<Array<{ id: string; name: string; last_fired: string | null }>>([]);
+  const [selectedPixelId, setSelectedPixelId] = useState<string>('');
+  const [customEventType, setCustomEventType] = useState<string>('PURCHASE');
+
+  // ═══════════ Placements (step 2) ═══════════
+  // Advantage+ Placements = omit publisher_platforms (Meta auto-selects).
+  // Manual mode = user picks platforms + positions explicitly.
+  const [placementsMode, setPlacementsMode] = useState<'advantage' | 'manual'>('advantage');
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['facebook', 'instagram']);
+  const [fbPositions, setFbPositions] = useState<string[]>(['feed', 'facebook_reels', 'story']);
+  const [igPositions, setIgPositions] = useState<string[]>(['stream', 'reels', 'story', 'explore']);
+  const [anPositions, setAnPositions] = useState<string[]>(['classic']);
+  const [msgrPositions, setMsgrPositions] = useState<string[]>(['story']);
+
+  // ═══════════ Page + Instagram account (step ad-creative) ═══════════
+  const [selectedPageId, setSelectedPageId] = useState<string>('');
+  const [selectedInstagramUserId, setSelectedInstagramUserId] = useState<string>('');
+  const [publishToInstagram, setPublishToInstagram] = useState<boolean>(true);
+
+  // ═══════════ UTMs (step ad-creative) ═══════════
+  const [utmSource, setUtmSource] = useState<string>('facebook');
+  const [utmMedium, setUtmMedium] = useState<string>('cpc');
+  const [utmCampaign, setUtmCampaign] = useState<string>('{{campaign.name}}');
+  const [utmContent, setUtmContent] = useState<string>('{{ad.name}}');
+  const [utmTerm, setUtmTerm] = useState<string>('{{adset.name}}');
+
+  // ═══════════ Advantage+ Creative features (step ad-creative) ═══════════
+  // Granular opt-in per feature (v22+ deprecated the standard_enhancements bundle).
+  const [advFeatVisual, setAdvFeatVisual] = useState<boolean>(true);   // image_touchups + image_brightness_and_contrast / video_auto_crop
+  const [advFeatText, setAdvFeatText] = useState<boolean>(true);       // text_optimizations + text_formatting_optimization
+  const [advFeatOverlays, setAdvFeatOverlays] = useState<boolean>(false); // image_templates + add_text_overlay
+  const [advFeatTranslate, setAdvFeatTranslate] = useState<boolean>(false); // text_translation + image_text_translation
+
   // Reset slot counts when format changes
   useEffect(() => {
     const imgCount = adSetFormat === 'single' ? 1 : 3;
@@ -2017,28 +2494,67 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       .finally(() => setCatalogsLoading(false));
   }, [objective, ctxConnectionId]);
 
+  // Load available pixels for the connected ad account (shown in step 2 when objective=CONVERSIONS).
+  // manage-meta-pixel action=list returns every pixel attached to the ad account.
+  useEffect(() => {
+    if (!ctxConnectionId || objective !== 'CONVERSIONS') return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await callApi('manage-meta-pixel', {
+        body: { action: 'list', connection_id: ctxConnectionId },
+      });
+      if (cancelled || !data?.pixels) return;
+      setAvailablePixels(data.pixels);
+      // Prefer the context pixel, else first pixel on the account
+      if (!selectedPixelId) {
+        setSelectedPixelId(ctxPixelId || data.pixels[0]?.id || '');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [ctxConnectionId, objective, ctxPixelId]);
+
+  // Sync Page + IG defaults from the Meta business context whenever it changes
+  // (portfolio switch). Only overwrite when the user hasn't explicitly picked one.
+  useEffect(() => {
+    if (ctxPageId && !selectedPageId) setSelectedPageId(ctxPageId);
+    if (ctxIgAccountId && !selectedInstagramUserId) setSelectedInstagramUserId(ctxIgAccountId);
+  }, [ctxPageId, ctxIgAccountId]);
+
   // Auto-generate campaign name: [Marca]-[OBJ]-[Audiencia]-[MesAño]
+  // Audience detection order:
+  //   1) custom/lookalike/saved audience selected in step 2 → LAL / RTG / CUSTOM / SAVED
+  //   2) free-text audienceDesc keywords (lookalike/similar/remarketing/custom)
+  //   3) free-text audienceDesc slug (first 15 chars)
+  //   4) funnelStage uppercased (only if user already chose one — skipped at step 1)
   const generateCampaignName = useCallback(() => {
     const parts: string[] = [];
     if (clientBrandName) parts.push(clientBrandName);
     const objShort: Record<string, string> = { CONVERSIONS: 'CONV', TRAFFIC: 'TRAF', AWARENESS: 'AWR', ENGAGEMENT: 'ENG', CATALOG: 'CATL' };
     parts.push(objShort[objective] || objective);
-    // Audience shorthand
+
     const audLower = audienceDesc.toLowerCase();
-    if (audLower.includes('lookalike') || audLower.includes('similar')) parts.push('LAL');
+    const audienceWasSelected = selectedAudienceIds.length > 0;
+    if (audienceWasSelected) {
+      // Pick a tag based on the joined audience names
+      if (audLower.includes('lookalike') || audLower.includes('similar') || audLower.includes('parec')) parts.push('LAL');
+      else if (audLower.includes('retarg') || audLower.includes('remarketing') || audLower.includes('rtg')) parts.push('RTG');
+      else if (audLower.includes('saved') || audLower.includes('guardad')) parts.push('SAVED');
+      else parts.push('AUD');
+    } else if (audLower.includes('lookalike') || audLower.includes('similar')) parts.push('LAL');
     else if (audLower.includes('retarg') || audLower.includes('remarketing') || audLower.includes('custom')) parts.push('RTG');
     else if (audienceDesc.trim()) parts.push(audienceDesc.substring(0, 15).replace(/\s+/g, ''));
-    else if (funnelStage) parts.push(funnelStage.toUpperCase());
+    // No fallback to funnelStage — avoids stamping "TOFU" before the user picks audience.
+
     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     const now = new Date();
     parts.push(`${months[now.getMonth()]}${String(now.getFullYear()).slice(-2)}`);
     return parts.join('-');
-  }, [clientBrandName, objective, audienceDesc, funnelStage]);
+  }, [clientBrandName, objective, audienceDesc, selectedAudienceIds]);
 
   useEffect(() => {
     if (campNameEdited) return; // Don't overwrite manual edits
     setCampName(generateCampaignName());
-  }, [objective, funnelStage, audienceDesc, clientBrandName, generateCampaignName, campNameEdited]);
+  }, [objective, audienceDesc, selectedAudienceIds, clientBrandName, generateCampaignName, campNameEdited]);
 
   // Auto-load CPA from brief (buyer_personas)
   useEffect(() => {
@@ -2491,6 +3007,32 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       const filledImages = images.filter(Boolean);
       const filledDescriptions = descriptions.filter(Boolean);
 
+      // Build url_tags (UTM) — keep Meta macros as literal placeholders so Meta expands them per click.
+      const utmParts: string[] = [];
+      if (utmSource.trim()) utmParts.push(`utm_source=${utmSource.trim()}`);
+      if (utmMedium.trim()) utmParts.push(`utm_medium=${utmMedium.trim()}`);
+      if (utmCampaign.trim()) utmParts.push(`utm_campaign=${utmCampaign.trim()}`);
+      if (utmContent.trim()) utmParts.push(`utm_content=${utmContent.trim()}`);
+      if (utmTerm.trim()) utmParts.push(`utm_term=${utmTerm.trim()}`);
+      const urlTags = utmParts.join('&');
+
+      // Build creative_features map for Advantage+ Creative (opt-in granular, v22+).
+      // Each toggle enables 1-2 real feature flags from the spec.
+      const creativeFeatures: Record<string, 'OPT_IN' | 'OPT_OUT'> = {};
+      creativeFeatures.image_touchups = advFeatVisual ? 'OPT_IN' : 'OPT_OUT';
+      creativeFeatures.image_brightness_and_contrast = advFeatVisual ? 'OPT_IN' : 'OPT_OUT';
+      creativeFeatures.video_auto_crop = advFeatVisual ? 'OPT_IN' : 'OPT_OUT';
+      creativeFeatures.text_optimizations = advFeatText ? 'OPT_IN' : 'OPT_OUT';
+      creativeFeatures.text_formatting_optimization = advFeatText ? 'OPT_IN' : 'OPT_OUT';
+      if (advFeatOverlays) {
+        creativeFeatures.image_templates = 'OPT_IN';
+        creativeFeatures.add_text_overlay = 'OPT_IN';
+      }
+      if (advFeatTranslate) {
+        creativeFeatures.text_translation = 'OPT_IN';
+        creativeFeatures.image_text_translation = 'OPT_IN';
+      }
+
       const submitData: Record<string, any> = {
         name,
         objective: objMap[objective],
@@ -2510,12 +3052,20 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         image_url: filledImages[0] || undefined,
         cta: cta || 'SHOP_NOW',
         destination_url: destinationUrl || undefined,
-        page_id: ctxPageId || undefined,
+        page_id: selectedPageId || ctxPageId || undefined,
+        instagram_user_id: publishToInstagram ? (selectedInstagramUserId || ctxIgAccountId || undefined) : undefined,
         ad_set_format: adSetFormat,
         images: filledImages.length > 0 ? filledImages : undefined,
         texts: filledTexts.length > 0 ? filledTexts : undefined,
         headlines: filledHeadlines.length > 0 ? filledHeadlines : undefined,
         descriptions: filledDescriptions.length > 0 ? filledDescriptions : undefined,
+        // Pixel + conversion event (when objective is CONVERSIONS)
+        pixel_id: objective === 'CONVERSIONS' && selectedPixelId ? selectedPixelId : undefined,
+        custom_event_type: objective === 'CONVERSIONS' ? customEventType : undefined,
+        // UTM tags on the ad
+        url_tags: urlTags || undefined,
+        // Advantage+ Creative features
+        creative_features: creativeFeatures,
       };
 
       // Use existing entities if selected
@@ -2576,6 +3126,16 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           };
         }
         submitData.targeting = targetingSpec;
+
+        // Placements — only send explicit lists when the user chose "Manual".
+        // Advantage+ Placements = omit these fields (Meta auto-selects).
+        if (placementsMode === 'manual' && selectedPlatforms.length > 0) {
+          submitData.publisher_platforms = selectedPlatforms;
+          if (selectedPlatforms.includes('facebook') && fbPositions.length > 0) submitData.facebook_positions = fbPositions;
+          if (selectedPlatforms.includes('instagram') && igPositions.length > 0) submitData.instagram_positions = igPositions;
+          if (selectedPlatforms.includes('audience_network') && anPositions.length > 0) submitData.audience_network_positions = anPositions;
+          if (selectedPlatforms.includes('messenger') && msgrPositions.length > 0) submitData.messenger_positions = msgrPositions;
+        }
       }
 
       if (!existingCampaignId && startDate) {
@@ -2890,6 +3450,14 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   targetInterests={targetInterests} setTargetInterests={setTargetInterests}
                   targetExcludeInterests={targetExcludeInterests} setTargetExcludeInterests={setTargetExcludeInterests}
                   targetLocations={targetLocations} setTargetLocations={setTargetLocations}
+                  objective={objective}
+                  availablePixels={availablePixels}
+                  selectedPixelId={selectedPixelId} setSelectedPixelId={setSelectedPixelId}
+                  customEventType={customEventType} setCustomEventType={setCustomEventType}
+                  placementsMode={placementsMode} setPlacementsMode={setPlacementsMode}
+                  selectedPlatforms={selectedPlatforms} setSelectedPlatforms={setSelectedPlatforms}
+                  fbPositions={fbPositions} setFbPositions={setFbPositions}
+                  igPositions={igPositions} setIgPositions={setIgPositions}
                 />
               )}
 
@@ -2934,7 +3502,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
 
               {/* AD CREATIVE step */}
               {currentStep === 'ad-creative' && (
-                <div className="relative">
+                <div className="relative space-y-6">
                   {/* Auto-generation overlay */}
                   {autoGenerating && (
                     <div className="absolute inset-0 z-20 bg-background/80 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center gap-4 pointer-events-auto">
@@ -2978,44 +3546,100 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                     />
                   )}
                 </div>
+
+                <PageAndInstagramPicker
+                  businessGroups={ctxBusinessGroups}
+                  selectedPageId={selectedPageId}
+                  setSelectedPageId={setSelectedPageId}
+                  selectedInstagramUserId={selectedInstagramUserId}
+                  setSelectedInstagramUserId={setSelectedInstagramUserId}
+                  publishToInstagram={publishToInstagram}
+                  setPublishToInstagram={setPublishToInstagram}
+                  defaultPageId={ctxPageId}
+                  defaultIgId={ctxIgAccountId}
+                  defaultIgName={ctxIgAccountName}
+                />
+
+                <UtmBuilder
+                  destinationUrl={destinationUrl}
+                  utmSource={utmSource} setUtmSource={setUtmSource}
+                  utmMedium={utmMedium} setUtmMedium={setUtmMedium}
+                  utmCampaign={utmCampaign} setUtmCampaign={setUtmCampaign}
+                  utmContent={utmContent} setUtmContent={setUtmContent}
+                  utmTerm={utmTerm} setUtmTerm={setUtmTerm}
+                />
+
+                <AdvantageCreativeToggles
+                  visual={advFeatVisual} setVisual={setAdvFeatVisual}
+                  text={advFeatText} setText={setAdvFeatText}
+                  overlays={advFeatOverlays} setOverlays={setAdvFeatOverlays}
+                  translate={advFeatTranslate} setTranslate={setAdvFeatTranslate}
+                />
                 </div>
               )}
 
               {/* REVIEW step */}
-              {currentStep === 'review' && (
-                <ReviewStep
-                  existingCampaignId={existingCampaignId}
-                  existingCampaignName={existingCampaignName}
-                  campName={campName}
-                  budgetType={budgetType}
-                  objective={objective}
-                  campBudget={campBudget}
-                  startDate={startDate}
-                  existingAdsetId={existingAdsetId}
-                  existingAdsetName={existingAdsetName}
-                  adsetName={adsetName}
-                  audienceDesc={audienceDesc}
-                  adsetBudget={adsetBudget}
-                  funnelStage={funnelStage}
-                  headline={headlines[0] || ''}
-                  primaryText={primaryTexts[0] || ''}
-                  description={descriptions[0] || ''}
-                  imageUrl={images[0] || ''}
-                  cta={cta}
-                  destinationUrl={destinationUrl}
-                  pageName={pageName || 'Tu Marca'}
-                  images={images.filter(Boolean)}
-                  headlines={headlines}
-                  primaryTexts={primaryTexts}
-                  descriptions={descriptions}
-                  adSetFormat={adSetFormat}
-                  selectedAngle={selectedAngle}
-                  onPublish={handleSubmit}
-                  onSaveDraft={handleSaveDraft}
-                  submitting={submitting}
-                  savingDraft={savingDraft}
-                />
-              )}
+              {currentStep === 'review' && (() => {
+                // Rebuild UTM preview for display
+                const utmParts: string[] = [];
+                if (utmSource.trim()) utmParts.push(`utm_source=${utmSource.trim()}`);
+                if (utmMedium.trim()) utmParts.push(`utm_medium=${utmMedium.trim()}`);
+                if (utmCampaign.trim()) utmParts.push(`utm_campaign=${utmCampaign.trim()}`);
+                if (utmContent.trim()) utmParts.push(`utm_content=${utmContent.trim()}`);
+                if (utmTerm.trim()) utmParts.push(`utm_term=${utmTerm.trim()}`);
+                const urlTagsPreview = utmParts.join('&');
+                const pixelName = (availablePixels.find(p => p.id === selectedPixelId)?.name) || (selectedPixelId ? `Pixel ${selectedPixelId}` : undefined);
+                const allPages = (ctxBusinessGroups || []).flatMap(g => g.pages || []);
+                const currentPage = allPages.find(p => p.id === (selectedPageId || ctxPageId));
+                return (
+                  <ReviewStep
+                    existingCampaignId={existingCampaignId}
+                    existingCampaignName={existingCampaignName}
+                    campName={campName}
+                    budgetType={budgetType}
+                    objective={objective}
+                    campBudget={campBudget}
+                    startDate={startDate}
+                    existingAdsetId={existingAdsetId}
+                    existingAdsetName={existingAdsetName}
+                    adsetName={adsetName}
+                    audienceDesc={audienceDesc}
+                    adsetBudget={adsetBudget}
+                    funnelStage={funnelStage}
+                    headline={headlines[0] || ''}
+                    primaryText={primaryTexts[0] || ''}
+                    description={descriptions[0] || ''}
+                    imageUrl={images[0] || ''}
+                    cta={cta}
+                    destinationUrl={destinationUrl}
+                    pageName={pageName || 'Tu Marca'}
+                    images={images.filter(Boolean)}
+                    headlines={headlines}
+                    primaryTexts={primaryTexts}
+                    descriptions={descriptions}
+                    adSetFormat={adSetFormat}
+                    selectedAngle={selectedAngle}
+                    pixelName={pixelName}
+                    customEventType={customEventType}
+                    placementsMode={placementsMode}
+                    selectedPlatforms={selectedPlatforms}
+                    fbPositions={fbPositions}
+                    igPositions={igPositions}
+                    pageLabel={currentPage?.name || pageName || undefined}
+                    igLabel={currentPage?.igAccountName || ctxIgAccountName || undefined}
+                    publishToInstagram={publishToInstagram}
+                    urlTagsPreview={urlTagsPreview}
+                    advFeatVisual={advFeatVisual}
+                    advFeatText={advFeatText}
+                    advFeatOverlays={advFeatOverlays}
+                    advFeatTranslate={advFeatTranslate}
+                    onPublish={handleSubmit}
+                    onSaveDraft={handleSaveDraft}
+                    submitting={submitting}
+                    savingDraft={savingDraft}
+                  />
+                );
+              })()}
             </CardContent>
           </Card>
 

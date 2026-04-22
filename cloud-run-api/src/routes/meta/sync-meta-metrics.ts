@@ -223,7 +223,7 @@ export async function syncMetaMetrics(c: Context) {
       'purchase_roas'
     ].join(',');
 
-    const insightsUrl = new URL(`https://graph.facebook.com/v21.0/${adAccountId}/insights`);
+    const insightsUrl = new URL(`https://graph.facebook.com/v23.0/${adAccountId}/insights`);
     insightsUrl.searchParams.set('fields', fields);
     insightsUrl.searchParams.set('time_range', JSON.stringify({
       since: formatDate(startDate),

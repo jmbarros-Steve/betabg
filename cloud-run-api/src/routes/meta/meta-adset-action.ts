@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getTokenForConnection } from '../../lib/resolve-meta-token.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
-const META_API_BASE = 'https://graph.facebook.com/v21.0';
+const META_API_BASE = 'https://graph.facebook.com/v23.0';
 
 type AdSetAction = 'pause' | 'resume';
 

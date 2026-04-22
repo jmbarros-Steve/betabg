@@ -167,7 +167,7 @@ export async function executeTokenHealth(
       const timeout = setTimeout(() => controller.abort(), 30_000);
       try {
         const res = await fetch(
-          'https://graph.facebook.com/v21.0/me?fields=id,name',
+          'https://graph.facebook.com/v23.0/me?fields=id,name',
           {
             headers: { Authorization: `Bearer ${decryptedToken}` },
             signal: controller.signal,
