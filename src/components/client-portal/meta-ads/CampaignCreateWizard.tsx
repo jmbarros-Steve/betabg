@@ -1763,8 +1763,13 @@ function AdFormMultiSlot({
     if (file.size > 20 * 1024 * 1024) { toast.error('Max 20MB'); return; }
     setUploading(true);
     try {
+      // The client-assets bucket policy requires the first folder of the path
+      // to equal auth.uid() — using any other string (e.g. "assets") fails RLS
+      // for every non-admin user. Match the pattern used by BrandAssetUploader.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No hay sesión activa');
       const ext = file.name.split('.').pop() || 'png';
-      const path = `assets/${clientId}/uploads/${Date.now()}.${ext}`;
+      const path = `${user.id}/meta-uploads/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
       const { error: upErr } = await supabase.storage.from('client-assets').upload(path, file, { upsert: false });
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from('client-assets').getPublicUrl(path);
