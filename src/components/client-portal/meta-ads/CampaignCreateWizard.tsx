@@ -2690,7 +2690,7 @@ function InterestAISuggestButton({
             {loading && (
               <div className="flex items-center gap-2 py-6 justify-center">
                 <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                <span className="text-sm text-muted-foreground">Claude está pensando…</span>
+                <span className="text-sm text-muted-foreground">Steve está pensando…</span>
               </div>
             )}
             {error && <p className="text-sm text-red-600">{error}</p>}
@@ -3216,6 +3216,16 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [images, setImages] = useState<string[]>(['']);
   const [cta, setCta] = useState('SHOP_NOW');
   const [destinationUrl, setDestinationUrl] = useState('');
+
+  // Ad name — Meta shows this in Ads Manager. Auto-suggests from the first
+  // headline if the user hasn't typed one yet.
+  const [adName, setAdName] = useState('');
+  const [adNameEdited, setAdNameEdited] = useState(false);
+  useEffect(() => {
+    if (adNameEdited) return;
+    const firstHeadline = headlines.find(h => h.trim());
+    if (firstHeadline) setAdName(firstHeadline.slice(0, 80));
+  }, [headlines, adNameEdited]);
 
   // ═══════════ Pixel + Conversion Event (step 2) ═══════════
   const [availablePixels, setAvailablePixels] = useState<Array<{ id: string; name: string; last_fired: string | null }>>([]);
@@ -3924,6 +3934,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         // Content source: 'advantage_catalog' uses product catalog template creative,
         // 'manual' uses the uploaded images/text.
         content_source: contentSource,
+        // Ad name — defaults to first headline on backend if empty.
+        ad_name: adName.trim() || undefined,
       };
 
       // Use existing entities if selected
@@ -4510,6 +4522,22 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                       destinationUrl={destinationUrl}
                     />
                   )}
+                </div>
+
+                <div className="p-4 rounded-lg border border-border/60 bg-muted/10 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <FileImage className="w-4 h-4 text-primary" />
+                    <Label className="text-sm font-semibold">Nombre del anuncio</Label>
+                  </div>
+                  <Input
+                    value={adName}
+                    onChange={(e) => { setAdName(e.target.value); setAdNameEdited(true); }}
+                    placeholder={headlines[0] || 'Ej: Razas Pet - Nacuttus - Abr26'}
+                    className="text-sm"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Así aparece en Meta Ads Manager. Si no lo editas, Steve usa el primer titular.
+                  </p>
                 </div>
 
                 <PageAndInstagramPicker

@@ -716,14 +716,19 @@ async function handleCreate(
       const uniqueHeadlines = [...new Set(allHeadlines.filter(Boolean))];
       const uniqueDescriptions = [...new Set(allDescriptions.filter(Boolean))];
 
-      // Build asset_feed_spec for Dynamic Creative
+      // Build asset_feed_spec for Dynamic Creative.
+      // `ad_formats: ['AUTOMATIC_FORMAT']` tells Meta to pick the optimal format
+      // per placement (single image, video, carousel, collection) — this is what
+      // makes the ad show up as "Flexible" in Ads Manager. Using ['SINGLE_IMAGE']
+      // here forces the ad into "Una sola imagen o video" mode even when DCT is
+      // active at the ad set level — that was the bug.
       const assetFeedSpec: Record<string, any> = {
         images: uniqueHashes.map((h) => ({ hash: h })),
         bodies: uniqueTexts.map((t) => ({ text: t })),
         titles: uniqueHeadlines.map((t) => ({ text: t })),
         call_to_action_types: [cta || 'SHOP_NOW'],
         link_urls: [{ website_url: destUrl }],
-        ad_formats: ['SINGLE_IMAGE'],
+        ad_formats: ['AUTOMATIC_FORMAT'],
       };
 
       if (uniqueDescriptions.length > 0) {
@@ -926,7 +931,11 @@ async function handleCreate(
     // Step 3b: Create ad (same for all formats)
     if (creativeId) {
       const adPayload: Record<string, any> = {
-        name: allHeadlines[0] || headline || `${name} - Ad`,
+        // Prefer explicit `ad_name` from the wizard; fall back to first headline
+        // or the campaign name. Truncate to Meta's 512-char limit.
+        name: (data.ad_name && typeof data.ad_name === 'string' && data.ad_name.trim())
+          ? data.ad_name.trim().slice(0, 512)
+          : (allHeadlines[0] || headline || `${name} - Ad`).slice(0, 512),
         adset_id: adSetId,
         creative: JSON.stringify({ creative_id: creativeId }),
         status,
