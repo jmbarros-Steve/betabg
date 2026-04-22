@@ -759,6 +759,8 @@ function AdSetForm({
   targetInterests, setTargetInterests,
   targetExcludeInterests, setTargetExcludeInterests,
   targetLocations, setTargetLocations,
+  clientId,
+  selectedProductId,
   // Pixel + conversion event
   objective, availablePixels, selectedPixelId, setSelectedPixelId,
   customEventType, setCustomEventType,
@@ -783,6 +785,8 @@ function AdSetForm({
   targetInterests: Array<{ id: string; name: string }>; setTargetInterests: (v: Array<{ id: string; name: string }>) => void;
   targetExcludeInterests: Array<{ id: string; name: string }>; setTargetExcludeInterests: (v: Array<{ id: string; name: string }>) => void;
   targetLocations: Array<{ key: string; name: string; type: string; country_name: string }>; setTargetLocations: (v: Array<{ key: string; name: string; type: string; country_name: string }>) => void;
+  clientId: string;
+  selectedProductId?: string;
   objective: Objective;
   availablePixels: Array<{ id: string; name: string; last_fired: string | null }>;
   selectedPixelId: string; setSelectedPixelId: (v: string) => void;
@@ -1120,7 +1124,20 @@ function AdSetForm({
 
         {/* ── Interests (Detailed Targeting) ── */}
         <div>
-          <Label className="text-xs font-medium text-muted-foreground">Intereses y comportamientos</Label>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-medium text-muted-foreground">Intereses y comportamientos</Label>
+            <InterestAISuggestButton
+              clientId={clientId}
+              connectionId={connectionId}
+              productId={selectedProductId}
+              selectedInterests={targetInterests}
+              onAdd={(interest) => {
+                if (!targetInterests.find(i => i.id === interest.id)) {
+                  setTargetInterests([...targetInterests, interest]);
+                }
+              }}
+            />
+          </div>
           <p className="text-[10px] text-muted-foreground mb-1.5">Busca intereses de Meta para segmentar tu audiencia con precisión.</p>
           <InterestSearch
             connectionId={connectionId}
@@ -2590,6 +2607,138 @@ function PageAndInstagramPicker({
 // ---------------------------------------------------------------------------
 // UTM Builder (step ad-creative)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Interest AI Suggest — calls /api/steve-suggest-interests and opens a panel
+// with Claude-proposed interests resolved against Meta's /search adinterest.
+// ---------------------------------------------------------------------------
+
+interface SuggestedInterest {
+  id: string;
+  name: string;
+  audience_size_lower_bound: number | null;
+  audience_size_upper_bound: number | null;
+  keyword_query: string;
+  reason: string | null;
+}
+
+function InterestAISuggestButton({
+  clientId, connectionId, productId,
+  selectedInterests, onAdd,
+}: {
+  clientId: string;
+  connectionId?: string;
+  productId?: string;
+  selectedInterests: Array<{ id: string; name: string }>;
+  onAdd: (i: { id: string; name: string }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<SuggestedInterest[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchSuggestions = async () => {
+    if (!connectionId) { toast.error('No hay conexión Meta activa'); return; }
+    setLoading(true);
+    setError(null);
+    setSuggestions([]);
+    try {
+      const { data, error: err } = await callApi('steve-suggest-interests', {
+        body: { client_id: clientId, connection_id: connectionId, product_id: productId || undefined },
+      });
+      if (err) throw new Error(typeof err === 'string' ? err : 'Error');
+      setSuggestions(data?.interests || []);
+    } catch (e: any) {
+      setError(e.message || 'No se pudieron sugerir intereses');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openAndFetch = () => {
+    setOpen(true);
+    fetchSuggestions();
+  };
+
+  const fmtAudience = (n: number | null) => {
+    if (!n) return '?';
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
+    return String(n);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={openAndFetch}
+        className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
+      >
+        <Sparkles className="w-3 h-3" /> Sugerir con IA
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-2xl">
+          <div className="space-y-3">
+            <div>
+              <h3 className="font-bold text-base flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                Steve sugiere intereses
+              </h3>
+              <p className="text-xs text-muted-foreground">Basado en tu brief + producto. Cada sugerencia está resuelta contra el catálogo real de Meta.</p>
+            </div>
+            {loading && (
+              <div className="flex items-center gap-2 py-6 justify-center">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                <span className="text-sm text-muted-foreground">Claude está pensando…</span>
+              </div>
+            )}
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            {!loading && !error && suggestions.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Sin sugerencias disponibles. ¿Tienes el brief completo y (opcionalmente) un producto elegido?
+              </p>
+            )}
+            {!loading && !error && suggestions.length > 0 && (
+              <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
+                {suggestions.map((s) => {
+                  const isSelected = selectedInterests.some(i => i.id === s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      disabled={isSelected}
+                      onClick={() => { onAdd({ id: s.id, name: s.name }); }}
+                      className={`w-full flex items-start justify-between gap-3 p-2.5 rounded-md border text-left transition-all ${
+                        isSelected ? 'border-green-400 bg-green-50 opacity-60' : 'border-border hover:border-primary/40 hover:bg-primary/5'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold">{s.name}</span>
+                          {isSelected && <span className="text-[10px] text-green-700">✓ Agregado</span>}
+                        </div>
+                        {s.reason && <p className="text-[11px] text-muted-foreground mt-0.5">{s.reason}</p>}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <Badge variant="outline" className="text-[10px]">
+                          {fmtAudience(s.audience_size_lower_bound)}–{fmtAudience(s.audience_size_upper_bound)}
+                        </Badge>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div className="flex justify-end pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => setOpen(false)}>Cerrar</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Destination extras — Display link (caption) + Browser add-on (Click-to-Message)
@@ -4125,7 +4274,47 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                     <div className="space-y-4 mt-5 p-4 rounded-lg border border-primary/20 bg-primary/5">
                       <div className="flex items-center gap-2">
                         <ShoppingBag className="h-4 w-4 text-primary" />
-                        <Label className="font-semibold">Catálogo de productos (DPA)</Label>
+                        <Label className="font-semibold">Origen del contenido</Label>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setContentSource('manual')}
+                          className={`flex flex-col items-start gap-1 p-3 rounded-md border text-left transition-all ${
+                            contentSource === 'manual' ? 'border-primary bg-background' : 'border-border hover:border-primary/40'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <FileImage className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span className="text-xs font-semibold">Subida manual</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground">Tú defines las imágenes y textos del anuncio.</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setContentSource('advantage_catalog')}
+                          className={`flex flex-col items-start gap-1 p-3 rounded-md border text-left transition-all ${
+                            contentSource === 'advantage_catalog' ? 'border-primary bg-background ring-1 ring-primary/20' : 'border-border hover:border-primary/40'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-green-600" />
+                            <span className="text-xs font-semibold">Anuncios de Catálogo Advantage+</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground">Meta genera ads dinámicos usando cada producto del catálogo.</span>
+                        </button>
+                      </div>
+
+                      {contentSource === 'advantage_catalog' && (
+                        <div className="p-2 rounded-md border border-green-300 bg-green-50 text-[11px] text-green-900">
+                          <strong>Modo Advantage+ Catálogo:</strong> Meta va a crear variantes automáticas mostrando distintos productos a cada persona según intención de compra. Skipearás los pasos de ángulo y imágenes.
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 pt-1 border-t">
+                        <ShoppingBag className="h-4 w-4 text-primary" />
+                        <Label className="font-semibold text-sm">Catálogo y Product Set</Label>
                       </div>
                       {catalogsLoading ? (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -4196,6 +4385,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   targetInterests={targetInterests} setTargetInterests={setTargetInterests}
                   targetExcludeInterests={targetExcludeInterests} setTargetExcludeInterests={setTargetExcludeInterests}
                   targetLocations={targetLocations} setTargetLocations={setTargetLocations}
+                  clientId={clientId}
+                  selectedProductId={selectedProduct?.id}
                   objective={objective}
                   availablePixels={availablePixels}
                   selectedPixelId={selectedPixelId} setSelectedPixelId={setSelectedPixelId}
