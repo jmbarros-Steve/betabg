@@ -3012,6 +3012,7 @@ function UtmBuilder({
   utmCampaign, setUtmCampaign,
   utmContent, setUtmContent,
   utmTerm, setUtmTerm,
+  extraParams, setExtraParams,
 }: {
   destinationUrl: string;
   utmSource: string; setUtmSource: (v: string) => void;
@@ -3019,6 +3020,7 @@ function UtmBuilder({
   utmCampaign: string; setUtmCampaign: (v: string) => void;
   utmContent: string; setUtmContent: (v: string) => void;
   utmTerm: string; setUtmTerm: (v: string) => void;
+  extraParams: string; setExtraParams: (v: string) => void;
 }) {
   const parts: string[] = [];
   if (utmSource.trim()) parts.push(`utm_source=${utmSource.trim()}`);
@@ -3026,6 +3028,10 @@ function UtmBuilder({
   if (utmCampaign.trim()) parts.push(`utm_campaign=${utmCampaign.trim()}`);
   if (utmContent.trim()) parts.push(`utm_content=${utmContent.trim()}`);
   if (utmTerm.trim()) parts.push(`utm_term=${utmTerm.trim()}`);
+  if (extraParams.trim()) {
+    const cleaned = extraParams.trim().replace(/^[?&]+/, '');
+    if (cleaned) parts.push(cleaned);
+  }
   const urlTags = parts.join('&');
   const joiner = destinationUrl.includes('?') ? '&' : '?';
   const previewUrl = destinationUrl ? `${destinationUrl}${urlTags ? joiner + urlTags : ''}` : urlTags;
@@ -3059,6 +3065,18 @@ function UtmBuilder({
           <Label className="text-xs font-medium text-muted-foreground">utm_term</Label>
           <Input value={utmTerm} onChange={(e) => setUtmTerm(e.target.value)} placeholder="{{adset.name}}" className="mt-1 h-9 text-xs font-mono" />
         </div>
+        <div className="col-span-2">
+          <Label className="text-xs font-medium text-muted-foreground">Parámetros extra (opcional)</Label>
+          <Textarea
+            value={extraParams}
+            onChange={(e) => setExtraParams(e.target.value)}
+            placeholder="fbclid={{fbclid}}&variant=a&ref=spring_sale"
+            className="mt-1 text-xs font-mono min-h-[50px]"
+          />
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Cualquier key=value adicional que quieras mandar al landing (separado con &amp;). Se agrega al final.
+          </p>
+        </div>
       </div>
 
       {previewUrl && (
@@ -3080,13 +3098,16 @@ function AdvantageCreativeToggles({
   text, setText,
   overlays, setOverlays,
   translate, setTranslate,
+  personalize, setPersonalize,
 }: {
   visual: boolean; setVisual: (v: boolean) => void;
   text: boolean; setText: (v: boolean) => void;
   overlays: boolean; setOverlays: (v: boolean) => void;
   translate: boolean; setTranslate: (v: boolean) => void;
+  personalize: boolean; setPersonalize: (v: boolean) => void;
 }) {
   const toggles: Array<{ on: boolean; set: (v: boolean) => void; label: string; desc: string }> = [
+    { on: personalize, set: setPersonalize, label: 'Personalizar por persona', desc: 'Meta adapta contenido y destino según la probabilidad de respuesta de cada viewer.' },
     { on: visual, set: setVisual, label: 'Mejoras visuales', desc: 'Meta ajusta luz, contraste y recorta automático a cada ubicación.' },
     { on: text, set: setText, label: 'Optimización de texto', desc: 'Meta puede reordenar o reformatear tu copy para mejorar performance.' },
     { on: overlays, set: setOverlays, label: 'Overlays + plantillas', desc: 'Meta superpone precios o CTAs sobre la imagen en feed (útil ecommerce).' },
@@ -3260,6 +3281,14 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [advFeatText, setAdvFeatText] = useState<boolean>(true);       // text_optimizations + text_formatting_optimization
   const [advFeatOverlays, setAdvFeatOverlays] = useState<boolean>(false); // image_templates + add_text_overlay
   const [advFeatTranslate, setAdvFeatTranslate] = useState<boolean>(false); // text_translation + image_text_translation
+  // Meta Ads Manager "Optimizar contenido para cada persona" — varies content
+  // and destination per viewer. Maps to use_flexible_image_aspect_ratio + the
+  // adapt_to_placement creative feature being OPT_IN.
+  const [personalizeContent, setPersonalizeContent] = useState<boolean>(true);
+
+  // Extra URL parameters (custom key=value pairs appended to url_tags,
+  // in addition to the UTMs). Meta Ads Manager "Parámetros de URL".
+  const [extraUrlParams, setExtraUrlParams] = useState<string>('');
 
   // ═══════════ URL visible (caption) + Complementos del navegador ═══════════
   // Meta Ads Manager equivalents:
@@ -3864,6 +3893,11 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       if (utmCampaign.trim()) utmParts.push(`utm_campaign=${utmCampaign.trim()}`);
       if (utmContent.trim()) utmParts.push(`utm_content=${utmContent.trim()}`);
       if (utmTerm.trim()) utmParts.push(`utm_term=${utmTerm.trim()}`);
+      // Append any extra params the user added (already in key=value&key=value form).
+      if (extraUrlParams.trim()) {
+        const cleaned = extraUrlParams.trim().replace(/^[?&]+/, '');
+        if (cleaned) utmParts.push(cleaned);
+      }
       const urlTags = utmParts.join('&');
 
       // Build creative_features map for Advantage+ Creative (opt-in granular, v22+).
@@ -3936,6 +3970,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         content_source: contentSource,
         // Ad name — defaults to first headline on backend if empty.
         ad_name: adName.trim() || undefined,
+        // Meta "Optimizar contenido para cada persona" — when true, backend
+        // enables use_flexible_image_aspect_ratio on the creative and keeps
+        // adapt_to_placement as OPT_IN in the creative_features_spec.
+        personalize_content: personalizeContent,
       };
 
       // Use existing entities if selected
@@ -4566,6 +4604,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   utmCampaign={utmCampaign} setUtmCampaign={setUtmCampaign}
                   utmContent={utmContent} setUtmContent={setUtmContent}
                   utmTerm={utmTerm} setUtmTerm={setUtmTerm}
+                  extraParams={extraUrlParams} setExtraParams={setExtraUrlParams}
                 />
 
                 <AdvancedPreviewButton
@@ -4586,6 +4625,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   text={advFeatText} setText={setAdvFeatText}
                   overlays={advFeatOverlays} setOverlays={setAdvFeatOverlays}
                   translate={advFeatTranslate} setTranslate={setAdvFeatTranslate}
+                  personalize={personalizeContent} setPersonalize={setPersonalizeContent}
                 />
                 </div>
               )}

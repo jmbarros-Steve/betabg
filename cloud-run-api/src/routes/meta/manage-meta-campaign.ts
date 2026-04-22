@@ -243,6 +243,10 @@ async function handleCreate(
     // Browser add-on: 'messenger' | 'instagram' | 'whatsapp' switches the CTA
     // to Click-to-Message on that platform. 'none' keeps the chosen CTA.
     browser_addon,
+    // Meta "Optimizar contenido para cada persona" → adds
+    // use_flexible_image_aspect_ratio on the link_data so Meta crops per
+    // placement, and forces adapt_to_placement to OPT_IN.
+    personalize_content,
   } = data;
 
   // --- Early validations (before any Meta API calls) ---
@@ -819,6 +823,9 @@ async function handleCreate(
       if (display_link && typeof display_link === 'string' && display_link.trim()) {
         carouselLinkData.caption = display_link.trim();
       }
+      if (personalize_content) {
+        carouselLinkData.use_flexible_image_aspect_ratio = true;
+      }
       const carouselStorySpec: Record<string, any> = {
         page_id: pageId,
         link_data: carouselLinkData,
@@ -889,6 +896,10 @@ async function handleCreate(
         // Display link (caption) — shown as readable URL under the title.
         if (display_link && typeof display_link === 'string' && display_link.trim()) {
           linkData.caption = display_link.trim();
+        }
+        // Personalize content per viewer — tells Meta to auto-crop per placement.
+        if (personalize_content) {
+          linkData.use_flexible_image_aspect_ratio = true;
         }
 
         const singleStorySpec: Record<string, any> = {
