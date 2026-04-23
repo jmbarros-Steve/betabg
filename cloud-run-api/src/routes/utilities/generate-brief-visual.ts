@@ -144,7 +144,11 @@ ${formato === 'video' ? `Responde en JSON para VIDEO:
 }`}
 
 IMPORTANTE para prompt_generacion (seguir OBLIGATORIAMENTE):
-${productDesc ? `- Describe el producto EXACTO en el prompt: "${productDesc}". The product must appear prominently and realistically — same shape, colors, packaging.` : ''}
+${productDesc
+  ? `- Describe el producto EXACTO en el prompt: "${productDesc}". The product must appear prominently and realistically — same shape, colors, packaging.`
+  : shopifyProducts.length > 0
+    ? `- CRÍTICO (marca general — NO inventes productos): el usuario NO eligió un producto específico, pero la tienda SÍ tiene productos reales. Elige UNO de los productos reales del catálogo Shopify listado arriba y descríbelo EXACTAMENTE como aparece (nombre, tipo, rango de precio que indique calidad). En tu prompt_generacion, el producto hero debe ser ese producto real — JAMÁS un producto genérico, imaginado o inventado. Si no puedes identificar detalles de un producto real del catálogo, escribe 'a generic product-free lifestyle scene' y NO incluyas ningún producto en la escena. Es mejor una foto SIN producto que con un producto falso.`
+    : `- IMPORTANTE: NO hay productos reales disponibles. Genera una escena de estilo de vida / marca SIN mostrar productos específicos. Ningún producto inventado debe aparecer en la escena. Si la escena necesita un objeto central, usa elementos neutros como manos, textura, persona, paisaje — nunca un producto alucinado.`}
 - ${personaPhotoDesc}
 - ESTILO DE LA TIENDA: El estilo fotográfico debe ser COHERENTE con la estética de la tienda y su catálogo de productos. Si la tienda vende productos premium, la foto debe verse premium. Si es una tienda casual/juvenil, la foto debe reflejar esa energía. Usa los colores de marca, el rango de precios y el tipo de productos como guía para definir el nivel de producción, ambientación y estilo de la imagen. La foto generada debe parecer parte natural del feed de la tienda o su catálogo.
 - CLAVE PARA REALISMO: El prompt debe especificar detalles físicos reales: textura de piel con poros e imperfecciones naturales, ropa con arrugas y pliegues reales, superficies con reflejos naturales, profundidad de campo con bokeh sutil, iluminación con sombras suaves y direccionales.
