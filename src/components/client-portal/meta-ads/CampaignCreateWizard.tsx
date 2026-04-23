@@ -4236,17 +4236,27 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           return;
         }
       }
-      // Check for creative issues (stay on current ad-creative step)
-      const isCatalog = objective === 'CATALOG' && !!productCatalogId && !!productSetId;
-      if (!isCatalog) {
-        const creativeIssues: string[] = [];
-        if (!images.some(Boolean)) creativeIssues.push('Agrega al menos 1 imagen para el anuncio');
-        if (!primaryTexts.some((t) => t.trim()) || !headlines.some((h) => h.trim())) creativeIssues.push('Genera o escribe el copy (texto + título)');
-        if (!destinationUrl.trim()) creativeIssues.push('Agrega la URL de destino');
-        if (creativeIssues.length > 0) {
-          creativeIssues.forEach((msg) => toast.error(msg));
-          return;
-        }
+      // Check for creative issues (stay on current ad-creative step).
+      // DPA campaigns don't need images — Meta pulls them from the catalog
+      // at render time. We detect DPA from any of these signals since they
+      // all get synced via useEffect.
+      const isDpa = adSetFormat === 'catalog' || objective === 'CATALOG' || budgetType === 'ADVANTAGE';
+      const creativeIssues: string[] = [];
+      if (!isDpa && !images.some(Boolean)) {
+        creativeIssues.push('Agrega al menos 1 imagen para el anuncio');
+      }
+      if (isDpa && (!productCatalogId || !productSetId)) {
+        creativeIssues.push('Elige un catálogo y un set de productos en el paso Ad Set');
+      }
+      if (!primaryTexts.some((t) => t.trim()) || !headlines.some((h) => h.trim())) {
+        creativeIssues.push('Genera o escribe el copy (texto + título)');
+      }
+      if (!destinationUrl.trim()) {
+        creativeIssues.push('Agrega la URL de destino');
+      }
+      if (creativeIssues.length > 0) {
+        creativeIssues.forEach((msg) => toast.error(msg));
+        return;
       }
     }
 
@@ -4646,9 +4656,16 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         return;
       }
 
-      const isCatalogSubmit = objective === 'CATALOG' && !!productCatalogId && !!productSetId;
-      if (!isCatalogSubmit && !images.some(Boolean)) {
+      // DPA detection — any of these signals means we're in catalog mode and
+      // Meta will pull images from the catalog (no need to require uploads).
+      const isDpaSubmit = adSetFormat === 'catalog' || objective === 'CATALOG' || budgetType === 'ADVANTAGE';
+      if (!isDpaSubmit && !images.some(Boolean)) {
         toast.error('Agrega al menos 1 imagen para el anuncio');
+        setSubmitting(false);
+        return;
+      }
+      if (isDpaSubmit && (!productCatalogId || !productSetId)) {
+        toast.error('Elige catálogo y set de productos (paso Ad Set) antes de publicar');
         setSubmitting(false);
         return;
       }
