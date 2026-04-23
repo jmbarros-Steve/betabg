@@ -139,6 +139,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
   const [connectionIds, setConnectionIds] = useState<string[]>([]);
   const [productBreakdown, setProductBreakdown] = useState<ProductMarginItem[]>([]);
   const [skuData, setSkuData] = useState<SkuData[]>([]);
+  const [skuCostMap, setSkuCostMap] = useState<Map<string, number>>(new Map());
   const [abandonedCarts, setAbandonedCarts] = useState<AbandonedCart[]>([]);
   const [customerMetrics, setCustomerMetrics] = useState<{ conversionRate: number; averageLtv: number; totalCustomers: number; repeatCustomerRate: number } | null>(null);
   const [cohortData, setCohortData] = useState<{ cohort: string; month0: number; month1?: number; month2?: number; month3?: number; month4?: number; month5?: number }[]>([]);
@@ -339,6 +340,17 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
               });
               items.sort((a, b) => b.revenue - a.revenue);
               setProductBreakdown(items);
+
+              // Build SKU → unitCost map for accurate COGS calculation
+              const costMap = new Map<string, number>();
+              for (const p of prodData.products) {
+                for (const v of (p.variants || [])) {
+                  if (v.sku && v.cost != null && v.cost > 0) {
+                    costMap.set(v.sku, v.cost);
+                  }
+                }
+              }
+              setSkuCostMap(costMap);
             }
           } catch {
             // P&L product breakdown unavailable — non-critical
@@ -543,8 +555,26 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
     const gatewayRate = financialConfig.payment_gateway_commission / 100;
 
     const netRevenue = current.totalRevenue / (1 + taxRate);
-    const grossProfit = netRevenue * marginRate;
-    const costOfGoods = netRevenue * (1 - marginRate);
+
+    // COGS híbrido: cost real por SKU si está disponible, fallback a marginRate para el resto.
+    let costOfGoods: number;
+    if (skuCostMap.size > 0 && skuData.length > 0) {
+      let coveredNetRevenue = 0;
+      let coveredCost = 0;
+      for (const sku of skuData) {
+        const unitCost = skuCostMap.get(sku.sku);
+        if (unitCost != null) {
+          coveredNetRevenue += sku.revenue / (1 + taxRate);
+          coveredCost += unitCost * sku.quantity;
+        }
+      }
+      const uncoveredNetRevenue = Math.max(0, netRevenue - coveredNetRevenue);
+      const uncoveredCost = uncoveredNetRevenue * (1 - marginRate);
+      costOfGoods = coveredCost + uncoveredCost;
+    } else {
+      costOfGoods = netRevenue * (1 - marginRate);
+    }
+    const grossProfit = netRevenue - costOfGoods;
 
     const prevNetRevenue = previous.totalRevenue / (1 + taxRate);
     const prevGrossProfit = prevNetRevenue * marginRate;
@@ -587,7 +617,7 @@ export function ClientPortalMetrics({ clientId }: ClientPortalMetricsProps) {
       costOfGoods,
       gatewayFees: netRevenue * gatewayRate,
     };
-  }, [current, previous, financialConfig, dateRange, customDateRange]);
+  }, [current, previous, financialConfig, dateRange, customDateRange, skuData, skuCostMap]);
 
   // P&L data
   const profitLossData = useMemo(() => {
