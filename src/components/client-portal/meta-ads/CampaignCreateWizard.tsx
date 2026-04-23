@@ -882,41 +882,57 @@ function AdSetForm({
         </div>
       </div>
 
-      {/* A4: Photo vs Video — only meaningful for 'single'. DCT+Carousel are
-          photo-first; video inside them requires manual upload per slot. */}
-      {adSetFormat === 'single' && (
-        <div>
-          <Label className="text-sm font-semibold">¿Qué quieres generar automáticamente?</Label>
-          <div className="grid grid-cols-2 gap-3 mt-2">
-            <button
-              type="button"
-              onClick={() => setAutoMediaType('photo')}
-              className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
-                autoMediaType === 'photo' ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
-              }`}
-            >
-              <ImageIcon className={`w-5 h-5 ${autoMediaType === 'photo' ? 'text-primary' : 'text-muted-foreground'}`} />
-              <div>
-                <p className="text-xs font-semibold">Foto</p>
-                <p className="text-[10px] text-muted-foreground">Gemini 2.5 · 2 créditos · instantáneo</p>
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setAutoMediaType('video')}
-              className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
-                autoMediaType === 'video' ? 'border-green-500 bg-green-50 ring-1 ring-green-500/20' : 'border-border hover:border-primary/30'
-              }`}
-            >
-              <Video className={`w-5 h-5 ${autoMediaType === 'video' ? 'text-green-600' : 'text-muted-foreground'}`} />
-              <div>
-                <p className="text-xs font-semibold">Video</p>
-                <p className="text-[10px] text-muted-foreground">Veo 3.1 · 30 créditos · 1-3 min · 1080p con audio</p>
-              </div>
-            </button>
+      {/* A4: Photo vs Video — disponible en Única, Carrusel y DCT Flexible.
+          Catálogo (DPA) queda fuera porque Meta trae los productos del
+          catálogo, no tiene sentido generar. Para formatos múltiples el
+          costo se multiplica (N videos × 30 créditos). */}
+      {adSetFormat !== 'catalog' && (() => {
+        const slots = adSetFormat === 'single' ? 1 : 3;
+        const videoCredits = slots * 30;
+        return (
+          <div>
+            <Label className="text-sm font-semibold">¿Qué quieres generar automáticamente?</Label>
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <button
+                type="button"
+                onClick={() => setAutoMediaType('photo')}
+                className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
+                  autoMediaType === 'photo' ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+                }`}
+              >
+                <ImageIcon className={`w-5 h-5 ${autoMediaType === 'photo' ? 'text-primary' : 'text-muted-foreground'}`} />
+                <div>
+                  <p className="text-xs font-semibold">{slots === 1 ? 'Foto' : `${slots} fotos`}</p>
+                  <p className="text-[10px] text-muted-foreground">Gemini 2.5 · {slots * 2} créditos · instantáneo</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAutoMediaType('video')}
+                className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
+                  autoMediaType === 'video' ? 'border-green-500 bg-green-50 ring-1 ring-green-500/20' : 'border-border hover:border-primary/30'
+                }`}
+              >
+                <Video className={`w-5 h-5 ${autoMediaType === 'video' ? 'text-green-600' : 'text-muted-foreground'}`} />
+                <div>
+                  <p className="text-xs font-semibold">{slots === 1 ? 'Video' : `${slots} videos`}</p>
+                  <p className="text-[10px] text-muted-foreground">Veo 3.1 · {videoCredits} créditos · {slots === 1 ? '1-3 min' : `${slots}-${slots * 3} min`} · 1080p con audio</p>
+                </div>
+              </button>
+            </div>
+            {adSetFormat === 'flexible' && autoMediaType === 'video' && (
+              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mt-2">
+                <strong>DCT 3:2:2 con videos:</strong> 3 videos × 2 textos × 2 títulos. Costo: {videoCredits} créditos (~${(videoCredits * 0.107).toFixed(2)} USD). Cada video demora 1-3 min con Veo 3.
+              </p>
+            )}
+            {adSetFormat === 'carousel' && autoMediaType === 'video' && (
+              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mt-2">
+                <strong>Carrusel de videos:</strong> 3 slides en video. Costo: {videoCredits} créditos. Cada video demora 1-3 min con Veo 3.
+              </p>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <div>
         <Label>Nombre del Ad Set</Label>
@@ -4050,10 +4066,20 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         // DCT flexible → 3 distinct compositions. Carousel → 3 slides (users
         // can add more manually via the + button). Single image → 1.
         const imageCount = adSetFormat === 'flexible' || adSetFormat === 'carousel' ? 3 : 1;
-        // Video auto-gen only for single. Carousel+DCT video is rare and very
-        // expensive (30 credits × 3 = 90). User can still upload/generate
-        // videos per-slot manually from the IA Video tab.
-        const wantVideo = autoMediaType === 'video' && adSetFormat === 'single';
+        // Video auto-gen available in Single / Carousel / DCT Flexible. Each
+        // Veo 3 video costs 30 credits so multi-slot video gets pricey fast
+        // (3×30 = 90 credits). Confirm with the user before spending.
+        let wantVideo = autoMediaType === 'video' && adSetFormat !== 'catalog';
+        if (wantVideo && imageCount > 1) {
+          const totalCredits = imageCount * 30;
+          const confirmed = window.confirm(
+            `Vas a generar ${imageCount} videos con Veo 3 (${totalCredits} créditos, ~$${(totalCredits * 0.107).toFixed(2)} USD). Cada video tarda 1-3 min, así que el wizard puede demorar ${imageCount * 2}-${imageCount * 3} min en total. ¿Continuar?`
+          );
+          if (!confirmed) {
+            wantVideo = false;
+            toast.info('OK, generando fotos en vez de videos.');
+          }
+        }
 
         for (let slot = 0; slot < imageCount; slot++) {
           const composition = pickComposition(slot);
