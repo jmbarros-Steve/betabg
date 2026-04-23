@@ -3675,7 +3675,15 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
 
   // DPA sample product — used by both the creative form preview and the
   // sticky PreviewPanel to render tokens ({{product.name}}, etc.) with real
-  // data. Owned here so both components see the same value.
+  // data. Fallback to a generic placeholder when the client hasn't synced
+  // Shopify products yet (otherwise the preview shows raw {{tokens}}).
+  const DPA_FALLBACK_SAMPLE = {
+    title: 'Producto de ejemplo',
+    image_url: null as string | null,
+    price: '$19.990',
+    brand: clientBrandName || 'Tu marca',
+    description: 'Descripción de ejemplo del producto que Meta mostrará.',
+  };
   const [dpaSampleProduct, setDpaSampleProduct] = useState<{ title: string; image_url: string | null; price: string | null; brand: string | null; description: string | null } | null>(null);
   useEffect(() => {
     if (adSetFormat !== 'catalog') { setDpaSampleProduct(null); return; }
@@ -3695,9 +3703,14 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           brand: data.vendor || null,
           description: (data.body_html || '').replace(/<[^>]+>/g, '').slice(0, 120) || null,
         });
+      } else {
+        // No products synced locally — use placeholder so the preview still
+        // resolves tokens instead of showing {{product.name}} literally.
+        setDpaSampleProduct(DPA_FALLBACK_SAMPLE);
       }
     })();
-  }, [adSetFormat, clientId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adSetFormat, clientId, clientBrandName]);
   // A4: explicit "photo or video" preference that drives the auto-generator.
   // Default 'photo' — video costs 15× more credits (Veo 3 = 30 each vs Imagen
   // = 2). Only active when adSetFormat === 'single'. Carousel/DCT always use
@@ -3862,6 +3875,11 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     if (objective !== 'CATALOG') setObjective('CATALOG');
     if (placementsMode !== 'advantage') setPlacementsMode('advantage');
     if (contentSource !== 'advantage_catalog') setContentSource('advantage_catalog');
+    // DPA forces adSetFormat='catalog' so the 4-format grid collapses into the
+    // single locked banner. Without this, budgetType=ADVANTAGE in step 1 would
+    // still show Flexible/Carrusel/Única/Catálogo in step 2 — the user reported
+    // seeing all 4 options after choosing DPA.
+    if (adSetFormat !== 'catalog') setAdSetFormat('catalog');
     if (selectedAudienceIds.length > 0) setSelectedAudienceIds([]);
     if (targetInterests.length > 0) setTargetInterests([]);
     if (targetExcludeInterests.length > 0) setTargetExcludeInterests([]);
