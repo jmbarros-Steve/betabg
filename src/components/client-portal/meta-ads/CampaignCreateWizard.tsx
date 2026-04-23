@@ -1766,6 +1766,7 @@ function AdFormMultiSlot({
   focusType,
   selectedProduct,
   isDpaCampaign,
+  dpaSampleProduct,
 }: {
   clientId: string;
   adSetFormat: AdSetFormat;
@@ -1783,6 +1784,7 @@ function AdFormMultiSlot({
   focusType: 'product' | 'broad';
   selectedProduct: ShopifyProduct | null;
   isDpaCampaign?: boolean;
+  dpaSampleProduct?: { title: string; image_url: string | null; price: string | null; brand: string | null; description: string | null } | null;
 }) {
   const [activeImageSlot, setActiveImageSlot] = useState(0);
   const [mediaTab, setMediaTab] = useState<MediaTab>(productContext ? 'products' : 'upload');
@@ -1994,31 +1996,8 @@ function AdFormMultiSlot({
   const currentSlotIsImage = !!images[activeImageSlot] && !images[activeImageSlot].endsWith('.mp4');
   const canAddMoreTexts = adSetFormat === 'flexible';
 
-  // Sample product for DPA preview — shows the user how the ad will look when
-  // Meta plugs in a real product from the catalog. We load one Shopify product
-  // and use it to render the tokens ({{product.name}}, {{product.price}}, etc.).
-  const [dpaSampleProduct, setDpaSampleProduct] = useState<{ title: string; image_url: string | null; price: string | null; brand: string | null; description: string | null } | null>(null);
-  useEffect(() => {
-    if (!isDpaCampaign) return;
-    (async () => {
-      const { data } = await supabase
-        .from('shopify_products')
-        .select('title, image_url, price, vendor, body_html')
-        .eq('client_id', clientId)
-        .not('image_url', 'is', null)
-        .limit(1)
-        .maybeSingle();
-      if (data) {
-        setDpaSampleProduct({
-          title: data.title || 'Producto',
-          image_url: data.image_url,
-          price: data.price ? `$${Number(data.price).toLocaleString('es-CL')}` : null,
-          brand: data.vendor || null,
-          description: (data.body_html || '').replace(/<[^>]+>/g, '').slice(0, 120) || null,
-        });
-      }
-    })();
-  }, [isDpaCampaign, clientId]);
+  // dpaSampleProduct is owned by the root CampaignCreateWizard and passed in
+  // as a prop (declared in its Props block as optional for backwards compat).
 
   const MEDIA_TABS: Array<{ key: MediaTab; label: string; icon: React.ElementType }> = [
     { key: 'upload', label: 'Subir', icon: Upload },
@@ -2509,6 +2488,7 @@ function AdFormMultiSlot({
 
 function PreviewPanel({
   images, primaryTexts, headlines, descriptions, cta, pageName, destinationUrl,
+  isDpaCampaign, dpaSampleProduct,
 }: {
   images: string[];
   primaryTexts: string[];
@@ -2517,6 +2497,8 @@ function PreviewPanel({
   cta: string;
   pageName: string;
   destinationUrl: string;
+  isDpaCampaign?: boolean;
+  dpaSampleProduct?: { title: string; image_url: string | null; price: string | null; brand: string | null; description: string | null } | null;
 }) {
   const [previewIdx, setPreviewIdx] = useState(0);
   const filledImages = images.filter(Boolean);
@@ -3690,6 +3672,32 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   // hook (see TDZ note above where `level`/`stepIndex` are declared).
   const steps = getStepsForLevel(level, adSetFormat === 'catalog');
   const currentStep = steps[stepIndex]?.key;
+
+  // DPA sample product — used by both the creative form preview and the
+  // sticky PreviewPanel to render tokens ({{product.name}}, etc.) with real
+  // data. Owned here so both components see the same value.
+  const [dpaSampleProduct, setDpaSampleProduct] = useState<{ title: string; image_url: string | null; price: string | null; brand: string | null; description: string | null } | null>(null);
+  useEffect(() => {
+    if (adSetFormat !== 'catalog') { setDpaSampleProduct(null); return; }
+    (async () => {
+      const { data } = await supabase
+        .from('shopify_products')
+        .select('title, image_url, price, vendor, body_html')
+        .eq('client_id', clientId)
+        .not('image_url', 'is', null)
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        setDpaSampleProduct({
+          title: data.title || 'Producto',
+          image_url: data.image_url,
+          price: data.price ? `$${Number(data.price).toLocaleString('es-CL')}` : null,
+          brand: data.vendor || null,
+          description: (data.body_html || '').replace(/<[^>]+>/g, '').slice(0, 120) || null,
+        });
+      }
+    })();
+  }, [adSetFormat, clientId]);
   // A4: explicit "photo or video" preference that drives the auto-generator.
   // Default 'photo' — video costs 15× more credits (Veo 3 = 30 each vs Imagen
   // = 2). Only active when adSetFormat === 'single'. Carousel/DCT always use
@@ -5128,6 +5136,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                     generating={generatingCopy}
                     onGenerateCopy={handleGenerateCopy}
                     isDpaCampaign={objective === 'CATALOG'}
+                    dpaSampleProduct={dpaSampleProduct}
                     onAddVariations={async () => {
                       // Generate 2 more variations and APPEND (not replace) to existing arrays.
                       // Uses a different instruction so Claude gives genuinely different angles.
@@ -5169,6 +5178,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                       cta={cta}
                       pageName={pageName || 'Tu Marca'}
                       destinationUrl={destinationUrl}
+                      isDpaCampaign={objective === 'CATALOG'}
+                      dpaSampleProduct={dpaSampleProduct}
                     />
                   )}
                 </div>
