@@ -3568,12 +3568,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [level, setLevel] = useState<StartLevel>(startFrom);
   const [wizardStarted, setWizardStarted] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
-  // Recompute steps when adSetFormat switches to/from 'catalog' so DPA users
-  // don't see Funnel/Ángulo/Enfoque screens that don't apply to dynamic ads.
-  const steps = useMemo(
-    () => getStepsForLevel(level, adSetFormat === 'catalog'),
-    [level, adSetFormat],
-  );
+  // Steps recompute on each render (cheap function) — avoids TDZ issues that
+  // appear in production bundles when useMemo captures a state declared later
+  // in the component. adSetFormat='catalog' trims the funnel/angle/focus steps.
+  const steps = getStepsForLevel(level, adSetFormat === 'catalog');
   const currentStep = steps[stepIndex]?.key;
 
   // Existing entity selection
