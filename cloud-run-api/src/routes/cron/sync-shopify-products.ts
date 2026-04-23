@@ -71,7 +71,7 @@ async function fetchNextLink(url: string, token: string): Promise<{ products: Sh
       throw new Error(`Shopify ${res.status}: ${body.slice(0, 200)}`);
     }
 
-    const { products }: { products: ShopifyProductRaw[] } = await res.json();
+    const { products } = (await res.json()) as { products: ShopifyProductRaw[] };
 
     // Shopify paginación via Link header: <url>; rel="next"
     const linkHeader = res.headers.get('link') || res.headers.get('Link');
