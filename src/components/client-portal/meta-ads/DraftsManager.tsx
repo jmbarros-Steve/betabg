@@ -36,6 +36,29 @@ import {
 import { useMetaBusiness } from './MetaBusinessContext';
 
 // ---------------------------------------------------------------------------
+// BriefVisual helpers — drafts are saved by CampaignCreateWizard with a snapshot
+// of every field. We read it back here and rebuild the full payload that
+// manage-meta-campaign.ts expects, instead of the stripped-down version we
+// had before (which was publishing empty campaigns with no creative).
+// ---------------------------------------------------------------------------
+
+function pickString(v: any): string | undefined {
+  if (typeof v === 'string' && v.trim().length > 0) return v;
+  return undefined;
+}
+
+function pickArray(v: any): string[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((x) => {
+      if (typeof x === 'string') return x;
+      if (x && typeof x === 'object') return x.texto || x.text || x.url || '';
+      return '';
+    })
+    .filter((x) => typeof x === 'string' && x.trim().length > 0);
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -236,6 +259,11 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
   };
 
   // ── Publish ──
+  // Rebuilds the full manage-meta-campaign payload from the draft's
+  // brief_visual snapshot (saved by CampaignCreateWizard). Previously we only
+  // sent name + objective + budget, which caused Meta to create empty
+  // campaigns with no creative. Now we pass images, copy, CTAs, targeting,
+  // funnel, angle, pixel, UTM — everything the wizard pushes at submit.
   const handlePublish = async (draft: DraftItem) => {
     setPublishTarget(null);
     setPublishing(draft.id);
@@ -244,35 +272,95 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
         toast.error('No hay conexión Meta Ads activa. Conecta Meta desde Conexiones.');
         return;
       }
-      const bv = draft.brief_visual;
-      const rawObjective = bv?.objective || 'CONVERSIONS';
+      const bv = (draft.brief_visual || {}) as Record<string, any>;
+      const rawObjective = bv.objective || 'CONVERSIONS';
       const objective = OBJECTIVE_MAP[rawObjective] || 'OUTCOME_SALES';
       const optimization_goal = OPTIMIZATION_MAP[rawObjective] || 'OFFSITE_CONVERSIONS';
       const dailyBudgetCLP = Number(
         bv?.plan_accion?.presupuesto_diario || bv?.adset_budget || bv?.campaign_budget || '10000'
       );
-      const name = bv?.campaign_name || draft.titulo || `Campaña - ${new Date().toISOString().split('T')[0]}`;
+      const name = bv.campaign_name || draft.titulo || `Campaña - ${new Date().toISOString().split('T')[0]}`;
+      const adSetFormat = pickString(bv.ad_set_format) || draft.formato || 'flexible';
+      const isDpa = adSetFormat === 'catalog' || rawObjective === 'CATALOG' || bv.budget_type === 'ADVANTAGE';
+
+      // Collect media + copy arrays from the draft
+      const images = getImages(draft);
+      const headlines = getHeadlines(draft);
+      const copies = getCopies(draft);
+      const descriptions = pickArray(draft.dct_descripciones);
+      if (descriptions.length === 0 && draft.descripcion) descriptions.push(draft.descripcion);
+
+      // Refuse to publish if critical pieces are missing
+      const issues: string[] = [];
+      if (!isDpa && images.length === 0) issues.push('agrega al menos 1 imagen');
+      if (headlines.length === 0) issues.push('el título');
+      if (copies.length === 0) issues.push('el texto principal');
+      if (!bv.destination_url) issues.push('la URL de destino');
+      if (isDpa && (!bv.product_catalog_id || !bv.product_set_id)) {
+        issues.push('catálogo + set de productos (edita el borrador)');
+      }
+      if (issues.length > 0) {
+        toast.error(`Completa antes de publicar: ${issues.join(', ')}`);
+        return;
+      }
+
+      // Fetch the client's default page/IG/pixel from platform_connections as
+      // fallback when the draft doesn't carry them.
+      const { data: conn } = await supabase
+        .from('platform_connections')
+        .select('page_id, ig_account_id, pixel_id')
+        .eq('id', ctxConnectionId)
+        .maybeSingle();
+
+      const payload: Record<string, any> = {
+        name,
+        objective,
+        status: 'PAUSED',
+        daily_budget: dailyBudgetCLP,
+        billing_event: 'IMPRESSIONS',
+        optimization_goal,
+        is_advantage_sales: bv.budget_type === 'ADVANTAGE',
+        adset_name: bv.adset_name || `${name} - Ad Set 1`,
+        ad_set_format: adSetFormat,
+        // Creative content
+        primary_text: copies[0] || undefined,
+        headline: headlines[0] || undefined,
+        description: descriptions[0] || undefined,
+        image_url: images[0] || undefined,
+        images: images.length > 0 ? images : undefined,
+        texts: copies.length > 0 ? copies : undefined,
+        headlines: headlines.length > 0 ? headlines : undefined,
+        descriptions: descriptions.length > 0 ? descriptions : undefined,
+        cta: draft.cta || 'SHOP_NOW',
+        destination_url: pickString(bv.destination_url),
+        // Targeting + placements (best effort — falls back to broad CL 18-65)
+        page_id: pickString(bv.page_id) || conn?.page_id || undefined,
+        instagram_user_id: pickString(bv.ig_account_id) || conn?.ig_account_id || undefined,
+        pixel_id: rawObjective === 'CONVERSIONS' ? (pickString(bv.pixel_id) || conn?.pixel_id || undefined) : undefined,
+        custom_event_type: rawObjective === 'CONVERSIONS' ? (pickString(bv.custom_event_type) || 'PURCHASE') : undefined,
+        // DPA specifics
+        product_catalog_id: isDpa ? pickString(bv.product_catalog_id) : undefined,
+        product_set_id: isDpa ? pickString(bv.product_set_id) : undefined,
+        // Funnel + angle → CRITERIO picks them up for ángulo-no-repetido / creative variety
+        angle: pickString(draft.angulo || bv.angle),
+        funnel_stage: pickString(draft.funnel || bv.funnel_stage),
+        // Content source (manual uploads vs advantage catalog template)
+        content_source: isDpa ? 'advantage_catalog' : (pickString(bv.content_source) || 'manual'),
+        ad_name: pickString(bv.ad_name) || draft.titulo || undefined,
+        // Advantage+ Creative features (saved with the draft if present)
+        creative_features: bv.creative_features && typeof bv.creative_features === 'object' ? bv.creative_features : undefined,
+      };
+
       const { error } = await callApi('manage-meta-campaign', {
-        body: {
-          action: 'create',
-          connection_id: ctxConnectionId,
-          data: {
-            name,
-            objective,
-            status: 'PAUSED',
-            daily_budget: dailyBudgetCLP,
-            billing_event: 'IMPRESSIONS',
-            optimization_goal,
-            adset_name: bv?.adset_name || `${name} - Ad Set 1`,
-          },
-        },
+        body: { action: 'create', connection_id: ctxConnectionId, data: payload },
       });
-      if (error) throw error;
+      if (error) {
+        throw new Error(typeof error === 'string' ? error : (error as any)?.message || 'Error al publicar');
+      }
       await supabase.from('ad_creatives').update({ estado: 'en_pauta' }).eq('id', draft.id);
       setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
-      toast.success(`"${draft.titulo}" publicado en Meta como pausado. Activa cuando estés listo.`);
+      toast.success(`"${draft.titulo}" publicado en Meta como pausado. Activa desde Meta Ads Manager cuando estés listo.`);
     } catch (err: any) {
-      // Publish error handled via toast
       toast.error(err?.message || 'Error al publicar');
     } finally {
       setPublishing(null);

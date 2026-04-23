@@ -4609,6 +4609,35 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           dolor: audienceDesc || 'Sin definir',
           producto: campName?.split(' - ')[0] || 'Sin definir',
           metodologia: adSetFormat === 'flexible' ? 'DCT 3:2:2 (Charles Tichener)' : adSetFormat,
+          // Page + Instagram + Pixel — required for DraftsManager.publish to
+          // rebuild a valid manage-meta-campaign payload without prompting
+          // the user again.
+          page_id: selectedPageId || ctxPageId || undefined,
+          ig_account_id: publishToInstagram ? (selectedInstagramUserId || ctxIgAccountId || undefined) : undefined,
+          pixel_id: objective === 'CONVERSIONS' ? (selectedPixelId || undefined) : undefined,
+          custom_event_type: objective === 'CONVERSIONS' ? customEventType : undefined,
+          // DPA catalog + product set (needed when republishing a catalog draft)
+          product_catalog_id: adSetFormat === 'catalog' ? productCatalogId || undefined : undefined,
+          product_set_id: adSetFormat === 'catalog' ? productSetId || undefined : undefined,
+          content_source: contentSource,
+          ad_name: adName.trim() || undefined,
+          // Advantage+ Creative opt-in map (merged from coarse toggles +
+          // granular overrides). Same format manage-meta-campaign expects.
+          creative_features: (() => {
+            const map: Record<string, 'OPT_IN' | 'OPT_OUT'> = {
+              image_touchups: advFeatVisual ? 'OPT_IN' : 'OPT_OUT',
+              image_brightness_and_contrast: advFeatVisual ? 'OPT_IN' : 'OPT_OUT',
+              video_auto_crop: advFeatVisual ? 'OPT_IN' : 'OPT_OUT',
+              text_optimizations: advFeatText ? 'OPT_IN' : 'OPT_OUT',
+              text_formatting_optimization: advFeatText ? 'OPT_IN' : 'OPT_OUT',
+            };
+            if (advFeatOverlays) { map.image_templates = 'OPT_IN'; map.add_text_overlay = 'OPT_IN'; }
+            if (advFeatTranslate) { map.text_translation = 'OPT_IN'; map.image_text_translation = 'OPT_IN'; }
+            for (const [k, v] of Object.entries(advantageOverrides)) {
+              map[k] = v ? 'OPT_IN' : 'OPT_OUT';
+            }
+            return map;
+          })(),
           plan_accion: {
             tipo_campana: budgetType === 'ABO' ? 'ABO Testing' : budgetType === 'ADVANTAGE' ? 'Advantage+ Shopping' : 'CBO Escalamiento',
             presupuesto_diario: adsetBudget || campBudget || '10000',
