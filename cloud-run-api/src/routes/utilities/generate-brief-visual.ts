@@ -3,7 +3,13 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 
 export async function generateBriefVisual(c: Context) {
   try {
-  const { clientId, formato, angulo, variacionElegida, assetUrls, productData } = await c.req.json();
+  const { clientId, formato, angulo, variacionElegida, assetUrls, productData, funnelStage } = await c.req.json();
+  // Funnel stage controls the VISUAL playbook. Each stage has a different
+  // purpose for the image: TOFU = stop the scroll + brand identity, MOFU =
+  // build trust with real use cases, BOFU = push the sale with hero product.
+  const stage: 'tofu' | 'mofu' | 'bofu' = ['tofu', 'mofu', 'bofu'].includes(String(funnelStage).toLowerCase())
+    ? String(funnelStage).toLowerCase() as 'tofu' | 'mofu' | 'bofu'
+    : 'mofu';
 
   const supabase = getSupabaseAdmin();
 
@@ -158,6 +164,48 @@ ${productDesc
 
 Responde SOLO el JSON sin markdown ni backticks.`;
 
+  // Stage-specific visual playbook. TOFU/MOFU/BOFU each need a different role
+  // for the image — this overrides any angle-level rules when there's conflict.
+  const STAGE_PLAYBOOKS: Record<'tofu' | 'mofu' | 'bofu', string> = {
+    tofu: `
+FUNNEL STAGE = TOFU (Top — presentar marca a gente que no te conoce)
+Purpose of the image: STOP THE SCROLL + build brand identity. NOT sell yet.
+- Product prominence: LOW. Product appears as a PROP, NOT the hero. Often partially cropped, at distance, or background element.
+- Scene: Wide LIFESTYLE shot. Rich environment (home, outdoor, café, beach, kitchen) that tells a story.
+- Person: YES, aspirational. Real person but idealized — happy, confident, in their element. Persona should match target demo.
+- Lighting: Natural, soft, golden hour preferred. Documentary-aspirational.
+- Composition: Editorial / fashion / magazine-style. Rule of thirds, negative space, depth of field.
+- Text overlay: NONE or a short emotional claim ("Así se vive", "Comer distinto"). NEVER prices, discounts, CTAs.
+- Colors: Warm, emotional, cinematic palette. Brand colors as accents, not dominant.
+- Goal: viewer should feel "me identifico con esto" or "qué mundo es ese".`,
+
+    mofu: `
+FUNNEL STAGE = MOFU (Middle — considerar, construir confianza)
+Purpose of the image: BUILD TRUST via real use cases + social proof.
+- Product prominence: MEDIUM. Product visible IN USE by real people. Balanced with the person/scene.
+- Scene: Casual / honest / documentary. Real home, real kitchen, real desk. No staged perfection.
+- Person: YES, realistic. Shows the product in the hands of someone who looks like the target customer. Medium shot (waist-up).
+- Lighting: Ambient, honest. Mixed (daylight + interior). Can be imperfect.
+- Composition: Over-the-shoulder, POV, UGC phone-style, or medium portrait. Feels unscripted.
+- Text overlay: Testimonial quotes ("Lo uso todos los días"), review stars, short phrases in real voice. Never generic slogans.
+- Colors: Natural, true-to-life. No heavy color grading.
+- Goal: viewer should feel "gente normal como yo lo usa y le gusta".`,
+
+    bofu: `
+FUNNEL STAGE = BOFU (Bottom — cerrar la venta)
+Purpose of the image: PUSH THE PURCHASE. Clear product, clear offer, clear CTA in the head.
+- Product prominence: MAX (80%+ del frame). Product is the absolute hero — large, centered, sharp.
+- Scene: Minimal OR high-production studio. Clean background (solid color, cyclorama, marble) or a prop context that only reinforces the product (ingredient around food product, texture under fabric).
+- Person: OPTIONAL. If present, focused on product (close-up of hand holding it). Never distracts from product.
+- Lighting: Studio-style, clean, controlled. Contrast to make product pop. Macro details visible (texture, packaging, labels, reflections).
+- Composition: Hero product shot, macro, flat-lay, tight crop. No negative space wasted.
+- Text overlay: Price, discount ("-40%", "Desde $X"), urgency ("Últimas unidades", "Solo hoy"), brand logo. CTA subtle or within copy.
+- Colors: High contrast. Brand colors dominant. Price/discount in bold accent color.
+- Goal: viewer should feel "lo quiero ya, precio claro, click".`,
+  };
+
+  const stagePlaybook = `\n${STAGE_PLAYBOOKS[stage]}\n`;
+
   const ANGLE_PHOTO_RULES = `
 Reglas de estilo fotográfico por ángulo creativo (DEBES seguir estas reglas al generar prompt_generacion):
 - Call Out: Close-up portrait, direct eye contact, clean minimal background, subject addressing viewer directly. TONE: provocative, confrontational, "Hey you!"
@@ -181,7 +229,7 @@ Reglas de estilo fotográfico por ángulo creativo (DEBES seguir estas reglas al
 REGLA CRÍTICA DE VARIACIÓN: Cada prompt_generacion debe ser ÚNICO y CREATIVO. NO repitas los mismos escenarios, metáforas o situaciones entre imágenes. Si el producto es X, piensa en 10 formas distintas de mostrarlo y elige la más inesperada y atractiva para este ángulo específico. Sorprende al espectador.
 `;
 
-  const systemPrompt = `${bugSection}${knowledgeSection}${referencesSection}${ANGLE_PHOTO_RULES}Eres un director creativo experto en producción de anuncios para Meta Ads. Generas briefs visuales detallados y accionables para equipos de producción. Cuando generes prompt_generacion, SIEMPRE sigue las reglas de estilo fotográfico del ángulo creativo indicado.${adReferences && adReferences.length > 0 ? ' PRIORIZA replicar los patrones de las referencias visuales reales proporcionadas.' : ''}`;
+  const systemPrompt = `${bugSection}${knowledgeSection}${referencesSection}${stagePlaybook}${ANGLE_PHOTO_RULES}Eres un director creativo experto en producción de anuncios para Meta Ads. Generas briefs visuales detallados y accionables para equipos de producción. Tu prompt_generacion DEBE respetar, en este orden de prioridad: (1) el FUNNEL STAGE playbook arriba — es la REGLA MÁS IMPORTANTE y define el rol visual de la imagen, (2) el ángulo creativo específico, (3) las referencias visuales reales.${adReferences && adReferences.length > 0 ? ' PRIORIZA replicar los patrones de las referencias visuales reales proporcionadas.' : ''}`;
 
   // Build multimodal message with reference images and product photos
   const messageContent: any[] = [];

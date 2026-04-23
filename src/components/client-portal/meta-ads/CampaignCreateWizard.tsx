@@ -1886,6 +1886,7 @@ function AdFormMultiSlot({
           angulo: angleValue,
           variacionElegida,
           assetUrls: productAssets,
+          funnelStage,
           productData: selectedProduct ? {
             title: selectedProduct.title,
             product_type: selectedProduct.product_type,
@@ -4184,7 +4185,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           );
 
           const { data: briefData, error: briefErr } = await callApi('generate-brief-visual', {
-            body: { clientId, formato: wantVideo ? 'video' : 'static', angulo: angleValue, variacionElegida, assetUrls: productAssets, productData },
+            body: { clientId, formato: wantVideo ? 'video' : 'static', angulo: angleValue, variacionElegida, assetUrls: productAssets, productData, funnelStage },
           });
 
           if (briefErr || !briefData?.prompt_generacion) {
