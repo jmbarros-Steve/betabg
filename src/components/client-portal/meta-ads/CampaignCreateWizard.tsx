@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { JargonTooltip } from '@/components/client-portal/JargonTooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
@@ -166,12 +166,18 @@ const STEPS_AD: StepDef[] = [
   { key: 'review', label: 'Revisar', icon: Rocket },
 ];
 
-function getStepsForLevel(level: StartLevel): StepDef[] {
-  switch (level) {
-    case 'campaign': return STEPS_CAMPAIGN;
-    case 'adset': return STEPS_ADSET;
-    case 'ad': return STEPS_AD;
-  }
+// DPA (Catálogo Advantage+) skips funnel-stage, angle-select, creative-focus.
+// Meta decides which product and which audience segment each user sees based
+// on the catalog signals — the agency doesn't choose funnel stage or angle.
+// The relevant work is: budget + targeting + catalog/product_set + copy with
+// dynamic tokens ({{product.name}}, {{product.price}}).
+const DPA_SKIP_STEPS = new Set(['funnel-stage', 'angle-select', 'creative-focus']);
+
+function getStepsForLevel(level: StartLevel, isDpa = false): StepDef[] {
+  const base = level === 'campaign' ? STEPS_CAMPAIGN
+    : level === 'adset' ? STEPS_ADSET
+    : STEPS_AD;
+  return isDpa ? base.filter((s) => !DPA_SKIP_STEPS.has(s.key)) : base;
 }
 
 // ---------------------------------------------------------------------------
@@ -2038,13 +2044,18 @@ function AdFormMultiSlot({
           <p className="text-[11px] text-muted-foreground">Steve recomienda 3 imágenes para testing óptimo (DCT 3:2:2)</p>
         )}
 
-        {/* Image slot tabs */}
+        {/* Image slot tabs. Wrapper is a DIV (not button) so the nested
+            Maximize2 / X buttons actually fire — nested buttons are invalid
+            HTML and silently break click handlers in most browsers. */}
         <div className="flex gap-1.5 flex-wrap">
           {images.map((img, i) => (
-            <button
+            <div
               key={i}
+              role="button"
+              tabIndex={0}
               onClick={() => setActiveImageSlot(i)}
-              className={`group relative w-16 h-16 rounded-lg border-2 overflow-hidden transition-all ${
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveImageSlot(i); }}
+              className={`group relative w-16 h-16 rounded-lg border-2 overflow-hidden transition-all cursor-pointer ${
                 activeImageSlot === i ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/30'
               }`}
             >
@@ -2090,14 +2101,14 @@ function AdFormMultiSlot({
                     setImages(next);
                     setActiveImageSlot(i);
                   }}
-                  className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5"
-                  aria-label="Vaciar slot"
-                  title="Vaciar para cambiar la imagen"
+                  className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center shadow-md hover:scale-110 transition-transform z-10"
+                  aria-label="Borrar imagen"
+                  title="Borrar imagen para cambiarla"
                 >
-                  <X className="w-2 h-2" />
+                  <X className="w-3 h-3" strokeWidth={3} />
                 </button>
               )}
-            </button>
+            </div>
           ))}
         </div>
 
@@ -3557,7 +3568,12 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [level, setLevel] = useState<StartLevel>(startFrom);
   const [wizardStarted, setWizardStarted] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
-  const steps = getStepsForLevel(level);
+  // Recompute steps when adSetFormat switches to/from 'catalog' so DPA users
+  // don't see Funnel/Ángulo/Enfoque screens that don't apply to dynamic ads.
+  const steps = useMemo(
+    () => getStepsForLevel(level, adSetFormat === 'catalog'),
+    [level, adSetFormat],
+  );
   const currentStep = steps[stepIndex]?.key;
 
   // Existing entity selection
