@@ -30,7 +30,9 @@ async function normalizeToPmaxSpec(buf: Uint8Array, formato: string | undefined)
   }
 }
 
-const IMAGE_CREDIT_COST = 2;
+const IMAGE_CREDIT_COST = 2; // Gemini — fast & cheap
+const FLUX_CREDIT_COST = 5;  // Flux Premium via Replicate — 2.5× more realistic
+const FLUX_USD_COST = 0.05;
 const DIVERSITY_STYLES = [
   'Vary the model ethnicity, age, and appearance for each generation.',
   'Use diverse backgrounds: urban, nature, studio, home, outdoor café.',
@@ -390,7 +392,101 @@ CRITICAL RENDERING INSTRUCTIONS FOR LOGO:
 
   let imageBytes: Uint8Array | null = null;
 
-  if (engine === 'imagen') {
+  if (engine === 'flux') {
+    // -- Flux Premium via Replicate --
+    // flux-kontext-pro edits with a reference image (ideal for keeping the
+    // real product identical while changing scene). flux-1.1-pro is pure
+    // text-to-image, used when no reference photo is available.
+    const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
+    if (!REPLICATE_API_KEY) {
+      console.error('[generate-image] REPLICATE_API_KEY not configured');
+      return c.json({ error: 'Error interno del servidor' }, 500);
+    }
+
+    // Map our internal formats to Flux aspect ratios.
+    const fmtKey = String(formato || '').toLowerCase();
+    const aspectRatio = fmtKey === 'portrait' ? '4:5'
+      : fmtKey === 'landscape' ? '16:9'
+      : fmtKey === 'landscape_logo' ? '16:9'
+      : '1:1';
+
+    const useKontext = !!effectiveFotoBase;
+    const modelPath = useKontext
+      ? 'black-forest-labs/flux-kontext-pro'
+      : 'black-forest-labs/flux-1.1-pro';
+
+    // Build the prompt. Kontext edit needs a concise instruction that
+    // references the input image, not our long Gemini-style prompt.
+    const fluxPrompt = useKontext
+      ? `Place the product shown in the input image into this new scene, keeping the product IDENTICAL (same shape, colors, labels, packaging, proportions): ${promptBase}`
+      : promptFinal;
+
+    const input: Record<string, any> = {
+      prompt: fluxPrompt.slice(0, 2000),
+      aspect_ratio: aspectRatio,
+      output_format: 'png',
+      safety_tolerance: 2,
+    };
+    if (useKontext && effectiveFotoBase) {
+      input.input_image = effectiveFotoBase;
+    }
+
+    // Replicate `Prefer: wait` waits up to 60s for the prediction to finish
+    // in a single HTTP call — no polling needed for the common case.
+    const replRes = await fetch(`https://api.replicate.com/v1/models/${modelPath}/predictions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${REPLICATE_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'wait=60',
+      },
+      body: JSON.stringify({ input }),
+      signal: AbortSignal.timeout(90_000),
+    });
+
+    const replData: any = await replRes.json().catch(() => ({}));
+    if (!replRes.ok) {
+      console.error('[generate-image] Replicate error:', replRes.status, JSON.stringify(replData).slice(0, 300));
+      return c.json({ error: `Flux error ${replRes.status}: ${replData?.detail || 'Unknown'}` }, 500);
+    }
+
+    let outputUrl: string | null = null;
+    if (replData.status === 'succeeded' && replData.output) {
+      outputUrl = typeof replData.output === 'string' ? replData.output : Array.isArray(replData.output) ? replData.output[0] : null;
+    } else if (replData.id && replData.urls?.get) {
+      // Fall back to polling if the wait header didn't deliver in time.
+      const pollUrl = replData.urls.get;
+      const deadline = Date.now() + 90_000;
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 3000));
+        const poll = await fetch(pollUrl, {
+          headers: { 'Authorization': `Token ${REPLICATE_API_KEY}` },
+          signal: AbortSignal.timeout(10_000),
+        });
+        const pollData: any = await poll.json().catch(() => ({}));
+        if (pollData.status === 'succeeded') {
+          outputUrl = typeof pollData.output === 'string' ? pollData.output : Array.isArray(pollData.output) ? pollData.output[0] : null;
+          break;
+        }
+        if (pollData.status === 'failed' || pollData.status === 'canceled') {
+          console.error('[generate-image] Flux failed:', pollData.error);
+          return c.json({ error: `Flux falló: ${pollData.error || 'unknown'}` }, 500);
+        }
+      }
+    }
+
+    if (!outputUrl) {
+      console.error('[generate-image] Flux no output url');
+      return c.json({ error: 'Flux no devolvió imagen a tiempo' }, 500);
+    }
+
+    const imgResp = await fetch(outputUrl, { signal: AbortSignal.timeout(30_000) });
+    if (!imgResp.ok) {
+      return c.json({ error: 'No se pudo descargar la imagen de Flux' }, 500);
+    }
+    imageBytes = new Uint8Array(await imgResp.arrayBuffer());
+
+  } else if (engine === 'imagen') {
     // -- Gemini 2.5 Flash native image generation --
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
@@ -644,11 +740,12 @@ CRITICAL RENDERING INSTRUCTIONS FOR LOGO:
   });
 
   // Log credit transaction (credits already deducted above)
+  const isFlux = engine === 'flux';
   await supabase.from('credit_transactions').insert({
     client_id: clientId,
-    accion: 'Generar imagen — Gemini',
-    creditos_usados: IMAGE_CREDIT_COST,
-    costo_real_usd: 0.02,
+    accion: isFlux ? 'Generar imagen — Flux Premium' : 'Generar imagen — Gemini',
+    creditos_usados: isFlux ? FLUX_CREDIT_COST : IMAGE_CREDIT_COST,
+    costo_real_usd: isFlux ? FLUX_USD_COST : 0.02,
   });
 
   return c.json({ asset_url: publicUrl });
