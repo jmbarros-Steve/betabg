@@ -3533,6 +3533,176 @@ function UtmBuilder({
 }
 
 // ---------------------------------------------------------------------------
+// Advantage+ Preview Panel — calls /meta-preview-enhancements and renders
+// one Meta-rendered iframe per enhancement so the merchant can see exactly
+// what changes before publishing.
+// ---------------------------------------------------------------------------
+
+type AdvantageFeatureResult = {
+  key: string;
+  label: string;
+  is_generative: boolean;
+  default: boolean;
+  applies_to: string[];
+  eligible: boolean;
+  iframe: string | null;
+  error: string | null;
+};
+
+function AdvantagePreviewPanel({
+  connectionId,
+  creative,
+  adType,
+  overrides,
+  setOverrides,
+}: {
+  connectionId?: string;
+  creative: any;
+  adType: 'image' | 'video' | 'dpa';
+  overrides: Record<string, boolean>;
+  setOverrides: (v: Record<string, boolean>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [baseline, setBaseline] = useState<string | null>(null);
+  const [features, setFeatures] = useState<AdvantageFeatureResult[]>([]);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadPreviews = async () => {
+    if (!connectionId || !creative) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: err } = await callApi('meta-preview-enhancements', {
+        body: { connection_id: connectionId, creative, ad_type: adType },
+      });
+      if (err) throw new Error(typeof err === 'string' ? err : 'Preview failed');
+      setBaseline(data?.baseline || null);
+      setFeatures(data?.features || []);
+      // Initialize overrides for first-time load: set each feature to its
+      // default (standard=true, generative=false) so they appear as toggles.
+      const initial: Record<string, boolean> = { ...overrides };
+      for (const f of data?.features || []) {
+        if (!(f.key in initial)) initial[f.key] = f.default;
+      }
+      setOverrides(initial);
+    } catch (e: any) {
+      setError(e.message || 'No se pudieron cargar los previews');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open && features.length === 0 && !loading) loadPreviews();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const standardFeatures = features.filter(f => !f.is_generative);
+  const generativeFeatures = features.filter(f => f.is_generative);
+
+  const toggleFeature = (key: string) => {
+    setOverrides({ ...overrides, [key]: !overrides[key] });
+  };
+
+  const renderFeatureRow = (f: AdvantageFeatureResult) => {
+    const isOn = overrides[f.key] ?? f.default;
+    const isExpanded = expandedKey === f.key;
+    return (
+      <div key={f.key} className="border rounded-md overflow-hidden">
+        <div className={`flex items-center gap-2 p-2.5 ${!f.eligible ? 'opacity-40' : ''}`}>
+          <button
+            type="button"
+            onClick={() => f.eligible && toggleFeature(f.key)}
+            disabled={!f.eligible}
+            className={`shrink-0 w-9 h-5 rounded-full transition-all relative ${isOn && f.eligible ? 'bg-primary' : 'bg-muted'} ${!f.eligible ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${isOn && f.eligible ? 'left-[18px]' : 'left-0.5'}`} />
+          </button>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold flex items-center gap-1">
+              {f.label}
+              {f.is_generative && <span className="text-[9px] bg-amber-100 text-amber-900 px-1 rounded">IA</span>}
+              {!f.eligible && <span className="text-[9px] bg-gray-200 text-gray-700 px-1 rounded">No aplica</span>}
+            </p>
+            {f.error && <p className="text-[10px] text-muted-foreground">{f.error.slice(0, 80)}</p>}
+          </div>
+          {f.iframe && (
+            <button
+              type="button"
+              onClick={() => setExpandedKey(isExpanded ? null : f.key)}
+              className="text-[10px] text-primary hover:underline"
+            >
+              {isExpanded ? 'Ocultar' : 'Ver preview'}
+            </button>
+          )}
+        </div>
+        {isExpanded && f.iframe && (
+          <div className="border-t bg-muted/20 p-2">
+            <div className="h-[420px] w-full overflow-hidden" dangerouslySetInnerHTML={{ __html: f.iframe }} />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-2 p-4 rounded-lg border border-purple-200 bg-gradient-to-br from-purple-50/50 to-transparent">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between gap-2"
+      >
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-purple-600" />
+          <span className="text-sm font-semibold">Mejoras visuales de Meta — aprueba cada una</span>
+        </div>
+        <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      <p className="text-[11px] text-muted-foreground text-left">
+        Meta puede aplicar mejoras visuales (brillo, recortes, música, overlays, etiquetas). Hacé click en cada "Ver preview" para ver exactamente qué cambia — si no te gusta, lo apagás.
+      </p>
+
+      {open && (
+        <div className="space-y-3 pt-2">
+          {loading && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground p-3">
+              <Loader2 className="w-3 h-3 animate-spin" /> Meta está generando los previews… (10-20s)
+            </div>
+          )}
+          {error && (
+            <div className="p-3 rounded border border-red-200 bg-red-50 text-xs text-red-900">{error}</div>
+          )}
+          {!loading && !error && features.length > 0 && (
+            <>
+              {baseline && (
+                <div className="border rounded-md overflow-hidden">
+                  <div className="p-2 text-[11px] font-semibold bg-muted/30">Original (sin mejoras)</div>
+                  <div className="h-[360px] w-full overflow-hidden" dangerouslySetInnerHTML={{ __html: baseline }} />
+                </div>
+              )}
+              {standardFeatures.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-semibold text-muted-foreground">Estándar (sin IA, seguras)</p>
+                  {standardFeatures.map(renderFeatureRow)}
+                </div>
+              )}
+              {generativeFeatures.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-semibold text-muted-foreground">Generativas (IA — marcan ad como AI-modified)</p>
+                  {generativeFeatures.map(renderFeatureRow)}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Advantage+ Creative toggles (step ad-creative)
 // ---------------------------------------------------------------------------
 
@@ -3780,6 +3950,11 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [advFeatVisual, setAdvFeatVisual] = useState<boolean>(true);   // image_touchups + image_brightness_and_contrast / video_auto_crop
   const [advFeatText, setAdvFeatText] = useState<boolean>(true);       // text_optimizations + text_formatting_optimization
   const [advFeatOverlays, setAdvFeatOverlays] = useState<boolean>(false); // image_templates + add_text_overlay
+  // Granular per-feature overrides set by the AdvantagePreviewPanel. When a
+  // key is present here, its value wins over the 5 coarse toggles above. The
+  // panel calls /meta-preview-enhancements and renders an iframe per feature
+  // so the merchant can approve/reject each enhancement visually.
+  const [advantageOverrides, setAdvantageOverrides] = useState<Record<string, boolean>>({});
   const [advFeatTranslate, setAdvFeatTranslate] = useState<boolean>(false); // text_translation + image_text_translation
   // Meta Ads Manager "Optimizar contenido para cada persona" — varies content
   // and destination per viewer. Maps to use_flexible_image_aspect_ratio + the
@@ -4521,6 +4696,13 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       if (advFeatTranslate) {
         creativeFeatures.text_translation = 'OPT_IN';
         creativeFeatures.image_text_translation = 'OPT_IN';
+      }
+
+      // Per-feature overrides from the AdvantagePreviewPanel always win over
+      // the 5 coarse toggles above. Lets the merchant approve/reject each
+      // enhancement individually after seeing Meta's preview.
+      for (const [key, value] of Object.entries(advantageOverrides)) {
+        creativeFeatures[key] = value ? 'OPT_IN' : 'OPT_OUT';
       }
 
       const isAdvantage = budgetType === 'ADVANTAGE';
@@ -5272,6 +5454,28 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   overlays={advFeatOverlays} setOverlays={setAdvFeatOverlays}
                   translate={advFeatTranslate} setTranslate={setAdvFeatTranslate}
                   personalize={personalizeContent} setPersonalize={setPersonalizeContent}
+                />
+                <AdvantagePreviewPanel
+                  connectionId={ctxConnectionId}
+                  adType={adSetFormat === 'catalog' ? 'dpa' : (images[0]?.endsWith('.mp4') ? 'video' : 'image')}
+                  overrides={advantageOverrides}
+                  setOverrides={setAdvantageOverrides}
+                  creative={{
+                    object_story_spec: {
+                      page_id: selectedPageId || ctxPageId || undefined,
+                      ...(publishToInstagram && (selectedInstagramUserId || ctxIgAccountId)
+                        ? { instagram_user_id: selectedInstagramUserId || ctxIgAccountId }
+                        : {}),
+                      link_data: {
+                        link: destinationUrl || 'https://example.com',
+                        message: primaryTexts[0] || '',
+                        name: headlines[0] || '',
+                        ...(descriptions[0] ? { description: descriptions[0] } : {}),
+                        ...(images[0] ? { picture: images[0] } : {}),
+                        call_to_action: { type: cta || 'SHOP_NOW', value: { link: destinationUrl || 'https://example.com' } },
+                      },
+                    },
+                  }}
                 />
                 </div>
               )}

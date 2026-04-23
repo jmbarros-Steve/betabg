@@ -120,6 +120,7 @@ import { metaTargetingSearch } from './meta/meta-targeting-search.js';
 import { detectAudienceOverlap } from './meta/detect-audience-overlap.js';
 import { syncKlaviyoToMetaAudience } from './meta/sync-klaviyo-to-meta-audience.js';
 import { metaCatalogs } from './meta/meta-catalogs.js';
+import { metaPreviewEnhancements } from './meta/meta-preview-enhancements.js';
 import { metaAdsetAction } from './meta/meta-adset-action.js';
 import { discoverClientAssets } from './meta/discover-client-assets.js';
 
@@ -387,6 +388,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/detect-audience-overlap', authMiddleware, detectAudienceOverlap);
   app.post('/api/sync-klaviyo-to-meta-audience', authMiddleware, syncKlaviyoToMetaAudience);
   app.post('/api/meta-catalogs', authMiddleware, metaCatalogs);
+  app.post('/api/meta-preview-enhancements', authMiddleware, metaPreviewEnhancements);
   app.post('/api/meta-adset-action', authMiddleware, metaAdsetAction);
   app.post('/api/discover-client-assets', authMiddleware, discoverClientAssets);
   app.post('/api/manage-report-schedule', authMiddleware, manageReportSchedule);
