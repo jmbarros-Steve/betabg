@@ -166,6 +166,21 @@ const STEPS_AD: StepDef[] = [
   { key: 'review', label: 'Revisar', icon: Rocket },
 ];
 
+// DPA token resolver — replaces Meta's dynamic placeholders with real values
+// from a sample product so the preview shows what the user will actually see.
+function resolveDpaTokens(
+  text: string,
+  sample: { title: string; price: string | null; brand: string | null; description: string | null } | null,
+): string {
+  if (!sample) return text;
+  return text
+    .replace(/\{\{\s*product\.name\s*\}\}/gi, sample.title)
+    .replace(/\{\{\s*product\.price\s*\}\}/gi, sample.price || '$—')
+    .replace(/\{\{\s*product\.current_price\s*\}\}/gi, sample.price || '$—')
+    .replace(/\{\{\s*product\.brand\s*\}\}/gi, sample.brand || '')
+    .replace(/\{\{\s*product\.description\s*\}\}/gi, sample.description || '');
+}
+
 // DPA (Catálogo Advantage+) skips funnel-stage, angle-select, creative-focus.
 // Meta decides which product and which audience segment each user sees based
 // on the catalog signals — the agency doesn't choose funnel stage or angle.
@@ -862,42 +877,45 @@ function AdSetForm({
 
   return (
     <div className="space-y-5">
-      {/* Format selector. When the campaign is in DPA mode (ADVANTAGE /
-          CATALOG) only 'catalog' is valid — disable the other options so the
-          user can't pick Single/Carousel/DCT by mistake, which would conflict
-          with the objective set in step 1. */}
-      <div>
-        <Label className="text-sm font-semibold">
-          Formato del Ad Set
-          {adSetFormat === 'catalog' && (
-            <span className="text-[10px] text-green-700 font-normal ml-2">(bloqueado: campañas Catálogo solo usan DPA)</span>
-          )}
-        </Label>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-2">
-          {formats.map((f) => {
-            const Icon = f.icon;
-            const isActive = adSetFormat === f.key;
-            const isDisabled = adSetFormat === 'catalog' && f.key !== 'catalog';
-            return (
-              <button
-                key={f.key}
-                onClick={() => !isDisabled && setAdSetFormat(f.key)}
-                disabled={isDisabled}
-                className={`relative flex flex-col items-center gap-1.5 p-4 rounded-lg border text-center transition-all ${
-                  isActive ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
-                } ${isDisabled ? 'opacity-40 cursor-not-allowed hover:border-border' : ''}`}
-              >
-                {f.recommended && (
-                  <Badge className="absolute -top-2 right-1 text-[9px] bg-green-500/15 text-green-700 border-green-500/30">Steve recomienda</Badge>
-                )}
-                <Icon className={`w-6 h-6 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                <span className={`text-xs font-semibold ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>{f.label}</span>
-                <span className="text-[10px] text-muted-foreground leading-tight">{f.desc}</span>
-              </button>
-            );
-          })}
+      {/* Format selector. DPA campaigns don't let the user pick — show a single
+          locked banner instead of the 4-option grid. */}
+      {adSetFormat === 'catalog' ? (
+        <div className="flex items-center gap-3 p-4 rounded-lg border border-green-300 bg-green-50">
+          <ShoppingBag className="w-6 h-6 text-green-700 shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-green-900">Formato: Catálogo (DPA) — bloqueado</p>
+            <p className="text-[11px] text-green-800 mt-0.5">
+              Esta campaña es Advantage+ Catálogo. Meta elige dinámicamente qué producto mostrar a cada persona desde tu catálogo de Shopify. No necesitas elegir formato, imágenes ni ángulo.
+            </p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div>
+          <Label className="text-sm font-semibold">Formato del Ad Set</Label>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-2">
+            {formats.map((f) => {
+              const Icon = f.icon;
+              const isActive = adSetFormat === f.key;
+              return (
+                <button
+                  key={f.key}
+                  onClick={() => setAdSetFormat(f.key)}
+                  className={`relative flex flex-col items-center gap-1.5 p-4 rounded-lg border text-center transition-all ${
+                    isActive ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+                  }`}
+                >
+                  {f.recommended && (
+                    <Badge className="absolute -top-2 right-1 text-[9px] bg-green-500/15 text-green-700 border-green-500/30">Steve recomienda</Badge>
+                  )}
+                  <Icon className={`w-6 h-6 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <span className={`text-xs font-semibold ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>{f.label}</span>
+                  <span className="text-[10px] text-muted-foreground leading-tight">{f.desc}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* A4: Photo vs Video — disponible en Única, Carrusel y DCT Flexible.
           Catálogo (DPA) queda fuera porque Meta trae los productos del
@@ -1976,6 +1994,32 @@ function AdFormMultiSlot({
   const currentSlotIsImage = !!images[activeImageSlot] && !images[activeImageSlot].endsWith('.mp4');
   const canAddMoreTexts = adSetFormat === 'flexible';
 
+  // Sample product for DPA preview — shows the user how the ad will look when
+  // Meta plugs in a real product from the catalog. We load one Shopify product
+  // and use it to render the tokens ({{product.name}}, {{product.price}}, etc.).
+  const [dpaSampleProduct, setDpaSampleProduct] = useState<{ title: string; image_url: string | null; price: string | null; brand: string | null; description: string | null } | null>(null);
+  useEffect(() => {
+    if (!isDpaCampaign) return;
+    (async () => {
+      const { data } = await supabase
+        .from('shopify_products')
+        .select('title, image_url, price, vendor, body_html')
+        .eq('client_id', clientId)
+        .not('image_url', 'is', null)
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        setDpaSampleProduct({
+          title: data.title || 'Producto',
+          image_url: data.image_url,
+          price: data.price ? `$${Number(data.price).toLocaleString('es-CL')}` : null,
+          brand: data.vendor || null,
+          description: (data.body_html || '').replace(/<[^>]+>/g, '').slice(0, 120) || null,
+        });
+      }
+    })();
+  }, [isDpaCampaign, clientId]);
+
   const MEDIA_TABS: Array<{ key: MediaTab; label: string; icon: React.ElementType }> = [
     { key: 'upload', label: 'Subir', icon: Upload },
     { key: 'products', label: 'Productos', icon: ShoppingBag },
@@ -2014,7 +2058,10 @@ function AdFormMultiSlot({
         )}
       </div>
 
-      {/* ---- IMAGE SLOTS ---- */}
+      {/* ---- IMAGE SLOTS ----
+          HIDDEN for DPA: catalog campaigns don't accept uploaded creatives —
+          Meta pulls product images from the Shopify catalog at render time. */}
+      {!isDpaCampaign && (
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <Label className="text-sm font-semibold">Creativos ({images.length} {images.length === 1 ? 'imagen' : 'imágenes'})</Label>
@@ -2321,6 +2368,7 @@ function AdFormMultiSlot({
           <Input value={images[activeImageSlot] || ''} onChange={(e) => setImageAtSlot(e.target.value)} placeholder="https://tu-imagen.com/foto.jpg" />
         )}
       </div>
+      )}
 
       {/* DPA product tokens — Meta renders these per-product when the ad runs.
           Docs: developers.facebook.com/docs/marketing-api/advantage-catalog-ads
@@ -2475,13 +2523,24 @@ function PreviewPanel({
 
   return (
     <div className="hidden lg:block">
-      <h4 className="text-sm font-semibold mb-2 text-muted-foreground">Vista previa</h4>
+      <h4 className="text-sm font-semibold mb-2 text-muted-foreground">
+        Vista previa
+        {isDpaCampaign && dpaSampleProduct && (
+          <span className="block text-[10px] font-normal text-purple-700 mt-0.5">
+            Mostrando ejemplo con "{dpaSampleProduct.title}" · Meta rotará productos automáticamente
+          </span>
+        )}
+      </h4>
       <div className="sticky top-4 space-y-2">
         <AdPreviewMockup
-          imageUrl={images[previewIdx] || ''}
-          primaryText={primaryTexts[previewIdx] || primaryTexts[0] || ''}
-          headline={headlines[previewIdx] || headlines[0] || ''}
-          description={descriptions[previewIdx] || descriptions[0] || ''}
+          imageUrl={
+            isDpaCampaign && dpaSampleProduct?.image_url
+              ? dpaSampleProduct.image_url
+              : images[previewIdx] || ''
+          }
+          primaryText={resolveDpaTokens(primaryTexts[previewIdx] || primaryTexts[0] || '', isDpaCampaign ? dpaSampleProduct : null)}
+          headline={resolveDpaTokens(headlines[previewIdx] || headlines[0] || '', isDpaCampaign ? dpaSampleProduct : null)}
+          description={resolveDpaTokens(descriptions[previewIdx] || descriptions[0] || '', isDpaCampaign ? dpaSampleProduct : null)}
           cta={cta}
           pageName={pageName}
           destinationUrl={destinationUrl}
