@@ -26,7 +26,7 @@ export async function updateShopifyProduct(c: Context) {
     }
 
     const body = await c.req.json();
-    const { connectionId, productId, title, price, inventory_quantity, variant_id, inventory_item_id, body_html, images } = body;
+    const { connectionId, productId, title, price, cost, inventory_quantity, variant_id, inventory_item_id, body_html, images } = body;
 
     if (!connectionId || !productId) {
       return c.json({ error: 'connectionId and productId required' }, 400);
@@ -127,6 +127,27 @@ export async function updateShopifyProduct(c: Context) {
       if (price !== undefined) updates.push('precio');
       if (body_html !== undefined) updates.push('descripción');
       if (images !== undefined) updates.push('imágenes');
+    }
+
+    // === Update cost (Cost per Item) via Inventory Items API ===
+    if (cost !== undefined && inventory_item_id) {
+      const numCost = Number(cost);
+      if (isNaN(numCost) || numCost < 0) return c.json({ error: 'cost must be a non-negative number' }, 400);
+
+      const costUrl = `https://${cleanStoreUrl}/admin/api/2026-04/inventory_items/${inventory_item_id}.json`;
+      const costRes = await fetch(costUrl, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ inventory_item: { id: inventory_item_id, cost: String(numCost) } }),
+      });
+
+      if (!costRes.ok) {
+        const errorText = await costRes.text();
+        console.error('[update-shopify-product] Cost update failed:', costRes.status, errorText);
+        return c.json({ error: `Failed to update cost: ${costRes.status}` }, 500);
+      }
+
+      updates.push('costo');
     }
 
     // === Update inventory quantity ===

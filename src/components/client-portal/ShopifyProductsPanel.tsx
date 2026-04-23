@@ -99,6 +99,7 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
   const [editVariantIndex, setEditVariantIndex] = useState(0);
   const [editTitle, setEditTitle] = useState('');
   const [editPrice, setEditPrice] = useState('');
+  const [editCost, setEditCost] = useState('');
   const [editStock, setEditStock] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -135,6 +136,7 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
     setEditVariantIndex(variantIdx);
     setEditTitle(product.title);
     setEditPrice(prefilledPrice !== undefined ? String(prefilledPrice) : String(product.variants[variantIdx].price));
+    setEditCost(product.variants[variantIdx].cost !== null ? String(product.variants[variantIdx].cost) : '');
     setEditStock(product.variants[variantIdx].inventory_quantity !== null ? String(product.variants[variantIdx].inventory_quantity) : '');
   };
 
@@ -150,6 +152,11 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
       };
       if (editTitle !== editProduct.title) body.title = editTitle;
       if (editPrice !== String(variant.price)) body.price = parseFloat(editPrice);
+      const currentCostStr = variant.cost !== null ? String(variant.cost) : '';
+      if (editCost !== currentCostStr && editCost !== '' && variant.inventory_item_id) {
+        body.cost = parseFloat(editCost);
+        body.inventory_item_id = variant.inventory_item_id;
+      }
       if (variant.inventory_quantity !== null && editStock !== String(variant.inventory_quantity) && variant.inventory_item_id) {
         body.inventory_quantity = parseInt(editStock, 10);
         body.inventory_item_id = variant.inventory_item_id;
@@ -652,6 +659,26 @@ export function ShopifyProductsPanel({ clientId, allSkuSales = [], connectionId:
                   </label>
                   <Input type="number" min="0" step="1" value={editPrice} onChange={e => setEditPrice(e.target.value)} />
                 </div>
+                {editProduct.variants[editVariantIndex].inventory_item_id !== null && (
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Costo por unidad {editProduct.variants.length > 1 ? `(${editProduct.variants[editVariantIndex].title})` : ''}
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="Costo del producto"
+                      value={editCost}
+                      onChange={e => setEditCost(e.target.value)}
+                    />
+                    {editPrice && editCost && parseFloat(editPrice) > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Margen: {(((parseFloat(editPrice) - parseFloat(editCost)) / parseFloat(editPrice)) * 100).toFixed(1)}%
+                      </p>
+                    )}
+                  </div>
+                )}
                 {editProduct.variants[editVariantIndex].inventory_quantity !== null && (
                   <div>
                     <label className="text-sm font-medium mb-1 block">
