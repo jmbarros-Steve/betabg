@@ -7,6 +7,11 @@
     <meta name="description" content="Steve es tu asistente de marketing IA que genera copies para Meta Ads, Google Ads y Klaviyo" />
     <meta name="author" content="Steve" />
 
+    <!-- Prevent Google Translate / extensions from rewriting text nodes, which
+         corrupts React's virtual DOM and crashes with
+         "removeChild: The node to be removed is not a child of this node". -->
+    <meta name="google" content="notranslate" />
+
     <meta property="og:title" content="Steve - Tu agencia de marketing 24/7" />
     <meta property="og:description" content="Steve gestiona tus campañas de Meta Ads, Google Ads, Klaviyo y Shopify con inteligencia artificial. Tu agencia de marketing 24/7." />
     <meta property="og:type" content="website" />
