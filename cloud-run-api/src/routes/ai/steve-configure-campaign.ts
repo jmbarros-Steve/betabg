@@ -24,8 +24,8 @@ export async function steveConfigureCampaign(c: Context) {
 
     const supabase = getSupabaseAdmin();
 
-    // Fetch brief + product in parallel
-    const [brief, product] = await Promise.all([
+    // Fetch brief + explicit product + catalog (for Steve to pick a hero)
+    const [brief, product, catalogProducts] = await Promise.all([
       safeQuerySingleOrDefault<any>(
         supabase
           .from('buyer_personas')
@@ -42,13 +42,23 @@ export async function steveConfigureCampaign(c: Context) {
         ? safeQuerySingleOrDefault<any>(
             supabase
               .from('shopify_products')
-              .select('id, title, price, compare_at_price, product_type, body_html, inventory')
+              .select('id, title, product_type, body_html')
               .eq('id', product_id)
               .maybeSingle(),
             null,
             'steve-configure.product',
           )
         : Promise.resolve(null),
+      // Top 10 products for Steve to pick a hero if user didn't choose
+      product_id
+        ? Promise.resolve([])
+        : supabase
+            .from('shopify_products')
+            .select('id, title, product_type')
+            .eq('client_id', client_id)
+            .not('image_url', 'is', null)
+            .limit(10)
+            .then(({ data }) => data || []),
     ]);
 
     const persona = brief?.persona_data || {};
@@ -62,16 +72,20 @@ export async function steveConfigureCampaign(c: Context) {
     const avgTicket = Number(persona.ticket_promedio || persona.average_ticket || 0);
     const cpa = avgTicket > 0 ? Math.round(avgTicket * 0.3) : 15000;
 
+    const catalogBlock = Array.isArray(catalogProducts) && catalogProducts.length > 0
+      ? `<catalogo_disponible>
+El usuario NO eligió un producto específico. La tienda tiene estos productos reales (elige UNO como hero si tiene sentido para la campaña):
+${catalogProducts.map((p: any, i: number) => `${i + 1}. id=${p.id} · ${p.title}${p.product_type ? ` (${p.product_type})` : ''}`).join('\n')}
+</catalogo_disponible>`
+      : '';
+
     const productBlock = product
       ? `<producto>
 Nombre: ${product.title}
-Precio: $${Number(product.price).toLocaleString('es-CL')}
-${product.compare_at_price ? `Precio original: $${Number(product.compare_at_price).toLocaleString('es-CL')}` : ''}
 Tipo: ${product.product_type || 'general'}
-Stock: ${product.inventory ?? 'desconocido'}
 Descripción: ${(product.body_html || '').replace(/<[^>]+>/g, '').slice(0, 300)}
 </producto>`
-      : `<producto>No se seleccionó producto específico — campaña de marca amplia.</producto>`;
+      : `<producto>No se seleccionó producto específico. Si el catálogo tiene productos (ver abajo), sugiere UNO como hero en el campo suggestedProductId. Si la campaña debe ser de marca amplia sin producto, deja suggestedProductId en null.</producto>`;
 
     const hintBlock = user_hint ? `<pista_usuario>${user_hint.slice(0, 500)}</pista_usuario>` : '';
 
@@ -92,12 +106,14 @@ Responde SOLO con JSON válido, sin texto antes ni después:
 {
   "campaign": {
     "name": "string (formato: Marca-OBJ-Audiencia-MesAño)",
-    "objective": "CONVERSIONS | TRAFFIC | AWARENESS | ENGAGEMENT",
+    "objective": "CONVERSIONS | TRAFFIC | AWARENESS | ENGAGEMENT | CATALOG",
     "budgetType": "ABO | CBO | ADVANTAGE",
     "dailyBudget": number (CLP, sin puntos)
   },
   "adset": {
     "name": "string",
+    "adSetFormat": "single | carousel | flexible | catalog",
+    "autoMediaType": "photo | video",
     "targetCountries": ["CL"],
     "targetAgeMin": 18,
     "targetAgeMax": 65,
@@ -110,14 +126,23 @@ Responde SOLO con JSON válido, sin texto antes ni después:
     "angle": "Beneficios | Bold Statement | Us vs Them | Call Out | Reviews | Ugly Ads | Descuentos/Ofertas | Reviews + Beneficios | ..."
   },
   "creative": {
-    "headlines": ["string max 80 chars", "variante 2"],
-    "primaryTexts": ["string 80-300 chars", "variante 2"],
-    "descriptions": ["string corta"],
+    "headlines": ["titulo 1", "titulo 2", "titulo 3"],
+    "primaryTexts": ["texto 1", "texto 2", "texto 3"],
+    "descriptions": ["descripcion 1", "descripcion 2"],
     "cta": "SHOP_NOW | LEARN_MORE | SIGN_UP | BOOK_NOW | GET_OFFER",
-    "focusType": "product | broad"
+    "focusType": "product | broad",
+    "suggestedProductId": "id del catálogo (si aplica) o null"
   },
   "reasoning": "1 frase breve explicando las 2-3 decisiones clave"
-}`;
+}
+
+REGLAS DE CONSISTENCIA obligatorias:
+1. Si budgetType=ADVANTAGE → objective DEBE ser CATALOG y adSetFormat DEBE ser 'catalog'.
+2. Si adSetFormat=catalog → budgetType DEBE ser ADVANTAGE y objective=CATALOG.
+3. Si el user_hint menciona "video", "veo", "reel" → autoMediaType='video'. Por default es 'photo'.
+4. Si adSetFormat=flexible → usa DCT 3:2:2 (3 titulos, 3 textos, 2 descripciones).
+5. Si hay catálogo disponible y focusType='product', elige suggestedProductId del listado.
+6. Devuelve SIEMPRE 3 headlines y 3 primaryTexts (2 descripciones) para dar variaciones — nunca solo 1.`;
 
     const userMessage = `<brief>
 Marca: ${brandName}
@@ -132,6 +157,8 @@ CPA máximo sugerido: $${cpa.toLocaleString('es-CL')}
 </brief>
 
 ${productBlock}
+
+${catalogBlock}
 
 ${hintBlock}
 

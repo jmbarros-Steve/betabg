@@ -856,20 +856,30 @@ function AdSetForm({
 
   return (
     <div className="space-y-5">
-      {/* Format selector */}
+      {/* Format selector. When the campaign is in DPA mode (ADVANTAGE /
+          CATALOG) only 'catalog' is valid — disable the other options so the
+          user can't pick Single/Carousel/DCT by mistake, which would conflict
+          with the objective set in step 1. */}
       <div>
-        <Label className="text-sm font-semibold">Formato del Ad Set</Label>
+        <Label className="text-sm font-semibold">
+          Formato del Ad Set
+          {adSetFormat === 'catalog' && (
+            <span className="text-[10px] text-green-700 font-normal ml-2">(bloqueado: campañas Catálogo solo usan DPA)</span>
+          )}
+        </Label>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-2">
           {formats.map((f) => {
             const Icon = f.icon;
             const isActive = adSetFormat === f.key;
+            const isDisabled = adSetFormat === 'catalog' && f.key !== 'catalog';
             return (
               <button
                 key={f.key}
-                onClick={() => setAdSetFormat(f.key)}
+                onClick={() => !isDisabled && setAdSetFormat(f.key)}
+                disabled={isDisabled}
                 className={`relative flex flex-col items-center gap-1.5 p-4 rounded-lg border text-center transition-all ${
                   isActive ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
-                }`}
+                } ${isDisabled ? 'opacity-40 cursor-not-allowed hover:border-border' : ''}`}
               >
                 {f.recommended && (
                   <Badge className="absolute -top-2 right-1 text-[9px] bg-green-500/15 text-green-700 border-green-500/30">Steve recomienda</Badge>
@@ -2502,9 +2512,26 @@ function PreviewPanel({
 
 interface SteveConfig {
   campaign?: { name?: string; objective?: Objective; budgetType?: BudgetType; dailyBudget?: number };
-  adset?: { name?: string; audienceDesc?: string; targetCountries?: string[]; targetAgeMin?: number; targetAgeMax?: number; targetGender?: number; suggestedInterests?: Array<{ name: string; reason: string }> };
+  adset?: {
+    name?: string;
+    audienceDesc?: string;
+    targetCountries?: string[];
+    targetAgeMin?: number;
+    targetAgeMax?: number;
+    targetGender?: number;
+    suggestedInterests?: Array<{ name: string; reason: string }>;
+    adSetFormat?: 'single' | 'carousel' | 'flexible' | 'catalog';
+    autoMediaType?: 'photo' | 'video';
+  };
   funnel?: { stage?: 'tofu' | 'mofu' | 'bofu'; angle?: string };
-  creative?: { headlines?: string[]; primaryTexts?: string[]; descriptions?: string[]; cta?: string; focusType?: 'product' | 'broad' };
+  creative?: {
+    headlines?: string[];
+    primaryTexts?: string[];
+    descriptions?: string[];
+    cta?: string;
+    focusType?: 'product' | 'broad';
+    suggestedProductId?: string | null;
+  };
   reasoning?: string;
 }
 
@@ -4613,17 +4640,39 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                 if (typeof config.adset.targetAgeMin === 'number') setTargetAgeMin(config.adset.targetAgeMin);
                 if (typeof config.adset.targetAgeMax === 'number') setTargetAgeMax(config.adset.targetAgeMax);
                 if (typeof config.adset.targetGender === 'number') setTargetGender(config.adset.targetGender as 0 | 1 | 2);
+                // Apply format + media choice recommended by Steve. When the
+                // campaign is CATALOG/ADVANTAGE, Steve returns adSetFormat='catalog'
+                // which propagates through the useEffect that enforces DPA config.
+                if (config.adset.adSetFormat) setAdSetFormat(config.adset.adSetFormat as AdSetFormat);
+                if (config.adset.autoMediaType === 'video' || config.adset.autoMediaType === 'photo') {
+                  setAutoMediaType(config.adset.autoMediaType);
+                }
               }
               if (config.funnel) {
                 if (config.funnel.stage) setFunnelStage(config.funnel.stage);
                 if (config.funnel.angle) setSelectedAngle(config.funnel.angle);
               }
               if (config.creative) {
-                if (Array.isArray(config.creative.headlines)) setHeadlines(config.creative.headlines);
-                if (Array.isArray(config.creative.primaryTexts)) setPrimaryTexts(config.creative.primaryTexts);
-                if (Array.isArray(config.creative.descriptions)) setDescriptions(config.creative.descriptions);
+                if (Array.isArray(config.creative.headlines) && config.creative.headlines.length > 0) setHeadlines(config.creative.headlines);
+                if (Array.isArray(config.creative.primaryTexts) && config.creative.primaryTexts.length > 0) setPrimaryTexts(config.creative.primaryTexts);
+                if (Array.isArray(config.creative.descriptions) && config.creative.descriptions.length > 0) setDescriptions(config.creative.descriptions);
                 if (config.creative.cta) setCta(config.creative.cta);
                 if (config.creative.focusType) setFocusType(config.creative.focusType);
+                // Hero product suggestion (only when user didn't pre-select one)
+                if (config.creative.suggestedProductId) {
+                  supabase.from('shopify_products').select('id, title, image_url, product_type').eq('id', config.creative.suggestedProductId).maybeSingle()
+                    .then(({ data }: any) => {
+                      if (data) {
+                        setSelectedProduct({
+                          id: data.id,
+                          title: data.title,
+                          image: data.image_url || '',
+                          price: 0,
+                          product_type: data.product_type || '',
+                        });
+                      }
+                    });
+                }
               }
               // Start the wizard — user lands on step 1 with everything prefilled.
               setWizardStarted(true);
