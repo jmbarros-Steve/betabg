@@ -3675,39 +3675,45 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
 
   // DPA sample product — used by both the creative form preview and the
   // sticky PreviewPanel to render tokens ({{product.name}}, etc.) with real
-  // data. Fallback to a generic placeholder when the client hasn't synced
-  // Shopify products yet (otherwise the preview shows raw {{tokens}}).
-  const DPA_FALLBACK_SAMPLE = {
-    title: 'Producto de ejemplo',
-    image_url: null as string | null,
-    price: '$19.990',
-    brand: clientBrandName || 'Tu marca',
-    description: 'Descripción de ejemplo del producto que Meta mostrará.',
-  };
+  // data. Fetches LIVE from Shopify (not from the local shopify_products
+  // table, which is currently empty because no sync cron has run).
   const [dpaSampleProduct, setDpaSampleProduct] = useState<{ title: string; image_url: string | null; price: string | null; brand: string | null; description: string | null } | null>(null);
   useEffect(() => {
     if (adSetFormat !== 'catalog') { setDpaSampleProduct(null); return; }
     (async () => {
-      const { data } = await supabase
-        .from('shopify_products')
-        .select('title, image_url, price, vendor, body_html')
+      // Prefer live Shopify fetch (same source the wizard uses to show the
+      // product grid). Works whether or not the local shopify_products table
+      // has been populated by a sync job.
+      const { data: conn } = await supabase
+        .from('platform_connections')
+        .select('id')
         .eq('client_id', clientId)
-        .not('image_url', 'is', null)
+        .eq('platform', 'shopify')
         .limit(1)
         .maybeSingle();
-      if (data) {
-        setDpaSampleProduct({
-          title: data.title || 'Producto',
-          image_url: data.image_url,
-          price: data.price ? `$${Number(data.price).toLocaleString('es-CL')}` : null,
-          brand: data.vendor || null,
-          description: (data.body_html || '').replace(/<[^>]+>/g, '').slice(0, 120) || null,
-        });
-      } else {
-        // No products synced locally — use placeholder so the preview still
-        // resolves tokens instead of showing {{product.name}} literally.
-        setDpaSampleProduct(DPA_FALLBACK_SAMPLE);
+      if (conn?.id) {
+        const { data: shopData } = await callApi('fetch-shopify-products', { body: { connectionId: conn.id } });
+        const p = shopData?.products?.[0];
+        if (p) {
+          const priceNum = Number(p.variants?.[0]?.price) || 0;
+          setDpaSampleProduct({
+            title: p.title || 'Producto',
+            image_url: p.variants?.[0]?.image_url || p.image || null,
+            price: priceNum > 0 ? `$${priceNum.toLocaleString('es-CL')}` : null,
+            brand: p.vendor || null,
+            description: (p.body_html || '').replace(/<[^>]+>/g, '').slice(0, 120) || null,
+          });
+          return;
+        }
       }
+      // Fallback: generic placeholder so the preview still resolves tokens.
+      setDpaSampleProduct({
+        title: 'Producto de ejemplo',
+        image_url: null,
+        price: '$19.990',
+        brand: clientBrandName || 'Tu marca',
+        description: 'Descripción del producto que Meta mostrará.',
+      });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adSetFormat, clientId, clientBrandName]);
