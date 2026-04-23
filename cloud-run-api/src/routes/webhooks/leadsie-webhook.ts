@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { timingSafeEqual } from 'crypto';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { assignAssetsToSystemUser } from '../../lib/meta-asset-assign.js';
 
 /**
  * Leadsie Webhook — receives POST when a merchant connects their assets via Leadsie.
@@ -230,6 +231,29 @@ export async function leadsieWebhook(c: Context) {
       console.log(
         `[leadsie-webhook] Meta connected client=${clientId} ad_account=${merged.account_id} page=${merged.page_id} ig=${merged.ig_account_id} pixel=${merged.pixel_id} active=${metaActive} (merged=${!!existing})`,
       );
+
+      // Assign Steve's System User to the freshly-shared assets so the API
+      // token can actually operate them. BM-level partnership via Leadsie
+      // grants access to Steve BM but NOT to the SU — we must add the SU
+      // explicitly or creating campaigns fails with "ads_management not
+      // granted". Non-blocking: we log failures but don't abort the webhook.
+      assignAssetsToSystemUser({
+        ad_account_id: merged.account_id,
+        page_id: merged.page_id,
+        pixel_id: merged.pixel_id,
+        ig_account_id: merged.ig_account_id,
+        // catalog_id comes from the webhook payload (meta.catalog_id) even
+        // though we don't persist it yet — still worth assigning to the SU.
+        catalog_id: meta.catalog_id || null,
+      })
+        .then((r) =>
+          console.log(
+            `[leadsie-webhook] SU assignment for client=${clientId}: assigned=${r.assigned.length} skipped=${r.skipped.length} failed=${r.failed.length}${r.failed.length > 0 ? ' — ' + JSON.stringify(r.failed) : ''}`,
+          ),
+        )
+        .catch((err) =>
+          console.error(`[leadsie-webhook] SU assignment threw for client=${clientId}:`, err),
+        );
     }
 
     // ── 6. Upsert Google Ads connection ────────────────
