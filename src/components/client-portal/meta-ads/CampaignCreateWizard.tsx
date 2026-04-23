@@ -2548,6 +2548,9 @@ function SteveQuickConfig({
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [loadingProducts, setLoadingProducts] = useState(false);
+  // Campaign intent — drives Steve's recommendations (objective, angle, focus).
+  // 4 options tuned for e-commerce: brand awareness, product sale, use cases, promo.
+  const [intent, setIntent] = useState<'brand' | 'product' | 'use_cases' | 'promo'>('product');
 
   useEffect(() => {
     if (!expanded || products.length > 0) return;
@@ -2585,6 +2588,7 @@ function SteveQuickConfig({
           client_id: clientId,
           product_id: selectedProductId || undefined,
           user_hint: userHint.trim() || undefined,
+          intent,
         },
       });
       if (error) throw new Error(typeof error === 'string' ? error : 'Error configurando');
@@ -2625,6 +2629,30 @@ function SteveQuickConfig({
           <button onClick={() => setExpanded(false)} className="text-xs text-muted-foreground hover:text-foreground">
             Prefiero hacerlo manual
           </button>
+        </div>
+
+        <div>
+          <Label className="text-xs">¿Qué tipo de campaña querés?</Label>
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            {[
+              { key: 'brand', label: 'Presentar marca', desc: 'Gente nueva conoce tu marca. TOFU, estilo de vida, sin producto específico.' },
+              { key: 'product', label: 'Vender producto', desc: 'Promocionás un producto puntual. BOFU, conversiones, producto hero.' },
+              { key: 'use_cases', label: 'Casos de uso', desc: 'Mostrás cómo lo usan tus clientes. MOFU, reviews, lifestyle.' },
+              { key: 'promo', label: 'Liquidar / Promo', desc: 'Descuento, stock, urgencia. BOFU, conversiones, precio destacado.' },
+            ].map((i) => (
+              <button
+                key={i.key}
+                type="button"
+                onClick={() => setIntent(i.key as typeof intent)}
+                className={`flex flex-col items-start gap-0.5 p-2.5 rounded-md border text-left transition-all ${
+                  intent === i.key ? 'border-primary bg-primary/10 ring-1 ring-primary/20' : 'border-border hover:border-primary/40'
+                }`}
+              >
+                <span className="text-xs font-semibold">{i.label}</span>
+                <span className="text-[10px] text-muted-foreground leading-tight">{i.desc}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         <div>
