@@ -1826,6 +1826,23 @@ async function handleGeneratePreviews(
     }
   }
 
+  // If EVERY format failed, surface a real error to the UI instead of a silent
+  // empty preview grid. Pick the first error to show in the toast.
+  if (Object.keys(previews).length === 0 && Object.keys(errors).length > 0) {
+    const firstErr = Object.values(errors)[0] || 'Meta rechazó todos los previews';
+    const isPerm = /permission|access|scope|does not have|not allowed/i.test(firstErr);
+    return {
+      body: {
+        success: false,
+        error: isPerm
+          ? `Meta rechazó los previews: ${firstErr}. Revisa que la conexión tenga permiso ads_read y que la Página pertenezca al BM del anuncio.`
+          : firstErr,
+        errors,
+      },
+      status: 200,
+    };
+  }
+
   return { body: { success: true, previews, errors }, status: 200 };
 }
 

@@ -280,13 +280,16 @@ export async function generateImage(c: Context) {
 
   // TODO: Re-enable credit system when billing is ready
 
-  // Auto-fetch client reference photos if none provided
-  // PRIORITY: Match product mentioned in the copy prompt to use its REAL Shopify photo
+  // Auto-fetch client reference photos if none provided.
+  // Goal (A1 fix): NEVER compose with an AI-generated asset as reference —
+  // iterating on previous AI output amplifies hallucinations ("the product
+  // lies"). Only real Shopify product photos are used as visual ground truth.
   let effectiveFotoBase = fotoBaseUrl;
+  let productRefConfidence: 'exact' | 'fuzzy' | 'none' = fotoBaseUrl ? 'exact' : 'none';
+  let productRefTitle: string | null = null;
   if (!effectiveFotoBase) {
     const supabaseForQuery = getSupabaseAdmin();
 
-    // Get ALL Shopify product images with titles for matching
     const shopifyProducts = await safeQueryOrDefault<{ image_url: string | null; title: string | null }>(
       supabaseForQuery
         .from('shopify_products')
@@ -298,51 +301,48 @@ export async function generateImage(c: Context) {
       'generate-image.fetchShopifyProducts',
     );
 
-    // Try to match a product mentioned in the copy/prompt text
+    // Token-based match against the copy prompt. Tightened thresholds vs. the
+    // previous version (score >= 0.3 with 1 hit matched almost anything).
     if (shopifyProducts && shopifyProducts.length > 0 && promptGeneracion) {
-      const promptLower = promptGeneracion.toLowerCase();
+      const STOP_WORDS = new Set(['para','con','sin','los','las','del','que','una','uno','est','este','esta','por','pro','más','mas','muy','sus','desde','hasta','entre','como','bien','todo','toda','todos','nuevo','nueva','nuestro','ideal','best','better','great','good']);
+      const tokenize = (s: string) =>
+        s.toLowerCase()
+         .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+         .split(/[^a-z0-9]+/)
+         .filter(w => w.length > 3 && !STOP_WORDS.has(w));
+      const promptTokens = new Set(tokenize(promptGeneracion));
 
-      // Score each product by how well its title matches the prompt
-      let bestMatch: { url: string; score: number } | null = null;
+      let bestMatch: { url: string; score: number; hits: number; title: string } | null = null;
       for (const product of shopifyProducts) {
         if (!product.image_url || !product.title) continue;
-        const titleLower = product.title.toLowerCase();
-        const titleWords = titleLower.split(/\s+/).filter((w: string) => w.length > 2);
-        // Count how many significant words from the product title appear in the prompt
-        const matchingWords = titleWords.filter((word: string) => promptLower.includes(word));
-        const score = matchingWords.length / Math.max(titleWords.length, 1);
-        // Require at least 1 matching word and a decent ratio
+        const titleTokens = tokenize(product.title);
+        if (titleTokens.length === 0) continue;
+        const matchingWords = titleTokens.filter(w => promptTokens.has(w));
+        const score = matchingWords.length / titleTokens.length;
         if (matchingWords.length >= 1 && (!bestMatch || score > bestMatch.score)) {
-          bestMatch = { url: product.image_url, score };
+          bestMatch = { url: product.image_url, score, hits: matchingWords.length, title: product.title };
         }
       }
 
-      if (bestMatch && bestMatch.score >= 0.3) {
+      if (bestMatch && (bestMatch.score >= 0.5 || bestMatch.hits >= 2)) {
         effectiveFotoBase = bestMatch.url;
-        console.log(`[generate-image] Matched product from copy: ${bestMatch.url} (score: ${bestMatch.score.toFixed(2)})`);
+        productRefConfidence = 'exact';
+        productRefTitle = bestMatch.title;
+        console.log(`[generate-image] Matched product "${bestMatch.title}" (score=${bestMatch.score.toFixed(2)}, hits=${bestMatch.hits})`);
+      } else if (bestMatch) {
+        console.log(`[generate-image] Weak product match "${bestMatch.title}" (score=${bestMatch.score.toFixed(2)}, hits=${bestMatch.hits}) — NOT using as reference`);
       }
     }
 
-    // Fallback: brand assets or random product photo
-    if (!effectiveFotoBase) {
-      const brandAssets = await safeQueryOrDefault<{ asset_url: string | null }>(
-        supabaseForQuery
-          .from('ad_assets')
-          .select('asset_url')
-          .eq('client_id', clientId)
-          .eq('tipo', 'imagen')
-          .order('created_at', { ascending: false })
-          .limit(5),
-        [],
-        'generate-image.fetchBrandAssets',
-      );
-
-      const allPhotos: string[] = [];
-      if (brandAssets) allPhotos.push(...brandAssets.map((a: any) => a.asset_url).filter(Boolean));
-      if (shopifyProducts) allPhotos.push(...shopifyProducts.map((p: any) => p.image_url).filter(Boolean));
-
-      if (allPhotos.length > 0) {
-        effectiveFotoBase = allPhotos[Math.floor(Math.random() * allPhotos.length)];
+    // Fallback: ONLY real Shopify photos. Never use ad_assets (may be
+    // AI-generated output from a prior run → feedback loop of garbage).
+    // Pick randomly among real products and tag as 'fuzzy' so the prompt can
+    // flag the LLM that this is NOT the exact product being advertised.
+    if (!effectiveFotoBase && shopifyProducts && shopifyProducts.length > 0) {
+      const realPhotos = shopifyProducts.map((p: any) => p.image_url).filter(Boolean);
+      if (realPhotos.length > 0) {
+        effectiveFotoBase = realPhotos[Math.floor(Math.random() * realPhotos.length)];
+        productRefConfidence = 'fuzzy';
       }
     }
   }
@@ -366,6 +366,15 @@ export async function generateImage(c: Context) {
   // genera caras humanas o escenas fotográficas en vez del logo variado.
   const isLogoFormat = String(formato || '').toLowerCase() === 'logo' || String(formato || '').toLowerCase() === 'landscape_logo';
 
+  // Pick the "photographic quality" block based on subject type:
+  // - logo → graphic design rules
+  // - product photography (product reference present, exact match) → product-oriented lens/light
+  // - lifestyle / people (no product ref or fuzzy) → portrait lens, skin texture, expressions
+  const isProductShot = productRefConfidence === 'exact';
+  const photographyBlock = isProductShot
+    ? `Ultra-sharp commercial product photograph, shot on medium-format digital (Hasselblad H6D) with 80mm macro lens at f/8. Studio-quality lighting (softbox + reflector) revealing real material textures — glass highlights, fabric weave, printed labels, condensation, natural food sheen. Tack-sharp focus on the product. Clean, deliberate composition suitable for an e-commerce hero banner. No illustrations, no 3D renders, no cartoon stylization, no floating objects, no AI shimmer, no plastic-looking surfaces. The product must look photographically identical to the real reference image — same shape, colors, proportions, packaging, and branding. The final image must be indistinguishable from a professional advertising product shoot.`
+    : `Ultra-realistic commercial photograph, shot on Canon EOS R5 with 85mm f/1.4 lens. Natural lighting with soft shadows, real skin texture with pores and subtle imperfections, genuine facial expressions. Real physical environment with depth of field and bokeh. No illustrations, no 3D renders, no AI artifacts, no plastic-looking skin, no floating objects. The image must be indistinguishable from a real professional advertising photo shoot.`;
+
   const promptFinal = isLogoFormat
     ? `${promptBase}.${brandColorsBlock}${brandConsistencyBlock}
 CRITICAL RENDERING INSTRUCTIONS FOR LOGO:
@@ -377,7 +386,7 @@ CRITICAL RENDERING INSTRUCTIONS FOR LOGO:
 - Only vary background color / framing / subtle styling as described in the prompt.
 - Centered composition with breathing space. Solid or flat subtle background.
 - Output must look like a professional brand logo — the kind that appears on a website header or business card.`
-    : `${promptBase}. ${randomDiversity}. ${visualRulesForPrompt}${brandColorsBlock}${brandConsistencyBlock}Ultra-realistic commercial photograph, shot on Canon EOS R5 with 85mm f/1.4 lens. Natural lighting with soft shadows, real skin texture with pores and subtle imperfections, genuine facial expressions. Real physical environment with depth of field and bokeh. No illustrations, no 3D renders, no AI artifacts, no plastic-looking skin, no floating objects. The image must be indistinguishable from a real professional advertising photo shoot.`;
+    : `${promptBase}. ${randomDiversity}. ${visualRulesForPrompt}${brandColorsBlock}${brandConsistencyBlock}${photographyBlock}`;
 
   let imageBytes: Uint8Array | null = null;
 
@@ -470,7 +479,12 @@ CRITICAL RENDERING INSTRUCTIONS FOR LOGO:
       const roleLines: string[] = [];
       let idx = 1;
       if (productPart) {
-        roleLines.push(`IMAGE ${idx} = the REAL product. Must appear EXACTLY as shown — same shape, colors, packaging, labels, textures. Do not alter, stylize, or reimagine it.`);
+        if (productRefConfidence === 'fuzzy') {
+          roleLines.push(`IMAGE ${idx} = a REAL photo from this brand's catalog, shown as STYLE/AESTHETIC REFERENCE only. Match its photographic style, lighting, and props, but do NOT copy the specific item — the ad is about a different product described in the prompt.`);
+        } else {
+          const titleHint = productRefTitle ? ` (titled "${productRefTitle}")` : '';
+          roleLines.push(`IMAGE ${idx} = the REAL product${titleHint}. The item in the generated photo MUST be the EXACT product shown — identical shape, colors, packaging, labels, logos, textures, and proportions. Do NOT invent, stylize, redesign, or substitute the product. You may change the scene, lighting, props around it, and framing, but the product itself must be photographically identical to this reference.`);
+        }
         idx++;
       }
       if (logoPart) {

@@ -749,6 +749,7 @@ function AdSetForm({
   dailyBudget, setDailyBudget,
   isABO,
   adSetFormat, setAdSetFormat,
+  autoMediaType, setAutoMediaType,
   cpaTarget, setCpaTarget,
   targetCountries, setTargetCountries,
   targetAgeMin, setTargetAgeMin,
@@ -775,6 +776,7 @@ function AdSetForm({
   dailyBudget: string; setDailyBudget: (v: string) => void;
   isABO: boolean;
   adSetFormat: AdSetFormat; setAdSetFormat: (v: AdSetFormat) => void;
+  autoMediaType: 'photo' | 'video'; setAutoMediaType: (v: 'photo' | 'video') => void;
   cpaTarget: string; setCpaTarget: (v: string) => void;
   targetCountries: string[]; setTargetCountries: (v: string[]) => void;
   targetAgeMin: number; setTargetAgeMin: (v: number) => void;
@@ -878,6 +880,42 @@ function AdSetForm({
           })}
         </div>
       </div>
+
+      {/* A4: Photo vs Video — only meaningful for 'single'. DCT+Carousel are
+          photo-first; video inside them requires manual upload per slot. */}
+      {adSetFormat === 'single' && (
+        <div>
+          <Label className="text-sm font-semibold">¿Qué quieres generar automáticamente?</Label>
+          <div className="grid grid-cols-2 gap-3 mt-2">
+            <button
+              type="button"
+              onClick={() => setAutoMediaType('photo')}
+              className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
+                autoMediaType === 'photo' ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+              }`}
+            >
+              <ImageIcon className={`w-5 h-5 ${autoMediaType === 'photo' ? 'text-primary' : 'text-muted-foreground'}`} />
+              <div>
+                <p className="text-xs font-semibold">Foto</p>
+                <p className="text-[10px] text-muted-foreground">Gemini 2.5 · 2 créditos · instantáneo</p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAutoMediaType('video')}
+              className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
+                autoMediaType === 'video' ? 'border-green-500 bg-green-50 ring-1 ring-green-500/20' : 'border-border hover:border-primary/30'
+              }`}
+            >
+              <Video className={`w-5 h-5 ${autoMediaType === 'video' ? 'text-green-600' : 'text-muted-foreground'}`} />
+              <div>
+                <p className="text-xs font-semibold">Video</p>
+                <p className="text-[10px] text-muted-foreground">Veo 3.1 · 30 créditos · 1-3 min · 1080p con audio</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
 
       <div>
         <Label>Nombre del Ad Set</Label>
@@ -1675,6 +1713,7 @@ function AdFormMultiSlot({
   productContext,
   focusType,
   selectedProduct,
+  isDpaCampaign,
 }: {
   clientId: string;
   adSetFormat: AdSetFormat;
@@ -1691,6 +1730,7 @@ function AdFormMultiSlot({
   productContext?: string;
   focusType: 'product' | 'broad';
   selectedProduct: ShopifyProduct | null;
+  isDpaCampaign?: boolean;
 }) {
   const [activeImageSlot, setActiveImageSlot] = useState(0);
   const [mediaTab, setMediaTab] = useState<MediaTab>(productContext ? 'products' : 'upload');
@@ -1844,7 +1884,59 @@ function AdFormMultiSlot({
     finally { setGeneratingImage(false); }
   };
 
+  // C7: Meta's "generate more images from one" feature. Takes the current
+  // slot's image as reference and asks Gemini for N style/angle variations
+  // that preserve the exact subject (product) but vary scene, lighting, and
+  // composition. Results are appended as new slots (up to 10 total per Meta).
+  const [generatingVariations, setGeneratingVariations] = useState(false);
+  const handleGenerateVariationsFromSlot = async () => {
+    const sourceUrl = images[activeImageSlot];
+    if (!sourceUrl || sourceUrl.endsWith('.mp4')) {
+      toast.error('Selecciona un slot con imagen primero');
+      return;
+    }
+    const variationCount = 3;
+    const remaining = 10 - images.length;
+    const toGenerate = Math.min(variationCount, remaining);
+    if (toGenerate <= 0) {
+      toast.info('Ya tienes el máximo de 10 imágenes por anuncio');
+      return;
+    }
+
+    setGeneratingVariations(true);
+    const variationPrompts = [
+      'Generate a VARIATION of the reference product photo: keep the product identical — exact shape, colors, labels, packaging — but change the scene, background, and lighting to a different setting (e.g., outdoor natural light instead of studio). Keep the brand aesthetic.',
+      'Generate a VARIATION of the reference product photo: keep the product identical, but change the camera angle and composition (e.g., overhead flat-lay instead of front-facing) and vary the props around it.',
+      'Generate a VARIATION of the reference product photo: keep the product identical, but use a different color palette in the background and lighting mood (warmer vs cooler), while preserving the brand feel.',
+    ];
+
+    let added = 0;
+    for (let i = 0; i < toGenerate; i++) {
+      try {
+        const { data, error } = await callApi('generate-image', {
+          body: {
+            clientId,
+            promptGeneracion: variationPrompts[i % variationPrompts.length],
+            fotoBaseUrl: sourceUrl,
+            engine: 'imagen',
+            formato: 'square',
+          },
+        });
+        if (error === 'NO_CREDITS') { toast.error('Sin créditos para generar más variaciones'); break; }
+        if (error) continue;
+        if (data?.asset_url) {
+          setImages((prev) => [...prev, data.asset_url]);
+          added++;
+          toast.success(`Variación ${added} lista`);
+        }
+      } catch { /* skip */ }
+    }
+    setGeneratingVariations(false);
+    if (added === 0) toast.error('No se pudieron generar variaciones. Intenta de nuevo.');
+  };
+
   const canAddMoreImages = adSetFormat === 'flexible' || adSetFormat === 'carousel';
+  const currentSlotIsImage = !!images[activeImageSlot] && !images[activeImageSlot].endsWith('.mp4');
   const canAddMoreTexts = adSetFormat === 'flexible';
 
   const MEDIA_TABS: Array<{ key: MediaTab; label: string; icon: React.ElementType }> = [
@@ -1889,11 +1981,26 @@ function AdFormMultiSlot({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <Label className="text-sm font-semibold">Creativos ({images.length} {images.length === 1 ? 'imagen' : 'imágenes'})</Label>
-          {canAddMoreImages && (
-            <Button variant="ghost" size="sm" onClick={() => setImages([...images, ''])} className="text-xs text-muted-foreground">
-              <Plus className="w-3 h-3 mr-1" />Agregar
-            </Button>
-          )}
+          <div className="flex gap-1">
+            {canAddMoreImages && currentSlotIsImage && images.length < 10 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleGenerateVariationsFromSlot}
+                disabled={generatingVariations}
+                className="text-xs border-primary/30 text-primary"
+                title="Genera 3 variaciones desde la imagen del slot actual (cambia fondo, ángulo y mood manteniendo el producto idéntico)"
+              >
+                {generatingVariations ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                3 variaciones desde esta
+              </Button>
+            )}
+            {canAddMoreImages && (
+              <Button variant="ghost" size="sm" onClick={() => setImages([...images, ''])} className="text-xs text-muted-foreground">
+                <Plus className="w-3 h-3 mr-1" />Agregar
+              </Button>
+            )}
+          </div>
         </div>
 
         {adSetFormat === 'flexible' && images.length <= 3 && (
@@ -2143,6 +2250,43 @@ function AdFormMultiSlot({
           <Input value={images[activeImageSlot] || ''} onChange={(e) => setImageAtSlot(e.target.value)} placeholder="https://tu-imagen.com/foto.jpg" />
         )}
       </div>
+
+      {/* DPA product tokens — Meta renders these per-product when the ad runs.
+          Docs: developers.facebook.com/docs/marketing-api/advantage-catalog-ads
+          Only available when the campaign objective is CATALOG (DPA). */}
+      {isDpaCampaign && (
+        <div className="rounded-lg border border-purple-300 bg-purple-50 p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <ShoppingBag className="w-4 h-4 text-purple-700" />
+            <p className="text-xs font-semibold text-purple-900">Etiquetas de producto (DPA)</p>
+          </div>
+          <p className="text-[11px] text-purple-800">
+            Meta reemplaza estas etiquetas automáticamente con los datos de cada producto del catálogo. Inserta las que quieras en títulos, textos y descripciones.
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { token: '{{product.name}}', label: 'Nombre' },
+              { token: '{{product.price}}', label: 'Precio' },
+              { token: '{{product.current_price}}', label: 'Precio actual' },
+              { token: '{{product.description}}', label: 'Descripción' },
+              { token: '{{product.brand}}', label: 'Marca' },
+            ].map((t) => (
+              <button
+                key={t.token}
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(t.token).catch(() => {});
+                  toast.success(`"${t.token}" copiado — pégalo donde quieras`);
+                }}
+                className="px-2 py-1 rounded bg-white border border-purple-300 text-[10px] font-mono text-purple-900 hover:bg-purple-100"
+                title="Click para copiar al portapapeles"
+              >
+                {t.label} <span className="text-purple-500">{t.token}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ---- HEADLINE SLOTS ---- */}
       <div className="space-y-2">
@@ -3044,6 +3188,11 @@ function AdvancedPreviewButton({
         },
       });
       if (err) throw new Error(typeof err === 'string' ? err : 'Preview failed');
+      // Backend returns success:false + error when ALL 13 placements failed
+      // (e.g., missing ads_read scope on the SUAT or Page not in BM).
+      if (data && data.success === false && data.error) {
+        throw new Error(data.error);
+      }
       setPreviews(data?.previews || {});
     } catch (e: any) {
       setError(e.message || 'Error al cargar previews');
@@ -3092,6 +3241,9 @@ function AdvancedPreviewButton({
             <div>
               <h3 className="font-bold text-lg">Vista previa en todos los placements</h3>
               <p className="text-xs text-muted-foreground">Ubicaciones reales de Meta renderizadas como se verán en producción.</p>
+            </div>
+            <div className="rounded border border-blue-200 bg-blue-50 p-2 text-[11px] text-blue-900">
+              Si alguna ubicación muestra <strong>"no tienes acceso"</strong>, es porque tu sesión actual de Facebook no tiene permiso directo sobre esta cuenta publicitaria. El anuncio se publicará sin problema cuando lo crees — esto solo afecta la vista previa.
             </div>
             <div className="flex gap-2 border-b pb-2">
               {(['all', 'facebook', 'instagram', 'other'] as const).map(t => (
@@ -3345,8 +3497,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [targetLocations, setTargetLocations] = useState<Array<{ key: string; name: string; type: string; country_name: string }>>([]);
 
   // DPA / Catalog fields
-  const [catalogs, setCatalogs] = useState<Array<{ id: string; name: string; product_count: number; product_sets: Array<{ id: string; name: string; product_count: number }> }>>([]);
+  const [catalogs, setCatalogs] = useState<Array<{ id: string; name: string; product_count: number; source?: string; product_sets: Array<{ id: string; name: string; product_count: number }> }>>([]);
   const [catalogsLoading, setCatalogsLoading] = useState(false);
+  const [catalogsHint, setCatalogsHint] = useState<string | null>(null);
   const [productCatalogId, setProductCatalogId] = useState('');
   const [productSetId, setProductSetId] = useState('');
 
@@ -3356,6 +3509,11 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   // Ad Set format + CPA
   const [adSetFormat, setAdSetFormat] = useState<AdSetFormat>('flexible');
   const [cpaTarget, setCpaTarget] = useState('');
+  // A4: explicit "photo or video" preference that drives the auto-generator.
+  // Default 'photo' — video costs 15× more credits (Veo 3 = 30 each vs Imagen
+  // = 2). Only active when adSetFormat === 'single'. Carousel/DCT always use
+  // photos (video carousels are rare and expensive).
+  const [autoMediaType, setAutoMediaType] = useState<'photo' | 'video'>('photo');
 
   // Angle
   const [selectedAngle, setSelectedAngle] = useState('');
@@ -3473,6 +3631,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     callApi('meta-catalogs', { body: { connection_id: ctxConnectionId } })
       .then(({ data, error }) => {
         if (data?.catalogs) setCatalogs(data.catalogs);
+        if (data?.hint) setCatalogsHint(data.hint);
         if (error) toast.error('No se pudieron cargar los catálogos de productos');
       })
       .finally(() => setCatalogsLoading(false));
@@ -3855,8 +4014,13 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           body_html: '',
         } : undefined;
 
-        // How many images to generate (3 for DCT flexible, 1 for others)
-        const imageCount = adSetFormat === 'flexible' ? 3 : 1;
+        // DCT flexible → 3 distinct compositions. Carousel → 3 slides (users
+        // can add more manually via the + button). Single image → 1.
+        const imageCount = adSetFormat === 'flexible' || adSetFormat === 'carousel' ? 3 : 1;
+        // Video auto-gen only for single. Carousel+DCT video is rare and very
+        // expensive (30 credits × 3 = 90). User can still upload/generate
+        // videos per-slot manually from the IA Video tab.
+        const wantVideo = autoMediaType === 'video' && adSetFormat === 'single';
 
         for (let slot = 0; slot < imageCount; slot++) {
           const composition = pickComposition(slot);
@@ -3867,26 +4031,77 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             cta: cta || 'SHOP_NOW',
           };
 
-          setAutoGenProgress(`Generando imagen ${slot + 1} de ${imageCount}...`);
-          // Generate brief-visual for image
+          setAutoGenProgress(
+            wantVideo
+              ? `Generando video con Veo 3 (1-3 min)...`
+              : `Generando imagen ${slot + 1} de ${imageCount}...`
+          );
 
           const { data: briefData, error: briefErr } = await callApi('generate-brief-visual', {
-            body: { clientId, formato: 'static', angulo: angleValue, variacionElegida, assetUrls: productAssets, productData },
+            body: { clientId, formato: wantVideo ? 'video' : 'static', angulo: angleValue, variacionElegida, assetUrls: productAssets, productData },
           });
 
           if (briefErr || !briefData?.prompt_generacion) {
-            // Brief-visual error, skip to next image
             continue;
           }
 
           const fotoBase = productPhoto || briefData?.foto_recomendada || undefined;
+
+          if (wantVideo) {
+            const { data: vidData, error: vidErr } = await callApi('generate-video', {
+              body: {
+                clientId,
+                promptGeneracion: briefData.prompt_generacion,
+                fotoBaseUrl: fotoBase,
+                aspectRatio: '9:16',
+              },
+            });
+            if (vidErr) {
+              if (vidErr === 'NO_CREDITS' || (typeof vidErr === 'string' && vidErr.includes('CREDITS'))) {
+                toast.error('Sin créditos para generar video');
+              } else {
+                toast.error(typeof vidErr === 'string' ? vidErr : 'Error generando video');
+              }
+              break;
+            }
+            if (vidData?.asset_url) {
+              setImages((prev) => { const next = [...prev]; next[slot] = vidData.asset_url; return next; });
+              toast.success('Video generado');
+              continue;
+            }
+            if (vidData?.status === 'generando' && vidData?.prediction_id) {
+              toast.info('Video en proceso — el wizard seguirá abierto mientras termina.');
+              const op = vidData.prediction_id as string;
+              const deadline = Date.now() + 3 * 60_000;
+              const { data: { session } } = await supabase.auth.getSession();
+              const token = session?.access_token || '';
+              while (Date.now() < deadline) {
+                await new Promise(r => setTimeout(r, 20_000));
+                const params = new URLSearchParams({ op, clientId });
+                const res = await fetch(
+                  `https://steve-api-850416724643.us-central1.run.app/api/generate-video-status?${params}`,
+                  { headers: { Authorization: `Bearer ${token}` } },
+                );
+                const statusData: any = await res.json().catch(() => ({}));
+                if (statusData?.status === 'listo' && statusData.asset_url) {
+                  setImages((prev) => { const next = [...prev]; next[slot] = statusData.asset_url; return next; });
+                  toast.success('Video listo');
+                  break;
+                }
+                if (statusData?.status === 'error') {
+                  toast.error(statusData.error || 'Veo falló');
+                  break;
+                }
+              }
+            }
+            continue;
+          }
 
           const { data: imgData, error: imgErr } = await callApi('generate-image', {
             body: { clientId, promptGeneracion: briefData.prompt_generacion, fotoBaseUrl: fotoBase, engine: 'imagen', formato: 'square' },
           });
 
           if (imgErr) {
-            // Image generation error, skip to next
             if (imgErr === 'NO_CREDITS') { toast.error('Sin créditos para generar más imágenes'); break; }
             continue;
           }
@@ -4426,6 +4641,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                           dailyBudget={adsetBudget} setDailyBudget={setAdsetBudget}
                           isABO={budgetType === 'ABO'}
                           adSetFormat={adSetFormat} setAdSetFormat={setAdSetFormat}
+                          autoMediaType={autoMediaType} setAutoMediaType={setAutoMediaType}
                           cpaTarget={cpaTarget} setCpaTarget={setCpaTarget}
                           targetCountries={targetCountries} setTargetCountries={setTargetCountries}
                           targetAgeMin={targetAgeMin} setTargetAgeMin={setTargetAgeMin}
@@ -4508,9 +4724,21 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                           Cargando catálogos...
                         </div>
                       ) : catalogs.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No se encontraron catálogos de productos en esta cuenta de Meta. Asegurate de tener un catálogo configurado en Commerce Manager.</p>
+                        <div className="rounded border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900 space-y-1">
+                          <p className="font-medium">No se encontraron catálogos accesibles.</p>
+                          {catalogsHint ? (
+                            <p className="text-xs">{catalogsHint}</p>
+                          ) : (
+                            <p className="text-xs">Verifica en Business Settings → Cuentas publicitarias → Catálogos que el catálogo esté asignado a esta cuenta publicitaria.</p>
+                          )}
+                        </div>
                       ) : (
                         <>
+                          {catalogsHint && (
+                            <div className="rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                              {catalogsHint}
+                            </div>
+                          )}
                           <div>
                             <Label className="text-xs">Catálogo</Label>
                             <Select value={productCatalogId} onValueChange={(v) => { setProductCatalogId(v); setProductSetId(''); }}>
@@ -4518,7 +4746,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                               <SelectContent>
                                 {catalogs.map((cat) => (
                                   <SelectItem key={cat.id} value={cat.id}>
-                                    {cat.name} ({cat.product_count} productos)
+                                    {cat.name} ({cat.product_count} productos){cat.source && cat.source !== 'ad_account' ? ` · ${cat.source === 'owned' ? 'BM propio' : 'compartido'}` : ''}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -4561,6 +4789,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   dailyBudget={adsetBudget} setDailyBudget={setAdsetBudget}
                   isABO={budgetType === 'ABO'}
                   adSetFormat={adSetFormat} setAdSetFormat={setAdSetFormat}
+                  autoMediaType={autoMediaType} setAutoMediaType={setAutoMediaType}
                   cpaTarget={cpaTarget} setCpaTarget={setCpaTarget}
                   targetCountries={targetCountries} setTargetCountries={setTargetCountries}
                   targetAgeMin={targetAgeMin} setTargetAgeMin={setTargetAgeMin}
@@ -4653,6 +4882,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                     destinationUrl={destinationUrl} setDestinationUrl={setDestinationUrl}
                     generating={generatingCopy}
                     onGenerateCopy={handleGenerateCopy}
+                    isDpaCampaign={objective === 'CATALOG'}
                     onAddVariations={async () => {
                       // Generate 2 more variations and APPEND (not replace) to existing arrays.
                       // Uses a different instruction so Claude gives genuinely different angles.
