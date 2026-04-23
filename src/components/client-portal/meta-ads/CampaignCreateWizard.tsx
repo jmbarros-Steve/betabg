@@ -3568,11 +3568,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [level, setLevel] = useState<StartLevel>(startFrom);
   const [wizardStarted, setWizardStarted] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
-  // Steps recompute on each render (cheap function) — avoids TDZ issues that
-  // appear in production bundles when useMemo captures a state declared later
-  // in the component. adSetFormat='catalog' trims the funnel/angle/focus steps.
-  const steps = getStepsForLevel(level, adSetFormat === 'catalog');
-  const currentStep = steps[stepIndex]?.key;
+  // NOTE: `steps` and `currentStep` are computed further down — AFTER
+  // adSetFormat is declared — to avoid a TDZ crash in production bundles
+  // ('Cannot access Gt before initialization'). Do NOT move them here.
 
   // Existing entity selection
   const [existingCampaignId, setExistingCampaignId] = useState<string | null>(null);
@@ -3628,6 +3626,11 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   // Ad Set format + CPA
   const [adSetFormat, setAdSetFormat] = useState<AdSetFormat>('flexible');
   const [cpaTarget, setCpaTarget] = useState('');
+
+  // Computed steps: depends on adSetFormat, declared here AFTER the state
+  // hook (see TDZ note above where `level`/`stepIndex` are declared).
+  const steps = getStepsForLevel(level, adSetFormat === 'catalog');
+  const currentStep = steps[stepIndex]?.key;
   // A4: explicit "photo or video" preference that drives the auto-generator.
   // Default 'photo' — video costs 15× more credits (Veo 3 = 30 each vs Imagen
   // = 2). Only active when adSetFormat === 'single'. Carousel/DCT always use
