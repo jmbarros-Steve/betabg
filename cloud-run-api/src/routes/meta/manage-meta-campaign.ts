@@ -102,6 +102,67 @@ function buildCallToAction(
   return { type: userCta || 'SHOP_NOW', value: { link } };
 }
 
+// Detect whether a given URL is video by extension / content-type probe.
+// Cheap heuristic first (extension), then HEAD if inconclusive.
+const VIDEO_EXTS = ['.mp4', '.mov', '.m4v', '.webm', '.avi', '.mkv'];
+function looksLikeVideoUrl(url: string): boolean {
+  try {
+    const path = new URL(url).pathname.toLowerCase();
+    return VIDEO_EXTS.some(ext => path.endsWith(ext));
+  } catch {
+    return false;
+  }
+}
+
+// Upload video to Meta ad account via POST /act_{id}/advideos with file_url,
+// then poll GET /{video_id}?fields=status until video_status === 'ready'.
+// Meta refuses to render a creative referencing a video still in 'processing'.
+async function uploadVideoFromUrl(
+  accountId: string,
+  accessToken: string,
+  videoUrl: string,
+  title?: string,
+): Promise<{ ok: boolean; videoId?: string; error?: string }> {
+  try {
+    // 1) Start upload via file_url (async on Meta side)
+    const startResult = await metaApiRequest(
+      `act_${accountId}/advideos`,
+      accessToken,
+      'POST',
+      {
+        file_url: videoUrl,
+        ...(title ? { title: title.slice(0, 255) } : {}),
+      },
+    );
+    if (!startResult.ok || !startResult.data?.id) {
+      return { ok: false, error: startResult.error || 'Video upload failed to start' };
+    }
+    const videoId: string = String(startResult.data.id);
+
+    // 2) Poll /{video_id}?fields=status until ready or timeout. Meta typically
+    //    takes 30s–5min depending on video length. Cap at 4 min so we don't
+    //    tie up the Cloud Run request.
+    const DEADLINE_MS = Date.now() + 4 * 60_000;
+    let attempts = 0;
+    while (Date.now() < DEADLINE_MS) {
+      attempts++;
+      await new Promise(r => setTimeout(r, attempts <= 3 ? 4_000 : 8_000));
+      const statusRes = await metaApiRequest(videoId, accessToken, 'GET', { fields: 'status' });
+      const vStatus = statusRes.data?.status?.video_status;
+      if (vStatus === 'ready') {
+        return { ok: true, videoId };
+      }
+      if (vStatus === 'error') {
+        return { ok: false, error: `Video processing failed on Meta side (video_id=${videoId})` };
+      }
+      // 'processing' | 'uploading' → keep polling
+    }
+    return { ok: false, error: `Video upload timed out after ${attempts} polls (video_id=${videoId})` };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Video upload exception' };
+  }
+}
+
 // --- Helper: upload image from URL to get image_hash ---
 
 async function uploadImageFromUrl(
@@ -675,41 +736,52 @@ async function handleCreate(
 
   if (adSetId && hasCreativeData && pageId) {
 
-    // ---- FLEXIBLE: Dynamic Creative with asset_feed_spec ----
+    // ---- FLEXIBLE: Dynamic Creative with asset_feed_spec (images + videos) ----
     if (isFlexible && allImages.length > 0) {
-      console.log(`[manage-meta-campaign] Creating Dynamic Creative (flexible) with ${allImages.length} images, ${allTexts.length} texts, ${allHeadlines.length} headlines`);
+      console.log(`[manage-meta-campaign] Creating Dynamic Creative (flexible) with ${allImages.length} assets, ${allTexts.length} texts, ${allHeadlines.length} headlines`);
 
-      // Upload images in parallel to get hashes
-      const uploadSettled = await Promise.allSettled(
-        allImages.filter(Boolean).map(imgUrl => uploadImageFromUrl(accountId, accessToken, imgUrl))
+      // Upload each asset in parallel. Classify by extension and route to the
+      // correct helper. DCT in v23 accepts a `videos[]` array with each entry
+      // shaped {video_id, thumbnail_hash|thumbnail_url}. Meta rejects videos in
+      // asset_feed_spec without a thumbnail, so we always include one.
+      const dctUploadSettled = await Promise.allSettled(
+        allImages.filter(Boolean).map(async (assetUrl) => {
+          if (looksLikeVideoUrl(assetUrl)) {
+            const vid = await uploadVideoFromUrl(accountId, accessToken, assetUrl, `${name} DCT`);
+            return { kind: 'video' as const, ok: vid.ok, videoId: vid.videoId, thumbUrl: assetUrl, error: vid.error };
+          }
+          const img = await uploadImageFromUrl(accountId, accessToken, assetUrl);
+          return { kind: 'image' as const, ok: img.ok, hash: img.hash, error: img.error };
+        })
       );
       const imageHashes: string[] = [];
-      for (const result of uploadSettled) {
-        if (result.status === 'fulfilled' && result.value.ok && result.value.hash) {
-          imageHashes.push(result.value.hash);
-        } else {
+      const videoEntries: Array<{ videoId: string; thumbUrl?: string }> = [];
+      for (const result of dctUploadSettled) {
+        if (result.status !== 'fulfilled' || !result.value.ok) {
           const reason = result.status === 'rejected' ? result.reason?.message : (result.value as any).error;
-          console.warn(`[manage-meta-campaign] Image upload failed: ${reason}`);
+          console.warn(`[manage-meta-campaign] DCT asset upload failed: ${reason}`);
+          continue;
         }
+        const v = result.value;
+        if (v.kind === 'video' && v.videoId) videoEntries.push({ videoId: v.videoId, thumbUrl: v.thumbUrl });
+        else if (v.kind === 'image' && v.hash) imageHashes.push(v.hash);
       }
 
-      // Deduplicate hashes — Meta rejects duplicate asset values in DCT
+      // Meta rejects duplicate asset values in DCT
       const uniqueHashes = [...new Set(imageHashes)];
-      if (uniqueHashes.length < imageHashes.length) {
-        console.log(`[manage-meta-campaign] Deduplicated image hashes: ${imageHashes.length} → ${uniqueHashes.length}`);
-      }
+      const uniqueVideos = videoEntries.filter((v, i, arr) => arr.findIndex(x => x.videoId === v.videoId) === i);
 
-      if (uniqueHashes.length === 0) {
-        console.error('[meta-campaign] All image uploads failed for Dynamic Creative');
+      if (uniqueHashes.length === 0 && uniqueVideos.length === 0) {
+        console.error('[meta-campaign] All asset uploads failed for Dynamic Creative');
         return {
           body: {
             success: false,
             partial: true,
-            error: 'Falló la subida de todas las imágenes',
-            details: 'All image uploads failed — cannot create Dynamic Creative without images',
+            error: 'Falló la subida de todas las piezas',
+            details: 'All asset uploads failed — cannot create Dynamic Creative without images or videos',
             campaign_id: campaignId,
             adset_id: adSetId,
-            creative_error: 'All image uploads failed — cannot create Dynamic Creative without images',
+            creative_error: 'All asset uploads failed',
           },
           status: 502,
         };
@@ -722,12 +794,10 @@ async function handleCreate(
 
       // Build asset_feed_spec for Dynamic Creative.
       // `ad_formats: ['AUTOMATIC_FORMAT']` tells Meta to pick the optimal format
-      // per placement (single image, video, carousel, collection) — this is what
-      // makes the ad show up as "Flexible" in Ads Manager. Using ['SINGLE_IMAGE']
-      // here forces the ad into "Una sola imagen o video" mode even when DCT is
-      // active at the ad set level — that was the bug.
+      // per placement (single image, video, carousel, collection). Image+video
+      // mix requires AUTOMATIC_FORMAT — using SINGLE_IMAGE forces single-image
+      // rendering even with is_dynamic_creative on the adset.
       const assetFeedSpec: Record<string, any> = {
-        images: uniqueHashes.map((h) => ({ hash: h })),
         bodies: uniqueTexts.map((t) => ({ text: t })),
         titles: uniqueHeadlines.map((t) => ({ text: t })),
         call_to_action_types: [cta || 'SHOP_NOW'],
@@ -735,9 +805,22 @@ async function handleCreate(
         ad_formats: ['AUTOMATIC_FORMAT'],
       };
 
+      if (uniqueHashes.length > 0) {
+        assetFeedSpec.images = uniqueHashes.map((h) => ({ hash: h }));
+      }
+      if (uniqueVideos.length > 0) {
+        // NOTE: we intentionally skip `thumbnail_url` — Meta expects an IMAGE
+        // URL (jpg/png), not an mp4. Passing the video URL itself fails review.
+        // Meta auto-extracts a frame as fallback thumbnail until we wire a
+        // proper thumbnail pipeline (ffmpeg / Imagen 4 / video frame grab).
+        assetFeedSpec.videos = uniqueVideos.map((v) => ({ video_id: v.videoId }));
+      }
+
       if (uniqueDescriptions.length > 0) {
         assetFeedSpec.descriptions = uniqueDescriptions.map((d) => ({ text: d }));
       }
+
+      console.log(`[manage-meta-campaign] DCT mix: ${uniqueHashes.length} images + ${uniqueVideos.length} videos`);
 
       console.log(`[manage-meta-campaign] DCT asset_feed_spec:`, JSON.stringify(assetFeedSpec));
 
@@ -775,44 +858,70 @@ async function handleCreate(
 
     // ---- CAROUSEL: child_attachments ----
     } else if (isCarousel && allImages.length > 1) {
-      console.log(`[manage-meta-campaign] Creating Carousel creative with ${allImages.length} images`);
+      console.log(`[manage-meta-campaign] Creating Carousel creative with ${allImages.length} assets (mix image+video allowed)`);
 
-      // Upload images in parallel to get hashes
+      // Upload each asset in parallel — classify by extension and route to the
+      // correct helper. Each child_attachment can be image (image_hash) or
+      // video (video_id + picture thumbnail) per Meta Carousel spec.
       const carouselUploadSettled = await Promise.allSettled(
-        allImages.filter(Boolean).map(imgUrl => uploadImageFromUrl(accountId, accessToken, imgUrl))
+        allImages.filter(Boolean).map(async (assetUrl) => {
+          if (looksLikeVideoUrl(assetUrl)) {
+            const vid = await uploadVideoFromUrl(accountId, accessToken, assetUrl, `${name} card`);
+            return { kind: 'video' as const, ok: vid.ok, videoId: vid.videoId, thumbnail: assetUrl, error: vid.error };
+          }
+          const img = await uploadImageFromUrl(accountId, accessToken, assetUrl);
+          return { kind: 'image' as const, ok: img.ok, hash: img.hash, error: img.error };
+        })
       );
-      const imageHashes: string[] = [];
+      const cards: Array<{ kind: 'image' | 'video'; hashOrId: string; thumbnail?: string }> = [];
       for (const result of carouselUploadSettled) {
-        if (result.status === 'fulfilled' && result.value.ok && result.value.hash) {
-          imageHashes.push(result.value.hash);
-        } else {
+        if (result.status !== 'fulfilled' || !result.value.ok) {
           const reason = result.status === 'rejected' ? result.reason?.message : (result.value as any).error;
-          console.warn(`[manage-meta-campaign] Image upload failed: ${reason}`);
+          console.warn(`[manage-meta-campaign] Carousel asset upload failed: ${reason}`);
+          continue;
+        }
+        const v = result.value;
+        if (v.kind === 'video' && v.videoId) {
+          cards.push({ kind: 'video', hashOrId: v.videoId, thumbnail: v.thumbnail });
+        } else if (v.kind === 'image' && v.hash) {
+          cards.push({ kind: 'image', hashOrId: v.hash });
         }
       }
 
-      if (imageHashes.length < 2) {
-        console.error('[meta-campaign] Carousel requires at least 2 images — not enough uploads succeeded');
+      if (cards.length < 2) {
+        console.error('[meta-campaign] Carousel requires at least 2 assets — not enough uploads succeeded');
         return {
           body: {
             success: false,
             partial: true,
-            error: 'Carousel necesita al menos 2 imágenes',
-            details: 'Carousel requires at least 2 images — not enough uploads succeeded',
+            error: 'Carrusel necesita al menos 2 piezas (imágenes o videos)',
+            details: 'Carousel requires at least 2 assets — not enough uploads succeeded',
             campaign_id: campaignId,
             adset_id: adSetId,
-            creative_error: 'Carousel requires at least 2 images — not enough uploads succeeded',
+            creative_error: 'Carousel requires at least 2 assets — not enough uploads succeeded',
           },
           status: 502,
         };
       }
 
-      const childAttachments = imageHashes.map((hash, i) => ({
-        image_hash: hash,
-        link: destUrl,
-        name: allHeadlines.length > 0 ? allHeadlines[i % allHeadlines.length] : '',
-        description: allDescriptions.length > 0 ? allDescriptions[i % allDescriptions.length] : '',
-      }));
+      const childAttachments = cards.map((card, i) => {
+        const base: Record<string, any> = {
+          link: destUrl,
+          name: allHeadlines.length > 0 ? allHeadlines[i % allHeadlines.length] : '',
+          description: allDescriptions.length > 0 ? allDescriptions[i % allDescriptions.length] : '',
+        };
+        if (card.kind === 'video') {
+          base.video_id = card.hashOrId;
+          // NOTE: we intentionally skip `picture` — Meta's Carousel API expects
+          // `picture` to be a URL of an IMAGE (jpg/png). Feeding the raw mp4 URL
+          // back makes Meta reject the creative or silently drop the thumbnail.
+          // Letting Meta auto-extract the first frame is the safe default until
+          // we wire a real thumbnail pipeline (ffmpeg / Imagen 4).
+        } else {
+          base.image_hash = card.hashOrId;
+        }
+        return base;
+      });
 
       const carouselLinkData: Record<string, any> = {
         link: destUrl,
@@ -863,58 +972,78 @@ async function handleCreate(
     } else {
       const singleImage = allImages[0] || image_url;
       if (singleImage) {
-        // Upload image to get image_hash (Meta no longer accepts image_url in link_data)
-        const upload = await uploadImageFromUrl(accountId, accessToken, singleImage);
-        if (!upload.ok || !upload.hash) {
-          console.error('[meta-campaign] Single image upload failed:', upload.error);
-          return {
-            body: {
-              success: false,
-              partial: true,
-              error: 'Falló la subida de imagen',
-              details: upload.error,
-              campaign_id: campaignId,
-              adset_id: adSetId,
-              creative_error: `Image upload failed: ${upload.error}`,
-            },
-            status: 502,
-          };
-        }
-
-        const linkData: Record<string, any> = {
-          link: destUrl,
-          message: allTexts[0] || primary_text || '',
-          name: allHeadlines[0] || headline || '',
-          image_hash: upload.hash,
-          call_to_action: buildCallToAction(cta, destUrl, browser_addon, pageId),
-        };
-
-        if (allDescriptions[0] || description) {
-          linkData.description = allDescriptions[0] || description;
-        }
-
-        // Display link (caption) — shown as readable URL under the title.
-        if (display_link && typeof display_link === 'string' && display_link.trim()) {
-          linkData.caption = display_link.trim();
-        }
-        // Personalize content per viewer — tells Meta to auto-crop per placement.
-        if (personalize_content) {
-          linkData.use_flexible_image_aspect_ratio = true;
-        }
-
-        const singleStorySpec: Record<string, any> = {
-          page_id: pageId,
-          link_data: linkData,
-        };
+        const singleAssetIsVideo = looksLikeVideoUrl(singleImage);
+        const singleStorySpec: Record<string, any> = { page_id: pageId };
         if (igUserId) singleStorySpec.instagram_user_id = igUserId;
+
+        if (singleAssetIsVideo) {
+          // ── SINGLE VIDEO ── use object_story_spec.video_data (NOT link_data).
+          // Per Meta docs 2026, single video creatives must use video_data with
+          // explicit thumbnail (image_hash) — without it ads get rejected at
+          // review with "poor quality preview".
+          const videoUpload = await uploadVideoFromUrl(accountId, accessToken, singleImage, name);
+          if (!videoUpload.ok || !videoUpload.videoId) {
+            return {
+              body: {
+                success: false, partial: true,
+                error: 'Falló la subida del video',
+                details: videoUpload.error,
+                campaign_id: campaignId, adset_id: adSetId,
+                creative_error: `Video upload failed: ${videoUpload.error}`,
+              }, status: 502,
+            };
+          }
+          // Try to use a sibling image slot as thumbnail; fallback to Meta auto.
+          const thumbSource = allImages.find(u => u && !looksLikeVideoUrl(u));
+          let thumbHash: string | undefined;
+          if (thumbSource) {
+            const thumbRes = await uploadImageFromUrl(accountId, accessToken, thumbSource);
+            if (thumbRes.ok && thumbRes.hash) thumbHash = thumbRes.hash;
+          }
+          const videoData: Record<string, any> = {
+            video_id: videoUpload.videoId,
+            title: allHeadlines[0] || headline || '',
+            message: allTexts[0] || primary_text || '',
+            call_to_action: buildCallToAction(cta, destUrl, browser_addon, pageId),
+          };
+          if (allDescriptions[0] || description) videoData.link_description = allDescriptions[0] || description;
+          if (thumbHash) videoData.image_hash = thumbHash;
+          singleStorySpec.video_data = videoData;
+          console.log(`[manage-meta-campaign] Creating SINGLE VIDEO creative (video_id=${videoUpload.videoId}, thumb=${thumbHash ? 'custom' : 'auto'})`);
+        } else {
+          // ── SINGLE IMAGE ── classic link_data path.
+          const upload = await uploadImageFromUrl(accountId, accessToken, singleImage);
+          if (!upload.ok || !upload.hash) {
+            console.error('[meta-campaign] Single image upload failed:', upload.error);
+            return {
+              body: {
+                success: false, partial: true,
+                error: 'Falló la subida de imagen',
+                details: upload.error,
+                campaign_id: campaignId, adset_id: adSetId,
+                creative_error: `Image upload failed: ${upload.error}`,
+              }, status: 502,
+            };
+          }
+          const linkData: Record<string, any> = {
+            link: destUrl,
+            message: allTexts[0] || primary_text || '',
+            name: allHeadlines[0] || headline || '',
+            image_hash: upload.hash,
+            call_to_action: buildCallToAction(cta, destUrl, browser_addon, pageId),
+          };
+          if (allDescriptions[0] || description) linkData.description = allDescriptions[0] || description;
+          if (display_link && typeof display_link === 'string' && display_link.trim()) linkData.caption = display_link.trim();
+          if (personalize_content) linkData.use_flexible_image_aspect_ratio = true;
+          singleStorySpec.link_data = linkData;
+          console.log(`[manage-meta-campaign] Creating SINGLE IMAGE creative for campaign ${campaignId}`);
+        }
 
         const creativePayload: Record<string, any> = {
           name: `${name} - Creative`,
           object_story_spec: JSON.stringify(singleStorySpec),
         };
         if (dofSpec) creativePayload.degrees_of_freedom_spec = JSON.stringify(dofSpec);
-
-        console.log(`[manage-meta-campaign] Creating single-image ad creative for campaign ${campaignId}`);
 
         const creativeResult = await createCreativeWithRetry(creativePayload);
 

@@ -332,7 +332,7 @@ function CampaignForm({
           {([
             { key: 'ABO' as BudgetType, label: 'ABO', name: 'Tú controlas', desc: 'Tú defines cuánto gasta cada audiencia. Ideal para probar.', badgeClass: 'bg-[#1E3A7B]/15 text-[#162D5F] border-[#2A4F9E]/30' },
             { key: 'CBO' as BudgetType, label: 'CBO', name: 'Meta controla budget', desc: 'Meta distribuye el dinero donde mejor funcione. Ideal para escalar.', badgeClass: 'bg-purple-500/15 text-purple-700 border-purple-500/30' },
-            { key: 'ADVANTAGE' as BudgetType, label: 'Advantage+', name: 'Meta lo automatiza todo', desc: 'Ecommerce: Meta elige audiencia, placements y optimiza. Recomendado con catálogo.', badgeClass: 'bg-green-500/15 text-green-700 border-green-500/30' },
+            { key: 'ADVANTAGE' as BudgetType, label: 'Advantage+ Catálogo', name: 'DPA con catálogo (ecommerce)', desc: 'Meta genera ads dinámicos con los productos de tu catálogo Shopify. Requiere elegir catálogo y colección.', badgeClass: 'bg-green-500/15 text-green-700 border-green-500/30' },
           ]).map((t) => (
             <button
               key={t.key}
@@ -345,7 +345,7 @@ function CampaignForm({
                 <Sparkles className="absolute top-2 right-2 w-3.5 h-3.5 text-green-600" />
               )}
               <Badge className={`text-xs font-bold ${t.badgeClass}`}>
-                {t.key === 'ADVANTAGE' ? 'Advantage+' : <JargonTooltip term={t.key} />}
+                {t.key === 'ADVANTAGE' ? 'Advantage+ Catálogo' : <JargonTooltip term={t.key} />}
               </Badge>
               <span className={`text-xs font-semibold text-center ${budgetType === t.key ? 'text-foreground' : 'text-muted-foreground'}`}>{t.name}</span>
               <span className="text-[10px] text-muted-foreground text-center leading-tight">{t.desc}</span>
@@ -355,8 +355,8 @@ function CampaignForm({
       </div>
 
       <div>
-        <Label>Objetivo</Label>
-        <Select value={objective} onValueChange={(v) => setObjective(v as Objective)}>
+        <Label>Objetivo {budgetType === 'ADVANTAGE' && <span className="text-[10px] text-green-700 font-normal">(bloqueado en CATALOG para Advantage+)</span>}</Label>
+        <Select value={objective} onValueChange={(v) => setObjective(v as Objective)} disabled={budgetType === 'ADVANTAGE'}>
           <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
           <SelectContent>
             {OBJECTIVES.map((o) => (
@@ -405,11 +405,11 @@ function CampaignForm({
           <div className="flex items-start gap-2">
             <Sparkles className="w-4 h-4 text-green-600 mt-0.5" />
             <div className="text-xs text-green-900">
-              <p className="font-semibold">Modo Advantage+ Shopping activado</p>
+              <p className="font-semibold">Modo Advantage+ Catálogo (DPA) activado</p>
               <p className="text-green-800/80 mt-1">
-                Steve configurará automáticamente: objetivo <strong>Conversiones</strong>,
-                audiencia <strong>amplia</strong> (Meta elige), todas las <strong>ubicaciones</strong>,
-                y estrategia de puja <strong>Lowest Cost</strong>. Solo configuras país, edad y género.
+                Meta generará anuncios dinámicos mostrando productos de tu <strong>catálogo</strong> a cada persona
+                según su comportamiento. Objetivo forzado a <strong>Catálogo (Ventas)</strong>.
+                Abajo elegí el catálogo y la colección (Product Set) a promocionar.
               </p>
             </div>
           </div>
@@ -1851,6 +1851,7 @@ function AdFormMultiSlot({
     { key: 'upload', label: 'Subir', icon: Upload },
     { key: 'products', label: 'Productos', icon: ShoppingBag },
     { key: 'ai-image', label: 'IA Imagen', icon: Sparkles },
+    { key: 'ai-video', label: 'IA Video', icon: Video },
     { key: 'gallery', label: 'Galería', icon: ImageIcon },
     { key: 'url', label: 'URL', icon: LinkIcon },
   ];
@@ -1910,11 +1911,22 @@ function AdFormMultiSlot({
               }`}
             >
               {img ? (
-                <img src={img} alt="Vista previa" className="w-full h-full object-cover" />
+                // Detect video by extension and render a <video> element instead
+                // of <img>. Meta's carousel/single/DCT flows accept videos, and
+                // the slot preview must reflect that so the user sees a poster
+                // frame + play icon instead of a broken image.
+                /\.(mp4|mov|webm|m4v)(\?|$)/i.test(img) ? (
+                  <video src={img} muted playsInline className="w-full h-full object-cover" />
+                ) : (
+                  <img src={img} alt="Vista previa" className="w-full h-full object-cover" />
+                )
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-muted">
                   <ImageIcon className="w-4 h-4 text-muted-foreground" />
                 </div>
+              )}
+              {img && /\.(mp4|mov|webm|m4v)(\?|$)/i.test(img) && (
+                <span className="absolute top-0.5 right-0.5 bg-black/70 text-white text-[8px] px-1 rounded">VIDEO</span>
               )}
               <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] text-center">{i + 1}</span>
               {img && (
@@ -1986,6 +1998,96 @@ function AdFormMultiSlot({
                 {generatingImage ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Generando...</> : <><Sparkles className="w-3 h-3 mr-1" />{aiPrompt.trim() ? 'Generar' : 'Auto-generar'}</>}
               </Button>
             </div>
+          </div>
+        )}
+
+        {mediaTab === 'ai-video' && (
+          <div className="space-y-2">
+            <Textarea
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              placeholder={`Describe el video ${activeImageSlot + 1}${selectedAngle ? ` (ángulo: ${selectedAngle})` : ''}. Ej: "mujer de 30 usando el producto en una cocina soleada, sonriendo a cámara"`}
+              rows={3}
+            />
+            <div className="p-2 bg-green-50 border border-green-300 rounded text-[10px] text-green-900">
+              <Sparkles className="w-3 h-3 inline mr-1 text-green-600" />
+              <strong>Google Veo 3.1</strong> — 8 segundos, 1080p, con audio nativo sincronizado (voz + ambiente + música). 30 créditos por video (~$3.20 USD).
+            </div>
+            <Button
+              onClick={async () => {
+                if (!aiPrompt.trim()) { toast.error('Describe qué video quieres'); return; }
+                // Cost warning — 30 credits is ~15 AI images. Let the user
+                // confirm before spending since video is 15× more expensive.
+                if (!window.confirm('Este video cuesta 30 créditos (~$3.20 USD, equivalente a 15 imágenes). ¿Generar ahora?')) return;
+
+                setGeneratingImage(true);
+                const aspectForVeo = aspectRatio === '16:9' ? '16:9' : '9:16'; // Veo 3.1 only supports 16:9 / 9:16
+                try {
+                  const { data, error } = await callApi('generate-video', {
+                    body: {
+                      clientId,
+                      promptGeneracion: aiPrompt,
+                      fotoBaseUrl: focusType === 'product' && selectedProduct?.image ? selectedProduct.image : undefined,
+                      aspectRatio: aspectForVeo,
+                    },
+                  });
+                  if (error) {
+                    if (error === 'NO_CREDITS' || (typeof error === 'string' && error.includes('CREDITS'))) {
+                      toast.error('Sin créditos para generar video');
+                    } else {
+                      toast.error(typeof error === 'string' ? error : 'Error generando video');
+                    }
+                    return;
+                  }
+                  if (data?.asset_url) {
+                    setImageAtSlot(data.asset_url);
+                    toast.success(`Video ${activeImageSlot + 1} listo`);
+                    return;
+                  }
+                  if (data?.status === 'generando' && data?.prediction_id) {
+                    // Client-side polling: Veo didn't finish inside the Cloud
+                    // Run request budget. Poll /api/generate-video-status every
+                    // 20s for up to ~3 min. Credits are refunded server-side if
+                    // the generation ultimately fails.
+                    toast.info('Video en proceso. Te aviso cuando esté listo — no cierres el wizard.');
+                    const op = data.prediction_id as string;
+                    const deadline = Date.now() + 3 * 60_000;
+                    let polls = 0;
+                    const { data: { session } } = await supabase.auth.getSession();
+                    const token = session?.access_token || '';
+                    while (Date.now() < deadline) {
+                      polls++;
+                      await new Promise(r => setTimeout(r, 20_000));
+                      const params = new URLSearchParams({ op, clientId });
+                      const res = await fetch(
+                        `https://steve-api-850416724643.us-central1.run.app/api/generate-video-status?${params}`,
+                        { headers: { Authorization: `Bearer ${token}` } },
+                      );
+                      const statusData: any = await res.json().catch(() => ({}));
+                      if (statusData?.status === 'listo' && statusData.asset_url) {
+                        setImageAtSlot(statusData.asset_url);
+                        toast.success(`Video ${activeImageSlot + 1} listo (poll ${polls})`);
+                        return;
+                      }
+                      if (statusData?.status === 'error') {
+                        toast.error(statusData.error || 'Veo falló');
+                        return;
+                      }
+                    }
+                    toast.warning('El video tarda más de lo esperado. Revisalo en unos minutos.');
+                    return;
+                  }
+                } catch (err: any) {
+                  toast.error(err?.message || 'Error');
+                } finally {
+                  setGeneratingImage(false);
+                }
+              }}
+              disabled={generatingImage || !aiPrompt.trim()}
+              className="w-full bg-green-600 hover:bg-green-700"
+            >
+              {generatingImage ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Generando con Veo... (1-3 min)</> : <><Video className="w-3 h-3 mr-1" />Generar video con Veo 3</>}
+            </Button>
           </div>
         )}
 
@@ -3402,14 +3504,16 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     if (ctxIgAccountId && !selectedInstagramUserId) setSelectedInstagramUserId(ctxIgAccountId);
   }, [ctxPageId, ctxIgAccountId]);
 
-  // Advantage+ Shopping Campaign: Meta auto-detects the mode when the 3 automation
-  // levers are all enabled (bid strategy, audience, placements). We enforce those
-  // defaults by clearing targeting/placement overrides when the user picks ADVANTAGE.
-  // Docs: developers.facebook.com/docs/marketing-api/advantage-campaigns/
+  // Advantage+ Catálogo (DPA): Meta renders dynamic product ads from a catalog.
+  // Requires: objective = CATALOG (OUTCOME_SALES with promoted_object.product_catalog_id),
+  // placements auto, broad audience, and user-selected catalog + product_set.
+  // Dynamic Media is on by default since Oct 2025 (no API flag to set).
+  // Docs: developers.facebook.com/docs/marketing-api/advantage-catalog-ads
   useEffect(() => {
     if (budgetType !== 'ADVANTAGE') return;
-    if (objective !== 'CONVERSIONS') setObjective('CONVERSIONS');
+    if (objective !== 'CATALOG') setObjective('CATALOG');
     if (placementsMode !== 'advantage') setPlacementsMode('advantage');
+    if (contentSource !== 'advantage_catalog') setContentSource('advantage_catalog');
     if (selectedAudienceIds.length > 0) setSelectedAudienceIds([]);
     if (targetInterests.length > 0) setTargetInterests([]);
     if (targetExcludeInterests.length > 0) setTargetExcludeInterests([]);

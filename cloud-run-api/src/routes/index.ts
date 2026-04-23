@@ -30,7 +30,7 @@ import { generateMetaCopy } from './ai/generate-meta-copy.js';
 import { steveConfigureCampaign } from './ai/steve-configure-campaign.js';
 import { steveSuggestInterests } from './ai/steve-suggest-interests.js';
 import { generateImage } from './ai/generate-image.js';
-import { generateVideo } from './ai/generate-video.js';
+import { generateVideo, generateVideoStatus } from './ai/generate-video.js';
 import { generateVideoScript } from './ai/generate-video-script.js';
 import { generateMassCampaigns } from './ai/generate-mass-campaigns.js';
 import { analyzeBrand } from './ai/analyze-brand.js';
@@ -335,6 +335,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/steve-suggest-interests', authMiddleware, steveSuggestInterests);
   app.post('/api/generate-image', authMiddleware, generateImage);
   app.post('/api/generate-video', authMiddleware, generateVideo);
+  app.get('/api/generate-video-status', authMiddleware, generateVideoStatus);
   app.post('/api/generate-video-script', authMiddleware, generateVideoScript);
   app.post('/api/generate-mass-campaigns', authMiddleware, generateMassCampaigns);
   app.post('/api/analyze-brand', authMiddleware, analyzeBrand);
