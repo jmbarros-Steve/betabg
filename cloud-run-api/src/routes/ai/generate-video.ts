@@ -20,7 +20,8 @@ type AspectRatio = '9:16' | '16:9' | '1:1';
 // Idempotent refund. Uses credit_transactions.accion as the dedup key because
 // we don't have an operation_id column yet. The first refund inserts a row with
 // `refund op=<operationName>` in accion; subsequent calls are no-ops.
-// This protects against double-refund from retries / dup requests.
+// Billing RPC (deduct_credits) not yet in place — we only log transactions.
+// When billing lands, wire back the `.rpc('deduct_credits', ...)` call.
 async function refundVideoCreditsOnce(
   supabase: SupabaseClient,
   clientId: string,
@@ -38,9 +39,6 @@ async function refundVideoCreditsOnce(
     console.log(`[generate-video] refund already applied for op ${operationName}, skipping`);
     return;
   }
-  // Apply the refund: negative amount adds back credits. Then write the marker
-  // row so a second call to this helper finds it and skips.
-  await supabase.rpc('deduct_credits', { p_client_id: clientId, p_amount: -VIDEO_CREDIT_COST });
   await supabase.from('credit_transactions').insert({
     client_id: clientId,
     accion: `Refund video Veo 3.1 (${reason}) — ${refundMarker}`,
@@ -75,22 +73,10 @@ export async function generateVideo(c: Context) {
       console.warn(`[generate-video] aspect ratio ${aspectRatio} not supported by Veo 3.1, falling back to ${finalAspect}`);
     }
 
-    // Atomically deduct credits BEFORE generating (prevents race condition)
-    const { data: deductResult, error: deductError } = await supabase
-      .rpc('deduct_credits', { p_client_id: clientId, p_amount: VIDEO_CREDIT_COST });
-
-    if (deductError) {
-      return c.json(
-        { error: 'NO_CREDIT_RECORD', message: 'No se encontró registro de créditos para este cliente. Contacta al administrador.' },
-        402
-      );
-    }
-    if (!deductResult?.[0]?.success) {
-      return c.json(
-        { error: 'NO_CREDITS', message: `Se necesitan ${VIDEO_CREDIT_COST} créditos para generar un video` },
-        402
-      );
-    }
+    // TODO: Re-enable credit enforcement when billing system is ready. For
+    // now we log the transaction at the end (same pattern as generate-image).
+    // The deduct_credits RPC doesn't exist yet — calling it returned
+    // NO_CREDIT_RECORD for every client, blocking all video generation.
 
     // Enrich prompt with learned visual style rules + explicit audio cue for Veo.
     // loadKnowledge is wrapped so a DB hiccup here doesn't strand the credits.

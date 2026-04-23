@@ -74,7 +74,7 @@ type StartLevel = 'campaign' | 'adset' | 'ad';
 type BudgetType = 'ABO' | 'CBO' | 'ADVANTAGE';
 type Objective = 'CONVERSIONS' | 'TRAFFIC' | 'AWARENESS' | 'ENGAGEMENT' | 'CATALOG';
 type WizardStep = 'select-campaign' | 'select-adset' | 'campaign-config' | 'adset-config' | 'funnel-stage' | 'angle-select' | 'creative-focus' | 'ad-creative' | 'review';
-type AdSetFormat = 'flexible' | 'carousel' | 'single';
+type AdSetFormat = 'flexible' | 'carousel' | 'single' | 'catalog';
 
 // Angle recommendations per funnel stage (from CopyGenerator.tsx)
 const ANGLE_RECOMMENDATIONS: Record<string, string[]> = {
@@ -850,6 +850,7 @@ function AdSetForm({
     { key: 'flexible', label: <>Flexible (<JargonTooltip term="DCT" />)</>, desc: 'Metodología 3:2:2 — 3 imágenes, 2 textos, 2 títulos. Meta optimiza combinaciones ganadoras.', icon: Layers, recommended: isABO },
     { key: 'carousel', label: 'Carrusel', desc: 'Múltiples imágenes en swipe. 3+ fotos.', icon: ImageIcon },
     { key: 'single', label: 'Imagen Única', desc: 'Un solo creativo. 1 foto, 1 texto, 1 headline.', icon: FileImage },
+    { key: 'catalog', label: 'Catálogo (DPA)', desc: 'Anuncio dinámico de productos del catálogo. Meta elige qué producto mostrar a cada persona. Acepta etiquetas {{product.name}}, {{product.price}}.', icon: ShoppingBag },
   ];
 
   return (
@@ -857,7 +858,7 @@ function AdSetForm({
       {/* Format selector */}
       <div>
         <Label className="text-sm font-semibold">Formato del Ad Set</Label>
-        <div className="grid grid-cols-3 gap-3 mt-2">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-2">
           {formats.map((f) => {
             const Icon = f.icon;
             const isActive = adSetFormat === f.key;
@@ -938,7 +939,7 @@ function AdSetForm({
               } else {
                 audTag = 'Broad';
               }
-              const fmtTag = adSetFormat === 'flexible' ? 'DCT' : adSetFormat === 'carousel' ? 'Carrusel' : 'Single';
+              const fmtTag = adSetFormat === 'flexible' ? 'DCT' : adSetFormat === 'carousel' ? 'Carrusel' : adSetFormat === 'catalog' ? 'DPA' : 'Single';
               const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
               const now = new Date();
               const dateTag = `${months[now.getMonth()]}${String(now.getFullYear()).slice(-2)}`;
@@ -1953,7 +1954,7 @@ function AdFormMultiSlot({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Badge variant="outline" className="text-xs">
-            {adSetFormat === 'flexible' ? 'Flexible (DCT 3:2:2)' : adSetFormat === 'carousel' ? 'Carrusel' : 'Imagen Única'}
+            {adSetFormat === 'flexible' ? 'Flexible (DCT 3:2:2)' : adSetFormat === 'carousel' ? 'Carrusel' : adSetFormat === 'catalog' ? 'Catálogo (DPA)' : 'Imagen Única'}
           </Badge>
           <div className="flex gap-1.5">
             <Button variant="outline" size="sm" onClick={onGenerateCopy} disabled={generating}>
@@ -3678,6 +3679,30 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     if (targetExcludeInterests.length > 0) setTargetExcludeInterests([]);
   }, [budgetType]);
 
+  // Inverse flow: user picked "Catálogo (DPA)" from the ad-set format selector
+  // — that should act as a shortcut to enter Advantage+ Catálogo mode without
+  // having to first switch budgetType at the top. Setting budgetType triggers
+  // the effect above which takes care of the rest.
+  useEffect(() => {
+    if (adSetFormat === 'catalog' && budgetType !== 'ADVANTAGE') {
+      setBudgetType('ADVANTAGE');
+    }
+    // If the user had ADVANTAGE set via the format selector and switches away
+    // to single/carousel/flexible, drop back to ABO as a sensible default.
+    if (adSetFormat !== 'catalog' && budgetType === 'ADVANTAGE') {
+      setBudgetType('ABO');
+      if (objective === 'CATALOG') setObjective('CONVERSIONS');
+    }
+  }, [adSetFormat]);
+
+  // Keep format in sync when user changes budget from the Campaign step.
+  // Guard prevents loop: after the change the condition becomes false.
+  useEffect(() => {
+    if (budgetType !== 'ADVANTAGE' && adSetFormat === 'catalog') {
+      setAdSetFormat('flexible');
+    }
+  }, [budgetType]);
+
   // Auto-generate campaign name: [Marca]-[OBJ]-[Audiencia]-[MesAño]
   // Audience detection order:
   //   1) custom/lookalike/saved audience selected in step 2 → LAL / RTG / CUSTOM / SAVED
@@ -4004,6 +4029,14 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
 
       setAutoGenProgress('Preparando brief visual...');
       try {
+        // DPA pulls images from the product catalog at render time — auto-gen
+        // would waste credits on imagery Meta won't use. Skip the loop and
+        // return here; the user just needs copy with product tokens.
+        if (adSetFormat === 'catalog') {
+          setAutoGenerating(false);
+          setAutoGenProgress('');
+          return;
+        }
         const angleValue = selectedAngle || 'beneficios';
         const productPhoto = focusType === 'product' && selectedProduct?.image
           ? selectedProduct.image : undefined;
@@ -4141,7 +4174,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       const { error } = await supabase.from('ad_creatives').insert({
         client_id: clientId,
         funnel: funnelStage,
-        formato: adSetFormat === 'carousel' ? 'carousel' : filledImages[0]?.endsWith('.mp4') ? 'video' : 'static',
+        formato: adSetFormat === 'catalog' ? 'dpa' : adSetFormat === 'carousel' ? 'carousel' : filledImages[0]?.endsWith('.mp4') ? 'video' : 'static',
         angulo: anguloText,
         titulo: filledHeadlines[0] || campName || 'Borrador sin título',
         texto_principal: filledTexts[0] || '',
@@ -4430,7 +4463,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         await supabase.from('ad_creatives').insert({
           client_id: clientId,
           funnel: funnelStage,
-          formato: adSetFormat === 'carousel' ? 'carousel' : filledImages[0]?.endsWith('.mp4') ? 'video' : 'static',
+          formato: adSetFormat === 'catalog' ? 'dpa' : adSetFormat === 'carousel' ? 'carousel' : filledImages[0]?.endsWith('.mp4') ? 'video' : 'static',
           angulo: anguloText,
           titulo: filledHeadlines[0] || name,
           texto_principal: filledTexts[0] || '',
