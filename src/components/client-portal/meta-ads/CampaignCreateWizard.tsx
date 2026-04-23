@@ -849,7 +849,7 @@ function AdSetForm({
   const formats: { key: AdSetFormat; label: React.ReactNode; desc: string; icon: React.ElementType; recommended?: boolean }[] = [
     { key: 'flexible', label: <>Flexible (<JargonTooltip term="DCT" />)</>, desc: 'Metodología 3:2:2 — 3 imágenes, 2 textos, 2 títulos. Meta optimiza combinaciones ganadoras.', icon: Layers, recommended: isABO },
     { key: 'carousel', label: 'Carrusel', desc: 'Múltiples imágenes en swipe. 3+ fotos.', icon: ImageIcon },
-    { key: 'single', label: 'Imagen Única', desc: 'Un solo creativo. 1 foto, 1 texto, 1 headline.', icon: FileImage },
+    { key: 'single', label: 'Única (imagen o video)', desc: 'Un solo creativo. 1 foto O 1 video, 1 texto, 1 headline.', icon: FileImage },
     { key: 'catalog', label: 'Catálogo (DPA)', desc: 'Anuncio dinámico de productos del catálogo. Meta elige qué producto mostrar a cada persona. Acepta etiquetas {{product.name}}, {{product.price}}.', icon: ShoppingBag },
   ];
 
@@ -1954,7 +1954,7 @@ function AdFormMultiSlot({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Badge variant="outline" className="text-xs">
-            {adSetFormat === 'flexible' ? 'Flexible (DCT 3:2:2)' : adSetFormat === 'carousel' ? 'Carrusel' : adSetFormat === 'catalog' ? 'Catálogo (DPA)' : 'Imagen Única'}
+            {adSetFormat === 'flexible' ? 'Flexible (DCT 3:2:2)' : adSetFormat === 'carousel' ? 'Carrusel' : adSetFormat === 'catalog' ? 'Catálogo (DPA)' : 'Única (imagen o video)'}
           </Badge>
           <div className="flex gap-1.5">
             <Button variant="outline" size="sm" onClick={onGenerateCopy} disabled={generating}>

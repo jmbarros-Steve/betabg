@@ -368,9 +368,9 @@ export async function generateImage(c: Context) {
 
   // Pick the "photographic quality" block based on subject type:
   // - logo → graphic design rules
-  // - product photography (product reference present, exact match) → product-oriented lens/light
-  // - lifestyle / people (no product ref or fuzzy) → portrait lens, skin texture, expressions
-  const isProductShot = productRefConfidence === 'exact';
+  // - product photography (ANY real Shopify reference, exact or fuzzy) → product-oriented lens/light
+  // - lifestyle / people (no product reference at all) → portrait lens, skin texture, expressions
+  const isProductShot = productRefConfidence === 'exact' || productRefConfidence === 'fuzzy';
   const photographyBlock = isProductShot
     ? `Ultra-sharp commercial product photograph, shot on medium-format digital (Hasselblad H6D) with 80mm macro lens at f/8. Studio-quality lighting (softbox + reflector) revealing real material textures — glass highlights, fabric weave, printed labels, condensation, natural food sheen. Tack-sharp focus on the product. Clean, deliberate composition suitable for an e-commerce hero banner. No illustrations, no 3D renders, no cartoon stylization, no floating objects, no AI shimmer, no plastic-looking surfaces. The product must look photographically identical to the real reference image — same shape, colors, proportions, packaging, and branding. The final image must be indistinguishable from a professional advertising product shoot.`
     : `Ultra-realistic commercial photograph, shot on Canon EOS R5 with 85mm f/1.4 lens. Natural lighting with soft shadows, real skin texture with pores and subtle imperfections, genuine facial expressions. Real physical environment with depth of field and bokeh. No illustrations, no 3D renders, no AI artifacts, no plastic-looking skin, no floating objects. The image must be indistinguishable from a real professional advertising photo shoot.`;
@@ -479,12 +479,16 @@ CRITICAL RENDERING INSTRUCTIONS FOR LOGO:
       const roleLines: string[] = [];
       let idx = 1;
       if (productPart) {
-        if (productRefConfidence === 'fuzzy') {
-          roleLines.push(`IMAGE ${idx} = a REAL photo from this brand's catalog, shown as STYLE/AESTHETIC REFERENCE only. Match its photographic style, lighting, and props, but do NOT copy the specific item — the ad is about a different product described in the prompt.`);
-        } else {
-          const titleHint = productRefTitle ? ` (titled "${productRefTitle}")` : '';
-          roleLines.push(`IMAGE ${idx} = the REAL product${titleHint}. The item in the generated photo MUST be the EXACT product shown — identical shape, colors, packaging, labels, logos, textures, and proportions. Do NOT invent, stylize, redesign, or substitute the product. You may change the scene, lighting, props around it, and framing, but the product itself must be photographically identical to this reference.`);
-        }
+        // Key rule (product realism fix): whether the match is exact or fuzzy,
+        // the reference photo is a REAL product from the store's Shopify
+        // catalog. Treat it as the product to show in the ad, period. The old
+        // 'style reference only — do NOT copy' instruction caused Gemini to
+        // invent fake products that looked nothing like the real catalog.
+        const titleHint = productRefTitle ? ` (titled "${productRefTitle}")` : '';
+        const fuzzyNote = productRefConfidence === 'fuzzy'
+          ? ' This is ONE of the brand\'s real products — if the copy mentions a different one, still feature THIS exact product in the scene (we\'d rather show a real item than a hallucinated one).'
+          : '';
+        roleLines.push(`IMAGE ${idx} = the REAL product${titleHint}. The item in the generated photo MUST be the EXACT product shown — identical shape, colors, packaging, labels, logos, textures, and proportions. Do NOT invent, stylize, redesign, or substitute the product. You may change the scene, lighting, props around it, and framing, but the product itself must be photographically identical to this reference.${fuzzyNote}`);
         idx++;
       }
       if (logoPart) {
