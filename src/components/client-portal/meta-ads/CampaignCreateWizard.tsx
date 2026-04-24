@@ -53,6 +53,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { useMetaBusiness } from './MetaBusinessContext';
 import { useBriefContext } from '@/hooks/useBriefContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import AdPreviewMockup from './AdPreviewMockup';
 import StepIndicator, { type StepDef } from './wizard/StepIndicator';
 import DynamicSteveTip from './wizard/DynamicSteveTip';
@@ -1867,6 +1868,12 @@ function AdFormMultiSlot({
   isDpaCampaign?: boolean;
   dpaSampleProduct?: { title: string; image_url: string | null; price: string | null; brand: string | null; description: string | null } | null;
 }) {
+  // Engine auto-selection now happens backend-side based on `angulo` (see
+  // cloud-run-api/src/routes/ai/generate-video.ts → deriveEngine). The Veo/Runway
+  // toggle is therefore only exposed to super_admin — non-admin callers get the
+  // engine their angle maps to automatically. We still send `engine` in the body;
+  // the backend ignores non-admin overrides.
+  const { isSuperAdmin } = useUserRole();
   const [activeImageSlot, setActiveImageSlot] = useState(0);
   const [mediaTab, setMediaTab] = useState<MediaTab>(productContext ? 'products' : 'upload');
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
@@ -2335,36 +2342,41 @@ function AdFormMultiSlot({
               )}
             </div>
 
-            {/* Engine toggle: Veo default / Runway premium. Mirrors the Gemini/Flux
-                pattern in ai-image tab. */}
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => setVideoEngine('veo')}
-                className={`flex items-center gap-2 p-2 rounded-md border text-left transition-all ${
-                  videoEngine === 'veo' ? 'border-green-500 bg-green-50 ring-1 ring-green-500/20' : 'border-border hover:border-primary/30'
-                }`}
-              >
-                <Video className={`w-4 h-4 ${videoEngine === 'veo' ? 'text-green-600' : 'text-muted-foreground'}`} />
-                <div className="leading-tight">
-                  <p className="text-[11px] font-semibold">Veo 3 (default)</p>
-                  <p className="text-[9px] text-muted-foreground">8s · 30 créd · audio nativo</p>
+            {/* Engine toggle — super_admin only. Backend auto-selects engine from
+                angle for regular clients. JM gets this toggle to override. */}
+            {isSuperAdmin && (
+              <div className="space-y-1">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Motor de video (admin override)</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setVideoEngine('veo')}
+                    className={`flex items-center gap-2 p-2 rounded-md border text-left transition-all ${
+                      videoEngine === 'veo' ? 'border-green-500 bg-green-50 ring-1 ring-green-500/20' : 'border-border hover:border-primary/30'
+                    }`}
+                  >
+                    <Video className={`w-4 h-4 ${videoEngine === 'veo' ? 'text-green-600' : 'text-muted-foreground'}`} />
+                    <div className="leading-tight">
+                      <p className="text-[11px] font-semibold">Veo 3</p>
+                      <p className="text-[9px] text-muted-foreground">8s · 30 créd · audio nativo</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVideoEngine('runway')}
+                    className={`flex items-center gap-2 p-2 rounded-md border text-left transition-all ${
+                      videoEngine === 'runway' ? 'border-purple-500 bg-purple-50 ring-1 ring-purple-500/20' : 'border-border hover:border-primary/30'
+                    }`}
+                  >
+                    <Sparkles className={`w-4 h-4 ${videoEngine === 'runway' ? 'text-purple-600' : 'text-muted-foreground'}`} />
+                    <div className="leading-tight">
+                      <p className="text-[11px] font-semibold">Runway Premium</p>
+                      <p className="text-[9px] text-muted-foreground">10s · 50 créd · Gen-4 Turbo</p>
+                    </div>
+                  </button>
                 </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setVideoEngine('runway')}
-                className={`flex items-center gap-2 p-2 rounded-md border text-left transition-all ${
-                  videoEngine === 'runway' ? 'border-purple-500 bg-purple-50 ring-1 ring-purple-500/20' : 'border-border hover:border-primary/30'
-                }`}
-              >
-                <Sparkles className={`w-4 h-4 ${videoEngine === 'runway' ? 'text-purple-600' : 'text-muted-foreground'}`} />
-                <div className="leading-tight">
-                  <p className="text-[11px] font-semibold">Runway Premium</p>
-                  <p className="text-[9px] text-muted-foreground">10s · 50 créd · Gen-4 Turbo</p>
-                </div>
-              </button>
-            </div>
+              </div>
+            )}
 
             <Textarea
               value={aiPrompt}
@@ -2426,7 +2438,8 @@ function AdFormMultiSlot({
                       fotoBaseUrl: fotoBaseUrls?.[0], // legacy compat
                       fotoBaseUrls,
                       aspectRatio: aspectForVeo,
-                      engine: videoEngine,
+                      engine: videoEngine, // honored only for super_admin; backend auto-selects otherwise
+                      angulo: selectedAngle, // drives backend's deriveEngine() when non-admin
                     },
                     timeoutMs: 300_000,
                   });
@@ -4708,6 +4721,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                 fotoBaseUrl: fotoBase,
                 fotoBaseUrls: fotoBaseUrlsAutoGen,
                 aspectRatio: '9:16',
+                // Backend auto-selects engine from angulo; non-admin clients
+                // can't override so we don't send `engine` here.
+                angulo: angleValue,
+                funnelStage,
               },
               timeoutMs: 300_000,
             });

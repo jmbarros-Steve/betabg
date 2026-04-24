@@ -26,6 +26,94 @@ const RUNWAY_DURATION_SEC = 10;
 type AspectRatio = '9:16' | '16:9' | '1:1';
 type VideoEngine = 'veo' | 'runway';
 
+// ── Hardcoded engine auto-select ───────────────────────────────────────────
+// The client NEVER chooses Veo vs Runway vs templates. Steve picks the right
+// engine behind the scenes based on the creative angle. Runway = product-led
+// cinematic (silent, 10s, better motion coherence). Veo = people-led with
+// audio (talking head, UGC, testimonials, 8s, native voice+ambience).
+// Admin override: super_admin callers can force `engine: 'veo' | 'runway'`
+// in the request body; everyone else gets auto-selection.
+const ANGLE_TEMPLATE: Record<string, string> = {
+  'Bold Statement': 'hero_shot',
+  'Beneficios': 'hero_shot',
+  'Beneficios Principales': 'hero_shot',
+  'Nueva Colección': 'product_reveal',
+  'Descuentos/Ofertas': 'product_reveal',
+  'Ingredientes/Material': 'macro_detail',
+  'Detalles de Producto': 'macro_detail',
+  'Antes y Después': 'before_after',
+  'Reviews/Testimonios': 'testimonial',
+  'Reviews + Beneficios': 'testimonial',
+  'Mensajes y Comentarios': 'testimonial',
+  'Call Out': 'talking_head',
+  'Ugly Ads': 'lifestyle_ugc',
+  'Memes': 'lifestyle_ugc',
+  'Pantalla Dividida': 'before_after',
+  'Paquetes': 'hero_shot',
+  'Resultados': 'hero_shot',
+  'Us vs Them': 'before_after',
+};
+
+const TEMPLATE_ENGINE: Record<string, VideoEngine> = {
+  'hero_shot': 'runway',
+  'product_reveal': 'runway',
+  'unboxing': 'runway',
+  'before_after': 'runway',
+  'macro_detail': 'runway',
+  'lifestyle_ugc': 'veo',
+  'talking_head': 'veo',
+  'testimonial': 'veo',
+};
+
+function deriveTemplate(angulo: string | undefined): string {
+  return (angulo && ANGLE_TEMPLATE[angulo]) || 'hero_shot';
+}
+
+function deriveEngine(angulo: string | undefined): VideoEngine {
+  const template = deriveTemplate(angulo);
+  return TEMPLATE_ENGINE[template] || 'runway';
+}
+
+async function isSuperAdmin(supabase: SupabaseClient, userId: string | undefined): Promise<boolean> {
+  if (!userId) return false;
+  try {
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('role', 'super_admin')
+      .maybeSingle();
+    return !!data;
+  } catch {
+    return false;
+  }
+}
+
+// Merge engine metadata into the existing brief_visual JSON without clobbering
+// the structured brief fields (concepto, plano, prompt_generacion, etc.) that
+// generate-brief-visual writes. Read-modify-write keeps it simple and we don't
+// care about the race window (single-writer per creativeId).
+async function persistEngineToCreative(
+  supabase: SupabaseClient,
+  creativeId: string,
+  extraUpdates: Record<string, unknown>,
+  engineMeta: { engine: VideoEngine; template: string; angulo: string | null },
+): Promise<void> {
+  const { data: existing } = await supabase
+    .from('ad_creatives')
+    .select('brief_visual')
+    .eq('id', creativeId)
+    .maybeSingle();
+  const currentBrief = (existing?.brief_visual && typeof existing.brief_visual === 'object')
+    ? existing.brief_visual as Record<string, unknown>
+    : {};
+  const mergedBrief = { ...currentBrief, ...engineMeta };
+  await supabase.from('ad_creatives').update({
+    ...extraUpdates,
+    brief_visual: mergedBrief,
+  }).eq('id', creativeId);
+}
+
 // Idempotent refund. Uses credit_transactions.accion as the dedup key because
 // we don't have an operation_id column yet. The first refund inserts a row with
 // `refund op=<operationName>` in accion; subsequent calls are no-ops.
@@ -141,12 +229,35 @@ export async function generateVideo(c: Context) {
       fotoBaseUrls,
       aspectRatio,
       engine,
+      angulo,
+      funnelStage,
     } = await c.req.json();
 
     const supabase = getSupabaseAdmin();
 
-    // Resolve engine. Default = veo. Runway = Replicate gen4-turbo.
-    const engineChoice: VideoEngine = engine === 'runway' ? 'runway' : 'veo';
+    // Resolve engine. Default path = auto-select based on creative angle (the
+    // client never sees Veo/Runway — Steve picks). Admin override: if the body
+    // passes an explicit engine AND the caller is super_admin, honor it.
+    // Otherwise we ignore `engine` and use deriveEngine(angulo).
+    const user = c.get('user');
+    const userId: string | undefined = user?.id;
+    const autoEngine: VideoEngine = deriveEngine(angulo);
+    let engineChoice: VideoEngine = autoEngine;
+    const explicitEngine: VideoEngine | null = engine === 'runway' || engine === 'veo' ? engine : null;
+    if (explicitEngine) {
+      const adminOverride = await isSuperAdmin(supabase, userId);
+      if (adminOverride) {
+        engineChoice = explicitEngine;
+        console.log(`[generate-video] super_admin override: engine=${explicitEngine} (auto would be ${autoEngine}) for angulo="${angulo || 'n/a'}"`);
+      } else {
+        console.log(`[generate-video] ignored non-admin engine override "${explicitEngine}", using auto=${autoEngine} for angulo="${angulo || 'n/a'}"`);
+      }
+    } else {
+      console.log(`[generate-video] auto-selected engine=${autoEngine} for angulo="${angulo || 'n/a'}" (template=${deriveTemplate(angulo)})`);
+    }
+    // Silence unused-param lint — funnelStage is forwarded for future use
+    // and logged here so the parameter is not stripped by TS pass.
+    if (funnelStage) console.log(`[generate-video] funnelStage=${funnelStage}`);
 
     if (!promptGeneracion || typeof promptGeneracion !== 'string') {
       return c.json({ error: 'promptGeneracion es obligatorio' }, 400);
@@ -178,6 +289,7 @@ export async function generateVideo(c: Context) {
         promptGeneracion,
         referenceUrls,
         finalAspect,
+        angulo,
       });
     }
 
@@ -269,11 +381,15 @@ export async function generateVideo(c: Context) {
     }
 
     // Persist the operation id so the caller can poll us (and we can poll Google).
+    // Engine persisted inside brief_visual JSON (no metadata column exists) so
+    // admin UIs can render which motor was used without adding a migration.
     if (creativeId) {
-      await supabase.from('ad_creatives').update({
-        prediction_id: operationName,
-        estado: 'generando',
-      }).eq('id', creativeId);
+      await persistEngineToCreative(
+        supabase,
+        creativeId,
+        { prediction_id: operationName, estado: 'generando' },
+        { engine: 'veo', template: deriveTemplate(angulo), angulo: angulo || null },
+      );
     }
 
     await supabase.from('credit_transactions').insert({
@@ -343,17 +459,19 @@ export async function generateVideo(c: Context) {
         const assetUrl = pub.publicUrl;
 
         if (creativeId) {
-          await supabase.from('ad_creatives').update({
-            asset_url: assetUrl,
-            estado: 'listo',
-            formato: 'video',
-          }).eq('id', creativeId);
+          await persistEngineToCreative(
+            supabase,
+            creativeId,
+            { asset_url: assetUrl, estado: 'listo', formato: 'video' },
+            { engine: 'veo', template: deriveTemplate(angulo), angulo: angulo || null },
+          );
         }
 
         return c.json({
           success: true,
           prediction_id: operationName,
           status: 'listo',
+          engine: 'veo',
           asset_url: assetUrl,
           duration_seconds: DEFAULT_DURATION_SEC,
           generation_attempts: attempts,
@@ -371,6 +489,7 @@ export async function generateVideo(c: Context) {
       success: true,
       prediction_id: operationName,
       status: 'generando',
+      engine: 'veo',
       message: 'El video se sigue generando. Reintenta en 1-2 min.',
     });
 
@@ -487,9 +606,10 @@ async function runGenerateRunway(
     promptGeneracion: string;
     referenceUrls: string[];
     finalAspect: AspectRatio;
+    angulo?: string;
   },
 ) {
-  const { clientId, creativeId, promptGeneracion, referenceUrls, finalAspect } = args;
+  const { clientId, creativeId, promptGeneracion, referenceUrls, finalAspect, angulo } = args;
 
   const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
   if (!REPLICATE_API_KEY) {
@@ -550,10 +670,12 @@ async function runGenerateRunway(
   const predictionId: string = prediction?.id || pseudoOpId;
 
   if (creativeId) {
-    await supabase.from('ad_creatives').update({
-      prediction_id: predictionId,
-      estado: 'generando',
-    }).eq('id', creativeId);
+    await persistEngineToCreative(
+      supabase,
+      creativeId,
+      { prediction_id: predictionId, estado: 'generando' },
+      { engine: 'runway', template: deriveTemplate(angulo), angulo: angulo || null },
+    );
   }
 
   await supabase.from('credit_transactions').insert({
@@ -636,11 +758,12 @@ async function runGenerateRunway(
   const assetUrl = pub.publicUrl;
 
   if (creativeId) {
-    await supabase.from('ad_creatives').update({
-      asset_url: assetUrl,
-      estado: 'listo',
-      formato: 'video',
-    }).eq('id', creativeId);
+    await persistEngineToCreative(
+      supabase,
+      creativeId,
+      { asset_url: assetUrl, estado: 'listo', formato: 'video' },
+      { engine: 'runway', template: deriveTemplate(angulo), angulo: angulo || null },
+    );
   }
 
   return c.json({

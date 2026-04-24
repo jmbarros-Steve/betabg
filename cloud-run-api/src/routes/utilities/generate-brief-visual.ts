@@ -1,6 +1,52 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 
+// Mirror of ANGLE_TEMPLATE + TEMPLATE_ENGINE in generate-video.ts. We duplicate
+// here (instead of importing) because this file is only called at brief time
+// and the video route is called later — no circular imports, no shared state.
+// The client never sees Veo/Runway — Steve picks the template behind the scenes
+// and the prompt is shaped accordingly (cinematic/silent for Runway templates,
+// audio-first for Veo templates).
+const ANGLE_TEMPLATE_BRIEF: Record<string, string> = {
+  'Bold Statement': 'hero_shot',
+  'Beneficios': 'hero_shot',
+  'Beneficios Principales': 'hero_shot',
+  'Nueva Colección': 'product_reveal',
+  'Descuentos/Ofertas': 'product_reveal',
+  'Ingredientes/Material': 'macro_detail',
+  'Detalles de Producto': 'macro_detail',
+  'Antes y Después': 'before_after',
+  'Reviews/Testimonios': 'testimonial',
+  'Reviews + Beneficios': 'testimonial',
+  'Mensajes y Comentarios': 'testimonial',
+  'Call Out': 'talking_head',
+  'Ugly Ads': 'lifestyle_ugc',
+  'Memes': 'lifestyle_ugc',
+  'Pantalla Dividida': 'before_after',
+  'Paquetes': 'hero_shot',
+  'Resultados': 'hero_shot',
+  'Us vs Them': 'before_after',
+};
+
+const TEMPLATE_ENGINE_BRIEF: Record<string, 'veo' | 'runway'> = {
+  'hero_shot': 'runway',
+  'product_reveal': 'runway',
+  'unboxing': 'runway',
+  'before_after': 'runway',
+  'macro_detail': 'runway',
+  'lifestyle_ugc': 'veo',
+  'talking_head': 'veo',
+  'testimonial': 'veo',
+};
+
+function deriveTemplateBrief(angulo: string | undefined): string {
+  return (angulo && ANGLE_TEMPLATE_BRIEF[angulo]) || 'hero_shot';
+}
+
+function deriveEngineBrief(angulo: string | undefined): 'veo' | 'runway' {
+  return TEMPLATE_ENGINE_BRIEF[deriveTemplateBrief(angulo)] || 'runway';
+}
+
 export async function generateBriefVisual(c: Context) {
   try {
   const { clientId, formato, angulo, variacionElegida, assetUrls, productData, funnelStage } = await c.req.json();
@@ -108,6 +154,16 @@ Productos destacados: ${productSamples || 'No disponible'}
   const personaAge = persona.edad || persona.age || '25-40';
   const personaLifestyle = persona.estilo_vida || persona.lifestyle || persona.intereses || '';
   const personaPhotoDesc = `The person in the photo should be: ${personaGender}, approximately ${personaAge} years old${personaLifestyle ? `, in a setting that reflects: ${personaLifestyle}` : ''}.`;
+
+  // Derive the video template + engine from the creative angle. The client
+  // never picks — Steve decides whether this is a cinematic product shot
+  // (silent 10s Runway) or a human-led scene (8s Veo with audio). The brief
+  // prompt is shaped accordingly so the AI doesn't produce an audio-centric
+  // prompt for a Runway (silent) engine or vice-versa.
+  const videoTemplate = deriveTemplateBrief(typeof angulo === 'string' ? angulo : undefined);
+  const videoEngine = deriveEngineBrief(typeof angulo === 'string' ? angulo : undefined);
+  const videoIsRunway = videoEngine === 'runway';
+  const videoDurationSec = videoIsRunway ? 10 : 8;
 
   const userPrompt = `Basándote en el copy aprobado y las fotos reales del producto, genera el brief visual para producción.
 
