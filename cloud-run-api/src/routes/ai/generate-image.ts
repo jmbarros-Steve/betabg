@@ -42,6 +42,30 @@ const DIVERSITY_STYLES = [
   'Vary compositions: rule of thirds, centered, off-center with negative space.',
 ];
 
+// Reglas universales de contenido — aplican a TODAS las imágenes generadas,
+// sea studio_mode o no. Previenen que Gemini se vaya a "Pinterest mode" y
+// devuelva bodegones atmosféricos sin persona ni producto.
+const ABSOLUTE_CONTENT_RULES = `ABSOLUTE CONTENT RULES (apply to EVERY generated image, no exceptions):
+
+1. The image MUST show at least ONE of: a person (actor/model), a product, or BOTH. Never only ambient scenery.
+
+2. FORBIDDEN outputs — regenerate if any of these appears alone without a person or product:
+   - Empty windows (rain, condensation, mist)
+   - Empty rooms or interiors without subject
+   - Pure landscapes, sunsets, forests, beaches
+   - Still life / tablescapes without context
+   - Steam, smoke, fog, falling leaves as the main subject
+   - Textures, fabrics, or details without context
+   - Mood-board / Pinterest-style shots that feel ambient-only
+
+3. If a person is included, she/he must be clearly visible, in focus, and recognizable (not a blurred silhouette, not just hands).
+
+4. If a product is included, it must be identifiable and occupy a meaningful portion of the frame (roughly ≥25%), not a tiny detail in the corner.
+
+5. Use ambient/lifestyle elements (weather, light, props) only as SUPPORTING background — never as the protagonist.
+
+6. This is a COMMERCIAL AD, not editorial photography or a mood board. Every image must serve the goal of selling a product.`;
+
 // SSRF-safe host validator (blocks private IPs, loopback, metadata services)
 function isPublicHost(urlStr: string): boolean {
   try {
@@ -645,10 +669,10 @@ CRITICAL RENDERING INSTRUCTIONS FOR LOGO:
         roleLines.push(`${range} = previous successful Google Ads of this brand. Match their visual style, tone, lighting mood, and overall aesthetic. Do NOT copy their exact scenes.`);
       }
       parts.push({
-        text: `CRITICAL: ${imagesProvided.length} reference image(s) were provided, each with a distinct role:\n${roleLines.join('\n')}\n\n${promptFinal}`,
+        text: `CRITICAL: ${imagesProvided.length} reference image(s) were provided, each with a distinct role:\n${roleLines.join('\n')}\n\n${promptFinal}\n\n${ABSOLUTE_CONTENT_RULES}`,
       });
     } else {
-      parts.push({ text: promptFinal });
+      parts.push({ text: `${promptFinal}\n\n${ABSOLUTE_CONTENT_RULES}` });
     }
 
     // Note: Gemini API requires key in URL per their docs
