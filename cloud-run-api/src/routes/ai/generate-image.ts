@@ -3,6 +3,7 @@ import sharp from 'sharp';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { loadKnowledge } from '../../lib/knowledge-loader.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { loadStudioAssets, buildAssetSnapshot } from '../../lib/brief-estudio-loader.js';
 
 // Spec oficial de Google Ads PMAX per field_type
 const PMAX_OUTPUT_SPECS: Record<string, { width: number; height: number }> = {
@@ -168,11 +169,16 @@ export async function generateImage(c: Context) {
     referenceImageUrls,
     userIntent: rawUserIntent,
     use_brand_logo_reference: forceBrandLogo,
+    // Brief Estudio — Etapa 5
+    studio_mode: rawStudioMode,
+    mood_key: rawMoodKey,
   } = body;
   const userIntent = typeof rawUserIntent === 'string' ? rawUserIntent.trim().slice(0, 600) : '';
   const refUrls: string[] = Array.isArray(referenceImageUrls)
     ? referenceImageUrls.filter((u: any) => typeof u === 'string' && u.trim().length > 0).slice(0, 3)
     : [];
+  const studioMode = rawStudioMode === true;
+  const moodKey = typeof rawMoodKey === 'string' ? rawMoodKey.trim().slice(0, 32) : null;
 
   // Verify the authenticated user owns this client
   const user = c.get('user');
@@ -202,6 +208,16 @@ export async function generateImage(c: Context) {
 
   // Load brand context (colors from brief + website, logo URL) for visual coherence
   const brandCtx = await loadBrandContext(supabase, clientId);
+
+  // Brief Estudio — Etapa 5: carga assets si studio_mode está activo.
+  // Si studio_ready=false, igual se permite usar los parciales — el caller
+  // decide pasando studio_mode=true. Mantiene compat: si el flag no viene,
+  // la pipeline funciona igual que antes.
+  const studioAssets = studioMode
+    ? await loadStudioAssets(supabase, clientId)
+    : null;
+  const studioActorImage = studioAssets?.primary_actor?.reference_images?.[0] || null;
+  const studioTopProduct = studioAssets?.featured_products?.[0] || null;
 
   // Shortcut: formato=landscape_logo con logo del cliente presente → letterbox con sharp
   // (logo centrado en canvas 1200x300 blanco). No llamamos a Gemini — es gratis, instantáneo,
@@ -289,6 +305,17 @@ export async function generateImage(c: Context) {
   let effectiveFotoBase = fotoBaseUrl;
   let productRefConfidence: 'exact' | 'fuzzy' | 'none' = fotoBaseUrl ? 'exact' : 'none';
   let productRefTitle: string | null = null;
+
+  // Brief Estudio: si studio_mode=true y no pasaron foto, usar el primer
+  // producto destacado del Brief Estudio como ground truth. El cliente
+  // explícitamente eligió este producto para creativos.
+  if (!effectiveFotoBase && studioTopProduct?.image_url) {
+    effectiveFotoBase = studioTopProduct.image_url;
+    productRefConfidence = 'exact';
+    productRefTitle = studioTopProduct.title || null;
+    console.log(`[generate-image][studio] Using Brief Estudio featured product: "${productRefTitle}"`);
+  }
+
   if (!effectiveFotoBase) {
     const supabaseForQuery = getSupabaseAdmin();
 
@@ -564,9 +591,20 @@ CRITICAL RENDERING INSTRUCTIONS FOR LOGO:
       if (part) prevAdParts.push(part);
     }
 
-    // Assemble parts in a defined order: product, logo, prev ads, text instruction
+    // 4) Brief Estudio actor reference — solo cuando studio_mode=true y hay
+    //    actor con imagen disponible. El actor es la PERSONA que aparece en
+    //    el ad (escenas lifestyle/UGC/testimoniales); para logos/formatos
+    //    que no toleran humanos se omite.
+    let actorPart: Record<string, any> | null = null;
+    if (studioMode && studioActorImage && !isLogoFormat) {
+      console.log('[generate-image][studio] Downloading actor reference:', studioActorImage);
+      actorPart = await downloadInlineData(studioActorImage, 'actor-ref');
+    }
+
+    // Assemble parts in a defined order: product, actor, logo, prev ads, text instruction
     const imagesProvided: string[] = [];
     if (productPart) { parts.push(productPart); imagesProvided.push('PRODUCT'); }
+    if (actorPart) { parts.push(actorPart); imagesProvided.push('ACTOR'); }
     if (logoPart) { parts.push(logoPart); imagesProvided.push('LOGO'); }
     for (const p of prevAdParts) { parts.push(p); imagesProvided.push('PREV_AD'); }
 
@@ -585,6 +623,12 @@ CRITICAL RENDERING INSTRUCTIONS FOR LOGO:
           ? ' This is ONE of the brand\'s real products — if the copy mentions a different one, still feature THIS exact product in the scene (we\'d rather show a real item than a hallucinated one).'
           : '';
         roleLines.push(`IMAGE ${idx} = the REAL product${titleHint}. The item in the generated photo MUST be the EXACT product shown — identical shape, colors, packaging, labels, logos, textures, and proportions. Do NOT invent, stylize, redesign, or substitute the product. You may change the scene, lighting, props around it, and framing, but the product itself must be photographically identical to this reference.${fuzzyNote}`);
+        idx++;
+      }
+      if (actorPart) {
+        // Studio Mode: el actor es la persona oficial de la marca. Mantener
+        // identidad visual (edad, etnia, estilo) consistente entre anuncios.
+        roleLines.push(`IMAGE ${idx} = the brand's OFFICIAL MODEL / ACTOR (Studio Mode). If the scene requires a person, use THIS exact person — match their age, ethnicity, hair, general appearance. Vary only pose, wardrobe, and expression. Do NOT invent a different model. This is the brand's recurring face across campaigns.`);
         idx++;
       }
       if (logoPart) {
@@ -739,6 +783,24 @@ CRITICAL RENDERING INSTRUCTIONS FOR LOGO:
     tipo: 'imagen',
   });
 
+  // Brief Estudio — Etapa 5: persist asset_snapshot on the creative row if
+  // we have a creativeId. Snapshot is immutable so editing the Brief Estudio
+  // later doesn't break already-published ads.
+  if (creativeId && studioMode && studioAssets) {
+    try {
+      const snapshot = buildAssetSnapshot(studioAssets, {
+        mood_key: moodKey,
+        featured_product_index: 0,
+      });
+      await supabase
+        .from('ad_creatives')
+        .update({ asset_snapshot: snapshot })
+        .eq('id', creativeId);
+    } catch (snapErr: any) {
+      console.warn('[generate-image][studio] asset_snapshot update failed:', snapErr?.message);
+    }
+  }
+
   // Log credit transaction (credits already deducted above)
   const isFlux = engine === 'flux';
   await supabase.from('credit_transactions').insert({
@@ -748,7 +810,7 @@ CRITICAL RENDERING INSTRUCTIONS FOR LOGO:
     costo_real_usd: isFlux ? FLUX_USD_COST : 0.02,
   });
 
-  return c.json({ asset_url: publicUrl });
+  return c.json({ asset_url: publicUrl, studio_mode: studioMode || undefined });
   } catch (err: any) {
     console.error('[generate-image]', err);
     return c.json({ error: 'Error interno del servidor' }, 500);

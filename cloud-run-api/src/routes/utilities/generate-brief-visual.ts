@@ -1,5 +1,7 @@
 import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
+import { loadStudioAssets } from '../../lib/brief-estudio-loader.js';
+import { pickTrackForAngleAndMood, type MusicMood } from '../../lib/music-library.js';
 
 // Mirror of ANGLE_TEMPLATE + TEMPLATE_ENGINE in generate-video.ts. We duplicate
 // here (instead of importing) because this file is only called at brief time
@@ -49,7 +51,21 @@ function deriveEngineBrief(angulo: string | undefined): 'veo' | 'runway' {
 
 export async function generateBriefVisual(c: Context) {
   try {
-  const { clientId, formato, angulo, variacionElegida, assetUrls, productData, funnelStage } = await c.req.json();
+  const {
+    clientId,
+    formato,
+    angulo,
+    variacionElegida,
+    assetUrls,
+    productData,
+    funnelStage,
+    // Brief Estudio — Etapa 5
+    studio_mode: rawStudioMode,
+    mood_key: rawMoodKey,
+  } = await c.req.json();
+  const studioMode = rawStudioMode === true;
+  const moodKeyInput: string | null =
+    typeof rawMoodKey === 'string' ? rawMoodKey.trim().slice(0, 32) : null;
   // Funnel stage controls the VISUAL playbook. Each stage has a different
   // purpose for the image: TOFU = stop the scroll + brand identity, MOFU =
   // build trust with real use cases, BOFU = push the sale with hero product.
@@ -430,6 +446,47 @@ REGLA CRÍTICA DE VARIACIÓN: Cada prompt_generacion debe ser ÚNICO y CREATIVO.
   } catch {
     console.error('Failed to parse AI JSON response:', rawContent.slice(0, 500));
     throw new Error('Error procesando la respuesta. Intenta de nuevo.');
+  }
+
+  // Brief Estudio — Etapa 5: enrich response with studio assets + suggested
+  // music track. Non-destructive: never overwrites fields produced by the AI.
+  if (studioMode) {
+    try {
+      const studioAssets = await loadStudioAssets(supabase, clientId);
+      // Prefer brand-chosen moods over caller-provided mood_key.
+      const studioMood =
+        (moodKeyInput as MusicMood | null) ||
+        ((studioAssets.music_preferences?.moods?.[0] as MusicMood | undefined) ?? null);
+      const pickedTrack = studioMood
+        ? pickTrackForAngleAndMood(String(angulo || ''), studioMood)
+        : undefined;
+
+      const studioMeta: Record<string, unknown> = {
+        studio_mode: true,
+        studio_ready: studioAssets.studio_ready,
+        actor_id: studioAssets.primary_actor?.id ?? null,
+        actor_reference_image: studioAssets.primary_actor?.reference_images?.[0] ?? null,
+        voice_id: studioAssets.primary_voice?.voice_id ?? null,
+        voice_source: studioAssets.primary_voice?.source ?? null,
+        featured_product_id: studioAssets.featured_products?.[0]?.shopify_product_id ?? null,
+        featured_product_title: studioAssets.featured_products?.[0]?.title ?? null,
+        featured_product_image: studioAssets.featured_products?.[0]?.image_url ?? null,
+        music_track_id: pickedTrack?.id ?? null,
+        music_mood: studioMood ?? null,
+      };
+      parsed = { ...parsed, studio: studioMeta };
+
+      // If AI didn't suggest a foto_recomendada (or returned literal placeholder),
+      // fall back to the first Brief Estudio featured product image so callers
+      // can use it as the image-to-video anchor.
+      const fotoValue = typeof parsed?.foto_recomendada === 'string' ? parsed.foto_recomendada : '';
+      const looksValid = /^https?:\/\//i.test(fotoValue.trim());
+      if (!looksValid && studioMeta.featured_product_image) {
+        parsed.foto_recomendada = studioMeta.featured_product_image;
+      }
+    } catch (err: any) {
+      console.warn('[generate-brief-visual][studio] enrichment failed:', err?.message);
+    }
   }
 
   return c.json(parsed);

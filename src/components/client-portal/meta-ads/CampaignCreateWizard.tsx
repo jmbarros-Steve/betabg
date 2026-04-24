@@ -1635,12 +1635,19 @@ function CreativeFocusStep({
   clientId,
   focusType, setFocusType,
   selectedProduct, setSelectedProduct,
+  studioProducts,
+  isStudioMode,
 }: {
   clientId: string;
   focusType: 'product' | 'broad';
   setFocusType: (v: 'product' | 'broad') => void;
   selectedProduct: ShopifyProduct | null;
   setSelectedProduct: (p: ShopifyProduct | null) => void;
+  // Brief Estudio — Etapa 5: cuando isStudioMode=true, mostramos sólo los
+  // productos destacados (ya hidratados). Null = aún cargando; [] = cliente
+  // sin productos destacados → fallback al listado completo.
+  studioProducts?: ShopifyProduct[] | null;
+  isStudioMode?: boolean;
 }) {
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -1671,9 +1678,16 @@ function CreativeFocusStep({
     setLoadingProducts(false);
   }, [clientId]);
 
+  // In studio mode with hydrated featured products, skip the full Shopify fetch.
+  const useStudioPicker =
+    Boolean(isStudioMode) && Array.isArray(studioProducts) && (studioProducts?.length ?? 0) > 0;
+  const effectiveProducts: ShopifyProduct[] = useStudioPicker ? (studioProducts as ShopifyProduct[]) : products;
+  const effectiveLoading = useStudioPicker ? false : loadingProducts;
+
   useEffect(() => {
+    if (useStudioPicker) return;
     if (focusType === 'product' && products.length === 0) fetchProducts();
-  }, [focusType, products.length, fetchProducts]);
+  }, [focusType, products.length, fetchProducts, useStudioPicker]);
 
   return (
     <div className="space-y-5">
@@ -1702,14 +1716,23 @@ function CreativeFocusStep({
 
       {focusType === 'product' && (
         <div className="space-y-3">
-          <Label className="text-sm font-semibold">Selecciona un producto de Shopify</Label>
-          {loadingProducts ? (
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-semibold">
+              {useStudioPicker ? 'Tus productos destacados (Brief Estudio)' : 'Selecciona un producto de Shopify'}
+            </Label>
+            {useStudioPicker && (
+              <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20">
+                <Sparkles className="w-2.5 h-2.5 mr-1" /> Modo Estudio
+              </Badge>
+            )}
+          </div>
+          {effectiveLoading ? (
             <div className="grid grid-cols-2 gap-2">
               {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
             </div>
-          ) : products.length > 0 ? (
+          ) : effectiveProducts.length > 0 ? (
             <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
-              {products.map((p) => {
+              {effectiveProducts.map((p) => {
                 const isSelected = selectedProduct?.id === p.id;
                 return (
                   <button
@@ -1818,6 +1841,9 @@ function AdFormMultiSlot({
   selectedProduct,
   isDpaCampaign,
   dpaSampleProduct,
+  // Brief Estudio — Etapa 5: pasar al backend de generación.
+  isStudioMode: studioMode = false,
+  studioMoodKey = null,
 }: {
   clientId: string;
   adSetFormat: AdSetFormat;
@@ -1837,6 +1863,8 @@ function AdFormMultiSlot({
   selectedProduct: ShopifyProduct | null;
   isDpaCampaign?: boolean;
   dpaSampleProduct?: { title: string; image_url: string | null; price: string | null; brand: string | null; description: string | null } | null;
+  isStudioMode?: boolean;
+  studioMoodKey?: string | null;
 }) {
   // Engine + template selection are 100% backend-side. `angulo` + `funnelStage`
   // are sent with every generate-video call; the backend picks cinematic-silent
@@ -1943,7 +1971,15 @@ function AdFormMultiSlot({
       if (aiPrompt.trim()) {
         const anglePrompt = selectedAngle ? ` Ángulo creativo: ${selectedAngle}.` : '';
         const { data, error } = await callApi('generate-image', {
-          body: { clientId, promptGeneracion: aiPrompt + anglePrompt, engine: imageEngine, formato },
+          body: {
+            clientId,
+            promptGeneracion: aiPrompt + anglePrompt,
+            engine: imageEngine,
+            formato,
+            // Brief Estudio — Etapa 5
+            studio_mode: studioMode || undefined,
+            mood_key: studioMode ? studioMoodKey || undefined : undefined,
+          },
         });
         if (error === 'NO_CREDITS') { toast.error('Sin créditos (2 por imagen)'); return; }
         if (error) throw error;
@@ -1976,6 +2012,9 @@ function AdFormMultiSlot({
             product_type: selectedProduct.product_type,
             body_html: '',
           } : undefined,
+          // Brief Estudio — Etapa 5
+          studio_mode: studioMode || undefined,
+          mood_key: studioMode ? studioMoodKey || undefined : undefined,
         },
       });
 
@@ -1990,7 +2029,16 @@ function AdFormMultiSlot({
         || undefined;
 
       const { data, error } = await callApi('generate-image', {
-        body: { clientId, promptGeneracion, fotoBaseUrl: fotoBase, engine: imageEngine, formato },
+        body: {
+          clientId,
+          promptGeneracion,
+          fotoBaseUrl: fotoBase,
+          engine: imageEngine,
+          formato,
+          // Brief Estudio — Etapa 5
+          studio_mode: studioMode || undefined,
+          mood_key: studioMode ? studioMoodKey || undefined : undefined,
+        },
       });
       if (error === 'NO_CREDITS') { toast.error('Sin créditos (2 por imagen)'); return; }
       if (error) throw error;
@@ -2323,7 +2371,18 @@ function AdFormMultiSlot({
                       cta: 'SHOP_NOW',
                     };
                     const { data: briefData, error: briefErr } = await callApi('generate-brief-visual', {
-                      body: { clientId, formato: 'video', angulo: selectedAngle, variacionElegida, assetUrls: productAssets, productData, funnelStage },
+                      body: {
+                        clientId,
+                        formato: 'video',
+                        angulo: selectedAngle,
+                        variacionElegida,
+                        assetUrls: productAssets,
+                        productData,
+                        funnelStage,
+                        // Brief Estudio — Etapa 5
+                        studio_mode: studioMode || undefined,
+                        mood_key: studioMode ? studioMoodKey || undefined : undefined,
+                      },
                     });
                     if (briefErr || !briefData?.prompt_generacion) {
                       toast.error('No se pudo armar el prompt del video. Describilo manualmente.');
@@ -2355,6 +2414,9 @@ function AdFormMultiSlot({
                       aspectRatio: aspectForVideo,
                       angulo: selectedAngle, // drives backend's deriveEngine()
                       funnelStage,
+                      // Brief Estudio — Etapa 5
+                      studio_mode: studioMode || undefined,
+                      mood_key: studioMode ? studioMoodKey || undefined : undefined,
                     },
                     timeoutMs: 300_000,
                   });
@@ -4026,6 +4088,115 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [focusType, setFocusType] = useState<'product' | 'broad'>('broad');
   const [selectedProduct, setSelectedProduct] = useState<ShopifyProduct | null>(null);
 
+  // ═══════════ Brief Estudio — Etapa 5 ═══════════
+  // Detecta si el cliente tiene el Brief Estudio completo (studio_ready=true)
+  // y expone los assets al wizard: actor primario, voz, productos destacados,
+  // música. Cuando está activo:
+  //   - El badge "Modo Estudio activo" aparece en el header
+  //   - CreativeFocusStep muestra solo los productos destacados (no todos)
+  //   - generate-* endpoints reciben studio_mode=true + mood_key
+  //
+  // Rollback / feature flag:
+  //   localStorage.FEATURE_BRIEF_ESTUDIO === 'off' → off aunque studio_ready=true
+  //   VITE_FEATURE_BRIEF_ESTUDIO === 'off' → off global sin deploy
+  const briefEstudioFeatureFlag = useMemo(() => {
+    try {
+      const envVal = (import.meta.env as any)?.VITE_FEATURE_BRIEF_ESTUDIO;
+      if (typeof envVal === 'string' && envVal.trim().toLowerCase() === 'off') return false;
+    } catch { /* no env */ }
+    try {
+      const lsVal = typeof window !== 'undefined' ? window.localStorage?.getItem('FEATURE_BRIEF_ESTUDIO') : null;
+      if (typeof lsVal === 'string' && lsVal.trim().toLowerCase() === 'off') return false;
+    } catch { /* no ls */ }
+    return true;
+  }, []);
+
+  interface StudioAssetsShape {
+    studio_ready: boolean;
+    actors: Array<{ id: string; source: string; name: string | null; reference_images: string[]; persona_tags: string[]; is_primary: boolean }>;
+    voice: { id: string; source: string; voice_id: string | null; sample_url: string | null; preset_key: string | null } | null;
+    featured_products: Array<{ id: string; shopify_product_id: string; priority: number }>;
+    music: { moods: string[]; keywords: string | null } | null;
+  }
+  const [studioAssets, setStudioAssets] = useState<StudioAssetsShape | null>(null);
+  const [studioDialogOpen, setStudioDialogOpen] = useState(false);
+  const [studioBannerDismissed, setStudioBannerDismissed] = useState(false);
+
+  useEffect(() => {
+    if (!briefEstudioFeatureFlag || !clientId) { setStudioAssets(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await callApi(
+          `brief-estudio/get?client_id=${encodeURIComponent(clientId)}`,
+          { method: 'GET' },
+        );
+        if (cancelled) return;
+        if (error || !data) { setStudioAssets(null); return; }
+        setStudioAssets({
+          studio_ready: Boolean(data.studio_ready),
+          actors: Array.isArray(data.actors) ? data.actors : [],
+          voice: data.voice || null,
+          featured_products: Array.isArray(data.featured_products) ? data.featured_products : [],
+          music: data.music || null,
+        });
+      } catch { if (!cancelled) setStudioAssets(null); }
+    })();
+    return () => { cancelled = true; };
+  }, [clientId, briefEstudioFeatureFlag]);
+
+  const isStudioMode = Boolean(briefEstudioFeatureFlag && studioAssets?.studio_ready);
+  // Mood key: primer mood configurado por el cliente en Brief Estudio.
+  const studioMoodKey = studioAssets?.music?.moods?.[0] || null;
+
+  // Productos destacados hidratados (título/imagen) — se cargan bajo demanda
+  // cuando el wizard llega a CreativeFocusStep. Lazy para no golpear Shopify
+  // en clientes que no abren el wizard.
+  const [studioFeaturedProducts, setStudioFeaturedProducts] = useState<ShopifyProduct[] | null>(null);
+  useEffect(() => {
+    if (!isStudioMode || !studioAssets || studioFeaturedProducts !== null) return;
+    if (studioAssets.featured_products.length === 0) { setStudioFeaturedProducts([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: conn } = await supabase
+          .from('platform_connections')
+          .select('id')
+          .eq('client_id', clientId)
+          .eq('platform', 'shopify')
+          .limit(1)
+          .maybeSingle();
+        if (!conn?.id) { if (!cancelled) setStudioFeaturedProducts([]); return; }
+        const { data } = await callApi('fetch-shopify-products', { body: { connectionId: conn.id } });
+        if (cancelled) return;
+        const allProducts: any[] = data?.products || [];
+        const featuredIds = new Set(studioAssets.featured_products.map((f) => String(f.shopify_product_id)));
+        const picked = allProducts
+          .filter((p: any) => featuredIds.has(String(p.id)))
+          .map((p: any) => ({
+            id: String(p.id),
+            title: p.title,
+            image: p.variants?.[0]?.image_url || p.image || '',
+            price: Number(p.variants?.[0]?.price) || 0,
+            product_type: p.product_type || '',
+          }));
+        setStudioFeaturedProducts(picked);
+      } catch { if (!cancelled) setStudioFeaturedProducts([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [isStudioMode, studioAssets, clientId, studioFeaturedProducts]);
+
+  // Preselect primer producto destacado cuando el wizard llega a la fase de
+  // enfoque y studio_mode está activo. Solo lo hace si el usuario aún no
+  // eligió uno para no sobrescribir selecciones manuales.
+  useEffect(() => {
+    if (!isStudioMode) return;
+    if (selectedProduct) return;
+    if (!studioFeaturedProducts || studioFeaturedProducts.length === 0) return;
+    setSelectedProduct(studioFeaturedProducts[0]);
+    setFocusType('product');
+  }, [isStudioMode, studioFeaturedProducts, selectedProduct]);
+
   // Ad fields (multi-slot)
   const [headlines, setHeadlines] = useState<string[]>(['']);
   const [primaryTexts, setPrimaryTexts] = useState<string[]>(['']);
@@ -4605,7 +4776,18 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           );
 
           const { data: briefData, error: briefErr } = await callApi('generate-brief-visual', {
-            body: { clientId, formato: wantVideo ? 'video' : 'static', angulo: angleValue, variacionElegida, assetUrls: productAssets, productData, funnelStage },
+            body: {
+              clientId,
+              formato: wantVideo ? 'video' : 'static',
+              angulo: angleValue,
+              variacionElegida,
+              assetUrls: productAssets,
+              productData,
+              funnelStage,
+              // Brief Estudio — Etapa 5
+              studio_mode: isStudioMode || undefined,
+              mood_key: isStudioMode ? studioMoodKey || undefined : undefined,
+            },
           });
 
           if (briefErr || !briefData?.prompt_generacion) {
@@ -4637,6 +4819,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                 aspectRatio: '9:16',
                 angulo: angleValue,
                 funnelStage,
+                // Brief Estudio — Etapa 5
+                studio_mode: isStudioMode || undefined,
+                mood_key: isStudioMode ? studioMoodKey || undefined : undefined,
               },
               timeoutMs: 300_000,
             });
@@ -4682,7 +4867,16 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           }
 
           const { data: imgData, error: imgErr } = await callApi('generate-image', {
-            body: { clientId, promptGeneracion: briefData.prompt_generacion, fotoBaseUrl: fotoBase, engine: 'imagen', formato: 'square' },
+            body: {
+              clientId,
+              promptGeneracion: briefData.prompt_generacion,
+              fotoBaseUrl: fotoBase,
+              engine: 'imagen',
+              formato: 'square',
+              // Brief Estudio — Etapa 5
+              studio_mode: isStudioMode || undefined,
+              mood_key: isStudioMode ? studioMoodKey || undefined : undefined,
+            },
           });
 
           if (imgErr) {
@@ -5119,8 +5313,21 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         <Button variant="ghost" size="icon" aria-label="Volver" onClick={wizardStarted ? () => { if (stepIndex === 0) { setWizardStarted(false); } else { goPrev(); } } : handleLeaveAttempt} className="h-8 w-8">
           <ArrowLeft className="w-4 h-4" />
         </Button>
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Crear Campaña</h2>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-2xl font-bold tracking-tight">Crear Campaña</h2>
+            {isStudioMode && (
+              <button
+                type="button"
+                onClick={() => setStudioDialogOpen(true)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-primary/10 text-primary border border-primary/25 hover:bg-primary/15 transition-colors"
+                title="Ver qué hace el Modo Estudio"
+              >
+                <Sparkles className="w-3 h-3" />
+                Modo Estudio activo
+              </button>
+            )}
+          </div>
           <p className="text-muted-foreground text-sm">
             {wizardStarted
               ? `Paso ${stepIndex + 1} de ${steps.length}`
@@ -5128,6 +5335,61 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           </p>
         </div>
       </div>
+
+      {/* Modo Estudio — explanation dialog */}
+      <Dialog open={studioDialogOpen} onOpenChange={setStudioDialogOpen}>
+        <DialogContent>
+          <div className="space-y-3">
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" /> Modo Estudio
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Steve va a usar automáticamente los assets que configuraste en el Brief Estudio:
+            </p>
+            <ul className="text-sm space-y-1.5 list-disc pl-5">
+              <li><strong>Actor oficial</strong> de la marca en las escenas con personas.</li>
+              <li><strong>Voz clonada o preset</strong> cuando el anuncio lleva narración.</li>
+              <li><strong>Productos destacados</strong> — aparecen primero en el paso de enfoque.</li>
+              <li><strong>Mood musical</strong> — track seleccionado según ángulo y humor de tu marca.</li>
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              Al editar el Brief Estudio, los anuncios ya publicados no se ven afectados — cada anuncio guarda un snapshot inmutable de los assets usados.
+            </p>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="outline" size="sm" onClick={() => setStudioDialogOpen(false)}>Cerrar</Button>
+              <Button size="sm" onClick={() => { setStudioDialogOpen(false); window.location.href = '/client-portal?tab=brief_estudio'; }}>
+                Ir al Brief Estudio
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Partial Brief Estudio banner — shows when some assets exist but studio_ready=false */}
+      {!isStudioMode && studioAssets && !studioBannerDismissed && briefEstudioFeatureFlag && (
+        (studioAssets.actors.length > 0 ||
+          !!studioAssets.voice ||
+          studioAssets.featured_products.length > 0 ||
+          (studioAssets.music?.moods?.length ?? 0) > 0) && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-start gap-3">
+            <Sparkles className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+            <div className="flex-1 text-xs">
+              <p className="font-semibold text-foreground">Activá el Modo Estudio</p>
+              <p className="text-muted-foreground mt-0.5">
+                Generá anuncios con tu actor, voz y música oficiales. Te falta completar algunos pasos del Brief Estudio.
+              </p>
+            </div>
+            <div className="flex gap-1 shrink-0">
+              <Button size="sm" variant="default" className="h-7 text-[11px]" onClick={() => { window.location.href = '/client-portal?tab=brief_estudio'; }}>
+                Completar
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setStudioBannerDismissed(true)} aria-label="Cerrar">
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+        )
+      )}
 
       {/* Pre-wizard: Level selector + "Steve configura todo" shortcut */}
       {!wizardStarted && (
@@ -5498,6 +5760,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   setFocusType={setFocusType}
                   selectedProduct={selectedProduct}
                   setSelectedProduct={setSelectedProduct}
+                  studioProducts={studioFeaturedProducts}
+                  isStudioMode={isStudioMode}
                 />
               )}
 
@@ -5565,6 +5829,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                     productContext={focusType === 'product' && selectedProduct ? `Anuncio para producto "${selectedProduct.title}" (${selectedProduct.product_type || 'general'}). Ángulo: ${selectedAngle || 'general'}. Genera una imagen publicitaria profesional para Meta Ads.` : undefined}
                     focusType={focusType}
                     selectedProduct={selectedProduct}
+                    isStudioMode={isStudioMode}
+                    studioMoodKey={studioMoodKey}
                   />
                   {(primaryTexts[0] || headlines[0] || images[0]) && (
                     <PreviewPanel

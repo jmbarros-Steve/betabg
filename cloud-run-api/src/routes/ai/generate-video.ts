@@ -2,6 +2,12 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { loadKnowledge } from '../../lib/knowledge-loader.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  loadStudioAssets,
+  buildAssetSnapshot,
+  type StudioAssets,
+} from '../../lib/brief-estudio-loader.js';
+import { pickTrackForAngleAndMood, type MusicMood } from '../../lib/music-library.js';
 
 // Google Veo 3.1 Preview (standard — max quality) via Gemini Developer API.
 // Same GEMINI_API_KEY as generate-image.ts (Imagen 4 Fast). Pricing: $0.40/sec
@@ -231,9 +237,28 @@ export async function generateVideo(c: Context) {
       engine,
       angulo,
       funnelStage,
+      // Brief Estudio — Etapa 5
+      studio_mode: rawStudioMode,
+      mood_key: rawMoodKey,
     } = await c.req.json();
 
     const supabase = getSupabaseAdmin();
+    const studioMode = rawStudioMode === true;
+    const moodKey: string | null =
+      typeof rawMoodKey === 'string' ? rawMoodKey.trim().slice(0, 32) : null;
+
+    // Brief Estudio: si studio_mode=true, cargamos assets del cliente una vez
+    // y los usamos para enriquecer refs (actor + primer producto) y seleccionar
+    // un track musical sugerido para el post-proceso.
+    let studioAssets: StudioAssets | null = null;
+    if (studioMode && clientId) {
+      try {
+        studioAssets = await loadStudioAssets(supabase, clientId);
+      } catch (err: any) {
+        console.warn('[generate-video][studio] loadStudioAssets failed:', err?.message);
+        studioAssets = null;
+      }
+    }
 
     // Resolve engine. Default path = auto-select based on creative angle (the
     // client never sees Veo/Runway — Steve picks). Admin override: if the body
@@ -279,7 +304,47 @@ export async function generateVideo(c: Context) {
     // IMPROVEMENT #1 + #5: image-to-video is now effectively mandatory whenever
     // the client has a catalog — we fetch up to 3 product photos automatically,
     // stopping Veo from inventing garbage on pure text-to-video.
-    const referenceUrls = await resolveReferenceImageUrls(supabase, clientId, fotoBaseUrls, fotoBaseUrl);
+    //
+    // Brief Estudio: if studio_mode=true and the caller did not pass explicit
+    // fotoBaseUrls, prepend Brief Estudio assets (first featured product +
+    // primary actor image) so Veo/Runway anchor to the brand's chosen visuals.
+    let mergedFotoBaseUrls: string[] | undefined = fotoBaseUrls;
+    if (studioMode && studioAssets) {
+      const providedAny =
+        (Array.isArray(fotoBaseUrls) && fotoBaseUrls.length > 0) ||
+        (typeof fotoBaseUrl === 'string' && fotoBaseUrl.trim().length > 0);
+      if (!providedAny) {
+        const studioRefs: string[] = [];
+        const firstProductImage = studioAssets.featured_products?.[0]?.image_url;
+        if (firstProductImage) studioRefs.push(firstProductImage);
+        const actorImage = studioAssets.primary_actor?.reference_images?.[0];
+        if (actorImage) studioRefs.push(actorImage);
+        if (studioRefs.length > 0) {
+          mergedFotoBaseUrls = studioRefs;
+          console.log(
+            `[generate-video][studio] Using Brief Estudio refs (${studioRefs.length}): first product + actor`,
+          );
+        }
+      }
+    }
+    const referenceUrls = await resolveReferenceImageUrls(supabase, clientId, mergedFotoBaseUrls, fotoBaseUrl);
+
+    // Brief Estudio: auto-pick a music track seed based on angulo + mood_key.
+    // This does NOT generate audio here — generate-video stays focused on
+    // video generation. The track id flows through to asset_snapshot so a
+    // later FFmpeg merge step (phase 2) can pull the track.
+    let studioMusicTrackId: string | null = null;
+    if (studioMode && moodKey && angulo) {
+      try {
+        const track = pickTrackForAngleAndMood(String(angulo), moodKey as MusicMood);
+        studioMusicTrackId = track?.id || null;
+        if (studioMusicTrackId) {
+          console.log(`[generate-video][studio] picked music track: ${studioMusicTrackId} (mood=${moodKey})`);
+        }
+      } catch (err: any) {
+        console.warn('[generate-video][studio] music pick failed:', err?.message);
+      }
+    }
 
     // Branch on engine. Runway uses Replicate, Veo uses Gemini Developer API.
     if (engineChoice === 'runway') {
@@ -290,6 +355,10 @@ export async function generateVideo(c: Context) {
         referenceUrls,
         finalAspect,
         angulo,
+        studioMode,
+        studioAssets,
+        studioMusicTrackId,
+        moodKey,
       });
     }
 
@@ -465,6 +534,22 @@ export async function generateVideo(c: Context) {
             { asset_url: assetUrl, estado: 'listo', formato: 'video' },
             { engine: 'veo', template: deriveTemplate(angulo), angulo: angulo || null },
           );
+          // Brief Estudio — Etapa 5: snapshot inmutable de los assets usados.
+          if (studioMode && studioAssets) {
+            try {
+              const snapshot = buildAssetSnapshot(studioAssets, {
+                mood_key: moodKey ?? null,
+                music_track_id: studioMusicTrackId ?? null,
+                featured_product_index: 0,
+              });
+              await supabase
+                .from('ad_creatives')
+                .update({ asset_snapshot: snapshot })
+                .eq('id', creativeId);
+            } catch (snapErr: any) {
+              console.warn('[generate-video:veo][studio] asset_snapshot failed:', snapErr?.message);
+            }
+          }
         }
 
         return c.json({
@@ -475,6 +560,8 @@ export async function generateVideo(c: Context) {
           asset_url: assetUrl,
           duration_seconds: DEFAULT_DURATION_SEC,
           generation_attempts: attempts,
+          studio_mode: studioMode || undefined,
+          music_track_id: studioMusicTrackId || undefined,
         });
       } catch (pollErr: any) {
         console.warn(`[generate-video] poll error attempt ${attempts}:`, pollErr?.message);
@@ -491,6 +578,8 @@ export async function generateVideo(c: Context) {
       status: 'generando',
       engine: 'veo',
       message: 'El video se sigue generando. Reintenta en 1-2 min.',
+      studio_mode: studioMode || undefined,
+      music_track_id: studioMusicTrackId || undefined,
     });
 
   } catch (err: any) {
@@ -607,9 +696,24 @@ async function runGenerateRunway(
     referenceUrls: string[];
     finalAspect: AspectRatio;
     angulo?: string;
+    studioMode?: boolean;
+    studioAssets?: StudioAssets | null;
+    studioMusicTrackId?: string | null;
+    moodKey?: string | null;
   },
 ) {
-  const { clientId, creativeId, promptGeneracion, referenceUrls, finalAspect, angulo } = args;
+  const {
+    clientId,
+    creativeId,
+    promptGeneracion,
+    referenceUrls,
+    finalAspect,
+    angulo,
+    studioMode,
+    studioAssets,
+    studioMusicTrackId,
+    moodKey,
+  } = args;
 
   const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
   if (!REPLICATE_API_KEY) {
@@ -764,6 +868,22 @@ async function runGenerateRunway(
       { asset_url: assetUrl, estado: 'listo', formato: 'video' },
       { engine: 'runway', template: deriveTemplate(angulo), angulo: angulo || null },
     );
+    // Brief Estudio — Etapa 5: snapshot inmutable de los assets usados.
+    if (studioMode && studioAssets) {
+      try {
+        const snapshot = buildAssetSnapshot(studioAssets, {
+          mood_key: moodKey ?? null,
+          music_track_id: studioMusicTrackId ?? null,
+          featured_product_index: 0,
+        });
+        await supabase
+          .from('ad_creatives')
+          .update({ asset_snapshot: snapshot })
+          .eq('id', creativeId);
+      } catch (snapErr: any) {
+        console.warn('[generate-video:runway][studio] asset_snapshot failed:', snapErr?.message);
+      }
+    }
   }
 
   return c.json({
@@ -774,5 +894,7 @@ async function runGenerateRunway(
     asset_url: assetUrl,
     duration_seconds: RUNWAY_DURATION_SEC,
     generation_attempts: attempts,
+    studio_mode: studioMode || undefined,
+    music_track_id: studioMusicTrackId || undefined,
   });
 }
