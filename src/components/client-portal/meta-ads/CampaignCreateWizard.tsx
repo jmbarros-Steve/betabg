@@ -1749,6 +1749,87 @@ function CreativeFocusStep({
 type MediaTab = 'upload' | 'ai-image' | 'ai-video' | 'gallery' | 'products' | 'url';
 type AspectRatio = '1:1' | '9:16' | '16:9';
 
+// Video engine toggle (matches the Gemini/Flux pattern in the ai-image tab).
+// Veo = default (30 credits, 8s, Gemini API). Runway = premium (50 credits, 10s,
+// Gen-4 Turbo via Replicate, better motion coherence).
+type VideoEngine = 'veo' | 'runway';
+
+// Hardcoded video template keys. Each template generates a tight, Veo-optimized
+// prompt (300-500 chars, finished product as hero) from a handful of placeholders.
+// `custom` bypasses the template and uses whatever the user types in the textarea
+// directly (or the Claude-generated brief in the auto-gen flow).
+type VideoTemplateKey = 'hero_shot' | 'lifestyle_ugc' | 'unboxing' | 'product_reveal' | 'before_after' | 'custom';
+
+interface VideoTemplateDef {
+  key: VideoTemplateKey;
+  label: string;
+  description: string;
+  build: (args: { productName: string; productMaterial: string; brand: string; mood: string }) => string;
+}
+
+// Each builder outputs a tight 5-layer prompt (SUBJECT+ACTION, SCENE+LIGHT,
+// CAMERA+STYLE, PRODUCT EMPHASIS, AUDIO). Target ≈400-500 chars. Veo saturates
+// past 800 — we stay safely under.
+const VIDEO_TEMPLATES: Record<VideoTemplateKey, VideoTemplateDef> = {
+  hero_shot: {
+    key: 'hero_shot',
+    label: 'Hero Shot',
+    description: 'Producto rotando en pedestal, studio',
+    build: ({ productName, productMaterial, brand, mood }) => {
+      const subject = productName || 'the product';
+      const material = productMaterial ? `, ${productMaterial}` : '';
+      const moodTxt = mood || 'warm earth-tone';
+      return `Cinematic 8-second hero shot of a finished ${subject}${material}${brand ? ` from ${brand}` : ''} on a dark charcoal concrete pedestal. Slow 360° rotation reveals surface detail, texture and finish. Dramatic key light from above right, rim light behind outlines the silhouette, soft fill on the shadow side. Macro 100mm lens, f/4, studio black background. ${moodTxt} color grade, rich shadows. Camera pans slowly around product; product fills frame for 7 of 8 seconds. Shot on Hasselblad medium format. Audio: deep ambient low drone, single crystalline piano note at second 2, subtle product-surface tap at second 6. No dialogue. 8-second total duration.`;
+    },
+  },
+  lifestyle_ugc: {
+    key: 'lifestyle_ugc',
+    label: 'Lifestyle UGC',
+    description: 'Persona usando el producto, iPhone handheld',
+    build: ({ productName, productMaterial, brand, mood }) => {
+      const subject = productName || 'the product';
+      const material = productMaterial ? ` (${productMaterial})` : '';
+      return `8-second iPhone handheld UGC-style clip of a person in their late 20s naturally using a ${subject}${material}${brand ? ` by ${brand}` : ''} in a real home setting — kitchen counter with soft morning light from a window. Slight camera shake, casual framing waist-up. Product is clearly visible and centered for at least 4 of 8 seconds; close-up insert of the product in use at second 5. ${mood || 'Natural golden-hour'} color tone, unfiltered Instagram reel look, iPhone 15 Pro Main lens. Audio: soft kitchen ambience, quiet indie-pop track, one spontaneous "mmm" at second 6. No dialogue. 8-second total duration.`;
+    },
+  },
+  unboxing: {
+    key: 'unboxing',
+    label: 'Unboxing',
+    description: 'Manos abriendo packaging, macro top-down',
+    build: ({ productName, productMaterial, brand, mood }) => {
+      const subject = productName || 'the product';
+      const material = productMaterial ? `, ${productMaterial}` : '';
+      return `8-second top-down macro unboxing of a ${brand ? `${brand} ` : ''}premium package. Hands slowly lift the lid, fold tissue paper aside, and reveal the finished ${subject}${material} nestled inside for the final 4 of 8 seconds. Soft overhead diffused daylight, matte cream-colored table surface, subtle brand tissue paper texture. Shot on Canon R5 100mm macro lens, f/5.6, shallow depth of field, ${mood || 'clean warm cinematic'} color grade. Product visible and in sharp focus from second 4 onwards; slow push-in reveal. Audio: quiet tissue paper crinkle, single soft piano chord on the reveal at second 5, gentle ambient room tone. No dialogue. 8-second total duration.`;
+    },
+  },
+  product_reveal: {
+    key: 'product_reveal',
+    label: 'Product Reveal',
+    description: 'Fade-in dramático desde negro',
+    build: ({ productName, productMaterial, brand, mood }) => {
+      const subject = productName || 'the product';
+      const material = productMaterial ? `, ${productMaterial}` : '';
+      return `Cinematic 8-second product reveal. Starts in pitch black; at second 1 a single spotlight fades up from above revealing the finished ${subject}${material}${brand ? ` by ${brand}` : ''} centered on a reflective black surface. Light intensifies and a second rim-light kicks in from behind at second 3, hero-lighting the silhouette. Camera slowly pushes in from medium to close-up over the full 8 seconds. Product fills frame for 6 of 8 seconds. ${mood || 'Deep cinematic teal-and-orange'} color grade, high contrast, macro 85mm lens, f/2.8. Shot on ARRI Alexa. Audio: low deep drone builds from silence, single orchestral swell at second 3, soft bass thump at second 7. No dialogue. 8-second total duration.`;
+    },
+  },
+  before_after: {
+    key: 'before_after',
+    label: 'Before / After',
+    description: 'Split-screen o cut dramático a los 4s',
+    build: ({ productName, productMaterial, brand, mood }) => {
+      const subject = productName || 'the product';
+      const material = productMaterial ? ` (${productMaterial})` : '';
+      return `8-second before/after comparison. Seconds 0-4: the "before" state — dull, monochrome, low-contrast scene of the problem context (cluttered, flat-lit, desaturated). Hard cut at second 4 to the "after" state featuring the finished ${subject}${material}${brand ? ` by ${brand}` : ''} — vibrant, high-contrast, sharp studio light, clean composition. Camera locked-off medium shot throughout for clarity. Product clearly visible and sharp for all 4 "after" seconds. ${mood || 'Before: desaturated grey; After: vivid warm cinematic'} color grade. Shot on Sony FX6, 50mm f/2.8. Audio: muffled ambient before, sharp snare hit on cut at second 4, upbeat beat kicks in after. No dialogue. 8-second total duration.`;
+    },
+  },
+  custom: {
+    key: 'custom',
+    label: 'Custom',
+    description: 'Tu prompt manual (o el de Steve AI)',
+    build: () => '',
+  },
+};
+
 function AdFormMultiSlot({
   clientId,
   adSetFormat,
@@ -1795,6 +1876,10 @@ function AdFormMultiSlot({
   // Engine selector: 'imagen' = Gemini 2.5 Flash (fast, 2 credits), 'flux' = Flux
   // Kontext/1.1 Pro via Replicate (5 credits, ~2× better realism for product shots).
   const [imageEngine, setImageEngine] = useState<'imagen' | 'flux'>('imagen');
+  // Video engine: 'veo' (default, 30 credits, 8s) or 'runway' (premium, 50 credits, 10s).
+  const [videoEngine, setVideoEngine] = useState<VideoEngine>('veo');
+  // Video template: preselects a tight prompt shape. 'custom' = user's own textarea text.
+  const [videoTemplate, setVideoTemplate] = useState<VideoTemplateKey>('hero_shot');
   const [galleryAssets, setGalleryAssets] = useState<Array<{ id: string; url: string; tipo: string }>>([]);
   const [loadingGallery, setLoadingGallery] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -2219,35 +2304,129 @@ function AdFormMultiSlot({
 
         {mediaTab === 'ai-video' && (
           <div className="space-y-2">
+            {/* Template chips — pick a video structure. "Custom" falls back to the
+                user's textarea text (or Steve AI auto-gen). */}
+            <div className="space-y-1">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Estilo de video</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(Object.values(VIDEO_TEMPLATES) as VideoTemplateDef[]).map((tpl) => {
+                  const active = videoTemplate === tpl.key;
+                  return (
+                    <button
+                      key={tpl.key}
+                      type="button"
+                      onClick={() => setVideoTemplate(tpl.key)}
+                      title={tpl.description}
+                      className={`px-2.5 py-1 rounded-full text-[10px] border transition-all ${
+                        active
+                          ? 'border-green-500 bg-green-100 text-green-900 ring-1 ring-green-500/30 font-semibold'
+                          : 'border-border hover:border-green-400 text-muted-foreground'
+                      }`}
+                    >
+                      {tpl.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {videoTemplate !== 'custom' && (
+                <p className="text-[9px] text-muted-foreground italic">
+                  {VIDEO_TEMPLATES[videoTemplate].description} — el prompt se construye del template. El textarea es opcional (mood/tono).
+                </p>
+              )}
+            </div>
+
+            {/* Engine toggle: Veo default / Runway premium. Mirrors the Gemini/Flux
+                pattern in ai-image tab. */}
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setVideoEngine('veo')}
+                className={`flex items-center gap-2 p-2 rounded-md border text-left transition-all ${
+                  videoEngine === 'veo' ? 'border-green-500 bg-green-50 ring-1 ring-green-500/20' : 'border-border hover:border-primary/30'
+                }`}
+              >
+                <Video className={`w-4 h-4 ${videoEngine === 'veo' ? 'text-green-600' : 'text-muted-foreground'}`} />
+                <div className="leading-tight">
+                  <p className="text-[11px] font-semibold">Veo 3 (default)</p>
+                  <p className="text-[9px] text-muted-foreground">8s · 30 créd · audio nativo</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setVideoEngine('runway')}
+                className={`flex items-center gap-2 p-2 rounded-md border text-left transition-all ${
+                  videoEngine === 'runway' ? 'border-purple-500 bg-purple-50 ring-1 ring-purple-500/20' : 'border-border hover:border-primary/30'
+                }`}
+              >
+                <Sparkles className={`w-4 h-4 ${videoEngine === 'runway' ? 'text-purple-600' : 'text-muted-foreground'}`} />
+                <div className="leading-tight">
+                  <p className="text-[11px] font-semibold">Runway Premium</p>
+                  <p className="text-[9px] text-muted-foreground">10s · 50 créd · Gen-4 Turbo</p>
+                </div>
+              </button>
+            </div>
+
             <Textarea
               value={aiPrompt}
               onChange={(e) => setAiPrompt(e.target.value)}
-              placeholder={`Describe el video ${activeImageSlot + 1}${selectedAngle ? ` (ángulo: ${selectedAngle})` : ''}. Ej: "mujer de 30 usando el producto en una cocina soleada, sonriendo a cámara"`}
+              placeholder={
+                videoTemplate === 'custom'
+                  ? `Describe el video ${activeImageSlot + 1}${selectedAngle ? ` (ángulo: ${selectedAngle})` : ''}. Ej: "mujer de 30 usando el producto en una cocina soleada, sonriendo a cámara"`
+                  : `Opcional — mood/tono extra para el template ${VIDEO_TEMPLATES[videoTemplate].label}. Ej: "cálido, premium, hora dorada"`
+              }
               rows={3}
             />
-            <div className="p-2 bg-green-50 border border-green-300 rounded text-[10px] text-green-900">
-              <Sparkles className="w-3 h-3 inline mr-1 text-green-600" />
-              <strong>Google Veo 3.1</strong> — 8 segundos, 1080p, con audio nativo sincronizado (voz + ambiente + música). 30 créditos por video (~$3.20 USD).
+            <div className={`p-2 border rounded text-[10px] ${videoEngine === 'runway' ? 'bg-purple-50 border-purple-300 text-purple-900' : 'bg-green-50 border-green-300 text-green-900'}`}>
+              <Sparkles className={`w-3 h-3 inline mr-1 ${videoEngine === 'runway' ? 'text-purple-600' : 'text-green-600'}`} />
+              {videoEngine === 'runway' ? (
+                <><strong>Runway Gen-4 Turbo</strong> — 10 segundos, image-to-video, mejor coherencia de movimiento. 50 créditos (~$0.50 USD).</>
+              ) : (
+                <><strong>Google Veo 3.1</strong> — 8 segundos, 1080p, con audio nativo sincronizado (voz + ambiente + música). 30 créditos por video (~$3.20 USD).</>
+              )}
             </div>
             <Button
               onClick={async () => {
-                if (!aiPrompt.trim()) { toast.error('Describe qué video quieres'); return; }
-                // Cost warning — 30 credits is ~15 AI images. Let the user
-                // confirm before spending since video is 15× more expensive.
-                if (!window.confirm('Este video cuesta 30 créditos (~$3.20 USD, equivalente a 15 imágenes). ¿Generar ahora?')) return;
+                // Build the prompt. Custom = use what the user typed. Template =
+                // interpolate the product metadata into the template builder and
+                // optionally append the user's mood text as extra flavor.
+                let finalPrompt = aiPrompt.trim();
+                if (videoTemplate !== 'custom') {
+                  const productName = selectedProduct?.title || '';
+                  const productMaterial = selectedProduct?.product_type || '';
+                  const builtPrompt = VIDEO_TEMPLATES[videoTemplate].build({
+                    productName,
+                    productMaterial,
+                    brand: '',
+                    mood: finalPrompt,
+                  });
+                  finalPrompt = builtPrompt;
+                }
+                if (!finalPrompt) { toast.error('Describe qué video quieres (o elegí un template distinto a Custom)'); return; }
+                // Cost warning — Veo 30 credits, Runway 50 credits. Both ~15× the cost
+                // of an image so explicit confirmation is mandatory.
+                const costStr = videoEngine === 'runway' ? '50 créditos (~$0.50 USD)' : '30 créditos (~$3.20 USD)';
+                const engineLabel = videoEngine === 'runway' ? 'Runway Gen-4 Turbo' : 'Veo 3';
+                if (!window.confirm(`Este video (${engineLabel}) cuesta ${costStr}. ¿Generar ahora?`)) return;
 
                 setGeneratingImage(true);
-                const aspectForVeo = aspectRatio === '16:9' ? '16:9' : '9:16'; // Veo 3.1 only supports 16:9 / 9:16
+                const aspectForVeo = aspectRatio === '16:9' ? '16:9' : '9:16'; // Veo 3.1 only supports 16:9 / 9:16; Runway also uses same
                 try {
+                  // Build the reference image array. Single selected product = 1 ref;
+                  // backend will auto-augment with Shopify catalog if we send less than 3.
+                  const fotoBaseUrls = focusType === 'product' && selectedProduct?.image
+                    ? [selectedProduct.image]
+                    : undefined;
                   // Backend polls Veo inline up to 4.5 min before handing off
                   // to client-side polling. callApi default timeout is 90s →
                   // bump to 5 min so the browser doesn't abort mid-generation.
                   const { data, error } = await callApi('generate-video', {
                     body: {
                       clientId,
-                      promptGeneracion: aiPrompt,
-                      fotoBaseUrl: focusType === 'product' && selectedProduct?.image ? selectedProduct.image : undefined,
+                      promptGeneracion: finalPrompt,
+                      fotoBaseUrl: fotoBaseUrls?.[0], // legacy compat
+                      fotoBaseUrls,
                       aspectRatio: aspectForVeo,
+                      engine: videoEngine,
                     },
                     timeoutMs: 300_000,
                   });
@@ -2303,10 +2482,14 @@ function AdFormMultiSlot({
                   setGeneratingImage(false);
                 }
               }}
-              disabled={generatingImage || !aiPrompt.trim()}
-              className="w-full bg-green-600 hover:bg-green-700"
+              disabled={generatingImage || (videoTemplate === 'custom' && !aiPrompt.trim())}
+              className={`w-full ${videoEngine === 'runway' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700'}`}
             >
-              {generatingImage ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Generando con Veo... (1-3 min)</> : <><Video className="w-3 h-3 mr-1" />Generar video con Veo 3</>}
+              {generatingImage ? (
+                <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Generando con {videoEngine === 'runway' ? 'Runway' : 'Veo'}... (1-3 min)</>
+              ) : (
+                <><Video className="w-3 h-3 mr-1" />Generar video con {videoEngine === 'runway' ? 'Runway Gen-4' : 'Veo 3'}</>
+              )}
             </Button>
           </div>
         )}
@@ -4513,11 +4696,17 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           if (wantVideo) {
             // Same timeout bump as the single-slot flow — backend holds up
             // to 4.5 min for Veo before handing off to client-side polling.
+            // NOTE: auto-gen stays on Veo (default engine) and doesn't expose
+            // a template picker. Users who want Runway / template-specific prompts
+            // go through the manual ai-video tab. Backend adds Shopify catalog
+            // fallback automatically when fotoBase is absent.
+            const fotoBaseUrlsAutoGen = fotoBase ? [fotoBase] : undefined;
             const { data: vidData, error: vidErr } = await callApi('generate-video', {
               body: {
                 clientId,
                 promptGeneracion: briefData.prompt_generacion,
                 fotoBaseUrl: fotoBase,
+                fotoBaseUrls: fotoBaseUrlsAutoGen,
                 aspectRatio: '9:16',
               },
               timeoutMs: 300_000,
