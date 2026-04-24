@@ -48,8 +48,12 @@ export async function callApi<T = any>(
       headers['Authorization'] = `Bearer ${session.access_token}`;
     }
 
+    // Effective timeout — capture once so the 401 retry below uses the SAME
+    // value instead of falling back to the 90s default (used to break long
+    // calls like video generation where callers pass timeoutMs=300000).
+    const effectiveTimeout = timeoutMs || 90000;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs || 90000);
+    const timeoutId = setTimeout(() => controller.abort(), effectiveTimeout);
 
     const response = await fetch(`${API_URL}/api/${functionName}`, {
       method,
@@ -69,7 +73,7 @@ export async function callApi<T = any>(
       if (refreshed?.session?.access_token) {
         headers['Authorization'] = `Bearer ${refreshed.session.access_token}`;
         const retryController = new AbortController();
-        const retryTimeout = setTimeout(() => retryController.abort(), 90000);
+        const retryTimeout = setTimeout(() => retryController.abort(), effectiveTimeout);
         const retryResponse = await fetch(`${API_URL}/api/${functionName}`, {
           method,
           headers,
