@@ -1574,6 +1574,10 @@ export async function cloneVoice(c: Context) {
 // Model hosted by Meta on Replicate. `melody-large` supports 30s generation.
 // Cost ~ $0.10 per 30s track (20 tracks = $2.00 one-time seed).
 const MUSICGEN_MODEL = 'meta/musicgen';
+// meta/musicgen no es "official model" en Replicate → requiere version hash.
+// Este es el hash estable de la stereo-melody-large (2024). Si Replicate lo
+// deprecara, actualizar aquí o cambiar a 'riffusion/riffusion' como fallback.
+const MUSICGEN_VERSION = '671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb';
 
 // ---- Helpers ---------------------------------------------------------------
 
@@ -1841,10 +1845,10 @@ export async function generateMusicPreviews(c: Context) {
           string | string[]
         >({
           model: MUSICGEN_MODEL,
+          version: MUSICGEN_VERSION,
           input: {
             prompt: track.musicgen_prompt,
             duration: Math.min(Math.max(track.duration_sec, 8), 30),
-            model_version: 'stereo-medium',
             output_format: 'mp3',
             normalization_strategy: 'peak',
           },
