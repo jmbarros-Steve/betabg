@@ -797,11 +797,27 @@ async function handleCreate(
       // per placement (single image, video, carousel, collection). Image+video
       // mix requires AUTOMATIC_FORMAT — using SINGLE_IMAGE forces single-image
       // rendering even with is_dynamic_creative on the adset.
+      //
+      // link_urls[].display_url is the "visible" rendered URL shown under the
+      // headline in Facebook feed (equivalent to link_data.caption in non-DCT
+      // creatives). Meta ref: Graph API AdAssetFeedSpecLinkURL.
+      // Default to the domain of the destination URL when user didn't set one.
+      const rawDisplayLink = typeof display_link === 'string' ? display_link.trim() : '';
+      const derivedDisplay = rawDisplayLink || (() => {
+        try { return new URL(destUrl).hostname.replace(/^www\./, ''); }
+        catch { return ''; }
+      })();
+      const linkUrlObj: Record<string, any> = { website_url: destUrl };
+      if (derivedDisplay) linkUrlObj.display_url = derivedDisplay;
+      if (url_tags && typeof url_tags === 'string' && url_tags.trim()) {
+        linkUrlObj.url_tags = url_tags.trim();
+      }
+
       const assetFeedSpec: Record<string, any> = {
         bodies: uniqueTexts.map((t) => ({ text: t })),
         titles: uniqueHeadlines.map((t) => ({ text: t })),
         call_to_action_types: [cta || 'SHOP_NOW'],
-        link_urls: [{ website_url: destUrl }],
+        link_urls: [linkUrlObj],
         ad_formats: ['AUTOMATIC_FORMAT'],
       };
 
