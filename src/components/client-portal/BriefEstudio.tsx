@@ -90,10 +90,10 @@ interface VoicePreset {
 }
 
 const VOICE_PRESETS: VoicePreset[] = [
-  { key: 'warm_female_es', label: 'Femenina cálida', description: 'Cercana, emocional, buena para lifestyle.' },
-  { key: 'energetic_male_es', label: 'Masculina enérgica', description: 'Dinámica, buena para retail y ofertas.' },
-  { key: 'neutral_female_es', label: 'Femenina neutra', description: 'Profesional, buena para B2B y servicios.' },
-  { key: 'luxury_male_es', label: 'Masculina premium', description: 'Elegante, buena para marcas aspiracionales.' },
+  { key: 'feminine_warm', label: 'Femenina cálida', description: 'Cercana, emocional, buena para lifestyle.' },
+  { key: 'masculine_energetic', label: 'Masculina enérgica', description: 'Dinámica, buena para retail y ofertas.' },
+  { key: 'feminine_neutral', label: 'Femenina neutra', description: 'Profesional, buena para B2B y servicios.' },
+  { key: 'masculine_premium', label: 'Masculina premium', description: 'Elegante, buena para marcas aspiracionales.' },
 ];
 
 const ACTOR_SLOT_LABELS = ['Actor principal', 'Actor casual', 'Actor editorial'];
@@ -198,14 +198,9 @@ export default function BriefEstudio({ clientId }: BriefEstudioProps) {
     };
   }, [clientId]);
 
-  // Section completion flags
+  // Section completion flags. Voice counts as "decided" if cliente eligió
+  // preset con key, clonó voz, o explícitamente eligió 'none'.
   const elencoComplete = actors.length > 0;
-  const vozComplete = !!voice && voice.source !== 'none' && (
-    voice.source === 'none' ||
-    voice.source === 'preset' ? !!voice.preset_key :
-    voice.source === 'xtts_cloned' ? !!voice.sample_url || !!voice.voice_id : false
-  );
-  // Voz especial: "sin voz" también cuenta como decidido
   const vozDecided = !!voice && (
     voice.source === 'none' ||
     (voice.source === 'preset' && !!voice.preset_key) ||
