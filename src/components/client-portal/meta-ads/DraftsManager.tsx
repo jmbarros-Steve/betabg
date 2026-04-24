@@ -595,30 +595,53 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
                       </p>
                     </div>
 
-                    {/* Images (3 slots) */}
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
-                        <ImageIcon className="w-3.5 h-3.5" />
-                        Imágenes ({images.length}/3)
-                      </p>
-                      <div className="grid grid-cols-3 gap-3">
-                        {[0, 1, 2].map((i) => (
-                          <div key={i} className="aspect-square rounded-lg overflow-hidden border-2 border-border">
-                            {images[i] ? (
-                              <SafeImage src={images[i]} className="w-full h-full" />
-                            ) : (
-                              <div className="w-full h-full bg-muted/30 flex flex-col items-center justify-center gap-1.5 p-2">
-                                <Plus className="w-6 h-6 text-muted-foreground/25" />
-                                <span className="text-[11px] text-muted-foreground/50 text-center">
-                                  Imagen {i + 1}
-                                </span>
-                                <span className="text-[9px] text-muted-foreground/40">Pendiente</span>
-                              </div>
-                            )}
+                    {/* Creatives (3 slots) — detects video vs image per slot */}
+                    {(() => {
+                      const isVideo = (u: string) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u);
+                      const videoCount = images.filter((u) => u && isVideo(u)).length;
+                      const imgCount = images.filter((u) => u && !isVideo(u)).length;
+                      const label = videoCount > 0 && imgCount > 0
+                        ? `Creativos (${imgCount} img + ${videoCount} video)`
+                        : videoCount > 0
+                          ? `Videos (${videoCount}/3)`
+                          : `Imágenes (${imgCount}/3)`;
+                      return (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                            <ImageIcon className="w-3.5 h-3.5" />
+                            {label}
+                          </p>
+                          <div className="grid grid-cols-3 gap-3">
+                            {[0, 1, 2].map((i) => {
+                              const url = images[i];
+                              const slotIsVideo = !!url && isVideo(url);
+                              return (
+                                <div key={i} className="aspect-square rounded-lg overflow-hidden border-2 border-border relative">
+                                  {url ? (
+                                    slotIsVideo ? (
+                                      <>
+                                        <video src={url} className="w-full h-full object-cover" muted playsInline />
+                                        <span className="absolute top-1 right-1 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded">VIDEO</span>
+                                      </>
+                                    ) : (
+                                      <SafeImage src={url} className="w-full h-full" />
+                                    )
+                                  ) : (
+                                    <div className="w-full h-full bg-muted/30 flex flex-col items-center justify-center gap-1.5 p-2">
+                                      <Plus className="w-6 h-6 text-muted-foreground/25" />
+                                      <span className="text-[11px] text-muted-foreground/50 text-center">
+                                        Slot {i + 1}
+                                      </span>
+                                      <span className="text-[9px] text-muted-foreground/40">Pendiente</span>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
-                        ))}
-                      </div>
-                    </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Copies (2 slots) */}
                     <div>
