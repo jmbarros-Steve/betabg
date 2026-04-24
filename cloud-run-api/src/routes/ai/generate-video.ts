@@ -96,8 +96,15 @@ export async function generateVideo(c: Context) {
 
     // Optional image-to-video: download fotoBaseUrl and inline as base64 (Veo API
     // doesn't accept public URLs — only bytesBase64Encoded / inlineData).
+    // Guard: foto_recomendada from generate-brief-visual sometimes comes back
+    // as text ('Sin foto disponible') instead of a URL — skip unless it's a
+    // real http(s) URL or we'd crash with 'Failed to parse URL'.
     let imagePart: { inlineData: { mimeType: string; data: string } } | undefined;
-    if (fotoBaseUrl) {
+    const isHttpUrl = typeof fotoBaseUrl === 'string' && /^https?:\/\//i.test(fotoBaseUrl.trim());
+    if (fotoBaseUrl && !isHttpUrl) {
+      console.warn(`[generate-video] fotoBaseUrl is not a URL, skipping image-to-video: "${String(fotoBaseUrl).slice(0, 80)}"`);
+    }
+    if (isHttpUrl) {
       try {
         const imgResp = await fetch(fotoBaseUrl, { signal: AbortSignal.timeout(15_000), redirect: 'follow' });
         if (imgResp.ok) {

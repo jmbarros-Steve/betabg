@@ -123,18 +123,17 @@ Estilo visual: ${brief.visual_style || brief.estilo || 'moderno y limpio'}
 Fotos disponibles del producto: ${photosList || 'No hay fotos'}
 ${shopifyContext}
 
-${formato === 'video' ? `Responde en JSON para VIDEO:
+${formato === 'video' ? `Responde en JSON para VIDEO (motor: Google Veo 3.1, 8 segundos, un solo plano continuo, con audio nativo sincronizado):
 {
   "tipo": "video",
-  "duracion": "15s",
-  "escena_1": {"tiempo": "0-3s", "descripcion": "...", "texto_overlay": "..."},
-  "escena_2": {"tiempo": "3-12s", "descripcion": "...", "texto_overlay": "..."},
-  "escena_3": {"tiempo": "12-15s", "descripcion": "...", "texto_overlay": "..."},
-  "musica_sugerida": "...",
+  "duracion": "8s",
+  "plano": "descripción corta del único plano del video (Veo 3.1 no soporta multi-escena en 8s)",
+  "texto_overlay": "opcional, 1-3 palabras máx",
+  "musica_sugerida": "género + mood (ej: acoustic folk, warm and intimate)",
   "tono": "...",
-  "foto_recomendada": "URL de la foto más adecuada y por qué (o 'Sin foto disponible')",
-  "instruccion_foto": "animar / usar como base / cambiar fondo",
-  "prompt_generacion": "prompt detallado en inglés para Kling AI"
+  "foto_recomendada": "URL http(s) real de foto de producto si existe, o null si no hay — NUNCA escribas 'Sin foto disponible' como string",
+  "instruccion_foto": "image-to-video (preservar el producto literal) / text-to-video (sin foto base)",
+  "prompt_generacion": "prompt cinematográfico en inglés para Veo 3.1 — OBLIGATORIO seguir la estructura de las reglas de abajo"
 }` : `Responde en JSON para IMAGEN:
 {
   "tipo": "imagen",
@@ -161,6 +160,29 @@ ${productDesc
 - Mencionar un entorno REAL y específico (ej: "en una cocina moderna con mesón de mármol" NO "en un fondo limpio").
 - NUNCA usar palabras como "digital art", "illustration", "3D render", "graphic design" — todo debe ser "photograph".
 - Siempre terminar el prompt con: "Ultra-realistic commercial photograph, professional advertising photo shoot, real textures, natural imperfections, shot on Canon EOS R5. No illustrations, no AI artifacts, no plastic-looking skin, no floating objects, no text overlays."
+
+${formato === 'video' ? `
+REGLAS ESPECÍFICAS para prompt_generacion de VIDEO (Veo 3.1 — 8 segundos, 1080p, con audio):
+
+Veo 3.1 rinde 10× mejor con prompts cinematográficos estructurados vs prompts planos tipo "mujer usando el producto". El prompt DEBE incluir estas 8 capas en este orden:
+
+1. SUBJECT — qué/quién está en cámara (describir cara/ropa/objeto con detalle).
+2. ACTION — verbos concretos específicos ("pouring", "unboxing", "stirring", "sliding a finger along"). Evita "sonriendo", "usando".
+3. SCENE / SETTING — dónde + props específicos + hora del día.
+4. CAMERA — elegir UNO: "close-up macro", "medium shot", "over-the-shoulder POV", "slow dolly-in", "handheld phone-style", "overhead flat-lay pan".
+5. LIGHTING — "golden hour from window left", "studio softbox at 45°", "practical kitchen pendants warm 2700K", "overcast diffused daylight".
+6. STYLE — "Canon 50mm f/1.4 look", "16mm film grain", "cinematic teal-and-orange grade", "natural Instagram UGC iPhone look", "Hasselblad medium-format product still".
+7. PACING — "single continuous take, slow pacing" or "snap cuts every 2s". Siempre terminar: "8-second total duration".
+8. AUDIO — ESPECÍFICO y detallado. Ejemplos:
+   - "Audio: soft kitchen ambience, acoustic guitar (warm finger-picking), occasional crockery clinks. No dialogue."
+   - "Audio: upbeat indie-pop beat (120bpm, tambourine), natural street ambience, a woman's voice saying in Spanish '¿Por qué pagar más?' at second 5. Clear lip-sync."
+   - "Audio: soft whirring of pottery wheel, faint acoustic guitar, single breath of concentration at second 4. No music."
+
+Ejemplo de prompt cinematográfico de calidad (replica este nivel de detalle):
+"Cinematic close-up, macro lens, of a ceramist's hands shaping wet clay on a spinning wheel. Hands are weathered, fingernails slightly clay-stained. The clay is forming the base of a stoneware vase — raw earth-tone texture, visible wheel lines. Studio natural light from a tall window on the left creates soft shadows and highlights the water glisten on her fingers. Single continuous slow dolly-in over 8 seconds. Shot on Hasselblad 80mm f/4. Warm earth-tone color grade, shallow depth of field. Audio: soft whirring of the pottery wheel at low RPM, faint acoustic guitar (single guitar warm tones), one concentrated breath at the 5-second mark. No dialogue. 8-second total duration."
+
+NUNCA entregues prompts vagos tipo "persona haciendo cerámica" o "mujer sonriendo en cocina". Eso produce videos mediocres. Sé MUY específico en CADA capa.
+` : ''}
 
 Responde SOLO el JSON sin markdown ni backticks.`;
 

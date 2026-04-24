@@ -4501,7 +4501,14 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             continue;
           }
 
-          const fotoBase = productPhoto || briefData?.foto_recomendada || undefined;
+          // foto_recomendada del brief a veces viene como texto literal
+          // ('Sin foto disponible', 'No existe...') en vez de URL. Solo aceptamos
+          // URLs http/https — si no, dejamos undefined y dejamos que el backend
+          // auto-fetchee de Shopify / genere text-to-video con prompt enriquecido.
+          const isValidUrl = (s: any): s is string =>
+            typeof s === 'string' && /^https?:\/\//i.test(s.trim());
+          const fotoBase = productPhoto
+            || (isValidUrl(briefData?.foto_recomendada) ? briefData.foto_recomendada : undefined);
 
           if (wantVideo) {
             // Same timeout bump as the single-slot flow — backend holds up
