@@ -530,8 +530,11 @@ function SectionElenco({
     }
     setGenerating(true);
 
-    // Try real endpoint first; fall back to mock if 404 (Etapa 2 pendiente)
-    const { data, error } = await callApi<{ actors?: { url: string; name?: string; tags?: string[] }[] }>(
+    // Backend response shape puede ser:
+    // A) { actors: BrandActor[] }                → Etapa 2 real: ya están persistidos en DB
+    // B) { actors: [{ url, name?, tags? }] }     → shape legacy (no usar, conservado por compat)
+    // C) error                                    → 404 = mock | otro = mostrar error
+    const { data, error } = await callApi<{ actors?: (BrandActor | { url: string; name?: string; tags?: string[] })[] }>(
       'brief-estudio/generate-actors',
       {
         method: 'POST',
@@ -540,46 +543,56 @@ function SectionElenco({
       },
     );
 
-    let generated: { url: string; name?: string; tags?: string[] }[] = [];
-
     if (error) {
-      // Fallback mock — Etapa 2 aún no desplegó el endpoint
       const isNotImplemented =
         /404|not found|not implemented|unknown endpoint|cannot\s+post/i.test(error);
-      if (isNotImplemented) {
-        console.warn('[BriefEstudio] generate-actors no disponible, usando mock:', error);
-        generated = [
-          { url: 'https://via.placeholder.com/400x500/9333EA/FFFFFF?text=Actor+1', name: 'Actor principal', tags: suggestedTags },
-          { url: 'https://via.placeholder.com/400x500/2563EB/FFFFFF?text=Actor+2', name: 'Actor casual', tags: suggestedTags },
-          { url: 'https://via.placeholder.com/400x500/DB2777/FFFFFF?text=Actor+3', name: 'Actor editorial', tags: suggestedTags },
-        ];
-        toast.info('Etapa 2 aún no despliega la generación real — mostramos placeholders.');
-      } else {
+      if (!isNotImplemented) {
         setGenerating(false);
         toast.error(`No pudimos generar actores: ${error}`);
         return;
       }
-    } else if (data?.actors?.length) {
-      generated = data.actors;
-    } else {
-      // Empty response fallback
-      generated = [
-        { url: 'https://via.placeholder.com/400x500/9333EA/FFFFFF?text=Actor+1' },
-        { url: 'https://via.placeholder.com/400x500/2563EB/FFFFFF?text=Actor+2' },
-        { url: 'https://via.placeholder.com/400x500/DB2777/FFFFFF?text=Actor+3' },
+      // Fallback mock — Etapa 2 aún no desplegó el endpoint (poco probable ahora)
+      console.warn('[BriefEstudio] generate-actors no disponible, usando mock:', error);
+      const mockActors: BrandActor[] = [
+        { source: 'ai_generated', name: 'Actor principal', reference_images: ['https://via.placeholder.com/400x500/9333EA/FFFFFF?text=Actor+1'], persona_tags: suggestedTags, is_primary: true, sort_order: 0, _key: `gen-${Date.now()}-0` },
+        { source: 'ai_generated', name: 'Actor casual', reference_images: ['https://via.placeholder.com/400x500/2563EB/FFFFFF?text=Actor+2'], persona_tags: suggestedTags, is_primary: false, sort_order: 1, _key: `gen-${Date.now()}-1` },
+        { source: 'ai_generated', name: 'Actor editorial', reference_images: ['https://via.placeholder.com/400x500/DB2777/FFFFFF?text=Actor+3'], persona_tags: suggestedTags, is_primary: false, sort_order: 2, _key: `gen-${Date.now()}-2` },
       ];
+      toast.info('Etapa 2 aún no despliega la generación real — mostramos placeholders.');
+      setActors(mockActors);
+      await persistActors(mockActors);
+      setGenerating(false);
+      return;
     }
 
-    const next: BrandActor[] = generated.slice(0, 3).map((g, idx) => ({
+    // Response OK. Detectar shape A (BrandActor completo) o legacy.
+    const rawActors = data?.actors ?? [];
+    const looksLikeBrandActor = (x: any): x is BrandActor =>
+      x && typeof x === 'object' && Array.isArray(x.reference_images);
+
+    if (rawActors.length > 0 && rawActors.every(looksLikeBrandActor)) {
+      // Shape A: backend ya persistió en DB con las URLs reales. NO re-persistir.
+      const next: BrandActor[] = (rawActors as BrandActor[]).map((a, idx) => ({
+        ...a,
+        _key: `gen-${Date.now()}-${idx}`,
+      }));
+      setActors(next);
+      setGenerating(false);
+      toast.success('Elenco creado');
+      return;
+    }
+
+    // Shape B (legacy): { url, name?, tags? } — transformar y persistir.
+    const legacy = rawActors as { url: string; name?: string; tags?: string[] }[];
+    const next: BrandActor[] = legacy.slice(0, 3).map((g, idx) => ({
       source: 'ai_generated',
       name: g.name ?? ACTOR_SLOT_LABELS[idx] ?? `Actor ${idx + 1}`,
-      reference_images: [g.url],
+      reference_images: g.url ? [g.url] : [],
       persona_tags: g.tags ?? suggestedTags,
       is_primary: idx === 0,
       sort_order: idx,
       _key: `gen-${Date.now()}-${idx}`,
     }));
-
     setActors(next);
     const ok = await persistActors(next);
     setGenerating(false);
