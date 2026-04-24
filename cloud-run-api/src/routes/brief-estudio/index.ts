@@ -19,6 +19,7 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getUserClientIds } from '../../lib/user-scoping.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { runReplicatePrediction, ReplicateError } from '../../lib/replicate.js';
 
 // ----------------------------- Types -----------------------------------------
 
@@ -560,5 +561,714 @@ function extractMusicMoods(
       return ['warm', 'emotional'];
     default:
       return ['neutral', 'modern'];
+  }
+}
+
+// ============================================================================
+// Etapa 2 — Replicate Flux (actores) + XTTS-v2 (voz)
+// ============================================================================
+
+// Replicate models. Kept as constants so they are easy to bump when we upgrade.
+const FLUX_ACTORS_MODEL = 'black-forest-labs/flux-1.1-pro-ultra';
+// XTTS-v2 hosted on Replicate by @lucataco — voice cloning from a single sample.
+const XTTS_V2_MODEL = 'lucataco/xtts-v2';
+
+// Costs. 1 credit = $0.01 for simplicity.
+const FLUX_USD_PER_IMAGE = 0.06;
+const FLUX_CREDITS_PER_IMAGE = Math.round(FLUX_USD_PER_IMAGE * 100);
+const XTTS_USD_PER_GENERATION = 0.003;
+const XTTS_CREDITS_PER_GENERATION = Math.max(1, Math.round(XTTS_USD_PER_GENERATION * 100));
+
+// Rate limit — 10 calls/hour per client_id for the heavy AI endpoints.
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const RATE_LIMIT_MAX_PER_WINDOW = 10;
+
+type Endpoint = 'generate-actors' | 'clone-voice';
+
+async function checkBriefEstudioRateLimit(
+  clientId: string,
+  endpoint: Endpoint,
+): Promise<{ allowed: true } | { allowed: false; retryAfterMin: number }> {
+  const supabase = getSupabaseAdmin();
+  const since = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString();
+  const { data, error } = await supabase
+    .from('brief_estudio_ai_usage')
+    .select('created_at')
+    .eq('client_id', clientId)
+    .eq('endpoint', endpoint)
+    .gte('created_at', since)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    // Fail open — don't block legitimate users because the log table has an issue.
+    console.error('[brief-estudio][rate-limit] query failed, allowing:', error.message);
+    return { allowed: true };
+  }
+
+  const rows = (data ?? []) as Array<{ created_at: string }>;
+  if (rows.length < RATE_LIMIT_MAX_PER_WINDOW) return { allowed: true };
+
+  const oldest = new Date(rows[0].created_at).getTime();
+  const retryAfterMs = oldest + RATE_LIMIT_WINDOW_MS - Date.now();
+  return {
+    allowed: false,
+    retryAfterMin: Math.max(1, Math.ceil(retryAfterMs / 60_000)),
+  };
+}
+
+async function logAiUsage(
+  clientId: string,
+  endpoint: Endpoint,
+  costCredits: number,
+): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.from('brief_estudio_ai_usage').insert({
+    client_id: clientId,
+    endpoint,
+    cost_credits: costCredits,
+  });
+  if (error) {
+    // Non-fatal — usage logging is best-effort.
+    console.error('[brief-estudio][rate-limit] usage insert failed:', error.message);
+  }
+}
+
+/**
+ * Download a URL to Uint8Array with a sensible timeout. Returns null on failure.
+ */
+async function downloadToBytes(url: string, timeoutMs = 30_000): Promise<Uint8Array | null> {
+  try {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), redirect: 'follow' });
+    if (!resp.ok) {
+      console.warn(`[brief-estudio] download failed ${resp.status} ${url.slice(0, 80)}`);
+      return null;
+    }
+    const buf = await resp.arrayBuffer();
+    return new Uint8Array(buf);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn('[brief-estudio] download error:', message);
+    return null;
+  }
+}
+
+/**
+ * Upload bytes to Supabase Storage (bucket `client-assets`) and return the
+ * public URL. Throws on failure.
+ */
+async function uploadToClientAssets(
+  storagePath: string,
+  bytes: Uint8Array,
+  contentType: string,
+  upsert = false,
+): Promise<string> {
+  const supabase = getSupabaseAdmin();
+  const { error: upErr } = await supabase.storage
+    .from('client-assets')
+    .upload(storagePath, bytes, { contentType, upsert });
+  if (upErr) throw new Error(`storage upload failed: ${upErr.message}`);
+  const { data } = supabase.storage.from('client-assets').getPublicUrl(storagePath);
+  return data.publicUrl;
+}
+
+// ---- Prompt construction for Flux actor generation --------------------------
+
+interface PersonaContext {
+  age: string | null;
+  gender: string | null;
+  country: string | null;
+  lifestyle: string | null;
+  tone: string | null;
+  tags: string[];
+}
+
+function extractPersonaContext(
+  personaData: Record<string, unknown> | null | undefined,
+  briefData: Record<string, unknown> | null | undefined,
+): PersonaContext {
+  const age =
+    pickField(personaData, ['age', 'edad', 'age_range', 'rango_edad']) ||
+    pickField(briefData, ['target_age', 'edad_objetivo']);
+  const gender =
+    pickField(personaData, ['gender', 'genero', 'sex']) ||
+    pickField(briefData, ['target_gender', 'genero_objetivo']);
+  const country =
+    pickField(personaData, ['country', 'pais', 'location', 'ubicacion']) ||
+    pickField(briefData, ['country', 'pais']);
+  const lifestyle =
+    pickField(personaData, ['lifestyle', 'estilo_vida', 'ocupacion', 'occupation']) ||
+    pickField(briefData, ['lifestyle', 'estilo_vida']);
+  const tone =
+    pickField(briefData, ['brand_tone', 'tono_marca', 'tone', 'tono']) ||
+    pickField(personaData, ['tone', 'tono']);
+
+  return {
+    age,
+    gender,
+    country,
+    lifestyle,
+    tone,
+    tags: extractPersonaTags(personaData, briefData),
+  };
+}
+
+type ActorVariant = 'actor_safe' | 'actor_casual' | 'actor_editorial';
+
+function buildActorPrompt(variant: ActorVariant, p: PersonaContext): string {
+  const gender = p.gender || 'person';
+  const age = p.age || 'adult';
+  const country = p.country ? `from ${p.country}` : 'Latin American';
+  const lifestyle = p.lifestyle ? `, ${p.lifestyle} lifestyle` : '';
+  const subject = `A ${age} ${gender} ${country}${lifestyle}`;
+
+  const common = `Real human, natural skin texture with pores and subtle imperfections, genuine expression, ultra-realistic photograph, sharp focus. No illustrations, no 3D renders, no AI artifacts, no plastic skin, no airbrushing. Single person, no logos, no text. Vertical portrait framing.`;
+
+  switch (variant) {
+    case 'actor_safe':
+      return `${subject}. Professional portrait, neutral studio background, soft even lighting (softbox), looking at camera with a warm confident expression. Classic casting headshot style. ${common}`;
+    case 'actor_casual':
+      return `${subject}. Urban everyday lifestyle: walking through a real city street or neighborhood café, natural daylight, candid relaxed mood. Documentary photography aesthetic. ${common}`;
+    case 'actor_editorial':
+      return `${subject}. Aspirational editorial magazine cover look: cinematic lighting, stylish but accessible wardrobe, confident posture, slight motion. Modern high-end lifestyle magazine aesthetic. ${common}`;
+  }
+}
+
+// ----------------------------- Handlers --------------------------------------
+
+/**
+ * POST /api/brief-estudio/generate-actors
+ * Body: { client_id: string, regenerate?: boolean }
+ *
+ * Generates 3 Flux actor photos matching the client's buyer persona. If
+ * actors already exist and regenerate=false, returns the cached set to avoid
+ * spending credits on reloads.
+ */
+export async function generateActors(c: Context) {
+  let clientId: string | undefined;
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      client_id?: string;
+      regenerate?: boolean;
+    };
+    clientId = body.client_id;
+    const regenerate = Boolean(body.regenerate);
+
+    if (!isNonEmptyString(clientId)) {
+      return c.json({ error: 'client_id is required' }, 400);
+    }
+
+    const access = await assertClientAccess(c, clientId);
+    if (!access.userId) return c.json({ error: 'Unauthorized' }, 401);
+    if (!access.allowed) return c.json({ error: 'Forbidden' }, 403);
+
+    const supabase = getSupabaseAdmin();
+
+    // If not regenerating, short-circuit with cached actors.
+    if (!regenerate) {
+      const { data: cached, error: cacheErr } = await supabase
+        .from('brand_actors')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('source', 'ai_generated')
+        .order('is_primary', { ascending: false })
+        .order('sort_order', { ascending: true });
+      if (cacheErr) return c.json({ error: cacheErr.message }, 500);
+      if (cached && cached.length > 0) {
+        return c.json({
+          actors: cached as BrandActor[],
+          cost_credits: 0,
+          cached: true,
+        });
+      }
+    }
+
+    // Require a buyer persona to prompt Flux intelligently.
+    const persona = await safeQuerySingleOrDefault<{ persona_data: Record<string, unknown> | null }>(
+      supabase
+        .from('buyer_personas')
+        .select('persona_data')
+        .eq('client_id', clientId)
+        .maybeSingle(),
+      null,
+      'generateActors.buyerPersona',
+    );
+    if (!persona?.persona_data) {
+      return c.json({ error: 'Primero completa tu brief' }, 400);
+    }
+
+    // Rate limit.
+    const rl = await checkBriefEstudioRateLimit(clientId, 'generate-actors');
+    if (!rl.allowed) {
+      return c.json(
+        {
+          error: `Rate limit exceeded. Try again in ${rl.retryAfterMin} minutes`,
+          retry_after_minutes: rl.retryAfterMin,
+        },
+        429,
+      );
+    }
+
+    const brief = await safeQuerySingleOrDefault<{ research_data: Record<string, unknown> | null }>(
+      supabase
+        .from('brand_research')
+        .select('research_data')
+        .eq('client_id', clientId)
+        .eq('research_type', 'brand_brief')
+        .maybeSingle(),
+      null,
+      'generateActors.brandResearch',
+    );
+
+    const personaCtx = extractPersonaContext(persona.persona_data, brief?.research_data);
+
+    const variants: ActorVariant[] = ['actor_safe', 'actor_casual', 'actor_editorial'];
+    const prompts = variants.map((v) => ({
+      variant: v,
+      prompt: buildActorPrompt(v, personaCtx),
+    }));
+
+    // Fire 3 Flux predictions in parallel.
+    const predictions = await Promise.allSettled(
+      prompts.map((p) =>
+        runReplicatePrediction<Record<string, unknown>, string | string[]>({
+          model: FLUX_ACTORS_MODEL,
+          input: {
+            prompt: p.prompt,
+            aspect_ratio: '3:4',
+            output_format: 'jpg',
+            safety_tolerance: 2,
+          },
+          timeoutMs: 120_000,
+          preferWaitSeconds: 55,
+        }),
+      ),
+    );
+
+    const successfulOutputs: Array<{ variant: ActorVariant; url: string }> = [];
+    const failures: Array<{ variant: ActorVariant; reason: string }> = [];
+    predictions.forEach((res, idx) => {
+      const variant = prompts[idx].variant;
+      if (res.status === 'fulfilled') {
+        const out = res.value;
+        const url = Array.isArray(out) ? out[0] : typeof out === 'string' ? out : null;
+        if (url) successfulOutputs.push({ variant, url });
+        else failures.push({ variant, reason: 'no output url' });
+      } else {
+        const err = res.reason;
+        const msg = err instanceof ReplicateError ? err.message : err?.message || 'unknown';
+        failures.push({ variant, reason: msg });
+      }
+    });
+
+    if (successfulOutputs.length === 0) {
+      console.error('[brief-estudio][generate-actors] all Flux predictions failed:', failures);
+      return c.json(
+        {
+          error: 'No se pudo generar ningún actor',
+          details: failures.map((f) => `${f.variant}: ${f.reason}`).join('; ').slice(0, 400),
+        },
+        502,
+      );
+    }
+
+    // Download + upload each successful image to Supabase Storage.
+    const uploaded: Array<{ variant: ActorVariant; publicUrl: string }> = [];
+    for (const out of successfulOutputs) {
+      const bytes = await downloadToBytes(out.url);
+      if (!bytes) {
+        failures.push({ variant: out.variant, reason: 'download failed' });
+        continue;
+      }
+      const uuid = crypto.randomUUID();
+      const path = `brand-actors/${clientId}/${uuid}.jpg`;
+      try {
+        const publicUrl = await uploadToClientAssets(path, bytes, 'image/jpeg', false);
+        uploaded.push({ variant: out.variant, publicUrl });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'storage error';
+        failures.push({ variant: out.variant, reason: message });
+      }
+    }
+
+    if (uploaded.length === 0) {
+      return c.json({ error: 'No se pudo persistir ningún actor generado' }, 502);
+    }
+
+    // If regenerating, drop the previous ai_generated set first.
+    if (regenerate) {
+      const { error: delErr } = await supabase
+        .from('brand_actors')
+        .delete()
+        .eq('client_id', clientId)
+        .eq('source', 'ai_generated');
+      if (delErr) {
+        console.error('[brief-estudio][generate-actors] delete previous failed:', delErr.message);
+      }
+    }
+
+    // Insert new rows. Order matches `variants` so safe is always first.
+    const variantOrder: Record<ActorVariant, number> = {
+      actor_safe: 0,
+      actor_casual: 1,
+      actor_editorial: 2,
+    };
+    // Preserve the original sort order based on variant, not on upload order.
+    uploaded.sort((a, b) => variantOrder[a.variant] - variantOrder[b.variant]);
+
+    const rows = uploaded.map((u, idx) => ({
+      client_id: clientId!,
+      source: 'ai_generated' as const,
+      name: u.variant,
+      reference_images: [u.publicUrl],
+      persona_tags: personaCtx.tags,
+      is_primary: idx === 0,
+      sort_order: variantOrder[u.variant],
+    }));
+
+    const { data: inserted, error: insertErr } = await supabase
+      .from('brand_actors')
+      .insert(rows)
+      .select('*');
+    if (insertErr) return c.json({ error: insertErr.message }, 500);
+
+    // Log usage (per image generated — we only charge for successful ones).
+    const totalCredits = uploaded.length * FLUX_CREDITS_PER_IMAGE;
+    await logAiUsage(clientId, 'generate-actors', totalCredits);
+
+    return c.json({
+      actors: (inserted as BrandActor[] | null) ?? [],
+      cost_credits: totalCredits,
+      cached: false,
+      failures: failures.length > 0 ? failures : undefined,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[brief-estudio][generate-actors] error:', message);
+    return c.json({ error: message }, 500);
+  }
+}
+
+// ---- Voice presets ----------------------------------------------------------
+
+/**
+ * Voice presets for the suggest-voice endpoint. These are static MP3 samples
+ * that should live in `client-assets/voice-presets/{preset_key}.mp3`.
+ *
+ * TODO (manual, one-time): generate the 4 preset samples by running a short
+ * Spanish phrase through XTTS-v2 with 4 public reference voices (masculine
+ * premium, feminine warm, masculine energetic, feminine neutral) and upload
+ * the MP3s to the bucket at the paths below. Until then, `sample_url` points
+ * to placeholder paths and the frontend will render as "sample unavailable".
+ */
+const VOICE_PRESETS: Record<
+  string,
+  { description: string; storagePath: string }
+> = {
+  masculine_premium: {
+    description: 'Voz masculina grave, calmada y profesional. Ideal para lujo y autoridad.',
+    storagePath: 'voice-presets/masculine_premium.mp3',
+  },
+  feminine_warm: {
+    description: 'Voz femenina cálida y cercana. Transmite cercanía y confianza.',
+    storagePath: 'voice-presets/feminine_warm.mp3',
+  },
+  masculine_energetic: {
+    description: 'Voz masculina joven y enérgica. Ideal para marcas dinámicas o juveniles.',
+    storagePath: 'voice-presets/masculine_energetic.mp3',
+  },
+  feminine_neutral: {
+    description: 'Voz femenina neutra y versátil. Funciona para casi cualquier marca.',
+    storagePath: 'voice-presets/feminine_neutral.mp3',
+  },
+};
+
+function toneToPresetPrimary(tone: VoiceTone): string {
+  switch (tone) {
+    case 'luxury':
+      return 'masculine_premium';
+    case 'warm':
+      return 'feminine_warm';
+    case 'energetic':
+      return 'masculine_energetic';
+    case 'neutral':
+    default:
+      return 'feminine_neutral';
+  }
+}
+
+function toneToPresetSecondary(tone: VoiceTone): string {
+  // Always suggest a contrast so the user has a second option.
+  switch (tone) {
+    case 'luxury':
+      return 'feminine_warm';
+    case 'warm':
+      return 'masculine_premium';
+    case 'energetic':
+      return 'feminine_neutral';
+    case 'neutral':
+    default:
+      return 'masculine_energetic';
+  }
+}
+
+/**
+ * POST /api/brief-estudio/suggest-voice
+ * Body: { client_id: string }
+ *
+ * Reads the brand brief tone and returns 2 preset voice suggestions with
+ * pre-generated MP3 samples hosted on Supabase Storage.
+ */
+export async function suggestVoice(c: Context) {
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as { client_id?: string };
+    const clientId = body.client_id;
+    if (!isNonEmptyString(clientId)) {
+      return c.json({ error: 'client_id is required' }, 400);
+    }
+
+    const access = await assertClientAccess(c, clientId);
+    if (!access.userId) return c.json({ error: 'Unauthorized' }, 401);
+    if (!access.allowed) return c.json({ error: 'Forbidden' }, 403);
+
+    const supabase = getSupabaseAdmin();
+
+    const brief = await safeQuerySingleOrDefault<{ research_data: Record<string, unknown> | null }>(
+      supabase
+        .from('brand_research')
+        .select('research_data')
+        .eq('client_id', clientId)
+        .eq('research_type', 'brand_brief')
+        .maybeSingle(),
+      null,
+      'suggestVoice.brandResearch',
+    );
+
+    const tone = extractVoiceTone(brief?.research_data);
+    const primaryKey = toneToPresetPrimary(tone);
+    const secondaryKey = toneToPresetSecondary(tone);
+
+    const toSuggestion = (key: string) => {
+      const preset = VOICE_PRESETS[key];
+      if (!preset) return null;
+      const { data } = supabase.storage
+        .from('client-assets')
+        .getPublicUrl(preset.storagePath);
+      return {
+        preset_key: key,
+        sample_url: data.publicUrl,
+        description: preset.description,
+      };
+    };
+
+    const suggestions = [toSuggestion(primaryKey), toSuggestion(secondaryKey)].filter(
+      (x): x is NonNullable<ReturnType<typeof toSuggestion>> => x !== null,
+    );
+
+    return c.json({
+      tone,
+      suggestions,
+      // Surface in case the frontend wants to warn the user: the mp3 files
+      // still need to be manually generated and uploaded (see VOICE_PRESETS
+      // TODO note in the source).
+      presets_ready: false,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[brief-estudio][suggest-voice] error:', message);
+    return c.json({ error: message }, 500);
+  }
+}
+
+// ---- XTTS voice cloning -----------------------------------------------------
+
+const XTTS_PREVIEW_TEXT = 'Hola, soy Steve. Bienvenido a tu marca.';
+const MAX_AUDIO_BYTES = 5 * 1024 * 1024; // 5MB
+
+/**
+ * POST /api/brief-estudio/clone-voice
+ * Body: { client_id: string, audio_base64: string, audio_format: 'webm'|'mp3' }
+ *
+ * Uploads the raw voice sample, then runs XTTS-v2 on Replicate to produce a
+ * short preview using the cloned voice. Stores both the sample and the preview
+ * on Supabase Storage, and upserts the primary `brand_voices` row.
+ */
+export async function cloneVoice(c: Context) {
+  let clientId: string | undefined;
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      client_id?: string;
+      audio_base64?: string;
+      audio_format?: string;
+    };
+    clientId = body.client_id;
+    const audioBase64 = body.audio_base64;
+    const audioFormat = (body.audio_format || '').toLowerCase();
+
+    if (!isNonEmptyString(clientId)) {
+      return c.json({ error: 'client_id is required' }, 400);
+    }
+    if (!isNonEmptyString(audioBase64)) {
+      return c.json({ error: 'audio_base64 is required' }, 400);
+    }
+    if (audioFormat !== 'webm' && audioFormat !== 'mp3') {
+      return c.json({ error: "audio_format must be 'webm' or 'mp3'" }, 400);
+    }
+
+    // Rough base64 size check BEFORE decoding (base64 is ~4/3 of raw bytes).
+    const approxRawBytes = (audioBase64.length * 3) / 4;
+    if (approxRawBytes > MAX_AUDIO_BYTES) {
+      return c.json(
+        { error: `Audio demasiado grande (máximo ${MAX_AUDIO_BYTES / (1024 * 1024)}MB)` },
+        400,
+      );
+    }
+
+    const access = await assertClientAccess(c, clientId);
+    if (!access.userId) return c.json({ error: 'Unauthorized' }, 401);
+    if (!access.allowed) return c.json({ error: 'Forbidden' }, 403);
+
+    // Rate limit.
+    const rl = await checkBriefEstudioRateLimit(clientId, 'clone-voice');
+    if (!rl.allowed) {
+      return c.json(
+        {
+          error: `Rate limit exceeded. Try again in ${rl.retryAfterMin} minutes`,
+          retry_after_minutes: rl.retryAfterMin,
+        },
+        429,
+      );
+    }
+
+    // Decode.
+    let audioBytes: Buffer;
+    try {
+      audioBytes = Buffer.from(audioBase64, 'base64');
+    } catch {
+      return c.json({ error: 'audio_base64 inválido' }, 400);
+    }
+    if (audioBytes.length > MAX_AUDIO_BYTES) {
+      return c.json(
+        { error: `Audio decodificado demasiado grande (${audioBytes.length} bytes)` },
+        400,
+      );
+    }
+    if (audioBytes.length < 1024) {
+      return c.json({ error: 'Audio demasiado corto' }, 400);
+    }
+
+    const timestamp = Date.now();
+    const sampleExt = audioFormat === 'mp3' ? 'mp3' : 'webm';
+    const sampleContentType = audioFormat === 'mp3' ? 'audio/mpeg' : 'audio/webm';
+    const samplePath = `brand-voices/${clientId}/sample-${timestamp}.${sampleExt}`;
+
+    const supabase = getSupabaseAdmin();
+
+    // Upload the raw sample.
+    let sampleUrl: string;
+    try {
+      sampleUrl = await uploadToClientAssets(
+        samplePath,
+        new Uint8Array(audioBytes),
+        sampleContentType,
+        false,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'storage error';
+      return c.json({ error: `No se pudo guardar el sample: ${message}` }, 502);
+    }
+
+    // Run XTTS-v2 on Replicate using the uploaded sample URL as the speaker.
+    let predictionOutput: string | string[] | null = null;
+    let predictionId = '';
+    try {
+      predictionOutput = await runReplicatePrediction<
+        Record<string, unknown>,
+        string | string[]
+      >({
+        model: XTTS_V2_MODEL,
+        input: {
+          text: XTTS_PREVIEW_TEXT,
+          speaker: sampleUrl,
+          language: 'es',
+        },
+        timeoutMs: 180_000,
+        preferWaitSeconds: 55,
+      });
+    } catch (err) {
+      if (err instanceof ReplicateError) {
+        predictionId = err.predictionId || '';
+        console.error('[brief-estudio][clone-voice] Replicate failed:', err.message);
+        return c.json(
+          {
+            error: 'Falló la clonación de voz',
+            details: err.message.slice(0, 400),
+          },
+          502,
+        );
+      }
+      throw err;
+    }
+
+    const previewSourceUrl =
+      typeof predictionOutput === 'string'
+        ? predictionOutput
+        : Array.isArray(predictionOutput)
+          ? predictionOutput[0]
+          : null;
+    if (!previewSourceUrl) {
+      return c.json({ error: 'XTTS completó pero no devolvió audio' }, 502);
+    }
+
+    // Download preview + persist.
+    const previewBytes = await downloadToBytes(previewSourceUrl, 60_000);
+    if (!previewBytes) {
+      return c.json({ error: 'No se pudo descargar el preview de XTTS' }, 502);
+    }
+    const previewPath = `brand-voices/${clientId}/preview-${timestamp}.mp3`;
+    let previewUrl: string;
+    try {
+      previewUrl = await uploadToClientAssets(previewPath, previewBytes, 'audio/mpeg', true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'storage error';
+      return c.json({ error: `No se pudo guardar el preview: ${message}` }, 502);
+    }
+
+    // Upsert brand_voices — replace the primary voice row.
+    const { error: delErr } = await supabase
+      .from('brand_voices')
+      .delete()
+      .eq('client_id', clientId);
+    if (delErr) {
+      console.error('[brief-estudio][clone-voice] delete existing voice failed:', delErr.message);
+    }
+
+    const { data: inserted, error: insertErr } = await supabase
+      .from('brand_voices')
+      .insert({
+        client_id: clientId,
+        source: 'xtts_cloned' as const,
+        voice_id: predictionId || null,
+        sample_url: sampleUrl,
+        preset_key: null,
+        is_primary: true,
+      })
+      .select('*')
+      .single();
+    if (insertErr) return c.json({ error: insertErr.message }, 500);
+
+    await logAiUsage(clientId, 'clone-voice', XTTS_CREDITS_PER_GENERATION);
+
+    // Recompute studio_ready since the voice just flipped from 'none' → 'xtts_cloned'.
+    await recomputeAndStoreStudioReady(clientId);
+
+    return c.json({
+      voice: inserted as BrandVoice,
+      preview_url: previewUrl,
+      cost_credits: XTTS_CREDITS_PER_GENERATION,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[brief-estudio][clone-voice] error:', message);
+    return c.json({ error: message }, 500);
   }
 }

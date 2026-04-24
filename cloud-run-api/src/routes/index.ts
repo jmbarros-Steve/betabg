@@ -242,6 +242,9 @@ import {
   getBriefEstudio,
   saveBriefEstudio,
   prefillBriefEstudioFromBrief,
+  generateActors,
+  suggestVoice,
+  cloneVoice,
 } from './brief-estudio/index.js';
 
 // El Chino — Check System + Fix Queue + Fixer + Reports
@@ -688,6 +691,11 @@ export function registerRoutes(app: Hono) {
   app.get('/api/brief-estudio/get', authMiddleware, getBriefEstudio);
   app.post('/api/brief-estudio/save', authMiddleware, saveBriefEstudio);
   app.get('/api/brief-estudio/prefill-from-brief', authMiddleware, prefillBriefEstudioFromBrief);
+
+  // Brief Estudio — Etapa 2 (generación IA con Replicate)
+  app.post('/api/brief-estudio/generate-actors', authMiddleware, generateActors);
+  app.post('/api/brief-estudio/suggest-voice', authMiddleware, suggestVoice);
+  app.post('/api/brief-estudio/clone-voice', authMiddleware, cloneVoice);
 
   // ============================================================
   // El Chino — Automated Check System (sub-router to avoid Hono RegExpRouter limit)
