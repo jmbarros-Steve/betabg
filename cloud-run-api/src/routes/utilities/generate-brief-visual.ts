@@ -164,37 +164,37 @@ ${productDesc
 ${formato === 'video' ? `
 REGLAS ESPECÍFICAS para prompt_generacion de VIDEO (Veo 3.1 — 8 segundos, 1080p, con audio):
 
-Veo 3.1 rinde 10× mejor con prompts cinematográficos estructurados vs prompts planos tipo "mujer usando el producto". El prompt DEBE incluir estas 8 capas en este orden:
+Veo 3.1 rinde 10× mejor con prompts TIGHT de 300-500 caracteres, 5 capas combinadas esenciales, vs prompts inflados de 4000 chars con 8 capas separadas. TIGHT > LARGO. No sobrecargues al modelo — se satura y produce garbage (tipo "dedo metiéndose en barro"). Target ≈500 chars.
 
-REGLA DE ORO — EL PRODUCTO ES PROTAGONISTA:
+REGLA DE ORO — PRODUCTO TERMINADO COMO HERO (no proceso artesanal):
 ${productDesc || shopifyProducts.length > 0 ? `
-- El prompt DEBE nombrar el producto REAL del catálogo de la tienda (ej: "a Good Gres stoneware vase with visible clay texture and mineral glaze", NO "a ceramic product").
-- El producto debe ser VISUALMENTE PROTAGÓNICO al menos 4 de los 8 segundos (close-up macro, hero shot, o zoom).
-- En SUBJECT: describí el producto con nombre + material + detalles físicos específicos del catálogo.
-- En ACTION: la acción debe girar ALREDEDOR del producto (revelar, servir, sostener, acercar la cámara al producto, no solo "mujer sonriendo").
-- En AUDIO: si hay voz humana, debe mencionar explícitamente el nombre de la marca o el producto al menos una vez. Si no hay voz, el sonido diegético debe ser del producto en uso (clink de la cerámica, sirviendo agua, etc.).
-- Si el cliente NO eligió producto específico, usá el primer producto del <catalogo_disponible> como hero. NUNCA uses un producto genérico o alucinado.
+- El prompt DEBE nombrar el producto REAL del catálogo de la tienda (ej: "a Good Gres stoneware vase with matte clay texture and mineral glaze", NO "a ceramic product").
+- PRIORIZÁ producto terminado como hero shot (rotando sobre pedestal, iluminado, close-up macro) POR ENCIMA de procesos artesanales (manos trabajando, materia prima).
+- Si mostrás el proceso (ej: manos haciendo cerámica, chef cocinando), el PRODUCTO TERMINADO debe aparecer visible en pantalla al menos 3 de los 8 segundos — NUNCA solo en el último segundo como reveal.
+- El producto debe ser VISUALMENTE PROTAGÓNICO al menos 4 de los 8 segundos (close-up macro, hero shot, o slow dolly).
+- Si el cliente NO eligió producto específico, usá el primer producto del catálogo como hero. NUNCA uses un producto genérico o alucinado.
 ` : `
-- No hay productos reales disponibles. El video debe ser de marca/lifestyle SIN ningún producto visible. En SUBJECT y ACTION no hay producto — trabajar solo con persona + ambiente + emoción. En AUDIO evitar referencias a productos inexistentes.
+- No hay productos reales disponibles. El video debe ser de marca/lifestyle SIN ningún producto visible. Trabajar solo con persona + ambiente + emoción. En AUDIO evitar referencias a productos inexistentes.
 `}
 
+ESTRUCTURA OBLIGATORIA — 5 CAPAS COMBINADAS (las 8 capas viejas sobrecargaban Veo):
 
-1. SUBJECT — qué/quién está en cámara (describir cara/ropa/objeto con detalle).
-2. ACTION — verbos concretos específicos ("pouring", "unboxing", "stirring", "sliding a finger along"). Evita "sonriendo", "usando".
-3. SCENE / SETTING — dónde + props específicos + hora del día.
-4. CAMERA — elegir UNO: "close-up macro", "medium shot", "over-the-shoulder POV", "slow dolly-in", "handheld phone-style", "overhead flat-lay pan".
-5. LIGHTING — "golden hour from window left", "studio softbox at 45°", "practical kitchen pendants warm 2700K", "overcast diffused daylight".
-6. STYLE — "Canon 50mm f/1.4 look", "16mm film grain", "cinematic teal-and-orange grade", "natural Instagram UGC iPhone look", "Hasselblad medium-format product still".
-7. PACING — "single continuous take, slow pacing" or "snap cuts every 2s". Siempre terminar: "8-second total duration".
-8. AUDIO — ESPECÍFICO y detallado. Ejemplos:
-   - "Audio: soft kitchen ambience, acoustic guitar (warm finger-picking), occasional crockery clinks. No dialogue."
-   - "Audio: upbeat indie-pop beat (120bpm, tambourine), natural street ambience, a woman's voice saying in Spanish '¿Por qué pagar más?' at second 5. Clear lip-sync."
-   - "Audio: soft whirring of pottery wheel, faint acoustic guitar, single breath of concentration at second 4. No music."
+1. SUBJECT + ACTION — qué/quién + verbo concreto combinados (ej: "a finished Good Gres stoneware vase slowly rotates on a charcoal concrete pedestal"). Evitá "sonriendo", "usando", "posando".
+2. SCENE + LIGHTING — dónde + cómo está iluminado combinados (ej: "studio black backdrop, dramatic key light from above-right, rim light behind outlines silhouette, soft fill on shadow side").
+3. CAMERA + STYLE — plano + look fotográfico combinados (ej: "slow 360° dolly, Hasselblad medium-format 100mm f/4, warm earth-tone color grade, shallow depth of field").
+4. PRODUCT EMPHASIS — declará explícitamente cuántos segundos el producto está visible + cómo se resalta (ej: "product fills frame for 6 of 8 seconds; macro reveals clay texture and glaze color shift from ocher to moss green").
+5. AUDIO — específico pero conciso, 1 línea (ej: "Audio: deep ambient drone, single crystalline piano note at s2, crisp clay-on-clay tap at s6. No dialogue.").
 
-Ejemplo de prompt cinematográfico de calidad (replica este nivel de detalle):
-"Cinematic close-up, macro lens, of a ceramist's hands shaping wet clay on a spinning wheel. Hands are weathered, fingernails slightly clay-stained. The clay is forming the base of a stoneware vase — raw earth-tone texture, visible wheel lines. Studio natural light from a tall window on the left creates soft shadows and highlights the water glisten on her fingers. Single continuous slow dolly-in over 8 seconds. Shot on Hasselblad 80mm f/4. Warm earth-tone color grade, shallow depth of field. Audio: soft whirring of the pottery wheel at low RPM, faint acoustic guitar (single guitar warm tones), one concentrated breath at the 5-second mark. No dialogue. 8-second total duration."
+Siempre cerrar con "8-second total duration."
 
-NUNCA entregues prompts vagos tipo "persona haciendo cerámica" o "mujer sonriendo en cocina". Eso produce videos mediocres. Sé MUY específico en CADA capa.
+EJEMPLO DE PROMPT DE CALIDAD A REPLICAR (producto terminado como hero, ≈500 chars, 5 capas):
+"Cinematic 8-second hero shot of a finished Good Gres stoneware vase on a dark charcoal concrete pedestal. Slow 360° rotation reveals the unique matte clay texture and mineral glaze that shifts color from deep ocher to moss green. Dramatic key light from above right, rim light behind outlines the silhouette, soft fill on the shadow side. Macro 100mm lens, f/4, studio black background. Warm earth-tone color grade, rich shadows. Camera pans slowly around product. Shot on Hasselblad medium format. Audio: deep ambient low drone, single crystalline piano note at second 2, crisp clay-on-clay tap at second 6. No dialogue. 8-second total duration."
+
+NUNCA entregues:
+- Prompts vagos tipo "persona haciendo cerámica" o "mujer sonriendo en cocina" (producen mediocre).
+- Prompts de >800 caracteres (Veo se satura → garbage).
+- Procesos artesanales SIN mostrar el producto terminado ≥3 segundos.
+- Más de 5 capas — las 5 son las esenciales. Menos es más.
 ` : ''}
 
 Responde SOLO el JSON sin markdown ni backticks.`;

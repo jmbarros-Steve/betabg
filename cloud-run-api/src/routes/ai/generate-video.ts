@@ -15,7 +15,16 @@ const DEFAULT_DURATION_SEC = 8;
 const VIDEO_USD_COST = DEFAULT_DURATION_SEC * 0.40; // $3.20 for 8s @ $0.40/s
 const VIDEO_CREDIT_COST = 30;                       // ~3x Kling cost (10) reflecting Veo pricing
 
+// Runway Gen-4 Turbo via Replicate — premium alternative to Veo. 10s default,
+// text+image-to-video, ~$0.05/s → $0.50/10s. 50 credits reflects higher perceived
+// quality (more cinematic camera moves, better motion coherence) and 10s length.
+const RUNWAY_REPLICATE_MODEL = 'runwayml/gen4-turbo';
+const RUNWAY_USD_COST = 0.50; // 10s at $0.05/s
+const RUNWAY_CREDIT_COST = 50;
+const RUNWAY_DURATION_SEC = 10;
+
 type AspectRatio = '9:16' | '16:9' | '1:1';
+type VideoEngine = 'veo' | 'runway';
 
 // Idempotent refund. Uses credit_transactions.accion as the dedup key because
 // we don't have an operation_id column yet. The first refund inserts a row with
@@ -27,6 +36,7 @@ async function refundVideoCreditsOnce(
   clientId: string,
   operationName: string,
   reason: string,
+  engine: VideoEngine = 'veo',
 ): Promise<void> {
   const refundMarker = `refund op=${operationName}`;
   const { data: existing } = await supabase
@@ -39,25 +49,104 @@ async function refundVideoCreditsOnce(
     console.log(`[generate-video] refund already applied for op ${operationName}, skipping`);
     return;
   }
+  const credits = engine === 'runway' ? RUNWAY_CREDIT_COST : VIDEO_CREDIT_COST;
+  const usd = engine === 'runway' ? RUNWAY_USD_COST : VIDEO_USD_COST;
+  const engineLabel = engine === 'runway' ? 'Runway Gen-4 Turbo' : 'Veo 3.1';
   await supabase.from('credit_transactions').insert({
     client_id: clientId,
-    accion: `Refund video Veo 3.1 (${reason}) — ${refundMarker}`,
-    creditos_usados: -VIDEO_CREDIT_COST,
-    costo_real_usd: -VIDEO_USD_COST,
+    accion: `Refund video ${engineLabel} (${reason}) — ${refundMarker}`,
+    creditos_usados: -credits,
+    costo_real_usd: -usd,
   });
+}
+
+// Resolve a valid image URL for image-to-video. Priority:
+// 1. Explicit `fotoBaseUrls[]` (array, new) — use up to 3
+// 2. Explicit `fotoBaseUrl` (string, legacy) — wrap as single-item array
+// 3. Shopify catalog fallback — if client has synced products, pick up to 3 real
+//    photos. This stops Veo from inventing garbage when the caller didn't pass
+//    any reference (previous symptom: "finger in mud" when doing pure text-to-video).
+// Only returns URLs that pass an http(s) validity check.
+async function resolveReferenceImageUrls(
+  supabase: SupabaseClient,
+  clientId: string | undefined,
+  fotoBaseUrls: string[] | undefined,
+  fotoBaseUrl: string | undefined,
+): Promise<string[]> {
+  const isHttpUrl = (s: unknown): s is string =>
+    typeof s === 'string' && /^https?:\/\//i.test(s.trim());
+
+  const urls: string[] = [];
+
+  if (Array.isArray(fotoBaseUrls)) {
+    for (const u of fotoBaseUrls) {
+      if (isHttpUrl(u)) urls.push(u.trim());
+    }
+  }
+  if (urls.length === 0 && isHttpUrl(fotoBaseUrl)) {
+    urls.push(fotoBaseUrl.trim());
+  }
+  if (urls.length > 0) return urls.slice(0, 3);
+
+  // Catalog fallback — only if we have a clientId. Text-to-video is the last
+  // resort because Veo hallucinates badly without an anchor image.
+  if (!clientId) return [];
+  try {
+    const { data: products } = await supabase
+      .from('shopify_products')
+      .select('image_url, title')
+      .eq('client_id', clientId)
+      .not('image_url', 'is', null)
+      .limit(20);
+    if (!products || products.length === 0) return [];
+    const catalogUrls = products
+      .map((p: any) => p.image_url as string | null)
+      .filter((u): u is string => isHttpUrl(u));
+    if (catalogUrls.length === 0) return [];
+    const picked = catalogUrls.slice(0, 3);
+    console.log(`[generate-video] Using catalog fallback product photos (${picked.length}):`, picked[0]);
+    return picked;
+  } catch (err: any) {
+    console.warn('[generate-video] catalog fallback query failed:', err?.message);
+    return [];
+  }
+}
+
+// Download a URL as base64 with a 15s timeout. Returns null on any failure.
+async function fetchImageAsBase64(
+  url: string,
+): Promise<{ mimeType: string; data: string } | null> {
+  try {
+    const imgResp = await fetch(url, { signal: AbortSignal.timeout(15_000), redirect: 'follow' });
+    if (!imgResp.ok) {
+      console.warn(`[generate-video] image download failed ${imgResp.status} for ${url.slice(0, 80)}`);
+      return null;
+    }
+    const buf = Buffer.from(await imgResp.arrayBuffer());
+    const mime = (imgResp.headers.get('content-type') || 'image/jpeg').split(';')[0].trim();
+    return { mimeType: mime, data: buf.toString('base64') };
+  } catch (err: any) {
+    console.warn('[generate-video] image download error:', err?.message);
+    return null;
+  }
 }
 
 export async function generateVideo(c: Context) {
   try {
-    const { clientId, creativeId, promptGeneracion, fotoBaseUrl, aspectRatio } = await c.req.json();
+    const {
+      clientId,
+      creativeId,
+      promptGeneracion,
+      fotoBaseUrl,
+      fotoBaseUrls,
+      aspectRatio,
+      engine,
+    } = await c.req.json();
 
     const supabase = getSupabaseAdmin();
 
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    if (!GEMINI_API_KEY) {
-      console.error('[generate-video] GEMINI_API_KEY not configured');
-      return c.json({ error: 'Error interno del servidor' }, 500);
-    }
+    // Resolve engine. Default = veo. Runway = Replicate gen4-turbo.
+    const engineChoice: VideoEngine = engine === 'runway' ? 'runway' : 'veo';
 
     if (!promptGeneracion || typeof promptGeneracion !== 'string') {
       return c.json({ error: 'promptGeneracion es obligatorio' }, 400);
@@ -65,21 +154,43 @@ export async function generateVideo(c: Context) {
 
     // Validate aspect ratio (Veo 3.1 supports 16:9 and 9:16 — 1:1 is NOT
     // supported as of April 2026, falls back to 9:16 with a warning).
+    // Runway Gen-4 supports 16:9, 9:16, 1:1 — so the same validated value
+    // works for both (1:1 gets normalized to 9:16 to be Veo-safe by default).
     const validRatios: AspectRatio[] = ['9:16', '16:9'];
     const finalAspect: AspectRatio = validRatios.includes(aspectRatio as AspectRatio)
       ? (aspectRatio as AspectRatio)
       : '9:16';
     if (aspectRatio && aspectRatio !== finalAspect) {
-      console.warn(`[generate-video] aspect ratio ${aspectRatio} not supported by Veo 3.1, falling back to ${finalAspect}`);
+      console.warn(`[generate-video] aspect ratio ${aspectRatio} not supported, falling back to ${finalAspect}`);
+    }
+
+    // Resolve reference images (multi-image support + Shopify catalog fallback).
+    // IMPROVEMENT #1 + #5: image-to-video is now effectively mandatory whenever
+    // the client has a catalog — we fetch up to 3 product photos automatically,
+    // stopping Veo from inventing garbage on pure text-to-video.
+    const referenceUrls = await resolveReferenceImageUrls(supabase, clientId, fotoBaseUrls, fotoBaseUrl);
+
+    // Branch on engine. Runway uses Replicate, Veo uses Gemini Developer API.
+    if (engineChoice === 'runway') {
+      return runGenerateRunway(c, supabase, {
+        clientId,
+        creativeId,
+        promptGeneracion,
+        referenceUrls,
+        finalAspect,
+      });
+    }
+
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) {
+      console.error('[generate-video] GEMINI_API_KEY not configured');
+      return c.json({ error: 'Error interno del servidor' }, 500);
     }
 
     // TODO: Re-enable credit enforcement when billing system is ready. For
     // now we log the transaction at the end (same pattern as generate-image).
-    // The deduct_credits RPC doesn't exist yet — calling it returned
-    // NO_CREDIT_RECORD for every client, blocking all video generation.
 
     // Enrich prompt with learned visual style rules + explicit audio cue for Veo.
-    // loadKnowledge is wrapped so a DB hiccup here doesn't strand the credits.
     let knowledgeBlock = '';
     try {
       const loaded = await loadKnowledge(['anuncios'], { limit: 5, label: 'VISUAL STYLE RULES', audit: { source: 'generate-video' } });
@@ -94,34 +205,36 @@ export async function generateVideo(c: Context) {
       knowledgeBlock,
     ].filter(Boolean).join('\n\n');
 
-    // Optional image-to-video: download fotoBaseUrl and inline as base64 (Veo API
-    // doesn't accept public URLs — only bytesBase64Encoded / inlineData).
-    // Guard: foto_recomendada from generate-brief-visual sometimes comes back
-    // as text ('Sin foto disponible') instead of a URL — skip unless it's a
-    // real http(s) URL or we'd crash with 'Failed to parse URL'.
-    let imagePart: { inlineData: { mimeType: string; data: string } } | undefined;
-    const isHttpUrl = typeof fotoBaseUrl === 'string' && /^https?:\/\//i.test(fotoBaseUrl.trim());
-    if (fotoBaseUrl && !isHttpUrl) {
-      console.warn(`[generate-video] fotoBaseUrl is not a URL, skipping image-to-video: "${String(fotoBaseUrl).slice(0, 80)}"`);
+    // Download reference images in parallel (up to 3). Each becomes an inlineData
+    // part. Veo 3.1 accepts a primary `image` field + optional `reference_images`
+    // array (up to 3 total). If no images resolve (no URL provided AND no
+    // catalog), fall through to pure text-to-video — still supported, just worse.
+    let imageParts: Array<{ inlineData: { mimeType: string; data: string } }> = [];
+    if (referenceUrls.length > 0) {
+      const fetched = await Promise.all(referenceUrls.map((u) => fetchImageAsBase64(u)));
+      imageParts = fetched
+        .filter((x): x is { mimeType: string; data: string } => !!x)
+        .map((x) => ({ inlineData: x }));
     }
-    if (isHttpUrl) {
-      try {
-        const imgResp = await fetch(fotoBaseUrl, { signal: AbortSignal.timeout(15_000), redirect: 'follow' });
-        if (imgResp.ok) {
-          const buf = Buffer.from(await imgResp.arrayBuffer());
-          const mime = (imgResp.headers.get('content-type') || 'image/jpeg').split(';')[0].trim();
-          imagePart = { inlineData: { mimeType: mime, data: buf.toString('base64') } };
-        } else {
-          console.warn(`[generate-video] fotoBase download failed ${imgResp.status}, continuing without image`);
-        }
-      } catch (err: any) {
-        console.warn('[generate-video] fotoBase download error — continuing text-to-video:', err?.message);
-      }
+    if (referenceUrls.length === 0) {
+      console.warn('[generate-video] No reference images available (no URL + no catalog) — falling back to text-to-video. Expect worse results.');
     }
 
-    // 1) Launch long-running generation
+    // 1) Launch long-running generation.
+    // Veo 3.1 REST API (predictLongRunning) shape:
+    //   - Single image anchor: `image: { inlineData: { mimeType, data } }` (classic image-to-video)
+    //   - Multi reference: `referenceImages: [{ image: {inlineData}, referenceType: 'asset' }]` (up to 3)
+    // We use `referenceImages` ONLY when we have multiple refs. With a single ref,
+    // sticking to the legacy `image` field is more reliable (documented as primary).
     const instance: Record<string, any> = { prompt: enrichedPrompt };
-    if (imagePart) instance.image = imagePart;
+    if (imageParts.length === 1) {
+      instance.image = imageParts[0];
+    } else if (imageParts.length > 1) {
+      instance.referenceImages = imageParts.slice(0, 3).map((p) => ({
+        image: p,
+        referenceType: 'asset',
+      }));
+    }
 
     const launch = await fetch(VEO_LAUNCH_URL, {
       method: 'POST',
@@ -357,4 +470,186 @@ export async function generateVideoStatus(c: Context) {
     console.error('[generate-video-status]', err);
     return c.json({ status: 'error', error: err?.message }, 500);
   }
+}
+
+// Runway Gen-4 Turbo via Replicate — premium alternative to Veo. Runs synchronously
+// via Replicate's "Prefer: wait" header which blocks up to 60s; if the model takes
+// longer we fall back to polling. Replicate returns an MP4 URL which we persist to
+// Supabase Storage (same pattern as Veo) so the frontend doesn't hit Replicate CDN
+// directly (would 404 after 24h). Uses the first reference image as image input —
+// Runway Gen-4 Turbo accepts a single image for image-to-video.
+async function runGenerateRunway(
+  c: Context,
+  supabase: SupabaseClient,
+  args: {
+    clientId: string;
+    creativeId?: string;
+    promptGeneracion: string;
+    referenceUrls: string[];
+    finalAspect: AspectRatio;
+  },
+) {
+  const { clientId, creativeId, promptGeneracion, referenceUrls, finalAspect } = args;
+
+  const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
+  if (!REPLICATE_API_KEY) {
+    console.error('[generate-video:runway] REPLICATE_API_KEY not configured');
+    return c.json({ error: 'REPLICATE_API_KEY no configurado en el servidor' }, 500);
+  }
+
+  // Map Veo aspect ratios to Runway ratios. Gen-4 Turbo supports 16:9, 9:16, 1:1,
+  // 4:3, 3:4, 21:9. We feed the input ratio string matching the supported set.
+  const runwayRatio = finalAspect === '16:9' ? '16:9' : '9:16';
+
+  // Runway Gen-4 Turbo schema (Replicate):
+  //   prompt: string (required for text-to-video, optional with image)
+  //   image: url (string) — single reference image
+  //   duration: 5 | 10 (seconds)
+  //   aspect_ratio: string
+  // We use duration=10 for premium feel and image (first ref) when available.
+  const input: Record<string, any> = {
+    prompt: promptGeneracion,
+    duration: RUNWAY_DURATION_SEC,
+    aspect_ratio: runwayRatio,
+  };
+  if (referenceUrls.length > 0) {
+    input.image = referenceUrls[0];
+  }
+
+  const pseudoOpId = `runway-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  // Use Replicate's model-endpoint form so we don't need to hardcode a version hash.
+  // This endpoint resolves the latest version of the model automatically.
+  let launchRes: Response;
+  try {
+    launchRes = await fetch(
+      `https://api.replicate.com/v1/models/${RUNWAY_REPLICATE_MODEL}/predictions`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${REPLICATE_API_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'wait=55',
+        },
+        body: JSON.stringify({ input }),
+        signal: AbortSignal.timeout(70_000),
+      },
+    );
+  } catch (err: any) {
+    console.error('[generate-video:runway] launch fetch failed:', err?.message);
+    return c.json({ error: 'No se pudo contactar a Replicate', details: err?.message }, 502);
+  }
+
+  if (!launchRes.ok) {
+    const errText = await launchRes.text();
+    console.error('[generate-video:runway] launch error:', launchRes.status, errText);
+    return c.json({ error: 'Error iniciando Runway Gen-4', details: errText.slice(0, 300) }, 502);
+  }
+
+  let prediction: any = await launchRes.json();
+  const predictionId: string = prediction?.id || pseudoOpId;
+
+  if (creativeId) {
+    await supabase.from('ad_creatives').update({
+      prediction_id: predictionId,
+      estado: 'generando',
+    }).eq('id', creativeId);
+  }
+
+  await supabase.from('credit_transactions').insert({
+    client_id: clientId,
+    accion: `Generar video Runway Gen-4 Turbo (${RUNWAY_DURATION_SEC}s, ${runwayRatio}) — op=${predictionId}`,
+    creditos_usados: RUNWAY_CREDIT_COST,
+    costo_real_usd: RUNWAY_USD_COST,
+  });
+
+  // If "Prefer: wait" gave us the final output, use it. Otherwise poll up to 4 min.
+  const deadline = Date.now() + 4 * 60_000;
+  let attempts = 0;
+  while (prediction?.status !== 'succeeded' && prediction?.status !== 'failed' && prediction?.status !== 'canceled') {
+    if (Date.now() > deadline) break;
+    attempts++;
+    await new Promise(r => setTimeout(r, attempts <= 2 ? 6_000 : 12_000));
+    try {
+      const pollRes = await fetch(
+        `https://api.replicate.com/v1/predictions/${predictionId}`,
+        { headers: { Authorization: `Bearer ${REPLICATE_API_KEY}` }, signal: AbortSignal.timeout(15_000) },
+      );
+      if (!pollRes.ok) {
+        console.warn(`[generate-video:runway] poll ${attempts} HTTP ${pollRes.status}`);
+        continue;
+      }
+      prediction = await pollRes.json();
+    } catch (err: any) {
+      console.warn(`[generate-video:runway] poll error ${attempts}:`, err?.message);
+    }
+  }
+
+  if (prediction?.status === 'failed' || prediction?.status === 'canceled') {
+    await refundVideoCreditsOnce(supabase, clientId, predictionId, `runway ${prediction?.status}: ${prediction?.error || 'unknown'}`, 'runway');
+    return c.json({ error: 'Runway falló al generar el video', details: prediction?.error }, 502);
+  }
+
+  if (prediction?.status !== 'succeeded') {
+    // Still processing — return the prediction id; frontend can poll /api/generate-video-status
+    // NOTE: status endpoint currently only handles Veo. Runway polling from the
+    // client is done directly for now (see wizard). This branch only happens on
+    // slow inference — typical Gen-4 Turbo finishes in ~30-60s.
+    console.warn(`[generate-video:runway] inline poll timed out after ${attempts} tries`);
+    return c.json({
+      success: true,
+      prediction_id: predictionId,
+      status: 'generando',
+      engine: 'runway',
+      message: 'Runway aún procesando. Reintenta en 1-2 min.',
+    });
+  }
+
+  // Extract MP4 URL. Runway Gen-4 Turbo returns a single string URL (video/mp4).
+  const videoUri: string | undefined = Array.isArray(prediction.output)
+    ? prediction.output[0]
+    : typeof prediction.output === 'string'
+      ? prediction.output
+      : undefined;
+  if (!videoUri) {
+    await refundVideoCreditsOnce(supabase, clientId, predictionId, 'no video uri from runway', 'runway');
+    return c.json({ error: 'Runway completó pero no devolvió URI' }, 502);
+  }
+
+  // Download MP4 and persist to Supabase Storage (Replicate CDN expires after 24h).
+  const dl = await fetch(videoUri, { signal: AbortSignal.timeout(60_000) });
+  if (!dl.ok) {
+    await refundVideoCreditsOnce(supabase, clientId, predictionId, `mp4 download ${dl.status}`, 'runway');
+    return c.json({ error: 'Video generado pero no se pudo descargar' }, 502);
+  }
+  const mp4Bytes = Buffer.from(await dl.arrayBuffer());
+  const storagePath = `${clientId}/ads/runway_${predictionId}.mp4`;
+  const { error: uploadErr } = await supabase
+    .storage
+    .from('client-assets')
+    .upload(storagePath, mp4Bytes, { contentType: 'video/mp4', upsert: true });
+  if (uploadErr) {
+    await refundVideoCreditsOnce(supabase, clientId, predictionId, `storage: ${uploadErr.message}`, 'runway');
+    return c.json({ error: 'No se pudo guardar el video de Runway' }, 502);
+  }
+  const { data: pub } = supabase.storage.from('client-assets').getPublicUrl(storagePath);
+  const assetUrl = pub.publicUrl;
+
+  if (creativeId) {
+    await supabase.from('ad_creatives').update({
+      asset_url: assetUrl,
+      estado: 'listo',
+      formato: 'video',
+    }).eq('id', creativeId);
+  }
+
+  return c.json({
+    success: true,
+    prediction_id: predictionId,
+    status: 'listo',
+    engine: 'runway',
+    asset_url: assetUrl,
+    duration_seconds: RUNWAY_DURATION_SEC,
+    generation_attempts: attempts,
+  });
 }
