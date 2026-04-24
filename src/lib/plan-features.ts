@@ -174,6 +174,7 @@ export const FEATURE_ACCESS: Record<FeatureKey, PlanSlug> = {
 export const TAB_MIN_PLAN: Record<string, PlanSlug> = {
   steve: 'estrategia',
   brief: 'estrategia',
+  brief_estudio: 'estrategia',
   metrics: 'visual',
   connections: 'visual',
   config: 'visual',

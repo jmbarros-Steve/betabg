@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare, Home, Share2, GraduationCap, Lock } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare, Home, Share2, GraduationCap, Lock, Clapperboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -17,6 +17,7 @@ import { ClientPortalConnections } from '@/components/client-portal/ClientPortal
 import { SteveChat } from '@/components/client-portal/SteveChat';
 import { SteveEstrategia } from '@/components/client-portal/SteveEstrategia';
 import { BrandBriefView } from '@/components/client-portal/BrandBriefView';
+import BriefEstudio from '@/components/client-portal/BriefEstudio';
 import { CopyGenerator } from '@/components/client-portal/CopyGenerator';
 import GoogleAdsTab from '@/components/client-portal/google-ads/GoogleAdsTab';
 import { CampaignStudio } from '@/components/client-portal/campaign-studio/CampaignStudio';
@@ -53,7 +54,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'competitors' | 'deepdive' | 'steve' | 'estrategia' | 'copies' | 'social' | 'google' | 'klaviyo' | 'email' | 'config' | 'wa_credits' | 'academy';
+type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'brief_estudio' | 'competitors' | 'deepdive' | 'steve' | 'estrategia' | 'copies' | 'social' | 'google' | 'klaviyo' | 'email' | 'config' | 'wa_credits' | 'academy';
 interface ClientInfo {
   id: string;
   name: string;
@@ -212,7 +213,7 @@ export default function ClientPortal() {
 
         // Read ?tab= from URL (e.g. after OAuth redirect: /portal?tab=connections)
         const urlTab = searchParams.get('tab') as TabType | null;
-        const validTabs: Set<string> = new Set(['metrics', 'shopify', 'campaigns', 'connections', 'brief', 'competitors', 'deepdive', 'steve', 'estrategia', 'copies', 'social', 'google', 'klaviyo', 'email', 'config', 'wa_credits', 'academy']);
+        const validTabs: Set<string> = new Set(['metrics', 'shopify', 'campaigns', 'connections', 'brief', 'brief_estudio', 'competitors', 'deepdive', 'steve', 'estrategia', 'copies', 'social', 'google', 'klaviyo', 'email', 'config', 'wa_credits', 'academy']);
         if (urlTab && validTabs.has(urlTab)) {
           setActiveTab(urlTab);
           setVisitedTabs(new Set([urlTab]));
@@ -323,6 +324,7 @@ export default function ClientPortal() {
   ] as const;
 
   const secondaryTabs = [
+    { id: 'brief_estudio', label: 'Brief Estudio', icon: Clapperboard },
     { id: 'shopify', label: 'Shopify', icon: ShoppingBag },
     { id: 'campaigns', label: 'Campañas', icon: PieChart },
     { id: 'deepdive', label: 'Deep Dive', icon: Code },
@@ -528,6 +530,13 @@ export default function ClientPortal() {
                   clientId={effectiveClientId}
                   onEditBrief={() => handleUserNavigate('steve')}
                 />
+              </TabErrorBoundary>
+            </div>
+          )}
+          {visitedTabs.has('brief_estudio') && effectiveClientId && (
+            <div className={activeTab !== 'brief_estudio' || !userCanAccessTab('brief_estudio') ? 'hidden' : ''}>
+              <TabErrorBoundary tabName="Brief Estudio">
+                <BriefEstudio clientId={effectiveClientId} />
               </TabErrorBoundary>
             </div>
           )}
