@@ -893,13 +893,14 @@ async function buildSmartActorContext(
     .join('\n\n')
     .slice(0, 9000);
 
-  const systemPrompt = `You are a senior Meta Ads creative director. Given a client's buyer persona and brand research, output a JSON describing the target customer AND three photo scenes to cast an actor for their ad campaigns. All output in ENGLISH.
+  const systemPrompt = `You are a senior Meta Ads creative director. Given a client's buyer persona and brand research, output a JSON describing the target customer AND three BACKGROUND / ATMOSPHERIC ENVIRONMENTS for portrait photos of a human actor. All output in ENGLISH.
 
 CRITICAL RULES:
-1. Scenes MUST match the brand's real world. Handcrafted ceramics from southern Chile → artisan workshop, rustic kitchen, forest backdrop. Streetwear brand → urban streets, skate park. Fitness brand → gym, trail. Luxury jewelry → minimalist studio, marble surfaces. NEVER default to generic "city café" unless the brand is actually urban.
-2. Each scene describes SETTING, LIGHTING, PROPS, ATMOSPHERE. Do NOT describe the person — they go separately.
-3. Keep each scene 30-80 words, vivid visual details.
-4. Translate all persona/brand fields to English. Examples: "Dueña de casa" → "homemaker", "cerámica gres artesanal" → "handcrafted stoneware ceramics".
+1. The output images WILL BE HUMAN PORTRAIT PHOTOS (one person in frame, chest-up). Your "scenes" describe only the BACKGROUND / AMBIENT SETTING that appears softly blurred behind the actor. Not a full scene. Not a still life. Not a tablescape. Not a product shot.
+2. Each "scene" is 20-50 words describing: location type, lighting quality, wall/surface textures, atmospheric props visible in the out-of-focus background. Examples of GOOD scenes: "artisan pottery workshop background with soft wooden shelves, hanging natural fibers, warm window light". Examples of BAD scenes (NEVER output these): "a table full of ceramics", "stoneware dishes on a linen cloth", "product display".
+3. Scenes MUST match the brand's real world. Ceramics artisanal from southern Chile → workshop, rustic kitchen, forest. Streetwear → urban street. Fitness → gym. Luxury → minimalist studio. NEVER default to "city café" unless the brand is truly urban.
+4. Do NOT describe the person. Do NOT describe products as the subject — products may appear small and incidental in the background but are NOT the focus.
+5. Translate all persona/brand fields to English. Examples: "Dueña de casa" → "homemaker", "cerámica gres artesanal" → "handcrafted stoneware ceramics".
 
 Output STRICTLY this JSON shape with NO markdown fences, NO prose before or after:
 {"persona":{"age":"","gender":"woman|man|person","country":"","lifestyle":""},"brand":{"name":"","category":"","aestheticKeywords":""},"scenes":{"safe":"","casual":"","editorial":""}}`;
@@ -947,28 +948,21 @@ Return the JSON now.`;
 }
 
 function buildActorPrompt(variant: ActorVariant, p: PersonaContext, scenes?: SceneSet | null): string {
-  // Demo básico del target customer (todos los campos ya vienen en inglés si
-  // buildSmartActorContext corrió bien; si no, llegan en español crudo).
+  // Demo básico del target customer (en inglés si smart-ctx corrió, crudo si no).
   const gender = p.gender || 'person';
-  const age = p.age ? `${p.age} year old` : 'adult';
+  const age = p.age ? `${p.age}-year-old` : 'adult';
   const country = p.country ? `from ${p.country}` : 'Latin American';
   const lifestyle = p.lifestyle ? `, ${p.lifestyle}` : '';
-  const subject = `A ${age} ${gender} ${country}${lifestyle}`;
 
-  // Contexto de marca.
+  // Contexto de marca (prosa corta que acompaña al sujeto).
   const brandBits: string[] = [];
   if (p.brandName) brandBits.push(`target customer of the brand "${p.brandName}"`);
   if (p.brandCategory) brandBits.push(`which sells ${p.brandCategory}`);
-  if (p.brandAesthetic) {
-    const clean = p.brandAesthetic.replace(/["\\\n\r]+/g, ' ').slice(0, 220);
-    brandBits.push(`brand aesthetic: ${clean}`);
-  }
-  const brandContext = brandBits.length > 0 ? ` — ${brandBits.join(', ')}` : '';
+  const brandContext = brandBits.length > 0 ? ` (${brandBits.join(', ')})` : '';
 
-  const common = `Real human, natural skin texture with pores and subtle imperfections, genuine expression, ultra-realistic photograph, sharp focus. No illustrations, no 3D renders, no AI artifacts, no plastic skin, no airbrushing. Single person, no logos, no text on image. Vertical portrait framing.`;
-
-  // Escena — si la generó la IA, usamos esa. Si no, fallback legacy genérico.
-  let sceneInstruction: string;
+  // Ambiente — si la IA lo generó, se convierte en BACKGROUND del retrato.
+  // CRÍTICO: el retrato de la persona es el sujeto. La escena es fondo/atmósfera.
+  let environment: string;
   if (scenes) {
     const sceneText =
       variant === 'actor_safe'
@@ -976,25 +970,38 @@ function buildActorPrompt(variant: ActorVariant, p: PersonaContext, scenes?: Sce
         : variant === 'actor_casual'
           ? scenes.casual
           : scenes.editorial;
-    sceneInstruction = `Scene: ${sceneText.replace(/["\\\n\r]+/g, ' ').slice(0, 500)}`;
+    environment = sceneText.replace(/["\\\n\r]+/g, ' ').slice(0, 350);
   } else {
-    sceneInstruction =
+    environment =
       variant === 'actor_safe'
-        ? 'Professional casting portrait, neutral studio background, soft even lighting (softbox), classic headshot composition.'
+        ? 'neutral studio background, soft even lighting (softbox)'
         : variant === 'actor_casual'
-          ? 'Everyday lifestyle scene matching the brand\'s world, natural daylight, candid relaxed mood, documentary photography aesthetic.'
-          : 'Aspirational editorial magazine look matching the brand\'s aesthetic, cinematic lighting, confident posture.';
+          ? 'everyday setting matching the brand\'s world, natural daylight, candid mood'
+          : 'aspirational setting matching the brand\'s aesthetic, cinematic lighting';
   }
 
-  // Styling / wardrobe instruction varía por variante.
-  const styling =
+  // Framing + expresión varían por variante.
+  const framingAndExpression =
     variant === 'actor_safe'
-      ? 'Wardrobe: clean, minimal, true to the brand identity. Expression: warm confident, looking at camera.'
+      ? 'Medium close-up casting headshot, subject centered and filling the frame from the chest up, looking directly at the camera with a warm confident expression. Classic professional casting photo composition.'
       : variant === 'actor_casual'
-        ? 'Wardrobe: authentic everyday clothing aligned with the brand. Expression: natural, candid, doing something plausible in the scene.'
-        : 'Wardrobe: styled but accessible, reflecting the brand aesthetic. Posture: confident, slight motion, aspirational but believable.';
+        ? 'Waist-up or three-quarter shot, subject clearly the main focus and filling most of the frame, candid natural expression, captured in a real moment. Documentary photography style.'
+        : 'Waist-up editorial portrait, subject dominant in the frame, confident posture with slight motion, magazine-cover quality composition.';
 
-  return `${subject}${brandContext}. ${sceneInstruction} ${styling} ${common}`;
+  const wardrobe =
+    variant === 'actor_safe'
+      ? 'Wardrobe: clean, minimal, true to the brand identity.'
+      : variant === 'actor_casual'
+        ? 'Wardrobe: authentic everyday clothing aligned with the brand world.'
+        : 'Wardrobe: styled but accessible, reflecting the brand aesthetic.';
+
+  // Construcción: el retrato de LA PERSONA primero y claro. La escena después, como background.
+  // Cerramos con reglas absolutas para que Flux no genere solo producto/bodegón.
+  const realism = `Ultra-realistic portrait photograph, real human, natural skin texture with pores and subtle imperfections, genuine expression, sharp focus on the face, shallow depth of field with background softly blurred. No illustrations, no 3D renders, no AI artifacts, no plastic skin, no airbrushing. Vertical portrait framing (3:4).`;
+
+  const hardRules = `ABSOLUTE REQUIREMENTS: the image MUST show exactly one real human person as the main subject, visible from the chest up or waist up, face clearly visible and in focus. The person is the protagonist — NOT the product, NOT the setting, NOT a still life. No empty rooms, no product-only shots, no tablescapes without a person. Single person, no logos, no text on image.`;
+
+  return `PORTRAIT PHOTOGRAPHY. Subject: a ${age} ${gender} ${country}${lifestyle}${brandContext}. ${framingAndExpression} ${wardrobe} Background / setting: ${environment}. ${realism} ${hardRules}`;
 }
 
 // ----------------------------- Handlers --------------------------------------
