@@ -135,7 +135,7 @@ function sanitizeStringArray(v: unknown): string[] {
 /**
  * Criterio de completitud para `clients.studio_ready`:
  *   - al menos 1 actor
- *   - voice existente con source distinto de 'none'
+ *   - voice configurada (source='none' cuenta — elección explícita del cliente)
  *   - al menos 1 featured product
  *   - music con al menos 1 mood
  */
@@ -146,7 +146,7 @@ function computeStudioReady(args: {
   moods: string[];
 }): boolean {
   if (args.actorCount < 1) return false;
-  if (!args.voice || args.voice.source === 'none') return false;
+  if (!args.voice) return false;
   if (args.featuredCount < 1) return false;
   if (!args.moods || args.moods.length < 1) return false;
   return true;
