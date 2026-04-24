@@ -31,29 +31,51 @@ const RUNWAY_USD_COST = 0.50; // 10s at $0.05/s
 const RUNWAY_CREDIT_COST = 50;
 const RUNWAY_DURATION_SEC = 10;
 
-// Seedance 1 Pro via Replicate — default silent engine (replaces Runway Gen-4 Turbo).
+// Seedance 1 Pro via Replicate — kept reachable as admin-forceable engine.
 // Image-to-video / text-to-video, 2-12s @ 480p/720p/1080p @ 24fps. Single start-frame
-// ref via `image` (+ optional `last_frame_image` for continuity). Schema verified
-// against Replicate openapi_schema 2026-04-24 (version a5fd550893da3b6f...):
-//   - required: prompt
-//   - image (uri, nullable) — PRIMARY anchor (we pin producto here to fix "producto
-//     falso" bug — Runway would sometimes hallucinate the product because it only
-//     received the actor ref)
-//   - aspect_ratio enum: '16:9' | '4:3' | '1:1' | '3:4' | '9:16' | '21:9' | '9:21'
-//     (IGNORED when image is used — Seedance infers ratio from the input image)
-//   - resolution enum: '480p' | '720p' | '1080p'
-//   - duration: integer 2-12, default 5
-//   - last_frame_image (uri, nullable) — for end-frame continuity only
-//   - NOTE: Seedance does NOT accept multi-ref (no image_list/images/reference_images).
-//     So even with Seedance we must pick ONE anchor. Producto wins over actor.
-// Pricing: $3.00/10s, billed as 60 credits (20% over Runway's 50 to reflect cost).
+// ref via `image`. Seedance does NOT accept multi-ref so even when studio_mode
+// has both producto + actor, only ONE anchor reaches the model. That single-ref
+// limitation is exactly what motivated the Kling migration below.
+// Pricing: $3.00/10s, billed as 60 credits.
 const SEEDANCE_REPLICATE_MODEL = 'bytedance/seedance-1-pro';
 const SEEDANCE_USD_COST = 3.00;
 const SEEDANCE_CREDIT_COST = 60;
 const SEEDANCE_DURATION_SEC = 10;
 
+// Kling Video 3.0 Omni via Replicate — DEFAULT silent engine (replaces Seedance 1 Pro).
+//
+// CRITICAL FINDING (2026-04-24): The user task referenced "Kling 2.1 Master" as the
+// multi-ref engine. That is FACTUALLY WRONG on Replicate — kwaivgi/kling-v2.1-master
+// only accepts a single `start_image` (verified against openapi_schema). The Kling
+// models on Replicate that accept multi-image refs are:
+//   - kwaivgi/kling-v1.6-pro      → reference_images array (max 4) — legacy
+//   - kwaivgi/kling-v3-omni-video → reference_images array (max 7) + native <<<image_N>>>
+//                                   template syntax in prompt for explicit per-image
+//                                   referencing — best disambiguation tooling.
+// We pick kling-v3-omni-video. It's the newest, supports per-image references in the
+// prompt (so we can explicitly say "<<<image_1>>> sits on a desk while <<<image_2>>>
+// holds it"), and produces 1080p in 'pro' mode. This is the DEFINITIVE fix for the
+// "producto falso" bug — both producto + actor land in reference_images at the same
+// time, no more 1-ref tradeoff.
+//
+// Schema verified 2026-04-24 against latest_version 460d4f46... (kling-v3-omni-video):
+//   - required: prompt (max 2500 chars; supports <<<image_1>>>, <<<video_1>>> templates)
+//   - reference_images: array<uri> — Max 7 without video, 4 with video. Used for
+//     elements/scenes/styles. THIS is the multi-ref field we need.
+//   - mode enum: 'standard' | 'pro' | 'pro4k' (note: schema literal is 'standard'/'pro'/'4k')
+//   - duration: integer 3-15 (we use 10)
+//   - aspect_ratio enum: '16:9' | '9:16' | '1:1' (required when no start_image)
+//   - generate_audio: boolean (default false) — we leave false for silent templates
+//   - start_image, end_image: optional anchors (we don't use them; reference_images
+//     is the multi-ref path)
+// Pricing: ~$3.50/10s 1080p (Kling v3 tier). 70 credits.
+const KLING_REPLICATE_MODEL = 'kwaivgi/kling-v3-omni-video';
+const KLING_USD_COST = 3.50;
+const KLING_CREDIT_COST = 70;
+const KLING_DURATION_SEC = 10;
+
 type AspectRatio = '9:16' | '16:9' | '1:1';
-type VideoEngine = 'veo' | 'runway' | 'seedance';
+type VideoEngine = 'veo' | 'runway' | 'seedance' | 'kling';
 
 // ── Hardcoded engine auto-select ───────────────────────────────────────────
 // The client NEVER chooses Veo vs Runway vs templates. Steve picks the right
@@ -83,17 +105,18 @@ const ANGLE_TEMPLATE: Record<string, string> = {
   'Us vs Them': 'before_after',
 };
 
-// Silent templates default to Seedance 1 Pro (replaces Runway Gen-4 Turbo).
-// Seedance still only accepts 1 image ref, but we now prioritize PRODUCT as the
-// anchor (the previous Runway path used actor→product, which made Runway
-// hallucinate fake versions of the product). Veo keeps all dialog angles.
-// Runway stays reachable via admin override `engine: 'runway'` for A/B testing.
+// Silent templates default to Kling Video 3.0 Omni (replaces Seedance 1 Pro).
+// Kling v3 Omni is the only Replicate Kling that accepts multi-image refs (up to
+// 7 via reference_images), so we can finally pass producto + actor as PEER
+// references and let the prompt disambiguate them via <<<image_1>>>/<<<image_2>>>
+// template tokens. Seedance and Runway stay reachable via admin override
+// `engine: 'seedance' | 'runway'` for A/B testing. Veo keeps all dialog angles.
 const TEMPLATE_ENGINE: Record<string, VideoEngine> = {
-  'hero_shot': 'seedance',
-  'product_reveal': 'seedance',
-  'unboxing': 'seedance',
-  'before_after': 'seedance',
-  'macro_detail': 'seedance',
+  'hero_shot': 'kling',
+  'product_reveal': 'kling',
+  'unboxing': 'kling',
+  'before_after': 'kling',
+  'macro_detail': 'kling',
   'lifestyle_ugc': 'veo',
   'talking_head': 'veo',
   'testimonial': 'veo',
@@ -105,7 +128,7 @@ function deriveTemplate(angulo: string | undefined): string {
 
 function deriveEngine(angulo: string | undefined): VideoEngine {
   const template = deriveTemplate(angulo);
-  return TEMPLATE_ENGINE[template] || 'seedance';
+  return TEMPLATE_ENGINE[template] || 'kling';
 }
 
 async function isSuperAdmin(supabase: SupabaseClient, userId: string | undefined): Promise<boolean> {
@@ -172,17 +195,20 @@ async function refundVideoCreditsOnce(
     return;
   }
   const credits =
-    engine === 'seedance' ? SEEDANCE_CREDIT_COST
-      : engine === 'runway' ? RUNWAY_CREDIT_COST
-        : VIDEO_CREDIT_COST;
+    engine === 'kling' ? KLING_CREDIT_COST
+      : engine === 'seedance' ? SEEDANCE_CREDIT_COST
+        : engine === 'runway' ? RUNWAY_CREDIT_COST
+          : VIDEO_CREDIT_COST;
   const usd =
-    engine === 'seedance' ? SEEDANCE_USD_COST
-      : engine === 'runway' ? RUNWAY_USD_COST
-        : VIDEO_USD_COST;
+    engine === 'kling' ? KLING_USD_COST
+      : engine === 'seedance' ? SEEDANCE_USD_COST
+        : engine === 'runway' ? RUNWAY_USD_COST
+          : VIDEO_USD_COST;
   const engineLabel =
-    engine === 'seedance' ? 'Seedance 1 Pro'
-      : engine === 'runway' ? 'Runway Gen-4 Turbo'
-        : 'Veo 3.1';
+    engine === 'kling' ? 'Kling 3.0 Omni'
+      : engine === 'seedance' ? 'Seedance 1 Pro'
+        : engine === 'runway' ? 'Runway Gen-4 Turbo'
+          : 'Veo 3.1';
   await supabase.from('credit_transactions').insert({
     client_id: clientId,
     accion: `Refund video ${engineLabel} (${reason}) — ${refundMarker}`,
@@ -306,7 +332,7 @@ export async function generateVideo(c: Context) {
     const autoEngine: VideoEngine = deriveEngine(angulo);
     let engineChoice: VideoEngine = autoEngine;
     const explicitEngine: VideoEngine | null =
-      engine === 'runway' || engine === 'veo' || engine === 'seedance' ? engine : null;
+      engine === 'runway' || engine === 'veo' || engine === 'seedance' || engine === 'kling' ? engine : null;
     if (explicitEngine) {
       const adminOverride = await isSuperAdmin(supabase, userId);
       if (adminOverride) {
@@ -384,7 +410,21 @@ export async function generateVideo(c: Context) {
       }
     }
 
-    // Branch on engine. Seedance + Runway use Replicate, Veo uses Gemini Developer API.
+    // Branch on engine. Kling + Seedance + Runway use Replicate, Veo uses Gemini Developer API.
+    if (engineChoice === 'kling') {
+      return runGenerateKling(c, supabase, {
+        clientId,
+        creativeId,
+        promptGeneracion,
+        referenceUrls,
+        finalAspect,
+        angulo,
+        studioMode,
+        studioAssets,
+        studioMusicTrackId,
+        moodKey,
+      });
+    }
     if (engineChoice === 'seedance') {
       return runGenerateSeedance(c, supabase, {
         clientId,
@@ -1142,6 +1182,209 @@ async function runGenerateSeedance(
     engine: 'seedance',
     asset_url: assetUrl,
     duration_seconds: SEEDANCE_DURATION_SEC,
+    studio_mode: studioMode || undefined,
+    music_track_id: studioMusicTrackId || undefined,
+  });
+}
+
+// Kling Video 3.0 Omni via Replicate — DEFAULT engine for silent templates
+// (replaces Seedance 1 Pro). The DEFINITIVE fix for the "producto falso" bug:
+// Kling v3 Omni is the only Replicate Kling that accepts an array of reference
+// images (`reference_images`, max 7 without a video reference), so we pass
+// BOTH the producto and the actor at the same time. The prompt uses Kling's
+// native <<<image_N>>> template syntax to disambiguate which subject is which
+// (image_1 = producto, image_2 = actor) — that token is documented in the
+// model's input schema (see Kling 3.0 Omni description in this file).
+//
+// Same MP4-to-Storage persistence pattern as runGenerateSeedance so frontend
+// URLs don't expire after 24h on Replicate's CDN.
+async function runGenerateKling(
+  c: Context,
+  supabase: SupabaseClient,
+  args: {
+    clientId: string;
+    creativeId?: string;
+    promptGeneracion: string;
+    referenceUrls: string[];
+    finalAspect: AspectRatio;
+    angulo?: string;
+    studioMode?: boolean;
+    studioAssets?: StudioAssets | null;
+    studioMusicTrackId?: string | null;
+    moodKey?: string | null;
+  },
+) {
+  const {
+    clientId,
+    creativeId,
+    promptGeneracion,
+    referenceUrls,
+    finalAspect,
+    angulo,
+    studioMode,
+    studioAssets,
+    studioMusicTrackId,
+    moodKey,
+  } = args;
+
+  const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
+  if (!REPLICATE_API_KEY) {
+    console.error('[generate-video:kling] REPLICATE_API_KEY not configured');
+    return c.json({ error: 'REPLICATE_API_KEY no configurado en el servidor' }, 500);
+  }
+
+  // Kling v3 Omni aspect_ratio enum: '16:9' | '9:16' | '1:1'.
+  // The site-wide validated aspect is 9:16 or 16:9 (see generateVideo).
+  // Note: aspect_ratio is REQUIRED when not using start_image — and we pass
+  // multi-ref via `reference_images`, NOT via start_image, so aspect_ratio
+  // is always honored here (different from Seedance which ignores it on image input).
+  const klingRatio: string = finalAspect === '16:9' ? '16:9' : '9:16';
+
+  // Multi-ref selection — THE FIX for producto-falso.
+  //
+  // Studio mode: collect [producto, actor] in that order. Producto goes first
+  // so the prompt's <<<image_1>>> is the SKU (not a face). Actor is image_2.
+  // Non-studio fallback: use up to 4 from referenceUrls (catalog or explicit).
+  // Kling v3 Omni accepts up to 7 reference_images without a reference_video,
+  // we cap at 4 to keep the prompt focused (more refs = more confusion).
+  const studioProductImage = studioAssets?.featured_products?.[0]?.image_url || null;
+  const studioActorImage = studioAssets?.primary_actor?.reference_images?.[0] || null;
+  const refsToUse: string[] = [];
+  if (studioMode && (studioProductImage || studioActorImage)) {
+    if (studioProductImage) refsToUse.push(studioProductImage);
+    if (studioActorImage) refsToUse.push(studioActorImage);
+    console.log(
+      `[generate-video:kling] studio refs (${refsToUse.length}): ${studioProductImage ? 'producto' : ''}${studioProductImage && studioActorImage ? '+actor' : studioActorImage ? 'actor' : ''}`,
+    );
+  } else if (referenceUrls.length > 0) {
+    for (const u of referenceUrls.slice(0, 4)) refsToUse.push(u);
+    console.log(`[generate-video:kling] non-studio refs (${refsToUse.length}) from referenceUrls`);
+  } else {
+    console.log('[generate-video:kling] no refs available — pure text-to-video (worse results expected)');
+  }
+
+  // Build the final prompt. When studio_mode + multi-ref, prepend Kling's
+  // native template tokens so the model knows image_1 is the producto and
+  // image_2 is the actor. Without these tokens, Kling treats reference_images
+  // as a soup — exactly the bug we're fixing.
+  let finalPrompt = promptGeneracion;
+  if (studioMode && refsToUse.length >= 2 && studioProductImage && studioActorImage) {
+    finalPrompt = `<<<image_1>>> is the real product (preserve its exact shape, colors, and packaging). <<<image_2>>> is the human actor (preserve their face and body). ${promptGeneracion}`;
+  } else if (refsToUse.length >= 1) {
+    finalPrompt = `<<<image_1>>> is the primary reference (preserve its exact appearance). ${promptGeneracion}`;
+  }
+  // Kling v3 Omni prompt cap is 2500 chars — truncate just in case.
+  if (finalPrompt.length > 2500) {
+    finalPrompt = finalPrompt.slice(0, 2497) + '...';
+  }
+
+  const input: Record<string, any> = {
+    prompt: finalPrompt,
+    duration: KLING_DURATION_SEC,
+    mode: 'pro',                   // 1080p
+    aspect_ratio: klingRatio,
+    generate_audio: false,         // silent templates — music is added in post
+  };
+  if (refsToUse.length > 0) {
+    input.reference_images = refsToUse;
+  }
+
+  const pseudoOpId = `kling-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  // Persist generating state + log the transaction BEFORE the prediction runs
+  // (same pattern as runGenerateSeedance — survives mid-call crashes).
+  if (creativeId) {
+    await persistEngineToCreative(
+      supabase,
+      creativeId,
+      { prediction_id: pseudoOpId, estado: 'generando' },
+      { engine: 'kling', template: deriveTemplate(angulo), angulo: angulo || null },
+    );
+  }
+  await supabase.from('credit_transactions').insert({
+    client_id: clientId,
+    accion: `Generar video Kling 3.0 Omni (${KLING_DURATION_SEC}s, ${klingRatio}, 1080p, refs=${refsToUse.length}) — op=${pseudoOpId}`,
+    creditos_usados: KLING_CREDIT_COST,
+    costo_real_usd: KLING_USD_COST,
+  });
+
+  let output: string | string[];
+  try {
+    output = await runReplicatePrediction<Record<string, any>, string | string[]>({
+      model: KLING_REPLICATE_MODEL,
+      input,
+      timeoutMs: 4 * 60_000, // 4 min wall clock — under Cloud Run 5 min limit
+      preferWaitSeconds: 55,
+      pollIntervalMs: 6_000,
+    });
+  } catch (err) {
+    const msg = err instanceof ReplicateError ? err.message : (err as any)?.message || 'unknown';
+    console.error('[generate-video:kling] prediction failed:', msg);
+    await refundVideoCreditsOnce(supabase, clientId, pseudoOpId, `kling failed: ${msg.slice(0, 80)}`, 'kling');
+    return c.json({ error: 'Kling falló al generar el video', details: msg.slice(0, 300) }, 502);
+  }
+
+  const videoUri: string | undefined = Array.isArray(output)
+    ? output[0]
+    : typeof output === 'string'
+      ? output
+      : undefined;
+  if (!videoUri) {
+    await refundVideoCreditsOnce(supabase, clientId, pseudoOpId, 'no video uri from kling', 'kling');
+    return c.json({ error: 'Kling completó pero no devolvió URI' }, 502);
+  }
+
+  // Persist MP4 to Supabase Storage (Replicate CDN expires after 24h).
+  const dl = await fetch(videoUri, { signal: AbortSignal.timeout(60_000) });
+  if (!dl.ok) {
+    await refundVideoCreditsOnce(supabase, clientId, pseudoOpId, `mp4 download ${dl.status}`, 'kling');
+    return c.json({ error: 'Video generado pero no se pudo descargar' }, 502);
+  }
+  const mp4Bytes = Buffer.from(await dl.arrayBuffer());
+  const storagePath = `${clientId}/ads/kling_${pseudoOpId}.mp4`;
+  const { error: uploadErr } = await supabase
+    .storage
+    .from('client-assets')
+    .upload(storagePath, mp4Bytes, { contentType: 'video/mp4', upsert: true });
+  if (uploadErr) {
+    await refundVideoCreditsOnce(supabase, clientId, pseudoOpId, `storage: ${uploadErr.message}`, 'kling');
+    return c.json({ error: 'No se pudo guardar el video de Kling' }, 502);
+  }
+  const { data: pub } = supabase.storage.from('client-assets').getPublicUrl(storagePath);
+  const assetUrl = pub.publicUrl;
+
+  if (creativeId) {
+    await persistEngineToCreative(
+      supabase,
+      creativeId,
+      { asset_url: assetUrl, estado: 'listo', formato: 'video' },
+      { engine: 'kling', template: deriveTemplate(angulo), angulo: angulo || null },
+    );
+    if (studioMode && studioAssets) {
+      try {
+        const snapshot = buildAssetSnapshot(studioAssets, {
+          mood_key: moodKey ?? null,
+          music_track_id: studioMusicTrackId ?? null,
+          featured_product_index: 0,
+        });
+        await supabase
+          .from('ad_creatives')
+          .update({ asset_snapshot: snapshot })
+          .eq('id', creativeId);
+      } catch (snapErr: any) {
+        console.warn('[generate-video:kling][studio] asset_snapshot failed:', snapErr?.message);
+      }
+    }
+  }
+
+  return c.json({
+    success: true,
+    prediction_id: pseudoOpId,
+    status: 'listo',
+    engine: 'kling',
+    asset_url: assetUrl,
+    duration_seconds: KLING_DURATION_SEC,
+    reference_count: refsToUse.length,
     studio_mode: studioMode || undefined,
     music_track_id: studioMusicTrackId || undefined,
   });
