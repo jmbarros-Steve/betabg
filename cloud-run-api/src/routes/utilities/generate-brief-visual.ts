@@ -166,6 +166,19 @@ REGLAS ESPECÍFICAS para prompt_generacion de VIDEO (Veo 3.1 — 8 segundos, 108
 
 Veo 3.1 rinde 10× mejor con prompts cinematográficos estructurados vs prompts planos tipo "mujer usando el producto". El prompt DEBE incluir estas 8 capas en este orden:
 
+REGLA DE ORO — EL PRODUCTO ES PROTAGONISTA:
+${productDesc || shopifyProducts.length > 0 ? `
+- El prompt DEBE nombrar el producto REAL del catálogo de la tienda (ej: "a Good Gres stoneware vase with visible clay texture and mineral glaze", NO "a ceramic product").
+- El producto debe ser VISUALMENTE PROTAGÓNICO al menos 4 de los 8 segundos (close-up macro, hero shot, o zoom).
+- En SUBJECT: describí el producto con nombre + material + detalles físicos específicos del catálogo.
+- En ACTION: la acción debe girar ALREDEDOR del producto (revelar, servir, sostener, acercar la cámara al producto, no solo "mujer sonriendo").
+- En AUDIO: si hay voz humana, debe mencionar explícitamente el nombre de la marca o el producto al menos una vez. Si no hay voz, el sonido diegético debe ser del producto en uso (clink de la cerámica, sirviendo agua, etc.).
+- Si el cliente NO eligió producto específico, usá el primer producto del <catalogo_disponible> como hero. NUNCA uses un producto genérico o alucinado.
+` : `
+- No hay productos reales disponibles. El video debe ser de marca/lifestyle SIN ningún producto visible. En SUBJECT y ACTION no hay producto — trabajar solo con persona + ambiente + emoción. En AUDIO evitar referencias a productos inexistentes.
+`}
+
+
 1. SUBJECT — qué/quién está en cámara (describir cara/ropa/objeto con detalle).
 2. ACTION — verbos concretos específicos ("pouring", "unboxing", "stirring", "sliding a finger along"). Evita "sonriendo", "usando".
 3. SCENE / SETTING — dónde + props específicos + hora del día.
