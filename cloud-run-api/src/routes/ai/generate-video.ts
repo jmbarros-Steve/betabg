@@ -8,6 +8,7 @@ import {
   type StudioAssets,
 } from '../../lib/brief-estudio-loader.js';
 import { pickTrackForAngleAndMood, type MusicMood } from '../../lib/music-library.js';
+import { runReplicatePrediction, ReplicateError } from '../../lib/replicate.js';
 
 // Google Veo 3.1 Preview (standard — max quality) via Gemini Developer API.
 // Same GEMINI_API_KEY as generate-image.ts (Imagen 4 Fast). Pricing: $0.40/sec
@@ -24,13 +25,35 @@ const VIDEO_CREDIT_COST = 30;                       // ~3x Kling cost (10) refle
 // Runway Gen-4 Turbo via Replicate — premium alternative to Veo. 10s default,
 // text+image-to-video, ~$0.05/s → $0.50/10s. 50 credits reflects higher perceived
 // quality (more cinematic camera moves, better motion coherence) and 10s length.
+// Kept as admin-forceable fallback — default for silent templates is now Seedance.
 const RUNWAY_REPLICATE_MODEL = 'runwayml/gen4-turbo';
 const RUNWAY_USD_COST = 0.50; // 10s at $0.05/s
 const RUNWAY_CREDIT_COST = 50;
 const RUNWAY_DURATION_SEC = 10;
 
+// Seedance 1 Pro via Replicate — default silent engine (replaces Runway Gen-4 Turbo).
+// Image-to-video / text-to-video, 2-12s @ 480p/720p/1080p @ 24fps. Single start-frame
+// ref via `image` (+ optional `last_frame_image` for continuity). Schema verified
+// against Replicate openapi_schema 2026-04-24 (version a5fd550893da3b6f...):
+//   - required: prompt
+//   - image (uri, nullable) — PRIMARY anchor (we pin producto here to fix "producto
+//     falso" bug — Runway would sometimes hallucinate the product because it only
+//     received the actor ref)
+//   - aspect_ratio enum: '16:9' | '4:3' | '1:1' | '3:4' | '9:16' | '21:9' | '9:21'
+//     (IGNORED when image is used — Seedance infers ratio from the input image)
+//   - resolution enum: '480p' | '720p' | '1080p'
+//   - duration: integer 2-12, default 5
+//   - last_frame_image (uri, nullable) — for end-frame continuity only
+//   - NOTE: Seedance does NOT accept multi-ref (no image_list/images/reference_images).
+//     So even with Seedance we must pick ONE anchor. Producto wins over actor.
+// Pricing: $3.00/10s, billed as 60 credits (20% over Runway's 50 to reflect cost).
+const SEEDANCE_REPLICATE_MODEL = 'bytedance/seedance-1-pro';
+const SEEDANCE_USD_COST = 3.00;
+const SEEDANCE_CREDIT_COST = 60;
+const SEEDANCE_DURATION_SEC = 10;
+
 type AspectRatio = '9:16' | '16:9' | '1:1';
-type VideoEngine = 'veo' | 'runway';
+type VideoEngine = 'veo' | 'runway' | 'seedance';
 
 // ── Hardcoded engine auto-select ───────────────────────────────────────────
 // The client NEVER chooses Veo vs Runway vs templates. Steve picks the right
@@ -60,12 +83,17 @@ const ANGLE_TEMPLATE: Record<string, string> = {
   'Us vs Them': 'before_after',
 };
 
+// Silent templates default to Seedance 1 Pro (replaces Runway Gen-4 Turbo).
+// Seedance still only accepts 1 image ref, but we now prioritize PRODUCT as the
+// anchor (the previous Runway path used actor→product, which made Runway
+// hallucinate fake versions of the product). Veo keeps all dialog angles.
+// Runway stays reachable via admin override `engine: 'runway'` for A/B testing.
 const TEMPLATE_ENGINE: Record<string, VideoEngine> = {
-  'hero_shot': 'runway',
-  'product_reveal': 'runway',
-  'unboxing': 'runway',
-  'before_after': 'runway',
-  'macro_detail': 'runway',
+  'hero_shot': 'seedance',
+  'product_reveal': 'seedance',
+  'unboxing': 'seedance',
+  'before_after': 'seedance',
+  'macro_detail': 'seedance',
   'lifestyle_ugc': 'veo',
   'talking_head': 'veo',
   'testimonial': 'veo',
@@ -77,7 +105,7 @@ function deriveTemplate(angulo: string | undefined): string {
 
 function deriveEngine(angulo: string | undefined): VideoEngine {
   const template = deriveTemplate(angulo);
-  return TEMPLATE_ENGINE[template] || 'runway';
+  return TEMPLATE_ENGINE[template] || 'seedance';
 }
 
 async function isSuperAdmin(supabase: SupabaseClient, userId: string | undefined): Promise<boolean> {
@@ -143,9 +171,18 @@ async function refundVideoCreditsOnce(
     console.log(`[generate-video] refund already applied for op ${operationName}, skipping`);
     return;
   }
-  const credits = engine === 'runway' ? RUNWAY_CREDIT_COST : VIDEO_CREDIT_COST;
-  const usd = engine === 'runway' ? RUNWAY_USD_COST : VIDEO_USD_COST;
-  const engineLabel = engine === 'runway' ? 'Runway Gen-4 Turbo' : 'Veo 3.1';
+  const credits =
+    engine === 'seedance' ? SEEDANCE_CREDIT_COST
+      : engine === 'runway' ? RUNWAY_CREDIT_COST
+        : VIDEO_CREDIT_COST;
+  const usd =
+    engine === 'seedance' ? SEEDANCE_USD_COST
+      : engine === 'runway' ? RUNWAY_USD_COST
+        : VIDEO_USD_COST;
+  const engineLabel =
+    engine === 'seedance' ? 'Seedance 1 Pro'
+      : engine === 'runway' ? 'Runway Gen-4 Turbo'
+        : 'Veo 3.1';
   await supabase.from('credit_transactions').insert({
     client_id: clientId,
     accion: `Refund video ${engineLabel} (${reason}) — ${refundMarker}`,
@@ -268,7 +305,8 @@ export async function generateVideo(c: Context) {
     const userId: string | undefined = user?.id;
     const autoEngine: VideoEngine = deriveEngine(angulo);
     let engineChoice: VideoEngine = autoEngine;
-    const explicitEngine: VideoEngine | null = engine === 'runway' || engine === 'veo' ? engine : null;
+    const explicitEngine: VideoEngine | null =
+      engine === 'runway' || engine === 'veo' || engine === 'seedance' ? engine : null;
     if (explicitEngine) {
       const adminOverride = await isSuperAdmin(supabase, userId);
       if (adminOverride) {
@@ -346,7 +384,21 @@ export async function generateVideo(c: Context) {
       }
     }
 
-    // Branch on engine. Runway uses Replicate, Veo uses Gemini Developer API.
+    // Branch on engine. Seedance + Runway use Replicate, Veo uses Gemini Developer API.
+    if (engineChoice === 'seedance') {
+      return runGenerateSeedance(c, supabase, {
+        clientId,
+        creativeId,
+        promptGeneracion,
+        referenceUrls,
+        finalAspect,
+        angulo,
+        studioMode,
+        studioAssets,
+        studioMusicTrackId,
+        moodKey,
+      });
+    }
     if (engineChoice === 'runway') {
       return runGenerateRunway(c, supabase, {
         clientId,
@@ -894,6 +946,202 @@ async function runGenerateRunway(
     asset_url: assetUrl,
     duration_seconds: RUNWAY_DURATION_SEC,
     generation_attempts: attempts,
+    studio_mode: studioMode || undefined,
+    music_track_id: studioMusicTrackId || undefined,
+  });
+}
+
+// Seedance 1 Pro via Replicate — default engine for silent templates (hero shot,
+// product reveal, unboxing, before/after, macro detail). Replaces Runway Gen-4
+// Turbo to fix the "producto falso" bug: Runway only accepts 1 image ref, and
+// when studio_mode sent actor + product, the first-listed (actor) was kept and
+// the product got hallucinated. Seedance also accepts only 1 ref — but we now
+// EXPLICITLY prioritize the product image so Seedance anchors the output on the
+// real SKU. The actor is described via the prompt text (Claude already enriches
+// promptGeneracion with actor traits when studio_mode is on).
+//
+// Uses the shared `runReplicatePrediction` helper (handles Prefer: wait +
+// polling + structured errors). Same MP4-to-Storage persistence pattern as
+// runGenerateRunway so frontend URLs don't expire after 24h.
+async function runGenerateSeedance(
+  c: Context,
+  supabase: SupabaseClient,
+  args: {
+    clientId: string;
+    creativeId?: string;
+    promptGeneracion: string;
+    referenceUrls: string[];
+    finalAspect: AspectRatio;
+    angulo?: string;
+    studioMode?: boolean;
+    studioAssets?: StudioAssets | null;
+    studioMusicTrackId?: string | null;
+    moodKey?: string | null;
+  },
+) {
+  const {
+    clientId,
+    creativeId,
+    promptGeneracion,
+    referenceUrls,
+    finalAspect,
+    angulo,
+    studioMode,
+    studioAssets,
+    studioMusicTrackId,
+    moodKey,
+  } = args;
+
+  const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
+  if (!REPLICATE_API_KEY) {
+    console.error('[generate-video:seedance] REPLICATE_API_KEY not configured');
+    return c.json({ error: 'REPLICATE_API_KEY no configurado en el servidor' }, 500);
+  }
+
+  // Seedance supports 9:16, 16:9, 1:1, 3:4, 4:3, 21:9, 9:21. The site-wide
+  // validated aspect is already 9:16 or 16:9 (see generateVideo). Note that
+  // Seedance IGNORES aspect_ratio when an image is provided (infers from image).
+  const seedanceRatio: string = finalAspect === '16:9' ? '16:9' : '9:16';
+
+  // Anchor-image selection — THE CRITICAL FIX for producto-falso.
+  //
+  // Previous Runway behavior (buggy): studio_mode passed [product, actor] via
+  // mergedFotoBaseUrls. referenceUrls[0] was the product, which Runway used as
+  // image input. Except the prompt often described an actor holding the product,
+  // so Runway tried to synthesize the actor AND the product and produced a fake
+  // version of both. When the actor was first (older code path) the product
+  // would just get replaced with a hallucinated similar-looking SKU.
+  //
+  // Seedance fix: we have the same 1-ref limit, but we're EXPLICIT: if a real
+  // product image is available (studio assets or first referenceUrl), use it.
+  // The actor is now text-described via the prompt enrichment done upstream
+  // (generate-brief-visual already bakes actor traits into promptGeneracion
+  // when studio_mode is on). This eliminates the "second subject from a photo"
+  // mismatch that Runway couldn't resolve.
+  let anchorImage: string | undefined;
+  const studioProductImage = studioAssets?.featured_products?.[0]?.image_url || null;
+  const studioActorImage = studioAssets?.primary_actor?.reference_images?.[0] || null;
+  if (studioMode && studioProductImage) {
+    anchorImage = studioProductImage;
+    console.log('[generate-video:seedance] anchor=producto (studio_mode)');
+  } else if (studioMode && studioActorImage) {
+    // Fallback: no product but we have actor — better than text-to-video.
+    anchorImage = studioActorImage;
+    console.log('[generate-video:seedance] anchor=actor (studio_mode, no producto)');
+  } else if (referenceUrls.length > 0) {
+    // Non-studio path: first ref wins (preserves legacy Runway behavior).
+    anchorImage = referenceUrls[0];
+    console.log('[generate-video:seedance] anchor=referenceUrls[0]');
+  }
+
+  const input: Record<string, any> = {
+    prompt: promptGeneracion,
+    duration: SEEDANCE_DURATION_SEC,
+    resolution: '1080p',
+    aspect_ratio: seedanceRatio, // Ignored by Seedance when image is set; harmless to send.
+    camera_fixed: false,
+  };
+  if (anchorImage) {
+    input.image = anchorImage;
+  }
+
+  const pseudoOpId = `seedance-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  // Persist generating state + log the transaction BEFORE the prediction runs,
+  // so a crash mid-call still leaves a traceable credit_transactions row + a
+  // creative in 'generando' state that the client can recover.
+  if (creativeId) {
+    await persistEngineToCreative(
+      supabase,
+      creativeId,
+      { prediction_id: pseudoOpId, estado: 'generando' },
+      { engine: 'seedance', template: deriveTemplate(angulo), angulo: angulo || null },
+    );
+  }
+  await supabase.from('credit_transactions').insert({
+    client_id: clientId,
+    accion: `Generar video Seedance 1 Pro (${SEEDANCE_DURATION_SEC}s, ${seedanceRatio}, 1080p) — op=${pseudoOpId}`,
+    creditos_usados: SEEDANCE_CREDIT_COST,
+    costo_real_usd: SEEDANCE_USD_COST,
+  });
+
+  let output: string | string[];
+  try {
+    output = await runReplicatePrediction<Record<string, any>, string | string[]>({
+      model: SEEDANCE_REPLICATE_MODEL,
+      input,
+      timeoutMs: 4 * 60_000, // 4 min wall clock — well under Cloud Run 5 min limit
+      preferWaitSeconds: 55,
+      pollIntervalMs: 6_000,
+    });
+  } catch (err) {
+    const msg = err instanceof ReplicateError ? err.message : (err as any)?.message || 'unknown';
+    console.error('[generate-video:seedance] prediction failed:', msg);
+    await refundVideoCreditsOnce(supabase, clientId, pseudoOpId, `seedance failed: ${msg.slice(0, 80)}`, 'seedance');
+    return c.json({ error: 'Seedance falló al generar el video', details: msg.slice(0, 300) }, 502);
+  }
+
+  // Replicate returns a URL string (or [string] depending on the model).
+  const videoUri: string | undefined = Array.isArray(output)
+    ? output[0]
+    : typeof output === 'string'
+      ? output
+      : undefined;
+  if (!videoUri) {
+    await refundVideoCreditsOnce(supabase, clientId, pseudoOpId, 'no video uri from seedance', 'seedance');
+    return c.json({ error: 'Seedance completó pero no devolvió URI' }, 502);
+  }
+
+  // Persist MP4 to Supabase Storage (Replicate CDN expires after 24h).
+  const dl = await fetch(videoUri, { signal: AbortSignal.timeout(60_000) });
+  if (!dl.ok) {
+    await refundVideoCreditsOnce(supabase, clientId, pseudoOpId, `mp4 download ${dl.status}`, 'seedance');
+    return c.json({ error: 'Video generado pero no se pudo descargar' }, 502);
+  }
+  const mp4Bytes = Buffer.from(await dl.arrayBuffer());
+  const storagePath = `${clientId}/ads/seedance_${pseudoOpId}.mp4`;
+  const { error: uploadErr } = await supabase
+    .storage
+    .from('client-assets')
+    .upload(storagePath, mp4Bytes, { contentType: 'video/mp4', upsert: true });
+  if (uploadErr) {
+    await refundVideoCreditsOnce(supabase, clientId, pseudoOpId, `storage: ${uploadErr.message}`, 'seedance');
+    return c.json({ error: 'No se pudo guardar el video de Seedance' }, 502);
+  }
+  const { data: pub } = supabase.storage.from('client-assets').getPublicUrl(storagePath);
+  const assetUrl = pub.publicUrl;
+
+  if (creativeId) {
+    await persistEngineToCreative(
+      supabase,
+      creativeId,
+      { asset_url: assetUrl, estado: 'listo', formato: 'video' },
+      { engine: 'seedance', template: deriveTemplate(angulo), angulo: angulo || null },
+    );
+    if (studioMode && studioAssets) {
+      try {
+        const snapshot = buildAssetSnapshot(studioAssets, {
+          mood_key: moodKey ?? null,
+          music_track_id: studioMusicTrackId ?? null,
+          featured_product_index: 0,
+        });
+        await supabase
+          .from('ad_creatives')
+          .update({ asset_snapshot: snapshot })
+          .eq('id', creativeId);
+      } catch (snapErr: any) {
+        console.warn('[generate-video:seedance][studio] asset_snapshot failed:', snapErr?.message);
+      }
+    }
+  }
+
+  return c.json({
+    success: true,
+    prediction_id: pseudoOpId,
+    status: 'listo',
+    engine: 'seedance',
+    asset_url: assetUrl,
+    duration_seconds: SEEDANCE_DURATION_SEC,
     studio_mode: studioMode || undefined,
     music_track_id: studioMusicTrackId || undefined,
   });
