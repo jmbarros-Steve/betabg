@@ -145,11 +145,21 @@ export async function loadStudioAssets(
 
   if (featuredRows.length > 0) {
     const ids = featuredRows.map((r) => r.shopify_product_id);
-    const { data: products } = await supabase
+    // CRITICAL: select solo columnas que existen en shopify_products.
+    // Schema real: id, shopify_product_id, title, product_type, image_url,
+    // price_min, price_max, description (NO hay `price` ni `body_html`).
+    // El bug original pedía `price` y `body_html` → query fallaba con 42703
+    // → featured_products llegaba VACÍO → bug del "producto falso" en Kling
+    // porque el actor era la única ref que llegaba al modelo.
+    const { data: products, error: prodErr } = await supabase
       .from('shopify_products')
-      .select('id, shopify_product_id, title, product_type, image_url, price, body_html')
+      .select('id, shopify_product_id, title, product_type, image_url, price_min, price_max, description')
       .eq('client_id', clientId)
       .in('shopify_product_id', ids);
+
+    if (prodErr) {
+      console.error('[brief-estudio-loader] shopify_products query failed:', prodErr.message);
+    }
 
     // Preservar el orden por priority: el primero en `featuredRows` es el top.
     const priorityMap = new Map(featuredRows.map((r) => [r.shopify_product_id, r.priority]));
@@ -159,8 +169,8 @@ export async function loadStudioAssets(
       title: (p.title as string) || '',
       product_type: (p.product_type as string) || null,
       image_url: (p.image_url as string) || null,
-      price: typeof p.price === 'number' ? p.price : p.price ? Number(p.price) : null,
-      body_html: (p.body_html as string) || null,
+      price: typeof p.price_min === 'number' ? p.price_min : p.price_min ? Number(p.price_min) : null,
+      body_html: (p.description as string) || null,
     }));
 
     hydrated.sort(
