@@ -2043,7 +2043,19 @@ function AdFormMultiSlot({
       {!isDpaCampaign && (
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <Label className="text-sm font-semibold">Creativos ({images.length} {images.length === 1 ? 'imagen' : 'imágenes'})</Label>
+          <Label className="text-sm font-semibold">
+            Creativos ({(() => {
+              const videoCount = images.filter(img => img && /\.(mp4|mov|webm|m4v)(\?|$)/i.test(img)).length;
+              const imageCount = images.filter(img => img && !/\.(mp4|mov|webm|m4v)(\?|$)/i.test(img)).length;
+              const emptyCount = images.filter(img => !img).length;
+              const parts: string[] = [];
+              if (videoCount > 0) parts.push(`${videoCount} ${videoCount === 1 ? 'video' : 'videos'}`);
+              if (imageCount > 0) parts.push(`${imageCount} ${imageCount === 1 ? 'imagen' : 'imágenes'}`);
+              if (parts.length === 0) return `${images.length} ${images.length === 1 ? 'slot vacío' : 'slots vacíos'}`;
+              if (emptyCount > 0) parts.push(`${emptyCount} ${emptyCount === 1 ? 'vacío' : 'vacíos'}`);
+              return parts.join(' + ');
+            })()})
+          </Label>
           <div className="flex gap-1">
             {canAddMoreImages && currentSlotIsImage && images.length < 10 && (
               <Button
@@ -2067,7 +2079,7 @@ function AdFormMultiSlot({
         </div>
 
         {adSetFormat === 'flexible' && images.length <= 3 && (
-          <p className="text-[11px] text-muted-foreground">Steve recomienda 3 imágenes para testing óptimo (DCT 3:2:2)</p>
+          <p className="text-[11px] text-muted-foreground">Steve recomienda 3 creativos (imágenes o videos) para testing óptimo (DCT 3:2:2)</p>
         )}
 
         {/* Image slot tabs. Wrapper is a DIV (not button) so the nested

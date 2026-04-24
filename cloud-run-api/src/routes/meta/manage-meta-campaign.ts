@@ -1850,17 +1850,48 @@ async function handleGeneratePreviews(
   }
 
   const linkData = creativeObj?.object_story_spec?.link_data;
-  if (linkData?.picture && !linkData.image_hash) {
-    try {
-      const upload = await uploadImageFromUrl(accountId, accessToken, linkData.picture);
-      if (upload.ok && upload.hash) {
-        linkData.image_hash = upload.hash;
-        delete linkData.picture;
-      } else {
-        console.warn('[handleGeneratePreviews] image upload failed — falling back to picture URL');
+  if (linkData?.picture) {
+    const rawUrl = String(linkData.picture);
+    const isVideoUrl = /\.(mp4|mov|webm|m4v)(\?|$)/i.test(rawUrl);
+
+    if (isVideoUrl) {
+      // Meta's /generatepreviews rejects mp4 URLs as `picture` — it fetches
+      // them expecting an image. For videos we must convert link_data into
+      // video_data with a real video_id + thumbnail hash.
+      try {
+        const vid = await uploadVideoFromUrl(accountId, accessToken, rawUrl, 'Preview video');
+        if (vid.ok && vid.videoId) {
+          const thumbHash = await getVideoThumbnailHash(accountId, accessToken, vid.videoId);
+          const videoData: Record<string, any> = {
+            video_id: vid.videoId,
+            title: linkData.name || '',
+            message: linkData.message || '',
+            link_description: linkData.description || '',
+            call_to_action: linkData.call_to_action,
+          };
+          if (thumbHash) videoData.image_hash = thumbHash;
+          // Swap link_data for video_data — required shape for single video ads
+          delete creativeObj.object_story_spec.link_data;
+          creativeObj.object_story_spec.video_data = videoData;
+          console.log(`[handleGeneratePreviews] swapped video link to video_data (id=${vid.videoId}, thumb=${thumbHash ? 'yes' : 'no'})`);
+        } else {
+          console.warn('[handleGeneratePreviews] video upload failed — preview will likely show error:', vid.error);
+        }
+      } catch (e: any) {
+        console.warn('[handleGeneratePreviews] video upload threw:', e?.message);
       }
-    } catch (e: any) {
-      console.warn('[handleGeneratePreviews] image upload threw:', e?.message);
+    } else if (!linkData.image_hash) {
+      try {
+        const upload = await uploadImageFromUrl(accountId, accessToken, rawUrl);
+        if (upload.ok && upload.hash) {
+          linkData.image_hash = upload.hash;
+          delete linkData.picture;
+        } else {
+          console.warn('[handleGeneratePreviews] image upload failed — falling back to picture URL');
+        }
+      } catch (e: any) {
+        console.warn('[handleGeneratePreviews] image upload threw:', e?.message);
+      }
     }
   }
 
