@@ -21,6 +21,7 @@ import { getUserClientIds } from '../../lib/user-scoping.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { runReplicatePrediction, ReplicateError } from '../../lib/replicate.js';
 import { syncClientShopifyProducts } from '../cron/sync-shopify-products.js';
+import { anthropicFetch } from '../../lib/anthropic-fetch.js';
 import {
   MUSIC_LIBRARY_SEED,
   MOOD_LABELS_ES,
@@ -689,28 +690,137 @@ interface PersonaContext {
   country: string | null;
   lifestyle: string | null;
   tone: string | null;
+  brandName: string | null;
+  brandCategory: string | null;
+  brandAesthetic: string | null;
   tags: string[];
+}
+
+/**
+ * Extrae un campo de un texto libre buscando "Clave: Valor\n". Case-insensitive.
+ * Devuelve el primer match que aparezca. Útil para parsear `raw_responses` del
+ * brief que viene en formato "👤 Nombre ficticio: Francisca\n🎂 Edad: 35\n...".
+ */
+function matchFieldInText(text: string, labels: string[]): string | null {
+  for (const label of labels) {
+    const re = new RegExp(`${label}\\s*:\\s*([^\\n\\r]+)`, 'i');
+    const m = text.match(re);
+    if (m && m[1]) {
+      const val = m[1].trim();
+      if (val && val.length < 200) return val;
+    }
+  }
+  return null;
+}
+
+/**
+ * Concatena todos los raw_responses de persona_data a un solo string para
+ * que matchFieldInText pueda escanearlo.
+ */
+function personaRawText(personaData: Record<string, unknown> | null | undefined): string {
+  if (!personaData) return '';
+  const raw = (personaData as { raw_responses?: unknown }).raw_responses;
+  if (!Array.isArray(raw)) return '';
+  return raw.filter((s): s is string => typeof s === 'string').join('\n');
+}
+
+/**
+ * Normaliza un género crudo del brief (puede venir como "Mujer", "Hombre",
+ * "Femenino", "Masculino", "Female", "Male", "Unisex", etc.) a inglés simple
+ * para el prompt de Flux: "woman" | "man" | "person" (fallback neutral).
+ */
+function normalizeGender(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const v = raw.toLowerCase().trim();
+  if (/^(mujer|femenino|female|woman|f)\b/.test(v)) return 'woman';
+  if (/^(hombre|masculino|male|man|m)\b/.test(v)) return 'man';
+  if (/^(unisex|ambos|cualquier)/.test(v)) return 'person';
+  return null;
+}
+
+/**
+ * Extrae país de un string tipo "Chile", "Puerto Varas, Chile", "Santiago, Chile".
+ * Prioriza "Chile" / "Argentina" / etc. sobre nombres de ciudad.
+ */
+function normalizeCountry(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const v = raw.trim();
+  const countries = ['Chile', 'Argentina', 'México', 'Mexico', 'Colombia', 'Perú', 'Peru', 'Uruguay', 'Brasil', 'Brazil', 'España', 'Spain'];
+  for (const c of countries) {
+    if (new RegExp(`\\b${c}\\b`, 'i').test(v)) return c;
+  }
+  // Si no detectamos país conocido, devolvemos "Latin American" salvo que venga un valor útil.
+  if (v.length > 3 && v.length < 80) return v;
+  return null;
+}
+
+/**
+ * Lee la primera fila de brand_research que calce (filtro por types o cualquier).
+ */
+function findResearch(
+  allResearch: Array<{ research_type: string; research_data: Record<string, unknown> | null }>,
+  types: string[],
+): Record<string, unknown> | null {
+  for (const t of types) {
+    const row = allResearch.find((r) => r.research_type === t);
+    if (row?.research_data) return row.research_data;
+  }
+  return null;
 }
 
 function extractPersonaContext(
   personaData: Record<string, unknown> | null | undefined,
-  briefData: Record<string, unknown> | null | undefined,
+  allResearch: Array<{ research_type: string; research_data: Record<string, unknown> | null }>,
 ): PersonaContext {
+  const brief = findResearch(allResearch, ['brand_brief']);
+  const summary = findResearch(allResearch, ['executive_summary', 'brand_strategy', 'analysis_progress']);
+  const personaText = personaRawText(personaData);
+  const summaryText = summary ? JSON.stringify(summary).slice(0, 8000) : '';
+
+  // Age — prueba fields estructurados, fallback a regex sobre raw_responses.
   const age =
     pickField(personaData, ['age', 'edad', 'age_range', 'rango_edad']) ||
-    pickField(briefData, ['target_age', 'edad_objetivo']);
-  const gender =
+    pickField(brief, ['target_age', 'edad_objetivo']) ||
+    matchFieldInText(personaText, ['Edad', 'Age']);
+
+  // Gender — idem.
+  const genderRaw =
     pickField(personaData, ['gender', 'genero', 'sex']) ||
-    pickField(briefData, ['target_gender', 'genero_objetivo']);
-  const country =
+    pickField(brief, ['target_gender', 'genero_objetivo']) ||
+    matchFieldInText(personaText, ['Género', 'Genero', 'Gender', 'Sexo']);
+  const gender = normalizeGender(genderRaw);
+
+  // Country/location.
+  const countryRaw =
     pickField(personaData, ['country', 'pais', 'location', 'ubicacion']) ||
-    pickField(briefData, ['country', 'pais']);
+    pickField(brief, ['country', 'pais']) ||
+    matchFieldInText(personaText, ['País', 'Pais', 'Country', 'Ciudad', 'Zona', 'Location', 'Ubicación']);
+  const country = normalizeCountry(countryRaw);
+
+  // Lifestyle / ocupación.
   const lifestyle =
     pickField(personaData, ['lifestyle', 'estilo_vida', 'ocupacion', 'occupation']) ||
-    pickField(briefData, ['lifestyle', 'estilo_vida']);
+    pickField(brief, ['lifestyle', 'estilo_vida']) ||
+    matchFieldInText(personaText, ['Ocupación', 'Ocupacion', 'Occupation', 'Lifestyle', 'Estilo de vida']);
+
   const tone =
-    pickField(briefData, ['brand_tone', 'tono_marca', 'tone', 'tono']) ||
+    pickField(brief, ['brand_tone', 'tono_marca', 'tone', 'tono']) ||
     pickField(personaData, ['tone', 'tono']);
+
+  // Brand context — del executive_summary o brand_brief.
+  const brandName =
+    pickField(brief, ['brand_name', 'nombre_marca', 'business_name']) ||
+    matchFieldInText(summaryText, ['brand_name', 'nombre de la marca', 'marca']) ||
+    matchFieldInText(personaText, ['URL de tu sitio web', 'sitio web']);
+
+  const brandCategory =
+    pickField(brief, ['business_category', 'category', 'product_category']) ||
+    matchFieldInText(summaryText, ['categoria', 'categoría', 'product_category', 'business_category']);
+
+  // Estética / descripción visual — a menudo es narrative, tomamos un snippet.
+  const brandAesthetic =
+    pickField(brief, ['brand_aesthetic', 'aesthetic', 'estetica', 'brand_style']) ||
+    (summaryText.length > 0 ? extractAestheticSnippet(summaryText) : null);
 
   return {
     age,
@@ -718,29 +828,173 @@ function extractPersonaContext(
     country,
     lifestyle,
     tone,
-    tags: extractPersonaTags(personaData, briefData),
+    brandName,
+    brandCategory,
+    brandAesthetic,
+    tags: extractPersonaTags(personaData, brief),
   };
+}
+
+/**
+ * De un JSON stringifica'o del executive_summary, extrae 150-300 chars que
+ * describan visualmente la marca (producto, estética, patrimonio cultural).
+ * No es perfecto pero suficiente para dar contexto a Flux.
+ */
+function extractAestheticSnippet(text: string): string | null {
+  // Busca descripciones típicas del brand.
+  const patterns = [
+    /descripcion["'\s:]+([^"]{80,400})/i,
+    /producto["'\s:]+([^"]{60,300})/i,
+    /estetica["'\s:]+([^"]{40,300})/i,
+    /patrimonio[^"]{20,300}/i,
+    /inspirad[ao][^"]{20,250}/i,
+  ];
+  for (const p of patterns) {
+    const m = text.match(p);
+    if (m) return (m[1] || m[0]).replace(/[\\n"]+/g, ' ').trim().slice(0, 300);
+  }
+  return null;
 }
 
 type ActorVariant = 'actor_safe' | 'actor_casual' | 'actor_editorial';
 
-function buildActorPrompt(variant: ActorVariant, p: PersonaContext): string {
+interface SceneSet {
+  safe: string;
+  casual: string;
+  editorial: string;
+}
+
+/**
+ * Usa Claude Haiku para traducir el contexto crudo del brief al inglés y
+ * generar 3 descripciones de escena específicas al universo de la marca.
+ * Esto evita los prompts genéricos de "urban café" cuando la marca es, por
+ * ejemplo, cerámica artesanal del sur de Chile o ropa fitness.
+ *
+ * Devuelve null si falla (Claude caído, API key ausente, JSON inválido) —
+ * el caller debe hacer fallback a los prompts legacy.
+ */
+async function buildSmartActorContext(
+  personaData: Record<string, unknown> | null | undefined,
+  allResearch: Array<{ research_type: string; research_data: Record<string, unknown> | null }>,
+): Promise<{
+  persona: { age: string; gender: 'woman' | 'man' | 'person'; country: string; lifestyle: string };
+  brand: { name: string; category: string; aestheticKeywords: string };
+  scenes: SceneSet;
+} | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    console.warn('[brief-estudio][smart-ctx] ANTHROPIC_API_KEY missing, fallback to regex');
+    return null;
+  }
+
+  const personaBlob = personaData ? JSON.stringify(personaData).slice(0, 4000) : '(vacío)';
+  const researchBlob = allResearch
+    .map((r) => `[${r.research_type}] ${r.research_data ? JSON.stringify(r.research_data).slice(0, 3000) : ''}`)
+    .join('\n\n')
+    .slice(0, 9000);
+
+  const systemPrompt = `You are a senior Meta Ads creative director. Given a client's buyer persona and brand research, output a JSON describing the target customer AND three photo scenes to cast an actor for their ad campaigns. All output in ENGLISH.
+
+CRITICAL RULES:
+1. Scenes MUST match the brand's real world. Handcrafted ceramics from southern Chile → artisan workshop, rustic kitchen, forest backdrop. Streetwear brand → urban streets, skate park. Fitness brand → gym, trail. Luxury jewelry → minimalist studio, marble surfaces. NEVER default to generic "city café" unless the brand is actually urban.
+2. Each scene describes SETTING, LIGHTING, PROPS, ATMOSPHERE. Do NOT describe the person — they go separately.
+3. Keep each scene 30-80 words, vivid visual details.
+4. Translate all persona/brand fields to English. Examples: "Dueña de casa" → "homemaker", "cerámica gres artesanal" → "handcrafted stoneware ceramics".
+
+Output STRICTLY this JSON shape with NO markdown fences, NO prose before or after:
+{"persona":{"age":"","gender":"woman|man|person","country":"","lifestyle":""},"brand":{"name":"","category":"","aestheticKeywords":""},"scenes":{"safe":"","casual":"","editorial":""}}`;
+
+  const userPrompt = `BUYER PERSONA (raw from brief):
+${personaBlob}
+
+BRAND RESEARCH (multiple types concatenated):
+${researchBlob}
+
+Return the JSON now.`;
+
+  try {
+    const res = await anthropicFetch(
+      {
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1400,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      },
+      apiKey,
+      { timeoutMs: 20_000 },
+    );
+    if (!res.ok) {
+      console.warn('[brief-estudio][smart-ctx] claude not ok:', res.status);
+      return null;
+    }
+    const text = (res.data?.content?.[0]?.text || '').trim();
+    if (!text) return null;
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.warn('[brief-estudio][smart-ctx] no JSON in claude response');
+      return null;
+    }
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!parsed?.persona || !parsed?.brand || !parsed?.scenes) return null;
+    if (!parsed.scenes.safe || !parsed.scenes.casual || !parsed.scenes.editorial) return null;
+    return parsed;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn('[brief-estudio][smart-ctx] failed:', msg);
+    return null;
+  }
+}
+
+function buildActorPrompt(variant: ActorVariant, p: PersonaContext, scenes?: SceneSet | null): string {
+  // Demo básico del target customer (todos los campos ya vienen en inglés si
+  // buildSmartActorContext corrió bien; si no, llegan en español crudo).
   const gender = p.gender || 'person';
-  const age = p.age || 'adult';
+  const age = p.age ? `${p.age} year old` : 'adult';
   const country = p.country ? `from ${p.country}` : 'Latin American';
-  const lifestyle = p.lifestyle ? `, ${p.lifestyle} lifestyle` : '';
+  const lifestyle = p.lifestyle ? `, ${p.lifestyle}` : '';
   const subject = `A ${age} ${gender} ${country}${lifestyle}`;
 
-  const common = `Real human, natural skin texture with pores and subtle imperfections, genuine expression, ultra-realistic photograph, sharp focus. No illustrations, no 3D renders, no AI artifacts, no plastic skin, no airbrushing. Single person, no logos, no text. Vertical portrait framing.`;
-
-  switch (variant) {
-    case 'actor_safe':
-      return `${subject}. Professional portrait, neutral studio background, soft even lighting (softbox), looking at camera with a warm confident expression. Classic casting headshot style. ${common}`;
-    case 'actor_casual':
-      return `${subject}. Urban everyday lifestyle: walking through a real city street or neighborhood café, natural daylight, candid relaxed mood. Documentary photography aesthetic. ${common}`;
-    case 'actor_editorial':
-      return `${subject}. Aspirational editorial magazine cover look: cinematic lighting, stylish but accessible wardrobe, confident posture, slight motion. Modern high-end lifestyle magazine aesthetic. ${common}`;
+  // Contexto de marca.
+  const brandBits: string[] = [];
+  if (p.brandName) brandBits.push(`target customer of the brand "${p.brandName}"`);
+  if (p.brandCategory) brandBits.push(`which sells ${p.brandCategory}`);
+  if (p.brandAesthetic) {
+    const clean = p.brandAesthetic.replace(/["\\\n\r]+/g, ' ').slice(0, 220);
+    brandBits.push(`brand aesthetic: ${clean}`);
   }
+  const brandContext = brandBits.length > 0 ? ` — ${brandBits.join(', ')}` : '';
+
+  const common = `Real human, natural skin texture with pores and subtle imperfections, genuine expression, ultra-realistic photograph, sharp focus. No illustrations, no 3D renders, no AI artifacts, no plastic skin, no airbrushing. Single person, no logos, no text on image. Vertical portrait framing.`;
+
+  // Escena — si la generó la IA, usamos esa. Si no, fallback legacy genérico.
+  let sceneInstruction: string;
+  if (scenes) {
+    const sceneText =
+      variant === 'actor_safe'
+        ? scenes.safe
+        : variant === 'actor_casual'
+          ? scenes.casual
+          : scenes.editorial;
+    sceneInstruction = `Scene: ${sceneText.replace(/["\\\n\r]+/g, ' ').slice(0, 500)}`;
+  } else {
+    sceneInstruction =
+      variant === 'actor_safe'
+        ? 'Professional casting portrait, neutral studio background, soft even lighting (softbox), classic headshot composition.'
+        : variant === 'actor_casual'
+          ? 'Everyday lifestyle scene matching the brand\'s world, natural daylight, candid relaxed mood, documentary photography aesthetic.'
+          : 'Aspirational editorial magazine look matching the brand\'s aesthetic, cinematic lighting, confident posture.';
+  }
+
+  // Styling / wardrobe instruction varía por variante.
+  const styling =
+    variant === 'actor_safe'
+      ? 'Wardrobe: clean, minimal, true to the brand identity. Expression: warm confident, looking at camera.'
+      : variant === 'actor_casual'
+        ? 'Wardrobe: authentic everyday clothing aligned with the brand. Expression: natural, candid, doing something plausible in the scene.'
+        : 'Wardrobe: styled but accessible, reflecting the brand aesthetic. Posture: confident, slight motion, aspirational but believable.';
+
+  return `${subject}${brandContext}. ${sceneInstruction} ${styling} ${common}`;
 }
 
 // ----------------------------- Handlers --------------------------------------
@@ -818,23 +1072,40 @@ export async function generateActors(c: Context) {
       );
     }
 
-    const brief = await safeQuerySingleOrDefault<{ research_data: Record<string, unknown> | null }>(
-      supabase
-        .from('brand_research')
-        .select('research_data')
-        .eq('client_id', clientId)
-        .eq('research_type', 'brand_brief')
-        .maybeSingle(),
-      null,
-      'generateActors.brandResearch',
-    );
+    // Leer TODOS los research_types del cliente (brand_brief, executive_summary,
+    // brand_strategy, etc.). Algunos proyectos tienen la data distribuida en
+    // múltiples rows — concatenamos todo para enriquecer el prompt.
+    const { data: allResearch } = await supabase
+      .from('brand_research')
+      .select('research_type,research_data')
+      .eq('client_id', clientId);
 
-    const personaCtx = extractPersonaContext(persona.persona_data, brief?.research_data);
+    // Intentamos construir contexto enriquecido con Claude (traduce al inglés
+    // y genera 3 escenas específicas del mundo de la marca). Si Claude cae,
+    // usamos el extractor por regex como fallback.
+    const smartCtx = await buildSmartActorContext(persona.persona_data, allResearch ?? []);
+    const personaCtx: PersonaContext = smartCtx
+      ? {
+          age: smartCtx.persona.age || null,
+          gender: smartCtx.persona.gender || null,
+          country: smartCtx.persona.country || null,
+          lifestyle: smartCtx.persona.lifestyle || null,
+          tone: null,
+          brandName: smartCtx.brand.name || null,
+          brandCategory: smartCtx.brand.category || null,
+          brandAesthetic: smartCtx.brand.aestheticKeywords || null,
+          tags: extractPersonaTags(persona.persona_data, findResearch(allResearch ?? [], ['brand_brief'])),
+        }
+      : extractPersonaContext(persona.persona_data, allResearch ?? []);
+
+    if (!smartCtx) {
+      console.warn('[brief-estudio][generate-actors] smart context unavailable, using regex fallback');
+    }
 
     const variants: ActorVariant[] = ['actor_safe', 'actor_casual', 'actor_editorial'];
     const prompts = variants.map((v) => ({
       variant: v,
-      prompt: buildActorPrompt(v, personaCtx),
+      prompt: buildActorPrompt(v, personaCtx, smartCtx?.scenes ?? null),
     }));
 
     // Fire 3 Flux predictions in parallel.
