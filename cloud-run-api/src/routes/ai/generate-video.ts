@@ -1263,15 +1263,29 @@ async function runGenerateKling(
     console.log('[generate-video:kling] no refs available — pure text-to-video (worse results expected)');
   }
 
-  // Build the final prompt. When studio_mode + multi-ref, prepend Kling's
-  // native template tokens so the model knows image_1 is the producto and
-  // image_2 is the actor. Without these tokens, Kling treats reference_images
-  // as a soup — exactly the bug we're fixing.
+  // Build the final prompt. When studio_mode + multi-ref, prepend ABSOLUTE
+  // CONTENT RULES that Kling respects above the scene description. Without
+  // these, Kling prioritizes the prose of the scene (which usually describes
+  // the actor) and the product gets "hallucinated" (producto falso bug).
+  //
+  // Balance: product must stay RECOGNIZABLE and occupy ≥25% of frame, but
+  // the actor can still appear FULLY (full body, portrait, three-quarter).
+  // Neither eclipses the other — they share the scene.
   let finalPrompt = promptGeneracion;
   if (studioMode && refsToUse.length >= 2 && studioProductImage && studioActorImage) {
-    finalPrompt = `<<<image_1>>> is the real product (preserve its exact shape, colors, and packaging). <<<image_2>>> is the human actor (preserve their face and body). ${promptGeneracion}`;
+    finalPrompt = [
+      'ABSOLUTE CONTENT RULES:',
+      '- <<<image_1>>> IS THE PRODUCT. Must be shown EXACTLY as in the reference: same shape, colors, packaging, textures, labels. Do NOT modify, redesign, or invent a different product.',
+      '- The product MUST be clearly visible and recognizable, occupying at least ~25% of the frame. Not a tiny detail in the corner. Not a blurred background element.',
+      '- <<<image_2>>> is the human actor. Can appear fully (full body, portrait, three-quarter shot) OR partially (hands, partial body). Both are fine — what matters is the product stays recognizable.',
+      '- The product and the actor share the scene. Neither eclipses the other.',
+      '- Never invent a different product. Never make the product unrecognizable.',
+      '',
+      'Scene context (supporting the ABSOLUTE RULES above, not replacing them):',
+      promptGeneracion,
+    ].join('\n');
   } else if (refsToUse.length >= 1) {
-    finalPrompt = `<<<image_1>>> is the primary reference (preserve its exact appearance). ${promptGeneracion}`;
+    finalPrompt = `<<<image_1>>> is the primary reference — preserve its exact appearance (shape, colors, details). It must be clearly visible and recognizable in the scene. ${promptGeneracion}`;
   }
   // Kling v3 Omni prompt cap is 2500 chars — truncate just in case.
   if (finalPrompt.length > 2500) {
