@@ -1718,7 +1718,7 @@ function CreativeFocusStep({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <Label className="text-sm font-semibold">
-              {useStudioPicker ? 'Tus productos destacados (Brief Estudio)' : 'Selecciona un producto de Shopify'}
+              {useStudioPicker ? 'Tus productos destacados (Estudio Creativo)' : 'Selecciona un producto de Shopify'}
             </Label>
             {useStudioPicker && (
               <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20">
@@ -4099,9 +4099,11 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   // Rollback / feature flag:
   //   localStorage.FEATURE_BRIEF_ESTUDIO === 'off' → off aunque studio_ready=true
   //   VITE_FEATURE_BRIEF_ESTUDIO === 'off' → off global sin deploy
-  const briefEstudioFeatureFlag = useMemo(() => {
+  // Reactive a 'storage' events: si otra pestaña apaga el flag, esta pestaña
+  // lo refleja sin reload. Dentro de la misma pestaña requiere reload.
+  function readBriefEstudioFlag(): boolean {
     try {
-      const envVal = (import.meta.env as any)?.VITE_FEATURE_BRIEF_ESTUDIO;
+      const envVal = (import.meta.env as { VITE_FEATURE_BRIEF_ESTUDIO?: string })?.VITE_FEATURE_BRIEF_ESTUDIO;
       if (typeof envVal === 'string' && envVal.trim().toLowerCase() === 'off') return false;
     } catch { /* no env */ }
     try {
@@ -4109,6 +4111,16 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       if (typeof lsVal === 'string' && lsVal.trim().toLowerCase() === 'off') return false;
     } catch { /* no ls */ }
     return true;
+  }
+  const [briefEstudioFeatureFlag, setBriefEstudioFeatureFlag] = useState<boolean>(readBriefEstudioFlag);
+  useEffect(() => {
+    function onStorageChange(e: StorageEvent) {
+      if (e.key === 'FEATURE_BRIEF_ESTUDIO') {
+        setBriefEstudioFeatureFlag(readBriefEstudioFlag());
+      }
+    }
+    window.addEventListener('storage', onStorageChange);
+    return () => window.removeEventListener('storage', onStorageChange);
   }, []);
 
   interface StudioAssetsShape {
@@ -4187,12 +4199,18 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   }, [isStudioMode, studioAssets, clientId, studioFeaturedProducts]);
 
   // Preselect primer producto destacado cuando el wizard llega a la fase de
-  // enfoque y studio_mode está activo. Solo lo hace si el usuario aún no
-  // eligió uno para no sobrescribir selecciones manuales.
+  // enfoque y studio_mode está activo. Usamos una ref para que el auto-preselect
+  // se dispare UNA sola vez: si el usuario selecciona manualmente un producto
+  // mientras el fetch de studioFeaturedProducts está corriendo, al resolver el
+  // fetch este effect no pisa su elección (el `selectedProduct` guard podía
+  // fallar por orden de microtasks en la ventana de carrera).
+  const didAutoPreselectStudioRef = useRef(false);
   useEffect(() => {
     if (!isStudioMode) return;
-    if (selectedProduct) return;
+    if (didAutoPreselectStudioRef.current) return;
+    if (selectedProduct) { didAutoPreselectStudioRef.current = true; return; }
     if (!studioFeaturedProducts || studioFeaturedProducts.length === 0) return;
+    didAutoPreselectStudioRef.current = true;
     setSelectedProduct(studioFeaturedProducts[0]);
     setFocusType('product');
   }, [isStudioMode, studioFeaturedProducts, selectedProduct]);
@@ -5344,7 +5362,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
               <Sparkles className="w-5 h-5 text-primary" /> Modo Estudio
             </h3>
             <p className="text-sm text-muted-foreground">
-              Steve va a usar automáticamente los assets que configuraste en el Brief Estudio:
+              Steve va a usar automáticamente los assets que configuraste en el Estudio Creativo:
             </p>
             <ul className="text-sm space-y-1.5 list-disc pl-5">
               <li><strong>Actor oficial</strong> de la marca en las escenas con personas.</li>
@@ -5353,12 +5371,12 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
               <li><strong>Mood musical</strong> — track seleccionado según ángulo y humor de tu marca.</li>
             </ul>
             <p className="text-xs text-muted-foreground">
-              Al editar el Brief Estudio, los anuncios ya publicados no se ven afectados — cada anuncio guarda un snapshot inmutable de los assets usados.
+              Al editar el Estudio Creativo, los anuncios ya publicados no se ven afectados — cada anuncio guarda un snapshot inmutable de los assets usados.
             </p>
             <div className="flex gap-2 justify-end pt-2">
               <Button variant="outline" size="sm" onClick={() => setStudioDialogOpen(false)}>Cerrar</Button>
               <Button size="sm" onClick={() => { setStudioDialogOpen(false); window.location.href = '/client-portal?tab=brief_estudio'; }}>
-                Ir al Brief Estudio
+                Ir al Estudio Creativo
               </Button>
             </div>
           </div>
@@ -5376,7 +5394,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
             <div className="flex-1 text-xs">
               <p className="font-semibold text-foreground">Activá el Modo Estudio</p>
               <p className="text-muted-foreground mt-0.5">
-                Generá anuncios con tu actor, voz y música oficiales. Te falta completar algunos pasos del Brief Estudio.
+                Generá anuncios con tu actor, voz y música oficiales. Te falta completar algunos pasos del Estudio Creativo.
               </p>
             </div>
             <div className="flex gap-1 shrink-0">

@@ -392,7 +392,7 @@ function Header({
             <Clapperboard className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Brief Estudio</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Estudio Creativo</h1>
             <p className="text-sm text-slate-500">
               Arma tu elenco, voz, productos y música para crear creatividades con Steve.
             </p>
@@ -1806,7 +1806,8 @@ function SectionMusica({
           try {
             const resp = await fetch(firstTrack.preview_url, { method: 'HEAD' });
             setPreviewsAvailable({ __global: resp.ok });
-          } catch {
+          } catch (err) {
+            console.warn('[brief-estudio] music preview HEAD failed (CORS o 404)', err);
             setPreviewsAvailable({ __global: false });
           }
         }

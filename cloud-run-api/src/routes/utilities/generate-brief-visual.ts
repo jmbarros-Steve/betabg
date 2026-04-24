@@ -482,6 +482,15 @@ REGLA CRÍTICA DE VARIACIÓN: Cada prompt_generacion debe ser ÚNICO y CREATIVO.
       const fotoValue = typeof parsed?.foto_recomendada === 'string' ? parsed.foto_recomendada : '';
       const looksValid = /^https?:\/\//i.test(fotoValue.trim());
       if (!looksValid && studioMeta.featured_product_image) {
+        if (fotoValue.trim().length > 0) {
+          // AI devolvió algo que no es http(s) — lo descartamos en favor del
+          // producto destacado real. Logueamos para detectar si pasa seguido
+          // (podría ser ruta relativa válida de storage que estamos perdiendo).
+          console.warn(
+            '[generate-brief-visual][studio] descartando foto_recomendada no-http:',
+            fotoValue.slice(0, 120),
+          );
+        }
         parsed.foto_recomendada = studioMeta.featured_product_image;
       }
     } catch (err: any) {

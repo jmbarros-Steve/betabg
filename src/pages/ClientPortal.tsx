@@ -324,7 +324,7 @@ export default function ClientPortal() {
   ] as const;
 
   const secondaryTabs = [
-    { id: 'brief_estudio', label: 'Brief Estudio', icon: Clapperboard },
+    { id: 'brief_estudio', label: 'Estudio Creativo', icon: Clapperboard },
     { id: 'shopify', label: 'Shopify', icon: ShoppingBag },
     { id: 'campaigns', label: 'Campañas', icon: PieChart },
     { id: 'deepdive', label: 'Deep Dive', icon: Code },
@@ -535,7 +535,7 @@ export default function ClientPortal() {
           )}
           {visitedTabs.has('brief_estudio') && effectiveClientId && (
             <div className={activeTab !== 'brief_estudio' || !userCanAccessTab('brief_estudio') ? 'hidden' : ''}>
-              <TabErrorBoundary tabName="Brief Estudio">
+              <TabErrorBoundary tabName="Estudio Creativo">
                 <BriefEstudio clientId={effectiveClientId} />
               </TabErrorBoundary>
             </div>

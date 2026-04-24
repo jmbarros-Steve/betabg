@@ -399,7 +399,11 @@ export async function saveBriefEstudio(c: Context) {
     // --- Music: upsert 1:1 por cliente ---
     if (body.music) {
       const moods = sanitizeStringArray(body.music.moods);
-      const keywords = isNonEmptyString(body.music.keywords) ? body.music.keywords : null;
+      // Truncar a 2000 chars para evitar que un cliente pueda guardar 10MB de
+      // texto libre y saturar la tabla. El CHECK constraint en DB también lo
+      // bloquea, pero truncamos silenciosamente en vez de devolver error.
+      const keywordsRaw = isNonEmptyString(body.music.keywords) ? body.music.keywords.slice(0, 2000).trim() : '';
+      const keywords = keywordsRaw.length > 0 ? keywordsRaw : null;
 
       const { error: musicErr } = await supabase
         .from('brand_music_preferences')
@@ -1101,6 +1105,18 @@ const MAX_AUDIO_BYTES = 5 * 1024 * 1024; // 5MB
 export async function cloneVoice(c: Context) {
   let clientId: string | undefined;
   try {
+    // Guard: reject oversized bodies BEFORE parsing JSON to avoid OOM on
+    // Cloud Run. MAX_AUDIO_BYTES (5MB raw) + ~35% base64 overhead + JSON
+    // metadata → 8MB cap on the request body itself.
+    const MAX_BODY_BYTES = 8 * 1024 * 1024;
+    const contentLength = Number(c.req.header('content-length') || 0);
+    if (contentLength > 0 && contentLength > MAX_BODY_BYTES) {
+      return c.json(
+        { error: `Request demasiado grande (máx ${MAX_BODY_BYTES / (1024 * 1024)}MB)` },
+        413,
+      );
+    }
+
     const body = (await c.req.json().catch(() => ({}))) as {
       client_id?: string;
       audio_base64?: string;
@@ -1544,12 +1560,10 @@ export async function generateMusicPreviews(c: Context) {
       failures: Array<{ id: string; error: string }>;
     } = { generated: 0, skipped: 0, failures: [] };
 
-    for (const track of MUSIC_LIBRARY_SEED) {
-      if (existing.has(track.id)) {
-        results.skipped += 1;
-        continue;
-      }
-
+    // Procesar 1 track: devuelve ok/error.
+    async function renderSingleTrack(
+      track: (typeof MUSIC_LIBRARY_SEED)[number],
+    ): Promise<{ ok: true } | { ok: false; error: string }> {
       try {
         const prediction = await runReplicatePrediction<
           Record<string, unknown>,
@@ -1563,7 +1577,7 @@ export async function generateMusicPreviews(c: Context) {
             output_format: 'mp3',
             normalization_strategy: 'peak',
           },
-          timeoutMs: 300_000, // MusicGen can take 2-4 minutes per track
+          timeoutMs: 300_000,
           preferWaitSeconds: 55,
         });
 
@@ -1573,16 +1587,10 @@ export async function generateMusicPreviews(c: Context) {
             : Array.isArray(prediction)
               ? prediction[0]
               : null;
-        if (!mp3Url) {
-          results.failures.push({ id: track.id, error: 'no output url' });
-          continue;
-        }
+        if (!mp3Url) return { ok: false, error: 'no output url' };
 
         const bytes = await downloadToBytes(mp3Url, 60_000);
-        if (!bytes) {
-          results.failures.push({ id: track.id, error: 'download failed' });
-          continue;
-        }
+        if (!bytes) return { ok: false, error: 'download failed' };
 
         await uploadToClientAssets(
           musicPreviewStoragePath(track.id),
@@ -1590,13 +1598,38 @@ export async function generateMusicPreviews(c: Context) {
           'audio/mpeg',
           true,
         );
-        results.generated += 1;
         console.log(`[brief-estudio][music] generated ${track.id}`);
+        return { ok: true };
       } catch (err) {
         const message = err instanceof Error ? err.message : 'unknown';
         console.error(`[brief-estudio][music] ${track.id} failed:`, message);
-        results.failures.push({ id: track.id, error: message.slice(0, 300) });
+        return { ok: false, error: message.slice(0, 300) };
       }
+    }
+
+    // Separar skipped (ya existen) de los pendientes de renderizar.
+    const pending: typeof MUSIC_LIBRARY_SEED = [];
+    for (const track of MUSIC_LIBRARY_SEED) {
+      if (existing.has(track.id)) results.skipped += 1;
+      else pending.push(track);
+    }
+
+    // Batch paralelo de 4 concurrentes. 20 tracks / 4 = 5 rondas × ~3min =
+    // ~15min total, bien dentro del wall-clock budget de Cloud Run.
+    const BATCH_SIZE = 4;
+    for (let i = 0; i < pending.length; i += BATCH_SIZE) {
+      const chunk = pending.slice(i, i + BATCH_SIZE);
+      const settled = await Promise.allSettled(chunk.map(renderSingleTrack));
+      settled.forEach((r, idx) => {
+        const trackId = chunk[idx].id;
+        if (r.status === 'fulfilled') {
+          if (r.value.ok) results.generated += 1;
+          else results.failures.push({ id: trackId, error: r.value.error });
+        } else {
+          const reason = r.reason instanceof Error ? r.reason.message : String(r.reason);
+          results.failures.push({ id: trackId, error: reason.slice(0, 300) });
+        }
+      });
     }
 
     return c.json({
