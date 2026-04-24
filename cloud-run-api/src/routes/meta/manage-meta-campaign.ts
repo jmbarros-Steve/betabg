@@ -163,6 +163,38 @@ async function uploadVideoFromUrl(
   }
 }
 
+// --- Helper: get a video thumbnail_hash for DCT asset_feed_spec ---
+// Meta REQUIRES each video entry in asset_feed_spec.videos[] to have either
+// thumbnail_hash or thumbnail_url — without it, creative creation fails with
+// "invalid parameter". We fetch the auto-generated thumbnail from Meta
+// (GET /{video_id}/thumbnails) and upload it to /adimages to get a hash.
+async function getVideoThumbnailHash(
+  accountId: string,
+  accessToken: string,
+  videoId: string,
+): Promise<string | null> {
+  try {
+    // 1) Query Meta's auto-generated thumbnails for this video
+    const thumbRes = await metaApiRequest(videoId, accessToken, 'GET', {
+      fields: 'thumbnails{uri,is_preferred}',
+    });
+    if (!thumbRes.ok) return null;
+    const thumbs: Array<{ uri?: string; is_preferred?: boolean }> =
+      thumbRes.data?.thumbnails?.data || [];
+    if (thumbs.length === 0) return null;
+    // Prefer the `is_preferred` frame; fallback to first
+    const best = thumbs.find(t => t.is_preferred) || thumbs[0];
+    if (!best?.uri) return null;
+
+    // 2) Upload that thumbnail as an adimage to obtain a hash usable in DCT
+    const up = await uploadImageFromUrl(accountId, accessToken, best.uri);
+    return up.ok && up.hash ? up.hash : null;
+  } catch (err: any) {
+    console.warn(`[getVideoThumbnailHash] failed for video=${videoId}:`, err?.message);
+    return null;
+  }
+}
+
 // --- Helper: upload image from URL to get image_hash ---
 
 async function uploadImageFromUrl(
@@ -825,11 +857,27 @@ async function handleCreate(
         assetFeedSpec.images = uniqueHashes.map((h) => ({ hash: h }));
       }
       if (uniqueVideos.length > 0) {
-        // NOTE: we intentionally skip `thumbnail_url` — Meta expects an IMAGE
-        // URL (jpg/png), not an mp4. Passing the video URL itself fails review.
-        // Meta auto-extracts a frame as fallback thumbnail until we wire a
-        // proper thumbnail pipeline (ffmpeg / Imagen 4 / video frame grab).
-        assetFeedSpec.videos = uniqueVideos.map((v) => ({ video_id: v.videoId }));
+        // Meta DCT requires thumbnail_hash per video entry. Fetch the
+        // auto-generated thumbnail from /{video_id}/thumbnails and upload it
+        // as an adimage to get the hash. If any video thumb fails, reuse the
+        // first image hash as a fallback — otherwise Meta rejects the whole
+        // DCT with "invalid parameter".
+        const videoThumbResults = await Promise.allSettled(
+          uniqueVideos.map((v) => getVideoThumbnailHash(accountId, accessToken, v.videoId)),
+        );
+        const fallbackThumb = uniqueHashes[0] || null;
+        assetFeedSpec.videos = uniqueVideos.map((v, i) => {
+          const r = videoThumbResults[i];
+          const hash = r.status === 'fulfilled' ? r.value : null;
+          const entry: Record<string, any> = { video_id: v.videoId };
+          const thumbHash = hash || fallbackThumb;
+          if (thumbHash) entry.thumbnail_hash = thumbHash;
+          return entry;
+        });
+        const missing = assetFeedSpec.videos.filter((v: any) => !v.thumbnail_hash).length;
+        if (missing > 0) {
+          console.warn(`[manage-meta-campaign] DCT: ${missing}/${uniqueVideos.length} videos without thumbnail_hash — Meta may reject`);
+        }
       }
 
       if (uniqueDescriptions.length > 0) {
