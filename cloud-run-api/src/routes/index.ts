@@ -245,6 +245,10 @@ import {
   generateActors,
   suggestVoice,
   cloneVoice,
+  getBriefEstudioProducts,
+  syncBriefEstudioProducts,
+  getBriefEstudioMusicLibrary,
+  generateMusicPreviews,
 } from './brief-estudio/index.js';
 
 // El Chino — Check System + Fix Queue + Fixer + Reports
@@ -696,6 +700,12 @@ export function registerRoutes(app: Hono) {
   app.post('/api/brief-estudio/generate-actors', authMiddleware, generateActors);
   app.post('/api/brief-estudio/suggest-voice', authMiddleware, suggestVoice);
   app.post('/api/brief-estudio/clone-voice', authMiddleware, cloneVoice);
+
+  // Brief Estudio — Etapa 4 (productos Shopify + música mood-based)
+  app.get('/api/brief-estudio/products', authMiddleware, getBriefEstudioProducts);
+  app.post('/api/brief-estudio/products/sync', authMiddleware, syncBriefEstudioProducts);
+  app.get('/api/brief-estudio/music/library', authMiddleware, getBriefEstudioMusicLibrary);
+  app.post('/api/brief-estudio/music/generate-previews', authMiddleware, generateMusicPreviews);
 
   // ============================================================
   // El Chino — Automated Check System (sub-router to avoid Hono RegExpRouter limit)

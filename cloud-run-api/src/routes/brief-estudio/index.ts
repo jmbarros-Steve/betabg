@@ -20,6 +20,12 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { getUserClientIds } from '../../lib/user-scoping.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { runReplicatePrediction, ReplicateError } from '../../lib/replicate.js';
+import { syncClientShopifyProducts } from '../cron/sync-shopify-products.js';
+import {
+  MUSIC_LIBRARY_SEED,
+  MOOD_LABELS_ES,
+  type MusicMood,
+} from '../../lib/music-library.js';
 
 // ----------------------------- Types -----------------------------------------
 
@@ -1269,6 +1275,338 @@ export async function cloneVoice(c: Context) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[brief-estudio][clone-voice] error:', message);
+    return c.json({ error: message }, 500);
+  }
+}
+
+// ============================================================================
+// Etapa 4 — Productos Shopify + Música mood-based
+// ============================================================================
+
+// ---- MusicGen (Replicate) para generar previews de 30s ----
+// Model hosted by Meta on Replicate. `melody-large` supports 30s generation.
+// Cost ~ $0.10 per 30s track (20 tracks = $2.00 one-time seed).
+const MUSICGEN_MODEL = 'meta/musicgen';
+
+// ---- Helpers ---------------------------------------------------------------
+
+async function assertSuperAdmin(
+  c: Context,
+): Promise<{ allowed: boolean; userId: string | null }> {
+  const user = c.get('user');
+  if (!user) return { allowed: false, userId: null };
+  if (user.id === 'internal') return { allowed: true, userId: user.id };
+  const supabase = getSupabaseAdmin();
+  const { isSuperAdmin } = await getUserClientIds(supabase, user.id);
+  return { allowed: isSuperAdmin, userId: user.id };
+}
+
+function musicPreviewStoragePath(trackId: string): string {
+  return `music-previews/${trackId}.mp3`;
+}
+
+function musicPreviewPublicUrl(trackId: string): string {
+  const supabase = getSupabaseAdmin();
+  const { data } = supabase.storage
+    .from('client-assets')
+    .getPublicUrl(musicPreviewStoragePath(trackId));
+  return data.publicUrl;
+}
+
+// ----------------------------- Handlers --------------------------------------
+
+/**
+ * GET /api/brief-estudio/products?client_id={id}
+ *
+ * Returns the client's Shopify catalog with a `is_featured` flag merged from
+ * `brand_featured_products`. If the client has no active Shopify connection,
+ * returns `shopify_connected: false` so the UI shows the "conectá Shopify" CTA.
+ */
+export async function getBriefEstudioProducts(c: Context) {
+  try {
+    const clientId = c.req.query('client_id');
+    if (!isNonEmptyString(clientId)) {
+      return c.json({ error: 'client_id is required' }, 400);
+    }
+
+    const access = await assertClientAccess(c, clientId);
+    if (!access.userId) return c.json({ error: 'Unauthorized' }, 401);
+    if (!access.allowed) return c.json({ error: 'Forbidden' }, 403);
+
+    const supabase = getSupabaseAdmin();
+
+    // Check shopify connection
+    const { data: conn } = await supabase
+      .from('platform_connections')
+      .select('id')
+      .eq('client_id', clientId)
+      .eq('platform', 'shopify')
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!conn) {
+      return c.json({ products: [], shopify_connected: false });
+    }
+
+    const [productsRes, featuredRes] = await Promise.all([
+      supabase
+        .from('shopify_products')
+        .select(
+          'shopify_product_id, title, image_url, price_min, price_max, status, synced_at',
+        )
+        .eq('client_id', clientId)
+        .eq('status', 'active')
+        .order('synced_at', { ascending: false })
+        .limit(500),
+      supabase
+        .from('brand_featured_products')
+        .select('shopify_product_id, is_featured, priority')
+        .eq('client_id', clientId),
+    ]);
+
+    if (productsRes.error) return c.json({ error: productsRes.error.message }, 500);
+    if (featuredRes.error) return c.json({ error: featuredRes.error.message }, 500);
+
+    const featMap = new Map<string, { is_featured: boolean; priority: number }>();
+    for (const row of (featuredRes.data ?? []) as Array<{
+      shopify_product_id: string;
+      is_featured: boolean;
+      priority: number;
+    }>) {
+      featMap.set(row.shopify_product_id, {
+        is_featured: !!row.is_featured,
+        priority: row.priority ?? 0,
+      });
+    }
+
+    type ProductRow = {
+      shopify_product_id: string;
+      title: string;
+      image_url: string | null;
+      price_min: number | null;
+      price_max: number | null;
+    };
+
+    const merged = ((productsRes.data ?? []) as ProductRow[]).map((p) => {
+      const feat = featMap.get(p.shopify_product_id);
+      return {
+        shopify_product_id: p.shopify_product_id,
+        title: p.title,
+        image_url: p.image_url,
+        price_min: p.price_min ?? 0,
+        price_max: p.price_max ?? 0,
+        is_featured: feat?.is_featured ?? false,
+        priority: feat?.priority ?? 0,
+      };
+    });
+
+    // Featured first (by priority desc), then the rest (already sorted by synced_at desc).
+    merged.sort((a, b) => {
+      if (a.is_featured !== b.is_featured) return a.is_featured ? -1 : 1;
+      if (a.is_featured) return (b.priority ?? 0) - (a.priority ?? 0);
+      return 0;
+    });
+
+    return c.json({
+      products: merged,
+      shopify_connected: true,
+      total: merged.length,
+      featured_count: merged.filter((p) => p.is_featured).length,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[brief-estudio][products] error:', message);
+    return c.json({ error: message }, 500);
+  }
+}
+
+/**
+ * POST /api/brief-estudio/products/sync
+ * Body: { client_id: string }
+ *
+ * Synchronous re-sync of the client's Shopify catalog. For typical shops
+ * (<5k products) this finishes within the HTTP budget. Larger shops may need
+ * to be split later — for now the user sees the sync progress via toast.
+ */
+export async function syncBriefEstudioProducts(c: Context) {
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as { client_id?: string };
+    const clientId = body.client_id;
+    if (!isNonEmptyString(clientId)) {
+      return c.json({ error: 'client_id is required' }, 400);
+    }
+
+    const access = await assertClientAccess(c, clientId);
+    if (!access.userId) return c.json({ error: 'Unauthorized' }, 401);
+    if (!access.allowed) return c.json({ error: 'Forbidden' }, 403);
+
+    const result = await syncClientShopifyProducts(clientId);
+    if (result.error) {
+      return c.json(
+        {
+          ok: false,
+          error: result.error,
+          shop_domain: result.shop_domain,
+          synced: result.synced,
+        },
+        502,
+      );
+    }
+
+    return c.json({
+      ok: true,
+      synced: result.synced,
+      shop_domain: result.shop_domain,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[brief-estudio][products/sync] error:', message);
+    return c.json({ error: message }, 500);
+  }
+}
+
+/**
+ * GET /api/brief-estudio/music/library
+ * Public-ish (any authenticated user) — the seed is shared across all clients.
+ */
+export async function getBriefEstudioMusicLibrary(c: Context) {
+  try {
+    // Require auth (middleware already did it), but no client_id needed.
+    const user = c.get('user');
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const moods = (Object.keys(MOOD_LABELS_ES) as MusicMood[]).map((key) => ({
+      key,
+      label: MOOD_LABELS_ES[key].label,
+      description: MOOD_LABELS_ES[key].description,
+      emoji: MOOD_LABELS_ES[key].emoji,
+    }));
+
+    const tracks_by_mood: Record<string, Array<{
+      id: string;
+      name: string;
+      tempo_bpm: number;
+      instruments: string[];
+      preview_url: string;
+    }>> = {};
+
+    for (const mood of moods) tracks_by_mood[mood.key] = [];
+
+    for (const track of MUSIC_LIBRARY_SEED) {
+      tracks_by_mood[track.mood].push({
+        id: track.id,
+        name: track.name,
+        tempo_bpm: track.tempo_bpm,
+        instruments: track.instruments,
+        preview_url: musicPreviewPublicUrl(track.id),
+      });
+    }
+
+    return c.json({ moods, tracks_by_mood });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[brief-estudio][music/library] error:', message);
+    return c.json({ error: message }, 500);
+  }
+}
+
+/**
+ * POST /api/brief-estudio/music/generate-previews  (SUPER ADMIN)
+ *
+ * One-time (idempotent) job to generate all 20 mp3 previews with MusicGen and
+ * upload them to `client-assets/music-previews/{id}.mp3`. Re-running skips
+ * tracks whose mp3 is already present — useful for incremental retry.
+ */
+export async function generateMusicPreviews(c: Context) {
+  try {
+    const admin = await assertSuperAdmin(c);
+    if (!admin.userId) return c.json({ error: 'Unauthorized' }, 401);
+    if (!admin.allowed) return c.json({ error: 'Forbidden — super admin only' }, 403);
+
+    const supabase = getSupabaseAdmin();
+
+    // Figure out which tracks are already uploaded — list the prefix.
+    const existing = new Set<string>();
+    const { data: listed } = await supabase.storage
+      .from('client-assets')
+      .list('music-previews', { limit: 1000 });
+    for (const f of listed ?? []) {
+      // file names look like `warm_acoustic_morning.mp3`
+      if (f.name?.endsWith('.mp3')) {
+        existing.add(f.name.replace(/\.mp3$/, ''));
+      }
+    }
+
+    const results: {
+      generated: number;
+      skipped: number;
+      failures: Array<{ id: string; error: string }>;
+    } = { generated: 0, skipped: 0, failures: [] };
+
+    for (const track of MUSIC_LIBRARY_SEED) {
+      if (existing.has(track.id)) {
+        results.skipped += 1;
+        continue;
+      }
+
+      try {
+        const prediction = await runReplicatePrediction<
+          Record<string, unknown>,
+          string | string[]
+        >({
+          model: MUSICGEN_MODEL,
+          input: {
+            prompt: track.musicgen_prompt,
+            duration: Math.min(Math.max(track.duration_sec, 8), 30),
+            model_version: 'stereo-medium',
+            output_format: 'mp3',
+            normalization_strategy: 'peak',
+          },
+          timeoutMs: 300_000, // MusicGen can take 2-4 minutes per track
+          preferWaitSeconds: 55,
+        });
+
+        const mp3Url =
+          typeof prediction === 'string'
+            ? prediction
+            : Array.isArray(prediction)
+              ? prediction[0]
+              : null;
+        if (!mp3Url) {
+          results.failures.push({ id: track.id, error: 'no output url' });
+          continue;
+        }
+
+        const bytes = await downloadToBytes(mp3Url, 60_000);
+        if (!bytes) {
+          results.failures.push({ id: track.id, error: 'download failed' });
+          continue;
+        }
+
+        await uploadToClientAssets(
+          musicPreviewStoragePath(track.id),
+          bytes,
+          'audio/mpeg',
+          true,
+        );
+        results.generated += 1;
+        console.log(`[brief-estudio][music] generated ${track.id}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'unknown';
+        console.error(`[brief-estudio][music] ${track.id} failed:`, message);
+        results.failures.push({ id: track.id, error: message.slice(0, 300) });
+      }
+    }
+
+    return c.json({
+      ...results,
+      total_tracks: MUSIC_LIBRARY_SEED.length,
+      cost_estimated_usd: results.generated * 0.1,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[brief-estudio][music/generate-previews] error:', message);
     return c.json({ error: message }, 500);
   }
 }

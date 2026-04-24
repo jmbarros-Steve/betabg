@@ -16,7 +16,7 @@
  *   - brand-voices/{client_id}/{uuid}.webm|m4a
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Clapperboard,
   Sparkles,
@@ -35,6 +35,9 @@ import {
   CheckCircle2,
   AlertCircle,
   ExternalLink,
+  Heart,
+  RefreshCw,
+  ShoppingBag,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,6 +48,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
+import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
 
 // ─────────────────────────── Types (mirror backend) ──────────────────────────
@@ -113,7 +117,10 @@ export default function BriefEstudio({ clientId }: BriefEstudioProps) {
   const [voice, setVoice] = useState<BrandVoice | null>(null);
   const [studioReady, setStudioReady] = useState(false);
   const [featuredCount, setFeaturedCount] = useState(0);
+  const [featuredIds, setFeaturedIds] = useState<string[]>([]);
   const [hasMusic, setHasMusic] = useState(false);
+  const [musicMoods, setMusicMoods] = useState<string[]>([]);
+  const [musicKeywords, setMusicKeywords] = useState<string>('');
   const [prefill, setPrefill] = useState<PrefillSuggestions | null>(null);
   const [prefillDismissed, setPrefillDismissed] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -126,8 +133,8 @@ export default function BriefEstudio({ clientId }: BriefEstudioProps) {
       const { data, error } = await callApi<{
         actors: BrandActor[];
         voice: BrandVoice | null;
-        featured_products: unknown[];
-        music: { moods?: string[] } | null;
+        featured_products: Array<{ shopify_product_id: string; is_featured: boolean; priority: number }>;
+        music: { moods?: string[]; keywords?: string | null } | null;
         studio_ready: boolean;
       }>(`brief-estudio/get?client_id=${encodeURIComponent(clientId)}`, { method: 'GET' });
 
@@ -149,8 +156,21 @@ export default function BriefEstudio({ clientId }: BriefEstudioProps) {
           })),
         );
         setVoice(data.voice ?? null);
-        setFeaturedCount(data.featured_products?.length ?? 0);
-        setHasMusic(!!data.music && Array.isArray(data.music.moods) && data.music.moods.length > 0);
+        const featList = (data.featured_products ?? []) as Array<{
+          shopify_product_id: string;
+          is_featured: boolean;
+        }>;
+        const onlyFeatured = featList.filter((p) => p.is_featured).map((p) => p.shopify_product_id);
+        setFeaturedCount(onlyFeatured.length);
+        setFeaturedIds(onlyFeatured);
+        const moods = (data.music?.moods ?? []) as string[];
+        setMusicMoods(moods);
+        setMusicKeywords(
+          typeof (data.music as { keywords?: string | null } | null)?.keywords === 'string'
+            ? (data.music as { keywords: string }).keywords
+            : '',
+        );
+        setHasMusic(moods.length > 0);
         setStudioReady(!!data.studio_ready);
       }
       setLoading(false);
@@ -245,6 +265,44 @@ export default function BriefEstudio({ clientId }: BriefEstudioProps) {
     return true;
   }
 
+  async function persistFeaturedProducts(ids: string[]) {
+    setSaving(true);
+    const { data, error } = await callApi<{ studio_ready?: boolean }>('brief-estudio/save', {
+      method: 'POST',
+      body: {
+        client_id: clientId,
+        featured_product_ids: ids,
+      },
+    });
+    setSaving(false);
+    if (error) {
+      toast.error(`No pudimos guardar los productos: ${error}`);
+      return false;
+    }
+    setFeaturedCount(ids.length);
+    if (data?.studio_ready !== undefined) setStudioReady(!!data.studio_ready);
+    return true;
+  }
+
+  async function persistMusic(nextMoods: string[], nextKeywords: string) {
+    setSaving(true);
+    const { data, error } = await callApi<{ studio_ready?: boolean }>('brief-estudio/save', {
+      method: 'POST',
+      body: {
+        client_id: clientId,
+        music: { moods: nextMoods, keywords: nextKeywords || null },
+      },
+    });
+    setSaving(false);
+    if (error) {
+      toast.error(`No pudimos guardar la música: ${error}`);
+      return false;
+    }
+    setHasMusic(nextMoods.length > 0);
+    if (data?.studio_ready !== undefined) setStudioReady(!!data.studio_ready);
+    return true;
+  }
+
   async function handleActivateStudio() {
     // Re-trigger a save (empty) to force studio_ready recompute
     setSaving(true);
@@ -295,8 +353,20 @@ export default function BriefEstudio({ clientId }: BriefEstudioProps) {
         suggestedTone={prefill?.suggested_voice_tone ?? null}
       />
 
-      <SectionProductosStub />
-      <SectionMusicaStub />
+      <SectionProductos
+        clientId={clientId}
+        featuredIds={featuredIds}
+        setFeaturedIds={setFeaturedIds}
+        persistFeaturedProducts={persistFeaturedProducts}
+      />
+
+      <SectionMusica
+        initialMoods={musicMoods}
+        initialKeywords={musicKeywords}
+        onMoodsChange={(next) => setMusicMoods(next)}
+        onKeywordsChange={(kw) => setMusicKeywords(kw)}
+        persistMusic={persistMusic}
+      />
 
       <SaveBar
         completeCount={completeCount}
@@ -1336,49 +1406,640 @@ function VoicePresetPicker({
   );
 }
 
-// ─────────────────────────── Stubs Productos / Música ───────────────────────
+// ─────────────────────────── Section: Productos ─────────────────────────────
 
-function SectionProductosStub() {
+interface ProductRow {
+  shopify_product_id: string;
+  title: string;
+  image_url: string | null;
+  price_min: number;
+  price_max: number;
+  is_featured: boolean;
+  priority: number;
+}
+
+const MAX_FEATURED = 10;
+const PAGE_SIZE = 24;
+
+function formatPrice(min: number, max: number): string {
+  const fmt = (n: number) =>
+    n.toLocaleString('es-CL', { maximumFractionDigits: 0 });
+  if (!min && !max) return '—';
+  if (min === max || max === 0) return `$${fmt(min)}`;
+  return `$${fmt(min)} – $${fmt(max)}`;
+}
+
+function SectionProductos({
+  clientId,
+  featuredIds,
+  setFeaturedIds,
+  persistFeaturedProducts,
+}: {
+  clientId: string;
+  featuredIds: string[];
+  setFeaturedIds: React.Dispatch<React.SetStateAction<string[]>>;
+  persistFeaturedProducts: (ids: string[]) => Promise<boolean>;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [shopifyConnected, setShopifyConnected] = useState<boolean | null>(null);
+  const [products, setProducts] = useState<ProductRow[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'featured'>('all');
+  const [page, setPage] = useState(0);
+  const debounceRef = useRef<number | null>(null);
+
+  async function loadProducts() {
+    setLoading(true);
+    const { data, error } = await callApi<{
+      products: ProductRow[];
+      shopify_connected: boolean;
+    }>(`brief-estudio/products?client_id=${encodeURIComponent(clientId)}`, { method: 'GET' });
+    if (error) {
+      toast.error(`No pudimos cargar productos: ${error}`);
+      setLoading(false);
+      return;
+    }
+    setShopifyConnected(data?.shopify_connected ?? false);
+    setProducts(data?.products ?? []);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId]);
+
+  async function handleSync() {
+    setSyncing(true);
+    const { data, error } = await callApi<{
+      ok: boolean;
+      synced: number;
+    }>('brief-estudio/products/sync', {
+      method: 'POST',
+      body: { client_id: clientId },
+      timeoutMs: 180000,
+    });
+    setSyncing(false);
+    if (error) {
+      toast.error(`Sync falló: ${error}`);
+      return;
+    }
+    toast.success(`Sincronizados ${data?.synced ?? 0} productos`);
+    await loadProducts();
+  }
+
+  function queuePersist(nextIds: string[]) {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => {
+      void persistFeaturedProducts(nextIds);
+    }, 300);
+  }
+
+  function handleToggleFeatured(productId: string) {
+    const isCurrentlyFeatured = featuredIds.includes(productId);
+    if (!isCurrentlyFeatured && featuredIds.length >= MAX_FEATURED) {
+      toast.warning(`Máximo ${MAX_FEATURED} productos destacados`);
+      return;
+    }
+    const nextIds = isCurrentlyFeatured
+      ? featuredIds.filter((id) => id !== productId)
+      : [...featuredIds, productId];
+    setFeaturedIds(nextIds);
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.shopify_product_id === productId ? { ...p, is_featured: !isCurrentlyFeatured } : p,
+      ),
+    );
+    queuePersist(nextIds);
+  }
+
+  const visibleProducts = useMemo(() => {
+    if (filter === 'featured') return products.filter((p) => p.is_featured);
+    return products;
+  }, [products, filter]);
+
+  const pagedProducts = useMemo(() => {
+    const start = page * PAGE_SIZE;
+    return visibleProducts.slice(start, start + PAGE_SIZE);
+  }, [visibleProducts, page]);
+
+  const totalPages = Math.max(1, Math.ceil(visibleProducts.length / PAGE_SIZE));
+
+  useEffect(() => {
+    // reset pagination when filter changes
+    setPage(0);
+  }, [filter]);
+
   return (
-    <Card className="opacity-75">
+    <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <span className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-sm font-bold">3</span>
-          Productos destacados
-          <Badge variant="outline" className="ml-2">Próximamente</Badge>
-        </CardTitle>
-        <CardDescription>
-          Elegí qué productos quiere que Steve priorice al armar creatividades.
-        </CardDescription>
+        <div className="flex items-start justify-between gap-3 flex-col sm:flex-row">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <span className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">
+                3
+              </span>
+              Productos destacados
+            </CardTitle>
+            <CardDescription>
+              Elegí hasta {MAX_FEATURED} productos que Steve va a priorizar en tus creatividades.
+            </CardDescription>
+          </div>
+          {shopifyConnected && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSync}
+              disabled={syncing || loading}
+            >
+              {syncing ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-1" />
+              )}
+              Re-sincronizar
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center gap-3 text-sm text-slate-500 bg-slate-50 rounded-lg p-4">
-          <Package className="w-5 h-5" />
-          Esta sección se habilita en la próxima actualización.
-        </div>
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="aspect-square rounded-lg bg-slate-100 animate-pulse" />
+            ))}
+          </div>
+        ) : shopifyConnected === false ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-10 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+            <ShoppingBag className="w-10 h-10 text-slate-400" />
+            <p className="text-sm font-medium text-slate-700">
+              Conectá Shopify para traer tus productos
+            </p>
+            <p className="text-xs text-slate-500 text-center max-w-sm">
+              Steve necesita ver tu catálogo para saber qué productos destacar en cada creatividad.
+            </p>
+            <Button
+              size="sm"
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent('steve:navigate-tab', { detail: { tab: 'connections' } }),
+                );
+              }}
+            >
+              Conectar Shopify
+            </Button>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-8 bg-slate-50 rounded-lg">
+            <Package className="w-8 h-8 text-slate-400" />
+            <p className="text-sm text-slate-600">No encontramos productos. Sincronizá Shopify para cargarlos.</p>
+            <Button size="sm" onClick={handleSync} disabled={syncing}>
+              {syncing ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-1" />
+              )}
+              Sincronizar ahora
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setFilter('all')}
+                  className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
+                    filter === 'all'
+                      ? 'bg-primary text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Todos ({products.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilter('featured')}
+                  className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
+                    filter === 'featured'
+                      ? 'bg-primary text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Solo destacados ({featuredIds.length})
+                </button>
+              </div>
+              <p className="text-xs text-slate-500">
+                <strong className="text-slate-700">{featuredIds.length}</strong> destacados de{' '}
+                {products.length}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {pagedProducts.map((p) => (
+                <ProductCard
+                  key={p.shopify_product_id}
+                  product={p}
+                  onToggle={() => handleToggleFeatured(p.shopify_product_id)}
+                />
+              ))}
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                >
+                  Anterior
+                </Button>
+                <span className="text-xs text-slate-500">
+                  Página {page + 1} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
 
-function SectionMusicaStub() {
+function ProductCard({
+  product,
+  onToggle,
+}: {
+  product: ProductRow;
+  onToggle: () => void;
+}) {
   return (
-    <Card className="opacity-75">
+    <div
+      className={`rounded-lg border overflow-hidden bg-white flex flex-col transition-shadow ${
+        product.is_featured ? 'border-amber-400 shadow-md' : 'border-slate-200 hover:shadow-sm'
+      }`}
+    >
+      <div className="relative aspect-square bg-slate-100">
+        {product.image_url ? (
+          <img
+            src={product.image_url}
+            alt={product.title}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-slate-400">
+            <Package className="w-10 h-10" />
+          </div>
+        )}
+        <button
+          type="button"
+          aria-label={product.is_featured ? 'Quitar de destacados' : 'Marcar como destacado'}
+          onClick={onToggle}
+          className={`absolute top-2 right-2 min-w-[44px] min-h-[44px] w-11 h-11 sm:w-9 sm:h-9 sm:min-w-0 sm:min-h-0 rounded-full flex items-center justify-center shadow-md transition-colors ${
+            product.is_featured
+              ? 'bg-amber-400 text-white'
+              : 'bg-white/90 text-slate-600 hover:bg-amber-50'
+          }`}
+        >
+          <Star className={`w-4 h-4 ${product.is_featured ? 'fill-current' : ''}`} />
+        </button>
+        {product.is_featured && (
+          <Badge className="absolute bottom-2 left-2 bg-amber-400 text-white border-amber-400 hover:bg-amber-500 text-[10px]">
+            Destacado
+          </Badge>
+        )}
+      </div>
+      <div className="p-3 space-y-1">
+        <p className="text-sm font-medium text-slate-900 line-clamp-2 min-h-[2.5rem]">
+          {product.title}
+        </p>
+        <p className="text-xs text-slate-500">{formatPrice(product.price_min, product.price_max)}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────── Section: Música ────────────────────────────────
+
+interface MoodInfo {
+  key: string;
+  label: string;
+  description: string;
+  emoji: string;
+}
+
+interface TrackSummary {
+  id: string;
+  name: string;
+  tempo_bpm: number;
+  instruments: string[];
+  preview_url: string;
+}
+
+interface MusicLibraryResponse {
+  moods: MoodInfo[];
+  tracks_by_mood: Record<string, TrackSummary[]>;
+}
+
+const MAX_MOODS = 3;
+
+function SectionMusica({
+  initialMoods,
+  initialKeywords,
+  onMoodsChange,
+  onKeywordsChange,
+  persistMusic,
+}: {
+  initialMoods: string[];
+  initialKeywords: string;
+  onMoodsChange: (next: string[]) => void;
+  onKeywordsChange: (kw: string) => void;
+  persistMusic: (moods: string[], keywords: string) => Promise<boolean>;
+}) {
+  const { isSuperAdmin } = useUserRole();
+  const [library, setLibrary] = useState<MusicLibraryResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedMoods, setSelectedMoods] = useState<string[]>(initialMoods);
+  const [keywords, setKeywords] = useState<string>(initialKeywords);
+  const [previewsAvailable, setPreviewsAvailable] = useState<Record<string, boolean>>({});
+  const [generatingPreviews, setGeneratingPreviews] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playingTrack, setPlayingTrack] = useState<string | null>(null);
+  const debounceRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setSelectedMoods(initialMoods);
+  }, [initialMoods]);
+
+  useEffect(() => {
+    setKeywords(initialKeywords);
+  }, [initialKeywords]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      const { data, error } = await callApi<MusicLibraryResponse>(
+        'brief-estudio/music/library',
+        { method: 'GET' },
+      );
+      if (cancelled) return;
+      if (error) {
+        toast.error(`No pudimos cargar la biblioteca: ${error}`);
+        setLoading(false);
+        return;
+      }
+      if (data) {
+        setLibrary(data);
+        // Probe a single mp3 head-request to detect if previews are generated.
+        // We grab the first track from the first mood group.
+        const firstTrack = Object.values(data.tracks_by_mood)
+          .flatMap((ts) => ts)[0];
+        if (firstTrack?.preview_url) {
+          try {
+            const resp = await fetch(firstTrack.preview_url, { method: 'HEAD' });
+            setPreviewsAvailable({ __global: resp.ok });
+          } catch {
+            setPreviewsAvailable({ __global: false });
+          }
+        }
+      }
+      setLoading(false);
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function queueMusicPersist(nextMoods: string[], nextKeywords: string) {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => {
+      void persistMusic(nextMoods, nextKeywords);
+    }, 500);
+  }
+
+  function handleToggleMood(moodKey: string) {
+    const isSelected = selectedMoods.includes(moodKey);
+    let next: string[];
+    if (isSelected) {
+      next = selectedMoods.filter((k) => k !== moodKey);
+    } else {
+      if (selectedMoods.length >= MAX_MOODS) {
+        toast.warning(`Solo ${MAX_MOODS} moods máximo`);
+        return;
+      }
+      next = [...selectedMoods, moodKey];
+    }
+    setSelectedMoods(next);
+    onMoodsChange(next);
+    queueMusicPersist(next, keywords);
+  }
+
+  function handleKeywordsChange(value: string) {
+    setKeywords(value);
+    onKeywordsChange(value);
+    queueMusicPersist(selectedMoods, value);
+  }
+
+  function handlePlay(track: TrackSummary) {
+    const previewOk = previewsAvailable.__global ?? false;
+    if (!previewOk) {
+      toast.info('Preview no disponible');
+      return;
+    }
+    // Pause current if any
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (playingTrack === track.id) {
+      setPlayingTrack(null);
+      return;
+    }
+    const audio = new Audio(track.preview_url);
+    audio.onended = () => setPlayingTrack(null);
+    audio.onerror = () => {
+      setPlayingTrack(null);
+      toast.info('No se pudo reproducir el preview');
+    };
+    audio.play().catch(() => setPlayingTrack(null));
+    audioRef.current = audio;
+    setPlayingTrack(track.id);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  async function handleGeneratePreviews() {
+    if (!window.confirm('Generar los 20 previews mp3 con MusicGen. Cuesta ~$2 y puede tardar 10-15 minutos. ¿Continuar?')) {
+      return;
+    }
+    setGeneratingPreviews(true);
+    const { data, error } = await callApi<{
+      generated: number;
+      skipped: number;
+      failures: Array<{ id: string; error: string }>;
+    }>('brief-estudio/music/generate-previews', {
+      method: 'POST',
+      body: {},
+      timeoutMs: 900000, // 15 min
+    });
+    setGeneratingPreviews(false);
+    if (error) {
+      toast.error(`Falló: ${error}`);
+      return;
+    }
+    const msg = `Generados ${data?.generated ?? 0}, saltados ${data?.skipped ?? 0}, fallos ${data?.failures?.length ?? 0}`;
+    toast.success(msg);
+    setPreviewsAvailable({ __global: true });
+  }
+
+  return (
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <span className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-sm font-bold">4</span>
+          <span className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">
+            4
+          </span>
           Música
-          <Badge variant="outline" className="ml-2">Próximamente</Badge>
         </CardTitle>
         <CardDescription>
-          Definí la vibe musical de tus videos (cálido, enérgico, premium, etc).
+          Elegí hasta {MAX_MOODS} vibes musicales. Steve usa el mood para elegir música en tus videos.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="flex items-center gap-3 text-sm text-slate-500 bg-slate-50 rounded-lg p-4">
-          <Music2 className="w-5 h-5" />
-          Esta sección se habilita en la próxima actualización.
-        </div>
+      <CardContent className="space-y-4">
+        {isSuperAdmin && previewsAvailable.__global === false && (
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex-1 text-sm text-amber-900">
+              <p className="font-medium">Previews mp3 no generados</p>
+              <p className="text-xs mt-0.5">Ejecutá una sola vez (cost ~$2, 20 tracks).</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGeneratePreviews}
+              disabled={generatingPreviews}
+            >
+              {generatingPreviews ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+              ) : (
+                <Sparkles className="w-4 h-4 mr-1" />
+              )}
+              Generar previews
+            </Button>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-32 rounded-lg bg-slate-100 animate-pulse" />
+            ))}
+          </div>
+        ) : !library ? (
+          <div className="text-sm text-slate-500 bg-slate-50 rounded-lg p-4">
+            Biblioteca no disponible.
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {library.moods.map((mood) => {
+                const tracks = library.tracks_by_mood[mood.key] ?? [];
+                const firstTrack = tracks[0];
+                const isSelected = selectedMoods.includes(mood.key);
+                const isPlaying = firstTrack ? playingTrack === firstTrack.id : false;
+                return (
+                  <div
+                    key={mood.key}
+                    className={`relative rounded-lg border p-4 transition-all ${
+                      isSelected
+                        ? 'border-primary bg-primary/5 shadow-sm'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="text-3xl leading-none">{mood.emoji}</div>
+                      <button
+                        type="button"
+                        aria-label={isSelected ? 'Quitar mood' : 'Agregar mood'}
+                        onClick={() => handleToggleMood(mood.key)}
+                        className={`min-w-[44px] min-h-[44px] w-11 h-11 sm:w-9 sm:h-9 sm:min-w-0 sm:min-h-0 rounded-full flex items-center justify-center transition-colors ${
+                          isSelected
+                            ? 'bg-pink-500 text-white'
+                            : 'bg-slate-100 text-slate-500 hover:bg-pink-50'
+                        }`}
+                      >
+                        <Heart className={`w-4 h-4 ${isSelected ? 'fill-current' : ''}`} />
+                      </button>
+                    </div>
+                    <p className="font-semibold text-sm text-slate-900">{mood.label}</p>
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2 min-h-[2rem]">
+                      {mood.description}
+                    </p>
+                    {firstTrack && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 w-full"
+                        onClick={() => handlePlay(firstTrack)}
+                      >
+                        {isPlaying ? (
+                          <Pause className="w-3.5 h-3.5 mr-1" />
+                        ) : (
+                          <Play className="w-3.5 h-3.5 mr-1" />
+                        )}
+                        {isPlaying ? 'Pausar' : `Escuchar "${firstTrack.name}"`}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pt-2 space-y-1.5">
+              <Label className="text-sm text-slate-700">Palabras clave (opcional)</Label>
+              <Input
+                value={keywords}
+                onChange={(e) => handleKeywordsChange(e.target.value)}
+                placeholder="ej: Dua Lipa vibes, ritmos latinoamericanos"
+                maxLength={200}
+              />
+              <p className="text-xs text-slate-500">
+                Si tenés referencias específicas, escribilas acá. Steve las va a considerar.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between pt-1 text-xs text-slate-500">
+              <span>
+                <strong className="text-slate-700">{selectedMoods.length}</strong> de {MAX_MOODS} moods seleccionados
+              </span>
+              <div className="flex items-center gap-1">
+                <Music2 className="w-3.5 h-3.5" />
+                {library.moods.length} moods • {Object.values(library.tracks_by_mood).flat().length} tracks
+              </div>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

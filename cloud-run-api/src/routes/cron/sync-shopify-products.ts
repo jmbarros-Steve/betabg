@@ -126,6 +126,83 @@ function mapProduct(p: ShopifyProductRaw, clientId: string, shopDomain: string):
 }
 
 /**
+ * Sync Shopify products for a single client connection.
+ * Returns { synced, error } — caller decides how to report.
+ * Extracted so other endpoints (e.g. brief-estudio UI trigger) can reuse it.
+ */
+export async function syncClientShopifyProducts(
+  clientId: string,
+): Promise<{ synced: number; error?: string; shop_domain?: string }> {
+  const supabase = getSupabaseAdmin();
+
+  const { data: conn, error: connErr } = await supabase
+    .from('platform_connections')
+    .select('id, client_id, shop_domain, store_url, access_token_encrypted, is_active')
+    .eq('client_id', clientId)
+    .eq('platform', 'shopify')
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (connErr) return { synced: 0, error: `connection query failed: ${connErr.message}` };
+  if (!conn) return { synced: 0, error: 'no active shopify connection' };
+
+  const shopDomain =
+    conn.shop_domain ||
+    (conn.store_url ? conn.store_url.replace(/^https?:\/\//, '').replace(/\/+$/, '') : '');
+
+  if (!conn.access_token_encrypted || !shopDomain) {
+    return { synced: 0, error: 'missing token or shop_domain', shop_domain: shopDomain };
+  }
+
+  const { data: decryptedToken, error: decErr } = await supabase.rpc('decrypt_platform_token', {
+    encrypted_token: conn.access_token_encrypted,
+  });
+  if (decErr || !decryptedToken) {
+    return { synced: 0, error: 'token decrypt failed', shop_domain: shopDomain };
+  }
+
+  const cleanDomain = shopDomain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  const fields =
+    'id,title,handle,status,vendor,product_type,body_html,tags,variants,images,created_at,updated_at';
+  let nextUrl: string | null = `https://${cleanDomain}/admin/api/${SHOPIFY_API_VERSION}/products.json?limit=${PAGE_SIZE}&fields=${fields}`;
+
+  try {
+    const allProducts: ShopifyProductRaw[] = [];
+    let pageCount = 0;
+    while (nextUrl && pageCount < MAX_PAGES_PER_SHOP) {
+      if (pageCount > 0) await sleep(PAGE_SLEEP_MS);
+      const { products, nextUrl: nu } = await fetchNextLink(nextUrl, decryptedToken);
+      allProducts.push(...products);
+      nextUrl = nu;
+      pageCount += 1;
+    }
+
+    if (allProducts.length === 0) {
+      return { synced: 0, shop_domain: cleanDomain };
+    }
+
+    const rows = allProducts.map((p) => mapProduct(p, clientId, cleanDomain));
+    for (let i = 0; i < rows.length; i += UPSERT_CHUNK_SIZE) {
+      const chunk = rows.slice(i, i + UPSERT_CHUNK_SIZE);
+      const { error: upsertErr } = await supabase
+        .from('shopify_products')
+        .upsert(chunk, { onConflict: 'client_id,shopify_product_id' });
+      if (upsertErr) {
+        return {
+          synced: 0,
+          error: `upsert failed: ${upsertErr.message}`,
+          shop_domain: cleanDomain,
+        };
+      }
+    }
+    return { synced: rows.length, shop_domain: cleanDomain };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown';
+    return { synced: 0, error: message, shop_domain: cleanDomain };
+  }
+}
+
+/**
  * Cron: sync Shopify products for all active connections.
  * Schedule: every 6 hours. Auth: X-Cron-Secret header.
  * Tolerates per-client failures; returns aggregate counts + per-client status.
