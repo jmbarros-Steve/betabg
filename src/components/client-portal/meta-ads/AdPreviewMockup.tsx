@@ -76,7 +76,7 @@ export default function AdPreviewMockup({
 
       {/* Creative — render <video> if the URL ends in a video extension,
           otherwise <img>. Without this the preview shows a broken image for
-          video creatives (Veo output, uploaded mp4, etc.). */}
+          video creatives (AI-generated mp4, uploaded mp4, etc.). */}
       <div className="w-full aspect-square bg-gray-100 relative overflow-hidden">
         {imageUrl ? (
           /\.(mp4|mov|webm|m4v)(\?|$)/i.test(imageUrl) ? (

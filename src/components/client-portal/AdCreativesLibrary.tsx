@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
+import { useUserRole } from '@/hooks/useUserRole';
 import { format, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -35,6 +36,10 @@ const ESTADO_CONFIG: Record<string, { label: string; className: string; next: st
 const FUNNEL_LABELS: Record<string, string> = { tofu: 'TOFU 🎯', mofu: 'MOFU 🔥', bofu: 'BOFU 💰' };
 
 export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
+  // Super-admins see a small engine badge next to video creatives (veo / runway)
+  // so JM can QA that deriveEngine picked the right one per angle. Hidden from
+  // everyone else — the abstraction is "a video" for regular clients.
+  const { isSuperAdmin } = useUserRole();
   const [creatives, setCreatives] = useState<AdCreative[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -267,6 +272,11 @@ export function AdCreativesLibrary({ clientId }: AdCreativesLibraryProps) {
                         <Badge variant="outline" className="text-[10px]">{isVideo ? '🎬 Video' : '📸 Imagen'}</Badge>
                         <Badge variant="outline" className="text-[10px]">{creative.angulo}</Badge>
                         {isDct && <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20"><JargonTooltip term="DCT" label="DCT 3-2-2" /></Badge>}
+                        {isSuperAdmin && isVideo && creative.brief_visual && typeof (creative.brief_visual as Record<string, unknown>).engine === 'string' && (
+                          <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-700 border-slate-300" title={`template: ${String((creative.brief_visual as Record<string, unknown>).template || 'n/a')}`}>
+                            🔧 {String((creative.brief_visual as Record<string, unknown>).engine)}
+                          </Badge>
+                        )}
                       </div>
                       <p className="font-semibold text-sm leading-tight truncate">{creative.titulo || 'Sin título'}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(creative.created_at), "d MMM yyyy", { locale: es })}</p>
