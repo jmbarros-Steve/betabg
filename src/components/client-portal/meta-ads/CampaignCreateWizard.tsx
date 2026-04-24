@@ -2227,6 +2227,9 @@ function AdFormMultiSlot({
                 setGeneratingImage(true);
                 const aspectForVeo = aspectRatio === '16:9' ? '16:9' : '9:16'; // Veo 3.1 only supports 16:9 / 9:16
                 try {
+                  // Backend polls Veo inline up to 4.5 min before handing off
+                  // to client-side polling. callApi default timeout is 90s →
+                  // bump to 5 min so the browser doesn't abort mid-generation.
                   const { data, error } = await callApi('generate-video', {
                     body: {
                       clientId,
@@ -2234,6 +2237,7 @@ function AdFormMultiSlot({
                       fotoBaseUrl: focusType === 'product' && selectedProduct?.image ? selectedProduct.image : undefined,
                       aspectRatio: aspectForVeo,
                     },
+                    timeoutMs: 300_000,
                   });
                   if (error) {
                     if (error === 'NO_CREDITS' || (typeof error === 'string' && error.includes('CREDITS'))) {
@@ -4488,6 +4492,8 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           const fotoBase = productPhoto || briefData?.foto_recomendada || undefined;
 
           if (wantVideo) {
+            // Same timeout bump as the single-slot flow — backend holds up
+            // to 4.5 min for Veo before handing off to client-side polling.
             const { data: vidData, error: vidErr } = await callApi('generate-video', {
               body: {
                 clientId,
@@ -4495,6 +4501,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                 fotoBaseUrl: fotoBase,
                 aspectRatio: '9:16',
               },
+              timeoutMs: 300_000,
             });
             if (vidErr) {
               if (vidErr === 'NO_CREDITS' || (typeof vidErr === 'string' && vidErr.includes('CREDITS'))) {
