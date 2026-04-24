@@ -9,15 +9,15 @@ export async function getUserClientIds(
   supabase: SupabaseClient,
   userId: string
 ): Promise<{ isSuperAdmin: boolean; clientIds: string[] }> {
-  // Consistente con el patrón canónico del proyecto (ver google-ads-api.ts):
-  // roles 'admin' y 'super_admin' ambos cuentan como super admin para scoping.
-  // Algunos users legacy tienen role='admin' + is_super_admin=true (bool),
-  // mientras que otros solo tienen role='super_admin'. Aceptamos ambos.
+  // La columna `role` es un ENUM app_role que NO acepta el valor 'super_admin'
+  // (fallaría con "invalid input value for enum app_role"). La fuente de verdad
+  // canónica para super admin en este proyecto es la columna booleana
+  // `is_super_admin`. Users legacy tienen role='admin' + is_super_admin=true.
   const { data: adminCheck } = await supabase
     .from('user_roles')
-    .select('role')
+    .select('is_super_admin')
     .eq('user_id', userId)
-    .in('role', ['admin', 'super_admin'])
+    .eq('is_super_admin', true)
     .limit(1)
     .maybeSingle();
 
