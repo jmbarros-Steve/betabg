@@ -479,9 +479,12 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         body: { action: 'send', client_id: clientId, campaign_id: campaignId, ab_test: abConfig },
       });
       if (error) { toast.error(error); return; }
+      const smartSuffix = data?.smart_send_count > 0
+        ? ` (${data.smart_send_count} diferidos a su hora óptima)`
+        : '';
       const msg = data?.ab_test
-        ? `Test A/B iniciado: ${data.variant_a_sent + data.variant_b_sent} enviados, ${data.remaining} esperan ganador`
-        : `Enviado a ${data?.sent_count || 0} contactos`;
+        ? `Test A/B iniciado: ${data.enqueued || 0} encolados, ${data.remaining || 0} esperan ganador`
+        : `Encolados ${data?.queued_count || 0} de ${data?.total_recipients || 0} contactos${smartSuffix}`;
       toast.success(msg);
       setShowEditor(false);
       loadCampaigns();

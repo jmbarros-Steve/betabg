@@ -1,129 +1,117 @@
 # Valentina W1 — Estado Actual
 
-**Última sesión:** 2026-04-08
+**Última sesión:** 2026-04-09 (Audit Fix Email)
+**Sesión previa:** 2026-04-08 (8 mejoras Steve Mail)
+**Reviewed-By:** Claude self-review (Isidora W6 + Javiera W12 pendientes sobre ambas sesiones)
 
-## Trabajo completado hoy (sesión con JM)
+---
 
-### Tarea 6 — Verificación brandColor en GrapesEmailEditor ✅
-- Confirmado que `brandColor` prop fluye end-to-end desde GrapesEmailEditor → grapes-steve-blocks.ts → grapes-theme.ts.
-- Los bloques custom (producto, botón, cupón) heredan el color del cliente correctamente.
+## Trabajo completado sesión 09/04 — Audit Fix Email (7 archivos)
 
-### Tarea 7 — Auditoría y fix de iframes en client-portal/email/ ✅
-Quitado `allow-scripts` del sandbox en 6 iframes (6 ubicaciones, 4 archivos):
-- `CampaignBuilder.tsx` — 2 iframes de preview
-- `FlowBuilder.tsx` — 2 iframes de preview
-- `UniversalBlocksPanel.tsx` — 1 iframe de preview de bloque
-- `ClickHeatmapPanel.tsx` — 1 iframe de heatmap. **Además** reemplazado el bloque `<script>` que bloqueaba navegación por CSS `pointer-events: none` (sandbox sin allow-scripts requiere fix sin JS).
+Auditoría de seguridad. **Antes:** 16 bugs (1 CRITICAL, 7 HIGH, 8 MEDIUM). **Después:** 0 pendientes.
 
-Todos ahora usan `sandbox="allow-same-origin"` sin scripts.
+1. **GDPR compliance** — `flow-webhooks.ts:493` → patrón check-first en vez de blind upsert (respeta opt-out del suscriptor antes de enrolar).
+2. **Timing-safe HMAC** — `send-email.ts:46` → `crypto.timingSafeEqual` en vez de `===` (previene timing attacks en webhook signature).
+3. **Optimistic lock** — `send-queue.ts:170` → `UPDATE ... WHERE id=X AND status='queued'` (solo procesa items efectivamente reclamados; evita double-send en races).
+4. **XSS prevention** — `unsubscribe.ts:82` → `escapeHtml()` en output HTML (página de desuscripción era vulnerable).
+5. **Cron auth** — handlers `winback` + `birthday` → `X-Cron-Secret` check (antes: endpoints abiertos).
+6. **SNS validation** — `track-events.ts` → valida estructura del mensaje SNS antes de procesar.
+7. **authMiddleware sweep** — verificado en todas las rutas email.
 
-### Tarea 8 — Mobile responsive de templates de flow ✅
-**Problema:** templates de Jardín de Eva son fragmentos HTML (sin `<!DOCTYPE>`/`<head>`) — carecen de viewport meta + @media queries → mobile rotos.
+---
 
-**Fix sistémico:** agregado `ensureMobileWrap()` en `cloud-run-api/src/lib/email-html-processor.ts` como paso 5 del pipeline. Detecta fragmentos vs documentos completos y envuelve los fragmentos con HTML5 full doc: viewport meta + CSS base @media ≤600px (tablas al 100%, imgs fluidas, padding adaptado, headings escalados, `.steve-mobile-stack`). No toca templates que ya son documentos completos.
+## Trabajo completado sesión 08/04 — 8 mejoras Steve Mail
 
-Cubre los 3 templates de Jardín de Eva sin tocarlos + previene el problema en futuros templates generados por AI.
+**Commits:** `0614d65` + `d7c1334` (33 archivos, +3237/-503). **Deploy:** revision `steve-api-00425-9p8` al 100%. **Migraciones:** 5 (`20260408140000` → `20260408140400`).
 
-### Tarea 9 — email_send_queue roto (0 filas) ✅ código listo, deploy pendiente
+| # | Tarea | Status |
+|---|------|--------|
+| P0-1 | Backfill `email_send_settings.use_send_queue=true` + trigger `default_use_send_queue` | ✅ |
+| P0-2 | Smart send en ruta directa (agrupa por `send_time_hour`, difiere via queue aunque flag off) | ✅ |
+| P0-3 | Quiet hours TZ-aware en `flow-engine` (`Intl.DateTimeFormat`, col `email_subscribers.timezone`) | ✅ |
+| P1-4 | Comentario SES→Resend corregido en `send-email.ts` | ✅ |
+| P1-5 | Tabla `email_industry_benchmarks` + seeds + `EmailAnalytics.tsx` lee desde DB | ✅ |
+| P1-6 | Refactor `CampaignBuilder.tsx` (1865 LOC) — Fase 1/5 (types + constants extraídos) | ✅ |
+| P2-7 | `GET /api/email-queue-health` + `QueueHealthDashboard.tsx` (tab "Cola" super-admin) | ✅ |
+| P2-8 | Tabla `steve_alerts` + trigger `alert_on_bounce_spike` (>5% bounce última hora) | ✅ |
+| safe-supabase | Migración defensiva de 14 archivos `email/` (patrón audit deuda técnica 07/04) | ✅ |
 
-**Diagnóstico:**
-- `email_send_queue` = 0 filas. `email_events` sent = 37. Campañas enviadas = 4/8.
-- **Causa raíz:** nadie llamaba al `enqueue`. `manage-campaigns.ts:378-436` y `flow-engine.ts:288` usaban `sendSingleEmail` directo. La cola era **código 100% huérfano** (lib + tabla + rate limit + retry + smart send implementados, sin llamadores ni cron processor).
-- Implicancias: sin rate limit por cliente, sin crash-recovery, sin smart send time, sin retry, sin cancelación mid-send.
+---
 
-**Decisión arquitectural con JM:** Plan A con feature flag (rollout gradual).
+## Trabajo completado sesión previa 08/04 (mañana) — feature flag email_send_queue
 
-**Implementación entregada:**
+Commit `312a8d5` — código listo + deploy. Migración `20260408100000_email_send_queue_feature_flag.sql` aplicada vía `migration repair --status reverted 20260321 20260322 20260325`.
 
-1. **Migración SQL** (`supabase/migrations/20260408100000_email_send_queue_feature_flag.sql`)
-   - `ALTER TABLE email_send_settings ADD COLUMN use_send_queue BOOLEAN NOT NULL DEFAULT false;`
-   - Default false → preserva comportamiento actual para todos los clientes.
+- `manage-campaigns.ts` ramificado con feature flag `use_send_queue` (campañas normales + A/B)
+- `email-queue-tick.ts` NEW — cron con `CONCURRENCY=5` + `Promise.allSettled`, sweep de stuck items `processing > 30 min` → `queued`
+- `send-queue.ts` process: itera todos los `campaign_id` distintos, transición `status='sent'` solo cuando `stillPending=0`
+- `ensureMobileWrap()` en `email-html-processor.ts` — detecta fragmentos HTML vs docs completos, envuelve con viewport + @media queries
+- 6 iframes `client-portal/email/` — removido `allow-scripts` del sandbox (CampaignBuilder, FlowBuilder, UniversalBlocksPanel, ClickHeatmapPanel con CSS `pointer-events:none` en vez de script)
+- Cloud Scheduler `email-queue-tick-1m` ENABLED
 
-2. **Handler cron** (`cloud-run-api/src/routes/cron/email-queue-tick.ts`)
-   - Query distinct client_id con items `status='queued' AND scheduled_for <= now()`.
-   - Para cada cliente llama internamente a `emailSendQueue({action:'process', client_id})`.
-   - Secuencial entre clientes para no saturar Resend. Auth: X-Cron-Secret.
+**Code review Isidora W6:** ciclo 1 RECHAZADO (5 hallazgos) → fixes aplicados → ciclo 2 APROBADO CON OBSERVACIONES.
 
-3. **Ramificación en `manage-campaigns.ts`**
-   - Lee `email_send_settings.use_send_queue` para el cliente al inicio de `send`.
-   - Helper nuevo `enqueueCampaignItems()` que inserta en chunks de 500.
-   - Path normal: si flag ON → personaliza (Nunjucks + processEmailHtml) + encola todos los items + deja `campaign.status='sending'` (el cron lo pasará a 'sent'). Si OFF → loop directo original.
-   - Path A/B: refactoré `processAndSend` extrayendo `personalizeForSub`. Si flag ON → encola variantes A y B con `ab_variant` marcado. Si OFF → envío directo original.
-   - El Cloud Task de winner se sigue agendando igual (no cambia).
+---
 
-4. **flow-engine.ts NO ramificado** (decisión defensiva). Razones: emails de flow son 1-a-1 por Cloud Task, ya están throttled, crash-recovery viene de Cloud Tasks retry, encolar introduce latencia sin beneficio. El flag solo aplica a campañas bulk.
+## Verificación Pendiente
 
-5. **Endpoint montado** en `index.ts:523` como `POST /api/cron/email-queue-tick`.
+### Crítico (bloquea activación full)
+- [ ] **Activar `use_send_queue=true` en primer cliente real** — sigue bloqueado: `email_send_settings` está **vacía en prod** (0 filas). El trigger de default solo aplica a nuevos inserts. Pending decisión de producto: ¿qué onboarding crea la primera fila?
+- [ ] **E2E test del trigger `alert_on_bounce_spike`** — simular 20+ sends con >5% bounces para ver entry en `steve_alerts`
+- [ ] **Verdict de `queue-health` con datos reales** — ahora devuelve `ok` cosméticamente porque no hay tráfico en la cola
 
-**TypeScript compila limpio**. NO se ha commiteado ni pusheado ni deployado.
+### Reviews pendientes
+- [ ] **Isidora W6** — backend (queue-health, smart send directo, quiet hours TZ-aware) + frontend (QueueHealthDashboard 323 LOC)
+- [ ] **Javiera W12** — RLS de `steve_alerts`, trigger `alert_on_bounce_spike`, índices `email_industry_benchmarks`
+- [ ] **Javiera W12 S-1** — migración separada antes de GA: `REVOKE UPDATE (use_send_queue) ON email_send_settings FROM authenticated;`
 
-### Code review ciclo 1: RECHAZADO (Isidora W6)
-- C1 CRITICAL: send-queue.ts process nunca transicionaba status → campaña eterna en 'sending'.
-- M1 MAJOR: A/B QUEUE marcaba 'sent' con sent_count=0.
-- M2 MAJOR: items stuck en 'processing' sin recovery.
-- M3 MAJOR: email-queue-tick serial → timeout >60s con >15 clientes.
-- M4 MAJOR: ensureMobileWrap detección laxa (includes sin anclar).
+### UX / QA
+- [ ] **Mobile responsive de QueueHealthDashboard** en iPhone SE (regla #1 de Valentina)
+- [ ] **Testear desuscripción con caracteres especiales** (verificar escapeHtml)
+- [ ] **Verificar winback/birthday rechazan llamadas sin CRON_SECRET**
+- [ ] **Confirmar SNS validation no rechaza mensajes legítimos**
 
-### Code review ciclo 2: APROBADO CON OBSERVACIONES (Isidora W6)
-Fixes aplicados:
-- **C1** — `send-queue.ts process`: itera todos los campaign_ids distintos, query `stillPending` (queued+processing). Solo setea `status='sent'` cuando stillPending=0. sent_count siempre actualizado.
-- **M1** — `manage-campaigns.ts` A/B: bifurcación QUEUE/DIRECT. QUEUE deja `status='sending'` (deja que C1 sweep lo cierre). DIRECT mantiene comportamiento original. `scheduleAbTestWinner` con margen +10 min en QUEUE.
-- **M2** — `send-queue.ts`: al mover a 'processing' setea `processed_at=now()` (last-touched marker). `email-queue-tick.ts`: pre-sweep antes del loop que resetea items con `status='processing' AND processed_at < now()-30min` → 'queued', reporta `recovered_stuck`.
-- **M3** — `email-queue-tick.ts`: `CONCURRENCY=5` constante, `Promise.allSettled` sobre chunks. Capacidad ~50 clientes/tick. Sin deps externas.
-- **M4** — `email-html-processor.ts ensureMobileWrap`: regex anclado `/^<!doctype\s/i` sobre `trimStart()` + `<html[\s>]/i` + `<head[\s>]/i` + `<body[\s>]/i`. Idempotente, no matchea `<header>`.
+### Deuda técnica (no bloquea)
+- [ ] **CampaignBuilder.tsx Fases 2-5** — hooks, sub-componentes, state reducer, testing. Regla de oro: NO borrar código legacy hasta que reemplazo esté testeado en prod
+- [ ] **Smart-send bypass en A/B QUEUE path** (preexistente, no introducido)
+- [ ] **Sentry capture en sweep error** de `email-queue-tick.ts` (cosmetic)
+- [ ] **`STUCK_PROCESSING_MINUTES=30`** env-configurable
 
-TypeScript compila limpio. Sin regresiones detectadas. Observaciones menores no bloqueantes:
-- Smart-send bypass en A/B QUEUE path (preexistente, no introducido por fixes).
-- `client_id='unknown'` cuando Promise.allSettled rechaza (cosmetic debug).
-- Sweep error solo logueado, sin Sentry capture.
-- `STUCK_PROCESSING_MINUTES=30` podría ser env-configurable a futuro.
+---
 
-**Listo para commit** con `Reviewed-By: Isidora W6`.
+## Problemas conocidos pendientes (externos a Valentina)
 
-**Follow-up Javiera W12 (S-1)**: crear migración separada antes de GA para `REVOKE UPDATE (use_send_queue) ON email_send_settings FROM authenticated;`.
+- **Cloud Tasks IAM** — `steve-api` service account sin `cloudtasks.tasks.create` → flows no se auto-programan (Sebastián W5)
+- **Shopify `write_discounts` scope** — no verificado en Jardín de Eva → step 3 del carrito abandonado podría fallar
+- **Deuda heredada Rodrigo W0** — `KlaviyoPlanner.tsx` iframe sin sandbox
 
-## Rollout ejecutado (sesión 2026-04-08)
+---
 
-| # | Paso | Estado | Detalle |
-|---|------|--------|---------|
-| 1 | Commit | ✅ | `312a8d5` — feat(email): email_send_queue feature flag + mobile wrap + 5 review fixes (Reviewed-By: Isidora W6) |
-| 2 | Migración SQL | ✅ | `use_send_queue` column aplicada vía `supabase migration repair --status reverted 20260321 20260322 20260325` + `db push --include-all`. Verificada vía REST API. |
-| 3 | Deploy Cloud Run | ✅ | `steve-api-00396-29h` al 100% del tráfico. (1er intento falló por TS error en klaviyo-push-emails.ts:315 — fix de Rodrigo `cec4493` desbloqueó.) |
-| 4 | Cloud Scheduler | ✅ | `email-queue-tick-1m` ENABLED, `* * * * *`. 5 ejecuciones consecutivas verificadas con HTTP 200 + ~250ms latencia, payload `{processed_clients:0,total_sent:0,total_failed:0,recovered_stuck:0}`. |
-| 5 | Activar flag cliente | ⏸️ DIFERIDO | Tabla `email_send_settings` está **completamente vacía** en producción (0 filas). No hay cliente al cual `UPDATE`. Activar requiere `INSERT` de fila completa con `from_email`, `from_name`, `daily_limit`, etc. → necesita decisión de producto + cliente real configurado en onboarding. |
-| 6 | Prueba e2e | ⏸️ BLOCKED por #5 | Se hará cuando exista el primer cliente con `email_send_settings` configurado. La infra está lista para ejecutar el flujo end-to-end sin más cambios de código. |
+## Coordinación cruzada activa
 
-**Estado de la infraestructura:** ✅ **Operativa y dormante** — el cron tick está vivo y funcional, esperando que algún cliente tenga `use_send_queue=true`. El default `false` preserva el comportamiento actual (envío directo) para todos los clientes futuros hasta que JM/producto decida activar.
+### Rodrigo W0 (semana 07-09/04) — sin conflicto
+1. `klaviyo_metrics_cache` solo FK a `clients(id)`, sin relación con email_send_queue
+2. Fix variables Klaviyo limitado a UI, no toca `email-html-processor.ts` ni `flow-engine.ts`
+3. Sandbox iframes de Rodrigo limitado a `campaign-studio/templates/ImportKlaviyoDialog.tsx` (NO `client-portal/email/` que cubrí yo)
 
-**Follow-ups conocidos (no bloqueantes):**
-- **Javiera W12 S-1**: crear migración separada antes de GA → `REVOKE UPDATE (use_send_queue) ON email_send_settings FROM authenticated;`
-- Smart-send bypass en A/B QUEUE path (preexistente)
-- Sweep error sin Sentry capture (cosmetic)
-- `STUCK_PROCESSING_MINUTES=30` env-configurable (cosmetic)
-- Decidir trigger de onboarding que crea la primera fila en `email_send_settings` y si por default debería traer `use_send_queue=true`.
+### Isidora W6 — review pendiente sobre sesiones 08/04 y 09/04
+### Javiera W12 — review SQL pendiente + S-1 REVOKE UPDATE
 
-## Problemas conocidos pendientes (no tocados esta sesión)
-- Cloud Tasks IAM: `steve-api` service account sin permiso `cloudtasks.tasks.create` → flows solo se auto-programan si el IAM está OK (Sebastián W5).
-- Shopify `write_discounts` scope: no verificado en Jardín de Eva.
-- **Deuda técnica heredada de Rodrigo:** `KlaviyoPlanner.tsx` iframe sin sandbox (coordinar).
+---
 
-## Coordinación cruzada activa con Rodrigo W0 (semana 07/04)
+## Infraestructura operativa — estado dormante
 
-Rodrigo confirmó 3 puntos — sin conflicto:
-1. `klaviyo_metrics_cache` solo FK a `clients(id)`, sin relación con email_send_queue.
-2. Fix variables Klaviyo limitado a UI, no toca `email-html-processor.ts` ni `flow-engine.ts`.
-3. Sandbox iframes de Rodrigo limitado a `campaign-studio/templates/ImportKlaviyoDialog.tsx`, NO toca `client-portal/email/`.
+- **`use_send_queue` feature flag** — deployed, cron vivo (`email-queue-tick-1m` cada minuto, HTTP 200 consistente), pero `{processed_clients:0, total_sent:0}` porque no hay cliente con settings. Infra lista para arrancar en cuanto exista la primera fila.
+- **Trigger `default_use_send_queue`** — activará por default solo a NUEVOS clientes (los existentes necesitan UPDATE manual o backfill).
+- **Trigger `alert_on_bounce_spike`** — vivo, esperando tráfico con bounce rate >5%.
 
-**Mi Task 7 cubrió client-portal/email/** — 6 iframes + 1 script replaced. No choca con Rodrigo.
+---
 
-## Files modificados esta sesión
-- `cloud-run-api/src/lib/email-html-processor.ts` — ensureMobileWrap()
-- `cloud-run-api/src/routes/email/manage-campaigns.ts` — enqueueCampaignItems() + feature flag ramification
-- `cloud-run-api/src/routes/cron/email-queue-tick.ts` — NEW
-- `cloud-run-api/src/routes/index.ts` — import + mount cron
-- `src/components/client-portal/email/CampaignBuilder.tsx` — 2 iframe sandbox fix
-- `src/components/client-portal/email/FlowBuilder.tsx` — 2 iframe sandbox fix
-- `src/components/client-portal/email/UniversalBlocksPanel.tsx` — 1 iframe sandbox fix
-- `src/components/client-portal/email/ClickHeatmapPanel.tsx` — 1 iframe sandbox fix + CSS pointer-events (no script)
-- `supabase/migrations/20260408100000_email_send_queue_feature_flag.sql` — NEW
-- `agents/state/valentina-w1.md` — este archivo
+## Archivos modificados sesión 09/04
+- `cloud-run-api/src/routes/email/flow-webhooks.ts` — GDPR check-first
+- `cloud-run-api/src/routes/email/send-email.ts` — timingSafeEqual
+- `cloud-run-api/src/routes/email/send-queue.ts` — optimistic lock
+- `cloud-run-api/src/routes/email/unsubscribe.ts` — escapeHtml
+- `cloud-run-api/src/routes/email/winback.ts` — cron secret
+- `cloud-run-api/src/routes/email/birthday.ts` — cron secret
+- `cloud-run-api/src/routes/email/track-events.ts` — SNS validation
