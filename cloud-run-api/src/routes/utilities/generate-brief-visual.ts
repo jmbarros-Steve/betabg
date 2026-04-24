@@ -179,17 +179,19 @@ Estilo visual: ${brief.visual_style || brief.estilo || 'moderno y limpio'}
 Fotos disponibles del producto: ${photosList || 'No hay fotos'}
 ${shopifyContext}
 
-${formato === 'video' ? `Responde en JSON para VIDEO (motor: Google Veo 3.1, 8 segundos, un solo plano continuo, con audio nativo sincronizado):
+${formato === 'video' ? `Responde en JSON para VIDEO (${videoDurationSec} segundos, un solo plano continuo${videoIsRunway ? ' — SIN audio, cinematográfico con foco absoluto en producto' : ' con audio nativo sincronizado (voz + ambiente + música)'}):
 {
   "tipo": "video",
-  "duracion": "8s",
-  "plano": "descripción corta del único plano del video (Veo 3.1 no soporta multi-escena en 8s)",
+  "duracion": "${videoDurationSec}s",
+  "plano": "descripción corta del único plano del video (no soporta multi-escena en ${videoDurationSec}s)",
   "texto_overlay": "opcional, 1-3 palabras máx",
-  "musica_sugerida": "género + mood (ej: acoustic folk, warm and intimate)",
+  ${videoIsRunway
+    ? '"musica_sugerida": "ninguna — video silencioso, se agrega audio en post si aplica",'
+    : '"musica_sugerida": "género + mood (ej: acoustic folk, warm and intimate)",'}
   "tono": "...",
   "foto_recomendada": "URL http(s) real de foto de producto si existe, o null si no hay — NUNCA escribas 'Sin foto disponible' como string",
   "instruccion_foto": "image-to-video (preservar el producto literal) / text-to-video (sin foto base)",
-  "prompt_generacion": "prompt cinematográfico en inglés para Veo 3.1 — OBLIGATORIO seguir la estructura de las reglas de abajo"
+  "prompt_generacion": "prompt cinematográfico en inglés para el motor de video IA — OBLIGATORIO seguir la estructura de las reglas de abajo"
 }` : `Responde en JSON para IMAGEN:
 {
   "tipo": "imagen",
@@ -217,41 +219,77 @@ ${productDesc
 - NUNCA usar palabras como "digital art", "illustration", "3D render", "graphic design" — todo debe ser "photograph".
 - Siempre terminar el prompt con: "Ultra-realistic commercial photograph, professional advertising photo shoot, real textures, natural imperfections, shot on Canon EOS R5. No illustrations, no AI artifacts, no plastic-looking skin, no floating objects, no text overlays."
 
-${formato === 'video' ? `
-REGLAS ESPECÍFICAS para prompt_generacion de VIDEO (Veo 3.1 — 8 segundos, 1080p, con audio):
+${formato === 'video' ? (videoIsRunway ? `
+REGLAS ESPECÍFICAS para prompt_generacion de VIDEO (${videoDurationSec} segundos, cinematográfico, SIN audio, 1080p):
 
-Veo 3.1 rinde 10× mejor con prompts TIGHT de 300-500 caracteres, 5 capas combinadas esenciales, vs prompts inflados de 4000 chars con 8 capas separadas. TIGHT > LARGO. No sobrecargues al modelo — se satura y produce garbage (tipo "dedo metiéndose en barro"). Target ≈500 chars.
+El motor de video IA rinde 10× mejor con prompts TIGHT de 300-500 caracteres, 5 capas combinadas esenciales, vs prompts inflados de 4000 chars con 8 capas separadas. TIGHT > LARGO. No sobrecargues al modelo — se satura y produce garbage. Target ≈500 chars.
 
-REGLA DE ORO — PRODUCTO TERMINADO COMO HERO (no proceso artesanal):
+REGLA DE ORO — PRODUCTO TERMINADO COMO HERO PIXEL-PERFECT (no proceso artesanal):
 ${productDesc || shopifyProducts.length > 0 ? `
 - El prompt DEBE nombrar el producto REAL del catálogo de la tienda (ej: "a Good Gres stoneware vase with matte clay texture and mineral glaze", NO "a ceramic product").
 - PRIORIZÁ producto terminado como hero shot (rotando sobre pedestal, iluminado, close-up macro) POR ENCIMA de procesos artesanales (manos trabajando, materia prima).
-- Si mostrás el proceso (ej: manos haciendo cerámica, chef cocinando), el PRODUCTO TERMINADO debe aparecer visible en pantalla al menos 3 de los 8 segundos — NUNCA solo en el último segundo como reveal.
-- El producto debe ser VISUALMENTE PROTAGÓNICO al menos 4 de los 8 segundos (close-up macro, hero shot, o slow dolly).
+- Este motor es SILENCIOSO — no menciones audio, diálogo, música ni voz en el prompt. Foco 100% visual.
+- El producto debe ser VISUALMENTE PROTAGÓNICO al menos ${Math.max(videoDurationSec - 2, 6)} de los ${videoDurationSec} segundos (close-up macro, hero shot, o slow dolly). Idealmente pixel-perfect, con textura fidedigna.
 - Si el cliente NO eligió producto específico, usá el primer producto del catálogo como hero. NUNCA uses un producto genérico o alucinado.
 ` : `
-- No hay productos reales disponibles. El video debe ser de marca/lifestyle SIN ningún producto visible. Trabajar solo con persona + ambiente + emoción. En AUDIO evitar referencias a productos inexistentes.
+- No hay productos reales disponibles. El video debe ser de marca/lifestyle SIN ningún producto visible. Trabajar solo con persona + ambiente + emoción.
+- Este motor es SILENCIOSO — no menciones audio, diálogo, música ni voz en el prompt. Foco 100% visual.
 `}
 
-ESTRUCTURA OBLIGATORIA — 5 CAPAS COMBINADAS (las 8 capas viejas sobrecargaban Veo):
+ESTRUCTURA OBLIGATORIA — 5 CAPAS COMBINADAS (sin capa de audio — este motor es silencioso):
 
 1. SUBJECT + ACTION — qué/quién + verbo concreto combinados (ej: "a finished Good Gres stoneware vase slowly rotates on a charcoal concrete pedestal"). Evitá "sonriendo", "usando", "posando".
 2. SCENE + LIGHTING — dónde + cómo está iluminado combinados (ej: "studio black backdrop, dramatic key light from above-right, rim light behind outlines silhouette, soft fill on shadow side").
 3. CAMERA + STYLE — plano + look fotográfico combinados (ej: "slow 360° dolly, Hasselblad medium-format 100mm f/4, warm earth-tone color grade, shallow depth of field").
-4. PRODUCT EMPHASIS — declará explícitamente cuántos segundos el producto está visible + cómo se resalta (ej: "product fills frame for 6 of 8 seconds; macro reveals clay texture and glaze color shift from ocher to moss green").
-5. AUDIO — específico pero conciso, 1 línea (ej: "Audio: deep ambient drone, single crystalline piano note at s2, crisp clay-on-clay tap at s6. No dialogue.").
+4. PRODUCT EMPHASIS — declará explícitamente cuántos segundos el producto está visible + cómo se resalta (ej: "product fills frame for ${videoDurationSec - 2} of ${videoDurationSec} seconds; macro reveals clay texture and glaze color shift from ocher to moss green").
+5. MOTION ARC — describir el movimiento visual en UNA línea (ej: "slow camera push-in from medium to macro; subject rotates 120° during the final 3 seconds").
 
-Siempre cerrar con "8-second total duration."
+Siempre cerrar con "${videoDurationSec}-second total duration."
 
-EJEMPLO DE PROMPT DE CALIDAD A REPLICAR (producto terminado como hero, ≈500 chars, 5 capas):
-"Cinematic 8-second hero shot of a finished Good Gres stoneware vase on a dark charcoal concrete pedestal. Slow 360° rotation reveals the unique matte clay texture and mineral glaze that shifts color from deep ocher to moss green. Dramatic key light from above right, rim light behind outlines the silhouette, soft fill on the shadow side. Macro 100mm lens, f/4, studio black background. Warm earth-tone color grade, rich shadows. Camera pans slowly around product. Shot on Hasselblad medium format. Audio: deep ambient low drone, single crystalline piano note at second 2, crisp clay-on-clay tap at second 6. No dialogue. 8-second total duration."
+EJEMPLO DE PROMPT DE CALIDAD A REPLICAR (producto terminado como hero, ≈500 chars, 5 capas, silencioso):
+"Cinematic ${videoDurationSec}-second hero shot of a finished Good Gres stoneware vase on a dark charcoal concrete pedestal. Slow 360° rotation reveals the unique matte clay texture and mineral glaze that shifts color from deep ocher to moss green. Dramatic key light from above right, rim light behind outlines the silhouette, soft fill on the shadow side. Macro 100mm lens, f/4, studio black background. Warm earth-tone color grade, rich shadows. Camera pans slowly around product. Shot on Hasselblad medium format. Slow push-in from medium to close-up over the final 4 seconds. ${videoDurationSec}-second total duration."
+
+NUNCA entregues:
+- Prompts con audio, música, diálogo o voz (este motor no lo soporta).
+- Prompts vagos tipo "persona haciendo cerámica" o "mujer sonriendo en cocina" (producen mediocre).
+- Prompts de >800 caracteres (el motor se satura → garbage).
+- Procesos artesanales SIN mostrar el producto terminado ≥${Math.max(videoDurationSec - 3, 4)} segundos.
+- Más de 5 capas — las 5 son las esenciales. Menos es más.
+` : `
+REGLAS ESPECÍFICAS para prompt_generacion de VIDEO (${videoDurationSec} segundos, con audio nativo sincronizado, 1080p):
+
+El motor de video IA rinde 10× mejor con prompts TIGHT de 300-500 caracteres, 5 capas combinadas esenciales, vs prompts inflados de 4000 chars con 8 capas separadas. TIGHT > LARGO. No sobrecargues al modelo — se satura y produce garbage (tipo "dedo metiéndose en barro"). Target ≈500 chars.
+
+REGLA DE ORO — PERSONA + PRODUCTO EN ESCENA HUMANA (no solo hero shot de producto):
+${productDesc || shopifyProducts.length > 0 ? `
+- El prompt DEBE incluir una PERSONA como foco principal — habla a cámara, usa el producto, reacciona, o da testimonio. Este motor hace voz + expresión + lip-sync mucho mejor que un producto rotando solo.
+- El producto REAL del catálogo debe aparecer al menos ${Math.max(videoDurationSec - 4, 3)} de los ${videoDurationSec} segundos, pero NO tiene que dominar el frame — la persona y la emoción son el hero.
+- Si la persona habla, incluí la frase exacta que dice en el prompt (ej: 'She says "esto me cambió la vida" looking directly at camera').
+- Si el cliente NO eligió producto específico, usá el primer producto del catálogo pero como secundario a la persona.
+` : `
+- Sin productos reales disponibles. El video es puramente sobre persona + ambiente + emoción. NUNCA inventes un producto.
+- Si la persona habla, incluí la frase exacta en el prompt.
+`}
+
+ESTRUCTURA OBLIGATORIA — 5 CAPAS COMBINADAS:
+
+1. SUBJECT + ACTION — qué persona + qué hace/dice combinados (ej: "a woman in her late 20s leans into camera and says 'no volví a dormir mal desde esto'"). Evitá "sonriendo", "usando", "posando" vagos.
+2. SCENE + LIGHTING — dónde + cómo está iluminado combinados (ej: "her bedroom at golden hour, soft window light from the left, warm fill bouncing off cream walls").
+3. CAMERA + STYLE — plano + look fotográfico combinados (ej: "medium close-up, iPhone 15 handheld with subtle shake, unfiltered UGC look").
+4. PRODUCT + CONTEXT — cómo aparece el producto (ej: "the ${productData?.title || 'product'} is visible on the nightstand for ${Math.max(videoDurationSec - 4, 3)} of ${videoDurationSec} seconds, picked up at second ${Math.floor(videoDurationSec / 2)}").
+5. AUDIO — específico pero conciso, 1 línea (ej: "Audio: ambient room tone, she speaks clearly in neutral Latin Spanish, soft indie guitar underlays. Lip-sync accurately.").
+
+Siempre cerrar con "${videoDurationSec}-second total duration."
+
+EJEMPLO DE PROMPT DE CALIDAD A REPLICAR (persona talking-head, ≈500 chars, 5 capas, con audio):
+"${videoDurationSec}-second UGC-style iPhone clip. A woman in her late 20s with unstyled hair sits on her bed, leans slightly into camera and says in neutral Latin Spanish: 'no volví a dormir mal desde que empecé'. Soft golden-hour window light from the left, warm fill on cream walls. Medium close-up, handheld iPhone 15 with subtle natural shake, unfiltered Instagram-reel look. Product visible on nightstand for ${Math.max(videoDurationSec - 4, 3)} of ${videoDurationSec} seconds. Audio: ambient room tone, clear voice, soft indie guitar underlays. Lip-sync accurately. ${videoDurationSec}-second total duration."
 
 NUNCA entregues:
 - Prompts vagos tipo "persona haciendo cerámica" o "mujer sonriendo en cocina" (producen mediocre).
-- Prompts de >800 caracteres (Veo se satura → garbage).
-- Procesos artesanales SIN mostrar el producto terminado ≥3 segundos.
+- Prompts de >800 caracteres (el motor se satura → garbage).
+- Producto rotando solo sin persona (para ese ángulo hay otro motor — este prioriza persona).
 - Más de 5 capas — las 5 son las esenciales. Menos es más.
-` : ''}
+`) : ''}
 
 Responde SOLO el JSON sin markdown ni backticks.`;
 
