@@ -9,11 +9,16 @@ export async function getUserClientIds(
   supabase: SupabaseClient,
   userId: string
 ): Promise<{ isSuperAdmin: boolean; clientIds: string[] }> {
+  // Consistente con el patrón canónico del proyecto (ver google-ads-api.ts):
+  // roles 'admin' y 'super_admin' ambos cuentan como super admin para scoping.
+  // Algunos users legacy tienen role='admin' + is_super_admin=true (bool),
+  // mientras que otros solo tienen role='super_admin'. Aceptamos ambos.
   const { data: adminCheck } = await supabase
     .from('user_roles')
     .select('role')
     .eq('user_id', userId)
-    .eq('role', 'super_admin')
+    .in('role', ['admin', 'super_admin'])
+    .limit(1)
     .maybeSingle();
 
   if (adminCheck) return { isSuperAdmin: true, clientIds: [] };
