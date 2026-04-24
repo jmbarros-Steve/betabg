@@ -237,6 +237,13 @@ import { webFormsCrud, webFormSubmit, webFormConfig } from './crm/web-forms.js';
 import { bookingSlots, bookingConfirm } from './booking/booking-api.js';
 import { googleCalendarOauthCallback } from './oauth/google-calendar-oauth-callback.js';
 
+// Brief Estudio
+import {
+  getBriefEstudio,
+  saveBriefEstudio,
+  prefillBriefEstudioFromBrief,
+} from './brief-estudio/index.js';
+
 // El Chino — Check System + Fix Queue + Fixer + Reports
 import {
   chinoRun, chinoReport, chinoLatest, chinoFailures,
@@ -674,6 +681,13 @@ export function registerRoutes(app: Hono) {
   app.post('/api/crm/proposals', authMiddleware, proposalsCrud);
   app.post('/api/crm/proposals/generate', authMiddleware, proposalsGenerate);
   app.post('/api/crm/sellers', authMiddleware, sellersList);
+
+  // ============================================================
+  // Brief Estudio — Etapa 1 (actores, voces, productos, música)
+  // ============================================================
+  app.get('/api/brief-estudio/get', authMiddleware, getBriefEstudio);
+  app.post('/api/brief-estudio/save', authMiddleware, saveBriefEstudio);
+  app.get('/api/brief-estudio/prefill-from-brief', authMiddleware, prefillBriefEstudioFromBrief);
 
   // ============================================================
   // El Chino — Automated Check System (sub-router to avoid Hono RegExpRouter limit)
