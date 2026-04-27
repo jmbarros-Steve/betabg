@@ -460,7 +460,7 @@ async function generateAIInsights(allData: any, period: { from: string; to: stri
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 2400,
+        max_tokens: 4000,
         system: `Eres Steve, un Bulldog Francés con doctorado en Performance Marketing de Stanford. Tu trabajo es analizar la data de un cliente y devolver insights concretos en formato JSON estricto.
 
 REGLAS:
@@ -492,8 +492,32 @@ REGLAS:
     const text = (json.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
     // Extract JSON from response (model may wrap in code fence)
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    const parsed = JSON.parse(jsonMatch[0]);
+    if (!jsonMatch) {
+      console.warn('[strategy-report] AI returned no JSON. Raw text:', text.slice(0, 300));
+      return null;
+    }
+    let parsed: any;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch (parseErr: any) {
+      console.warn('[strategy-report] AI JSON parse failed (text length:', text.length, '). Trying to fix truncation...');
+      // Common case: model hit max_tokens mid-array. Trim to last complete }
+      const fixed = jsonMatch[0].replace(/,\s*\{[^}]*$/, '').replace(/,\s*"[^"]*$/, '');
+      // Close any open brackets
+      const opens = (fixed.match(/\[/g) || []).length;
+      const closes = (fixed.match(/\]/g) || []).length;
+      let attempt = fixed + ']'.repeat(Math.max(0, opens - closes));
+      const oOpens = (attempt.match(/\{/g) || []).length;
+      const oCloses = (attempt.match(/\}/g) || []).length;
+      attempt = attempt + '}'.repeat(Math.max(0, oOpens - oCloses));
+      try {
+        parsed = JSON.parse(attempt);
+        console.log('[strategy-report] Recovered partial AI response after truncation fix.');
+      } catch {
+        console.error('[strategy-report] AI JSON unrecoverable:', parseErr?.message);
+        return null;
+      }
+    }
     return {
       narrative: parsed.narrative || '',
       alerts: Array.isArray(parsed.alerts) ? parsed.alerts.slice(0, 5) : [],
