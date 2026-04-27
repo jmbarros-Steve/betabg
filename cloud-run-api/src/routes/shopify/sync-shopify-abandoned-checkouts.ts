@@ -197,6 +197,7 @@ export async function syncAllAbandonedCheckouts(c: Context) {
 
     const results: Array<{ connection_id: string; status: string; error?: string; fetched?: number }> = [];
     const baseUrl = process.env.SELF_URL || 'https://steve-api-850416724643.us-central1.run.app';
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
     for (const conn of connections) {
       try {
@@ -204,6 +205,8 @@ export async function syncAllAbandonedCheckouts(c: Context) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceKey}`,
+            'X-Internal-Key': serviceKey,
             'X-Cron-Secret': process.env.CRON_SECRET || 'steve-cron-secret-2024',
           },
           body: JSON.stringify({ connectionId: conn.id }),
