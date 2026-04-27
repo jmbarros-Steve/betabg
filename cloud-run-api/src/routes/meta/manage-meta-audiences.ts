@@ -208,9 +208,27 @@ async function handleCreateCustom(
     }
   }
 
-  // Add customer_file_source for customer list audiences
+  // Add customer_file_source for customer list audiences.
+  // Meta v23 valid values:
+  //   USER_PROVIDED_ONLY            (default — list collected directly from users)
+  //   PARTNER_PROVIDED_ONLY         (third-party data partner)
+  //   BOTH_USER_AND_PARTNER_PROVIDED (mix)
   if (source_type === 'customer_list') {
-    payload.customer_file_source = customer_file_source || 'USER_PROVIDED_ONLY';
+    const VALID_CFS = [
+      'USER_PROVIDED_ONLY',
+      'PARTNER_PROVIDED_ONLY',
+      'BOTH_USER_AND_PARTNER_PROVIDED',
+    ];
+    const requestedCfs = customer_file_source || 'USER_PROVIDED_ONLY';
+    if (!VALID_CFS.includes(requestedCfs)) {
+      return {
+        body: {
+          error: `Invalid customer_file_source: ${requestedCfs}. Valid values: ${VALID_CFS.join(', ')}`,
+        },
+        status: 400,
+      };
+    }
+    payload.customer_file_source = requestedCfs;
   }
 
   console.log(`[manage-meta-audiences] Creating custom audience "${name}" (${subtype}) for account ${accountId}`);
