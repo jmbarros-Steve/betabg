@@ -1947,15 +1947,27 @@ async function handleReachEstimate(
     return { body: { error: 'Reach estimate failed', details: result.error }, status: 502 };
   }
 
-  // Meta returns an array with one object inside data[]
+  // Meta returns an array with one object inside data[].
+  // v23 NOTE: estimate_dau is deprecated/removed for /delivery_estimate.
+  // Use estimate_mau_lower_bound / estimate_mau_upper_bound only.
+  // If both are missing, return null + an explicit error message rather than
+  // pretending the audience is 0.
   const estimate = result.data?.data?.[0] || {};
+  const lower = estimate.estimate_mau_lower_bound;
+  const upper = estimate.estimate_mau_upper_bound;
+  const hasMau = typeof lower === 'number' && typeof upper === 'number';
+
   return {
     body: {
       success: true,
       estimate_ready: !!estimate.estimate_ready,
-      users_lower_bound: estimate.estimate_mau_lower_bound || estimate.estimate_dau || 0,
-      users_upper_bound: estimate.estimate_mau_upper_bound || estimate.estimate_dau || 0,
+      users_lower: hasMau ? lower : null,
+      users_upper: hasMau ? upper : null,
+      // legacy keys for callers still on the old contract — same values
+      users_lower_bound: hasMau ? lower : null,
+      users_upper_bound: hasMau ? upper : null,
       daily_outcomes_curve: estimate.daily_outcomes_curve || null,
+      ...(hasMau ? {} : { error: 'Estimación no disponible' }),
     },
     status: 200,
   };
