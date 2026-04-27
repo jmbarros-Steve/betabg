@@ -310,7 +310,12 @@ export function NorthStarPage({ data }: { data: ReportData }) {
       </View>
 
       <Text style={[northStarStyles.pnlLabelMuted, { marginTop: 12, fontSize: sizes.micro, fontStyle: 'italic' }]}>
-        Costos fijos prorrateados linealmente al rango ({data.period.daysInPeriod} días sobre 30). Si tu rango cubre solo parte de un mes, los gastos mensuales reales pueden diferir.
+        {data.profitLoss.cogsMethod === 'real'
+          ? `Costo de productos calculado con costos reales por SKU desde Shopify.`
+          : data.profitLoss.cogsMethod === 'mixed'
+            ? `Costo de productos: ${data.profitLoss.cogsCoveredPct.toFixed(0)}% calculado con costos reales por SKU, el resto estimado al ${data.financial.default_margin_percentage}% de margen configurado. Configurá el "Cost per Item" de tus variants en Shopify para precisión total.`
+            : `Costo de productos estimado al ${data.financial.default_margin_percentage}% de margen configurado en Steve. Configurá el "Cost per Item" de tus variants en Shopify para usar costos reales por SKU.`}
+        {' '}Costos fijos prorrateados linealmente al rango ({data.period.daysInPeriod} días sobre 30).
       </Text>
 
       <Footer />

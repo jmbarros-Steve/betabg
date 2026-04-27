@@ -324,7 +324,7 @@ export function MarketingPage({ data }: { data: ReportData }) {
             return (
               <View key={i} style={mktStyles.platformCard}>
                 <View style={mktStyles.platformHeader}>
-                  <Text style={mktStyles.platformName}>{m.platform === 'meta' ? 'Meta Ads' : m.platform === 'google' ? 'Google Ads' : 'TikTok Ads'}</Text>
+                  <Text style={mktStyles.platformName}>{m.platform === 'meta' ? 'Meta Ads' : 'Google Ads'}</Text>
                   <Text style={[mktStyles.roasBadge, { backgroundColor: aboveBreakEven ? colors.positive : colors.negative }]}>
                     ROAS {m.roas.toFixed(2)}x {aboveBreakEven ? '▲' : '▼'}
                   </Text>

@@ -48,6 +48,8 @@ export interface ReportProfitLoss {
   grossRevenue: number;
   netRevenue: number;
   costOfGoods: number;
+  cogsMethod: 'real' | 'estimated' | 'mixed';
+  cogsCoveredPct: number; // 0-100, % de revenue cubierto por cost real
   grossProfit: number;
   totalAdSpend: number;
   fixedCostItems: Array<{ name: string; amount: number }>;
@@ -117,7 +119,7 @@ export interface FunnelData {
 }
 
 export interface MarketingPerformance {
-  platform: 'meta' | 'tiktok' | 'google';
+  platform: 'meta' | 'google';
   spend: number;
   revenue: number;
   roas: number;
@@ -257,7 +259,7 @@ async function fetchKpisForPeriod(
 ): Promise<ReportKpiSet> {
   let totalRevenue = 0;
   let totalOrders = 0;
-  const uniqueCustomers = 0; // TODO Sprint 2: count distinct desde shopify_orders
+  const uniqueCustomers = 0; // TODO Sprint 3: count distinct desde shopify_orders
 
   // platform_metrics está scoped por connection_id (no client_id, no platform col).
   if (shopifyConnectionId) {
@@ -275,15 +277,15 @@ async function fetchKpisForPeriod(
     }
   }
 
-  // Ad spend: campaign_metrics también scoped por connection_id.
-  // Buscamos todas las conexiones de ads (meta, tiktok, etc.) del cliente,
-  // EXCLUYENDO google (manual_google_spend lo cubre desde el financial_config).
+  // Ad spend: solo Meta (enum platform_type acepta meta/google/klaviyo/shopify).
+  // Google se cubre via manual_google_spend del financial_config para no duplicar
+  // si el cliente tiene Google sincronizado y manual configurado a la vez.
   const { data: adsConns } = await supabase
     .from('platform_connections')
     .select('id, platform')
     .eq('client_id', clientId)
     .eq('is_active', true)
-    .in('platform', ['meta', 'tiktok']);
+    .eq('platform', 'meta');
 
   const adsConnectionIds = (adsConns || []).map((c) => c.id);
 
@@ -329,17 +331,103 @@ async function fetchFinancialConfig(supabase: SupabaseClient, clientId: string):
   };
 }
 
+async function computeRealCogs(
+  supabase: SupabaseClient,
+  clientId: string,
+  orders: OrderRow[],
+  netRevenue: number,
+  marginRate: number,
+): Promise<{ cogs: number; method: 'real' | 'estimated' | 'mixed'; coveredPct: number }> {
+  if (orders.length === 0) {
+    return { cogs: netRevenue * (1 - marginRate), method: 'estimated', coveredPct: 0 };
+  }
+
+  // Construir mapa variant_id → cost desde products presentes en orders
+  const variantIdsInOrders = new Set<number>();
+  for (const o of orders) {
+    const items = (o.line_items as LineItem[]) || [];
+    for (const it of items) {
+      if (it.variant_id) variantIdsInOrders.add(it.variant_id);
+    }
+  }
+
+  const productIdsInOrders = new Set<string>();
+  for (const o of orders) {
+    const items = (o.line_items as LineItem[]) || [];
+    for (const it of items) {
+      if (it.product_id) productIdsInOrders.add(String(it.product_id));
+    }
+  }
+
+  if (productIdsInOrders.size === 0) {
+    return { cogs: netRevenue * (1 - marginRate), method: 'estimated', coveredPct: 0 };
+  }
+
+  const { data: products } = await supabase
+    .from('shopify_products')
+    .select('shopify_product_id, variants')
+    .eq('client_id', clientId)
+    .in('shopify_product_id', Array.from(productIdsInOrders));
+
+  // Mapa variant_id → cost (puede estar null si Shopify no tiene cost configurado)
+  const variantCostMap = new Map<number, number | null>();
+  for (const p of products || []) {
+    const variants = (p.variants as Array<{ id?: number; cost?: number | null }>) || [];
+    for (const v of variants) {
+      if (v.id != null) {
+        variantCostMap.set(v.id, v.cost != null && v.cost > 0 ? v.cost : null);
+      }
+    }
+  }
+
+  let cogsReal = 0;
+  let netRevenueWithCost = 0;
+  let netRevenueWithoutCost = 0;
+
+  for (const o of orders) {
+    const items = (o.line_items as LineItem[]) || [];
+    for (const it of items) {
+      const qty = Number(it.quantity) || 0;
+      const price = parseFloat(it.price || '0') || 0;
+      const discount = parseFloat(it.total_discount || '0') || 0;
+      const lineGross = qty * price - discount;
+      const lineNet = lineGross / (1 + TAX_RATE);
+
+      const unitCost = it.variant_id ? variantCostMap.get(it.variant_id) : null;
+      if (unitCost != null) {
+        cogsReal += unitCost * qty;
+        netRevenueWithCost += lineNet;
+      } else {
+        netRevenueWithoutCost += lineNet;
+      }
+    }
+  }
+
+  const totalCovered = netRevenueWithCost + netRevenueWithoutCost;
+  const coveredPct = totalCovered > 0 ? (netRevenueWithCost / totalCovered) * 100 : 0;
+
+  if (coveredPct >= 95) {
+    return { cogs: cogsReal, method: 'real', coveredPct };
+  }
+  if (coveredPct < 5) {
+    return { cogs: netRevenue * (1 - marginRate), method: 'estimated', coveredPct };
+  }
+  // Mixto: cost real para los que tienen + estimado para los que no
+  const cogsEstimadoFaltante = netRevenueWithoutCost * (1 - marginRate);
+  return { cogs: cogsReal + cogsEstimadoFaltante, method: 'mixed', coveredPct };
+}
+
 function computeProfitLoss(
   current: ReportKpiSet,
   financial: ReportFinancialConfig,
   daysInPeriod: number,
+  cogsResult: { cogs: number; method: 'real' | 'estimated' | 'mixed'; coveredPct: number },
 ): ReportProfitLoss {
-  const marginRate = financial.default_margin_percentage / 100;
   const gatewayRate = financial.payment_gateway_commission / 100;
 
   const grossRevenue = current.totalRevenue;
   const netRevenue = grossRevenue / (1 + TAX_RATE);
-  const costOfGoods = netRevenue * (1 - marginRate); // fallback hasta que cruzemos con sku-level cost en Sprint 2
+  const costOfGoods = cogsResult.cogs;
   const grossProfit = netRevenue - costOfGoods;
 
   // Prorrateo de costos mensuales al rango de fechas
@@ -363,6 +451,8 @@ function computeProfitLoss(
     grossRevenue,
     netRevenue,
     costOfGoods,
+    cogsMethod: cogsResult.method,
+    cogsCoveredPct: cogsResult.coveredPct,
     grossProfit,
     totalAdSpend,
     fixedCostItems,
@@ -766,7 +856,7 @@ async function computeMarketingPerformance(
     .select('id, platform')
     .eq('client_id', clientId)
     .eq('is_active', true)
-    .in('platform', ['meta', 'tiktok', 'google']);
+    .in('platform', ['meta', 'google']);
 
   if (!adsConns || adsConns.length === 0) return [];
 
@@ -813,7 +903,7 @@ async function computeMarketingPerformance(
     const worstCampaign = sortedByRoas[sortedByRoas.length - 1] || null;
 
     result.push({
-      platform: conn.platform as 'meta' | 'tiktok' | 'google',
+      platform: conn.platform as 'meta' | 'google',
       spend: totals.spend,
       revenue: totals.revenue,
       roas: totals.spend > 0 ? totals.revenue / totals.spend : 0,
@@ -850,8 +940,10 @@ export async function fetchReportData(
     fetchOrders(supabase, clientId, period.start, period.end),
   ]);
 
-  const profitLoss = computeProfitLoss(current, financial, period.daysInPeriod);
   const marginRate = financial.default_margin_percentage / 100;
+  const netRevenueCurrent = current.totalRevenue / (1 + TAX_RATE);
+  const cogsResult = await computeRealCogs(supabase, clientId, orders, netRevenueCurrent, marginRate);
+  const profitLoss = computeProfitLoss(current, financial, period.daysInPeriod, cogsResult);
 
   const [topProducts, productBreakdown, staleProducts, funnel, marketing] = await Promise.all([
     fetchTopProducts(supabase, clientId, period.start, period.end, marginRate),
