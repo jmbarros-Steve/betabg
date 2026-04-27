@@ -316,6 +316,7 @@ function CampaignForm({
   dailyBudget, setDailyBudget,
   startDate, setStartDate,
   cpaTarget,
+  specialAdCategory, setSpecialAdCategory,
 }: {
   name: string; setName: (v: string) => void;
   onNameEdited?: () => void;
@@ -325,6 +326,11 @@ function CampaignForm({
   dailyBudget: string; setDailyBudget: (v: string) => void;
   startDate: string; setStartDate: (v: string) => void;
   cpaTarget?: string;
+  // C4: Special Ad Category — Meta-regulated industries (Housing/Employment/
+  // Credit/Politics) where targeting is heavily restricted. Sent at the
+  // campaign level as `special_ad_categories: [<value>]`.
+  specialAdCategory: 'NONE' | 'HOUSING' | 'EMPLOYMENT' | 'CREDIT' | 'ISSUES_ELECTIONS_POLITICS';
+  setSpecialAdCategory: (v: 'NONE' | 'HOUSING' | 'EMPLOYMENT' | 'CREDIT' | 'ISSUES_ELECTIONS_POLITICS') => void;
 }) {
   const cboCpa = Number(cpaTarget) || 0;
   const cboRecommended = cboCpa > 0 ? Math.round((cboCpa * 10) / 7) : 0;
@@ -441,6 +447,31 @@ function CampaignForm({
           </div>
         </div>
       )}
+
+      {/* C4: Special Ad Category selector. Required by Meta for regulated
+          industries (housing, employment, credit, political ads). When set,
+          targeting by age/gender/zip/cities is forbidden — Meta will reject
+          the campaign or strip those fields silently. The wizard locks the
+          age/gender/location pickers downstream when this is non-NONE. */}
+      <div>
+        <Label>Categoría especial de anuncios</Label>
+        <Select value={specialAdCategory} onValueChange={(v) => setSpecialAdCategory(v as typeof specialAdCategory)}>
+          <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="NONE">Ninguna</SelectItem>
+            <SelectItem value="HOUSING">Vivienda (HOUSING)</SelectItem>
+            <SelectItem value="EMPLOYMENT">Empleo (EMPLOYMENT)</SelectItem>
+            <SelectItem value="CREDIT">Crédito (CREDIT)</SelectItem>
+            <SelectItem value="ISSUES_ELECTIONS_POLITICS">Política / Elecciones (ISSUES_ELECTIONS_POLITICS)</SelectItem>
+          </SelectContent>
+        </Select>
+        {specialAdCategory !== 'NONE' && (
+          <div className="mt-2 p-3 rounded-lg border border-yellow-300 bg-yellow-50 text-xs text-yellow-900">
+            <p className="font-semibold mb-1">⚠️ Tu marca está en categoría regulada.</p>
+            <p>Meta deshabilita targeting por edad, género y código postal en estas campañas. El rango se forzará a 18-65 y se desactivarán los selectores de género y ciudades.</p>
+          </div>
+        )}
+      </div>
 
       <div>
         <Label>Fecha de inicio</Label>
@@ -761,12 +792,95 @@ function LocationSearch({
 }
 
 // ---------------------------------------------------------------------------
+// M6: Language picker. Common LATAM/EU locales hardcoded first so the most-used
+// languages don't require an API roundtrip. Meta locale IDs are stable; full
+// list at https://developers.facebook.com/docs/marketing-api/audiences/reference/targeting-search/#locales
+// ---------------------------------------------------------------------------
+
+const COMMON_LANGUAGES: Array<{ id: number; name: string }> = [
+  { id: 1003, name: 'Español' },
+  { id: 1001, name: 'Inglés' },
+  { id: 1014, name: 'Portugués (Brasil)' },
+  { id: 1002, name: 'Francés' },
+  { id: 1006, name: 'Italiano' },
+  { id: 1005, name: 'Alemán' },
+  { id: 1009, name: 'Catalán' },
+  { id: 1012, name: 'Holandés' },
+];
+
+function LanguagePicker({
+  targetLanguages,
+  setTargetLanguages,
+}: {
+  targetLanguages: Array<{ id: number; name: string }>;
+  setTargetLanguages: (v: Array<{ id: number; name: string }>) => void;
+}) {
+  const [showMore, setShowMore] = useState(false);
+  return (
+    <div>
+      <Label className="text-xs font-medium text-muted-foreground">Idiomas</Label>
+      <p className="text-[10px] text-muted-foreground mb-1.5">Limita el anuncio a personas que usan Meta en estos idiomas. Si no eliges ninguno, Meta muestra a hablantes de cualquier idioma.</p>
+      <div className="flex flex-wrap gap-1.5">
+        {COMMON_LANGUAGES.map((lang) => {
+          const isSelected = targetLanguages.find(l => l.id === lang.id);
+          return (
+            <button
+              key={lang.id}
+              type="button"
+              onClick={() => {
+                if (isSelected) {
+                  setTargetLanguages(targetLanguages.filter(l => l.id !== lang.id));
+                } else {
+                  setTargetLanguages([...targetLanguages, lang]);
+                }
+              }}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                isSelected
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground hover:border-primary/30'
+              }`}
+            >
+              {lang.name}
+            </button>
+          );
+        })}
+        {!showMore && (
+          <button
+            type="button"
+            onClick={() => setShowMore(true)}
+            className="px-2.5 py-1 rounded-full text-[11px] font-medium border border-dashed border-border text-muted-foreground hover:border-primary/30"
+          >
+            + Más
+          </button>
+        )}
+      </div>
+      {showMore && (
+        <p className="text-[10px] text-muted-foreground mt-1.5 italic">
+          Para idiomas adicionales (más de 50 disponibles en Meta), agréganos como hint en
+          el ad set name o dejá los IDs vacíos — Meta sirve a todos por defecto.
+        </p>
+      )}
+      {targetLanguages.length > 0 && (
+        <p className="text-[10px] text-primary mt-1 font-medium">
+          {targetLanguages.length} idioma(s) seleccionado(s): {targetLanguages.map(l => l.name).join(', ')}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 interface MetaAudienceOption {
   id: string;
   name: string;
   type: 'custom' | 'lookalike' | 'saved';
   approximate_count?: number;
+  // Saved Audiences carry pre-built targeting (geo/age/gender/interests)
+  // returned by Meta on /saved_audiences. When the user picks a saved audience
+  // we expand this and merge it into targetingSpec as the BASE, then layer the
+  // user's custom audiences and other tweaks on top.
+  targeting?: Record<string, any>;
 }
 
 function AdSetForm({
@@ -778,14 +892,22 @@ function AdSetForm({
   autoMediaType, setAutoMediaType,
   cpaTarget, setCpaTarget,
   targetCountries, setTargetCountries,
+  countryGroups, setCountryGroups,
   targetAgeMin, setTargetAgeMin,
   targetAgeMax, setTargetAgeMax,
   targetGender, setTargetGender,
   connectionId,
-  selectedAudienceIds, setSelectedAudienceIds,
+  selectedCustomAudienceIds, setSelectedCustomAudienceIds,
+  selectedSavedAudienceId, setSelectedSavedAudienceId,
+  excludedAudienceIds, setExcludedAudienceIds,
   targetInterests, setTargetInterests,
   targetExcludeInterests, setTargetExcludeInterests,
   targetLocations, setTargetLocations,
+  targetLanguages, setTargetLanguages,
+  devicePlatforms, setDevicePlatforms,
+  brandSafetyLevel, setBrandSafetyLevel,
+  specialAdCategory,
+  metaAudiences, setMetaAudiences,
   clientId,
   selectedProductId,
   // Pixel + conversion event
@@ -805,14 +927,31 @@ function AdSetForm({
   autoMediaType: 'photo' | 'video'; setAutoMediaType: (v: 'photo' | 'video') => void;
   cpaTarget: string; setCpaTarget: (v: string) => void;
   targetCountries: string[]; setTargetCountries: (v: string[]) => void;
+  // m3: country_groups (LATAM/EU). When set, replaces countries in geo_locations.
+  countryGroups: string[]; setCountryGroups: (v: string[]) => void;
   targetAgeMin: number; setTargetAgeMin: (v: number) => void;
   targetAgeMax: number; setTargetAgeMax: (v: number) => void;
   targetGender: 0 | 1 | 2; setTargetGender: (v: 0 | 1 | 2) => void;
   connectionId?: string;
-  selectedAudienceIds: string[]; setSelectedAudienceIds: (v: string[]) => void;
+  // C2: Custom Audiences (multi-select) → targeting.custom_audiences
+  selectedCustomAudienceIds: string[]; setSelectedCustomAudienceIds: (v: string[]) => void;
+  // C2: Saved Audience (single) → expand its targeting as base in submit
+  selectedSavedAudienceId: string | null; setSelectedSavedAudienceId: (v: string | null) => void;
+  // M5: Excluded audiences → targeting.excluded_custom_audiences
+  excludedAudienceIds: string[]; setExcludedAudienceIds: (v: string[]) => void;
   targetInterests: Array<{ id: string; name: string }>; setTargetInterests: (v: Array<{ id: string; name: string }>) => void;
   targetExcludeInterests: Array<{ id: string; name: string }>; setTargetExcludeInterests: (v: Array<{ id: string; name: string }>) => void;
   targetLocations: Array<{ key: string; name: string; type: string; country_name: string }>; setTargetLocations: (v: Array<{ key: string; name: string; type: string; country_name: string }>) => void;
+  // M6: Languages selected (Meta locale IDs)
+  targetLanguages: Array<{ id: number; name: string }>; setTargetLanguages: (v: Array<{ id: number; name: string }>) => void;
+  // m4: Device platforms checkboxes
+  devicePlatforms: string[]; setDevicePlatforms: (v: string[]) => void;
+  // m5: Brand safety filter level
+  brandSafetyLevel: 'STANDARD' | 'LIMITED' | 'EXPANDED'; setBrandSafetyLevel: (v: 'STANDARD' | 'LIMITED' | 'EXPANDED') => void;
+  // C4: Lift to know whether to disable age/gender/locations UI
+  specialAdCategory: 'NONE' | 'HOUSING' | 'EMPLOYMENT' | 'CREDIT' | 'ISSUES_ELECTIONS_POLITICS';
+  // Audiences are now lifted to parent so they can be used in handleSubmit
+  metaAudiences: MetaAudienceOption[]; setMetaAudiences: (v: MetaAudienceOption[]) => void;
   clientId: string;
   selectedProductId?: string;
   objective: Objective;
@@ -824,10 +963,11 @@ function AdSetForm({
   fbPositions: string[]; setFbPositions: (v: string[]) => void;
   igPositions: string[]; setIgPositions: (v: string[]) => void;
 }) {
-  // Fetch available audiences from Meta
-  const [metaAudiences, setMetaAudiences] = useState<MetaAudienceOption[]>([]);
+  // Audiences are fetched in the parent (CampaignCreateWizardInner) and passed
+  // down via props so the publish handler can also expand a saved audience's
+  // base targeting. We just need a local "loading" state for the inline UI.
   const [audiencesLoading, setAudiencesLoading] = useState(false);
-  const [audiencesFetched, setAudiencesFetched] = useState(false);
+  const [audiencesFetched, setAudiencesFetched] = useState(metaAudiences.length > 0);
 
   useEffect(() => {
     if (!connectionId || audiencesFetched) return;
@@ -847,6 +987,7 @@ function AdSetForm({
                 ? 'custom' as const
                 : 'saved' as const,
             approximate_count: a.approximate_count_lower_bound || a.approximate_count || 0,
+            targeting: a.targeting || undefined, // saved audiences carry their full targeting blob
           }));
           setMetaAudiences(mapped);
         }
@@ -860,7 +1001,17 @@ function AdSetForm({
       }
     })();
     return () => { cancelled = true; };
-  }, [connectionId, audiencesFetched]);
+  }, [connectionId, audiencesFetched, setMetaAudiences]);
+
+  const customAudienceOptions = metaAudiences.filter((a) => a.type === 'custom' || a.type === 'lookalike');
+  const savedAudienceOptions = metaAudiences.filter((a) => a.type === 'saved');
+  const isRestricted = specialAdCategory !== 'NONE'; // C4: lock geo/age/gender
+  // Combined for downstream UI components (e.g. reach estimate). Excluded list
+  // is NOT included — Meta's reach estimate doesn't subtract excluded blobs.
+  const selectedAudienceIds = [
+    ...selectedCustomAudienceIds,
+    ...(selectedSavedAudienceId ? [selectedSavedAudienceId] : []),
+  ];
 
   const cpa = Number(cpaTarget) || 0;
   const recommendedBudget = cpa > 0 ? Math.round((cpa * 10) / 7) : 0;
@@ -987,11 +1138,12 @@ function AdSetForm({
               // Pattern: [AudienciaCorta]-[Formato]-[MMMYY]
               const audLower = audienceDesc.toLowerCase();
               let audTag = '';
-              if (selectedAudienceIds.length > 0) {
+              const totalSelected = selectedCustomAudienceIds.length + (selectedSavedAudienceId ? 1 : 0);
+              if (totalSelected > 0) {
                 if (audLower.includes('lookalike') || audLower.includes('similar')) audTag = 'LAL';
                 else if (audLower.includes('retarg') || audLower.includes('remarketing')) audTag = 'RTG';
-                else if (audLower.includes('saved') || audLower.includes('guardad')) audTag = 'SAVED';
-                else audTag = audienceDesc.substring(0, 12).replace(/\s+/g, '');
+                else if (selectedSavedAudienceId) audTag = 'SAVED';
+                else audTag = audienceDesc.substring(0, 12).replace(/\s+/g, '') || 'CUSTOM';
               } else if (audienceDesc.trim()) {
                 audTag = audienceDesc.substring(0, 12).replace(/\s+/g, '');
               } else {
@@ -1010,67 +1162,168 @@ function AdSetForm({
         </div>
       </div>
 
-      {/* Audience selector — show real Meta audiences */}
-      <div>
-        <Label>Audiencia de Meta</Label>
+      {/* Audience selector — split into Saved + Custom + Excluded (M5/C2) */}
+      <div className="space-y-4">
+        <Label>Audiencias de Meta</Label>
         {audiencesLoading ? (
           <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" /> Cargando audiencias de Meta...
           </div>
         ) : metaAudiences.length > 0 ? (
-          <div className="space-y-2 mt-2">
-            <div className="max-h-48 overflow-y-auto space-y-1 rounded-lg border p-2 bg-muted/20">
-              {metaAudiences.map((aud) => {
-                const isSelected = selectedAudienceIds.includes(aud.id);
-                const typeLabel = aud.type === 'custom' ? 'Personalizada'
-                  : aud.type === 'lookalike' ? 'Similar'
-                  : 'Guardada';
-                const typeBg = aud.type === 'custom' ? 'bg-purple-500/15 text-purple-700 border-purple-500/30'
-                  : aud.type === 'lookalike' ? 'bg-[#1E3A7B]/15 text-[#162D5F] border-[#2A4F9E]/30'
-                  : 'bg-gray-500/15 text-gray-600 border-gray-500/30';
-                return (
+          <>
+            {/* SAVED AUDIENCES — single select. Their targeting is expanded as base. */}
+            {savedAudienceOptions.length > 0 && (
+              <div>
+                <p className="text-[11px] font-semibold text-muted-foreground mb-1">Audiencias guardadas</p>
+                <p className="text-[10px] text-muted-foreground mb-1.5">
+                  Una audiencia guardada incluye geo, edad, género e intereses. Si elegís una, esa será la base — podés sumar listas (Custom Audiences) abajo.
+                </p>
+                <div className="max-h-32 overflow-y-auto space-y-1 rounded-lg border p-2 bg-muted/20">
                   <button
-                    key={aud.id}
                     type="button"
-                    onClick={() => {
-                      if (isSelected) {
-                        setSelectedAudienceIds(selectedAudienceIds.filter(id => id !== aud.id));
-                      } else {
-                        setSelectedAudienceIds([...selectedAudienceIds, aud.id]);
-                      }
-                      // Also update audienceDesc for display/AI context
-                      const newSelected = isSelected
-                        ? selectedAudienceIds.filter(id => id !== aud.id)
-                        : [...selectedAudienceIds, aud.id];
-                      const names = metaAudiences
-                        .filter(a => newSelected.includes(a.id))
-                        .map(a => a.name);
-                      setAudienceDesc(names.join(', '));
-                    }}
+                    onClick={() => setSelectedSavedAudienceId(null)}
                     className={`w-full flex items-center justify-between gap-2 p-2 rounded-md text-left text-sm transition-all ${
-                      isSelected
+                      !selectedSavedAudienceId
                         ? 'bg-primary/10 border border-primary/30 ring-1 ring-primary/20'
                         : 'hover:bg-muted/50 border border-transparent'
                     }`}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Target className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
-                      <span className="truncate">{aud.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {aud.approximate_count ? (
-                        <span className="text-[10px] text-muted-foreground">{new Intl.NumberFormat('es-CL').format(aud.approximate_count)}</span>
-                      ) : null}
-                      <Badge variant="outline" className={`text-[9px] ${typeBg}`}>{typeLabel}</Badge>
-                    </div>
+                    <span className="text-muted-foreground italic">Ninguna (usar segmentación detallada de abajo)</span>
                   </button>
-                );
-              })}
-            </div>
-            {selectedAudienceIds.length > 0 && (
-              <p className="text-xs text-muted-foreground">{selectedAudienceIds.length} audiencia(s) seleccionada(s)</p>
+                  {savedAudienceOptions.map((aud) => {
+                    const isSelected = selectedSavedAudienceId === aud.id;
+                    return (
+                      <button
+                        key={aud.id}
+                        type="button"
+                        onClick={() => setSelectedSavedAudienceId(isSelected ? null : aud.id)}
+                        className={`w-full flex items-center justify-between gap-2 p-2 rounded-md text-left text-sm transition-all ${
+                          isSelected
+                            ? 'bg-primary/10 border border-primary/30 ring-1 ring-primary/20'
+                            : 'hover:bg-muted/50 border border-transparent'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Target className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                          <span className="truncate">{aud.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {aud.approximate_count ? (
+                            <span className="text-[10px] text-muted-foreground">{new Intl.NumberFormat('es-CL').format(aud.approximate_count)}</span>
+                          ) : null}
+                          <Badge variant="outline" className="text-[9px] bg-gray-500/15 text-gray-600 border-gray-500/30">Guardada</Badge>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             )}
-          </div>
+
+            {/* CUSTOM AUDIENCES (incluye Lookalikes) — multi select. Suman como targeting.custom_audiences */}
+            {customAudienceOptions.length > 0 && (
+              <div>
+                <p className="text-[11px] font-semibold text-muted-foreground mb-1">Listas de personas (Custom Audiences + Lookalikes)</p>
+                <div className="max-h-40 overflow-y-auto space-y-1 rounded-lg border p-2 bg-muted/20">
+                  {customAudienceOptions.map((aud) => {
+                    const isSelected = selectedCustomAudienceIds.includes(aud.id);
+                    const isExcluded = excludedAudienceIds.includes(aud.id);
+                    const typeLabel = aud.type === 'lookalike' ? 'Similar' : 'Personalizada';
+                    const typeBg = aud.type === 'lookalike'
+                      ? 'bg-[#1E3A7B]/15 text-[#162D5F] border-[#2A4F9E]/30'
+                      : 'bg-purple-500/15 text-purple-700 border-purple-500/30';
+                    return (
+                      <button
+                        key={aud.id}
+                        type="button"
+                        disabled={isExcluded}
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedCustomAudienceIds(selectedCustomAudienceIds.filter(id => id !== aud.id));
+                          } else {
+                            setSelectedCustomAudienceIds([...selectedCustomAudienceIds, aud.id]);
+                          }
+                          const newSelected = isSelected
+                            ? selectedCustomAudienceIds.filter(id => id !== aud.id)
+                            : [...selectedCustomAudienceIds, aud.id];
+                          const names = metaAudiences
+                            .filter(a => newSelected.includes(a.id))
+                            .map(a => a.name);
+                          setAudienceDesc(names.join(', '));
+                        }}
+                        className={`w-full flex items-center justify-between gap-2 p-2 rounded-md text-left text-sm transition-all ${
+                          isExcluded
+                            ? 'opacity-40 cursor-not-allowed line-through'
+                            : isSelected
+                              ? 'bg-primary/10 border border-primary/30 ring-1 ring-primary/20'
+                              : 'hover:bg-muted/50 border border-transparent'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Target className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                          <span className="truncate">{aud.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {aud.approximate_count ? (
+                            <span className="text-[10px] text-muted-foreground">{new Intl.NumberFormat('es-CL').format(aud.approximate_count)}</span>
+                          ) : null}
+                          <Badge variant="outline" className={`text-[9px] ${typeBg}`}>{typeLabel}</Badge>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedCustomAudienceIds.length > 0 && (
+                  <p className="text-[10px] text-muted-foreground mt-1">{selectedCustomAudienceIds.length} lista(s) incluida(s)</p>
+                )}
+              </div>
+            )}
+
+            {/* EXCLUDED AUDIENCES (M5) — multi select roja. Va a targeting.excluded_custom_audiences */}
+            {customAudienceOptions.length > 0 && (
+              <div>
+                <p className="text-[11px] font-semibold text-red-700 mb-1">Excluir audiencias</p>
+                <p className="text-[10px] text-muted-foreground mb-1.5">
+                  Personas en estas listas NO verán el anuncio (ej: clientes actuales, compradores recientes).
+                </p>
+                <div className="max-h-32 overflow-y-auto space-y-1 rounded-lg border border-red-200 p-2 bg-red-50/40">
+                  {customAudienceOptions.map((aud) => {
+                    const isExcluded = excludedAudienceIds.includes(aud.id);
+                    const isIncluded = selectedCustomAudienceIds.includes(aud.id);
+                    return (
+                      <button
+                        key={`excl-${aud.id}`}
+                        type="button"
+                        disabled={isIncluded}
+                        onClick={() => {
+                          if (isExcluded) {
+                            setExcludedAudienceIds(excludedAudienceIds.filter(id => id !== aud.id));
+                          } else {
+                            setExcludedAudienceIds([...excludedAudienceIds, aud.id]);
+                          }
+                        }}
+                        className={`w-full flex items-center justify-between gap-2 p-2 rounded-md text-left text-sm transition-all ${
+                          isIncluded
+                            ? 'opacity-40 cursor-not-allowed'
+                            : isExcluded
+                              ? 'bg-red-100 border border-red-300 ring-1 ring-red-300/40 text-red-800'
+                              : 'hover:bg-red-100/40 border border-transparent text-muted-foreground'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <X className={`w-3.5 h-3.5 shrink-0 ${isExcluded ? 'text-red-700' : 'text-muted-foreground/60'}`} />
+                          <span className="truncate">{aud.name}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {excludedAudienceIds.length > 0 && (
+                  <p className="text-[10px] text-red-700 mt-1">{excludedAudienceIds.length} lista(s) excluida(s)</p>
+                )}
+              </div>
+            )}
+          </>
         ) : (
           <div className="mt-2 p-3 rounded-lg bg-muted/30 border border-border/60 text-sm text-muted-foreground">
             <p>No tienes audiencias guardadas en Meta Ads.</p>
@@ -1079,11 +1332,11 @@ function AdSetForm({
         )}
         {/* Fallback: optional free text for extra targeting notes */}
         <Input
-          value={selectedAudienceIds.length > 0 ? '' : audienceDesc}
+          value={(selectedCustomAudienceIds.length > 0 || selectedSavedAudienceId) ? '' : audienceDesc}
           onChange={(e) => setAudienceDesc(e.target.value)}
-          placeholder={selectedAudienceIds.length > 0 ? 'Audiencia seleccionada arriba' : 'O describe manualmente: intereses, comportamiento...'}
+          placeholder={(selectedCustomAudienceIds.length > 0 || selectedSavedAudienceId) ? 'Audiencia seleccionada arriba' : 'O describe manualmente: intereses, comportamiento...'}
           className="mt-2"
-          disabled={selectedAudienceIds.length > 0}
+          disabled={selectedCustomAudienceIds.length > 0 || !!selectedSavedAudienceId}
         />
       </div>
 
@@ -1094,9 +1347,11 @@ function AdSetForm({
           <Label className="text-sm font-semibold">Segmentación detallada</Label>
         </div>
 
-        {/* ── Gender ── */}
+        {/* ── Gender ── (C4: disabled when in restricted Special Ad Category) */}
         <div>
-          <Label className="text-xs font-medium text-muted-foreground">Género</Label>
+          <Label className="text-xs font-medium text-muted-foreground">
+            Género {isRestricted && <span className="text-yellow-700">(deshabilitado por categoría regulada)</span>}
+          </Label>
           <div className="flex gap-2 mt-1.5">
             {([
               { val: 0 as const, label: 'Todos', icon: Users },
@@ -1106,11 +1361,14 @@ function AdSetForm({
               <button
                 key={g.val}
                 type="button"
+                disabled={isRestricted}
                 onClick={() => setTargetGender(g.val)}
                 className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
-                  targetGender === g.val
-                    ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary/20'
-                    : 'border-border text-muted-foreground hover:border-primary/30'
+                  isRestricted
+                    ? 'border-border text-muted-foreground/40 cursor-not-allowed'
+                    : (isRestricted ? 0 : targetGender) === g.val
+                      ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary/20'
+                      : 'border-border text-muted-foreground hover:border-primary/30'
                 }`}
               >
                 {g.label}
@@ -1119,51 +1377,99 @@ function AdSetForm({
           </div>
         </div>
 
-        {/* ── Age Range ── */}
-        <div>
-          <Label className="text-xs font-medium text-muted-foreground">Rango de edad</Label>
-          <div className="flex items-center gap-3 mt-1.5">
-            <div className="flex-1">
-              <Select value={String(targetAgeMin)} onValueChange={(v) => { const n = Number(v); setTargetAgeMin(n); if (n > targetAgeMax) setTargetAgeMax(n); }}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 48 }, (_, i) => 18 + i).map((age) => (
-                    <SelectItem key={age} value={String(age)}>{age} {age === 18 ? '(min)' : ''}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        {/* ── Age Range ── (M1: 13-65 by default, locked to 18-65 in restricted categories) */}
+        {(() => {
+          // M1: ages 13-17 are only allowed when specialAdCategory === 'NONE'.
+          // In restricted categories Meta forces 18-65.
+          const minAllowedAge = isRestricted ? 18 : 13;
+          const ageOptions = Array.from({ length: 65 - minAllowedAge + 1 }, (_, i) => minAllowedAge + i);
+          // Auto-clamp current values when category changes
+          if (isRestricted && targetAgeMin < 18) {
+            // The handler clamps on change; render-side just shows valid range.
+          }
+          return (
+            <div>
+              <Label className="text-xs font-medium text-muted-foreground">
+                Rango de edad {isRestricted && <span className="text-yellow-700">(forzado a 18-65 por categoría regulada)</span>}
+              </Label>
+              <div className="flex items-center gap-3 mt-1.5">
+                <div className="flex-1">
+                  <Select value={String(Math.max(minAllowedAge, targetAgeMin))} onValueChange={(v) => { const n = Number(v); setTargetAgeMin(n); if (n > targetAgeMax) setTargetAgeMax(n); }} disabled={isRestricted}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ageOptions.map((age) => (
+                        <SelectItem key={age} value={String(age)}>{age} {age === minAllowedAge ? '(min)' : ''}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Minus className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div className="flex-1">
+                  <Select value={String(targetAgeMax)} onValueChange={(v) => { const n = Number(v); setTargetAgeMax(n); if (n < targetAgeMin) setTargetAgeMin(n); }} disabled={isRestricted}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ageOptions.map((age) => (
+                        <SelectItem key={age} value={String(age)}>{age}{age === 65 ? '+' : ''}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="mt-1.5 h-1.5 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary/40 rounded-full transition-all"
+                  style={{
+                    marginLeft: `${((Math.max(minAllowedAge, targetAgeMin) - minAllowedAge) / (65 - minAllowedAge)) * 100}%`,
+                    width: `${((targetAgeMax - Math.max(minAllowedAge, targetAgeMin)) / (65 - minAllowedAge)) * 100}%`,
+                  }}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {targetAgeMin === minAllowedAge && targetAgeMax === 65
+                  ? `Todas las edades (${minAllowedAge}-65+)`
+                  : `${Math.max(minAllowedAge, targetAgeMin)} - ${targetAgeMax}${targetAgeMax === 65 ? '+' : ''} años`}
+              </p>
             </div>
-            <Minus className="w-4 h-4 text-muted-foreground shrink-0" />
-            <div className="flex-1">
-              <Select value={String(targetAgeMax)} onValueChange={(v) => { const n = Number(v); setTargetAgeMax(n); if (n < targetAgeMin) setTargetAgeMin(n); }}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 48 }, (_, i) => 18 + i).map((age) => (
-                    <SelectItem key={age} value={String(age)}>{age}{age === 65 ? '+' : ''}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="mt-1.5 h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary/40 rounded-full transition-all"
-              style={{
-                marginLeft: `${((targetAgeMin - 18) / 47) * 100}%`,
-                width: `${((targetAgeMax - targetAgeMin) / 47) * 100}%`,
-              }}
-            />
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-1">
-            {targetAgeMin === 18 && targetAgeMax === 65 ? 'Todas las edades (18-65+)' : `${targetAgeMin} - ${targetAgeMax}${targetAgeMax === 65 ? '+' : ''} años`}
-          </p>
-        </div>
+          );
+        })()}
 
         {/* ── Locations ── */}
         <div>
           <Label className="text-xs font-medium text-muted-foreground">Ubicaciones</Label>
-          {/* Quick country buttons */}
-          <div className="flex flex-wrap gap-1.5 mt-1.5">
+          {/* m3: country_groups (LATAM/EU). Mutually exclusive with countries[]. */}
+          <div className="flex flex-wrap gap-1.5 mt-1.5 pb-2 border-b border-border/40">
+            {([
+              { id: 'worldwide', label: '🌎 LATAM (Worldwide)', description: 'Todos los países habilitados por Meta' },
+              { id: 'europe', label: '🇪🇺 Europa', description: 'Países UE + EFTA' },
+            ]).map((g) => {
+              const isSelected = countryGroups.includes(g.id);
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => {
+                    if (isSelected) {
+                      setCountryGroups(countryGroups.filter(cc => cc !== g.id));
+                    } else {
+                      // country_groups replace `countries` — clear those.
+                      setCountryGroups([...countryGroups, g.id]);
+                      setTargetCountries([]);
+                    }
+                  }}
+                  className={`px-2 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                    isSelected
+                      ? 'border-purple-500 bg-purple-500/10 text-purple-700'
+                      : 'border-border text-muted-foreground hover:border-purple-300'
+                  }`}
+                  title={g.description}
+                >
+                  {g.label}
+                </button>
+              );
+            })}
+          </div>
+          {/* Quick country buttons (disabled when a country_group is selected) */}
+          <div className={`flex flex-wrap gap-1.5 mt-1.5 ${countryGroups.length > 0 ? 'opacity-40 pointer-events-none' : ''}`}>
             {([
               { code: 'CL', flag: 'CL', label: 'Chile' },
               { code: 'MX', flag: 'MX', label: 'México' },
@@ -1186,7 +1492,8 @@ function AdSetForm({
                   onClick={() => {
                     if (isSelected) {
                       const next = targetCountries.filter(cc => cc !== c.code);
-                      setTargetCountries(next.length > 0 ? next : ['CL']);
+                      // M2: don't silently fallback to 'CL' anymore — let user re-pick.
+                      setTargetCountries(next);
                     } else {
                       setTargetCountries([...targetCountries, c.code]);
                     }
@@ -1202,21 +1509,29 @@ function AdSetForm({
               );
             })}
           </div>
-          {targetCountries.length > 1 && (
+          {countryGroups.length > 0 && (
+            <p className="text-[10px] text-purple-700 mt-1 font-medium">Grupo geográfico activo — los países individuales quedan ignorados.</p>
+          )}
+          {targetCountries.length > 1 && countryGroups.length === 0 && (
             <p className="text-[10px] text-primary mt-1 font-medium">{targetCountries.length} países seleccionados</p>
           )}
 
-          {/* Location search (cities/regions via Meta API) */}
-          <LocationSearch
-            connectionId={connectionId}
-            selectedLocations={targetLocations}
-            onAdd={(loc) => {
-              if (!targetLocations.find(l => l.key === loc.key)) {
-                setTargetLocations([...targetLocations, loc]);
-              }
-            }}
-            onRemove={(key) => setTargetLocations(targetLocations.filter(l => l.key !== key))}
-          />
+          {/* Location search (cities/regions via Meta API). C4: disabled in
+              restricted Special Ad Categories where Meta strips city/zip. */}
+          {isRestricted ? (
+            <p className="text-[10px] text-yellow-800 mt-2 italic">Ciudades / regiones deshabilitadas — solo países por categoría regulada.</p>
+          ) : (
+            <LocationSearch
+              connectionId={connectionId}
+              selectedLocations={targetLocations}
+              onAdd={(loc) => {
+                if (!targetLocations.find(l => l.key === loc.key)) {
+                  setTargetLocations([...targetLocations, loc]);
+                }
+              }}
+              onRemove={(key) => setTargetLocations(targetLocations.filter(l => l.key !== key))}
+            />
+          )}
         </div>
 
         {/* ── Interests (Detailed Targeting) ── */}
@@ -1268,6 +1583,78 @@ function AdSetForm({
             />
           </div>
         )}
+
+        {/* ── M6: Idiomas (locales) ── */}
+        <LanguagePicker
+          targetLanguages={targetLanguages}
+          setTargetLanguages={setTargetLanguages}
+        />
+
+        {/* ── m4: Device platforms ── */}
+        <div>
+          <Label className="text-xs font-medium text-muted-foreground">Dispositivos</Label>
+          <p className="text-[10px] text-muted-foreground mb-1.5">¿En qué dispositivos quieres mostrar el anuncio? Por defecto, todos.</p>
+          <div className="flex gap-2 flex-wrap">
+            {([
+              { id: 'mobile', label: 'Móvil' },
+              { id: 'desktop', label: 'Desktop' },
+              { id: 'connected_tv', label: 'Connected TV' },
+            ]).map((d) => {
+              const isSelected = devicePlatforms.includes(d.id);
+              return (
+                <label
+                  key={d.id}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border cursor-pointer transition-all ${
+                    isSelected ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/30'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => {
+                      if (isSelected) {
+                        // Don't allow removing the last one — Meta needs ≥1
+                        if (devicePlatforms.length === 1) return;
+                        setDevicePlatforms(devicePlatforms.filter(p => p !== d.id));
+                      } else {
+                        setDevicePlatforms([...devicePlatforms, d.id]);
+                      }
+                    }}
+                    className="accent-primary"
+                  />
+                  {d.label}
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── m5: Filtro de contenido sensible (brand safety) ── */}
+        <div>
+          <Label className="text-xs font-medium text-muted-foreground">Filtro de contenido sensible</Label>
+          <p className="text-[10px] text-muted-foreground mb-1.5">Controla en qué contexto se muestra tu anuncio (placements de feed, in-stream, audience network).</p>
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              { val: 'STANDARD' as const, label: 'Estándar Meta', desc: 'Default. Equilibrio entre alcance y seguridad.' },
+              { val: 'LIMITED' as const, label: 'Limitado', desc: 'Más restrictivo. Solo placements premium.' },
+              { val: 'EXPANDED' as const, label: 'Expandido', desc: 'Mayor alcance. Permite placements menos verificados.' },
+            ]).map((b) => (
+              <button
+                key={b.val}
+                type="button"
+                onClick={() => setBrandSafetyLevel(b.val)}
+                className={`flex flex-col items-start gap-0.5 px-2.5 py-2 rounded-lg border text-left transition-all ${
+                  brandSafetyLevel === b.val
+                    ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary/20'
+                    : 'border-border text-muted-foreground hover:border-primary/30'
+                }`}
+              >
+                <span className="text-xs font-semibold">{b.label}</span>
+                <span className="text-[9px] text-muted-foreground leading-tight">{b.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* ── Live reach estimate ── */}
         <ReachEstimateBanner
@@ -4119,10 +4506,49 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [targetAgeMin, setTargetAgeMin] = useState(18);
   const [targetAgeMax, setTargetAgeMax] = useState(65);
   const [targetGender, setTargetGender] = useState<0 | 1 | 2>(0); // 0=all, 1=male, 2=female
-  const [selectedAudienceIds, setSelectedAudienceIds] = useState<string[]>([]);
+  // C4: Special Ad Category (HOUSING/EMPLOYMENT/CREDIT/POLITICS). When non-NONE,
+  // Meta strips age/gender/zip targeting and forces 18-65 — UI reflects this.
+  const [specialAdCategory, setSpecialAdCategory] = useState<'NONE' | 'HOUSING' | 'EMPLOYMENT' | 'CREDIT' | 'ISSUES_ELECTIONS_POLITICS'>('NONE');
+  const isRestricted = specialAdCategory !== 'NONE';
+  // m3: country_groups (LATAM/EU) — when set, replaces `countries` in geo_locations.
+  const [countryGroups, setCountryGroups] = useState<string[]>([]);
+  // M6: target languages (Meta locale IDs). Empty = all languages.
+  const [targetLanguages, setTargetLanguages] = useState<Array<{ id: number; name: string }>>([]);
+  // m4: device_platforms picker. Empty or all 3 = no filter sent.
+  const [devicePlatforms, setDevicePlatforms] = useState<string[]>(['mobile', 'desktop', 'connected_tv']);
+  // m5: brand safety filter level. STANDARD = Meta default (no field sent).
+  const [brandSafetyLevel, setBrandSafetyLevel] = useState<'STANDARD' | 'LIMITED' | 'EXPANDED'>('STANDARD');
+
+  // C2: split into separate buckets — custom_audiences vs saved audience.
+  // ↓ effect declared further down once dependencies (targetAgeMin etc.) exist
+  // selectedCustomAudienceIds[] → goes to targeting.custom_audiences
+  // selectedSavedAudienceId (single) → expands its targeting blob as base
+  // excludedAudienceIds[] (M5) → goes to targeting.excluded_custom_audiences
+  const [selectedCustomAudienceIds, setSelectedCustomAudienceIds] = useState<string[]>([]);
+  const [selectedSavedAudienceId, setSelectedSavedAudienceId] = useState<string | null>(null);
+  const [excludedAudienceIds, setExcludedAudienceIds] = useState<string[]>([]);
+  // Lifted: audience list itself (so handleSubmit can read saved targeting).
+  const [metaAudiences, setMetaAudiences] = useState<MetaAudienceOption[]>([]);
+  // Convenience: combined list for places that just need "any audience selected".
+  const selectedAudienceIds = useMemo(() => [
+    ...selectedCustomAudienceIds,
+    ...(selectedSavedAudienceId ? [selectedSavedAudienceId] : []),
+  ], [selectedCustomAudienceIds, selectedSavedAudienceId]);
   const [targetInterests, setTargetInterests] = useState<Array<{ id: string; name: string }>>([]);
   const [targetExcludeInterests, setTargetExcludeInterests] = useState<Array<{ id: string; name: string }>>([]);
   const [targetLocations, setTargetLocations] = useState<Array<{ key: string; name: string; type: string; country_name: string }>>([]);
+
+  // C4: when category becomes restricted, force age 18-65, clear gender, and
+  // strip cities/regions (Meta will reject those targeting fields). Also clear
+  // country_groups since regulated campaigns target by country.
+  useEffect(() => {
+    if (specialAdCategory === 'NONE') return;
+    if (targetAgeMin < 18) setTargetAgeMin(18);
+    if (targetAgeMax !== 65) setTargetAgeMax(65);
+    if (targetGender !== 0) setTargetGender(0);
+    if (targetLocations.length > 0) setTargetLocations([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [specialAdCategory]);
 
   // DPA / Catalog fields
   const [catalogs, setCatalogs] = useState<Array<{ id: string; name: string; product_count: number; source?: string; product_sets: Array<{ id: string; name: string; product_count: number }> }>>([]);
@@ -4517,7 +4943,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
     // still show Flexible/Carrusel/Única/Catálogo in step 2 — the user reported
     // seeing all 4 options after choosing DPA.
     if (adSetFormat !== 'catalog') setAdSetFormat('catalog');
-    if (selectedAudienceIds.length > 0) setSelectedAudienceIds([]);
+    if (selectedCustomAudienceIds.length > 0) setSelectedCustomAudienceIds([]);
+    if (selectedSavedAudienceId) setSelectedSavedAudienceId(null);
+    if (excludedAudienceIds.length > 0) setExcludedAudienceIds([]);
     if (targetInterests.length > 0) setTargetInterests([]);
     if (targetExcludeInterests.length > 0) setTargetExcludeInterests([]);
   }, [budgetType]);
@@ -4656,6 +5084,13 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [savingDraft, setSavingDraft] = useState(false);
   const [autoGenerating, setAutoGenerating] = useState(false);
   const [autoGenProgress, setAutoGenProgress] = useState('');
+
+  // M4: backend warnings from manage-meta-campaign create response. Each
+  // warning has shape { code, message, removed_fields[] }. Surfaced in the
+  // Review step as yellow dismissible cards.
+  type MetaWarning = { code?: string; message: string; removed_fields?: string[] };
+  const [backendWarnings, setBackendWarnings] = useState<MetaWarning[]>([]);
+  const [dismissedWarnings, setDismissedWarnings] = useState<Set<number>>(new Set());
 
   // Leave confirmation
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
@@ -5352,12 +5787,45 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           : Number(campBudget);
         submitData.daily_budget = budget || 10000;
 
-        // Build targeting from wizard fields
-        const geoLocations: Record<string, any> = {
-          countries: targetCountries.length > 0 ? targetCountries : ['CL'],
-        };
+        // C2: If a Saved Audience was picked, expand its targeting blob as the
+        // BASE for the targeting spec. Then layer the user's custom audiences,
+        // exclusions, country tweaks, etc. on top so the user can still
+        // refine even after selecting a saved preset.
+        const savedAudObj = selectedSavedAudienceId
+          ? metaAudiences.find(a => a.id === selectedSavedAudienceId)
+          : null;
+        const savedTargeting = (savedAudObj?.targeting && typeof savedAudObj.targeting === 'object')
+          ? { ...savedAudObj.targeting }
+          : null;
+
+        // M2: derive client country fallback. Try in order:
+        //   1) targetCountries[] picked in UI
+        //   2) saved audience's geo_locations.countries
+        //   3) the country auto-loaded from the buyer_persona (already setTargetCountries)
+        // Never silently fallback to 'CL' anymore — show error.
+        const savedGeo = savedTargeting?.geo_locations as Record<string, any> | undefined;
+        const fallbackCountries: string[] = (() => {
+          if (targetCountries.length > 0) return targetCountries;
+          if (Array.isArray(savedGeo?.countries) && savedGeo.countries.length > 0) return savedGeo.countries as string[];
+          if (Array.isArray(savedGeo?.country_groups) && savedGeo.country_groups.length > 0) return [];
+          return [];
+        })();
+        if (fallbackCountries.length === 0 && !savedGeo?.country_groups?.length) {
+          toast.error('Selecciona al menos un país en "Ubicaciones".');
+          setSubmitting(false);
+          return;
+        }
+
+        const geoLocations: Record<string, any> = savedGeo ? { ...savedGeo } : {};
+        // m3: country_groups (LATAM/EU) take precedence over countries when set
+        if (countryGroups.length > 0) {
+          geoLocations.country_groups = countryGroups;
+          delete geoLocations.countries;
+        } else if (fallbackCountries.length > 0) {
+          geoLocations.countries = fallbackCountries;
+        }
         // Add specific cities/regions from location search
-        if (targetLocations.length > 0) {
+        if (targetLocations.length > 0 && !isRestricted) {
           const cities = targetLocations.filter(l => l.type === 'city').map(l => ({ key: l.key }));
           const regions = targetLocations.filter(l => l.type === 'region').map(l => ({ key: l.key }));
           if (cities.length > 0) geoLocations.cities = cities;
@@ -5365,30 +5833,62 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         }
 
         const targetingSpec: Record<string, any> = {
+          ...(savedTargeting || {}),
           geo_locations: geoLocations,
-          age_min: targetAgeMin || 18,
-          age_max: targetAgeMax || 65,
+          // M1 + C4: Special Ad Categories force 18-65, no narrower
+          age_min: isRestricted ? 18 : (targetAgeMin || 18),
+          age_max: isRestricted ? 65 : (targetAgeMax || 65),
         };
-        if (targetGender > 0) {
+        // C4: in restricted categories Meta strips genders too — skip sending
+        if (!isRestricted && targetGender > 0) {
           targetingSpec.genders = [targetGender];
+        } else if (isRestricted) {
+          delete targetingSpec.genders;
         }
-        // Include selected Meta audiences (custom/lookalike/saved) in targeting
-        if (selectedAudienceIds.length > 0) {
-          targetingSpec.custom_audiences = selectedAudienceIds.map(id => ({ id }));
+        // C2: custom_audiences (multi-include)
+        if (selectedCustomAudienceIds.length > 0) {
+          targetingSpec.custom_audiences = selectedCustomAudienceIds.map(id => ({ id }));
         }
-        // Include interests (detailed targeting)
+        // M5: excluded_custom_audiences
+        if (excludedAudienceIds.length > 0) {
+          targetingSpec.excluded_custom_audiences = excludedAudienceIds.map(id => ({ id }));
+        }
+        // M6: languages (Meta locale IDs)
+        if (targetLanguages.length > 0) {
+          targetingSpec.locales = targetLanguages.map(l => l.id);
+        }
+        // m4: device_platforms checkboxes — default omit (= all). Only send when user changed it.
+        if (devicePlatforms.length > 0 && devicePlatforms.length < 3) {
+          targetingSpec.device_platforms = devicePlatforms;
+        }
+        // m5: brand safety filter level. STANDARD is Meta's default — skip sending in that case.
+        if (brandSafetyLevel !== 'STANDARD') {
+          targetingSpec.brand_safety_content_filter_levels = [
+            brandSafetyLevel === 'LIMITED' ? 'FACEBOOK_LIMITED_INVENTORY' : 'FACEBOOK_EXPANDED_INVENTORY',
+          ];
+        }
+        // Include interests (detailed targeting). Layer on top of savedTargeting.flexible_spec if present.
         if (targetInterests.length > 0) {
-          targetingSpec.flexible_spec = [{
-            interests: targetInterests.map(i => ({ id: i.id, name: i.name })),
-          }];
+          const baseFlex = Array.isArray(targetingSpec.flexible_spec) ? targetingSpec.flexible_spec : [];
+          targetingSpec.flexible_spec = [
+            ...baseFlex,
+            { interests: targetInterests.map(i => ({ id: i.id, name: i.name })) },
+          ];
         }
         // Exclude interests
         if (targetExcludeInterests.length > 0) {
           targetingSpec.exclusions = {
+            ...(targetingSpec.exclusions || {}),
             interests: targetExcludeInterests.map(i => ({ id: i.id, name: i.name })),
           };
         }
         submitData.targeting = targetingSpec;
+        // C4: Special Ad Categories at the campaign level (Meta requires this on the
+        // campaign object, not the ad set). Backend should map this to
+        // campaign.special_ad_categories: [<value>] when creating a new campaign.
+        if (specialAdCategory !== 'NONE' && !existingCampaignId) {
+          submitData.special_ad_categories = [specialAdCategory];
+        }
 
         // Placements — only send explicit lists when the user chose "Manual".
         // Advantage+ Placements = omit these fields (Meta auto-selects).
@@ -5448,6 +5948,14 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         });
       } catch (saveErr) {
         // Non-critical: creative library save failed silently
+      }
+
+      // M4: capture backend warnings (e.g. fields stripped due to special_ad_categories,
+      // unsupported placement+objective combos, deprecated CTAs). Each warning
+      // has shape { code, message, removed_fields[] }. Surfaced in Review step.
+      if (Array.isArray(data?.warnings) && data.warnings.length > 0) {
+        setBackendWarnings(data.warnings as MetaWarning[]);
+        setDismissedWarnings(new Set());
       }
 
       if (data?.partial === true) {
@@ -5701,6 +6209,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                           dailyBudget={campBudget} setDailyBudget={setCampBudget}
                           startDate={startDate} setStartDate={setStartDate}
                           cpaTarget={cpaTarget}
+                          specialAdCategory={specialAdCategory} setSpecialAdCategory={setSpecialAdCategory}
                         />
                       </CardContent>
                     </Card>
@@ -5737,14 +6246,32 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                           autoMediaType={autoMediaType} setAutoMediaType={setAutoMediaType}
                           cpaTarget={cpaTarget} setCpaTarget={setCpaTarget}
                           targetCountries={targetCountries} setTargetCountries={setTargetCountries}
+                          countryGroups={countryGroups} setCountryGroups={setCountryGroups}
                           targetAgeMin={targetAgeMin} setTargetAgeMin={setTargetAgeMin}
                           targetAgeMax={targetAgeMax} setTargetAgeMax={setTargetAgeMax}
                           targetGender={targetGender} setTargetGender={setTargetGender}
                           connectionId={ctxConnectionId}
-                          selectedAudienceIds={selectedAudienceIds} setSelectedAudienceIds={setSelectedAudienceIds}
+                          selectedCustomAudienceIds={selectedCustomAudienceIds} setSelectedCustomAudienceIds={setSelectedCustomAudienceIds}
+                          selectedSavedAudienceId={selectedSavedAudienceId} setSelectedSavedAudienceId={setSelectedSavedAudienceId}
+                          excludedAudienceIds={excludedAudienceIds} setExcludedAudienceIds={setExcludedAudienceIds}
                           targetInterests={targetInterests} setTargetInterests={setTargetInterests}
                           targetExcludeInterests={targetExcludeInterests} setTargetExcludeInterests={setTargetExcludeInterests}
                           targetLocations={targetLocations} setTargetLocations={setTargetLocations}
+                          targetLanguages={targetLanguages} setTargetLanguages={setTargetLanguages}
+                          devicePlatforms={devicePlatforms} setDevicePlatforms={setDevicePlatforms}
+                          brandSafetyLevel={brandSafetyLevel} setBrandSafetyLevel={setBrandSafetyLevel}
+                          specialAdCategory={specialAdCategory}
+                          metaAudiences={metaAudiences} setMetaAudiences={setMetaAudiences}
+                          clientId={clientId}
+                          selectedProductId={selectedProduct?.id}
+                          objective={objective}
+                          availablePixels={availablePixels}
+                          selectedPixelId={selectedPixelId} setSelectedPixelId={setSelectedPixelId}
+                          customEventType={customEventType} setCustomEventType={setCustomEventType}
+                          placementsMode={placementsMode} setPlacementsMode={setPlacementsMode}
+                          selectedPlatforms={selectedPlatforms} setSelectedPlatforms={setSelectedPlatforms}
+                          fbPositions={fbPositions} setFbPositions={setFbPositions}
+                          igPositions={igPositions} setIgPositions={setIgPositions}
                         />
                       </CardContent>
                     </Card>
@@ -5764,6 +6291,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                     dailyBudget={campBudget} setDailyBudget={setCampBudget}
                     startDate={startDate} setStartDate={setStartDate}
                     cpaTarget={cpaTarget}
+                    specialAdCategory={specialAdCategory} setSpecialAdCategory={setSpecialAdCategory}
                   />
                   {objective === 'CATALOG' && (
                     <div className="space-y-4 mt-5 p-4 rounded-lg border border-primary/20 bg-primary/5">
@@ -5885,14 +6413,22 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                   autoMediaType={autoMediaType} setAutoMediaType={setAutoMediaType}
                   cpaTarget={cpaTarget} setCpaTarget={setCpaTarget}
                   targetCountries={targetCountries} setTargetCountries={setTargetCountries}
+                  countryGroups={countryGroups} setCountryGroups={setCountryGroups}
                   targetAgeMin={targetAgeMin} setTargetAgeMin={setTargetAgeMin}
                   targetAgeMax={targetAgeMax} setTargetAgeMax={setTargetAgeMax}
                   targetGender={targetGender} setTargetGender={setTargetGender}
                   connectionId={ctxConnectionId}
-                  selectedAudienceIds={selectedAudienceIds} setSelectedAudienceIds={setSelectedAudienceIds}
+                  selectedCustomAudienceIds={selectedCustomAudienceIds} setSelectedCustomAudienceIds={setSelectedCustomAudienceIds}
+                  selectedSavedAudienceId={selectedSavedAudienceId} setSelectedSavedAudienceId={setSelectedSavedAudienceId}
+                  excludedAudienceIds={excludedAudienceIds} setExcludedAudienceIds={setExcludedAudienceIds}
                   targetInterests={targetInterests} setTargetInterests={setTargetInterests}
                   targetExcludeInterests={targetExcludeInterests} setTargetExcludeInterests={setTargetExcludeInterests}
                   targetLocations={targetLocations} setTargetLocations={setTargetLocations}
+                  targetLanguages={targetLanguages} setTargetLanguages={setTargetLanguages}
+                  devicePlatforms={devicePlatforms} setDevicePlatforms={setDevicePlatforms}
+                  brandSafetyLevel={brandSafetyLevel} setBrandSafetyLevel={setBrandSafetyLevel}
+                  specialAdCategory={specialAdCategory}
+                  metaAudiences={metaAudiences} setMetaAudiences={setMetaAudiences}
                   clientId={clientId}
                   selectedProductId={selectedProduct?.id}
                   objective={objective}
@@ -6187,6 +6723,13 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                     onSaveDraft={handleSaveDraft}
                     submitting={submitting}
                     savingDraft={savingDraft}
+                    backendWarnings={backendWarnings.map((w, i) => ({ ...w, _idx: i }))}
+                    dismissedWarnings={dismissedWarnings}
+                    onDismissWarning={(idx) => {
+                      const next = new Set(dismissedWarnings);
+                      next.add(idx);
+                      setDismissedWarnings(next);
+                    }}
                   />
                 );
               })()}
