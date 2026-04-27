@@ -111,8 +111,33 @@ async function handleCreateCustom(
     payload.rule = typeof rule === 'object' ? JSON.stringify(rule) : rule;
   }
 
-  // For website audiences, pixel_id must also be sent as a top-level param
+  // For website audiences, pixel_id must also be sent as a top-level param.
+  // M9: Validate the pixel belongs to this ad account before posting; Meta
+  // would otherwise reject with a generic "Object does not exist or you do not
+  // have permission" error.
   if (source_type === 'website' && pixel_id) {
+    const pixelsResp = await metaApiRequest(
+      `act_${accountId}/adspixels`,
+      accessToken,
+      'GET',
+      { fields: 'id', limit: '50' }
+    );
+    if (!pixelsResp.ok) {
+      return {
+        body: { error: 'No se pudo validar el pixel contra la cuenta', details: pixelsResp.error },
+        status: 502,
+      };
+    }
+    const knownPixelIds: string[] = (pixelsResp.data?.data || []).map((p: any) => String(p.id));
+    if (!knownPixelIds.includes(String(pixel_id))) {
+      return {
+        body: {
+          error: `Pixel ${pixel_id} no pertenece a la cuenta act_${accountId}.`,
+          available_pixel_ids: knownPixelIds,
+        },
+        status: 400,
+      };
+    }
     payload.pixel_id = pixel_id;
   }
 
@@ -451,6 +476,30 @@ async function handleCreateRetargeting(
 
   if (!name) return { body: { error: 'Missing required field: name' }, status: 400 };
   if (!pixel_id) return { body: { error: 'Missing required field: pixel_id' }, status: 400 };
+
+  // M9: validate pixel belongs to the ad account before building any rule.
+  const pixelsResp = await metaApiRequest(
+    `act_${accountId}/adspixels`,
+    accessToken,
+    'GET',
+    { fields: 'id', limit: '50' }
+  );
+  if (!pixelsResp.ok) {
+    return {
+      body: { error: 'No se pudo validar el pixel contra la cuenta', details: pixelsResp.error },
+      status: 502,
+    };
+  }
+  const knownPixelIds: string[] = (pixelsResp.data?.data || []).map((p: any) => String(p.id));
+  if (!knownPixelIds.includes(String(pixel_id))) {
+    return {
+      body: {
+        error: `Pixel ${pixel_id} no pertenece a la cuenta act_${accountId}.`,
+        available_pixel_ids: knownPixelIds,
+      },
+      status: 400,
+    };
+  }
 
   // Build rule based on retargeting type
   let rule: any;
