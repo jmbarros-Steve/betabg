@@ -368,29 +368,46 @@ async function fetchShopifyOrdersForReport(supabase: any, shopifyConnId: string,
   const baseFields = 'id,created_at,financial_status,total_price,line_items';
   let url: string | null = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&created_at_min=${fromIso}T00:00:00Z&created_at_max=${toIso}T23:59:59Z&fields=${baseFields}&limit=250`;
   let pages = 0;
+  console.log(`[strategy-report] Fetching Shopify orders for ${cleanStoreUrl} ${fromIso}→${toIso}`);
   while (url && pages < 10) {
     try {
       const res = await fetch(url, { headers });
-      if (!res.ok) break;
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        console.error(`[strategy-report] Shopify API ${res.status}: ${errText.slice(0, 200)}`);
+        break;
+      }
       const json: any = await res.json();
-      out.push(...(json.orders || []));
+      const pageOrders = json.orders || [];
+      out.push(...pageOrders);
+      console.log(`[strategy-report] Page ${pages + 1}: ${pageOrders.length} orders fetched`);
       const linkHeader = res.headers.get('Link') || '';
       const m = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
       url = m ? m[1] : null;
       pages++;
-    } catch (e) {
-      console.error('[strategy-report] Shopify orders fetch error:', e);
+    } catch (e: any) {
+      console.error('[strategy-report] Shopify orders fetch error:', e?.message || e);
       break;
     }
   }
+  console.log(`[strategy-report] Total orders fetched: ${out.length} from ${cleanStoreUrl}`);
   return out;
 }
 
 function aggregateTopProducts(orders: ShopifyOrder[], limit: number = 10): Array<{ sku: string | null; title: string; units: number; revenue: number; orders: number }> {
   const map: Record<string, { sku: string | null; title: string; units: number; revenue: number; orders: number }> = {};
-  const PAID = new Set(['paid', 'partially_paid', 'partially_refunded']);
+  // Accept both PAID and FULFILLED-but-pending states (small merchants often have manual / pending payments)
+  const ACCEPTED = new Set(['paid', 'partially_paid', 'partially_refunded', 'pending', 'authorized']);
+  let kept = 0, dropped = 0;
+  const droppedStatuses: Record<string, number> = {};
   for (const o of orders) {
-    if (!PAID.has(o.financial_status)) continue;
+    const fs = String(o.financial_status || '');
+    if (!ACCEPTED.has(fs)) {
+      dropped++;
+      droppedStatuses[fs] = (droppedStatuses[fs] || 0) + 1;
+      continue;
+    }
+    kept++;
     for (const li of (o.line_items || [])) {
       const key = li.sku || li.title || 'sin-sku';
       if (!map[key]) map[key] = { sku: li.sku || null, title: li.title || 'Sin título', units: 0, revenue: 0, orders: 0 };
@@ -399,6 +416,7 @@ function aggregateTopProducts(orders: ShopifyOrder[], limit: number = 10): Array
       map[key].orders += 1;
     }
   }
+  console.log(`[strategy-report] Top products aggregation: ${kept} accepted, ${dropped} dropped, ${Object.keys(map).length} unique products. Dropped statuses:`, droppedStatuses);
   return Object.values(map).sort((a, b) => b.units - a.units).slice(0, limit);
 }
 
@@ -456,7 +474,8 @@ REGLAS:
     });
     clearTimeout(timer);
     if (!res.ok) {
-      console.error('[strategy-report] AI insights HTTP error:', res.status);
+      const errBody = await res.text().catch(() => '');
+      console.error(`[strategy-report] AI insights HTTP ${res.status}: ${errBody.slice(0, 400)}`);
       return null;
     }
     const json: any = await res.json();
@@ -962,7 +981,7 @@ function renderReportHtml(d: any, sections: string[]): string {
   if (d.aiInsights) blocks.push(renderHealthScoreSection(d.aiInsights, brandPrimary));
   blocks.push(renderExecSummarySection(d, sections, brandPrimary));
   if (sections.includes('shopify')) blocks.push(renderShopifySection(d, brandPrimary, brandSecondary));
-  if (d.topProducts && d.topProducts.length > 0) blocks.push(renderTopProductsSection(d, brandPrimary));
+  if (sections.includes('shopify')) blocks.push(renderTopProductsSection(d, brandPrimary));
   if (sections.includes('ads_meta') || sections.includes('ads_google')) blocks.push(renderAdsSection(d, brandPrimary, brandSecondary));
   if (sections.includes('creativos')) blocks.push(renderCreativosSection(d, brandPrimary));
   if (sections.includes('email')) blocks.push(renderEmailSection(d, brandPrimary, brandSecondary));
@@ -1292,7 +1311,26 @@ function renderShopifySection(d: any, brandPrimary: string, brandSecondary: stri
 
 function renderTopProductsSection(d: any, brandPrimary: string): string {
   const tp = d.topProducts || [];
-  if (tp.length === 0) return '';
+  const fetched = d.shopifyOrders?.length ?? null;
+
+  if (tp.length === 0) {
+    let msg = '';
+    if (fetched === null) {
+      msg = 'No pudimos consultar tus pedidos en Shopify durante el período. Posibles causas: el token de la conexión expiró o faltan permisos (read_orders).';
+    } else if (fetched === 0) {
+      msg = `Tu Shopify respondió correctamente pero no había pedidos en el período (${escapeHtml(d.period.from)} → ${escapeHtml(d.period.to)}).`;
+    } else {
+      msg = `Recibimos ${fetched} pedidos del período pero ninguno tenía estado financiero válido (paid/pending/authorized). Revisar pagos manuales o pendientes en tu Shopify Admin.`;
+    }
+    return `
+      <div class="page">
+        <h2>Top productos vendidos</h2>
+        <p class="muted" style="margin-top:4pt;font-size:10pt">${msg}</p>
+        ${renderFooterInline()}
+      </div>
+    `;
+  }
+
   const top = tp.slice(0, 9);
   const totalUnits = tp.reduce((acc: number, p: any) => acc + p.units, 0);
   const totalRev = tp.reduce((acc: number, p: any) => acc + p.revenue, 0);

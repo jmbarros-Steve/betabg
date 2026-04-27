@@ -326,6 +326,61 @@ export async function strategyChat(c: Context) {
     const mergedKnowledge = [...(clientKnowledgeData || []), ...(knowledge || [])];
     timelog('estrategia-parallel-queries');
 
+    // === LIVE SHOPIFY: top sold products last 30d (best-effort, ≤4s budget) ===
+    // We fetch orders directly from Shopify Admin API so Steve knows which SKUs
+    // are actually moving, not just what's in the catalog.
+    let topSoldProducts: Array<{ sku: string | null; title: string; units: number; revenue: number }> = [];
+    const shopifyConnections = (connections || []).filter((c: any) => c.platform === 'shopify');
+    if (shopifyConnections.length > 0) {
+      try {
+        const shopConn = shopifyConnections[0];
+        const { data: connFull } = await supabase
+          .from('platform_connections')
+          .select('store_url, access_token_encrypted')
+          .eq('id', shopConn.id)
+          .single();
+        if (connFull?.store_url && connFull?.access_token_encrypted) {
+          const { data: tok } = await supabase
+            .rpc('decrypt_platform_token', { encrypted_token: connFull.access_token_encrypted });
+          if (tok) {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 4000);
+            try {
+              const cleanUrl = String(connFull.store_url).replace(/^https?:\/\//, '');
+              const url = `https://${cleanUrl}/admin/api/2026-04/orders.json?status=any&created_at_min=${thirtyDaysAgo}T00:00:00Z&fields=id,financial_status,line_items&limit=250`;
+              const res = await fetch(url, {
+                headers: { 'X-Shopify-Access-Token': tok, 'Content-Type': 'application/json' },
+                signal: ctrl.signal,
+              });
+              if (res.ok) {
+                const j: any = await res.json();
+                const orders = j.orders || [];
+                const ACCEPTED = new Set(['paid', 'partially_paid', 'partially_refunded', 'pending', 'authorized']);
+                const map: Record<string, any> = {};
+                for (const o of orders) {
+                  if (!ACCEPTED.has(o.financial_status)) continue;
+                  for (const li of (o.line_items || [])) {
+                    const key = li.sku || li.title || 'sin-sku';
+                    if (!map[key]) map[key] = { sku: li.sku || null, title: li.title || 'Sin título', units: 0, revenue: 0 };
+                    map[key].units += Number(li.quantity) || 0;
+                    map[key].revenue += (Number(li.price) || 0) * (Number(li.quantity) || 0);
+                  }
+                }
+                topSoldProducts = Object.values(map).sort((a: any, b: any) => b.units - a.units).slice(0, 8);
+              }
+            } catch (e: any) {
+              console.warn('[strategy-chat] Top sold products fetch skipped:', e?.message);
+            } finally {
+              clearTimeout(timer);
+            }
+          }
+        }
+      } catch (e: any) {
+        console.warn('[strategy-chat] Top sold products outer error:', e?.message);
+      }
+    }
+    timelog('estrategia-top-sold-products');
+
     // Smart rule selection (Mejora #10): use Haiku to pick most relevant rules for this question
     // Uses mergedKnowledge (client-specific + global, client first for priority)
     let filteredKnowledge = mergedKnowledge;
@@ -419,6 +474,21 @@ export async function strategyChat(c: Context) {
           : `$${Number(p.price_min).toLocaleString()}-$${Number(p.price_max).toLocaleString()} CLP`;
         productsContext += `  - "${p.title}" — ${priceLabel} (${stock})\n`;
       }
+    }
+
+    // === TOP PRODUCTOS VENDIDOS (live Shopify orders) ===
+    let topSoldContext = '';
+    if (topSoldProducts.length > 0) {
+      const totalUnits = topSoldProducts.reduce((acc, p) => acc + p.units, 0);
+      const totalRev = topSoldProducts.reduce((acc, p) => acc + p.revenue, 0);
+      topSoldContext = `\n🔥 TOP PRODUCTOS VENDIDOS (últimos 30 días, datos live de Shopify):\n`;
+      topSoldContext += `- Total movido: ${totalUnits} unidades por $${Math.round(totalRev).toLocaleString()} CLP\n`;
+      for (const p of topSoldProducts) {
+        const sku = p.sku ? ` [SKU: ${p.sku}]` : '';
+        topSoldContext += `  - "${p.title}"${sku}: ${p.units} u. ($${Math.round(p.revenue).toLocaleString()} revenue)\n`;
+      }
+    } else if (shopifyConnections.length > 0) {
+      topSoldContext = `\n🔥 TOP PRODUCTOS VENDIDOS: No detecté pedidos pagados en Shopify en los últimos 30 días (puede ser que el cliente esté empezando o el sync de orders esté limitado por scopes).\n`;
     }
 
     // === FINANCIAL CONFIG ===
@@ -848,7 +918,7 @@ IMPORTANTE — MÉTRICAS Y DATOS:
 🛑 REGLAS ABSOLUTAS DE TRANSPARENCIA SOBRE LOS DATOS (NUNCA romper):
 A. Si abajo aparece "📦 SHOPIFY — VENTAS" o "🛍️ CATÁLOGO SHOPIFY" o el bloque "Conectadas ahora" incluye Shopify → el cliente TIENE Shopify conectado y vos tenés acceso. NUNCA digas "no tengo conectado tu Shopify" ni "no tengo datos de tu tienda" ni "no estoy viendo tu Shopify".
 B. Lo que SÍ tenés de Shopify (cuando hay conexión activa): revenue diario, número de pedidos diarios, ticket promedio, comparaciones 7d/30d/semana/mes, desglose diario 14d, catálogo de productos activos con precio y stock.
-C. Lo que NO tenés de Shopify hoy (decílo así, NO digas "no tengo datos"): sesiones, tasa de conversión (CR), tráfico por fuente, top productos VENDIDOS (solo tenés catálogo por precio, no por unidades vendidas), tiempo en sitio, bounce rate. Si te piden algo de esta lista, decí "ese dato no se está sincronizando hoy, lo que sí puedo decirte es X" — NUNCA "no estoy conectado".
+C. Lo que NO tenés de Shopify hoy (decílo así, NO digas "no tengo datos"): sesiones, tasa de conversión (CR), tráfico por fuente, tiempo en sitio, bounce rate. Si te piden algo de esta lista, decí "ese dato no se está sincronizando hoy, lo que sí puedo decirte es X" — NUNCA "no estoy conectado".
 D. Lo mismo aplica a Meta y Google Ads: si el bloque "Conectadas ahora" los lista, tenés acceso. Spend, impressions, clicks, conversions, ROAS y campañas individuales están en CAMPAÑAS abajo.
 E. Si hay 0 filas en una métrica pero la conexión existe → decí "tu Shopify está conectado pero no registró ventas en este período" (NO "no tengo datos").
 
@@ -859,6 +929,7 @@ ${persona?.is_complete ? '' : '⚠️ NOTA: El brief del cliente aún NO está c
 === MÉTRICAS REALES (PRIORIDAD MÁXIMA — usa estos datos en TODA respuesta) ===
 ${metricsContext}
 ${productsContext}
+${topSoldContext}
 ${financialContext}
 ${emailContext}
 ${waContext}
