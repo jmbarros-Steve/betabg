@@ -13,6 +13,7 @@ export interface ReportClientInfo {
   name: string;
   shop_domain: string;
   logo_url: string | null;
+  shopifyConnectionId: string | null;
 }
 
 export interface ReportPeriod {
@@ -109,13 +110,14 @@ async function fetchClientInfo(supabase: SupabaseClient, clientId: string): Prom
 
   const { data: conn } = await supabase
     .from('platform_connections')
-    .select('shop_domain, store_url, access_token_encrypted')
+    .select('id, shop_domain, store_url, access_token_encrypted')
     .eq('client_id', clientId)
     .eq('platform', 'shopify')
     .eq('is_active', true)
     .maybeSingle();
 
   const shopDomain = conn?.shop_domain || (conn?.store_url ? conn.store_url.replace(/^https?:\/\//, '').replace(/\/+$/, '') : '');
+  const shopifyConnectionId = conn?.id || null;
 
   // Auto-extract logo from Shopify shop.json on first report (logo_url null = not extracted yet).
   // El cliente puede sobrescribirlo manualmente en settings; ese override gana porque solo
@@ -167,43 +169,60 @@ async function fetchClientInfo(supabase: SupabaseClient, clientId: string): Prom
     name: client?.name || 'Cliente',
     shop_domain: shopDomain,
     logo_url: logoDataUri,
+    shopifyConnectionId,
   };
 }
 
-async function fetchKpisForPeriod(supabase: SupabaseClient, clientId: string, start: string, end: string): Promise<ReportKpiSet> {
-  // Revenue + orders desde platform_metrics agregada por día (la que llena sync-shopify-metrics)
-  const { data: metrics } = await supabase
-    .from('platform_metrics')
-    .select('metric_type, metric_value, metric_date')
-    .eq('client_id', clientId)
-    .eq('platform', 'shopify')
-    .gte('metric_date', start)
-    .lte('metric_date', end);
-
+async function fetchKpisForPeriod(
+  supabase: SupabaseClient,
+  clientId: string,
+  shopifyConnectionId: string | null,
+  start: string,
+  end: string,
+): Promise<ReportKpiSet> {
   let totalRevenue = 0;
   let totalOrders = 0;
-  let uniqueCustomers = 0;
+  const uniqueCustomers = 0; // TODO Sprint 2: count distinct desde shopify_orders
 
-  for (const m of metrics || []) {
-    const v = Number(m.metric_value) || 0;
-    if (m.metric_type === 'revenue') totalRevenue += v;
-    else if (m.metric_type === 'orders') totalOrders += v;
-    else if (m.metric_type === 'unique_customers') uniqueCustomers = Math.max(uniqueCustomers, v);
+  // platform_metrics está scoped por connection_id (no client_id, no platform col).
+  if (shopifyConnectionId) {
+    const { data: metrics } = await supabase
+      .from('platform_metrics')
+      .select('metric_type, metric_value, metric_date')
+      .eq('connection_id', shopifyConnectionId)
+      .gte('metric_date', start)
+      .lte('metric_date', end);
+
+    for (const m of metrics || []) {
+      const v = Number(m.metric_value) || 0;
+      if (m.metric_type === 'revenue') totalRevenue += v;
+      else if (m.metric_type === 'orders') totalOrders += v;
+    }
   }
 
-  // Ad spend: Meta + Google sincronizado en campaign_metrics.
-  // CRÍTICO: si se filtra `manual_google_spend` luego en computeProfitLoss, NO debemos
-  // contar acá los rows con platform='google' o se duplica el gasto de Google.
-  // Acá traemos TODO menos Google (Google se computa con manual_google_spend del config).
-  const { data: campaignMetrics } = await supabase
-    .from('campaign_metrics')
-    .select('spend, metric_date, platform')
+  // Ad spend: campaign_metrics también scoped por connection_id.
+  // Buscamos todas las conexiones de ads (meta, tiktok, etc.) del cliente,
+  // EXCLUYENDO google (manual_google_spend lo cubre desde el financial_config).
+  const { data: adsConns } = await supabase
+    .from('platform_connections')
+    .select('id, platform')
     .eq('client_id', clientId)
-    .neq('platform', 'google')
-    .gte('metric_date', start)
-    .lte('metric_date', end);
+    .eq('is_active', true)
+    .in('platform', ['meta', 'tiktok']);
 
-  const totalSpend = (campaignMetrics || []).reduce((sum, m) => sum + (Number(m.spend) || 0), 0);
+  const adsConnectionIds = (adsConns || []).map((c) => c.id);
+
+  let totalSpend = 0;
+  if (adsConnectionIds.length > 0) {
+    const { data: campaignMetrics } = await supabase
+      .from('campaign_metrics')
+      .select('spend, metric_date')
+      .in('connection_id', adsConnectionIds)
+      .gte('metric_date', start)
+      .lte('metric_date', end);
+
+    totalSpend = (campaignMetrics || []).reduce((sum, m) => sum + (Number(m.spend) || 0), 0);
+  }
 
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
   const totalRoas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
@@ -284,58 +303,39 @@ function computeProfitLoss(
 async function fetchTopProducts(
   supabase: SupabaseClient,
   clientId: string,
-  start: string,
-  end: string,
+  _start: string,
+  _end: string,
   marginRate: number,
 ): Promise<ReportTopProduct[]> {
-  // Top SKUs vendidos en el período (desde platform_metrics o desde fetch-shopify-analytics si está disponible)
-  const { data: skuRows } = await supabase
-    .from('platform_metrics')
-    .select('metric_type, metric_value, metric_date, metadata')
-    .eq('client_id', clientId)
-    .eq('platform', 'shopify')
-    .eq('metric_type', 'top_sku')
-    .gte('metric_date', start)
-    .lte('metric_date', end);
-
-  // Agregar por SKU desde metadata JSON
-  const skuAggregated = new Map<string, { name: string; revenue: number; quantity: number; sku: string }>();
-  for (const row of skuRows || []) {
-    const meta = (row.metadata as { sku?: string; name?: string; quantity?: number; revenue?: number } | null) || {};
-    const sku = meta.sku || '';
-    if (!sku) continue;
-    const prev = skuAggregated.get(sku) || { name: meta.name || sku, revenue: 0, quantity: 0, sku };
-    prev.revenue += Number(meta.revenue) || 0;
-    prev.quantity += Number(meta.quantity) || 0;
-    skuAggregated.set(sku, prev);
-  }
-
-  // Costos por SKU desde shopify_products.variants
+  // Sprint 1: top productos por price_max y inventory_total desde shopify_products
+  // (la tabla está scoped por client_id y tiene snapshots cada 6h).
+  // Sprint 2: cruzar con shopify_orders del período para top REAL por revenue vendido.
   const { data: products } = await supabase
     .from('shopify_products')
-    .select('variants, title')
-    .eq('client_id', clientId);
+    .select('title, variants, price_min, price_max, inventory_total')
+    .eq('client_id', clientId)
+    .eq('status', 'active')
+    .order('inventory_total', { ascending: false })
+    .limit(10);
 
-  const skuCostMap = new Map<string, number>();
-  for (const p of products || []) {
+  return (products || []).map((p) => {
     const variants = (p.variants as Array<{ sku?: string; cost?: number | null; price?: number | null }>) || [];
-    for (const v of variants) {
-      if (v.sku && v.cost != null && v.cost > 0) {
-        skuCostMap.set(v.sku, v.cost);
-      }
-    }
-  }
-
-  const top = Array.from(skuAggregated.values())
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 10);
-
-  return top.map((s) => {
-    const unitCost = skuCostMap.get(s.sku);
-    const cost = unitCost != null ? unitCost * s.quantity : (s.revenue / (1 + TAX_RATE)) * (1 - marginRate);
-    const margin = s.revenue / (1 + TAX_RATE) - cost;
-    const marginPct = s.revenue > 0 ? (margin / (s.revenue / (1 + TAX_RATE))) * 100 : 0;
-    return { title: s.name, revenue: s.revenue, quantity: s.quantity, cost, margin, marginPct };
+    const avgCost = variants.reduce((sum, v) => sum + (Number(v.cost) || 0), 0) / Math.max(1, variants.length);
+    const avgPrice = (Number(p.price_min) + Number(p.price_max)) / 2;
+    const stock = Number(p.inventory_total) || 0;
+    // Estimación: revenue potencial = avgPrice × stock (no es venta real, solo es ranking de catálogo)
+    const potentialRevenue = avgPrice * stock;
+    const cost = avgCost > 0 ? avgCost * stock : potentialRevenue * (1 - marginRate);
+    const margin = potentialRevenue - cost;
+    const marginPct = potentialRevenue > 0 ? (margin / potentialRevenue) * 100 : 0;
+    return {
+      title: p.title || 'Sin nombre',
+      revenue: potentialRevenue,
+      quantity: stock,
+      cost,
+      margin,
+      marginPct,
+    };
   });
 }
 
@@ -347,11 +347,15 @@ export async function fetchReportData(
 ): Promise<ReportData> {
   const period = buildPeriod(startDate, endDate);
 
-  const [client, current, previous, financial] = await Promise.all([
+  // Resolvemos client info primero porque incluye shopifyConnectionId que necesitan los KPIs.
+  const [client, financial] = await Promise.all([
     fetchClientInfo(supabase, clientId),
-    fetchKpisForPeriod(supabase, clientId, period.start, period.end),
-    fetchKpisForPeriod(supabase, clientId, period.previousStart, period.previousEnd),
     fetchFinancialConfig(supabase, clientId),
+  ]);
+
+  const [current, previous] = await Promise.all([
+    fetchKpisForPeriod(supabase, clientId, client.shopifyConnectionId, period.start, period.end),
+    fetchKpisForPeriod(supabase, clientId, client.shopifyConnectionId, period.previousStart, period.previousEnd),
   ]);
 
   const profitLoss = computeProfitLoss(current, financial, period.daysInPeriod);
