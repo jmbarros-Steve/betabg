@@ -203,6 +203,7 @@ export async function strategyChat(c: Context) {
       { data: creativeHist },
       { data: criterioFailed },
       { data: episodicMem },
+      { data: pricingHistory },
       { data: abandonedCheckouts },
     ] = await Promise.all([
       // 1. Fetch last messages for context
@@ -351,7 +352,15 @@ export async function strategyChat(c: Context) {
         .eq('client_id', client_id)
         .order('created_at', { ascending: false })
         .limit(10),
-      // 20. Shopify abandoned checkouts (not converted, last 30d)
+      // 20. Shopify pricing history last 30d (#18) — detectar cambios de precio
+      supabase
+        .from('shopify_pricing_history')
+        .select('shopify_product_id, title, price_min, price_max, snapshot_date')
+        .eq('client_id', client_id)
+        .gte('snapshot_date', thirtyDaysAgo)
+        .order('snapshot_date', { ascending: false })
+        .limit(2000),
+      // 21. Shopify abandoned checkouts (not converted, last 30d)
       supabase
         .from('shopify_abandoned_checkouts')
         .select('checkout_id, customer_name, customer_email, customer_phone, total_price, currency, line_items, created_at, order_completed, abandoned_checkout_url')
@@ -449,6 +458,76 @@ export async function strategyChat(c: Context) {
     }
     timelog('estrategia-pixel-health');
 
+    // === LIVE SHOPIFY ANALYTICS via ShopifyQL (#1-#7, ≤4s budget) ===
+    // Sessions, total visitors, conversion rate — métricas que Shopify Admin API NO da por orders.json.
+    // Requiere scope read_analytics (ya está en shopify.app.toml).
+    let shopifyAnalytics: { sessions: number; visitors: number; conversionRate: number; sessionsPrev: number; visitorsPrev: number; conversionRatePrev: number } | null = null;
+    const shopifyConnections = (connections || []).filter((c: any) => c.platform === 'shopify');
+    if (shopifyConnections.length > 0) {
+      try {
+        const shopConn = shopifyConnections[0];
+        const { data: connFull } = await supabase
+          .from('platform_connections')
+          .select('store_url, access_token_encrypted')
+          .eq('id', shopConn.id)
+          .single();
+        if (connFull?.store_url && connFull?.access_token_encrypted) {
+          const { data: tok } = await supabase
+            .rpc('decrypt_platform_token', { encrypted_token: connFull.access_token_encrypted });
+          if (tok) {
+            const cleanUrl = String(connFull.store_url).replace(/^https?:\/\//, '');
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 4000);
+            const sixtyDaysAgoStr = new Date(now.getTime() - 60 * 86400000).toISOString().split('T')[0];
+            const queryQL = `FROM sessions SHOW total_sessions, total_visitors, conversion_rate WHERE date BETWEEN '${sixtyDaysAgoStr}' AND '${today}'`;
+            try {
+              const r = await fetch(`https://${cleanUrl}/admin/api/2026-04/graphql.json`, {
+                method: 'POST',
+                headers: { 'X-Shopify-Access-Token': tok, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: `query { shopifyqlQuery(query: ${JSON.stringify(queryQL)}) { ... on TableResponse { tableData { rowData columns { name } } } ... on ParseError { code message } } }` }),
+                signal: ctrl.signal,
+              });
+              if (r.ok) {
+                const j: any = await r.json();
+                const td = j?.data?.shopifyqlQuery?.tableData;
+                if (td?.rowData) {
+                  // Aggregate current 30d vs previous 30d
+                  let s30 = 0, v30 = 0, sumCr30 = 0, sumCrW30 = 0;
+                  let sPrev = 0, vPrev = 0, sumCrP = 0, sumCrWP = 0;
+                  for (const row of td.rowData) {
+                    const date = String(row[0]);
+                    const sessions = Number(row[1]) || 0;
+                    const visitors = Number(row[2]) || 0;
+                    const cr = Number(row[3]) || 0;
+                    if (date >= thirtyDaysAgo && date <= today) {
+                      s30 += sessions; v30 += visitors; sumCr30 += cr * sessions; sumCrW30 += sessions;
+                    } else if (date >= sixtyDaysAgoStr && date < thirtyDaysAgo) {
+                      sPrev += sessions; vPrev += visitors; sumCrP += cr * sessions; sumCrWP += sessions;
+                    }
+                  }
+                  shopifyAnalytics = {
+                    sessions: s30,
+                    visitors: v30,
+                    conversionRate: sumCrW30 > 0 ? sumCr30 / sumCrW30 : 0,
+                    sessionsPrev: sPrev,
+                    visitorsPrev: vPrev,
+                    conversionRatePrev: sumCrWP > 0 ? sumCrP / sumCrWP : 0,
+                  };
+                }
+              }
+            } catch (e: any) {
+              console.warn('[strategy-chat] ShopifyQL analytics skipped:', e?.message);
+            } finally {
+              clearTimeout(timer);
+            }
+          }
+        }
+      } catch (e: any) {
+        console.warn('[strategy-chat] ShopifyQL outer error:', e?.message);
+      }
+    }
+    timelog('estrategia-shopify-analytics');
+
     // === LIVE SHOPIFY: orders last 30d → top sold products + new/returning + bundles (best-effort, ≤5s budget) ===
     let topSoldProducts: Array<{ sku: string | null; title: string; units: number; revenue: number }> = [];
     let shopifyOrdersAnalysis: {
@@ -458,7 +537,6 @@ export async function strategyChat(c: Context) {
       bundles: Array<{ items: string[]; count: number }>;
       attribution: Record<string, number>;
     } | null = null;
-    const shopifyConnections = (connections || []).filter((c: any) => c.platform === 'shopify');
     if (shopifyConnections.length > 0) {
       try {
         const shopConn = shopifyConnections[0];
@@ -671,6 +749,21 @@ export async function strategyChat(c: Context) {
       topSoldContext = `\n🔥 TOP PRODUCTOS VENDIDOS: No detecté pedidos pagados en Shopify en los últimos 30 días (puede ser que el cliente esté empezando o el sync de orders esté limitado por scopes).\n`;
     }
 
+    // === SHOPIFY ANALYTICS (#1-#7) ===
+    let analyticsContext = '';
+    if (shopifyAnalytics) {
+      const a = shopifyAnalytics;
+      const _n = (n: number) => Math.round(n).toLocaleString('es-CL');
+      analyticsContext = `\n📊 SHOPIFY ANALYTICS (sessions/CR, últimos 30 días):\n`;
+      analyticsContext += `- Sesiones: ${_n(a.sessions)} (vs ${_n(a.sessionsPrev)} período anterior)\n`;
+      analyticsContext += `- Visitantes únicos: ${_n(a.visitors)} (vs ${_n(a.visitorsPrev)})\n`;
+      const crPct = (a.conversionRate * 100).toFixed(2);
+      const crPrev = (a.conversionRatePrev * 100).toFixed(2);
+      analyticsContext += `- Conversion Rate: ${crPct}% (vs ${crPrev}% anterior)\n`;
+      if (a.conversionRate < 0.01 && a.sessions > 100) analyticsContext += `- ⚠️ CR muy bajo (<1%) con tráfico considerable: revisar landing, checkout o segmentación de tráfico.\n`;
+      if (a.sessionsPrev > 0 && a.sessions / a.sessionsPrev < 0.7) analyticsContext += `- 📉 Tráfico cayó >30% vs período anterior. Causas típicas: pausa de campañas, problema técnico, estacionalidad.\n`;
+    }
+
     // === META AUDIENCES (#35 — overlap mínimo viable) ===
     let audiencesContext = '';
     if (metaAudiences.length > 0) {
@@ -696,6 +789,48 @@ export async function strategyChat(c: Context) {
         for (const group of possibleOverlaps.slice(0, 3)) {
           audiencesContext += `    - ${group.map((a: any) => `"${a.name}"`).join(' / ')}\n`;
         }
+      }
+    }
+
+    // === PRICING CHANGES (#18) ===
+    let pricingChangesContext = '';
+    if (pricingHistory && pricingHistory.length > 0) {
+      // Group by product, find min/max snapshot_date
+      const byProduct: Record<string, any[]> = {};
+      for (const row of pricingHistory as any[]) {
+        const key = String(row.shopify_product_id);
+        if (!byProduct[key]) byProduct[key] = [];
+        byProduct[key].push(row);
+      }
+      const changes: Array<{ title: string; oldPrice: number; newPrice: number; deltaPct: number; date: string }> = [];
+      for (const product of Object.values(byProduct)) {
+        if (product.length < 2) continue;
+        product.sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
+        const first = product[0];
+        const last = product[product.length - 1];
+        const oldPrice = Number(first.price_max) || 0;
+        const newPrice = Number(last.price_max) || 0;
+        if (oldPrice > 0 && newPrice > 0 && oldPrice !== newPrice) {
+          const deltaPct = ((newPrice - oldPrice) / oldPrice) * 100;
+          if (Math.abs(deltaPct) >= 1) {
+            changes.push({
+              title: last.title || 'Sin título',
+              oldPrice,
+              newPrice,
+              deltaPct,
+              date: last.snapshot_date,
+            });
+          }
+        }
+      }
+      if (changes.length > 0) {
+        pricingChangesContext = `\n💲 CAMBIOS DE PRECIO DETECTADOS (últimos 30 días):\n`;
+        const sorted = changes.sort((a, b) => Math.abs(b.deltaPct) - Math.abs(a.deltaPct)).slice(0, 8);
+        for (const c of sorted) {
+          const arrow = c.deltaPct > 0 ? '📈' : '📉';
+          pricingChangesContext += `  - ${arrow} "${String(c.title).slice(0, 50)}": $${c.oldPrice.toLocaleString('es-CL')} → $${c.newPrice.toLocaleString('es-CL')} (${c.deltaPct > 0 ? '+' : ''}${c.deltaPct.toFixed(1)}%)\n`;
+        }
+        pricingChangesContext += `Si hubo subida de precio reciente y las ventas cayeron — correlacionar. Si hubo bajada y no subieron — el problema no es precio, es tráfico/CR.\n`;
       }
     }
 
@@ -1321,7 +1456,7 @@ IMPORTANTE — MÉTRICAS Y DATOS:
 🛑 REGLAS ABSOLUTAS DE TRANSPARENCIA SOBRE LOS DATOS (NUNCA romper):
 A. Si abajo aparece "📦 SHOPIFY — VENTAS" o "🛍️ CATÁLOGO SHOPIFY" o el bloque "Conectadas ahora" incluye Shopify → el cliente TIENE Shopify conectado y vos tenés acceso. NUNCA digas "no tengo conectado tu Shopify" ni "no tengo datos de tu tienda" ni "no estoy viendo tu Shopify".
 B. Lo que SÍ tenés de Shopify (cuando hay conexión activa): revenue diario, número de pedidos diarios, ticket promedio, comparaciones 7d/30d/semana/mes, desglose diario 14d, catálogo de productos activos con precio y stock.
-C. Lo que NO tenés de Shopify hoy (decílo así, NO digas "no tengo datos"): sesiones, tasa de conversión (CR), tráfico por fuente, tiempo en sitio, bounce rate. Si te piden algo de esta lista, decí "ese dato no se está sincronizando hoy, lo que sí puedo decirte es X" — NUNCA "no estoy conectado".
+C. Lo que NO tenés de Shopify hoy (decílo así, NO digas "no tengo datos"): tiempo en sitio, bounce rate detallado, top productos VISITADOS (vs vendidos), funnel completo paso por paso. Si te piden algo de esta lista, decí "ese dato específico no lo estoy sincronizando hoy, lo que sí puedo decirte es X" — NUNCA "no estoy conectado".
 D. Lo mismo aplica a Meta y Google Ads: si el bloque "Conectadas ahora" los lista, tenés acceso. Spend, impressions, clicks, conversions, ROAS y campañas individuales están en CAMPAÑAS abajo.
 E. Si hay 0 filas en una métrica pero la conexión existe → decí "tu Shopify está conectado pero no registró ventas en este período" (NO "no tengo datos").
 
@@ -1336,9 +1471,11 @@ ${topSoldContext}
 ${inventoryAlertsContext}
 ${customerIntelContext}
 ${realRoasContext}
+${analyticsContext}
 ${pixelHealthContext}
 ${audiencesContext}
 ${attributionContext}
+${pricingChangesContext}
 ${commitmentsStatusContext}
 ${seasonalContext}
 ${financialContext}

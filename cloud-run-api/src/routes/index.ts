@@ -60,6 +60,7 @@ import { createShopifyDiscount } from './shopify/create-shopify-discount.js';
 import { shopifySessionValidate } from './shopify/shopify-session-validate.js';
 import { syncShopifyMetrics } from './shopify/sync-shopify-metrics.js';
 import { syncShopifyAbandonedCheckouts, syncAllAbandonedCheckouts } from './shopify/sync-shopify-abandoned-checkouts.js';
+import { snapshotShopifyPricing } from './cron/snapshot-shopify-pricing.js';
 import { fetchShopifyDiscounts } from './shopify/fetch-shopify-discounts.js';
 import { fetchShopifyCustomers } from './shopify/fetch-shopify-customers.js';
 import { updateShopifyProduct } from './shopify/update-shopify-product.js';
@@ -608,6 +609,7 @@ export function registerRoutes(app: Hono) {
   cron.post('/sync-shopify-products', syncShopifyProducts);
   cron.post('/sync-shopify-orders', syncShopifyOrders);
   cron.post('/sync-all-abandoned-checkouts', syncAllAbandonedCheckouts);
+  cron.post('/snapshot-shopify-pricing', snapshotShopifyPricing);
   cron.post('/changelog-watcher', apiChangelogWatcher);
   cron.post('/error-budget-calculator', errorBudgetCalculator);
   cron.post('/reconciliation', reconciliation);
