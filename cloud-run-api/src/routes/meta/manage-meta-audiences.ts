@@ -86,6 +86,12 @@ async function handleCreateCustom(
     retention_days = 180,
     pixel_id,
     engagement_type,
+    // Engagement audience source IDs:
+    //   - PAGE  → page_id (real Facebook Page ID)
+    //   - INSTAGRAM → ig_user_id (real Instagram Business Account ID)
+    //   - VIDEO → page_id (videos posted by a Page)
+    page_id,
+    ig_user_id,
   } = data;
 
   if (!name) {
@@ -119,29 +125,59 @@ async function handleCreateCustom(
     payload.retention_days = numRetention;
   }
 
-  // Build rule for engagement audiences if not already provided
+  // Build rule for engagement audiences if not already provided.
+  // event_sources for PAGE/VIDEO needs the real Facebook Page ID and for
+  // INSTAGRAM the real IG Business Account ID. The ad account ID
+  // (act_{accountId}) is NOT a valid event source — Meta returns
+  // "Invalid event_sources.id" if we send it.
   if (source_type === 'engagement' && !rule) {
+    const engKind = engagement_type || 'PAGE';
+
+    if (engKind === 'PAGE' || engKind === 'VIDEO') {
+      if (!page_id) {
+        console.error(`[manage-meta-audiences] missing page_id for engagement subtype (${engKind})`);
+        return {
+          body: {
+            error: `Missing required field: page_id is required for ${engKind} engagement audiences`,
+            hint: 'Send the real Facebook Page ID, not the ad account ID.',
+          },
+          status: 400,
+        };
+      }
+    } else if (engKind === 'INSTAGRAM') {
+      if (!ig_user_id) {
+        console.error('[manage-meta-audiences] missing ig_user_id for engagement subtype (INSTAGRAM)');
+        return {
+          body: {
+            error: 'Missing required field: ig_user_id is required for INSTAGRAM engagement audiences',
+            hint: 'Send the real Instagram Business Account ID, not the ad account ID.',
+          },
+          status: 400,
+        };
+      }
+    }
+
     const engagementRules: Record<string, any> = {
       PAGE: {
         inclusions: {
           operator: 'or',
-          rules: [{ event_sources: [{ type: 'page', id: `act_${accountId}` }], retention_seconds: retention_days * 86400 }],
+          rules: [{ event_sources: [{ type: 'page', id: page_id }], retention_seconds: retention_days * 86400 }],
         },
       },
       INSTAGRAM: {
         inclusions: {
           operator: 'or',
-          rules: [{ event_sources: [{ type: 'ig_business', id: `act_${accountId}` }], retention_seconds: retention_days * 86400 }],
+          rules: [{ event_sources: [{ type: 'ig_business', id: ig_user_id }], retention_seconds: retention_days * 86400 }],
         },
       },
       VIDEO: {
         inclusions: {
           operator: 'or',
-          rules: [{ event_sources: [{ type: 'page', id: `act_${accountId}` }], retention_seconds: retention_days * 86400, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'video_watched' }] } }],
+          rules: [{ event_sources: [{ type: 'page', id: page_id }], retention_seconds: retention_days * 86400, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'video_watched' }] } }],
         },
       },
     };
-    const engRule = engagementRules[engagement_type || 'PAGE'];
+    const engRule = engagementRules[engKind];
     if (engRule) {
       payload.rule = JSON.stringify(engRule);
     }
