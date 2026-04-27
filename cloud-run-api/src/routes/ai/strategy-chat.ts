@@ -953,15 +953,22 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
       const agentData: any = await agentRes.json();
 
       if (agentData.stop_reason === 'tool_use') {
-        // Claude wants to use a tool
-        const toolUseBlock = agentData.content.find((b: any) => b.type === 'tool_use');
-        if (!toolUseBlock) break;
+        // Claude can return MULTIPLE tool_use blocks in one assistant turn.
+        // Each tool_use MUST have a matching tool_result, otherwise Anthropic
+        // returns 400: "messages.X: tool_use ids must have corresponding tool_result".
+        const toolUseBlocks = (agentData.content || []).filter((b: any) => b.type === 'tool_use');
+        if (toolUseBlocks.length === 0) break;
 
         toolCallCount++;
-        let toolResult = '';
-        console.log(`[EST] Tool call #${toolCallCount}: ${toolUseBlock.name}(${JSON.stringify(toolUseBlock.input).slice(0, 100)})`);
+        console.log(`[EST] Turn #${toolCallCount}: ${toolUseBlocks.length} tool call(s) — ${toolUseBlocks.map((b: any) => b.name).join(', ')}`);
 
-        switch (toolUseBlock.name) {
+        // Execute all tool_use blocks and collect their results
+        const toolResultsArr: Array<{ type: 'tool_result'; tool_use_id: string; content: string }> = [];
+        for (const toolUseBlock of toolUseBlocks) {
+          let toolResult = '';
+          console.log(`[EST]   → ${toolUseBlock.name}(${JSON.stringify(toolUseBlock.input).slice(0, 100)})`);
+
+          switch (toolUseBlock.name) {
           case 'buscar_youtube': {
             const query = toolUseBlock.input.query;
             try {
@@ -1068,11 +1075,14 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
 
           default:
             toolResult = 'Herramienta no reconocida.';
+          }
+
+          toolResultsArr.push({ type: 'tool_result', tool_use_id: toolUseBlock.id, content: toolResult });
         }
 
-        // Add assistant message with tool use and tool result to conversation
+        // Add assistant message with all tool_use blocks AND user message with ALL matching tool_results
         agentMessages.push({ role: 'assistant', content: agentData.content });
-        agentMessages.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUseBlock.id, content: toolResult }] });
+        agentMessages.push({ role: 'user', content: toolResultsArr });
 
       } else {
         // Claude is done — extract text response
