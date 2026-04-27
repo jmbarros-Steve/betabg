@@ -42,6 +42,7 @@ import {
   Video,
   Mail,
   AlertCircle,
+  AlertTriangle,
   Info,
   RefreshCw,
 } from 'lucide-react';
@@ -976,6 +977,22 @@ function CreateLookalikeDialog({
             </p>
           </div>
 
+          {/* M3: warn if origin audience < 100 — Meta minimum to compute LAL */}
+          {(() => {
+            const origin = customAudiences.find((a) => a.id === formData.source_audience_id);
+            const tooSmall = origin && origin.size > 0 && origin.size < 100;
+            if (!tooSmall) return null;
+            return (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-300">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-red-800">
+                  <p className="font-semibold">Esta audiencia tiene {formatNumber(origin.size)} personas, mínimo Meta requiere 100.</p>
+                  <p className="mt-0.5">El lookalike fallará al crearse. Aumentá el tamaño de la audiencia de origen primero (más datos del pixel, lista de clientes más grande, etc.).</p>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Info note */}
           <div className="flex items-start gap-2 p-3 rounded-lg bg-[#1E3A7B]/5 border border-[#2A4F9E]/20">
             <Info className="w-4 h-4 text-[#2A4F9E] shrink-0 mt-0.5" />
@@ -995,19 +1012,25 @@ function CreateLookalikeDialog({
           >
             Cancelar
           </Button>
-          <Button
-            onClick={onSubmit}
-            disabled={submitting || !formData.source_audience_id}
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Creando...
-              </>
-            ) : (
-              'Crear Lookalike'
-            )}
-          </Button>
+          {(() => {
+            const origin = customAudiences.find((a) => a.id === formData.source_audience_id);
+            const tooSmall = origin && origin.size > 0 && origin.size < 100;
+            return (
+              <Button
+                onClick={onSubmit}
+                disabled={submitting || !formData.source_audience_id || !!tooSmall}
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  'Crear Lookalike'
+                )}
+              </Button>
+            );
+          })()}
         </DialogFooter>
       </DialogContent>
     </Dialog>
