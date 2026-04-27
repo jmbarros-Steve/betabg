@@ -142,6 +142,7 @@ import { waStatusCallback } from './whatsapp/status-callback.js';
 // Cron
 import { syncAllMetrics } from './cron/sync-all-metrics.js';
 import { syncShopifyProducts } from './cron/sync-shopify-products.js';
+import { syncShopifyOrders } from './cron/sync-shopify-orders.js';
 import { errorBudgetCalculator } from './cron/error-budget-calculator.js';
 import { reconciliation } from './cron/reconciliation.js';
 import { ruleCalibrator } from './cron/rule-calibrator.js';
@@ -605,6 +606,7 @@ export function registerRoutes(app: Hono) {
   cron.post('/abandoned-cart-wa', abandonedCartWA);
   cron.post('/sync-all-metrics', syncAllMetrics);
   cron.post('/sync-shopify-products', syncShopifyProducts);
+  cron.post('/sync-shopify-orders', syncShopifyOrders);
   cron.post('/sync-all-abandoned-checkouts', syncAllAbandonedCheckouts);
   cron.post('/changelog-watcher', apiChangelogWatcher);
   cron.post('/error-budget-calculator', errorBudgetCalculator);
