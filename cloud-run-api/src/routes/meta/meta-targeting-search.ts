@@ -97,9 +97,12 @@ export async function metaTargetingSearch(c: Context) {
     let results: any[] = [];
 
     if (search_type === 'interests') {
-      // Search for interests, behaviors, and demographics
-      const url = new URL(`${META_API_BASE}/act_${accountId}/targetingsearch`);
-      
+      // Search for interests, behaviors, and demographics.
+      // v22+ deprecated the act-scoped endpoint /act_{id}/targetingsearch;
+      // the supported endpoint is /search?type=adinterest. We keep the same
+      // response shape so the frontend doesn't need to change.
+      const url = new URL(`${META_API_BASE}/search`);
+
       url.searchParams.set('q', query);
       url.searchParams.set('type', 'adinterest');
       url.searchParams.set('limit', '15');
