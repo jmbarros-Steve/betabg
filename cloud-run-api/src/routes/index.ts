@@ -67,6 +67,7 @@ import { generateProductDescription } from './shopify/generate-product-descripti
 import { computeCrossSell } from './shopify/compute-cross-sell.js';
 import { collectionRevenue } from './shopify/collection-revenue.js';
 import { createShopifyCombo } from './shopify/create-shopify-combo.js';
+import { generateShopifyReport, listShopifyReports } from './shopify/generate-shopify-report.js';
 
 // Phase 3: Google
 import { syncGoogleAdsMetrics } from './google/sync-google-ads-metrics.js';
@@ -452,6 +453,8 @@ export function registerRoutes(app: Hono) {
   app.post('/api/fetch-shopify-customers', authMiddleware, fetchShopifyCustomers);
   app.post('/api/update-shopify-product', authMiddleware, updateShopifyProduct);
   app.post('/api/generate-product-description', authMiddleware, generateProductDescription);
+  app.post('/api/generate-shopify-report', authMiddleware, generateShopifyReport);
+  app.post('/api/shopify-reports', authMiddleware, listShopifyReports);
   app.post('/api/compute-cross-sell', authMiddleware, computeCrossSell);
   app.post('/api/collection-revenue', authMiddleware, collectionRevenue);
   app.post('/api/create-shopify-combo', authMiddleware, createShopifyCombo);

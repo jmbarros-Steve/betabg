@@ -19,6 +19,7 @@ import { ShopifyProductsPanel } from './ShopifyProductsPanel';
 import { ShopifyOrdersPanel } from './ShopifyOrdersPanel';
 import { ShopifyDiscountsPanel } from './ShopifyDiscountsPanel';
 import { ShopifyCustomersPanel } from './ShopifyCustomersPanel';
+import { GenerateReportDialog } from './GenerateReportDialog';
 import { ChartSkeleton, TableSkeleton } from './metrics/MetricsSkeleton';
 import { WeeklyReportCard } from '../dashboard/WeeklyReportCard';
 import { Coachmark } from '@/components/client-portal/Coachmark';
@@ -59,6 +60,7 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [hasConnection, setHasConnection] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [skuData, setSkuData] = useState<SkuData[]>([]);
   const [abandonedCarts, setAbandonedCarts] = useState<AbandonedCart[]>([]);
   const [salesByChannel, setSalesByChannel] = useState<ChannelData[]>([]);
@@ -249,8 +251,18 @@ export function ShopifyDashboard({ clientId }: ShopifyDashboardProps) {
             <RefreshCw className="w-4 h-4 mr-1" />
             Actualizar
           </Button>
+          <Button size="sm" onClick={() => setReportDialogOpen(true)} aria-label="Generar informe PDF">
+            <FileText className="w-4 h-4 mr-1" />
+            Generar Informe
+          </Button>
         </div>
       </div>
+
+      <GenerateReportDialog
+        open={reportDialogOpen}
+        onOpenChange={setReportDialogOpen}
+        clientId={clientId}
+      />
 
       {/* KPI Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
