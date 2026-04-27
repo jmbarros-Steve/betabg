@@ -48,7 +48,9 @@ import {
   Trash2,
   SlidersHorizontal,
   Zap,
+  Music,
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { useMetaBusiness } from './MetaBusinessContext';
@@ -1844,6 +1846,12 @@ function AdFormMultiSlot({
   // Brief Estudio — Etapa 5: pasar al backend de generación.
   isStudioMode: studioMode = false,
   studioMoodKey = null,
+  // Etapa 5+: overrides de audio por ad (voz/música) y assets para la UI
+  studioAssets = null,
+  effectiveUseVoice = false,
+  effectiveUseMusic = false,
+  onChangeOverrideUseVoice,
+  onChangeOverrideUseMusic,
 }: {
   clientId: string;
   adSetFormat: AdSetFormat;
@@ -1865,6 +1873,17 @@ function AdFormMultiSlot({
   dpaSampleProduct?: { title: string; image_url: string | null; price: string | null; brand: string | null; description: string | null } | null;
   isStudioMode?: boolean;
   studioMoodKey?: string | null;
+  studioAssets?: {
+    studio_ready: boolean;
+    actors: Array<{ id: string; source: string; name: string | null; reference_images: string[]; persona_tags: string[]; is_primary: boolean }>;
+    voice: { id: string; source: string; voice_id: string | null; sample_url: string | null; preset_key: string | null } | null;
+    featured_products: Array<{ id: string; shopify_product_id: string; priority: number }>;
+    music: { moods: string[]; keywords: string | null } | null;
+  } | null;
+  effectiveUseVoice?: boolean;
+  effectiveUseMusic?: boolean;
+  onChangeOverrideUseVoice?: (v: boolean) => void;
+  onChangeOverrideUseMusic?: (v: boolean) => void;
 }) {
   // Engine + template selection are 100% backend-side. `angulo` + `funnelStage`
   // are sent with every generate-video call; the backend picks cinematic-silent
@@ -2340,6 +2359,68 @@ function AdFormMultiSlot({
               <Sparkles className="w-3 h-3 inline mr-1 text-green-600" />
               <strong>Video IA</strong> — Steve genera un video {estVideoCost === 50 ? 'cinematográfico de producto' : 'con audio nativo'} optimizado para tu ángulo. {estVideoCost} créditos por video, 1-3 min.
             </div>
+
+            {/* Audio override por ad — solo en Modo Estudio + format video.
+                Permite apagar voz/música para ESTE video sin tocar la config
+                global del Estudio Creativo. Si ningún canal de audio está
+                configurado en el Estudio (no hay voz Y no hay moods), escondemos
+                la card entera para no agregar ruido. */}
+            {studioMode && (
+              (Boolean(studioAssets?.voice && studioAssets.voice.source !== 'none')) ||
+              (Boolean(studioAssets?.music?.moods?.length))
+            ) && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
+                <div className="text-sm font-semibold flex items-center gap-2">
+                  <Music className="w-4 h-4" /> Audio del video
+                </div>
+
+                {/* Toggle voz */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1">
+                    <Label className="text-sm cursor-pointer">
+                      Usar voz en este video
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {studioAssets?.voice?.source === 'xtts_cloned' && 'Tu voz clonada'}
+                      {studioAssets?.voice?.source === 'preset' && `Voz preset: ${studioAssets.voice.preset_key}`}
+                      {(!studioAssets?.voice || studioAssets.voice.source === 'none') && 'Sin voz configurada en el Estudio'}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={effectiveUseVoice}
+                    disabled={!studioAssets?.voice || studioAssets.voice.source === 'none'}
+                    onCheckedChange={(v) => onChangeOverrideUseVoice?.(v)}
+                  />
+                </div>
+
+                {/* Toggle música */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1">
+                    <Label className="text-sm cursor-pointer">
+                      Usar música de fondo
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {studioAssets?.music?.moods?.length
+                        ? `Mood: ${studioAssets.music.moods.join(', ')}`
+                        : 'Sin moods configurados en el Estudio'}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={effectiveUseMusic}
+                    disabled={!studioAssets?.music?.moods?.length}
+                    onCheckedChange={(v) => onChangeOverrideUseMusic?.(v)}
+                  />
+                </div>
+
+                {/* Hint si ambos OFF */}
+                {!effectiveUseVoice && !effectiveUseMusic && (
+                  <p className="text-xs text-amber-600">
+                    ⚠️ Ambos apagados — el video va a quedar 100% silencioso
+                  </p>
+                )}
+              </div>
+            )}
+
             <Button
               onClick={async () => {
                 // Either use the user's prompt or let the backend get a brief-built
@@ -2417,6 +2498,9 @@ function AdFormMultiSlot({
                       // Brief Estudio — Etapa 5
                       studio_mode: studioMode || undefined,
                       mood_key: studioMode ? studioMoodKey || undefined : undefined,
+                      // Etapa 5+: override de audio por ad
+                      use_voice: studioMode ? effectiveUseVoice : undefined,
+                      use_music: studioMode ? effectiveUseMusic : undefined,
                     },
                     timeoutMs: 300_000,
                   });
@@ -4161,6 +4245,23 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   // Mood key: primer mood configurado por el cliente en Brief Estudio.
   const studioMoodKey = studioAssets?.music?.moods?.[0] || null;
 
+  // ═══════════ Audio override por anuncio (Etapa 5+) ═══════════
+  // Cuando isStudioMode=true y el cliente está creando un VIDEO, le damos la
+  // chance de apagar voz/música SOLO para este ad puntual sin tocar la config
+  // global del Estudio Creativo. Defaults: vienen del Estudio (ON si está
+  // configurado, OFF si source==='none' o moods===[]). null = "usar default".
+  const defaultUseVoice = Boolean(
+    studioAssets?.voice && studioAssets.voice.source !== 'none'
+  );
+  const defaultUseMusic = Boolean(
+    studioAssets?.music?.moods && studioAssets.music.moods.length > 0
+  );
+  const [overrideUseVoice, setOverrideUseVoice] = useState<boolean | null>(null);
+  const [overrideUseMusic, setOverrideUseMusic] = useState<boolean | null>(null);
+  // Si hay override explícito, usarlo. Si null → default del Estudio.
+  const effectiveUseVoice = overrideUseVoice ?? defaultUseVoice;
+  const effectiveUseMusic = overrideUseMusic ?? defaultUseMusic;
+
   // Productos destacados hidratados (título/imagen) — se cargan bajo demanda
   // cuando el wizard llega a CreativeFocusStep. Lazy para no golpear Shopify
   // en clientes que no abren el wizard.
@@ -4840,6 +4941,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                 // Brief Estudio — Etapa 5
                 studio_mode: isStudioMode || undefined,
                 mood_key: isStudioMode ? studioMoodKey || undefined : undefined,
+                // Etapa 5+: override de audio por ad
+                use_voice: isStudioMode ? effectiveUseVoice : undefined,
+                use_music: isStudioMode ? effectiveUseMusic : undefined,
               },
               timeoutMs: 300_000,
             });
@@ -5849,6 +5953,11 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                     selectedProduct={selectedProduct}
                     isStudioMode={isStudioMode}
                     studioMoodKey={studioMoodKey}
+                    studioAssets={studioAssets}
+                    effectiveUseVoice={effectiveUseVoice}
+                    effectiveUseMusic={effectiveUseMusic}
+                    onChangeOverrideUseVoice={setOverrideUseVoice}
+                    onChangeOverrideUseMusic={setOverrideUseMusic}
                   />
                   {(primaryTexts[0] || headlines[0] || images[0]) && (
                     <PreviewPanel
