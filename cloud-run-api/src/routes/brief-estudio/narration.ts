@@ -31,7 +31,6 @@ import {
   extractVoiceTone,
   XTTS_V2_MODEL,
   XTTS_V2_VERSION,
-  VOICE_PRESETS,
   type VoiceTone,
 } from './index.js';
 
@@ -42,6 +41,30 @@ import {
 // Cap script length to keep XTTS predictable (~10s read at native pace).
 const MAX_SCRIPT_CHARS = 200;
 const MAX_SCRIPT_WORDS = 25;
+
+// ---------------------------------------------------------------------------
+// ElevenLabs preset voices
+// ---------------------------------------------------------------------------
+// Cuando voice_source='preset', usamos ElevenLabs en lugar de XTTS porque:
+//   1. XTTS necesita un sample y los .mp3 de presets nunca se subieron
+//      (eran tarea pendiente manual desde el sprint inicial).
+//   2. ElevenLabs tiene voces premade pro multilingual_v2 que rinden en
+//      español y suenan claramente mejor que XTTS para voces no clonadas.
+//   3. La voz clonada del cliente sigue por XTTS (más barato + ya integrado).
+//
+// API key en env var ELEVENLABS_API_KEY. Modelo `eleven_multilingual_v2`
+// para mejor calidad ES; cambiar a `eleven_turbo_v2_5` si la latencia
+// se vuelve problema (sacrifica un poco de calidad).
+const ELEVENLABS_VOICE_IDS: Record<string, string> = {
+  // Multilingual V2 voices que rinden bien en español:
+  masculine_premium: 'ErXwobaYiN019PkySvjV',   // "Antoni" — narrative, deep, premium
+  feminine_warm: '21m00Tcm4TlvDq8ikWAM',        // "Rachel" — warm, conversational
+  masculine_energetic: 'TxGEqnHWrfWFTfGW9XjX',  // "Josh" — clear, energetic young
+  feminine_neutral: 'EXAVITQu4vr4xnSDxMaL',     // "Bella" — neutral professional
+};
+
+const ELEVENLABS_MODEL_ID = 'eleven_multilingual_v2';
+const ELEVENLABS_API = 'https://api.elevenlabs.io/v1';
 
 // Approx ~3 words/sec at conversational Spanish pace. Used as a sanity
 // estimate so the FFmpeg merge can clip music to roughly the audio length.
@@ -288,10 +311,66 @@ export async function generateNarrationAudioFile(
 
   const supabase = getSupabaseAdmin();
 
-  // Resolve speaker URL.
-  let speakerUrl: string | null = input.speaker_override?.trim() || null;
-  if (!speakerUrl) {
-    if (input.voice_source === 'xtts_cloned') {
+  // Branch por source:
+  //   'preset'      → ElevenLabs (voces premade pro, no requiere sample)
+  //   'xtts_cloned' → XTTS-v2 con sample del cliente (más barato, ya integrado)
+  let bytes: Uint8Array;
+  let voiceRef: string;  // identificador para cache key
+
+  if (input.voice_source === 'preset') {
+    const presetKey = input.preset_key || 'feminine_warm';
+    const voiceId = ELEVENLABS_VOICE_IDS[presetKey];
+    if (!voiceId) {
+      throw new Error(`Unknown preset_key: ${presetKey}`);
+    }
+
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    if (!apiKey) {
+      throw new Error('ELEVENLABS_API_KEY not configured in Cloud Run env');
+    }
+
+    voiceRef = `elevenlabs:${voiceId}`;
+
+    let resp: Response;
+    try {
+      resp = await fetch(`${ELEVENLABS_API}/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
+        method: 'POST',
+        signal: AbortSignal.timeout(60_000),
+        headers: {
+          'xi-api-key': apiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'audio/mpeg',
+        },
+        body: JSON.stringify({
+          text: script,
+          model_id: ELEVENLABS_MODEL_ID,
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75,
+            style: 0.3,
+            use_speaker_boost: true,
+          },
+        }),
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`ElevenLabs TTS request failed: ${msg.slice(0, 200)}`);
+    }
+
+    if (!resp.ok) {
+      const errBody = await resp.text();
+      throw new Error(`ElevenLabs ${resp.status}: ${errBody.slice(0, 300)}`);
+    }
+
+    const buf = await resp.arrayBuffer();
+    bytes = new Uint8Array(buf);
+    if (bytes.length < 1000) {
+      throw new Error(`ElevenLabs returned suspiciously small audio: ${bytes.length} bytes`);
+    }
+  } else {
+    // xtts_cloned: usar sample del cliente con XTTS-v2
+    let speakerUrl: string | null = input.speaker_override?.trim() || null;
+    if (!speakerUrl) {
       const voice = await safeQuerySingleOrDefault<{ sample_url: string | null }>(
         supabase
           .from('brand_voices')
@@ -305,72 +384,61 @@ export async function generateNarrationAudioFile(
         'narration.audio.brandVoice',
       );
       speakerUrl = voice?.sample_url || null;
-    } else {
-      // preset
-      const preset = input.preset_key ? VOICE_PRESETS[input.preset_key] : null;
-      if (preset) {
-        const { data } = supabase.storage
-          .from('client-assets')
-          .getPublicUrl(preset.storagePath);
-        speakerUrl = data.publicUrl;
+    }
+
+    if (!speakerUrl) {
+      throw new Error(`No XTTS speaker sample for client ${clientId} (graba tu voz en el Estudio Creativo)`);
+    }
+
+    voiceRef = `xtts:${speakerUrl}`;
+
+    let predictionOutput: string | string[];
+    try {
+      predictionOutput = await runReplicatePrediction<
+        Record<string, unknown>,
+        string | string[]
+      >({
+        model: XTTS_V2_MODEL,
+        version: XTTS_V2_VERSION,
+        input: {
+          text: script,
+          speaker: speakerUrl,
+          language: 'es',
+        },
+        timeoutMs: 180_000,
+        preferWaitSeconds: 55,
+      });
+    } catch (err) {
+      if (err instanceof ReplicateError) {
+        throw new Error(`XTTS narration failed: ${err.message.slice(0, 220)}`);
       }
+      throw err;
     }
-  }
 
-  if (!speakerUrl) {
-    throw new Error(
-      `No speaker reference available for voice_source='${input.voice_source}' (preset_key=${input.preset_key ?? 'null'})`,
-    );
-  }
-
-  // XTTS-v2 input. Same shape used in clone-voice.
-  let predictionOutput: string | string[];
-  try {
-    predictionOutput = await runReplicatePrediction<
-      Record<string, unknown>,
-      string | string[]
-    >({
-      model: XTTS_V2_MODEL,
-      version: XTTS_V2_VERSION,
-      input: {
-        text: script,
-        speaker: speakerUrl,
-        language: 'es',
-      },
-      timeoutMs: 180_000,
-      preferWaitSeconds: 55,
-    });
-  } catch (err) {
-    if (err instanceof ReplicateError) {
-      throw new Error(`XTTS narration failed: ${err.message.slice(0, 220)}`);
+    const audioSourceUrl =
+      typeof predictionOutput === 'string'
+        ? predictionOutput
+        : Array.isArray(predictionOutput)
+          ? predictionOutput[0]
+          : null;
+    if (!audioSourceUrl) {
+      throw new Error('XTTS completed but returned no audio URL');
     }
-    throw err;
+
+    const downloaded = await downloadToBytes(audioSourceUrl, 60_000);
+    if (!downloaded) throw new Error('Failed to download XTTS narration mp3');
+    bytes = downloaded;
   }
 
-  const audioSourceUrl =
-    typeof predictionOutput === 'string'
-      ? predictionOutput
-      : Array.isArray(predictionOutput)
-        ? predictionOutput[0]
-        : null;
-  if (!audioSourceUrl) {
-    throw new Error('XTTS completed but returned no audio URL');
-  }
-
-  const bytes = await downloadToBytes(audioSourceUrl, 60_000);
-  if (!bytes) throw new Error('Failed to download XTTS narration mp3');
-
-  // Cache key: hash of script + voice ref so re-running with same input reuses.
+  // Cache key común para ambos paths.
   const hash = createHash('sha1')
-    .update(`${clientId}|${speakerUrl}|${script}`)
+    .update(`${clientId}|${voiceRef}|${script}`)
     .digest('hex')
     .slice(0, 16);
   const path = `brand-voices/${clientId}/narration-${hash}.mp3`;
 
   const audioUrl = await uploadToClientAssets(path, bytes, 'audio/mpeg', true);
 
-  // Estimate duration from word count (XTTS exact duration would require
-  // probing the file with FFmpeg; this is good enough for music clipping).
   const words = countWords(script);
   const duration_sec = Math.max(2, Math.round(words / APPROX_WORDS_PER_SEC));
 
