@@ -61,6 +61,8 @@ import DynamicSteveTip from './wizard/DynamicSteveTip';
 import CampaignSelector from './wizard/CampaignSelector';
 import AdSetSelector from './wizard/AdSetSelector';
 import ReviewStep from './wizard/ReviewStep';
+import { AudioOverrideDialog } from './AudioOverrideDialog';
+import { useAudioOverridesDialog } from './useAudioOverridesDialog';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1852,6 +1854,11 @@ function AdFormMultiSlot({
   effectiveUseMusic = false,
   onChangeOverrideUseVoice,
   onChangeOverrideUseMusic,
+  // Etapa 5+: dialog de audio por ad — aparece antes de cualquier generate-video
+  // cuando isStudioMode=true. Si null, no se intercepta.
+  askForAudioOverrides,
+  defaultUseVoice = false,
+  defaultUseMusic = false,
 }: {
   clientId: string;
   adSetFormat: AdSetFormat;
@@ -1884,6 +1891,9 @@ function AdFormMultiSlot({
   effectiveUseMusic?: boolean;
   onChangeOverrideUseVoice?: (v: boolean) => void;
   onChangeOverrideUseMusic?: (v: boolean) => void;
+  askForAudioOverrides?: (defaults: { useVoice: boolean; useMusic: boolean }) => Promise<{ useVoice: boolean; useMusic: boolean } | null>;
+  defaultUseVoice?: boolean;
+  defaultUseMusic?: boolean;
 }) {
   // Engine + template selection are 100% backend-side. `angulo` + `funnelStage`
   // are sent with every generate-video call; the backend picks cinematic-silent
@@ -2478,6 +2488,22 @@ function AdFormMultiSlot({
                     return;
                   }
 
+                  // Audio override por ad — abre dialog (o usa preferencia de
+                  // sesión) cuando isStudioMode=true. Si user cancela, abortamos
+                  // sin descontar créditos. Si no es studio mode, seguimos con
+                  // el flow legacy (sin flags use_voice/use_music).
+                  let audioFlags: { useVoice: boolean; useMusic: boolean } | null = null;
+                  if (studioMode && askForAudioOverrides) {
+                    audioFlags = await askForAudioOverrides({
+                      useVoice: defaultUseVoice,
+                      useMusic: defaultUseMusic,
+                    });
+                    if (audioFlags === null) {
+                      setGeneratingImage(false);
+                      return;
+                    }
+                  }
+
                   // Build the reference image array. Single selected product = 1 ref;
                   // backend auto-augments with Shopify catalog if we send nothing.
                   const fotoBaseUrls = focusType === 'product' && selectedProduct?.image
@@ -2498,9 +2524,11 @@ function AdFormMultiSlot({
                       // Brief Estudio — Etapa 5
                       studio_mode: studioMode || undefined,
                       mood_key: studioMode ? studioMoodKey || undefined : undefined,
-                      // Etapa 5+: override de audio por ad
-                      use_voice: studioMode ? effectiveUseVoice : undefined,
-                      use_music: studioMode ? effectiveUseMusic : undefined,
+                      // Etapa 5+: override de audio por ad — viene del dialog
+                      // si está disponible, si no fallback al toggle local
+                      // del tab "AI Video" (effectiveUseVoice/Music).
+                      use_voice: studioMode ? (audioFlags?.useVoice ?? effectiveUseVoice) : undefined,
+                      use_music: studioMode ? (audioFlags?.useMusic ?? effectiveUseMusic) : undefined,
                     },
                     timeoutMs: 300_000,
                   });
@@ -4262,6 +4290,18 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const effectiveUseVoice = overrideUseVoice ?? defaultUseVoice;
   const effectiveUseMusic = overrideUseMusic ?? defaultUseMusic;
 
+  // Dialog de audio per-ad: aparece SIEMPRE antes de cualquier generate-video
+  // cuando isStudioMode=true (single, carrusel, DCT, atajo "Steve arme todo").
+  // Si no hay nada de audio configurado en el Estudio, el hook resuelve sin abrir.
+  // Si el cliente tildó "no volver a preguntar" en esta sesión, usa la preferencia
+  // cacheada en sessionStorage por client_id.
+  const {
+    open: audioDialogOpen,
+    askForOverrides: askForAudioOverrides,
+    handleConfirm: handleAudioConfirm,
+    handleCancel: handleAudioCancel,
+  } = useAudioOverridesDialog(clientId);
+
   // Productos destacados hidratados (título/imagen) — se cargan bajo demanda
   // cuando el wizard llega a CreativeFocusStep. Lazy para no golpear Shopify
   // en clientes que no abren el wizard.
@@ -4879,6 +4919,24 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           }
         }
 
+        // Etapa 5+: si va a generar videos en modo Estudio, preguntar UNA vez
+        // por las overrides de audio (voz/música) antes del loop. El usuario
+        // puede tildar "no volver a preguntar" para reusar la preferencia en
+        // los próximos videos de esta sesión.
+        let autoGenAudioFlags: { useVoice: boolean; useMusic: boolean } | null = null;
+        if (wantVideo && isStudioMode) {
+          autoGenAudioFlags = await askForAudioOverrides({
+            useVoice: defaultUseVoice,
+            useMusic: defaultUseMusic,
+          });
+          if (autoGenAudioFlags === null) {
+            // Usuario canceló — abortar auto-gen sin descontar créditos
+            setAutoGenerating(false);
+            setAutoGenProgress('');
+            return;
+          }
+        }
+
         for (let slot = 0; slot < imageCount; slot++) {
           const composition = pickComposition(slot);
           const variacionElegida = {
@@ -4941,9 +4999,11 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                 // Brief Estudio — Etapa 5
                 studio_mode: isStudioMode || undefined,
                 mood_key: isStudioMode ? studioMoodKey || undefined : undefined,
-                // Etapa 5+: override de audio por ad
-                use_voice: isStudioMode ? effectiveUseVoice : undefined,
-                use_music: isStudioMode ? effectiveUseMusic : undefined,
+                // Etapa 5+: override de audio por ad — viene del dialog
+                // que se abrió UNA vez antes del loop (autoGenAudioFlags).
+                // Fallback al toggle local si no hay flags del dialog.
+                use_voice: isStudioMode ? (autoGenAudioFlags?.useVoice ?? effectiveUseVoice) : undefined,
+                use_music: isStudioMode ? (autoGenAudioFlags?.useMusic ?? effectiveUseMusic) : undefined,
               },
               timeoutMs: 300_000,
             });
@@ -5958,6 +6018,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
                     effectiveUseMusic={effectiveUseMusic}
                     onChangeOverrideUseVoice={setOverrideUseVoice}
                     onChangeOverrideUseMusic={setOverrideUseMusic}
+                    askForAudioOverrides={askForAudioOverrides}
+                    defaultUseVoice={defaultUseVoice}
+                    defaultUseMusic={defaultUseMusic}
                   />
                   {(primaryTexts[0] || headlines[0] || images[0]) && (
                     <PreviewPanel
@@ -6181,6 +6244,19 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           </div>
         </>
       )}
+
+      {/* Audio override dialog — aparece antes de cualquier generate-video
+          cuando isStudioMode=true (single, carrusel, DCT, atajo Steve).
+          NO afecta la config global del Estudio Creativo. */}
+      <AudioOverrideDialog
+        open={audioDialogOpen}
+        onClose={handleAudioCancel}
+        onConfirm={handleAudioConfirm}
+        voice={studioAssets?.voice ?? null}
+        music={studioAssets?.music ?? null}
+        defaultUseVoice={defaultUseVoice}
+        defaultUseMusic={defaultUseMusic}
+      />
 
       {/* Leave confirmation dialog */}
       <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
