@@ -224,6 +224,8 @@ async function handleCreateLookalike(
     source_audience_id,
     country,
     ratio = 0.01,
+    starting_ratio,
+    end_ratio,
   } = data;
 
   if (!name) {
@@ -243,13 +245,76 @@ async function handleCreateLookalike(
     return { body: { error: 'ratio must be between 0.01 and 0.20 (1% to 20%)' }, status: 400 };
   }
 
-  const lookalikeSpec = JSON.stringify({
+  // Validate optional starting_ratio / end_ratio (used for "expanded" lookalikes
+  // like 1-3% / 3-5%). Both must be in [0, 0.20] and starting < end.
+  let numStartingRatio: number | null = null;
+  let numEndRatio: number | null = null;
+  if (starting_ratio !== undefined || end_ratio !== undefined) {
+    if (starting_ratio === undefined || end_ratio === undefined) {
+      return { body: { error: 'starting_ratio and end_ratio must be provided together' }, status: 400 };
+    }
+    numStartingRatio = Number(starting_ratio);
+    numEndRatio = Number(end_ratio);
+    if (
+      isNaN(numStartingRatio) || isNaN(numEndRatio) ||
+      numStartingRatio < 0 || numStartingRatio > 0.20 ||
+      numEndRatio <= numStartingRatio || numEndRatio > 0.20
+    ) {
+      return { body: { error: 'starting_ratio/end_ratio must be in [0, 0.20] and starting < end' }, status: 400 };
+    }
+  }
+
+  // Pre-flight: Meta requires the source audience to have at least 100 people.
+  // Hit the audience endpoint and read approximate_count first so we fail
+  // fast with a clear error instead of letting Meta reject the POST with a
+  // generic message.
+  const sourceCheck = await metaApiRequest(
+    String(source_audience_id),
+    accessToken,
+    'GET',
+    { fields: 'approximate_count,approximate_count_lower_bound,approximate_count_upper_bound,name' }
+  );
+
+  if (!sourceCheck.ok) {
+    return {
+      body: {
+        error: 'No se pudo leer la audiencia origen',
+        details: sourceCheck.error,
+      },
+      status: 502,
+    };
+  }
+
+  const approxCount = Number(
+    sourceCheck.data?.approximate_count ??
+    sourceCheck.data?.approximate_count_lower_bound ??
+    0
+  );
+
+  if (!Number.isFinite(approxCount) || approxCount < 100) {
+    return {
+      body: {
+        error: 'Audiencia origen tiene menos de 100 personas. Mínimo Meta requiere 100.',
+        count: approxCount,
+        source_audience_id,
+      },
+      status: 400,
+    };
+  }
+
+  const lookalikeSpecObj: Record<string, any> = {
     type: 'similarity',
     country,
     ratio: numRatio,
-  });
+  };
+  if (numStartingRatio !== null && numEndRatio !== null) {
+    lookalikeSpecObj.starting_ratio = numStartingRatio;
+    lookalikeSpecObj.ratio = numEndRatio; // when expanded, ratio = end_ratio
+    delete lookalikeSpecObj.type; // expanded lookalikes don't take "similarity"
+  }
+  const lookalikeSpec = JSON.stringify(lookalikeSpecObj);
 
-  console.log(`[manage-meta-audiences] Creating lookalike audience "${name}" from source ${source_audience_id} for account ${accountId}`);
+  console.log(`[manage-meta-audiences] Creating lookalike audience "${name}" from source ${source_audience_id} (count=${approxCount}) for account ${accountId}`);
 
   const result = await metaApiRequest(
     `act_${accountId}/customaudiences`,
@@ -278,6 +343,9 @@ async function handleCreateLookalike(
       source_audience_id,
       country,
       ratio,
+      starting_ratio: numStartingRatio,
+      end_ratio: numEndRatio,
+      source_count: approxCount,
     },
     status: 200
   };
