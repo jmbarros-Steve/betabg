@@ -32,21 +32,19 @@ async function launchBrowser() {
   const puppeteer = await import(/* webpackIgnore: true */ 'puppeteer' as string) as any;
   const launcher = puppeteer.default || puppeteer;
   // Per-launch unique user data dir under /tmp (writable for non-root).
-  // Chromium's crashpad helper requires a writable --user-data-dir, otherwise
-  // it spawns chrome_crashpad_handler without --database and crashes.
   const userDataDir = `/tmp/chrome-${process.pid}-${Date.now()}`;
   return launcher.launch({
-    headless: true,
+    // Use legacy "shell" headless mode — does NOT spawn chrome_crashpad_handler
+    // and therefore avoids the "--database is required" crash on Cloud Run.
+    headless: 'shell',
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
+      '--no-crashpad',
       '--disable-breakpad',
-      '--disable-crash-reporter',
-      '--no-crash-upload',
       `--user-data-dir=${userDataDir}`,
-      '--disable-features=Crashpad,CrashpadReporter',
       '--no-first-run',
       '--disable-extensions',
       '--disable-background-networking',
