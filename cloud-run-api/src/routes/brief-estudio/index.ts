@@ -582,7 +582,11 @@ function extractMusicMoods(
 // Replicate models. Kept as constants so they are easy to bump when we upgrade.
 const FLUX_ACTORS_MODEL = 'black-forest-labs/flux-1.1-pro-ultra';
 // XTTS-v2 hosted on Replicate by @lucataco — voice cloning from a single sample.
+// Es community model → requiere version hash explícito (sin él, /v1/models/.../
+// predictions devuelve HTTP 404 igual que MusicGen y Kling). Pineamos la versión
+// estable conocida; si Replicate la deprecara, actualizar acá.
 export const XTTS_V2_MODEL = 'lucataco/xtts-v2';
+export const XTTS_V2_VERSION = '684bc3855b37866c0c65add2ff39c78f3dea3f4ff103a436465326e0f438d55e';
 
 // Costs. 1 credit = $0.01 for simplicity.
 const FLUX_USD_PER_IMAGE = 0.06;
@@ -1486,6 +1490,7 @@ export async function cloneVoice(c: Context) {
         string | string[]
       >({
         model: XTTS_V2_MODEL,
+        version: XTTS_V2_VERSION,
         input: {
           text: XTTS_PREVIEW_TEXT,
           speaker: sampleUrl,

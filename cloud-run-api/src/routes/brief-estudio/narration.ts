@@ -30,6 +30,7 @@ import {
   uploadToClientAssets,
   extractVoiceTone,
   XTTS_V2_MODEL,
+  XTTS_V2_VERSION,
   VOICE_PRESETS,
   type VoiceTone,
 } from './index.js';
@@ -330,6 +331,7 @@ export async function generateNarrationAudioFile(
       string | string[]
     >({
       model: XTTS_V2_MODEL,
+      version: XTTS_V2_VERSION,
       input: {
         text: script,
         speaker: speakerUrl,
