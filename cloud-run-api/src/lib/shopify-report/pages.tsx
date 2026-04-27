@@ -393,7 +393,7 @@ export function RecommendationsPage({ data }: { data: ReportData }) {
     <Page size="LETTER" style={pageStyle.page}>
       <Header shopName={data.client.name} logoUrl={data.client.logo_url} periodStart={data.period.start} periodEnd={data.period.end} />
 
-      <Text style={recsStyles.subtitle}>Sección 03</Text>
+      <Text style={recsStyles.subtitle}>Sección 07</Text>
       <Text style={recsStyles.title}>Recomendaciones Priorizadas</Text>
 
       <Text style={recsStyles.intro}>
@@ -458,7 +458,7 @@ export function NextStepsPage({ data }: { data: ReportData }) {
     <Page size="LETTER" style={pageStyle.page}>
       <Header shopName={data.client.name} logoUrl={data.client.logo_url} periodStart={data.period.start} periodEnd={data.period.end} />
 
-      <Text style={nextStepsStyles.subtitle}>Sección 04</Text>
+      <Text style={nextStepsStyles.subtitle}>Sección 08</Text>
       <Text style={nextStepsStyles.title}>Próximos Pasos</Text>
 
       <Text style={nextStepsStyles.intro}>

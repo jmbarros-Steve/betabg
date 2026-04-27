@@ -8,18 +8,29 @@ import {
   RecommendationsPage,
   NextStepsPage,
 } from './pages.js';
+import {
+  RevenuePage,
+  ProductPage,
+  FunnelPage,
+  MarketingPage,
+} from './pages-sprint2.js';
 import type { ReportData } from './data.js';
 
 /**
- * Sprint 1 — incluye 6 capítulos:
- *   01 Portada
- *   02 Carta del Equipo
- *   03 Resumen Ejecutivo
- *   04 North Star + EERR
- *   13 Recomendaciones
- *   14 Próximos Pasos
+ * Sprint 1 + 2 — 10 páginas:
+ *   00 Portada
+ *   00 Carta del Equipo
+ *   01 Resumen Ejecutivo
+ *   02 North Star + EERR
+ *   03 Revenue Deep Dive          (Sprint 2)
+ *   04 Análisis de Producto       (Sprint 2)
+ *   05 Funnel & Conversión        (Sprint 2)
+ *   06 Marketing Performance      (Sprint 2)
+ *   07 Recomendaciones
+ *   08 Próximos Pasos
  *
- * Sprints siguientes agregan capítulos 5-12 + 15.
+ * Sprint 3 agrega: Cohortes/LTV, Hallazgos AI.
+ * Sprint 4 polish: tipografía custom, anexos, branding final.
  */
 export function ShopifyReportDocument({ data }: { data: ReportData }) {
   return (
@@ -34,6 +45,10 @@ export function ShopifyReportDocument({ data }: { data: ReportData }) {
       <LetterPage data={data} />
       <ExecutiveSummary data={data} />
       <NorthStarPage data={data} />
+      <RevenuePage data={data} />
+      <ProductPage data={data} />
+      <FunnelPage data={data} />
+      <MarketingPage data={data} />
       <RecommendationsPage data={data} />
       <NextStepsPage data={data} />
     </Document>
