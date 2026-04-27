@@ -58,6 +58,7 @@ import { fetchShopifyCollections } from './shopify/fetch-shopify-collections.js'
 import { createShopifyDiscount } from './shopify/create-shopify-discount.js';
 import { shopifySessionValidate } from './shopify/shopify-session-validate.js';
 import { syncShopifyMetrics } from './shopify/sync-shopify-metrics.js';
+import { syncShopifyAbandonedCheckouts, syncAllAbandonedCheckouts } from './shopify/sync-shopify-abandoned-checkouts.js';
 import { fetchShopifyDiscounts } from './shopify/fetch-shopify-discounts.js';
 import { fetchShopifyCustomers } from './shopify/fetch-shopify-customers.js';
 import { updateShopifyProduct } from './shopify/update-shopify-product.js';
@@ -441,6 +442,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/create-shopify-discount', authMiddleware, createShopifyDiscount);
   app.post('/api/shopify-session-validate', shopifySessionValidate); // Uses Shopify session token, no JWT
   app.post('/api/sync-shopify-metrics', authMiddleware, syncShopifyMetrics);
+  app.post('/api/sync-shopify-abandoned-checkouts', authMiddleware, syncShopifyAbandonedCheckouts);
   app.post('/api/fetch-shopify-discounts', authMiddleware, fetchShopifyDiscounts);
   app.post('/api/store-shopify-credentials', authMiddleware, storeShopifyCredentials);
   app.get('/api/shopify/config', shopifyConfig); // Public - returns current SHOPIFY_MODE
@@ -598,6 +600,7 @@ export function registerRoutes(app: Hono) {
   cron.post('/abandoned-cart-wa', abandonedCartWA);
   cron.post('/sync-all-metrics', syncAllMetrics);
   cron.post('/sync-shopify-products', syncShopifyProducts);
+  cron.post('/sync-all-abandoned-checkouts', syncAllAbandonedCheckouts);
   cron.post('/changelog-watcher', apiChangelogWatcher);
   cron.post('/error-budget-calculator', errorBudgetCalculator);
   cron.post('/reconciliation', reconciliation);

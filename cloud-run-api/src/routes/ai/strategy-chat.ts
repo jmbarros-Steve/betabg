@@ -163,6 +163,7 @@ export async function strategyChat(c: Context) {
       { data: creativeHist },
       { data: criterioFailed },
       { data: episodicMem },
+      { data: abandonedCheckouts },
     ] = await Promise.all([
       // 1. Fetch last messages for context
       supabase
@@ -310,6 +311,15 @@ export async function strategyChat(c: Context) {
         .eq('client_id', client_id)
         .order('created_at', { ascending: false })
         .limit(10),
+      // 20. Shopify abandoned checkouts (not converted, last 30d)
+      supabase
+        .from('shopify_abandoned_checkouts')
+        .select('checkout_id, customer_name, customer_email, customer_phone, total_price, currency, line_items, created_at, order_completed, abandoned_checkout_url')
+        .eq('client_id', client_id)
+        .eq('order_completed', false)
+        .gte('created_at', thirtyDaysAgo)
+        .order('created_at', { ascending: false })
+        .limit(20),
     ]);
 
     // Merge client-specific + global knowledge (client first for priority)
@@ -528,6 +538,27 @@ export async function strategyChat(c: Context) {
         criterioContext += `- Regla ${f.rule_id} (${f.entity_type}): valor ${f.actual_value} vs esperado ${f.expected_value}\n`;
         if (f.details && typeof f.details === 'string') criterioContext += `  ${f.details.slice(0, 150)}\n`;
       }
+    }
+
+    // === SHOPIFY ABANDONED CHECKOUTS ===
+    let abandonedContext = '';
+    const abandonedList = abandonedCheckouts || [];
+    if (abandonedList.length > 0) {
+      const totalLost = abandonedList.reduce((acc: number, co: any) => acc + (Number(co.total_price) || 0), 0);
+      const withPhone = abandonedList.filter((co: any) => co.customer_phone).length;
+      const withEmail = abandonedList.filter((co: any) => co.customer_email).length;
+      abandonedContext = `\n🛒 CARRITOS ABANDONADOS SHOPIFY (últimos 30 días, sin completar):\n`;
+      abandonedContext += `- Total: ${abandonedList.length} carritos por $${Math.round(totalLost).toLocaleString()} CLP en revenue PERDIDO/PENDIENTE\n`;
+      abandonedContext += `- Con teléfono (recuperables vía WA): ${withPhone}/${abandonedList.length}\n`;
+      abandonedContext += `- Con email (recuperables vía Klaviyo): ${withEmail}/${abandonedList.length}\n`;
+      abandonedContext += `- Top 5 más recientes:\n`;
+      for (const co of abandonedList.slice(0, 5)) {
+        const items = (co.line_items || []).slice(0, 2).map((li: any) => li.title).join(', ');
+        const date = new Date(co.created_at).toLocaleDateString('es-CL');
+        const contact = co.customer_phone ? '📱' : co.customer_email ? '📧' : '👻';
+        abandonedContext += `  - ${date} ${contact} ${co.customer_name || 'Anónimo'} — $${Math.round(co.total_price).toLocaleString()} CLP (${items || 'productos sin detalle'})\n`;
+      }
+      abandonedContext += `Acción sugerida si hay >5 carritos: recordá al cliente activar flujo de recuperación (WA si tiene phone, Klaviyo si tiene email).\n`;
     }
 
     // === EPISODIC MEMORY ===
@@ -817,7 +848,7 @@ IMPORTANTE — MÉTRICAS Y DATOS:
 🛑 REGLAS ABSOLUTAS DE TRANSPARENCIA SOBRE LOS DATOS (NUNCA romper):
 A. Si abajo aparece "📦 SHOPIFY — VENTAS" o "🛍️ CATÁLOGO SHOPIFY" o el bloque "Conectadas ahora" incluye Shopify → el cliente TIENE Shopify conectado y vos tenés acceso. NUNCA digas "no tengo conectado tu Shopify" ni "no tengo datos de tu tienda" ni "no estoy viendo tu Shopify".
 B. Lo que SÍ tenés de Shopify (cuando hay conexión activa): revenue diario, número de pedidos diarios, ticket promedio, comparaciones 7d/30d/semana/mes, desglose diario 14d, catálogo de productos activos con precio y stock.
-C. Lo que NO tenés de Shopify hoy (decílo así, NO digas "no tengo datos"): sesiones, tasa de conversión (CR), tráfico por fuente, top productos VENDIDOS (solo tenés catálogo por precio, no por unidades vendidas), carritos abandonados (sync no funcionando), tiempo en sitio, bounce rate. Si te piden algo de esta lista, decí "ese dato no se está sincronizando hoy, lo que sí puedo decirte es X" — NUNCA "no estoy conectado".
+C. Lo que NO tenés de Shopify hoy (decílo así, NO digas "no tengo datos"): sesiones, tasa de conversión (CR), tráfico por fuente, top productos VENDIDOS (solo tenés catálogo por precio, no por unidades vendidas), tiempo en sitio, bounce rate. Si te piden algo de esta lista, decí "ese dato no se está sincronizando hoy, lo que sí puedo decirte es X" — NUNCA "no estoy conectado".
 D. Lo mismo aplica a Meta y Google Ads: si el bloque "Conectadas ahora" los lista, tenés acceso. Spend, impressions, clicks, conversions, ROAS y campañas individuales están en CAMPAÑAS abajo.
 E. Si hay 0 filas en una métrica pero la conexión existe → decí "tu Shopify está conectado pero no registró ventas en este período" (NO "no tengo datos").
 
@@ -835,6 +866,7 @@ ${competitorContext}
 ${recsContext}
 ${creativesContext}
 ${criterioContext}
+${abandonedContext}
 ${memoryContext}
 
 BRIEF DEL CLIENTE:
