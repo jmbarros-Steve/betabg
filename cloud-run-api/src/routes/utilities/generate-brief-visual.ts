@@ -90,7 +90,7 @@ export async function generateBriefVisual(c: Context) {
   const [briefRes, personaRes, shopifyProductsRes, clientRes] = await Promise.all([
     supabase.from('brand_research').select('research_data').eq('client_id', clientId).eq('research_type', 'brand_brief').maybeSingle(),
     supabase.from('buyer_personas').select('persona_data').eq('client_id', clientId).eq('is_complete', true).maybeSingle(),
-    supabase.from('shopify_products').select('title, product_type, image_url, price').eq('client_id', clientId).limit(10),
+    supabase.from('shopify_products').select('title, product_type, image_url, price_min').eq('client_id', clientId).limit(10),
     supabase.from('clients').select('shop_domain, name, company').eq('id', clientId).maybeSingle(),
   ]);
 
@@ -147,9 +147,9 @@ Tu prompt_generacion DEBE seguir los patrones de composición, iluminación, est
     const storeName = (clientInfo as any).name || (clientInfo as any).company || '';
     const productTypes = [...new Set(shopifyProducts.map((p: any) => p.product_type).filter(Boolean))];
     const priceRange = shopifyProducts.length > 0
-      ? { min: Math.min(...shopifyProducts.map((p: any) => parseFloat(p.price) || 0)), max: Math.max(...shopifyProducts.map((p: any) => parseFloat(p.price) || 0)) }
+      ? { min: Math.min(...shopifyProducts.map((p: any) => parseFloat(p.price_min) || 0)), max: Math.max(...shopifyProducts.map((p: any) => parseFloat(p.price_min) || 0)) }
       : null;
-    const productSamples = shopifyProducts.slice(0, 5).map((p: any) => `${p.title} ($${p.price})`).join(', ');
+    const productSamples = shopifyProducts.slice(0, 5).map((p: any) => `${p.title} ($${p.price_min})`).join(', ');
 
     shopifyContext = `\nCONTEXTO DE TIENDA SHOPIFY:
 Tienda: ${storeName}${storeDomain ? ` (${storeDomain})` : ''}

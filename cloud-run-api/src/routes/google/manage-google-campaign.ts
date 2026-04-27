@@ -2102,12 +2102,12 @@ async function handleGetBudgetRecommendation(
         const [finRes, bpRes, shopRes] = await Promise.all([
           fetch(`${supabaseUrl}/rest/v1/client_financial_config?client_id=eq.${safeClientId}&select=*&limit=1`, { headers, signal: AbortSignal.timeout(5_000) }),
           fetch(`${supabaseUrl}/rest/v1/buyer_personas?client_id=eq.${safeClientId}&select=persona_data&limit=1`, { headers, signal: AbortSignal.timeout(5_000) }),
-          fetch(`${supabaseUrl}/rest/v1/shopify_products?client_id=eq.${safeClientId}&select=price&not.price=is.null&limit=100`, { headers, signal: AbortSignal.timeout(5_000) }),
+          fetch(`${supabaseUrl}/rest/v1/shopify_products?client_id=eq.${safeClientId}&select=price_min&not.price_min=is.null&limit=100`, { headers, signal: AbortSignal.timeout(5_000) }),
         ]);
 
         const fin = finRes.ok ? ((await finRes.json() as any[])?.[0] || null) : null;
         const bp = bpRes.ok ? ((await bpRes.json() as any[])?.[0]?.persona_data || null) : null;
-        const prices = shopRes.ok ? ((await shopRes.json() as any[]) || []).map((p: any) => Number(p.price)).filter((n: number) => n > 0) : [];
+        const prices = shopRes.ok ? ((await shopRes.json() as any[]) || []).map((p: any) => Number(p.price_min)).filter((n: number) => n > 0) : [];
         const aovShopify = prices.length > 0 ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length : null;
 
         const marginPct = Number(fin?.default_margin_percentage || 0);
