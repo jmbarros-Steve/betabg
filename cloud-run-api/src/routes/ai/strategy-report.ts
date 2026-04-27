@@ -31,11 +31,14 @@ interface ReportPayload {
 async function launchBrowser() {
   const puppeteer = await import(/* webpackIgnore: true */ 'puppeteer' as string) as any;
   const launcher = puppeteer.default || puppeteer;
-  // Per-launch unique user data dir under /tmp (writable for non-root).
-  const userDataDir = `/tmp/chrome-${process.pid}-${Date.now()}`;
+  // Per-launch unique writable dirs under /tmp (writable for non-root user).
+  const ts = `${process.pid}-${Date.now()}`;
+  const userDataDir = `/tmp/chrome-data-${ts}`;
+  const crashDumpsDir = `/tmp/chrome-crash-${ts}`;
+  const fs = await import('fs');
+  try { fs.mkdirSync(userDataDir, { recursive: true }); } catch {}
+  try { fs.mkdirSync(crashDumpsDir, { recursive: true }); } catch {}
   return launcher.launch({
-    // Use legacy "shell" headless mode — does NOT spawn chrome_crashpad_handler
-    // and therefore avoids the "--database is required" crash on Cloud Run.
     headless: 'shell',
     args: [
       '--no-sandbox',
@@ -45,6 +48,7 @@ async function launchBrowser() {
       '--no-crashpad',
       '--disable-breakpad',
       `--user-data-dir=${userDataDir}`,
+      `--crash-dumps-dir=${crashDumpsDir}`,
       '--no-first-run',
       '--disable-extensions',
       '--disable-background-networking',
@@ -54,6 +58,12 @@ async function launchBrowser() {
       '--mute-audio',
     ],
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    env: {
+      ...process.env,
+      HOME: '/tmp',
+      XDG_CONFIG_HOME: '/tmp/.config',
+      XDG_CACHE_HOME: '/tmp/.cache',
+    },
     dumpio: false,
   });
 }
