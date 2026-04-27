@@ -38,7 +38,7 @@ export async function strategyChat(c: Context) {
   const [{ data: client, error: clientError }, { data: roleRow }] = await Promise.all([
     supabase
       .from('clients')
-      .select('id, client_user_id, user_id')
+      .select('id, client_user_id, user_id, shop_domain')
       .eq('id', client_id)
       .single(),
     userId
@@ -142,7 +142,7 @@ export async function strategyChat(c: Context) {
     const lastMonthStart = lastMonthDate.toISOString().split('T')[0];
     const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
 
-    // PARALLELIZED: 5 independent queries that all depend only on client_id / conversation_id
+    // PARALLELIZED: 19 independent queries that all depend only on client_id / conversation_id
     const [
       { data: convMessages },
       { data: persona },
@@ -151,6 +151,18 @@ export async function strategyChat(c: Context) {
       { data: connections },
       { data: clientKnowledgeData },
       { data: commitments },
+      { data: shopifyProducts },
+      { data: financialConfig },
+      { data: emailEvents },
+      { data: emailCampaigns },
+      { data: emailSubsAgg },
+      { data: waMessages },
+      { data: competitorAds },
+      { data: competitorTracking },
+      { data: campaignRecs },
+      { data: creativeHist },
+      { data: criterioFailed },
+      { data: episodicMem },
     ] = await Promise.all([
       // 1. Fetch last messages for context
       supabase
@@ -206,6 +218,98 @@ export async function strategyChat(c: Context) {
         .eq('status', 'pending')
         .order('agreed_date', { ascending: false })
         .limit(5),
+      // 8. Load Shopify product catalog (active products by price desc)
+      supabase
+        .from('shopify_products')
+        .select('title, vendor, product_type, price_min, price_max, inventory_total, status')
+        .eq('client_id', client_id)
+        .eq('status', 'active')
+        .order('price_max', { ascending: false })
+        .limit(15),
+      // 9. Financial config (margin, costs, CPA viable)
+      supabase
+        .from('client_financial_config')
+        .select('default_margin_percentage, shopify_commission_percentage, payment_gateway_commission, shipping_cost_per_order, other_fixed_costs, klaviyo_plan_cost, shopify_plan_cost')
+        .eq('client_id', client_id)
+        .maybeSingle(),
+      // 10. Email events last 30d (opens/clicks/bounces)
+      supabase
+        .from('email_events')
+        .select('event_type, campaign_id, created_at')
+        .eq('client_id', client_id)
+        .gte('created_at', thirtyDaysAgo)
+        .limit(2000),
+      // 11. Last 10 sent email campaigns
+      supabase
+        .from('email_campaigns')
+        .select('name, subject, sent_count, total_recipients, sent_at, status')
+        .eq('client_id', client_id)
+        .eq('status', 'sent')
+        .order('sent_at', { ascending: false })
+        .limit(10),
+      // 12. Email subscribers count + active
+      supabase
+        .from('email_subscribers')
+        .select('status, total_orders, total_spent', { count: 'exact' })
+        .eq('client_id', client_id)
+        .limit(500),
+      // 13. WhatsApp messages last 30d (count + last 5 inbound for tone)
+      supabase
+        .from('wa_messages')
+        .select('direction, body, contact_name, created_at')
+        .eq('client_id', client_id)
+        .gte('created_at', thirtyDaysAgo)
+        .order('created_at', { ascending: false })
+        .limit(50),
+      // 14. Competitor ads last 30d active
+      supabase
+        .from('competitor_ads')
+        .select('ad_text, ad_headline, days_running, platforms, started_at, is_active')
+        .eq('client_id', client_id)
+        .eq('is_active', true)
+        .gte('started_at', thirtyDaysAgo)
+        .order('days_running', { ascending: false })
+        .limit(8),
+      // 15. Competitors being tracked
+      supabase
+        .from('competitor_tracking')
+        .select('display_name, ig_handle, store_url, last_sync_at')
+        .eq('client_id', client_id)
+        .eq('is_active', true)
+        .limit(10),
+      // 16. Pre-computed campaign recommendations (not dismissed)
+      supabase
+        .from('campaign_recommendations')
+        .select('platform, recommendation_type, recommendation_text, priority, created_at')
+        .eq('shop_domain', client.shop_domain || '')
+        .eq('is_dismissed', false)
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(8),
+      // 17. Creative history top 10 by performance_score (last 30d)
+      supabase
+        .from('creative_history')
+        .select('channel, type, theme, content_summary, performance_verdict, performance_reason, performance_score, meta_ctr, meta_roas, meta_cpa, klaviyo_open_rate, klaviyo_click_rate, measured_at')
+        .eq('client_id', client_id)
+        .gte('measured_at', thirtyDaysAgo)
+        .order('performance_score', { ascending: false, nullsFirst: false })
+        .limit(10),
+      // 18. Criterio rules failed recently (last 14d)
+      supabase
+        .from('criterio_results')
+        .select('rule_id, entity_type, actual_value, expected_value, details, evaluated_at')
+        .eq('shop_id', client_id)
+        .eq('passed', false)
+        .gte('evaluated_at', fourteenDaysAgo)
+        .order('evaluated_at', { ascending: false })
+        .limit(10),
+      // 19. Steve episodic memory (last 10 events)
+      supabase
+        .from('steve_episodic_memory')
+        .select('event_type, summary, created_at')
+        .eq('client_id', client_id)
+        .order('created_at', { ascending: false })
+        .limit(10),
     ]);
 
     // Merge client-specific + global knowledge (client first for priority)
@@ -277,6 +381,165 @@ export async function strategyChat(c: Context) {
     const knowledgeCtx = filteredKnowledge?.map((k: { categoria: string; titulo: string; contenido: string }) =>
       `### [${k.categoria.toUpperCase()}] ${k.titulo}\n${k.contenido}`
     ).join('\n\n') || '';
+
+    const productsList = shopifyProducts || [];
+    const activeProductsCount = productsList.length;
+    let productsContext = '';
+    if (activeProductsCount > 0) {
+      const top10 = productsList.slice(0, 10);
+      const priceRange = (() => {
+        const mins = productsList.map((p: any) => Number(p.price_min) || 0).filter((n: number) => n > 0);
+        const maxs = productsList.map((p: any) => Number(p.price_max) || 0).filter((n: number) => n > 0);
+        if (!mins.length) return '';
+        return `rango de precios $${Math.min(...mins).toLocaleString()} - $${Math.max(...maxs).toLocaleString()} CLP`;
+      })();
+      const byType: Record<string, number> = {};
+      for (const p of productsList) {
+        const t = p.product_type || 'Sin tipo';
+        byType[t] = (byType[t] || 0) + 1;
+      }
+      const typesLine = Object.entries(byType).map(([k, v]) => `${k} (${v})`).join(', ');
+      productsContext = `\n🛍️ CATÁLOGO SHOPIFY (${activeProductsCount}+ productos activos${priceRange ? `, ${priceRange}` : ''}):\n`;
+      productsContext += `Tipos: ${typesLine}\n`;
+      productsContext += `Top productos por precio (los 10 más caros activos):\n`;
+      for (const p of top10) {
+        const stock = p.inventory_total === -1 ? 'sin tracking' : p.inventory_total === 0 ? '⚠️ SIN STOCK' : `${p.inventory_total} u.`;
+        const priceLabel = p.price_min === p.price_max
+          ? `$${Number(p.price_min).toLocaleString()} CLP`
+          : `$${Number(p.price_min).toLocaleString()}-$${Number(p.price_max).toLocaleString()} CLP`;
+        productsContext += `  - "${p.title}" — ${priceLabel} (${stock})\n`;
+      }
+    }
+
+    // === FINANCIAL CONFIG ===
+    let financialContext = '';
+    if (financialConfig) {
+      const margin = Number(financialConfig.default_margin_percentage) || 0;
+      const shopifyComm = Number(financialConfig.shopify_commission_percentage) || 0;
+      const gatewayComm = Number(financialConfig.payment_gateway_commission) || 0;
+      const shipping = Number(financialConfig.shipping_cost_per_order) || 0;
+      const otherFixed = Number(financialConfig.other_fixed_costs) || 0;
+      financialContext = `\n💰 CONFIG FINANCIERA DEL CLIENTE:\n`;
+      if (margin > 0) financialContext += `- Margen bruto promedio: ${margin}%\n`;
+      if (shopifyComm > 0) financialContext += `- Comisión Shopify: ${shopifyComm}%\n`;
+      if (gatewayComm > 0) financialContext += `- Comisión pasarela de pago: ${gatewayComm}%\n`;
+      if (shipping > 0) financialContext += `- Costo envío promedio: $${shipping.toLocaleString()} CLP/orden\n`;
+      if (otherFixed > 0) financialContext += `- Otros costos fijos: $${otherFixed.toLocaleString()} CLP\n`;
+      financialContext += `Usá estos números para evaluar si el CPA / ROAS de las campañas es viable o no.\n`;
+    }
+
+    // === EMAIL / KLAVIYO ===
+    let emailContext = '';
+    const evts = emailEvents || [];
+    const camps = emailCampaigns || [];
+    const subsCount = emailSubsAgg?.length || 0;
+    const activeSubs = (emailSubsAgg || []).filter((s: any) => s.status === 'active' || s.status === 'subscribed').length;
+    if (camps.length > 0 || evts.length > 0 || subsCount > 0) {
+      emailContext = `\n📧 EMAIL / KLAVIYO (últimos 30 días):\n`;
+      if (subsCount > 0) emailContext += `- Lista: ${subsCount} suscriptores en BD (${activeSubs} activos)\n`;
+      if (evts.length > 0) {
+        const opens = evts.filter((e: any) => e.event_type === 'open' || e.event_type === 'opened').length;
+        const clicks = evts.filter((e: any) => e.event_type === 'click' || e.event_type === 'clicked').length;
+        const bounces = evts.filter((e: any) => e.event_type === 'bounce' || e.event_type === 'bounced').length;
+        const unsubs = evts.filter((e: any) => e.event_type === 'unsubscribe' || e.event_type === 'unsubscribed').length;
+        emailContext += `- Eventos 30d: ${opens} opens, ${clicks} clicks, ${bounces} bounces, ${unsubs} unsubs\n`;
+        if (clicks > 0 && opens > 0) emailContext += `- Click-to-open rate: ${((clicks / opens) * 100).toFixed(1)}%\n`;
+      }
+      if (camps.length > 0) {
+        emailContext += `- Últimas campañas enviadas:\n`;
+        for (const cmp of camps.slice(0, 5)) {
+          const sent = cmp.sent_count || 0;
+          const total = cmp.total_recipients || 0;
+          const date = cmp.sent_at ? new Date(cmp.sent_at).toLocaleDateString('es-CL') : '?';
+          emailContext += `  - "${(cmp.subject || cmp.name || 'Sin subject').slice(0, 80)}" — ${date} (${sent}/${total} enviados)\n`;
+        }
+      }
+    }
+
+    // === WHATSAPP ===
+    let waContext = '';
+    const waList = waMessages || [];
+    if (waList.length > 0) {
+      const inbound = waList.filter((m: any) => m.direction === 'inbound').length;
+      const outbound = waList.filter((m: any) => m.direction === 'outbound').length;
+      const uniqueContacts = new Set(waList.map((m: any) => m.contact_phone || m.contact_name).filter(Boolean)).size;
+      waContext = `\n💬 WHATSAPP (últimos 30 días):\n`;
+      waContext += `- ${waList.length} mensajes (${inbound} inbound, ${outbound} outbound) con ${uniqueContacts} contactos únicos\n`;
+      const lastInbound = waList.filter((m: any) => m.direction === 'inbound').slice(0, 3);
+      if (lastInbound.length > 0) {
+        waContext += `- Últimos mensajes recibidos:\n`;
+        for (const m of lastInbound) {
+          waContext += `  - ${m.contact_name || 'Sin nombre'}: "${(m.body || '').slice(0, 100)}"\n`;
+        }
+      }
+    }
+
+    // === COMPETENCIA ===
+    let competitorContext = '';
+    const trackingList = competitorTracking || [];
+    const adsList = competitorAds || [];
+    if (trackingList.length > 0 || adsList.length > 0) {
+      competitorContext = `\n🎯 COMPETENCIA:\n`;
+      if (trackingList.length > 0) {
+        competitorContext += `- Monitoreando: ${trackingList.map((c: any) => c.display_name || c.ig_handle).filter(Boolean).join(', ')}\n`;
+      }
+      if (adsList.length > 0) {
+        competitorContext += `- Ads activos detectados (top por días corriendo):\n`;
+        for (const ad of adsList.slice(0, 5)) {
+          const headline = (ad.ad_headline || ad.ad_text || '').slice(0, 100);
+          competitorContext += `  - "${headline}" (${ad.days_running || 0}d corriendo en ${(ad.platforms || []).join(',') || 'meta'})\n`;
+        }
+      }
+    }
+
+    // === RECOMENDACIONES PRE-COMPUTADAS ===
+    let recsContext = '';
+    const recs = campaignRecs || [];
+    if (recs.length > 0) {
+      recsContext = `\n🤖 RECOMENDACIONES PRE-COMPUTADAS (otros agentes ya las generaron):\n`;
+      for (const r of recs.slice(0, 6)) {
+        const prio = r.priority ? `[P${r.priority}]` : '';
+        recsContext += `- ${prio} [${r.platform || '?'}] ${r.recommendation_type || ''}: ${(r.recommendation_text || '').slice(0, 200)}\n`;
+      }
+    }
+
+    // === CREATIVE HISTORY (fatiga + ganadores) ===
+    let creativesContext = '';
+    const creatives = creativeHist || [];
+    if (creatives.length > 0) {
+      creativesContext = `\n🎨 PERFORMANCE DE CREATIVOS (últimos 30d, top por score):\n`;
+      for (const c of creatives.slice(0, 8)) {
+        const verdict = c.performance_verdict || '?';
+        const score = c.performance_score != null ? `score ${c.performance_score}` : '';
+        const metrics = c.channel === 'klaviyo'
+          ? `OR ${c.klaviyo_open_rate ? (c.klaviyo_open_rate * 100).toFixed(1) + '%' : 'N/A'}, CR ${c.klaviyo_click_rate ? (c.klaviyo_click_rate * 100).toFixed(1) + '%' : 'N/A'}`
+          : `CTR ${c.meta_ctr ? (c.meta_ctr * 100).toFixed(2) + '%' : 'N/A'}, ROAS ${c.meta_roas?.toFixed(2) || 'N/A'}, CPA $${c.meta_cpa?.toLocaleString() || 'N/A'}`;
+        creativesContext += `  - [${c.channel}/${c.type || '?'}] "${(c.theme || c.content_summary || '').slice(0, 80)}" — ${verdict} ${score} (${metrics})\n`;
+        if (c.performance_reason) creativesContext += `    Motivo: ${c.performance_reason.slice(0, 120)}\n`;
+      }
+    }
+
+    // === CRITERIO RULES FAILED ===
+    let criterioContext = '';
+    const failed = criterioFailed || [];
+    if (failed.length > 0) {
+      criterioContext = `\n⚠️ REGLAS CRITERIO QUE EL CLIENTE NO ESTÁ CUMPLIENDO (últimos 14d):\n`;
+      for (const f of failed.slice(0, 8)) {
+        criterioContext += `- Regla ${f.rule_id} (${f.entity_type}): valor ${f.actual_value} vs esperado ${f.expected_value}\n`;
+        if (f.details && typeof f.details === 'string') criterioContext += `  ${f.details.slice(0, 150)}\n`;
+      }
+    }
+
+    // === EPISODIC MEMORY ===
+    let memoryContext = '';
+    const memList = episodicMem || [];
+    if (memList.length > 0) {
+      memoryContext = `\n🧠 MEMORIA DE SESIONES PASADAS CON ESTE CLIENTE:\n`;
+      for (const m of memList.slice(0, 6)) {
+        const date = new Date(m.created_at).toLocaleDateString('es-CL');
+        memoryContext += `- [${date}] ${m.event_type}: ${(m.summary || '').slice(0, 200)}\n`;
+      }
+    }
 
     const safeConnections = connections || [];
     if (!connections) {
@@ -551,12 +814,28 @@ IMPORTANTE — MÉTRICAS Y DATOS:
 11. Da respuestas CONCRETAS con números. Nada de respuestas vacías o evasivas.
 12. El ROAS cruzado (Shopify revenue / Ad spend) es la métrica más importante — úsala.
 
+🛑 REGLAS ABSOLUTAS DE TRANSPARENCIA SOBRE LOS DATOS (NUNCA romper):
+A. Si abajo aparece "📦 SHOPIFY — VENTAS" o "🛍️ CATÁLOGO SHOPIFY" o el bloque "Conectadas ahora" incluye Shopify → el cliente TIENE Shopify conectado y vos tenés acceso. NUNCA digas "no tengo conectado tu Shopify" ni "no tengo datos de tu tienda" ni "no estoy viendo tu Shopify".
+B. Lo que SÍ tenés de Shopify (cuando hay conexión activa): revenue diario, número de pedidos diarios, ticket promedio, comparaciones 7d/30d/semana/mes, desglose diario 14d, catálogo de productos activos con precio y stock.
+C. Lo que NO tenés de Shopify hoy (decílo así, NO digas "no tengo datos"): sesiones, tasa de conversión (CR), tráfico por fuente, top productos VENDIDOS (solo tenés catálogo por precio, no por unidades vendidas), carritos abandonados (sync no funcionando), tiempo en sitio, bounce rate. Si te piden algo de esta lista, decí "ese dato no se está sincronizando hoy, lo que sí puedo decirte es X" — NUNCA "no estoy conectado".
+D. Lo mismo aplica a Meta y Google Ads: si el bloque "Conectadas ahora" los lista, tenés acceso. Spend, impressions, clicks, conversions, ROAS y campañas individuales están en CAMPAÑAS abajo.
+E. Si hay 0 filas en una métrica pero la conexión existe → decí "tu Shopify está conectado pero no registró ventas en este período" (NO "no tengo datos").
+
 NO eres un cuestionario. NO hagas preguntas estructuradas. Simplemente conversa y asesora.
 
 ${persona?.is_complete ? '' : '⚠️ NOTA: El brief del cliente aún NO está completo. Puedes responder sus preguntas pero recuérdale que para un análisis más profundo debería completar el brief en la pestaña "Steve".'}
 
 === MÉTRICAS REALES (PRIORIDAD MÁXIMA — usa estos datos en TODA respuesta) ===
 ${metricsContext}
+${productsContext}
+${financialContext}
+${emailContext}
+${waContext}
+${competitorContext}
+${recsContext}
+${creativesContext}
+${criterioContext}
+${memoryContext}
 
 BRIEF DEL CLIENTE:
 ${briefSummary}
