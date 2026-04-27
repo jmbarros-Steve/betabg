@@ -276,6 +276,15 @@ async function uploadImageFromUrl(
  * handleCreate — Create a Meta Marketing API campaign + ad set + creative + ad.
  *
  * Notable body fields:
+ * - `special_ad_categories`: string[] (Meta restricted ads).
+ *   Valid values: HOUSING | EMPLOYMENT | CREDIT | ISSUES_ELECTIONS_POLITICS.
+ *   When set, targeting MUST respect:
+ *     - age_min >= 18 and age_max <= 65
+ *     - genders cannot be set (audience must include all)
+ *     - geo_locations.cities and geo_locations.zips not allowed
+ *   Otherwise the endpoint returns 400 with `violations[]`.
+ *   Docs: https://developers.facebook.com/docs/marketing-api/special-ad-category
+ *
  * - `targeting.targeting_automation.advantage_audience`: 0 | 1.
  *   Defaults to 1 ONLY when no detailed targeting is provided
  *   (no custom_audiences, flexible_spec, exclusions). Otherwise defaults to 0
@@ -357,6 +366,70 @@ async function handleCreate(
   // Budget validation: reject negative, zero, or non-numeric values
   if (daily_budget && (isNaN(Number(daily_budget)) || Number(daily_budget) <= 0)) {
     return { body: { error: 'Invalid daily_budget: must be a positive number' }, status: 400 };
+  }
+
+  // special_ad_categories validation (Meta restricted-ad rules).
+  // Valid values per Marketing API v23 docs:
+  //   HOUSING, EMPLOYMENT, CREDIT, ISSUES_ELECTIONS_POLITICS
+  // Restrictions when ANY category is set:
+  //   - age_min must be >= 18 and age_max must be <= 65
+  //   - genders cannot be set (must target all)
+  //   - geo_locations.cities/zips not allowed (use country/region only)
+  // Docs: /docs/marketing-api/special-ad-category
+  const VALID_SPECIAL_CATEGORIES = ['HOUSING', 'EMPLOYMENT', 'CREDIT', 'ISSUES_ELECTIONS_POLITICS'];
+  if (Array.isArray(special_ad_categories) && special_ad_categories.length > 0) {
+    const invalid = special_ad_categories.filter((c: string) => !VALID_SPECIAL_CATEGORIES.includes(c));
+    if (invalid.length > 0) {
+      return {
+        body: {
+          error: `Invalid special_ad_categories: ${invalid.join(', ')}. Valid values: ${VALID_SPECIAL_CATEGORIES.join(', ')}`,
+        },
+        status: 400,
+      };
+    }
+
+    // Validate targeting respects restrictions when categories are set.
+    let restrictedTargeting: any = null;
+    if (targeting) {
+      try {
+        restrictedTargeting = typeof targeting === 'string' ? JSON.parse(targeting) : targeting;
+      } catch {
+        // Targeting parsing error will be caught later in the flow.
+        restrictedTargeting = null;
+      }
+    }
+
+    if (restrictedTargeting) {
+      const violations: string[] = [];
+
+      if (typeof restrictedTargeting.age_min === 'number' && restrictedTargeting.age_min < 18) {
+        violations.push(`age_min (${restrictedTargeting.age_min}) must be >= 18 for special_ad_categories`);
+      }
+      if (typeof restrictedTargeting.age_max === 'number' && restrictedTargeting.age_max > 65) {
+        violations.push(`age_max (${restrictedTargeting.age_max}) must be <= 65 for special_ad_categories`);
+      }
+      if (Array.isArray(restrictedTargeting.genders) && restrictedTargeting.genders.length > 0) {
+        violations.push('genders cannot be set when special_ad_categories is used');
+      }
+      const geo = restrictedTargeting.geo_locations || {};
+      if (Array.isArray(geo.cities) && geo.cities.length > 0) {
+        violations.push('geo_locations.cities not allowed for special_ad_categories (use country or region)');
+      }
+      if (Array.isArray(geo.zips) && geo.zips.length > 0) {
+        violations.push('geo_locations.zips not allowed for special_ad_categories');
+      }
+
+      if (violations.length > 0) {
+        return {
+          body: {
+            error: 'Targeting violates special_ad_categories restrictions',
+            categories: special_ad_categories,
+            violations,
+          },
+          status: 400,
+        };
+      }
+    }
   }
 
   // destination_url is required for non-DPA campaigns (DPA uses product URLs)
