@@ -308,8 +308,8 @@ async function handleCreate(
     // Ad set fields
     adset_name,
     daily_budget,
-    billing_event = 'IMPRESSIONS',
-    optimization_goal = 'LINK_CLICKS',
+    billing_event: rawBillingEvent,
+    optimization_goal: rawOptimizationGoal,
     targeting,
     start_time,
     end_time,
@@ -360,6 +360,28 @@ async function handleCreate(
     // placement, and forces adapt_to_placement to OPT_IN.
     personalize_content,
   } = data;
+
+  // m2: objective-aware defaults for optimization_goal / billing_event.
+  // Without this, every objective fell back to LINK_CLICKS / IMPRESSIONS which
+  // is only sensible for OUTCOME_TRAFFIC. Mapping per Meta v23 docs:
+  //   OUTCOME_SALES      → OFFSITE_CONVERSIONS, IMPRESSIONS
+  //   OUTCOME_LEADS      → LEAD_GENERATION,     IMPRESSIONS
+  //   OUTCOME_AWARENESS  → REACH,               IMPRESSIONS
+  //   OUTCOME_ENGAGEMENT → POST_ENGAGEMENT,     IMPRESSIONS
+  //   OUTCOME_APP_PROMOTION → APP_INSTALLS,     IMPRESSIONS
+  //   OUTCOME_TRAFFIC    → LINK_CLICKS,         IMPRESSIONS (legacy default)
+  // The caller can always override either field explicitly.
+  const OBJECTIVE_DEFAULTS: Record<string, { optimization_goal: string; billing_event: string }> = {
+    OUTCOME_SALES: { optimization_goal: 'OFFSITE_CONVERSIONS', billing_event: 'IMPRESSIONS' },
+    OUTCOME_LEADS: { optimization_goal: 'LEAD_GENERATION', billing_event: 'IMPRESSIONS' },
+    OUTCOME_AWARENESS: { optimization_goal: 'REACH', billing_event: 'IMPRESSIONS' },
+    OUTCOME_ENGAGEMENT: { optimization_goal: 'POST_ENGAGEMENT', billing_event: 'IMPRESSIONS' },
+    OUTCOME_APP_PROMOTION: { optimization_goal: 'APP_INSTALLS', billing_event: 'IMPRESSIONS' },
+    OUTCOME_TRAFFIC: { optimization_goal: 'LINK_CLICKS', billing_event: 'IMPRESSIONS' },
+  };
+  const objectiveDefaults = OBJECTIVE_DEFAULTS[objective] || OBJECTIVE_DEFAULTS.OUTCOME_TRAFFIC;
+  const optimization_goal: string = rawOptimizationGoal || objectiveDefaults.optimization_goal;
+  const billing_event: string = rawBillingEvent || objectiveDefaults.billing_event;
 
   // --- Early validations (before any Meta API calls) ---
 
