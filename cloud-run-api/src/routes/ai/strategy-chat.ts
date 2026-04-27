@@ -882,6 +882,8 @@ ${commitments && commitments.length > 0
 ${creativeHistoryCtx}
 Tienes herramientas para buscar información. Si el usuario pregunta algo que no sabes o sobre lo que no tienes reglas, usa buscar_youtube o buscar_web para encontrar información actualizada antes de responder. Si aprendes algo nuevo y valioso durante la búsqueda, usa guardar_regla para guardarlo.
 
+📊 REPORTES PDF (tool generar_reporte_pdf): Si el usuario pide explícitamente un "reporte", "dashboard exportable", "resumen formal", "PDF", "documento", o frases similares — DISPARÁ la tool. Inferí el rango de fechas del lenguaje natural (ej. "últimos 30 días" → from = today - 30, to = today; "marzo" → from=2026-03-01, to=2026-03-31). HOY ES ${today}. Inferí los temas según lo que pida: Meta → ads_meta + creativos; Google → ads_google; Shopify/ventas → shopify; email/Klaviyo → email; WhatsApp → whatsapp; carritos abandonados → abandoned; competencia → competencia; catálogo/productos → catalogo; diagnóstico/Criterio → criterio. Si no especifica tema o pide "todo / completo / general" → temas=["all"]. Después de obtener la URL, respondé al cliente con el link en formato markdown [Ver reporte PDF](URL) y agregá 3 bullets resumen del contenido.
+
 Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accionables. Cuando hables de métricas, cita los números reales que tienes.`;
 
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -932,6 +934,23 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
           required: ['titulo', 'contenido', 'categoria'],
         },
       },
+      {
+        name: 'generar_reporte_pdf',
+        description: 'Genera un reporte PDF branded con la performance del cliente. ÚSALO cuando el cliente pida explícitamente un reporte, dashboard, resumen formal, o exportable. Inferí el rango de fechas (from/to en formato YYYY-MM-DD) del lenguaje natural del usuario ("últimos 14 días", "marzo", "Q1", etc.) — usá la fecha de hoy como referencia. Inferí los temas: si el usuario menciona Meta/Facebook/Instagram → ads_meta + creativos; Google → ads_google; ventas/Shopify → shopify; mails/Klaviyo → email; carritos abandonados → abandoned; competencia → competencia; productos/catálogo → catalogo; reglas/diagnóstico → criterio; whatsapp → whatsapp. Si no especifica tema, usá ["all"]. Devuelvo URL del PDF que respondés con el link.',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            from: { type: 'string' as const, description: 'Fecha inicio en formato YYYY-MM-DD' },
+            to: { type: 'string' as const, description: 'Fecha fin en formato YYYY-MM-DD' },
+            temas: {
+              type: 'array' as const,
+              items: { type: 'string' as const },
+              description: 'Lista de temas: ads_meta, ads_google, shopify, email, whatsapp, abandoned, competencia, creativos, catalogo, criterio, all',
+            },
+          },
+          required: ['from', 'to', 'temas'],
+        },
+      },
     ];
 
     timelog('estrategia-pre-anthropic');
@@ -940,7 +959,7 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
     let agentMessages: any[] = [...aiMessages]; // copy the messages array (any[] for tool_use/tool_result shapes)
     let finalResponse = '';
     let toolCallCount = 0;
-    const MAX_TOOL_CALLS = 3; // Max 3 searches per question
+    const MAX_TOOL_CALLS = 4; // Max 4 turns (3 search/learn + 1 report generation)
     const maxTokens = 2000;
 
     while (toolCallCount < MAX_TOOL_CALLS) {
@@ -1101,6 +1120,34 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
               toolResult = `Regla "${titulo}" guardada exitosamente (pendiente de aprobación).`;
             } catch (e) {
               toolResult = `Error guardando regla: ${e}`;
+            }
+            break;
+          }
+
+          case 'generar_reporte_pdf': {
+            const { from, to, temas } = toolUseBlock.input as { from: string; to: string; temas: string[] };
+            try {
+              const baseUrl = process.env.SELF_URL || 'https://steve-api-850416724643.us-central1.run.app';
+              const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+              const reportRes = await fetch(`${baseUrl}/api/strategy-report`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${serviceKey}`,
+                  'X-Internal-Key': serviceKey,
+                  'X-Cron-Secret': process.env.CRON_SECRET || 'steve-cron-secret-2024',
+                },
+                body: JSON.stringify({ client_id, from, to, temas }),
+                signal: AbortSignal.timeout(110_000),
+              });
+              const body: any = await reportRes.json().catch(() => ({}));
+              if (!reportRes.ok || !body?.url) {
+                toolResult = `Error generando reporte: ${body?.error || `HTTP ${reportRes.status}`}. Detalles: ${body?.details || 'sin detalles'}`;
+              } else {
+                toolResult = `Reporte generado exitosamente. URL: ${body.url}\nPeríodo: ${body.period?.from} → ${body.period?.to} (${body.period?.days} días). Secciones: ${(body.sections || []).join(', ')}. Devuelve la URL al cliente como link descargable junto con un resumen breve (3 bullets) del contenido.`;
+              }
+            } catch (e: any) {
+              toolResult = `Error invocando reporte: ${e?.message?.slice(0, 200) || e}`;
             }
             break;
           }

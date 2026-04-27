@@ -23,6 +23,7 @@ import { creativeReviewFeed } from './utilities/creative-review-feed.js';
 // Phase 2: AI
 import { steveChat } from './ai/steve-chat.js';
 import { strategyChat } from './ai/strategy-chat.js';
+import { strategyReport } from './ai/strategy-report.js';
 import { steveStrategy } from './ai/steve-strategy.js';
 import { steveEmailContent } from './ai/steve-email-content.js';
 import { steveSendTimeAnalysis } from './ai/steve-send-time-analysis.js';
@@ -350,6 +351,7 @@ export function registerRoutes(app: Hono) {
   // ============================================================
   app.post('/api/steve-chat', authMiddleware, steveChat);
   app.post('/api/strategy-chat', authMiddleware, strategyChat);
+  app.post('/api/strategy-report', authMiddleware, strategyReport);
   app.post('/api/steve-strategy', authMiddleware, steveStrategy);
   app.post('/api/steve-email-content', authMiddleware, steveEmailContent);
   app.post('/api/steve-send-time-analysis', authMiddleware, steveSendTimeAnalysis);
