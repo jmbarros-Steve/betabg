@@ -179,12 +179,11 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
     }, 130_000);
 
     try {
-      const { data, error } = await callApi('steve-chat', {
+      const { data, error } = await callApi('strategy-chat', {
         body: {
           client_id: clientId,
           conversation_id: conversationId,
           message: userMessage,
-          mode: 'estrategia',
         },
       });
 
