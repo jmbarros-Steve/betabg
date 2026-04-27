@@ -10,6 +10,7 @@ import {
 import { pickTrackForAngleAndMood, type MusicMood } from '../../lib/music-library.js';
 import { runReplicatePrediction, ReplicateError } from '../../lib/replicate.js';
 import { mergeVideoStudio } from '../../lib/video-merge.js';
+import { runLipSync, templateNeedsLipSync } from '../../lib/lipsync.js';
 import { musicPreviewPublicUrl } from '../brief-estudio/index.js';
 import {
   generateNarrationScriptText,
@@ -81,6 +82,20 @@ const KLING_USD_COST = 3.50;
 const KLING_CREDIT_COST = 70;
 const KLING_DURATION_SEC = 10;
 
+// Sync Labs 2.0 lip-sync via Replicate (slug `sync/lipsync-2`). Takes the
+// silent Kling mp4 + the narration mp3 and returns a video where the actor's
+// mouth matches the audio. Used for talking_head / testimonial / lifestyle_ugc
+// where there's a person on camera. ~$0.30 per call (30 credits) added on top
+// of Kling's $3.50, keeping total under $4 per dialog video — still cheaper
+// than Veo's $3.20 with the bonus that we get to pick the voice (ElevenLabs
+// preset OR XTTS clone) instead of Veo's locked-in TTS.
+//
+// Sync 2.0 produces SILENT output (mouth changes, no audio mixed) — narration
+// + music get muxed in by FFmpeg in mergeVideoStudio() afterwards. See
+// lib/lipsync.ts for the full schema notes.
+const SYNC_USD_COST = 0.30;
+const SYNC_CREDIT_COST = 30;
+
 type AspectRatio = '9:16' | '16:9' | '1:1';
 type VideoEngine = 'veo' | 'runway' | 'seedance' | 'kling';
 
@@ -112,21 +127,26 @@ const ANGLE_TEMPLATE: Record<string, string> = {
   'Us vs Them': 'before_after',
 };
 
-// Silent templates default to Kling Video 3.0 Omni (replaces Seedance 1 Pro).
-// Kling v3 Omni is the only Replicate Kling that accepts multi-image refs (up to
-// 7 via reference_images), so we can finally pass producto + actor as PEER
-// references and let the prompt disambiguate them via <<<image_1>>>/<<<image_2>>>
-// template tokens. Seedance and Runway stay reachable via admin override
-// `engine: 'seedance' | 'runway'` for A/B testing. Veo keeps all dialog angles.
+// All templates default to Kling Video 3.0 Omni (Veo 3.1 preview is currently
+// 403 PERMISSION_DENIED for project steveapp-agency — Google allowlist gating
+// for Veo preview is blocking us, sesión 2026-04-24). For talking_head /
+// testimonial / lifestyle_ugc we layer Sync Labs 2.0 lip-sync (sync/lipsync-2
+// via Replicate) on top of Kling's silent output so the actor's mouth matches
+// the ElevenLabs/XTTS narration. See lib/lipsync.ts and the post-process step
+// in maybePostProcessStudioAudio.
+//
+// Veo + Seedance + Runway stay reachable via super_admin override
+// (`engine: 'veo' | 'seedance' | 'runway'` in body) for A/B testing once Veo
+// access is granted.
 const TEMPLATE_ENGINE: Record<string, VideoEngine> = {
   'hero_shot': 'kling',
   'product_reveal': 'kling',
   'unboxing': 'kling',
   'before_after': 'kling',
   'macro_detail': 'kling',
-  'lifestyle_ugc': 'veo',
-  'talking_head': 'veo',
-  'testimonial': 'veo',
+  'lifestyle_ugc': 'kling',     // was 'veo' (talking, but Sync handles lip-sync now)
+  'talking_head': 'kling',      // was 'veo'
+  'testimonial': 'kling',       // was 'veo'
 };
 
 function deriveTemplate(angulo: string | undefined): string {
@@ -317,6 +337,11 @@ interface AudioMeta {
   use_music: boolean;
   merge_label: string | null;
   fallback_reason?: string;
+  // Sync Labs 2.0 lip-sync metadata (only set when lip-sync was attempted).
+  lip_sync_applied?: boolean;
+  lip_sync_model?: string | null;
+  lip_sync_url?: string | null;
+  lip_sync_fallback_reason?: string;
 }
 
 async function maybePostProcessStudioAudio(args: {
@@ -425,10 +450,62 @@ async function maybePostProcessStudioAudio(args: {
     return null;
   }
 
+  // 2.5) Sync Labs 2.0 lip-sync (talking_head / testimonial / lifestyle_ugc).
+  //
+  // Runs between narration generation and FFmpeg merge. Sync takes the silent
+  // Kling video + the narration mp3 and returns a video where the actor's
+  // mouth matches the audio (still SILENT — audio gets muxed in step 3).
+  //
+  // We only run it when:
+  //   (a) the template implies a person speaks on camera, AND
+  //   (b) we successfully generated narration audio (otherwise no audio to sync).
+  // If Sync fails for any reason we log + continue with the original silent
+  // video; the actor's mouth won't be synced but the user still gets audio.
+  let mergeSourceUrl = videoUrl;
+  const template = deriveTemplate(angulo);
+  if (templateNeedsLipSync(template) && audioMeta.narration_url) {
+    audioMeta.lip_sync_applied = false;
+    audioMeta.lip_sync_model = 'sync/lipsync-2';
+    try {
+      const lipSyncedUrl = await runLipSync({
+        videoUrl,
+        audioUrl: audioMeta.narration_url,
+      });
+      mergeSourceUrl = lipSyncedUrl;
+      audioMeta.lip_sync_applied = true;
+      audioMeta.lip_sync_url = lipSyncedUrl;
+      // Charge the credits for the lip-sync call (best-effort — failure to log
+      // does not break the pipeline).
+      try {
+        await getSupabaseAdmin()
+          .from('credit_transactions')
+          .insert({
+            client_id: clientId,
+            accion: `Sync Labs 2.0 lip-sync (template=${template})`,
+            creditos_usados: SYNC_CREDIT_COST,
+            costo_real_usd: SYNC_USD_COST,
+          });
+      } catch (creditErr: any) {
+        console.warn(
+          '[generate-video][lipsync] credit log failed:',
+          creditErr?.message,
+        );
+      }
+      console.log(
+        `[generate-video][lipsync] ok template=${template} → ${lipSyncedUrl.slice(0, 80)}...`,
+      );
+    } catch (err: any) {
+      const reason = err?.message?.slice(0, 120) || 'unknown';
+      console.warn(`[generate-video][lipsync] failed: ${reason}`);
+      audioMeta.lip_sync_fallback_reason = reason;
+      // mergeSourceUrl stays as the original silent videoUrl — fallback path.
+    }
+  }
+
   // 3) Run FFmpeg merge.
   try {
     const merged = await mergeVideoStudio({
-      videoUrl,
+      videoUrl: mergeSourceUrl,
       narrationUrl: audioMeta.narration_url,
       musicTrackUrl: audioMeta.music_track_url,
       videoDurationSec,
@@ -907,6 +984,11 @@ export async function generateVideo(c: Context) {
               use_music: audioOutcomeVeo.audioMeta.use_music,
               merge_label: audioOutcomeVeo.audioMeta.merge_label,
               merged_asset_url: audioOutcomeVeo.assetUrl,
+              lip_sync_applied: audioOutcomeVeo.audioMeta.lip_sync_applied ?? false,
+              lip_sync_model: audioOutcomeVeo.audioMeta.lip_sync_model ?? null,
+              lip_sync_url: audioOutcomeVeo.audioMeta.lip_sync_url ?? null,
+              lip_sync_fallback_reason:
+                audioOutcomeVeo.audioMeta.lip_sync_fallback_reason ?? null,
             };
             await supabase
               .from('ad_creatives')
@@ -1290,6 +1372,11 @@ async function runGenerateRunway(
         use_music: audioOutcome.audioMeta.use_music,
         merge_label: audioOutcome.audioMeta.merge_label,
         merged_asset_url: audioOutcome.assetUrl,
+        lip_sync_applied: audioOutcome.audioMeta.lip_sync_applied ?? false,
+        lip_sync_model: audioOutcome.audioMeta.lip_sync_model ?? null,
+        lip_sync_url: audioOutcome.audioMeta.lip_sync_url ?? null,
+        lip_sync_fallback_reason:
+          audioOutcome.audioMeta.lip_sync_fallback_reason ?? null,
       };
       await supabase
         .from('ad_creatives')
@@ -1536,6 +1623,11 @@ async function runGenerateSeedance(
         use_music: audioOutcome.audioMeta.use_music,
         merge_label: audioOutcome.audioMeta.merge_label,
         merged_asset_url: audioOutcome.assetUrl,
+        lip_sync_applied: audioOutcome.audioMeta.lip_sync_applied ?? false,
+        lip_sync_model: audioOutcome.audioMeta.lip_sync_model ?? null,
+        lip_sync_url: audioOutcome.audioMeta.lip_sync_url ?? null,
+        lip_sync_fallback_reason:
+          audioOutcome.audioMeta.lip_sync_fallback_reason ?? null,
       };
       await supabase
         .from('ad_creatives')
@@ -1806,6 +1898,12 @@ async function runGenerateKling(
         use_music: audioOutcome.audioMeta.use_music,
         merge_label: audioOutcome.audioMeta.merge_label,
         merged_asset_url: audioOutcome.assetUrl,
+        // Sync Labs 2.0 lip-sync metadata (only present when applicable).
+        lip_sync_applied: audioOutcome.audioMeta.lip_sync_applied ?? false,
+        lip_sync_model: audioOutcome.audioMeta.lip_sync_model ?? null,
+        lip_sync_url: audioOutcome.audioMeta.lip_sync_url ?? null,
+        lip_sync_fallback_reason:
+          audioOutcome.audioMeta.lip_sync_fallback_reason ?? null,
       };
       await supabase
         .from('ad_creatives')
