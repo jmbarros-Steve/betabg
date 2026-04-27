@@ -371,9 +371,24 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
                     <AvatarFallback className="bg-primary text-primary-foreground">🐕</AvatarFallback>
                   </Avatar>
                   <div className="max-w-[80%] px-4 py-3 text-sm shadow-sm bg-slate-50 text-slate-700 rounded-xl rounded-tl-sm">
-                    <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0 [&>ul]:my-1 [&>ol]:my-1 leading-relaxed">
+                    <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0 [&>ul]:my-1 [&>ol]:my-1 leading-relaxed [&_a]:text-primary [&_a]:underline [&_a]:font-medium hover:[&_a]:opacity-80">
                       <MarkdownErrorBoundary fallback={stripThinking(message.content)}>
-                        <ReactMarkdown>{stripThinking(message.content)}</ReactMarkdown>
+                        <ReactMarkdown
+                          components={{
+                            a: ({ node, href, children, ...props }) => (
+                              <a
+                                {...props}
+                                href={href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                {children}
+                              </a>
+                            ),
+                          }}
+                        >
+                          {stripThinking(message.content)}
+                        </ReactMarkdown>
                       </MarkdownErrorBoundary>
                     </div>
                   </div>
