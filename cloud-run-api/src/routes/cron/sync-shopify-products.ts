@@ -87,8 +87,13 @@ async function fetchNextLink(url: string, token: string): Promise<{ products: Sh
   }
 }
 
-function mapProduct(p: ShopifyProductRaw, clientId: string, shopDomain: string): SyncRow {
-  const variants = p.variants || [];
+function mapProduct(p: ShopifyProductRaw, clientId: string, shopDomain: string, costMap: Map<number, number | null>): SyncRow {
+  const rawVariants = p.variants || [];
+  // Enriquecer variants con cost desde Inventory Items API (Shopify no lo trae en /products.json)
+  const variants = rawVariants.map((v) => ({
+    ...v,
+    cost: v.inventory_item_id != null ? costMap.get(v.inventory_item_id) ?? null : null,
+  }));
   const prices = variants
     .map((v) => parseFloat(v.price))
     .filter((n) => !isNaN(n) && n >= 0);
@@ -123,6 +128,48 @@ function mapProduct(p: ShopifyProductRaw, clientId: string, shopDomain: string):
     inventory_total: inventoryTotal,
     synced_at: new Date().toISOString(),
   };
+}
+
+/**
+ * Fetch costs (Cost per Item) desde Shopify Inventory Items API en batches de 100.
+ * Devuelve Map<inventory_item_id, unitCost|null>.
+ */
+async function fetchInventoryCosts(
+  cleanDomain: string,
+  token: string,
+  inventoryItemIds: number[],
+): Promise<Map<number, number | null>> {
+  const map = new Map<number, number | null>();
+  if (inventoryItemIds.length === 0) return map;
+
+  const BATCH = 100;
+  for (let i = 0; i < inventoryItemIds.length; i += BATCH) {
+    const batch = inventoryItemIds.slice(i, i + BATCH);
+    if (i > 0) await sleep(PAGE_SLEEP_MS);
+
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const url = `https://${cleanDomain}/admin/api/${SHOPIFY_API_VERSION}/inventory_items.json?ids=${batch.join(',')}`;
+      const res = await fetch(url, {
+        headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' },
+        signal: ctrl.signal,
+      });
+      if (!res.ok) {
+        console.warn(`[cron] inventory_items batch failed ${res.status}, continuing without costs for batch`);
+        for (const id of batch) map.set(id, null);
+        continue;
+      }
+      const { inventory_items } = (await res.json()) as { inventory_items: Array<{ id: number; cost?: string | null }> };
+      for (const item of inventory_items || []) {
+        const cost = item.cost != null && item.cost !== '' ? parseFloat(item.cost) : null;
+        map.set(item.id, cost != null && !isNaN(cost) && cost > 0 ? cost : null);
+      }
+    } finally {
+      clearTimeout(t);
+    }
+  }
+  return map;
 }
 
 /**
@@ -181,7 +228,13 @@ export async function syncClientShopifyProducts(
       return { synced: 0, shop_domain: cleanDomain };
     }
 
-    const rows = allProducts.map((p) => mapProduct(p, clientId, cleanDomain));
+    const inventoryItemIds = allProducts
+      .flatMap((p) => p.variants || [])
+      .map((v) => v.inventory_item_id)
+      .filter((id): id is number => id != null);
+    const costMap = await fetchInventoryCosts(cleanDomain, decryptedToken, inventoryItemIds);
+
+    const rows = allProducts.map((p) => mapProduct(p, clientId, cleanDomain, costMap));
     for (let i = 0; i < rows.length; i += UPSERT_CHUNK_SIZE) {
       const chunk = rows.slice(i, i + UPSERT_CHUNK_SIZE);
       const { error: upsertErr } = await supabase
@@ -298,7 +351,13 @@ export async function syncShopifyProducts(c: Context) {
           continue;
         }
 
-        const rows = allProducts.map((p) => mapProduct(p, conn.client_id, cleanDomain));
+        const inventoryItemIds = allProducts
+          .flatMap((p) => p.variants || [])
+          .map((v) => v.inventory_item_id)
+          .filter((id): id is number => id != null);
+        const costMap = await fetchInventoryCosts(cleanDomain, decryptedToken, inventoryItemIds);
+
+        const rows = allProducts.map((p) => mapProduct(p, conn.client_id, cleanDomain, costMap));
 
         // Chunk upserts to avoid PostgREST payload/timeout limits on large shops
         let upsertFailed = false;
