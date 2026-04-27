@@ -718,36 +718,22 @@ export async function generateVideo(c: Context) {
       knowledgeBlock,
     ].filter(Boolean).join('\n\n');
 
-    // Download reference images in parallel (up to 3). Each becomes an inlineData
-    // part. Veo 3.1 accepts a primary `image` field + optional `reference_images`
-    // array (up to 3 total). If no images resolve (no URL provided AND no
-    // catalog), fall through to pure text-to-video — still supported, just worse.
-    let imageParts: Array<{ inlineData: { mimeType: string; data: string } }> = [];
+    // CRITICAL: veo-3.1-generate-preview NO acepta `inlineData` — devuelve
+    // 400 con "`inlineData` isn't supported by this model". Solo soporta
+    // text-to-video puro. El ángulo (talking_head, testimonial, lifestyle_ugc)
+    // describe al actor + producto via texto enriquecido del prompt — esa es
+    // la fortaleza de Veo: comprensión semántica del prompt + audio nativo.
+    //
+    // Para image-to-video con refs reales usamos Kling v3-omni-video (silent
+    // templates). Veo queda text-only.
     if (referenceUrls.length > 0) {
-      const fetched = await Promise.all(referenceUrls.map((u) => fetchImageAsBase64(u)));
-      imageParts = fetched
-        .filter((x): x is { mimeType: string; data: string } => !!x)
-        .map((x) => ({ inlineData: x }));
-    }
-    if (referenceUrls.length === 0) {
-      console.warn('[generate-video] No reference images available (no URL + no catalog) — falling back to text-to-video. Expect worse results.');
+      console.log(
+        `[generate-video:veo] ignoring ${referenceUrls.length} reference image(s) — Veo preview no soporta inlineData. Refs van descriptas en el prompt.`,
+      );
     }
 
-    // 1) Launch long-running generation.
-    // Veo 3.1 REST API (predictLongRunning) shape:
-    //   - Single image anchor: `image: { inlineData: { mimeType, data } }` (classic image-to-video)
-    //   - Multi reference: `referenceImages: [{ image: {inlineData}, referenceType: 'asset' }]` (up to 3)
-    // We use `referenceImages` ONLY when we have multiple refs. With a single ref,
-    // sticking to the legacy `image` field is more reliable (documented as primary).
+    // 1) Launch long-running generation. Solo prompt de texto.
     const instance: Record<string, any> = { prompt: enrichedPrompt };
-    if (imageParts.length === 1) {
-      instance.image = imageParts[0];
-    } else if (imageParts.length > 1) {
-      instance.referenceImages = imageParts.slice(0, 3).map((p) => ({
-        image: p,
-        referenceType: 'asset',
-      }));
-    }
 
     const launch = await fetch(VEO_LAUNCH_URL, {
       method: 'POST',
