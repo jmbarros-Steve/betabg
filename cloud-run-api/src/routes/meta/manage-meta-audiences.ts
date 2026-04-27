@@ -307,6 +307,74 @@ async function handleCreateLookalike(
     }
   }
 
+  // CRITICO-1 (Antipatrón #2 SUAT): Validar ownership de la audiencia origen
+  // contra la cuenta publicitaria ANTES de leer su count.
+  // Con tokens SUAT (bm_partner/leadsie) un GET directo a `source_audience_id`
+  // succeed para CUALQUIER audiencia del BM → un user malicioso podría crear un
+  // lookalike apuntando a la audiencia de OTRO cliente. Listamos primero las
+  // audiencias del act_{accountId} y rechazamos si el ID no pertenece.
+  // Mismo patrón que M9 con pixel_id.
+  const ownedAudienceIds = new Set<string>();
+  let nextEndpoint: string | null = `act_${accountId}/customaudiences`;
+  let nextParams: Record<string, any> | null = { fields: 'id', limit: '1000' };
+  let pageGuard = 0;
+  while (nextEndpoint && pageGuard < 10) {
+    pageGuard++;
+    const ownershipCheck: { ok: boolean; data?: any; error?: string } = await metaApiRequest(
+      nextEndpoint,
+      accessToken,
+      'GET',
+      nextParams || undefined
+    );
+    if (!ownershipCheck.ok) {
+      return {
+        body: {
+          error: 'No se pudo validar la audiencia origen contra la cuenta',
+          details: ownershipCheck.error,
+        },
+        status: 502,
+      };
+    }
+    for (const a of ownershipCheck.data?.data || []) {
+      ownedAudienceIds.add(String(a.id));
+    }
+    // Follow paging.next if present (already a fully-qualified URL with cursor)
+    const nextUrl: string | undefined = ownershipCheck.data?.paging?.next;
+    if (nextUrl && !ownedAudienceIds.has(String(source_audience_id))) {
+      // Use the absolute URL by stripping the base prefix; metaApiRequest builds
+      // `${META_API_BASE}/${endpoint}` so we pass only the path+query relative
+      // to v23.0/.
+      try {
+        const u = new URL(nextUrl);
+        // Preserve everything after `/v23.0/` as endpoint, drop access_token
+        // (metaApiRequest re-attaches it) and let other params ride in body.
+        const pathAfterVersion = u.pathname.replace(/^\/v\d+\.\d+\//, '');
+        const params: Record<string, string> = {};
+        u.searchParams.forEach((v, k) => {
+          if (k !== 'access_token') params[k] = v;
+        });
+        nextEndpoint = pathAfterVersion;
+        nextParams = params;
+      } catch {
+        nextEndpoint = null;
+        nextParams = null;
+      }
+    } else {
+      nextEndpoint = null;
+      nextParams = null;
+    }
+  }
+
+  if (!ownedAudienceIds.has(String(source_audience_id))) {
+    return {
+      body: {
+        error: 'La audiencia origen no pertenece a esta cuenta publicitaria',
+        source_audience_id,
+      },
+      status: 403,
+    };
+  }
+
   // Pre-flight: Meta requires the source audience to have at least 100 people.
   // Hit the audience endpoint and read approximate_count first so we fail
   // fast with a clear error instead of letting Meta reject the POST with a
