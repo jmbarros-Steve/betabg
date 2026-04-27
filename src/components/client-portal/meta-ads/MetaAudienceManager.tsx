@@ -634,7 +634,7 @@ function CreateCustomAudienceDialog({
                           <SelectTrigger className="w-[160px]">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="z-[100]">
                             <SelectItem value="CONTAINS">Contiene</SelectItem>
                             <SelectItem value="EQUALS">Es igual a</SelectItem>
                             <SelectItem value="STARTS_WITH">Empieza con</SelectItem>
@@ -693,7 +693,7 @@ function CreateCustomAudienceDialog({
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[100]">
                     {(
                       Object.entries(CUSTOMER_LIST_SOURCE_LABELS) as [
                         CustomerListSource,
@@ -759,7 +759,7 @@ function CreateCustomAudienceDialog({
                     <SelectTrigger className="mt-1">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-[100]">
                       {(
                         Object.entries(ENGAGEMENT_TYPE_LABELS) as [
                           EngagementType,
@@ -865,7 +865,7 @@ function CreateCustomAudienceDialog({
                     <SelectTrigger className="mt-1">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-[100]">
                       {(
                         Object.entries(APP_ACTIVITY_LABELS) as [
                           AppActivityType,
@@ -969,7 +969,7 @@ function CreateLookalikeDialog({
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Selecciona una audiencia personalizada" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[100]">
                 {customAudiences.length === 0 ? (
                   <div className="px-3 py-2 text-sm text-muted-foreground">
                     No hay audiencias personalizadas disponibles
@@ -1002,7 +1002,7 @@ function CreateLookalikeDialog({
               <SelectTrigger className="mt-1">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[100]">
                 {COUNTRY_OPTIONS.map((c) => (
                   <SelectItem key={c.value} value={c.value}>
                     {c.label}
@@ -1135,7 +1135,11 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
   const [searchQuery, setSearchQuery] = useState('');
   // Fallback pixel ID from DB if context doesn't have it
   const [dbPixelId, setDbPixelId] = useState<string | null>(null);
-  const pixelId = ctxPixelId || dbPixelId;
+  // Last-resort fallback: si ni context ni DB tienen pixel_id (común en
+  // conexiones leadsie donde el sync no pobló el campo), llamamos a Meta API
+  // directo (action list_pixels) para auto-detectar.
+  const [autoFetchedPixelId, setAutoFetchedPixelId] = useState<string | null>(null);
+  const pixelId = ctxPixelId || dbPixelId || autoFetchedPixelId;
 
   // Connection info
   const [hasMetaConnection, setHasMetaConnection] = useState(false);
@@ -1334,6 +1338,33 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
     window.addEventListener('bg:sync-complete', handler);
     return () => window.removeEventListener('bg:sync-complete', handler);
   }, [fetchData]);
+
+  // Auto-detect pixel cuando ni context ni DB lo tienen. Pasa típicamente con
+  // conexiones leadsie/bm_partner donde el sync inicial no pobló pixel_id.
+  // Llamamos al action list_pixels y tomamos el primero. Mejora UX inmediata
+  // sin requerir resync manual.
+  useEffect(() => {
+    if (ctxPixelId || dbPixelId || autoFetchedPixelId) return;
+    if (!ctxConnectionId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await callApi<{ pixels?: Array<{ id: string; name: string }> }>(
+          'manage-meta-audiences',
+          {
+            body: { connection_id: ctxConnectionId, action: 'list_pixels' },
+            timeoutMs: 15_000,
+          },
+        );
+        if (cancelled) return;
+        const first = data?.pixels?.[0];
+        if (first?.id) setAutoFetchedPixelId(first.id);
+      } catch {
+        // silencioso — el banner "Conecta tu Pixel primero" sigue siendo el fallback
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [ctxConnectionId, ctxPixelId, dbPixelId, autoFetchedPixelId]);
 
   // ---- Filtering ----
 

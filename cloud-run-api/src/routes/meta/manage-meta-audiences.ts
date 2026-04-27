@@ -5,7 +5,7 @@ import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 
 const META_API_BASE = 'https://graph.facebook.com/v23.0';
 
-type Action = 'create_custom' | 'create_lookalike' | 'create_retargeting' | 'delete' | 'list';
+type Action = 'create_custom' | 'create_lookalike' | 'create_retargeting' | 'delete' | 'list' | 'list_pixels';
 
 interface RequestBody {
   action: Action;
@@ -462,6 +462,40 @@ async function handleCreateLookalike(
   };
 }
 
+/**
+ * Lista los pixels disponibles del ad account. Used cuando platform_connections
+ * no tiene pixel_id guardado (común en conexiones leadsie/bm_partner donde el
+ * sync no pobló el campo). El frontend usa esto para auto-detectar el pixel
+ * antes de mostrar "Conecta tu Pixel primero".
+ */
+async function handleListPixels(
+  accountId: string,
+  accessToken: string,
+): Promise<{ body: any; status: number }> {
+  try {
+    const result = await metaApiRequest(
+      `act_${accountId}/adspixels`,
+      accessToken,
+      'GET',
+      { fields: 'id,name', limit: '50' },
+    );
+    if (result.error) {
+      return { body: { error: 'No se pudieron listar los pixels', details: result.error }, status: 502 };
+    }
+    return {
+      body: {
+        pixels: (result.data || []).map((p: any) => ({
+          id: String(p.id || ''),
+          name: String(p.name || ''),
+        })),
+      },
+      status: 200,
+    };
+  } catch (e: any) {
+    return { body: { error: e?.message || 'unknown' }, status: 500 };
+  }
+}
+
 async function handleList(
   accountId: string,
   accessToken: string
@@ -808,6 +842,10 @@ export async function manageMetaAudiences(c: Context) {
 
       case 'list':
         result = await handleList(accountId, decryptedToken);
+        break;
+
+      case 'list_pixels':
+        result = await handleListPixels(accountId, decryptedToken);
         break;
 
       case 'delete':
