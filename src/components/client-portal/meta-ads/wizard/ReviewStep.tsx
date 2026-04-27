@@ -58,6 +58,10 @@ interface ReviewStepProps {
   advFeatTranslate?: boolean;
   // Advantage+ Shopping Campaign (auto-detected by Meta based on 3 automation levers)
   isAdvantageSales?: boolean;
+  // M4: backend warnings (e.g. removed fields due to special_ad_categories)
+  backendWarnings?: Array<{ code?: string; message: string; removed_fields?: string[]; _idx?: number }>;
+  dismissedWarnings?: Set<number>;
+  onDismissWarning?: (idx: number) => void;
   // Actions
   onPublish?: () => void;
   onSaveDraft?: () => void;
@@ -98,6 +102,7 @@ export default function ReviewStep(props: ReviewStepProps) {
     urlTagsPreview,
     advFeatVisual, advFeatText, advFeatOverlays, advFeatTranslate,
     isAdvantageSales,
+    backendWarnings, dismissedWarnings, onDismissWarning,
     onPublish, onSaveDraft, submitting, savingDraft,
   } = props;
 
@@ -487,6 +492,43 @@ export default function ReviewStep(props: ReviewStepProps) {
               destinationUrl={destinationUrl}
             />
           </div>
+        </div>
+      )}
+
+      {/* M4: backend warnings — yellow dismissible cards before Publish */}
+      {backendWarnings && backendWarnings.length > 0 && (
+        <div className="space-y-2">
+          {backendWarnings.map((w) => {
+            const idx = w._idx ?? 0;
+            if (dismissedWarnings?.has(idx)) return null;
+            return (
+              <Card key={idx} className="border-yellow-300 bg-yellow-50">
+                <CardContent className="py-3 flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" aria-label="warning" />
+                  <div className="flex-1 text-sm text-yellow-900 space-y-1">
+                    <p className="font-semibold">
+                      Advertencia de Meta{w.code ? ` · ${w.code}` : ''}
+                    </p>
+                    <p className="text-xs">{w.message}</p>
+                    {w.removed_fields && w.removed_fields.length > 0 && (
+                      <p className="text-[11px] text-yellow-800">
+                        Campos eliminados: <code className="text-[10px] bg-white/50 px-1 rounded">{w.removed_fields.join(', ')}</code>
+                      </p>
+                    )}
+                  </div>
+                  {onDismissWarning && (
+                    <button
+                      type="button"
+                      onClick={() => onDismissWarning(idx)}
+                      className="text-yellow-700 hover:text-yellow-900 text-xs font-medium px-2"
+                    >
+                      Descartar
+                    </button>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
