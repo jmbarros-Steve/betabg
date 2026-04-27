@@ -250,6 +250,11 @@ import {
   getBriefEstudioMusicLibrary,
   generateMusicPreviews,
 } from './brief-estudio/index.js';
+// Brief Estudio — Fase 2 (narración + audio merge)
+import {
+  generateNarrationScript,
+  generateNarrationAudio,
+} from './brief-estudio/narration.js';
 
 // El Chino — Check System + Fix Queue + Fixer + Reports
 import {
@@ -706,6 +711,10 @@ export function registerRoutes(app: Hono) {
   app.post('/api/brief-estudio/products/sync', authMiddleware, syncBriefEstudioProducts);
   app.get('/api/brief-estudio/music/library', authMiddleware, getBriefEstudioMusicLibrary);
   app.post('/api/brief-estudio/music/generate-previews', authMiddleware, generateMusicPreviews);
+
+  // Brief Estudio — Fase 2 (narración + audio merge)
+  app.post('/api/brief-estudio/narration/script', authMiddleware, generateNarrationScript);
+  app.post('/api/brief-estudio/narration/audio', authMiddleware, generateNarrationAudio);
 
   // ============================================================
   // El Chino — Automated Check System (sub-router to avoid Hono RegExpRouter limit)

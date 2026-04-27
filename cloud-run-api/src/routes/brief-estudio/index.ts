@@ -107,7 +107,7 @@ interface SavePayload {
 
 // ----------------------------- Helpers ---------------------------------------
 
-async function assertClientAccess(
+export async function assertClientAccess(
   c: Context,
   clientId: string,
 ): Promise<{ allowed: boolean; isSuperAdmin: boolean; userId: string | null }> {
@@ -124,7 +124,7 @@ async function assertClientAccess(
   };
 }
 
-function isNonEmptyString(v: unknown): v is string {
+export function isNonEmptyString(v: unknown): v is string {
   return typeof v === 'string' && v.trim().length > 0;
 }
 
@@ -485,7 +485,7 @@ export async function prefillBriefEstudioFromBrief(c: Context) {
 
 // ----------------------------- Heuristics ------------------------------------
 
-type VoiceTone = 'warm' | 'energetic' | 'neutral' | 'luxury';
+export type VoiceTone = 'warm' | 'energetic' | 'neutral' | 'luxury';
 
 function asString(v: unknown): string | null {
   return typeof v === 'string' && v.trim().length > 0 ? v : null;
@@ -535,7 +535,7 @@ function extractPersonaTags(
   return tags;
 }
 
-function extractVoiceTone(
+export function extractVoiceTone(
   briefData: Record<string, unknown> | null | undefined,
 ): VoiceTone {
   const raw = (
@@ -582,7 +582,7 @@ function extractMusicMoods(
 // Replicate models. Kept as constants so they are easy to bump when we upgrade.
 const FLUX_ACTORS_MODEL = 'black-forest-labs/flux-1.1-pro-ultra';
 // XTTS-v2 hosted on Replicate by @lucataco — voice cloning from a single sample.
-const XTTS_V2_MODEL = 'lucataco/xtts-v2';
+export const XTTS_V2_MODEL = 'lucataco/xtts-v2';
 
 // Costs. 1 credit = $0.01 for simplicity.
 const FLUX_USD_PER_IMAGE = 0.06;
@@ -647,7 +647,7 @@ async function logAiUsage(
 /**
  * Download a URL to Uint8Array with a sensible timeout. Returns null on failure.
  */
-async function downloadToBytes(url: string, timeoutMs = 30_000): Promise<Uint8Array | null> {
+export async function downloadToBytes(url: string, timeoutMs = 30_000): Promise<Uint8Array | null> {
   try {
     const resp = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), redirect: 'follow' });
     if (!resp.ok) {
@@ -667,7 +667,7 @@ async function downloadToBytes(url: string, timeoutMs = 30_000): Promise<Uint8Ar
  * Upload bytes to Supabase Storage (bucket `client-assets`) and return the
  * public URL. Throws on failure.
  */
-async function uploadToClientAssets(
+export async function uploadToClientAssets(
   storagePath: string,
   bytes: Uint8Array,
   contentType: string,
@@ -1248,7 +1248,7 @@ export async function generateActors(c: Context) {
  * the MP3s to the bucket at the paths below. Until then, `sample_url` points
  * to placeholder paths and the frontend will render as "sample unavailable".
  */
-const VOICE_PRESETS: Record<
+export const VOICE_PRESETS: Record<
   string,
   { description: string; storagePath: string }
 > = {
@@ -1599,11 +1599,11 @@ async function assertSuperAdmin(
   return { allowed: isSuperAdmin, userId: user.id };
 }
 
-function musicPreviewStoragePath(trackId: string): string {
+export function musicPreviewStoragePath(trackId: string): string {
   return `music-previews/${trackId}.mp3`;
 }
 
-function musicPreviewPublicUrl(trackId: string): string {
+export function musicPreviewPublicUrl(trackId: string): string {
   const supabase = getSupabaseAdmin();
   const { data } = supabase.storage
     .from('client-assets')

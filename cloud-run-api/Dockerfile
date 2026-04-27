@@ -10,7 +10,7 @@ RUN npm run build
 FROM node:20-slim
 WORKDIR /app
 
-# Chromium for Puppeteer (El Chino visual checks)
+# Chromium for Puppeteer (El Chino visual checks) + FFmpeg (Brief Estudio Fase 2 audio merge)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     fonts-liberation \
@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 \
     libcairo2 \
     libasound2 \
+    ffmpeg \
   && rm -rf /var/lib/apt/lists/*
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true

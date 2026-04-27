@@ -9,6 +9,13 @@ import {
 } from '../../lib/brief-estudio-loader.js';
 import { pickTrackForAngleAndMood, type MusicMood } from '../../lib/music-library.js';
 import { runReplicatePrediction, ReplicateError } from '../../lib/replicate.js';
+import { mergeVideoStudio } from '../../lib/video-merge.js';
+import { musicPreviewPublicUrl } from '../brief-estudio/index.js';
+import {
+  generateNarrationScriptText,
+  generateNarrationAudioFile,
+} from '../brief-estudio/narration.js';
+import { randomUUID } from 'node:crypto';
 
 // Google Veo 3.1 Preview (standard — max quality) via Gemini Developer API.
 // Same GEMINI_API_KEY as generate-image.ts (Imagen 4 Fast). Pricing: $0.40/sec
@@ -288,6 +295,221 @@ async function fetchImageAsBase64(
   }
 }
 
+/**
+ * Brief Estudio — Fase 2: post-process the engine's mp4 with narración (XTTS)
+ * + música (MusicGen preview cached in Storage), mixed by FFmpeg.
+ *
+ * Best-effort: if any step fails (script gen, XTTS, ffmpeg, upload) we log a
+ * warning and the caller falls back to the silent / native-audio mp4. We never
+ * abort the parent endpoint because of an audio failure.
+ *
+ * Returns either:
+ *   - { mergedUrl, audioMeta } when at least one of narration|music produced
+ *     output and the merge succeeded.
+ *   - null if there was nothing to merge or the merge failed (silent fallback).
+ */
+interface AudioMeta {
+  narration_script: string | null;
+  narration_url: string | null;
+  music_track_id: string | null;
+  music_track_url: string | null;
+  use_voice: boolean;
+  use_music: boolean;
+  merge_label: string | null;
+  fallback_reason?: string;
+}
+
+async function maybePostProcessStudioAudio(args: {
+  videoUrl: string;
+  videoDurationSec: number;
+  clientId: string;
+  angulo?: string;
+  funnelStage?: string;
+  studioMode: boolean;
+  studioAssets: StudioAssets | null;
+  studioMusicTrackId: string | null;
+  moodKey: string | null;
+  useVoice: boolean;
+  useMusic: boolean;
+}): Promise<{ mergedUrl: string; audioMeta: AudioMeta } | null> {
+  const {
+    videoUrl,
+    videoDurationSec,
+    clientId,
+    angulo,
+    funnelStage,
+    studioMode,
+    studioAssets,
+    studioMusicTrackId,
+    moodKey,
+    useVoice,
+    useMusic,
+  } = args;
+
+  if (!studioMode || !studioAssets) return null;
+  if (!useVoice && !useMusic) return null;
+
+  const audioMeta: AudioMeta = {
+    narration_script: null,
+    narration_url: null,
+    music_track_id: null,
+    music_track_url: null,
+    use_voice: useVoice,
+    use_music: useMusic,
+    merge_label: null,
+  };
+
+  // 1) Narration (parallelizable with music selection — but music is local so
+  //    serial is simpler and cheap).
+  const voiceSource = studioAssets.primary_voice?.source ?? 'none';
+  if (useVoice && voiceSource !== 'none') {
+    try {
+      const featured = studioAssets.featured_products?.[0];
+      const productHint = featured
+        ? {
+            title: featured.title || null,
+            description: featured.body_html || null,
+            price_min: featured.price ?? null,
+          }
+        : null;
+      const scriptRes = await generateNarrationScriptText({
+        client_id: clientId,
+        angulo: angulo ?? null,
+        producto: productHint,
+        funnel_stage: funnelStage ?? null,
+        duration_sec: videoDurationSec,
+      });
+      audioMeta.narration_script = scriptRes.script;
+      const audioRes = await generateNarrationAudioFile({
+        client_id: clientId,
+        script: scriptRes.script,
+        voice_source: voiceSource,
+        preset_key: studioAssets.primary_voice?.preset_key ?? null,
+      });
+      audioMeta.narration_url = audioRes.audio_url;
+      console.log(
+        `[generate-video][studio-audio] narration ok (${scriptRes.word_count} words, ${audioRes.duration_sec}s est)`,
+      );
+    } catch (err: any) {
+      console.warn('[generate-video][studio-audio] narration failed:', err?.message);
+      audioMeta.fallback_reason = `narration:${err?.message?.slice(0, 80) || 'unknown'}`;
+    }
+  }
+
+  // 2) Music URL — pull from preview cache. moodKey + angulo determines which
+  //    track. studioMusicTrackId is the resolved id from the parent (already
+  //    matched against pickTrackForAngleAndMood).
+  if (useMusic && studioAssets.music_preferences?.moods?.length) {
+    let trackId = studioMusicTrackId;
+    if (!trackId && moodKey && angulo) {
+      try {
+        const track = pickTrackForAngleAndMood(angulo, moodKey as MusicMood);
+        trackId = track?.id || null;
+      } catch (err: any) {
+        console.warn('[generate-video][studio-audio] music pick fallback failed:', err?.message);
+      }
+    }
+    if (trackId) {
+      audioMeta.music_track_id = trackId;
+      try {
+        audioMeta.music_track_url = musicPreviewPublicUrl(trackId);
+      } catch (err: any) {
+        console.warn('[generate-video][studio-audio] music url failed:', err?.message);
+        audioMeta.music_track_url = null;
+      }
+    }
+  }
+
+  if (!audioMeta.narration_url && !audioMeta.music_track_url) {
+    // Nothing to merge.
+    return null;
+  }
+
+  // 3) Run FFmpeg merge.
+  try {
+    const merged = await mergeVideoStudio({
+      videoUrl,
+      narrationUrl: audioMeta.narration_url,
+      musicTrackUrl: audioMeta.music_track_url,
+      videoDurationSec,
+      outputPath: `${clientId}/ads/merged_${Date.now()}_${randomUUID().slice(0, 8)}.mp4`,
+    });
+    audioMeta.merge_label = merged.command_label;
+    return { mergedUrl: merged.url, audioMeta };
+  } catch (err: any) {
+    console.warn('[generate-video][studio-audio] ffmpeg merge failed:', err?.message);
+    audioMeta.fallback_reason = `merge:${err?.message?.slice(0, 100) || 'unknown'}`;
+    return null;
+  }
+}
+
+/**
+ * Apply the studio audio post-process to a creative if studio_mode is on.
+ * Mutates the asset_snapshot to record narration + audio overrides. Returns
+ * the URL the caller should report (merged URL on success, original URL as
+ * fallback). Never throws.
+ */
+async function applyStudioAudioToCreative(args: {
+  supabase: SupabaseClient;
+  creativeId: string | undefined;
+  clientId: string;
+  videoUrl: string;
+  videoDurationSec: number;
+  studioMode: boolean;
+  studioAssets: StudioAssets | null;
+  studioMusicTrackId: string | null;
+  moodKey: string | null;
+  angulo?: string;
+  funnelStage?: string;
+  useVoice: boolean;
+  useMusic: boolean;
+}): Promise<{ assetUrl: string; audioMeta: AudioMeta | null }> {
+  const {
+    supabase,
+    creativeId,
+    clientId,
+    videoUrl,
+    videoDurationSec,
+    studioMode,
+    studioAssets,
+    studioMusicTrackId,
+    moodKey,
+    angulo,
+    funnelStage,
+    useVoice,
+    useMusic,
+  } = args;
+
+  const result = await maybePostProcessStudioAudio({
+    videoUrl,
+    videoDurationSec,
+    clientId,
+    angulo,
+    funnelStage,
+    studioMode,
+    studioAssets,
+    studioMusicTrackId,
+    moodKey,
+    useVoice,
+    useMusic,
+  });
+
+  if (!result) return { assetUrl: videoUrl, audioMeta: null };
+
+  // Update the creative row with the merged URL + augmented snapshot.
+  if (creativeId) {
+    try {
+      await supabase
+        .from('ad_creatives')
+        .update({ asset_url: result.mergedUrl })
+        .eq('id', creativeId);
+    } catch (err: any) {
+      console.warn('[generate-video][studio-audio] update asset_url failed:', err?.message);
+    }
+  }
+  return { assetUrl: result.mergedUrl, audioMeta: result.audioMeta };
+}
+
 export async function generateVideo(c: Context) {
   try {
     const {
@@ -303,12 +525,21 @@ export async function generateVideo(c: Context) {
       // Brief Estudio — Etapa 5
       studio_mode: rawStudioMode,
       mood_key: rawMoodKey,
+      // Brief Estudio — Fase 2 (audio overrides). Default true when studio_mode.
+      use_voice: rawUseVoice,
+      use_music: rawUseMusic,
     } = await c.req.json();
 
     const supabase = getSupabaseAdmin();
     const studioMode = rawStudioMode === true;
     const moodKey: string | null =
       typeof rawMoodKey === 'string' ? rawMoodKey.trim().slice(0, 32) : null;
+
+    // Brief Estudio Fase 2 — voice/music gating. Default: true when studio_mode
+    // is on and the brand has the required asset; explicit `false` from the
+    // client wizard turns either off (e.g. "video silent" toggle).
+    const useVoice = rawUseVoice !== false;
+    const useMusic = rawUseMusic !== false;
 
     // Brief Estudio: si studio_mode=true, cargamos assets del cliente una vez
     // y los usamos para enriquecer refs (actor + primer producto) y seleccionar
@@ -419,10 +650,13 @@ export async function generateVideo(c: Context) {
         referenceUrls,
         finalAspect,
         angulo,
+        funnelStage,
         studioMode,
         studioAssets,
         studioMusicTrackId,
         moodKey,
+        useVoice,
+        useMusic,
       });
     }
     if (engineChoice === 'seedance') {
@@ -433,10 +667,13 @@ export async function generateVideo(c: Context) {
         referenceUrls,
         finalAspect,
         angulo,
+        funnelStage,
         studioMode,
         studioAssets,
         studioMusicTrackId,
         moodKey,
+        useVoice,
+        useMusic,
       });
     }
     if (engineChoice === 'runway') {
@@ -447,10 +684,13 @@ export async function generateVideo(c: Context) {
         referenceUrls,
         finalAspect,
         angulo,
+        funnelStage,
         studioMode,
         studioAssets,
         studioMusicTrackId,
         moodKey,
+        useVoice,
+        useMusic,
       });
     }
 
@@ -644,16 +884,64 @@ export async function generateVideo(c: Context) {
           }
         }
 
+        // Brief Estudio Fase 2 — narración + música via FFmpeg. NOTE: Veo
+        // already produces native audio, so the merge OVERWRITES Veo's audio
+        // track with the brand voice + curated music. Only triggers when the
+        // wizard sends `studio_mode=true` and `use_voice/use_music` are not
+        // explicitly disabled. The fallback (silent merge fail) keeps Veo's
+        // original audio because we only update asset_url on merge success.
+        const audioOutcomeVeo = await applyStudioAudioToCreative({
+          supabase,
+          creativeId,
+          clientId,
+          videoUrl: assetUrl,
+          videoDurationSec: DEFAULT_DURATION_SEC,
+          studioMode,
+          studioAssets,
+          studioMusicTrackId,
+          moodKey,
+          angulo,
+          funnelStage,
+          useVoice,
+          useMusic,
+        });
+        if (audioOutcomeVeo.audioMeta && creativeId && studioMode && studioAssets) {
+          try {
+            const snapshot = buildAssetSnapshot(studioAssets, {
+              mood_key: moodKey ?? null,
+              music_track_id: audioOutcomeVeo.audioMeta.music_track_id ?? null,
+              featured_product_index: 0,
+            });
+            const augmented = {
+              ...snapshot,
+              narration_script: audioOutcomeVeo.audioMeta.narration_script,
+              narration_url: audioOutcomeVeo.audioMeta.narration_url,
+              music_track_url: audioOutcomeVeo.audioMeta.music_track_url,
+              use_voice: audioOutcomeVeo.audioMeta.use_voice,
+              use_music: audioOutcomeVeo.audioMeta.use_music,
+              merge_label: audioOutcomeVeo.audioMeta.merge_label,
+              merged_asset_url: audioOutcomeVeo.assetUrl,
+            };
+            await supabase
+              .from('ad_creatives')
+              .update({ asset_snapshot: augmented })
+              .eq('id', creativeId);
+          } catch (snapErr: any) {
+            console.warn('[generate-video:veo][studio-audio] asset_snapshot augment failed:', snapErr?.message);
+          }
+        }
+
         return c.json({
           success: true,
           prediction_id: operationName,
           status: 'listo',
           engine: 'veo',
-          asset_url: assetUrl,
+          asset_url: audioOutcomeVeo.assetUrl,
           duration_seconds: DEFAULT_DURATION_SEC,
           generation_attempts: attempts,
           studio_mode: studioMode || undefined,
           music_track_id: studioMusicTrackId || undefined,
+          audio_merge: audioOutcomeVeo.audioMeta?.merge_label ?? undefined,
         });
       } catch (pollErr: any) {
         console.warn(`[generate-video] poll error attempt ${attempts}:`, pollErr?.message);
@@ -788,10 +1076,13 @@ async function runGenerateRunway(
     referenceUrls: string[];
     finalAspect: AspectRatio;
     angulo?: string;
+    funnelStage?: string;
     studioMode?: boolean;
     studioAssets?: StudioAssets | null;
     studioMusicTrackId?: string | null;
     moodKey?: string | null;
+    useVoice?: boolean;
+    useMusic?: boolean;
   },
 ) {
   const {
@@ -801,10 +1092,13 @@ async function runGenerateRunway(
     referenceUrls,
     finalAspect,
     angulo,
+    funnelStage,
     studioMode,
     studioAssets,
     studioMusicTrackId,
     moodKey,
+    useVoice = true,
+    useMusic = true,
   } = args;
 
   const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
@@ -978,16 +1272,59 @@ async function runGenerateRunway(
     }
   }
 
+  // Brief Estudio Fase 2 — narración + música via FFmpeg.
+  const audioOutcome = await applyStudioAudioToCreative({
+    supabase,
+    creativeId,
+    clientId,
+    videoUrl: assetUrl,
+    videoDurationSec: RUNWAY_DURATION_SEC,
+    studioMode: !!studioMode,
+    studioAssets: studioAssets ?? null,
+    studioMusicTrackId: studioMusicTrackId ?? null,
+    moodKey: moodKey ?? null,
+    angulo,
+    funnelStage,
+    useVoice,
+    useMusic,
+  });
+  if (audioOutcome.audioMeta && creativeId && studioMode && studioAssets) {
+    try {
+      const snapshot = buildAssetSnapshot(studioAssets, {
+        mood_key: moodKey ?? null,
+        music_track_id: audioOutcome.audioMeta.music_track_id ?? null,
+        featured_product_index: 0,
+      });
+      const augmented = {
+        ...snapshot,
+        narration_script: audioOutcome.audioMeta.narration_script,
+        narration_url: audioOutcome.audioMeta.narration_url,
+        music_track_url: audioOutcome.audioMeta.music_track_url,
+        use_voice: audioOutcome.audioMeta.use_voice,
+        use_music: audioOutcome.audioMeta.use_music,
+        merge_label: audioOutcome.audioMeta.merge_label,
+        merged_asset_url: audioOutcome.assetUrl,
+      };
+      await supabase
+        .from('ad_creatives')
+        .update({ asset_snapshot: augmented })
+        .eq('id', creativeId);
+    } catch (snapErr: any) {
+      console.warn('[generate-video:runway][studio-audio] asset_snapshot augment failed:', snapErr?.message);
+    }
+  }
+
   return c.json({
     success: true,
     prediction_id: predictionId,
     status: 'listo',
     engine: 'runway',
-    asset_url: assetUrl,
+    asset_url: audioOutcome.assetUrl,
     duration_seconds: RUNWAY_DURATION_SEC,
     generation_attempts: attempts,
     studio_mode: studioMode || undefined,
     music_track_id: studioMusicTrackId || undefined,
+    audio_merge: audioOutcome.audioMeta?.merge_label ?? undefined,
   });
 }
 
@@ -1013,10 +1350,13 @@ async function runGenerateSeedance(
     referenceUrls: string[];
     finalAspect: AspectRatio;
     angulo?: string;
+    funnelStage?: string;
     studioMode?: boolean;
     studioAssets?: StudioAssets | null;
     studioMusicTrackId?: string | null;
     moodKey?: string | null;
+    useVoice?: boolean;
+    useMusic?: boolean;
   },
 ) {
   const {
@@ -1026,10 +1366,13 @@ async function runGenerateSeedance(
     referenceUrls,
     finalAspect,
     angulo,
+    funnelStage,
     studioMode,
     studioAssets,
     studioMusicTrackId,
     moodKey,
+    useVoice = true,
+    useMusic = true,
   } = args;
 
   const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
@@ -1175,15 +1518,58 @@ async function runGenerateSeedance(
     }
   }
 
+  // Brief Estudio Fase 2 — narración + música via FFmpeg.
+  const audioOutcome = await applyStudioAudioToCreative({
+    supabase,
+    creativeId,
+    clientId,
+    videoUrl: assetUrl,
+    videoDurationSec: SEEDANCE_DURATION_SEC,
+    studioMode: !!studioMode,
+    studioAssets: studioAssets ?? null,
+    studioMusicTrackId: studioMusicTrackId ?? null,
+    moodKey: moodKey ?? null,
+    angulo,
+    funnelStage,
+    useVoice,
+    useMusic,
+  });
+  if (audioOutcome.audioMeta && creativeId && studioMode && studioAssets) {
+    try {
+      const snapshot = buildAssetSnapshot(studioAssets, {
+        mood_key: moodKey ?? null,
+        music_track_id: audioOutcome.audioMeta.music_track_id ?? null,
+        featured_product_index: 0,
+      });
+      const augmented = {
+        ...snapshot,
+        narration_script: audioOutcome.audioMeta.narration_script,
+        narration_url: audioOutcome.audioMeta.narration_url,
+        music_track_url: audioOutcome.audioMeta.music_track_url,
+        use_voice: audioOutcome.audioMeta.use_voice,
+        use_music: audioOutcome.audioMeta.use_music,
+        merge_label: audioOutcome.audioMeta.merge_label,
+        merged_asset_url: audioOutcome.assetUrl,
+      };
+      await supabase
+        .from('ad_creatives')
+        .update({ asset_snapshot: augmented })
+        .eq('id', creativeId);
+    } catch (snapErr: any) {
+      console.warn('[generate-video:seedance][studio-audio] asset_snapshot augment failed:', snapErr?.message);
+    }
+  }
+
   return c.json({
     success: true,
     prediction_id: pseudoOpId,
     status: 'listo',
     engine: 'seedance',
-    asset_url: assetUrl,
+    asset_url: audioOutcome.assetUrl,
     duration_seconds: SEEDANCE_DURATION_SEC,
     studio_mode: studioMode || undefined,
     music_track_id: studioMusicTrackId || undefined,
+    audio_merge: audioOutcome.audioMeta?.merge_label ?? undefined,
   });
 }
 
@@ -1208,10 +1594,13 @@ async function runGenerateKling(
     referenceUrls: string[];
     finalAspect: AspectRatio;
     angulo?: string;
+    funnelStage?: string;
     studioMode?: boolean;
     studioAssets?: StudioAssets | null;
     studioMusicTrackId?: string | null;
     moodKey?: string | null;
+    useVoice?: boolean;
+    useMusic?: boolean;
   },
 ) {
   const {
@@ -1221,10 +1610,13 @@ async function runGenerateKling(
     referenceUrls,
     finalAspect,
     angulo,
+    funnelStage,
     studioMode,
     studioAssets,
     studioMusicTrackId,
     moodKey,
+    useVoice = true,
+    useMusic = true,
   } = args;
 
   const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
@@ -1391,15 +1783,63 @@ async function runGenerateKling(
     }
   }
 
+  // Brief Estudio Fase 2 — narración + música via FFmpeg. Best-effort: if it
+  // fails we keep the original silent mp4 as the fallback. Only runs when
+  // studio_mode=true and at least one of voice/music is enabled.
+  const audioOutcome = await applyStudioAudioToCreative({
+    supabase,
+    creativeId,
+    clientId,
+    videoUrl: assetUrl,
+    videoDurationSec: KLING_DURATION_SEC,
+    studioMode: !!studioMode,
+    studioAssets: studioAssets ?? null,
+    studioMusicTrackId: studioMusicTrackId ?? null,
+    moodKey: moodKey ?? null,
+    angulo,
+    funnelStage,
+    useVoice,
+    useMusic,
+  });
+  if (audioOutcome.audioMeta && creativeId && studioMode && studioAssets) {
+    try {
+      const snapshot = buildAssetSnapshot(studioAssets, {
+        mood_key: moodKey ?? null,
+        music_track_id: audioOutcome.audioMeta.music_track_id ?? null,
+        featured_product_index: 0,
+      });
+      // Augment the snapshot with audio metadata (asset_snapshot is JSONB —
+      // additive keys are safe; column shape verified in
+      // supabase/migrations/20260424140000_brief_estudio_asset_snapshot.sql).
+      const augmented = {
+        ...snapshot,
+        narration_script: audioOutcome.audioMeta.narration_script,
+        narration_url: audioOutcome.audioMeta.narration_url,
+        music_track_url: audioOutcome.audioMeta.music_track_url,
+        use_voice: audioOutcome.audioMeta.use_voice,
+        use_music: audioOutcome.audioMeta.use_music,
+        merge_label: audioOutcome.audioMeta.merge_label,
+        merged_asset_url: audioOutcome.assetUrl,
+      };
+      await supabase
+        .from('ad_creatives')
+        .update({ asset_snapshot: augmented })
+        .eq('id', creativeId);
+    } catch (snapErr: any) {
+      console.warn('[generate-video:kling][studio-audio] asset_snapshot augment failed:', snapErr?.message);
+    }
+  }
+
   return c.json({
     success: true,
     prediction_id: pseudoOpId,
     status: 'listo',
     engine: 'kling',
-    asset_url: assetUrl,
+    asset_url: audioOutcome.assetUrl,
     duration_seconds: KLING_DURATION_SEC,
     reference_count: refsToUse.length,
     studio_mode: studioMode || undefined,
     music_track_id: studioMusicTrackId || undefined,
+    audio_merge: audioOutcome.audioMeta?.merge_label ?? undefined,
   });
 }
