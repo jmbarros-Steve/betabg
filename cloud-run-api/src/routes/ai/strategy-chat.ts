@@ -6,6 +6,46 @@ import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.js';
 import { sanitizeMessagesForAnthropic, truncateMessages } from './steve-chat.js';
 
+// Calendario de fechas comerciales relevantes para Chile/LATAM (#39)
+// Usadas para que Steve sepa qué evento se aproxima y pueda recomendar
+// preparación de campañas/inventario/email.
+function buildSeasonalContext(today: Date): string {
+  const year = today.getFullYear();
+  const events: Array<{ date: Date; name: string; type: string }> = [
+    { date: new Date(year, 1, 14), name: 'San Valentín', type: 'romántico/regalo' },
+    { date: new Date(year, 2, 8), name: 'Día Internacional de la Mujer', type: 'awareness/regalo' },
+    { date: new Date(year, 4, 1), name: 'Día del Trabajador (feriado)', type: 'feriado/oferta' },
+    { date: new Date(year, 4, 11), name: 'Día de la Madre (Chile)', type: 'regalo/alta demanda' },
+    { date: new Date(year, 5, 16), name: 'Día del Padre (Chile)', type: 'regalo' },
+    { date: new Date(year, 5, 21), name: 'CyberDay Chile (junio)', type: 'descuento/alta competencia' },
+    { date: new Date(year, 6, 16), name: 'Día Internacional de la Amistad', type: 'regalo' },
+    { date: new Date(year, 8, 18), name: 'Fiestas Patrias Chile', type: 'feriado largo/preparación' },
+    { date: new Date(year, 9, 6), name: 'CyberMonday Chile (octubre)', type: 'descuento/alta competencia' },
+    { date: new Date(year, 9, 31), name: 'Halloween', type: 'nicho/disfraces' },
+    { date: new Date(year, 10, 28), name: 'Black Friday', type: 'descuento/conversión alta' },
+    { date: new Date(year, 11, 1), name: 'Cyber Monday global', type: 'descuento' },
+    { date: new Date(year, 11, 25), name: 'Navidad', type: 'regalo/máxima demanda' },
+    { date: new Date(year, 11, 31), name: 'Año Nuevo', type: 'cierre/promoción liquidación' },
+  ];
+  const todayMs = today.getTime();
+  const upcoming = events
+    .map(e => ({ ...e, daysUntil: Math.ceil((e.date.getTime() - todayMs) / 86400000) }))
+    .filter(e => e.daysUntil >= -3 && e.daysUntil <= 60)
+    .sort((a, b) => a.daysUntil - b.daysUntil);
+  if (upcoming.length === 0) return '';
+  let out = `\n📅 CALENDARIO ESTACIONAL (Chile/LATAM, próximas fechas comerciales):\n`;
+  for (const e of upcoming.slice(0, 4)) {
+    if (e.daysUntil < 0) {
+      out += `- ${e.name} (${e.type}): pasó hace ${Math.abs(e.daysUntil)} días — analizar performance reciente\n`;
+    } else if (e.daysUntil === 0) {
+      out += `- ${e.name} (${e.type}): HOY 🔥\n`;
+    } else {
+      out += `- ${e.name} (${e.type}): en ${e.daysUntil} días — ventana ideal de preparación\n`;
+    }
+  }
+  return out;
+}
+
 export async function strategyChat(c: Context) {
   const requestStart = Date.now();
   const timelog = (label: string) => console.log(`[strategy-chat][timing] ${label}: ${Date.now() - requestStart}ms`);
@@ -326,10 +366,14 @@ export async function strategyChat(c: Context) {
     const mergedKnowledge = [...(clientKnowledgeData || []), ...(knowledge || [])];
     timelog('estrategia-parallel-queries');
 
-    // === LIVE SHOPIFY: top sold products last 30d (best-effort, ≤4s budget) ===
-    // We fetch orders directly from Shopify Admin API so Steve knows which SKUs
-    // are actually moving, not just what's in the catalog.
+    // === LIVE SHOPIFY: orders last 30d → top sold products + new/returning + bundles (best-effort, ≤5s budget) ===
     let topSoldProducts: Array<{ sku: string | null; title: string; units: number; revenue: number }> = [];
+    let shopifyOrdersAnalysis: {
+      totalOrders: number;
+      newCustomers: number;
+      returningCustomers: number;
+      bundles: Array<{ items: string[]; count: number }>;
+    } | null = null;
     const shopifyConnections = (connections || []).filter((c: any) => c.platform === 'shopify');
     if (shopifyConnections.length > 0) {
       try {
@@ -344,10 +388,10 @@ export async function strategyChat(c: Context) {
             .rpc('decrypt_platform_token', { encrypted_token: connFull.access_token_encrypted });
           if (tok) {
             const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), 4000);
+            const timer = setTimeout(() => ctrl.abort(), 5000);
             try {
               const cleanUrl = String(connFull.store_url).replace(/^https?:\/\//, '');
-              const url = `https://${cleanUrl}/admin/api/2026-04/orders.json?status=any&created_at_min=${thirtyDaysAgo}T00:00:00Z&fields=id,financial_status,line_items&limit=250`;
+              const url = `https://${cleanUrl}/admin/api/2026-04/orders.json?status=any&created_at_min=${thirtyDaysAgo}T00:00:00Z&fields=id,financial_status,line_items,customer&limit=250`;
               const res = await fetch(url, {
                 headers: { 'X-Shopify-Access-Token': tok, 'Content-Type': 'application/json' },
                 signal: ctrl.signal,
@@ -356,30 +400,61 @@ export async function strategyChat(c: Context) {
                 const j: any = await res.json();
                 const orders = j.orders || [];
                 const ACCEPTED = new Set(['paid', 'partially_paid', 'partially_refunded', 'pending', 'authorized']);
-                const map: Record<string, any> = {};
+                const skuMap: Record<string, any> = {};
+                const bundleMap: Record<string, number> = {};
+                let totalAccepted = 0;
+                let newCust = 0;
+                let returning = 0;
                 for (const o of orders) {
                   if (!ACCEPTED.has(o.financial_status)) continue;
+                  totalAccepted++;
+                  // New vs returning: customer.orders_count
+                  const oc = Number(o.customer?.orders_count) || 0;
+                  if (oc === 1) newCust++;
+                  else if (oc > 1) returning++;
+                  // SKU aggregation
+                  const orderItems: string[] = [];
                   for (const li of (o.line_items || [])) {
                     const key = li.sku || li.title || 'sin-sku';
-                    if (!map[key]) map[key] = { sku: li.sku || null, title: li.title || 'Sin título', units: 0, revenue: 0 };
-                    map[key].units += Number(li.quantity) || 0;
-                    map[key].revenue += (Number(li.price) || 0) * (Number(li.quantity) || 0);
+                    if (!skuMap[key]) skuMap[key] = { sku: li.sku || null, title: li.title || 'Sin título', units: 0, revenue: 0 };
+                    skuMap[key].units += Number(li.quantity) || 0;
+                    skuMap[key].revenue += (Number(li.price) || 0) * (Number(li.quantity) || 0);
+                    orderItems.push(li.title || li.sku || 'sin-titulo');
+                  }
+                  // Bundle detection: if this order has 2+ items, count combinations
+                  if (orderItems.length >= 2) {
+                    const sortedItems = [...new Set(orderItems)].sort();
+                    if (sortedItems.length >= 2) {
+                      const bundleKey = sortedItems.slice(0, 4).join(' + ');
+                      bundleMap[bundleKey] = (bundleMap[bundleKey] || 0) + 1;
+                    }
                   }
                 }
-                topSoldProducts = Object.values(map).sort((a: any, b: any) => b.units - a.units).slice(0, 8);
+                topSoldProducts = Object.values(skuMap).sort((a: any, b: any) => b.units - a.units).slice(0, 8);
+                const topBundles = Object.entries(bundleMap)
+                  .filter(([, count]) => count >= 2)
+                  .sort(([, a], [, b]) => b - a)
+                  .slice(0, 5)
+                  .map(([items, count]) => ({ items: items.split(' + '), count }));
+                shopifyOrdersAnalysis = {
+                  totalOrders: totalAccepted,
+                  newCustomers: newCust,
+                  returningCustomers: returning,
+                  bundles: topBundles,
+                };
               }
             } catch (e: any) {
-              console.warn('[strategy-chat] Top sold products fetch skipped:', e?.message);
+              console.warn('[strategy-chat] Shopify orders analysis skipped:', e?.message);
             } finally {
               clearTimeout(timer);
             }
           }
         }
       } catch (e: any) {
-        console.warn('[strategy-chat] Top sold products outer error:', e?.message);
+        console.warn('[strategy-chat] Shopify orders outer error:', e?.message);
       }
     }
-    timelog('estrategia-top-sold-products');
+    timelog('estrategia-shopify-orders-analysis');
 
     // Smart rule selection (Mejora #10): use Haiku to pick most relevant rules for this question
     // Uses mergedKnowledge (client-specific + global, client first for priority)
@@ -490,6 +565,130 @@ export async function strategyChat(c: Context) {
     } else if (shopifyConnections.length > 0) {
       topSoldContext = `\n🔥 TOP PRODUCTOS VENDIDOS: No detecté pedidos pagados en Shopify en los últimos 30 días (puede ser que el cliente esté empezando o el sync de orders esté limitado por scopes).\n`;
     }
+
+    // === ALERTAS DE INVENTARIO (#16, #17, #19) ===
+    let inventoryAlertsContext = '';
+    if (productsList.length > 0) {
+      const sinStock = productsList.filter((p: any) => p.inventory_total === 0);
+      const sinStockNames = new Set(sinStock.map((p: any) => String(p.title || '').toLowerCase()));
+      const sinImagen = productsList.filter((p: any) => !p.image_url && p.status === 'active');
+      // Velocidad de rotación: stock vs ventas últimos 30d
+      const rotacionLenta: any[] = [];
+      const rotacionRapida: any[] = [];
+      for (const p of productsList) {
+        if (p.inventory_total === -1 || p.inventory_total === 0) continue;
+        const sold = topSoldProducts.find(s => s.title === p.title);
+        const unitsSold = sold?.units || 0;
+        const stock = Number(p.inventory_total) || 0;
+        if (stock > 50 && unitsSold === 0) rotacionLenta.push(p);
+        if (stock > 0 && unitsSold > stock * 0.5) rotacionRapida.push({ ...p, unitsSold });
+      }
+      const alerts: string[] = [];
+      if (sinStock.length > 0) {
+        alerts.push(`⚠️ ${sinStock.length} producto(s) SIN STOCK (estás perdiendo conversiones si tenés ads activos): ${sinStock.slice(0, 5).map((p: any) => `"${String(p.title).slice(0, 40)}"`).join(', ')}`);
+      }
+      if (sinImagen.length > 0) {
+        alerts.push(`⚠️ ${sinImagen.length} producto(s) activo(s) SIN IMAGEN: ${sinImagen.slice(0, 3).map((p: any) => `"${String(p.title).slice(0, 40)}"`).join(', ')}`);
+      }
+      if (rotacionLenta.length > 0) {
+        alerts.push(`📉 ${rotacionLenta.length} producto(s) con stock alto pero CERO ventas en 30d (capital atrapado): ${rotacionLenta.slice(0, 3).map((p: any) => `"${String(p.title).slice(0, 40)}" (${p.inventory_total} u.)`).join(', ')}`);
+      }
+      if (rotacionRapida.length > 0) {
+        alerts.push(`🚀 ${rotacionRapida.length} producto(s) con ROTACIÓN RÁPIDA — riesgo de quedar sin stock pronto: ${rotacionRapida.slice(0, 3).map((p: any) => `"${String(p.title).slice(0, 40)}" (${p.unitsSold}/${p.inventory_total})`).join(', ')}`);
+      }
+      // Bundles
+      if (shopifyOrdersAnalysis?.bundles && shopifyOrdersAnalysis.bundles.length > 0) {
+        const top = shopifyOrdersAnalysis.bundles[0];
+        alerts.push(`🎁 BUNDLE detectado: ${top.count} clientes compraron juntos "${top.items.slice(0, 2).join('" + "')}" — oportunidad de combo/discount`);
+      }
+      if (alerts.length > 0) {
+        inventoryAlertsContext = `\n📦 ALERTAS DE INVENTARIO Y CATÁLOGO:\n` + alerts.map(a => `- ${a}`).join('\n') + '\n';
+      }
+    }
+
+    // === CUSTOMER INTELLIGENCE (#11, #27, #28) ===
+    let customerIntelContext = '';
+    if (emailSubsAgg && emailSubsAgg.length > 0) {
+      const subs = emailSubsAgg as any[];
+      const totalWithOrders = subs.filter(s => Number(s.total_orders) > 0).length;
+      const repeatCount = subs.filter(s => Number(s.total_orders) >= 2).length;
+      const totalSpent = subs.reduce((acc, s) => acc + (Number(s.total_spent) || 0), 0);
+      const avgLtv = totalWithOrders > 0 ? Math.round(totalSpent / totalWithOrders) : 0;
+      const repeatRate = subs.length > 0 ? Math.round((repeatCount / subs.length) * 1000) / 10 : 0;
+      // Top 5 spenders
+      const topSpenders = subs
+        .filter(s => Number(s.total_spent) > 0)
+        .sort((a, b) => Number(b.total_spent) - Number(a.total_spent))
+        .slice(0, 5);
+      // Churn signals
+      const now = Date.now();
+      const sixtyDaysAgoMs = now - 60 * 86400000;
+      const churnRisk = subs.filter(s => {
+        if (!s.last_order_at) return false;
+        const last = new Date(s.last_order_at).getTime();
+        return last < sixtyDaysAgoMs && Number(s.total_orders) >= 1;
+      });
+      customerIntelContext = `\n👥 CUSTOMER INTELLIGENCE (basado en tu lista de Klaviyo):\n`;
+      customerIntelContext += `- ${subs.length} suscriptores totales · ${totalWithOrders} con al menos 1 compra (${avgLtv > 0 ? `LTV promedio $${avgLtv.toLocaleString()} CLP` : 'sin LTV calculable'})\n`;
+      customerIntelContext += `- Repeat rate: ${repeatCount}/${subs.length} clientes (${repeatRate}%) — clientes con 2+ compras\n`;
+      if (churnRisk.length > 0) {
+        customerIntelContext += `- 🚨 ${churnRisk.length} clientes en RIESGO DE CHURN (compraron pero nada hace 60+ días) — candidatos a flujo de winback\n`;
+      }
+      if (topSpenders.length > 0) {
+        customerIntelContext += `- TOP 5 clientes por LTV individual:\n`;
+        for (const s of topSpenders) {
+          const name = s.first_name ? `${s.first_name} ${s.last_name || ''}`.trim() : (s.email || 'Anónimo');
+          customerIntelContext += `  - ${name}: ${s.total_orders} pedidos, $${Math.round(Number(s.total_spent)).toLocaleString()} gastado\n`;
+        }
+      }
+      // New vs returning del período actual (de Shopify orders live)
+      if (shopifyOrdersAnalysis && shopifyOrdersAnalysis.totalOrders > 0) {
+        const total = shopifyOrdersAnalysis.totalOrders;
+        const newPct = Math.round((shopifyOrdersAnalysis.newCustomers / total) * 100);
+        const retPct = Math.round((shopifyOrdersAnalysis.returningCustomers / total) * 100);
+        customerIntelContext += `- Mix de pedidos últimos 30d: ${shopifyOrdersAnalysis.newCustomers} nuevos clientes (${newPct}%) · ${shopifyOrdersAnalysis.returningCustomers} repetidores (${retPct}%)\n`;
+      }
+    }
+
+    // === ROAS CON MARGEN REAL (#13) ===
+    let realRoasContext = '';
+    const hasAdsConnection = (connections || []).some((c: any) => c.platform === 'meta' || c.platform === 'google_ads');
+    if (financialConfig && hasAdsConnection) {
+      const margin = Number(financialConfig.default_margin_percentage) || 0;
+      if (margin > 0 && margin < 100) {
+        // Usamos los datos ya en metricsContext (ya calculados arriba en este handler)
+        // Buscamos los totales 30d en campaignMetrics (variable local más arriba en el handler)
+        // Como están dentro de connIds.length>0 branch, necesitamos referencia: usaremos
+        // el mismo aggregateCampaigns que ya se usa más abajo. Para evitar acoplamiento,
+        // calculamos aquí con un mini-loop sobre lo disponible.
+        let totalSpend = 0, totalRevenue = 0;
+        // No tenemos campaignMetrics en este scope (está en branch); usamos topSoldProducts revenue
+        // como aproximación — pero mejor hacer un mini fetch desde data ya cargada arriba.
+        // Como simplificación: dejamos al modelo calcular el ROAS ajustado con los números que
+        // vea en metricsContext y la regla siguiente:
+        realRoasContext = `\n💎 ROAS AJUSTADO POR MARGEN (regla para Steve):\n`;
+        realRoasContext += `- El cliente tiene margen bruto de ${margin}%.\n`;
+        realRoasContext += `- Cuando hables de ROAS, calculá también el ROAS REAL = ROAS bruto × ${(margin / 100).toFixed(2)}.\n`;
+        realRoasContext += `- ROAS bruto >${(100 / margin).toFixed(2)}x es necesario para que la campaña aporte utilidad real (breakeven).\n`;
+        realRoasContext += `- Usá esto para evaluar si una campaña con ROAS 3x está realmente generando plata o solo cubriendo costo.\n`;
+      }
+    }
+
+    // === COMMITMENTS STATUS (#37) ===
+    let commitmentsStatusContext = '';
+    if (commitments && commitments.length > 0) {
+      const overdue = commitments.filter((c: any) => c.follow_up_date && new Date(c.follow_up_date).getTime() < Date.now());
+      if (overdue.length > 0) {
+        commitmentsStatusContext = `\n⏰ COMPROMISOS VENCIDOS SIN SEGUIMIENTO (${overdue.length}):\n`;
+        for (const c of overdue.slice(0, 3)) {
+          commitmentsStatusContext += `- "${String(c.commitment).slice(0, 100)}" (vencía ${new Date(c.follow_up_date).toLocaleDateString('es-CL')})\n`;
+        }
+        commitmentsStatusContext += `Si el cliente menciona algún tema relacionado, traé estos compromisos a colación y preguntá si avanzaron.\n`;
+      }
+    }
+
+    // === CALENDARIO ESTACIONAL (#39) ===
+    const seasonalContext = buildSeasonalContext(now);
 
     // === FINANCIAL CONFIG ===
     let financialContext = '';
@@ -930,6 +1129,11 @@ ${persona?.is_complete ? '' : '⚠️ NOTA: El brief del cliente aún NO está c
 ${metricsContext}
 ${productsContext}
 ${topSoldContext}
+${inventoryAlertsContext}
+${customerIntelContext}
+${realRoasContext}
+${commitmentsStatusContext}
+${seasonalContext}
 ${financialContext}
 ${emailContext}
 ${waContext}

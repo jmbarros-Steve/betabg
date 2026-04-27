@@ -79,6 +79,34 @@ function dayDiff(from: string, to: string): number {
   return Math.max(1, Math.round((b - a) / 86400000) + 1);
 }
 
+// Calendario estacional Chile/LATAM (#39) — duplicated from strategy-chat.ts
+// for module independence; consider moving to lib/seasonal.ts later.
+interface SeasonalEvent { date: Date; name: string; type: string; daysUntil: number }
+function getUpcomingSeasonalEvents(today: Date): SeasonalEvent[] {
+  const year = today.getFullYear();
+  const events: Array<{ date: Date; name: string; type: string }> = [
+    { date: new Date(year, 1, 14), name: 'San Valentín', type: 'romántico/regalo' },
+    { date: new Date(year, 2, 8), name: 'Día Internacional de la Mujer', type: 'awareness/regalo' },
+    { date: new Date(year, 4, 1), name: 'Día del Trabajador', type: 'feriado/oferta' },
+    { date: new Date(year, 4, 11), name: 'Día de la Madre (Chile)', type: 'regalo/alta demanda' },
+    { date: new Date(year, 5, 16), name: 'Día del Padre (Chile)', type: 'regalo' },
+    { date: new Date(year, 5, 21), name: 'CyberDay Chile', type: 'descuento/alta competencia' },
+    { date: new Date(year, 6, 16), name: 'Día Internacional de la Amistad', type: 'regalo' },
+    { date: new Date(year, 8, 18), name: 'Fiestas Patrias Chile', type: 'feriado largo' },
+    { date: new Date(year, 9, 6), name: 'CyberMonday Chile', type: 'descuento/alta competencia' },
+    { date: new Date(year, 9, 31), name: 'Halloween', type: 'nicho/disfraces' },
+    { date: new Date(year, 10, 28), name: 'Black Friday', type: 'descuento/conversión alta' },
+    { date: new Date(year, 11, 1), name: 'Cyber Monday global', type: 'descuento' },
+    { date: new Date(year, 11, 25), name: 'Navidad', type: 'regalo/máxima demanda' },
+    { date: new Date(year, 11, 31), name: 'Año Nuevo', type: 'cierre/liquidación' },
+  ];
+  const todayMs = today.getTime();
+  return events
+    .map(e => ({ ...e, daysUntil: Math.ceil((e.date.getTime() - todayMs) / 86400000) }))
+    .filter(e => e.daysUntil >= -3 && e.daysUntil <= 90)
+    .sort((a, b) => a.daysUntil - b.daysUntil);
+}
+
 function eachDay(from: string, to: string): string[] {
   const out: string[] = [];
   const a = new Date(from + 'T00:00:00Z');
@@ -600,6 +628,44 @@ function buildInsightsPrompt(d: any, period: { from: string; to: string; days: n
     }
   }
 
+  // Inventory alerts (#16-#19)
+  if (d.inventoryInsights) {
+    const inv = d.inventoryInsights;
+    if (inv.sinStock?.length > 0) lines.push(`ALERTA: ${inv.sinStock.length} productos SIN STOCK activos: ${inv.sinStock.slice(0, 3).map((p: any) => p.title).join(', ')}`);
+    if (inv.sinImagen?.length > 0) lines.push(`ALERTA: ${inv.sinImagen.length} productos activos sin imagen`);
+    if (inv.rotacionLenta?.length > 0) lines.push(`ALERTA: ${inv.rotacionLenta.length} productos con stock alto sin ventas en período (capital atrapado)`);
+    if (inv.rotacionRapida?.length > 0) lines.push(`OPORTUNIDAD: ${inv.rotacionRapida.length} productos con rotación rápida — riesgo de stockout`);
+    if (inv.bundles?.length > 0) lines.push(`BUNDLES detectados: top combo "${inv.bundles[0].items.slice(0, 2).join(' + ')}" comprado ${inv.bundles[0].count} veces`);
+    if (inv.newCustomers > 0 || inv.returningCustomers > 0) {
+      const total = inv.newCustomers + inv.returningCustomers;
+      lines.push(`Mix de pedidos: ${inv.newCustomers} nuevos clientes (${Math.round((inv.newCustomers / total) * 100)}%) · ${inv.returningCustomers} repetidores (${Math.round((inv.returningCustomers / total) * 100)}%)`);
+    }
+  }
+
+  // Top spenders + churn
+  if (d.topSpenders && d.topSpenders.length > 0) {
+    lines.push('TOP SPENDERS individuales:');
+    for (const s of d.topSpenders.slice(0, 3)) {
+      lines.push(`  - ${s.name}: ${s.orders} pedidos, ${fmtMoney(s.spent)}`);
+    }
+  }
+  if (d.churnRiskCount && d.churnRiskCount > 0) {
+    lines.push(`CHURN RISK: ${d.churnRiskCount} clientes con compras pero inactivos hace 60+ días — candidatos a winback`);
+  }
+
+  // Seasonal
+  if (d.seasonalEvents && d.seasonalEvents.length > 0) {
+    const next = d.seasonalEvents[0];
+    if (next.daysUntil >= 0 && next.daysUntil <= 30) {
+      lines.push(`PRÓXIMO EVENTO ESTACIONAL: ${next.name} en ${next.daysUntil} días (${next.type})`);
+    }
+  }
+
+  // ROAS con margen real (#13)
+  if (d.financialConfig?.default_margin_percentage) {
+    lines.push(`MARGEN BRUTO DEL CLIENTE: ${d.financialConfig.default_margin_percentage}% — ROAS breakeven = ${(100 / d.financialConfig.default_margin_percentage).toFixed(2)}x. Cualquier ROAS por debajo está perdiendo plata.`);
+  }
+
   // Cohort
   if (d.cohort) {
     lines.push(`COHORTE: ${d.cohort.totalSubs} suscriptores total, ${d.cohort.repeatCount} con 2+ pedidos (${d.cohort.repeatRate}% repeat rate), LTV promedio ${fmtMoney(d.cohort.avgLtv)}`);
@@ -926,10 +992,13 @@ export async function strategyReport(c: Context) {
       sectionsToInclude.push('criterio');
     }
 
-    // Persona (always included for context)
-    const { data: persona } = await supabase
-      .from('buyer_personas').select('persona_data, is_complete').eq('client_id', client_id).maybeSingle();
+    // Persona + financial config (always included for AI context)
+    const [{ data: persona }, { data: finCfg }] = await Promise.all([
+      supabase.from('buyer_personas').select('persona_data, is_complete').eq('client_id', client_id).maybeSingle(),
+      supabase.from('client_financial_config').select('default_margin_percentage, shopify_commission_percentage, payment_gateway_commission, shipping_cost_per_order, other_fixed_costs').eq('client_id', client_id).maybeSingle(),
+    ]);
     data.persona = persona;
+    data.financialConfig = finCfg;
 
     // Live Shopify orders → top sold products (only if shopify section + connection exists)
     if (wants('shopify') && shopifyConnIds.length > 0) {
@@ -947,6 +1016,67 @@ export async function strategyReport(c: Context) {
     if (wants('whatsapp') && data.waMessages?.length > 0) {
       data.waSentiment = await classifyWaSentiment(data.waMessages);
     }
+
+    // === ANÁLISIS CRUZADO PRE-AI (#15-#19, #11, #13, #39) ===
+    // Inventory alerts: sin stock, sin imagen, rotación lenta vs rápida
+    const products = data.products || [];
+    const topProds = data.topProducts || [];
+    const sinStock = products.filter((p: any) => p.inventory_total === 0);
+    const sinImagen = products.filter((p: any) => !p.image_url && p.status === 'active');
+    const rotacionLenta: any[] = [];
+    const rotacionRapida: any[] = [];
+    for (const p of products) {
+      if (p.inventory_total === -1 || p.inventory_total === 0) continue;
+      const sold = topProds.find((s: any) => s.title === p.title);
+      const unitsSold = sold?.units || 0;
+      const stock = Number(p.inventory_total) || 0;
+      if (stock > 50 && unitsSold === 0) rotacionLenta.push(p);
+      if (stock > 0 && unitsSold > stock * 0.5) rotacionRapida.push({ ...p, unitsSold });
+    }
+    // Bundles del período (co-occurrence en orders)
+    const bundleMap: Record<string, number> = {};
+    let newCustomers = 0, returningCustomers = 0;
+    for (const o of (data.shopifyOrders || [])) {
+      const oc = Number(o.customer?.orders_count) || 0;
+      if (oc === 1) newCustomers++;
+      else if (oc > 1) returningCustomers++;
+      const items = (o.line_items || []).map((li: any) => li.title || li.sku || '').filter(Boolean);
+      if (items.length >= 2) {
+        const sorted = [...new Set(items)].sort();
+        if (sorted.length >= 2) {
+          const key = sorted.slice(0, 4).join(' + ');
+          bundleMap[key] = (bundleMap[key] || 0) + 1;
+        }
+      }
+    }
+    const bundles = Object.entries(bundleMap).filter(([, c]) => c >= 2).sort(([, a], [, b]) => b - a).slice(0, 5)
+      .map(([items, count]) => ({ items: items.split(' + '), count }));
+    data.inventoryInsights = { sinStock, sinImagen, rotacionLenta, rotacionRapida, bundles, newCustomers, returningCustomers };
+
+    // Top spenders individuales con datos completos
+    if (data.emailSubs && data.emailSubs.length > 0) {
+      const topSpenders = (data.emailSubs as any[])
+        .filter(s => Number(s.total_spent) > 0)
+        .sort((a, b) => Number(b.total_spent) - Number(a.total_spent))
+        .slice(0, 8)
+        .map(s => ({
+          name: s.first_name ? `${s.first_name} ${s.last_name || ''}`.trim() : (s.email || 'Anónimo'),
+          orders: Number(s.total_orders) || 0,
+          spent: Number(s.total_spent) || 0,
+          lastOrderAt: s.last_order_at,
+        }));
+      const sixtyDaysAgoMs = Date.now() - 60 * 86400000;
+      const churnRisk = (data.emailSubs as any[]).filter(s => {
+        if (!s.last_order_at) return false;
+        const last = new Date(s.last_order_at).getTime();
+        return last < sixtyDaysAgoMs && Number(s.total_orders) >= 1;
+      });
+      data.topSpenders = topSpenders;
+      data.churnRiskCount = churnRisk.length;
+    }
+
+    // Seasonal events
+    data.seasonalEvents = getUpcomingSeasonalEvents(new Date());
 
     // AI insights (narrative + alerts + opportunities + action plan + health scores)
     data.aiInsights = await generateAIInsights(data, data.period, sectionsToInclude);
@@ -1016,6 +1146,8 @@ function renderReportHtml(d: any, sections: string[]): string {
   blocks.push(renderExecSummarySection(d, sections, brandPrimary));
   if (sections.includes('shopify')) blocks.push(renderShopifySection(d, brandPrimary, brandSecondary));
   if (sections.includes('shopify')) blocks.push(renderTopProductsSection(d, brandPrimary));
+  if (sections.includes('shopify') || sections.includes('catalogo')) blocks.push(renderInventoryAlertsSection(d, brandPrimary));
+  if (d.seasonalEvents && d.seasonalEvents.length > 0) blocks.push(renderSeasonalSection(d, brandPrimary));
   if (sections.includes('ads_meta') || sections.includes('ads_google')) blocks.push(renderAdsSection(d, brandPrimary, brandSecondary));
   if (sections.includes('creativos')) blocks.push(renderCreativosSection(d, brandPrimary));
   if (sections.includes('email')) blocks.push(renderEmailSection(d, brandPrimary, brandSecondary));
@@ -1774,6 +1906,65 @@ function renderActionPlanSection(insights: AIInsights, brandPrimary: string): st
       <h2>Plan de acción priorizado</h2>
       <p class="muted" style="font-size:9.5pt">Recomendaciones generadas por Steve a partir del análisis cruzado de toda tu data del período. Ordenadas por prioridad.</p>
       <div class="action-list">${cards}</div>
+      ${renderFooterInline()}
+    </div>
+  `;
+}
+
+function renderInventoryAlertsSection(d: any, brandPrimary: string): string {
+  const inv = d.inventoryInsights;
+  if (!inv) return '';
+  const blocks: string[] = [];
+  if (inv.sinStock?.length > 0) {
+    const items = inv.sinStock.slice(0, 6).map((p: any) => `<li><strong>${escapeHtml(String(p.title).slice(0, 60))}</strong> · precio ${fmtMoney(Number(p.price_max) || 0)}</li>`).join('');
+    blocks.push(`<div class="alert-card high"><span class="pill high">SIN STOCK</span><div class="title">${inv.sinStock.length} producto(s) sin stock</div><div class="detail">Si tenés ads activos apuntando a estos productos, estás quemando presupuesto.<ul class="simple" style="margin-top:5pt">${items}</ul></div></div>`);
+  }
+  if (inv.sinImagen?.length > 0) {
+    const items = inv.sinImagen.slice(0, 4).map((p: any) => `<li>${escapeHtml(String(p.title).slice(0, 60))}</li>`).join('');
+    blocks.push(`<div class="alert-card medium"><span class="pill medium">SIN IMAGEN</span><div class="title">${inv.sinImagen.length} producto(s) activo(s) sin imagen</div><div class="detail">Conversión baja garantizada — productos sin foto no se compran.<ul class="simple" style="margin-top:5pt">${items}</ul></div></div>`);
+  }
+  if (inv.rotacionLenta?.length > 0) {
+    const items = inv.rotacionLenta.slice(0, 4).map((p: any) => `<li><strong>${escapeHtml(String(p.title).slice(0, 50))}</strong> · ${p.inventory_total} u. en stock, 0 ventas</li>`).join('');
+    blocks.push(`<div class="alert-card medium"><span class="pill medium">CAPITAL ATRAPADO</span><div class="title">${inv.rotacionLenta.length} producto(s) con stock alto sin ventas</div><div class="detail">Considerá liquidación, descuento o sacar de la vitrina.<ul class="simple" style="margin-top:5pt">${items}</ul></div></div>`);
+  }
+  if (inv.rotacionRapida?.length > 0) {
+    const items = inv.rotacionRapida.slice(0, 4).map((p: any) => `<li><strong>${escapeHtml(String(p.title).slice(0, 50))}</strong> · ${p.unitsSold} vendidos / ${p.inventory_total} en stock</li>`).join('');
+    blocks.push(`<div class="alert-card low"><span class="pill low">ROTACIÓN RÁPIDA</span><div class="title">${inv.rotacionRapida.length} producto(s) volando</div><div class="detail">Riesgo de stockout pronto. Reponer inventario antes de quedarte sin.<ul class="simple" style="margin-top:5pt">${items}</ul></div></div>`);
+  }
+  if (inv.bundles?.length > 0) {
+    const items = inv.bundles.map((b: any) => `<li><strong>${b.count}× compraron juntos:</strong> ${escapeHtml(b.items.slice(0, 3).join(' + '))}</li>`).join('');
+    blocks.push(`<div class="alert-card low"><span class="pill low">BUNDLE DETECTADO</span><div class="title">Combos naturales en tus pedidos</div><div class="detail">Oportunidad: crear bundles oficiales con descuento para acelerar AOV.<ul class="simple" style="margin-top:5pt">${items}</ul></div></div>`);
+  }
+  if (blocks.length === 0) return '';
+  return `
+    <div class="page">
+      <h2>Alertas de inventario y catálogo</h2>
+      <p class="muted" style="font-size:9.5pt;margin-bottom:8pt">Análisis cruzado de tu catálogo Shopify vs ventas reales del período.</p>
+      <div class="alerts-grid">${blocks.join('')}</div>
+      ${renderFooterInline()}
+    </div>
+  `;
+}
+
+function renderSeasonalSection(d: any, brandPrimary: string): string {
+  const evs: SeasonalEvent[] = d.seasonalEvents || [];
+  if (evs.length === 0) return '';
+  const cards = evs.slice(0, 6).map((e) => {
+    const cls = e.daysUntil < 0 ? 'low' : e.daysUntil <= 14 ? 'high' : e.daysUntil <= 30 ? 'medium' : 'low';
+    const label = e.daysUntil < 0 ? `Hace ${Math.abs(e.daysUntil)}d` : e.daysUntil === 0 ? 'HOY' : `En ${e.daysUntil} días`;
+    return `
+      <div class="alert-card ${cls}">
+        <span class="pill ${cls}">${label}</span>
+        <div class="title">${escapeHtml(e.name)}</div>
+        <div class="detail">${escapeHtml(e.type)} · ${e.date.toLocaleDateString('es-CL', { day: '2-digit', month: 'long' })}</div>
+      </div>
+    `;
+  }).join('');
+  return `
+    <div class="page">
+      <h2>Calendario estacional</h2>
+      <p class="muted" style="font-size:9.5pt;margin-bottom:8pt">Próximas fechas comerciales relevantes para Chile/LATAM en los próximos 90 días. Usalas para preparar campañas, inventario y emails con anticipación.</p>
+      <div class="alerts-grid">${cards}</div>
       ${renderFooterInline()}
     </div>
   `;
