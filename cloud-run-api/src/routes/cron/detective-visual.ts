@@ -143,10 +143,10 @@ async function checkShopifyProducts(supabase: ReturnType<typeof getSupabaseAdmin
     const accessToken = await getTokenForConnection(supabase, conn);
     if (!shopDomain || !accessToken) continue;
 
-    const steveProducts = await safeQuery<{ id: string; title: string | null; price: number | null; shopify_product_id: string }>(
+    const steveProducts = await safeQuery<{ id: string; title: string | null; price_min: number | null; shopify_product_id: string }>(
       supabase
         .from('shopify_products')
-        .select('id, title, price, shopify_product_id')
+        .select('id, title, price_min, shopify_product_id')
         .eq('client_id', clientId)
         .limit(50),
       'detectiveVisual.fetchSteveProducts',
@@ -176,7 +176,7 @@ async function checkShopifyProducts(supabase: ReturnType<typeof getSupabaseAdmin
         }
         const firstVariant = realProd.variants?.[0];
         const realPrice = firstVariant ? Number(firstVariant.price) : 0;
-        const stevePrice = Number(sp.price) || 0;
+        const stevePrice = Number(sp.price_min) || 0;
         if (stevePrice > 0 && realPrice > 0 && !withinTolerance(stevePrice, realPrice, TOLERANCES.price)) {
           results.push({ module: 'shopify-products', check_type: 'product_data', status: 'MISMATCH', severity: 'CRITICAL', steve_value: { title: sp.title, price: stevePrice }, real_value: { title: realProd.title, price: realPrice }, mismatched_fields: ['price'], details: `Product "${sp.title}": price Steve=$${stevePrice} vs Shopify=$${realPrice}`, client_id: clientId, steve_record_id: sp.id, external_id: sp.shopify_product_id });
         } else {

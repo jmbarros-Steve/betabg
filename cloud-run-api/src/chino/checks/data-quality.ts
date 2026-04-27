@@ -1977,7 +1977,7 @@ export async function executeDataQuality(
         return { result: 'pass', steve_value: `${data133.length} emails válidos`, duration_ms: Date.now() - start };
       }
       case 134: { // No products with negative price
-        const { count: cnt134, error: e134 } = await supabase.from('shopify_products').select('id', { count: 'exact', head: true }).lt('price', 0);
+        const { count: cnt134, error: e134 } = await supabase.from('shopify_products').select('id', { count: 'exact', head: true }).lt('price_min', 0);
         if (e134) throw new Error(e134.message);
         if (cnt134 && cnt134 > 0) return { result: 'fail', steve_value: cnt134, error_message: `${cnt134} productos con precio negativo`, duration_ms: Date.now() - start };
         return { result: 'pass', steve_value: '0 precios negativos', duration_ms: Date.now() - start };

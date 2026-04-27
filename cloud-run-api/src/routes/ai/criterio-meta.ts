@@ -297,7 +297,7 @@ export async function criterioMeta(campaignData: Record<string, any>, shopId: st
     products = await safeQueryOrDefault<Record<string, any>>(
       supabase
         .from('shopify_products')
-        .select('title, price, inventory')
+        .select('title, price_min, inventory_total')
         .in('id', campaignData.product_ids),
       [],
       'criterio-meta.fetchShopifyProducts',

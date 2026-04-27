@@ -793,10 +793,10 @@ export async function generateMetaCopy(c: Context) {
     }
 
     // Fetch Shopify products for concrete context
-    const shopifyProducts = await safeQueryOrDefault<{ title: string | null; product_type: string | null; price: any; image_url: string | null }>(
+    const shopifyProducts = await safeQueryOrDefault<{ title: string | null; product_type: string | null; price_min: any; image_url: string | null }>(
       supabase
         .from('shopify_products')
-        .select('title, product_type, price, image_url')
+        .select('title, product_type, price_min, image_url')
         .eq('client_id', cId)
         .limit(10),
       [],
@@ -814,7 +814,7 @@ export async function generateMetaCopy(c: Context) {
     );
 
     const shopifySection = shopifyProducts && shopifyProducts.length > 0
-      ? `\nPRODUCTOS REALES DE LA TIENDA:\n${shopifyProducts.map((p: any) => `- ${p.title} ($${Number(p.price).toLocaleString('es-CL')} CLP) — ${p.product_type || 'general'}`).join('\n')}\n`
+      ? `\nPRODUCTOS REALES DE LA TIENDA:\n${shopifyProducts.map((p: any) => `- ${p.title} ($${Number(p.price_min).toLocaleString('es-CL')} CLP) — ${p.product_type || 'general'}`).join('\n')}\n`
       : '';
 
     const clientSection = clientInfo
@@ -906,7 +906,7 @@ export async function generateMetaCopy(c: Context) {
 
     const [{ data: brandResearchVar }, { data: shopifyProductsVar }, { data: clientInfoVar }] = await Promise.all([
       supabase.from('brand_research').select('brand_name, industry, target_audience, value_proposition, brand_voice, product_details').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-      supabase.from('shopify_products').select('title, product_type, price, image_url').eq('client_id', clientId).limit(10),
+      supabase.from('shopify_products').select('title, product_type, price_min, image_url').eq('client_id', clientId).limit(10),
       supabase.from('clients').select('name, company, shop_domain').eq('id', clientId).maybeSingle(),
     ]);
 
@@ -917,7 +917,7 @@ Voz de marca: ${JSON.stringify(brandResearchVar.brand_voice || 'N/A')}
 Productos: ${JSON.stringify(brandResearchVar.product_details || 'N/A')}\n` : '';
 
     const shopifyContextVar = shopifyProductsVar && shopifyProductsVar.length > 0
-      ? `\nPRODUCTOS REALES DE LA TIENDA:\n${shopifyProductsVar.map((p: any) => `- ${p.title} ($${Number(p.price).toLocaleString('es-CL')} CLP) — ${p.product_type || 'general'}`).join('\n')}\n`
+      ? `\nPRODUCTOS REALES DE LA TIENDA:\n${shopifyProductsVar.map((p: any) => `- ${p.title} ($${Number(p.price_min).toLocaleString('es-CL')} CLP) — ${p.product_type || 'general'}`).join('\n')}\n`
       : '';
 
     const storeNameVar = clientInfoVar?.name || clientInfoVar?.company || '';
@@ -1024,13 +1024,13 @@ Responde SOLO en JSON válido sin markdown ni backticks:
     const knowledgeSectionBV = kbKnowledgeBV && kbKnowledgeBV.length > 0 ? `\nREGLAS APRENDIDAS DE CREATIVOS (seguir obligatoriamente):\n${kbKnowledgeBV.map((k: any) => `- ${k.titulo}: ${k.contenido}`).join('\n')}\n` : '';
 
     const [{ data: shopifyProductsBV }, { data: brandResearchBV }, { data: clientInfoBV }] = await Promise.all([
-      supabase.from('shopify_products').select('title, product_type, price, image_url').eq('client_id', clientId).limit(10),
+      supabase.from('shopify_products').select('title, product_type, price_min, image_url').eq('client_id', clientId).limit(10),
       supabase.from('brand_research').select('brand_name, industry, value_proposition, product_details').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('clients').select('name, company, shop_domain').eq('id', clientId).maybeSingle(),
     ]);
 
     const shopifyContextBV = shopifyProductsBV && shopifyProductsBV.length > 0
-      ? `\nProductos reales de la tienda:\n${shopifyProductsBV.map((p: any) => `- ${p.title} ($${Number(p.price).toLocaleString('es-CL')} CLP)${p.image_url ? ` [foto: ${p.image_url}]` : ''}`).join('\n')}\n`
+      ? `\nProductos reales de la tienda:\n${shopifyProductsBV.map((p: any) => `- ${p.title} ($${Number(p.price_min).toLocaleString('es-CL')} CLP)${p.image_url ? ` [foto: ${p.image_url}]` : ''}`).join('\n')}\n`
       : '';
 
     const brandContextBV = brandResearchBV ? `\nMarca: ${brandResearchBV.brand_name || 'N/A'}\nIndustria: ${brandResearchBV.industry || 'N/A'}\nProductos: ${JSON.stringify(brandResearchBV.product_details || 'N/A')}\n` : '';
@@ -1245,7 +1245,7 @@ las preferencias específicas de cada cliente cuando las conozco.
     supabase.from('steve_bugs').select('descripcion, ejemplo_bueno').eq('categoria', 'meta_ads').eq('activo', true),
     supabase.from('steve_knowledge').select('id, titulo, contenido').in('categoria', ['meta_ads', 'anuncios']).eq('activo', true).eq('approval_status', 'approved').is('purged_at', null).order('orden', { ascending: false }).order('created_at', { ascending: false }).limit(20),
     supabase.from('brand_research').select('brand_name, industry, target_audience, value_proposition, brand_voice, competitor_analysis, product_details').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('shopify_products').select('title, product_type, price, image_url').eq('client_id', clientId).limit(10),
+    supabase.from('shopify_products').select('title, product_type, price_min, image_url').eq('client_id', clientId).limit(10),
     supabase.from('clients').select('name, company, shop_domain').eq('id', clientId).maybeSingle(),
   ]);
   const bugSectionLegacy = kbBugsLegacy && kbBugsLegacy.length > 0 ? `\nERRORES CRÍTICOS QUE DEBES EVITAR:\n${kbBugsLegacy.map((b: any) => `❌ ${b.descripcion}${b.ejemplo_bueno ? `\nBIEN: ${b.ejemplo_bueno}` : ''}`).join('\n\n')}\n` : '';
@@ -1278,7 +1278,7 @@ DATOS DE LA MARCA (brand_research)
 ═══════════════════════════════════════════════════════════════════════════════
 PRODUCTOS REALES DE LA TIENDA (Shopify) — USA ESTOS PRODUCTOS EN EL COPY
 ═══════════════════════════════════════════════════════════════════════════════
-${shopifyProductsLegacy.map((p: any) => `- ${p.title} ($${Number(p.price).toLocaleString('es-CL')} CLP) — ${p.product_type || 'general'}`).join('\n')}`
+${shopifyProductsLegacy.map((p: any) => `- ${p.title} ($${Number(p.price_min).toLocaleString('es-CL')} CLP) — ${p.product_type || 'general'}`).join('\n')}`
     : '';
 
   const clientNameLegacy = clientInfoLegacy?.name || clientInfoLegacy?.company || '';

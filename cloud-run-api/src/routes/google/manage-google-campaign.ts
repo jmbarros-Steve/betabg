@@ -3470,7 +3470,7 @@ async function handleListCatalogProducts(
   try {
     const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
     const res = await fetch(
-      `${supabaseUrl}/rest/v1/shopify_products?client_id=eq.${cid}&select=id,product_id,title,image_url,price,handle,sku,status,product_type&order=created_at.desc&limit=200`,
+      `${supabaseUrl}/rest/v1/shopify_products?client_id=eq.${cid}&select=id,shopify_product_id,title,image_url,price_min,handle,status,product_type&order=created_at.desc&limit=200`,
       { headers, signal: AbortSignal.timeout(8_000) }
     );
     if (!res.ok) return { body: { success: true, products: [], source: 'none', reason: 'shopify fetch failed' }, status: 200 };
@@ -3478,14 +3478,14 @@ async function handleListCatalogProducts(
     const seen = new Set<string>();
     const products: any[] = [];
     for (const r of rows) {
-      const id = String(r.product_id || r.id || '');
+      const id = String(r.shopify_product_id || r.id || '');
       if (!id || seen.has(id)) continue;
       seen.add(id);
       products.push(normalize({
         id,
         title: r.title,
         image_url: r.image_url,
-        price: r.price,
+        price: r.price_min,
         status: r.status,
         product_type: r.product_type || null,
         category: null,

@@ -199,7 +199,7 @@ async function getSteveValue(
         .from('shopify_products')
         .select('id', { count: 'exact', head: true })
         .eq('client_id', merchant.client_id)
-        .gt('price', 0);
+        .gt('price_min', 0);
       return count ?? null;
     }
     case 21: { // Meta spend 7d
