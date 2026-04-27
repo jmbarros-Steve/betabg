@@ -472,6 +472,10 @@ function CreateCustomAudienceDialog({
   submitting,
   pixelId,
   shopDomain,
+  pageId,
+  pageName,
+  igAccountId,
+  igAccountName,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -481,8 +485,26 @@ function CreateCustomAudienceDialog({
   submitting: boolean;
   pixelId: string | null;
   shopDomain: string | null;
+  pageId: string | null;
+  pageName: string | null;
+  igAccountId: string | null;
+  igAccountName: string | null;
 }) {
   const SourceIcon = SOURCE_ICONS[formData.source];
+
+  // CRITICO-2: el backend exige IDs reales de Page/IG para audiencias de
+  // engagement. Detectamos si el usuario tiene los assets disponibles según
+  // el tipo elegido y preparamos labels readonly + bloqueo del submit.
+  const engKind = formData.engagement_type;
+  const engagementNeedsPage = engKind === 'PAGE' || engKind === 'VIDEO';
+  const engagementNeedsIg = engKind === 'INSTAGRAM';
+  const engagementMissingAsset =
+    formData.source === 'ENGAGEMENT' &&
+    ((engagementNeedsPage && !pageId) || (engagementNeedsIg && !igAccountId));
+  const submitDisabled =
+    submitting ||
+    (formData.source === 'WEBSITE' && !pixelId) ||
+    engagementMissingAsset;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -751,6 +773,60 @@ function CreateCustomAudienceDialog({
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* CRITICO-2: el backend exige page_id real para PAGE/VIDEO e
+                    ig_user_id para INSTAGRAM. Mostramos el asset disponible
+                    como readonly o un error accionable. */}
+                {engagementNeedsPage && (
+                  pageId ? (
+                    <div>
+                      <Label>Página de Facebook</Label>
+                      <div className="mt-1 flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/30">
+                        <Heart className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{pageName || 'Página conectada'}</p>
+                          <p className="text-xs text-muted-foreground truncate">ID: {pageId}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20">
+                      <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-yellow-700">Conectá tu Facebook Page primero</p>
+                        <p className="text-xs text-yellow-600 mt-1">
+                          Para crear audiencias de interacción con página o video necesitas tener una Página de Facebook conectada en Conexiones → Meta.
+                        </p>
+                      </div>
+                    </div>
+                  )
+                )}
+
+                {engagementNeedsIg && (
+                  igAccountId ? (
+                    <div>
+                      <Label>Cuenta de Instagram</Label>
+                      <div className="mt-1 flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/30">
+                        <Heart className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{igAccountName || 'Cuenta IG conectada'}</p>
+                          <p className="text-xs text-muted-foreground truncate">ID: {igAccountId}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20">
+                      <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-yellow-700">Conectá tu Instagram Business primero</p>
+                        <p className="text-xs text-yellow-600 mt-1">
+                          Para crear audiencias de interacción con Instagram necesitas tener una cuenta de Instagram Business conectada en Conexiones → Meta.
+                        </p>
+                      </div>
+                    </div>
+                  )
+                )}
+
                 <div>
                   <Label>Período (días)</Label>
                   <div className="flex items-center gap-4 mt-2">
@@ -834,7 +910,7 @@ function CreateCustomAudienceDialog({
           >
             Cancelar
           </Button>
-          <Button onClick={onSubmit} disabled={submitting || (formData.source === 'WEBSITE' && !pixelId)}>
+          <Button onClick={onSubmit} disabled={submitDisabled}>
             {submitting ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1042,7 +1118,15 @@ function CreateLookalikeDialog({
 // ---------------------------------------------------------------------------
 
 export default function MetaAudienceManager({ clientId }: MetaAudienceManagerProps) {
-  const { connectionId: ctxConnectionId, lastSyncAt, pixelId: ctxPixelId } = useMetaBusiness();
+  const {
+    connectionId: ctxConnectionId,
+    lastSyncAt,
+    pixelId: ctxPixelId,
+    pageId: ctxPageId,
+    pageName: ctxPageName,
+    igAccountId: ctxIgAccountId,
+    igAccountName: ctxIgAccountName,
+  } = useMetaBusiness();
 
   // State
   const [audiences, setAudiences] = useState<AudienceRow[]>([]);
@@ -1379,7 +1463,26 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
           ? 'USER_PROVIDED_ONLY'
           : customForm.customer_list_source;
       } else if (customForm.source === 'ENGAGEMENT') {
-        data.engagement_type = customForm.engagement_type;
+        // CRITICO-2: el backend (commit be7372eb / C1) exige page_id para
+        // PAGE/VIDEO e ig_user_id para INSTAGRAM. Tomamos los IDs reales del
+        // MetaBusinessContext (cargados desde platform_connections / Meta API).
+        const engKind = customForm.engagement_type;
+        if (engKind === 'PAGE' || engKind === 'VIDEO') {
+          if (!ctxPageId) {
+            toast.error('Conectá tu Facebook Page primero (Conexiones → Meta).');
+            setFormSubmitting(false);
+            return;
+          }
+          data.page_id = ctxPageId;
+        } else if (engKind === 'INSTAGRAM') {
+          if (!ctxIgAccountId) {
+            toast.error('Conectá tu Instagram Business primero (Conexiones → Meta).');
+            setFormSubmitting(false);
+            return;
+          }
+          data.ig_user_id = ctxIgAccountId;
+        }
+        data.engagement_type = engKind;
         data.retention_days = customForm.engagement_days;
       } else if (customForm.source === 'APP_ACTIVITY') {
         data.app_activity_type = customForm.app_activity_type;
@@ -1918,6 +2021,10 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         submitting={formSubmitting}
         pixelId={pixelId}
         shopDomain={shopDomain}
+        pageId={ctxPageId}
+        pageName={ctxPageName}
+        igAccountId={ctxIgAccountId}
+        igAccountName={ctxIgAccountName}
       />
 
       {/* ================================================================= */}
