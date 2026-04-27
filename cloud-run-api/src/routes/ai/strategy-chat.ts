@@ -366,6 +366,89 @@ export async function strategyChat(c: Context) {
     const mergedKnowledge = [...(clientKnowledgeData || []), ...(knowledge || [])];
     timelog('estrategia-parallel-queries');
 
+    // === LIVE META PIXEL HEALTH (#36, ≤4s budget) + AUDIENCES (#35) ===
+    // Verifica que el pixel del cliente esté disparando los eventos críticos.
+    // Si falta PageView, ViewContent, AddToCart o Purchase = pixel quemado.
+    let pixelHealth: { pixelName: string; events: Record<string, number>; missing: string[]; lastFired: string | null } | null = null;
+    let metaAudiences: Array<{ name: string; subtype: string; sizeMin: number; sizeMax: number; retention: number; status: string }> = [];
+    const metaConnections = (connections || []).filter((c: any) => c.platform === 'meta');
+    if (metaConnections.length > 0) {
+      try {
+        const metaConn = metaConnections[0];
+        const { data: connFull } = await supabase
+          .from('platform_connections')
+          .select('access_token_encrypted, account_id, connection_type')
+          .eq('id', metaConn.id)
+          .single();
+        // Decrypt only if we have a token (SUAT connections like leadsie/bm_partner read from env)
+        let metaToken: string | null = null;
+        if (connFull?.access_token_encrypted) {
+          const { data: tok } = await supabase
+            .rpc('decrypt_platform_token', { encrypted_token: connFull.access_token_encrypted });
+          metaToken = tok;
+        } else if (connFull?.connection_type === 'leadsie' || connFull?.connection_type === 'bm_partner') {
+          metaToken = process.env.META_SYSTEM_TOKEN || null;
+        }
+        const accId = connFull?.account_id;
+        if (metaToken && accId) {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 4000);
+          try {
+            // List pixels
+            const pixelsRes = await fetch(`https://graph.facebook.com/v23.0/act_${accId}/adspixels?fields=id,name,last_fired_time,is_unavailable&access_token=${metaToken}`, { signal: ctrl.signal });
+            if (pixelsRes.ok) {
+              const pj: any = await pixelsRes.json();
+              const pixel = (pj.data || []).find((p: any) => !p.is_unavailable) || pj.data?.[0];
+              if (pixel?.id) {
+                const statsRes = await fetch(`https://graph.facebook.com/v23.0/${pixel.id}/stats?aggregation=event&access_token=${metaToken}`, { signal: ctrl.signal });
+                if (statsRes.ok) {
+                  const sj: any = await statsRes.json();
+                  const events: Record<string, number> = {};
+                  for (const row of (sj.data || [])) {
+                    const name = String(row.event || row.name || 'unknown');
+                    events[name] = (events[name] || 0) + (Number(row.count) || 0);
+                  }
+                  const CRITICAL = ['PageView', 'ViewContent', 'AddToCart', 'InitiateCheckout', 'Purchase'];
+                  const missing = CRITICAL.filter(e => !events[e] || events[e] === 0);
+                  pixelHealth = {
+                    pixelName: pixel.name || pixel.id,
+                    events,
+                    missing,
+                    lastFired: pixel.last_fired_time || null,
+                  };
+                }
+              }
+              // === #35 AUDIENCE OVERLAP (mínimo viable) ===
+              // Listar custom audiences y flaggear posibles overlaps por size + retention similar.
+              try {
+                const audRes = await fetch(`https://graph.facebook.com/v23.0/act_${accId}/customaudiences?fields=name,subtype,approximate_count_lower_bound,approximate_count_upper_bound,retention_days,delivery_status&limit=50&access_token=${metaToken}`, { signal: ctrl.signal });
+                if (audRes.ok) {
+                  const aj: any = await audRes.json();
+                  metaAudiences = (aj.data || []).map((a: any) => ({
+                    name: a.name,
+                    subtype: a.subtype,
+                    sizeMin: Number(a.approximate_count_lower_bound) || 0,
+                    sizeMax: Number(a.approximate_count_upper_bound) || 0,
+                    retention: Number(a.retention_days) || 0,
+                    status: a.delivery_status?.code === 200 ? 'ready' : (a.delivery_status?.description || 'unknown'),
+                  }));
+                }
+              } catch (e: any) {
+                console.warn('[strategy-chat] Audience list skipped:', e?.message);
+              }
+            }
+          } catch (e: any) {
+            console.warn('[strategy-chat] Pixel health skipped:', e?.message);
+          } finally {
+            clearTimeout(timer);
+          }
+        }
+      } catch (e: any) {
+        console.warn('[strategy-chat] Pixel health outer error:', e?.message);
+      }
+    }
+    timelog('estrategia-pixel-health');
+
     // === LIVE SHOPIFY: orders last 30d → top sold products + new/returning + bundles (best-effort, ≤5s budget) ===
     let topSoldProducts: Array<{ sku: string | null; title: string; units: number; revenue: number }> = [];
     let shopifyOrdersAnalysis: {
@@ -373,6 +456,7 @@ export async function strategyChat(c: Context) {
       newCustomers: number;
       returningCustomers: number;
       bundles: Array<{ items: string[]; count: number }>;
+      attribution: Record<string, number>;
     } | null = null;
     const shopifyConnections = (connections || []).filter((c: any) => c.platform === 'shopify');
     if (shopifyConnections.length > 0) {
@@ -391,7 +475,7 @@ export async function strategyChat(c: Context) {
             const timer = setTimeout(() => ctrl.abort(), 5000);
             try {
               const cleanUrl = String(connFull.store_url).replace(/^https?:\/\//, '');
-              const url = `https://${cleanUrl}/admin/api/2026-04/orders.json?status=any&created_at_min=${thirtyDaysAgo}T00:00:00Z&fields=id,financial_status,line_items,customer&limit=250`;
+              const url = `https://${cleanUrl}/admin/api/2026-04/orders.json?status=any&created_at_min=${thirtyDaysAgo}T00:00:00Z&fields=id,financial_status,line_items,customer,referring_site,landing_site,source_name&limit=250`;
               const res = await fetch(url, {
                 headers: { 'X-Shopify-Access-Token': tok, 'Content-Type': 'application/json' },
                 signal: ctrl.signal,
@@ -402,6 +486,7 @@ export async function strategyChat(c: Context) {
                 const ACCEPTED = new Set(['paid', 'partially_paid', 'partially_refunded', 'pending', 'authorized']);
                 const skuMap: Record<string, any> = {};
                 const bundleMap: Record<string, number> = {};
+                const attribution: Record<string, number> = {};
                 let totalAccepted = 0;
                 let newCust = 0;
                 let returning = 0;
@@ -412,6 +497,25 @@ export async function strategyChat(c: Context) {
                   const oc = Number(o.customer?.orders_count) || 0;
                   if (oc === 1) newCust++;
                   else if (oc > 1) returning++;
+                  // Attribution: parse UTM source from landing_site, fallback to referring_site host, fallback to source_name
+                  let attrKey = '';
+                  const landing = String(o.landing_site || '');
+                  const utmMatch = landing.match(/[?&]utm_source=([^&]+)/i);
+                  if (utmMatch) {
+                    attrKey = decodeURIComponent(utmMatch[1]).toLowerCase();
+                    const utmMedium = landing.match(/[?&]utm_medium=([^&]+)/i);
+                    if (utmMedium) attrKey += `/${decodeURIComponent(utmMedium[1]).toLowerCase()}`;
+                  } else if (o.referring_site) {
+                    try {
+                      const host = new URL(String(o.referring_site)).host.replace(/^www\./, '').toLowerCase();
+                      attrKey = host || 'desconocido';
+                    } catch { attrKey = 'desconocido'; }
+                  } else if (o.source_name) {
+                    attrKey = String(o.source_name).toLowerCase();
+                  } else {
+                    attrKey = 'directo';
+                  }
+                  attribution[attrKey] = (attribution[attrKey] || 0) + 1;
                   // SKU aggregation
                   const orderItems: string[] = [];
                   for (const li of (o.line_items || [])) {
@@ -441,6 +545,7 @@ export async function strategyChat(c: Context) {
                   newCustomers: newCust,
                   returningCustomers: returning,
                   bundles: topBundles,
+                  attribution,
                 };
               }
             } catch (e: any) {
@@ -564,6 +669,71 @@ export async function strategyChat(c: Context) {
       }
     } else if (shopifyConnections.length > 0) {
       topSoldContext = `\n🔥 TOP PRODUCTOS VENDIDOS: No detecté pedidos pagados en Shopify en los últimos 30 días (puede ser que el cliente esté empezando o el sync de orders esté limitado por scopes).\n`;
+    }
+
+    // === META AUDIENCES (#35 — overlap mínimo viable) ===
+    let audiencesContext = '';
+    if (metaAudiences.length > 0) {
+      const ready = metaAudiences.filter(a => a.status === 'ready');
+      audiencesContext = `\n👥 META CUSTOM AUDIENCES (${metaAudiences.length} totales, ${ready.length} listas):\n`;
+      const top = metaAudiences.sort((a, b) => b.sizeMax - a.sizeMax).slice(0, 8);
+      for (const a of top) {
+        const sizeRange = a.sizeMin > 0 ? `${(a.sizeMin / 1000).toFixed(0)}K-${(a.sizeMax / 1000).toFixed(0)}K` : 'tamaño no disponible';
+        audiencesContext += `  - "${a.name}" (${a.subtype}, ${sizeRange}, ${a.retention}d retención, ${a.status})\n`;
+      }
+      // Detección simple de overlap potencial: audiences con misma retention y tamaño similar
+      const buckets: Record<string, any[]> = {};
+      for (const a of metaAudiences) {
+        if (a.sizeMax === 0) continue;
+        const sizeBucket = Math.floor(Math.log10(a.sizeMax));
+        const key = `${a.retention}d_${sizeBucket}`;
+        if (!buckets[key]) buckets[key] = [];
+        buckets[key].push(a);
+      }
+      const possibleOverlaps = Object.values(buckets).filter(arr => arr.length >= 2);
+      if (possibleOverlaps.length > 0) {
+        audiencesContext += `- ⚠️ Posible canibalización detectada: ${possibleOverlaps.length} grupo(s) de audiencias con misma retención y tamaño similar — pueden estar compitiendo entre sí (subiendo CPM):\n`;
+        for (const group of possibleOverlaps.slice(0, 3)) {
+          audiencesContext += `    - ${group.map((a: any) => `"${a.name}"`).join(' / ')}\n`;
+        }
+      }
+    }
+
+    // === ATRIBUCIÓN POR FUENTE (#8-10 — UTM tracking básico) ===
+    let attributionContext = '';
+    if (shopifyOrdersAnalysis?.attribution && Object.keys(shopifyOrdersAnalysis.attribution).length > 0) {
+      const sortedAttr = Object.entries(shopifyOrdersAnalysis.attribution).sort(([, a], [, b]) => Number(b) - Number(a));
+      const total = shopifyOrdersAnalysis.totalOrders;
+      attributionContext = `\n🎯 ATRIBUCIÓN DE PEDIDOS POR FUENTE (últimos 30 días, ${total} pedidos):\n`;
+      for (const [source, count] of sortedAttr.slice(0, 8)) {
+        const pct = total > 0 ? Math.round((Number(count) / total) * 100) : 0;
+        attributionContext += `  - ${source}: ${count} pedidos (${pct}%)\n`;
+      }
+      attributionContext += `Datos derivados de utm_source/utm_medium en landing_site, referring_site host, y source_name de Shopify. Si "directo" es alto, puede ser tráfico orgánico, branded search o falta de UTM tagging en las campañas pagadas.\n`;
+    }
+
+    // === META PIXEL HEALTH (#36) ===
+    let pixelHealthContext = '';
+    if (pixelHealth) {
+      const eventLines = Object.entries(pixelHealth.events)
+        .sort(([, a], [, b]) => Number(b) - Number(a))
+        .slice(0, 8)
+        .map(([k, v]) => `${k} (${(v as number).toLocaleString('es-CL')})`)
+        .join(', ');
+      pixelHealthContext = `\n📡 META PIXEL HEALTH ("${pixelHealth.pixelName}"):\n`;
+      pixelHealthContext += `- Eventos disparando: ${eventLines || 'ninguno'}\n`;
+      if (pixelHealth.lastFired) {
+        const lastFiredDate = new Date(pixelHealth.lastFired);
+        const hoursAgo = Math.round((Date.now() - lastFiredDate.getTime()) / 3600000);
+        pixelHealthContext += `- Último evento recibido: hace ${hoursAgo} horas (${lastFiredDate.toLocaleDateString('es-CL')})\n`;
+        if (hoursAgo > 24) pixelHealthContext += `- ⚠️ ALERTA: el pixel no recibe eventos hace más de 24h. Posible que el código esté roto en el sitio.\n`;
+      }
+      if (pixelHealth.missing.length > 0) {
+        pixelHealthContext += `- 🚨 EVENTOS CRÍTICOS FALTANTES: ${pixelHealth.missing.join(', ')}. Sin estos, las campañas Meta optimizan ciegas y el costo por conversión sube.\n`;
+        if (pixelHealth.missing.includes('Purchase')) pixelHealthContext += `- ⚠️ FALTA Purchase event = imposible optimizar para conversiones reales. Prioridad MÁXIMA.\n`;
+      } else {
+        pixelHealthContext += `- ✓ Todos los eventos críticos (PageView, ViewContent, AddToCart, InitiateCheckout, Purchase) están disparando.\n`;
+      }
     }
 
     // === ALERTAS DE INVENTARIO (#16, #17, #19) ===
@@ -1166,6 +1336,9 @@ ${topSoldContext}
 ${inventoryAlertsContext}
 ${customerIntelContext}
 ${realRoasContext}
+${pixelHealthContext}
+${audiencesContext}
+${attributionContext}
 ${commitmentsStatusContext}
 ${seasonalContext}
 ${financialContext}
