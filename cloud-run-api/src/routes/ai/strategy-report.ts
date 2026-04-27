@@ -33,8 +33,24 @@ async function launchBrowser() {
   const launcher = puppeteer.default || puppeteer;
   return launcher.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-crash-reporter',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+      '--disable-extensions',
+      '--disable-background-networking',
+      '--disable-default-apps',
+      '--disable-sync',
+      '--hide-scrollbars',
+      '--mute-audio',
+    ],
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    dumpio: false,
   });
 }
 
