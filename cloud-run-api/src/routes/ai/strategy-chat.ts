@@ -864,7 +864,7 @@ export async function strategyChat(c: Context) {
           .limit(1000),
         supabase
           .from('campaign_metrics')
-          .select('campaign_name, campaign_status, spend, impressions, clicks, conversions, conversion_value, metric_date, connection_id')
+          .select('campaign_name, campaign_status, spend, impressions, reach, frequency, clicks, conversions, conversion_value, metric_date, connection_id')
           .in('connection_id', connIds)
           .gte('metric_date', ninetyDaysAgo)
           .order('metric_date', { ascending: false })
@@ -1013,6 +1013,40 @@ export async function strategyChat(c: Context) {
             return `  - "${name}" [${d.status}]: $${Math.round(d.spend).toLocaleString()} gasto, $${Math.round(d.revenue).toLocaleString()} revenue, ROAS ${roas}x, CTR ${ctr}%, ${d.conversions} conv`;
           }).join('\n');
         if (campaignLines) metricsContext += `\nCAMPAÑAS (30 días, por gasto):\n${campaignLines}\n`;
+
+        // === FREQUENCY ANALYSIS (#34) ===
+        // Frecuencia = veces promedio que un usuario único vio el ad. >3.5 = saturación.
+        let totalImp30 = 0, weightedFreq30 = 0;
+        const freqByCamp: Record<string, { imp: number; weighted: number; status: string }> = {};
+        for (const m of (campaignMetrics || [])) {
+          if (m.metric_date < thirtyDaysAgo || m.metric_date > today) continue;
+          const imp = Number(m.impressions) || 0;
+          const freq = Number(m.frequency) || 0;
+          totalImp30 += imp;
+          weightedFreq30 += imp * freq;
+          const name = m.campaign_name || 'Sin nombre';
+          if (!freqByCamp[name]) freqByCamp[name] = { imp: 0, weighted: 0, status: m.campaign_status || 'UNKNOWN' };
+          freqByCamp[name].imp += imp;
+          freqByCamp[name].weighted += imp * freq;
+        }
+        const avgFreq30 = totalImp30 > 0 ? weightedFreq30 / totalImp30 : 0;
+        if (avgFreq30 > 0) {
+          const saturated = Object.entries(freqByCamp)
+            .map(([name, d]) => ({ name, freq: d.imp > 0 ? d.weighted / d.imp : 0, status: d.status }))
+            .filter(c => c.freq > 3.5 && c.status === 'ACTIVE')
+            .sort((a, b) => b.freq - a.freq)
+            .slice(0, 5);
+          metricsContext += `\n🔁 FRECUENCIA DE IMPRESIÓN (saturación de audiencia):\n`;
+          metricsContext += `- Frecuencia promedio 30d: ${avgFreq30.toFixed(2)}× (cada usuario único vio el ad ${avgFreq30.toFixed(1)} veces en promedio)\n`;
+          if (avgFreq30 > 4) metricsContext += `- ⚠️ Por encima de 4× — alta probabilidad de fatiga de audiencia. Considerar refrescar creativos o expandir lookalike.\n`;
+          else if (avgFreq30 < 1.5) metricsContext += `- ✓ Por debajo de 1.5× — la audiencia es amplia, hay espacio para escalar presupuesto sin saturar.\n`;
+          if (saturated.length > 0) {
+            metricsContext += `- 🚨 Campañas ACTIVAS con frecuencia > 3.5× (saturadas):\n`;
+            for (const c of saturated) {
+              metricsContext += `    - "${c.name}": frecuencia ${c.freq.toFixed(2)}×\n`;
+            }
+          }
+        }
 
         // Daily Meta/Google ads breakdown (last 14 days) — impressions, clicks, CTR, CPC, spend
         const adsDailyRows: { date: string; spend: number; impressions: number; clicks: number; conversions: number; revenue: number }[] = [];

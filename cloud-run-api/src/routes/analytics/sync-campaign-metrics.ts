@@ -40,6 +40,8 @@ interface MetaCampaign {
       date_start: string;
       spend?: string;
       impressions?: string;
+      reach?: string;
+      frequency?: string;
       clicks?: string;
       cpm?: string;
       cpc?: string;
@@ -330,7 +332,7 @@ async function syncMetaCampaigns(
         accessToken,
         {
           params: {
-            fields: 'spend,impressions,reach,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas',
+            fields: 'spend,impressions,reach,frequency,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas',
             time_range: JSON.stringify({
               since: formatDate(startDate),
               until: formatDate(endDate),
@@ -368,6 +370,7 @@ async function syncMetaCampaigns(
           metric_date: day.date_start,
           impressions: parseFloat(day.impressions || '0'),
           reach: parseFloat(day.reach || '0'),
+          frequency: parseFloat(day.frequency || '0'),
           clicks: parseFloat(day.clicks || '0'),
           spend: Math.round(spendCLP),
           conversions: parseFloat(purchases?.value || '0'),
@@ -563,7 +566,7 @@ async function syncMetaAdsetMetrics(
             accessToken,
             {
               params: {
-                fields: 'spend,impressions,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas',
+                fields: 'spend,impressions,reach,frequency,clicks,cpm,cpc,ctr,actions,action_values,purchase_roas',
                 time_range: JSON.stringify({
                   since: formatDate(startDate),
                   until: formatDate(endDate),

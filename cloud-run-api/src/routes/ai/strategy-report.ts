@@ -905,7 +905,7 @@ export async function strategyReport(c: Context) {
     if ((wants('ads_meta') || wants('ads_google')) && connIds.length > 0) {
       const { data: cm } = await supabase
         .from('campaign_metrics')
-        .select('campaign_name, campaign_status, spend, impressions, clicks, conversions, conversion_value, metric_date, connection_id')
+        .select('campaign_name, campaign_status, spend, impressions, reach, frequency, clicks, conversions, conversion_value, metric_date, connection_id')
         .in('connection_id', connIds)
         .gte('metric_date', prevFromStr)
         .lte('metric_date', toStr)
