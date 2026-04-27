@@ -1475,17 +1475,21 @@ async function runGenerateSeedance(
   // when studio_mode is on). This eliminates the "second subject from a photo"
   // mismatch that Runway couldn't resolve.
   let anchorImage: string | undefined;
-  const studioProductImage = studioAssets?.featured_products?.[0]?.image_url || null;
+  // Priorizar imagen del producto seleccionado en el wizard (referenceUrls[0])
+  // sobre featured_products[0] que siempre es el priority más alta. Mismo fix
+  // que en runGenerateKling.
+  const wizardProductImage = referenceUrls[0] || null;
+  const fallbackProductImage = studioAssets?.featured_products?.[0]?.image_url || null;
+  const studioProductImage = wizardProductImage || fallbackProductImage;
   const studioActorImage = studioAssets?.primary_actor?.reference_images?.[0] || null;
   if (studioMode && studioProductImage) {
     anchorImage = studioProductImage;
-    console.log('[generate-video:seedance] anchor=producto (studio_mode)');
+    const src = wizardProductImage ? 'wizard' : 'studio_fallback';
+    console.log(`[generate-video:seedance] anchor=producto (studio_mode, source=${src})`);
   } else if (studioMode && studioActorImage) {
-    // Fallback: no product but we have actor — better than text-to-video.
     anchorImage = studioActorImage;
     console.log('[generate-video:seedance] anchor=actor (studio_mode, no producto)');
   } else if (referenceUrls.length > 0) {
-    // Non-studio path: first ref wins (preserves legacy Runway behavior).
     anchorImage = referenceUrls[0];
     console.log('[generate-video:seedance] anchor=referenceUrls[0]');
   }
@@ -1717,14 +1721,23 @@ async function runGenerateKling(
   // Non-studio fallback: use up to 4 from referenceUrls (catalog or explicit).
   // Kling v3 Omni accepts up to 7 reference_images without a reference_video,
   // we cap at 4 to keep the prompt focused (more refs = more confusion).
-  const studioProductImage = studioAssets?.featured_products?.[0]?.image_url || null;
+  // PRODUCTO: priorizar la imagen que el wizard mandó (selectedProduct.image
+  // del producto que el cliente eligió), NO siempre el primer featured_product.
+  // El bug anterior tomaba featured_products[0] (priority más alta) ignorando
+  // el producto seleccionado. Ahora respetamos referenceUrls[0] del wizard y
+  // solo caemos al fallback featured[0] si no vino producto explícito.
+  const wizardProductImage = referenceUrls[0] || null; // viene de fotoBaseUrls del wizard
+  const fallbackProductImage = studioAssets?.featured_products?.[0]?.image_url || null;
+  const studioProductImage = wizardProductImage || fallbackProductImage;
   const studioActorImage = studioAssets?.primary_actor?.reference_images?.[0] || null;
+
   const refsToUse: string[] = [];
   if (studioMode && (studioProductImage || studioActorImage)) {
     if (studioProductImage) refsToUse.push(studioProductImage);
     if (studioActorImage) refsToUse.push(studioActorImage);
+    const productSource = wizardProductImage ? 'wizard' : fallbackProductImage ? 'studio_fallback' : 'none';
     console.log(
-      `[generate-video:kling] studio refs (${refsToUse.length}): ${studioProductImage ? 'producto' : ''}${studioProductImage && studioActorImage ? '+actor' : studioActorImage ? 'actor' : ''}`,
+      `[generate-video:kling] studio refs (${refsToUse.length}): producto(${productSource})${studioActorImage ? '+actor' : ''}`,
     );
   } else if (referenceUrls.length > 0) {
     for (const u of referenceUrls.slice(0, 4)) refsToUse.push(u);
