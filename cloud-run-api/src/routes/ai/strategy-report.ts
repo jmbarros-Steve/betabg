@@ -432,11 +432,21 @@ interface AIInsights {
   healthScores: Array<{ dimension: string; value: number; reason: string }>;
 }
 
+/** Strip lone UTF-16 surrogates that break JSON.stringify → Anthropic 400. */
+function sanitizeForJson(s: string): string {
+  if (!s) return '';
+  return s
+    // Remove high surrogates not followed by a low surrogate
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '')
+    // Remove low surrogates not preceded by a high surrogate
+    .replace(/(^|[^\uD800-\uDBFF])([\uDC00-\uDFFF])/g, '$1');
+}
+
 async function generateAIInsights(allData: any, period: { from: string; to: string; days: number }, sectionsIncluded: string[]): Promise<AIInsights | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
 
-  const prompt = buildInsightsPrompt(allData, period, sectionsIncluded);
+  const prompt = sanitizeForJson(buildInsightsPrompt(allData, period, sectionsIncluded));
 
   try {
     const ctrl = new AbortController();
