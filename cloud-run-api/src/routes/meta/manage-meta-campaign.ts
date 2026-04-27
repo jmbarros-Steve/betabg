@@ -272,6 +272,16 @@ async function uploadImageFromUrl(
 
 // --- Action handlers ---
 
+/**
+ * handleCreate — Create a Meta Marketing API campaign + ad set + creative + ad.
+ *
+ * Notable body fields:
+ * - `targeting.targeting_automation.advantage_audience`: 0 | 1.
+ *   Defaults to 1 ONLY when no detailed targeting is provided
+ *   (no custom_audiences, flexible_spec, exclusions). Otherwise defaults to 0
+ *   to respect the user's manual setup. `is_advantage_sales=true` always wins
+ *   and forces 1 (and surfaces removed fields via warnings[]).
+ */
 async function handleCreate(
   accountId: string,
   accessToken: string,
@@ -396,8 +406,9 @@ async function handleCreate(
   const isFlexible = ad_set_format === 'flexible';
   const isCarousel = ad_set_format === 'carousel';
 
-  // Track warnings to include in the response
-  const warnings: string[] = [];
+  // Track warnings to include in the response. Structured shape so the UI
+  // can render each warning individually (code, message, removed_fields, ...).
+  const warnings: Array<Record<string, any>> = [];
 
   // Check if existing campaign uses CBO (Campaign Budget Optimization)
   let isCboCampaign = false;
@@ -449,36 +460,92 @@ async function handleCreate(
         console.error('[manage-meta-campaign] Invalid targeting JSON:', typeof targeting === 'string' ? targeting.slice(0, 100) : targeting);
         return { body: { success: false, error: 'Invalid targeting format' }, status: 400 };
       }
-      if (!targetingObj.targeting_automation) {
-        targetingObj.targeting_automation = { advantage_audience: 1 };
+
+      // Decide advantage_audience default:
+      //   - If user explicitly set targeting_automation.advantage_audience (0 or 1),
+      //     respect that.
+      //   - If user provided detailed targeting (custom_audiences, flexible_spec,
+      //     exclusions) → default 0 (don't override their work).
+      //   - Else (broad targeting) → default 1.
+      // is_advantage_sales=true overrides everything below in its own block.
+      const userSetAdvantageAudience =
+        targetingObj.targeting_automation &&
+        Object.prototype.hasOwnProperty.call(targetingObj.targeting_automation, 'advantage_audience');
+
+      const hasDetailedTargeting =
+        (Array.isArray(targetingObj.custom_audiences) && targetingObj.custom_audiences.length > 0) ||
+        (Array.isArray(targetingObj.flexible_spec) && targetingObj.flexible_spec.length > 0) ||
+        (targetingObj.exclusions && Object.keys(targetingObj.exclusions).length > 0) ||
+        (Array.isArray(targetingObj.excluded_custom_audiences) && targetingObj.excluded_custom_audiences.length > 0);
+
+      if (!userSetAdvantageAudience) {
+        const defaultAdvantage = hasDetailedTargeting || is_advantage_sales ? (is_advantage_sales ? 1 : 0) : 1;
+        targetingObj.targeting_automation = {
+          ...(targetingObj.targeting_automation || {}),
+          advantage_audience: defaultAdvantage,
+        };
       }
-      // With Advantage+ audience, age_max cannot be below 65
-      if (targetingObj.targeting_automation?.advantage_audience === 1 && targetingObj.age_max && targetingObj.age_max < 65) {
+
+      // age_max bump: only apply when advantage_audience is ON AND the user
+      // didn't set a smaller cap intentionally. We never bump silently — if
+      // we adjust, surface a warning.
+      if (
+        targetingObj.targeting_automation?.advantage_audience === 1 &&
+        typeof targetingObj.age_max === 'number' &&
+        targetingObj.age_max < 65
+      ) {
         const originalAgeMax = targetingObj.age_max;
         targetingObj.age_max = 65;
-        warnings.push(`Advantage+ audience requires age_max >= 65. Your value (${originalAgeMax}) was adjusted to 65.`);
+        warnings.push({
+          code: 'ADVANTAGE_AUDIENCE_AGE_MAX_BUMPED',
+          message: `Advantage+ audience requires age_max >= 65. Your value (${originalAgeMax}) was adjusted to 65.`,
+          original: { age_max: originalAgeMax },
+          adjusted: { age_max: 65 },
+        } as any);
         console.log(`[manage-meta-campaign] Advantage+ forced age_max from ${originalAgeMax} to 65`);
       }
 
       // Advantage+ Shopping: force the 3 automation levers regardless of what
       // the caller sent — Meta requires all three to be ON for the campaign to
       // qualify as ADVANTAGE_PLUS_SALES. Any manual override would degrade the
-      // campaign back to a regular one.
+      // campaign back to a regular one. Surface every removed field as a
+      // structured warning so the caller (and the UI) can show "esto se quitó".
       if (is_advantage_sales) {
         targetingObj.targeting_automation = { advantage_audience: 1 };
-        // Strip any placement override — Advantage+ needs auto placements.
-        delete targetingObj.publisher_platforms;
-        delete targetingObj.facebook_positions;
-        delete targetingObj.instagram_positions;
-        delete targetingObj.audience_network_positions;
-        delete targetingObj.messenger_positions;
-        // Strip any custom audience / interest targeting — Advantage+ Sales
-        // only accepts geo_locations + age + gender + advantage_audience.
-        delete targetingObj.custom_audiences;
-        delete targetingObj.excluded_custom_audiences;
-        delete targetingObj.flexible_spec;
-        delete targetingObj.exclusions;
-        console.log('[manage-meta-campaign] Advantage+ Sales: forcing automation levers (placements auto, broad audience)');
+
+        const removedFields: string[] = [];
+        const removedDetail: Record<string, any> = {};
+
+        const checkAndDelete = (key: string) => {
+          const v = targetingObj[key];
+          const isPresent = Array.isArray(v) ? v.length > 0 : v !== undefined && v !== null;
+          if (isPresent) {
+            removedFields.push(key);
+            removedDetail[key] = Array.isArray(v) ? v.length : v;
+            delete targetingObj[key];
+          }
+        };
+
+        checkAndDelete('publisher_platforms');
+        checkAndDelete('facebook_positions');
+        checkAndDelete('instagram_positions');
+        checkAndDelete('audience_network_positions');
+        checkAndDelete('messenger_positions');
+        checkAndDelete('custom_audiences');
+        checkAndDelete('excluded_custom_audiences');
+        checkAndDelete('flexible_spec');
+        checkAndDelete('exclusions');
+
+        if (removedFields.length > 0) {
+          warnings.push({
+            code: 'ADVANTAGE_SALES_OVERRIDE',
+            message: `Advantage+ Sales activado: se removieron ${removedFields.join(', ')} para cumplir con los requisitos de Meta.`,
+            removed_fields: removedFields,
+            removed_detail: removedDetail,
+          } as any);
+        }
+
+        console.log('[manage-meta-campaign] Advantage+ Sales: forcing automation levers (placements auto, broad audience)', removedFields);
       }
 
       // Placements: Advantage+ Placements = omit these fields (Meta auto-selects).
