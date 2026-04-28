@@ -312,10 +312,10 @@ export async function strategyChat(c: Context) {
         .gte('started_at', thirtyDaysAgo)
         .order('days_running', { ascending: false })
         .limit(8),
-      // 15. Competitors being tracked
+      // 15. Competitors being tracked + deep_dive_data (#30-32 — competencia profunda)
       supabase
         .from('competitor_tracking')
-        .select('display_name, ig_handle, store_url, last_sync_at')
+        .select('display_name, ig_handle, store_url, last_sync_at, last_deep_dive_at, deep_dive_data')
         .eq('client_id', client_id)
         .eq('is_active', true)
         .limit(10),
@@ -374,6 +374,87 @@ export async function strategyChat(c: Context) {
     // Merge client-specific + global knowledge (client first for priority)
     const mergedKnowledge = [...(clientKnowledgeData || []), ...(knowledge || [])];
     timelog('estrategia-parallel-queries');
+
+    // === LIVE GOOGLE TRENDS (#40 — Sofía W14, ≤3s budget) ===
+    // Top trending searches en Chile hoy. Permite correlacionar caídas/subidas
+    // de demanda externa con la performance del cliente.
+    let trendingSearches: string[] = [];
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3000);
+      try {
+        const res = await fetch('https://trends.google.com/trends/api/dailytrends?hl=es-CL&geo=CL', { signal: ctrl.signal });
+        if (res.ok) {
+          let txt = await res.text();
+          // Google prepends ")]}',\n" to JSON to prevent JSON hijacking
+          if (txt.startsWith(")]}',")) txt = txt.slice(5);
+          const j = JSON.parse(txt);
+          const days = j?.default?.trendingSearchesDays || [];
+          const today = days[0]?.trendingSearches || [];
+          trendingSearches = today.slice(0, 8).map((t: any) => String(t.title?.query || t.title || '')).filter(Boolean);
+        }
+      } catch (e: any) {
+        console.warn('[strategy-chat] Google Trends skipped:', e?.message);
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch (e: any) {
+      console.warn('[strategy-chat] Google Trends outer error:', e?.message);
+    }
+    timelog('estrategia-google-trends');
+
+    // === LIVE KLAVIYO SEGMENTS (#29, ≤4s budget) ===
+    // Hoy Steve ve aggregates de email_events. Con esto Steve sabe qué segmentos
+    // tiene el cliente (VIP, dormant, recent buyers) para recomendar acciones segmentadas.
+    let klaviyoSegments: Array<{ name: string; profileCount: number; created: string; updated: string }> = [];
+    const klaviyoConnections = (connections || []).filter((c: any) => c.platform === 'klaviyo');
+    if (klaviyoConnections.length > 0) {
+      try {
+        const klConn = klaviyoConnections[0];
+        const { data: connFull } = await supabase
+          .from('platform_connections')
+          .select('access_token_encrypted, api_key_encrypted')
+          .eq('id', klConn.id)
+          .single();
+        const encryptedKey = connFull?.api_key_encrypted || connFull?.access_token_encrypted;
+        if (encryptedKey) {
+          const { data: tok } = await supabase
+            .rpc('decrypt_platform_token', { encrypted_token: encryptedKey });
+          if (tok) {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 4000);
+            try {
+              const res = await fetch('https://a.klaviyo.com/api/segments/?fields[segment]=name,profile_count,created,updated&page[size]=20', {
+                headers: {
+                  'Authorization': `Klaviyo-API-Key ${tok}`,
+                  'Accept': 'application/json',
+                  'revision': '2024-10-15',
+                },
+                signal: ctrl.signal,
+              });
+              if (res.ok) {
+                const j: any = await res.json();
+                klaviyoSegments = (j.data || []).map((s: any) => ({
+                  name: s.attributes?.name || 'Sin nombre',
+                  profileCount: Number(s.attributes?.profile_count) || 0,
+                  created: s.attributes?.created || '',
+                  updated: s.attributes?.updated || '',
+                }));
+              } else {
+                console.warn('[strategy-chat] Klaviyo segments HTTP', res.status);
+              }
+            } catch (e: any) {
+              console.warn('[strategy-chat] Klaviyo segments skipped:', e?.message);
+            } finally {
+              clearTimeout(timer);
+            }
+          }
+        }
+      } catch (e: any) {
+        console.warn('[strategy-chat] Klaviyo segments outer error:', e?.message);
+      }
+    }
+    timelog('estrategia-klaviyo-segments');
 
     // === LIVE META PIXEL HEALTH (#36, ≤4s budget) + AUDIENCES (#35) ===
     // Verifica que el pixel del cliente esté disparando los eventos críticos.
@@ -749,6 +830,38 @@ export async function strategyChat(c: Context) {
       topSoldContext = `\n🔥 TOP PRODUCTOS VENDIDOS: No detecté pedidos pagados en Shopify en los últimos 30 días (puede ser que el cliente esté empezando o el sync de orders esté limitado por scopes).\n`;
     }
 
+    // === KLAVIYO SEGMENTS (#29) ===
+    let klaviyoSegmentsContext = '';
+    if (klaviyoSegments.length > 0) {
+      const top = klaviyoSegments
+        .sort((a, b) => b.profileCount - a.profileCount)
+        .slice(0, 10);
+      klaviyoSegmentsContext = `\n📬 KLAVIYO SEGMENTOS (${klaviyoSegments.length} total):\n`;
+      for (const s of top) {
+        klaviyoSegmentsContext += `  - "${s.name}": ${s.profileCount.toLocaleString('es-CL')} perfiles\n`;
+      }
+      // Heurística: detectar segmentos importantes por nombre
+      const lcNames = klaviyoSegments.map(s => ({ ...s, lc: s.name.toLowerCase() }));
+      const vips = lcNames.filter(s => /vip|loyal|repeat|top|frequent/.test(s.lc));
+      const dormant = lcNames.filter(s => /dormant|inactive|churn|sleep|lost/.test(s.lc));
+      const newSubs = lcNames.filter(s => /new|nuevo|recent|signup|welcome/.test(s.lc));
+      const detected: string[] = [];
+      if (vips.length > 0) detected.push(`VIPs: ${vips.map(v => `"${v.name}" (${v.profileCount})`).join(', ')}`);
+      if (dormant.length > 0) detected.push(`Dormant: ${dormant.map(d => `"${d.name}" (${d.profileCount})`).join(', ')}`);
+      if (newSubs.length > 0) detected.push(`Nuevos: ${newSubs.map(n => `"${n.name}" (${n.profileCount})`).join(', ')}`);
+      if (detected.length > 0) {
+        klaviyoSegmentsContext += `- Segmentos clave detectados: ${detected.join(' | ')}\n`;
+      }
+      // Detectar gaps típicos
+      const missingTypes: string[] = [];
+      if (vips.length === 0) missingTypes.push('VIP');
+      if (dormant.length === 0) missingTypes.push('Dormant');
+      if (newSubs.length === 0) missingTypes.push('Nuevos suscriptores');
+      if (missingTypes.length > 0) {
+        klaviyoSegmentsContext += `- 💡 Falta segmentos típicos: ${missingTypes.join(', ')}. Crearlos permite emails segmentados con mucha mejor performance.\n`;
+      }
+    }
+
     // === SHOPIFY ANALYTICS (#1-#7) ===
     let analyticsContext = '';
     if (shopifyAnalytics) {
@@ -955,6 +1068,35 @@ export async function strategyChat(c: Context) {
       }
     }
 
+    // === COMPETENCIA PROFUNDA (#30-32 — Ignacio W17) ===
+    let competitorDeepContext = '';
+    if (competitorTracking && competitorTracking.length > 0) {
+      const withDeepDive = (competitorTracking as any[]).filter(c => c.deep_dive_data && Object.keys(c.deep_dive_data).length > 0);
+      if (withDeepDive.length > 0) {
+        competitorDeepContext = `\n🥷 COMPETENCIA — ANÁLISIS PROFUNDO (deep dive de ${withDeepDive.length} competidores):\n`;
+        for (const c of withDeepDive.slice(0, 5)) {
+          const dd = c.deep_dive_data || {};
+          competitorDeepContext += `\n  📍 ${c.display_name || c.ig_handle || c.store_url}:\n`;
+          if (dd.irresistible_offer) {
+            const offer = typeof dd.irresistible_offer === 'string' ? dd.irresistible_offer : JSON.stringify(dd.irresistible_offer);
+            competitorDeepContext += `     - Oferta principal: "${String(offer).slice(0, 200)}"\n`;
+          }
+          if (dd.ai_insights) {
+            const insights = typeof dd.ai_insights === 'string' ? dd.ai_insights : JSON.stringify(dd.ai_insights);
+            competitorDeepContext += `     - Insights AI: "${String(insights).slice(0, 250)}"\n`;
+          }
+          if (dd.tech_stack && Array.isArray(dd.tech_stack) && dd.tech_stack.length > 0) {
+            competitorDeepContext += `     - Stack tecnológico: ${dd.tech_stack.slice(0, 4).join(', ')}\n`;
+          }
+          if (c.last_deep_dive_at) {
+            const days = Math.round((Date.now() - new Date(c.last_deep_dive_at).getTime()) / 86400000);
+            competitorDeepContext += `     - Análisis hace ${days} días\n`;
+          }
+        }
+        competitorDeepContext += `\nUsá esta info para comparar tu propuesta de valor vs competencia. Si tu oferta es similar, NO competirás solo con descuento — necesitás diferenciación clara.\n`;
+      }
+    }
+
     // === ROAS CON MARGEN REAL (#13) ===
     let realRoasContext = '';
     const hasAdsConnection = (connections || []).some((c: any) => c.platform === 'meta' || c.platform === 'google_ads');
@@ -979,6 +1121,38 @@ export async function strategyChat(c: Context) {
       }
     }
 
+    // === APP ENGAGEMENT (#38 — Sebastián W5) ===
+    // MVP usando data existente: clients.last_active_at + steve_messages count.
+    // Tracking detallado de tabs/eventos queda como follow-up con tabla app_events.
+    let appEngagementContext = '';
+    {
+      const { data: clientFull } = await supabase
+        .from('clients')
+        .select('last_active_at, created_at')
+        .eq('id', client_id)
+        .maybeSingle();
+      const lastActive = clientFull?.last_active_at;
+      const createdAt = clientFull?.created_at;
+      const totalMessagesAllConv = (allMessages || []).length;
+      if (lastActive) {
+        const lastActiveDate = new Date(lastActive);
+        const minutesAgo = Math.round((Date.now() - lastActiveDate.getTime()) / 60000);
+        const lastActiveLabel = minutesAgo < 60 ? `hace ${minutesAgo} min` : minutesAgo < 1440 ? `hace ${Math.round(minutesAgo / 60)}h` : `hace ${Math.round(minutesAgo / 1440)} días`;
+        appEngagementContext = `\n🐕 ENGAGEMENT DEL CLIENTE CON STEVE:\n`;
+        appEngagementContext += `- Última actividad: ${lastActiveLabel}\n`;
+        if (createdAt) {
+          const daysSinceCreation = Math.round((Date.now() - new Date(createdAt).getTime()) / 86400000);
+          appEngagementContext += `- Cliente desde hace ${daysSinceCreation} días\n`;
+        }
+        appEngagementContext += `- Mensajes históricos en esta tab Estrategia: ${totalMessagesAllConv}\n`;
+        if (minutesAgo > 14 * 1440) {
+          appEngagementContext += `- 🚨 CHURN RISK: el cliente no abrió Steve hace +14 días. Considerá enviar email/WA de reactivación con un insight concreto del último período.\n`;
+        } else if (minutesAgo > 7 * 1440) {
+          appEngagementContext += `- ⚠️ Engagement bajando: +7 días sin abrir Steve. Aprovechá esta sesión para mostrar valor real y ganchear.\n`;
+        }
+      }
+    }
+
     // === COMMITMENTS STATUS (#37) ===
     let commitmentsStatusContext = '';
     if (commitments && commitments.length > 0) {
@@ -990,6 +1164,14 @@ export async function strategyChat(c: Context) {
         }
         commitmentsStatusContext += `Si el cliente menciona algún tema relacionado, traé estos compromisos a colación y preguntá si avanzaron.\n`;
       }
+    }
+
+    // === GOOGLE TRENDS (#40) ===
+    let trendsContext = '';
+    if (trendingSearches.length > 0) {
+      trendsContext = `\n🌎 GOOGLE TRENDS HOY (Chile):\n`;
+      trendsContext += `Top búsquedas trending: ${trendingSearches.slice(0, 6).join(', ')}\n`;
+      trendsContext += `Si alguna de estas búsquedas se relaciona con la categoría del cliente, es una oportunidad táctica del día. Si el rubro del cliente NO está en trending, su demanda puede estar atenuada por factores macro.\n`;
     }
 
     // === CALENDARIO ESTACIONAL (#39) ===
@@ -1010,6 +1192,33 @@ export async function strategyChat(c: Context) {
       if (shipping > 0) financialContext += `- Costo envío promedio: $${shipping.toLocaleString()} CLP/orden\n`;
       if (otherFixed > 0) financialContext += `- Otros costos fijos: $${otherFixed.toLocaleString()} CLP\n`;
       financialContext += `Usá estos números para evaluar si el CPA / ROAS de las campañas es viable o no.\n`;
+    }
+
+    // === EMAIL DELIVERABILITY (#33 — Valentina W1) ===
+    let deliverabilityContext = '';
+    {
+      const events = (emailEvents || []) as any[];
+      const camps = (emailCampaigns || []) as any[];
+      const totalSent = camps.reduce((acc, c) => acc + (Number(c.sent_count) || 0), 0);
+      const bounces = events.filter(e => e.event_type === 'bounce' || e.event_type === 'bounced' || e.event_type === 'hard_bounce' || e.event_type === 'soft_bounce').length;
+      const complaints = events.filter(e => e.event_type === 'spam_complaint' || e.event_type === 'complaint' || e.event_type === 'spam').length;
+      const unsubs = events.filter(e => e.event_type === 'unsubscribe' || e.event_type === 'unsubscribed').length;
+      if (totalSent > 0) {
+        const bounceRate = (bounces / totalSent) * 100;
+        const complaintRate = (complaints / totalSent) * 100;
+        const unsubRate = (unsubs / totalSent) * 100;
+        const inboxApprox = Math.max(0, 100 - bounceRate - complaintRate);
+        deliverabilityContext = `\n📮 EMAIL DELIVERABILITY (últimos 30 días, ${totalSent.toLocaleString('es-CL')} enviados):\n`;
+        deliverabilityContext += `- Bounce rate: ${bounceRate.toFixed(2)}% (${bounces} bounces)\n`;
+        deliverabilityContext += `- Complaint rate: ${complaintRate.toFixed(3)}% (${complaints} reclamos)\n`;
+        deliverabilityContext += `- Unsub rate: ${unsubRate.toFixed(2)}% (${unsubs} unsubs)\n`;
+        deliverabilityContext += `- Inbox rate aproximado: ~${inboxApprox.toFixed(1)}%\n`;
+        if (bounceRate > 5) deliverabilityContext += `- 🚨 ALERTA CRÍTICA: bounce rate >5% (industria recomienda <2%). Limpiar lista de inválidos YA o Klaviyo restringe la cuenta.\n`;
+        else if (bounceRate > 2) deliverabilityContext += `- ⚠️ Bounce rate elevado (>2%). Considerá verificar emails antes de importar.\n`;
+        if (complaintRate > 0.1) deliverabilityContext += `- 🚨 ALERTA CRÍTICA: complaint rate >0.1% — Gmail/Outlook van a marcar tu dominio como spammer. Pausar campañas masivas hasta corregir.\n`;
+        else if (complaintRate > 0.05) deliverabilityContext += `- ⚠️ Complaint rate elevado (>0.05%). Revisar segmentación y opt-in.\n`;
+        if (unsubRate > 1) deliverabilityContext += `- ⚠️ Unsub rate >1%: el contenido no está conectando con la audiencia. Revisar segmentación o frecuencia.\n`;
+      }
     }
 
     // === EMAIL / KLAVIYO ===
@@ -1472,11 +1681,16 @@ ${inventoryAlertsContext}
 ${customerIntelContext}
 ${realRoasContext}
 ${analyticsContext}
+${deliverabilityContext}
+${klaviyoSegmentsContext}
 ${pixelHealthContext}
 ${audiencesContext}
 ${attributionContext}
 ${pricingChangesContext}
+${competitorDeepContext}
+${appEngagementContext}
 ${commitmentsStatusContext}
+${trendsContext}
 ${seasonalContext}
 ${financialContext}
 ${emailContext}
