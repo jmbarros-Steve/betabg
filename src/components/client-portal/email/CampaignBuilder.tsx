@@ -4,6 +4,7 @@ import GrapesEmailEditor, { type UnlayerEditorRef } from './GrapesEmailEditor';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -261,6 +262,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       });
       if (error) { toast.error(error); return; }
 
+      const name = data?.name || editingCampaign?.name || '';
       const subject = data?.subject || editingCampaign?.subject || '';
       const previewText = data?.preview_text || '';
       // AI now returns MJML — use it to load into editor
@@ -268,6 +270,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
 
       setEditingCampaign(prev => ({
         ...prev,
+        name: name,
         subject: subject,
         preview_text: previewText,
       }));
@@ -978,113 +981,127 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
           </div>
         </div>
 
-        {/* Step 1: Setup - Name + Subject */}
+        {/* Step 1: Setup - AI primero, campos manuales abajo */}
         {editorStep === 'setup' && (
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-2xl mx-auto py-8 px-4 space-y-6">
               <div>
-                <h2 className="text-xl font-semibold mb-1">Paso 1: Datos de la campaña</h2>
-                <p className="text-sm text-muted-foreground">Define el nombre, asunto y remitente</p>
+                <h2 className="text-xl font-semibold mb-1">Paso 1: Cuéntale a Steve sobre tu campaña</h2>
+                <p className="text-sm text-muted-foreground">Steve genera nombre, asunto, preview y email completo desde tu contexto.</p>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <Label>Nombre de la campaña *</Label>
-                  <Input
-                    value={editingCampaign?.name || ''}
-                    onChange={(e) => setEditingCampaign(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Ej: Promoción Black Friday"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Asunto del email *</Label>
-                    <Input
-                      value={editingCampaign?.subject || ''}
-                      onChange={(e) => setEditingCampaign(prev => ({ ...prev, subject: e.target.value }))}
-                      placeholder="Ej: 30% de descuento solo hoy"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Máx 50 caracteres recomendado.</p>
-                  </div>
-                  <div>
-                    <Label>Preview text</Label>
-                    <Input
-                      value={editingCampaign?.preview_text || ''}
-                      onChange={(e) => setEditingCampaign(prev => ({ ...prev, preview_text: e.target.value }))}
-                      placeholder="Texto que se ve en la bandeja"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Nombre del remitente</Label>
-                    <Input
-                      value={editingCampaign?.from_name || ''}
-                      onChange={(e) => setEditingCampaign(prev => ({ ...prev, from_name: e.target.value }))}
-                      placeholder="Nombre de tu tienda o marca"
-                    />
-                  </div>
-                  <div>
-                    <Label>Email del remitente</Label>
-                    <Input
-                      value={editingCampaign?.from_email || ''}
-                      onChange={(e) => setEditingCampaign(prev => ({ ...prev, from_email: e.target.value }))}
-                      placeholder="noreply@tudominio.com"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* AI Generation */}
-              <Card className="border-dashed border-2">
-                <CardContent className="py-5 space-y-4">
+              {/* AI Generation - principal */}
+              <Card className="border-dashed border-2 border-purple-300">
+                <CardContent className="py-6 space-y-4">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-purple-600" />
                     <h3 className="font-semibold">Generar con Steve AI</h3>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Steve genera el email completo con tu branding, productos y tono de marca.
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs">Tipo de campaña</Label>
-                      <Select value={campaignType} onValueChange={setCampaignType}>
-                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {CAMPAIGN_TYPES.map(t => (
-                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-xs">Instrucciones (opcional)</Label>
-                      <Input
-                        value={aiInstructions}
-                        onChange={(e) => setAiInstructions(e.target.value)}
-                        placeholder="Ej: Enfócate en el descuento del 30%"
-                        className="h-9"
-                      />
-                    </div>
+
+                  <div>
+                    <Label>Tipo de campaña *</Label>
+                    <Select value={campaignType} onValueChange={setCampaignType}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {CAMPAIGN_TYPES.map(t => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
+
+                  <div>
+                    <Label>Cuéntale a Steve sobre tu campaña *</Label>
+                    <Textarea
+                      value={aiInstructions}
+                      onChange={(e) => setAiInstructions(e.target.value)}
+                      placeholder="Ej: Quiero promocionar mi nueva colección de invierno con 30% off el primer pedido. Mi audiencia son mujeres 25-45 que ya compraron antes. Tono cercano y emocional. Incluir urgencia (oferta válida hasta domingo)."
+                      rows={6}
+                      className="resize-y"
+                    />
+                    <p className={`text-xs mt-1 ${aiInstructions.trim().length < 30 ? 'text-amber-600' : 'text-green-600'}`}>
+                      {aiInstructions.trim().length < 30
+                        ? `Mínimo 30 caracteres (${aiInstructions.trim().length}/30)`
+                        : `${aiInstructions.trim().length} caracteres ✓`}
+                    </p>
+                  </div>
+
                   <Button
                     onClick={handleGenerateWithAI}
-                    disabled={generating}
+                    disabled={generating || aiInstructions.trim().length < 30}
+                    size="lg"
                     className="w-full bg-gradient-to-r from-purple-600 to-[#1E3A7B] hover:from-purple-700 hover:to-[#162D5F]"
                   >
                     {generating ? (
                       <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generando email...</>
                     ) : (
-                      <><Sparkles className="w-4 h-4 mr-2" /> Generar Email con AI</>
+                      <><Sparkles className="w-4 h-4 mr-2" /> Generar Email con Steve AI</>
                     )}
                   </Button>
                   {editingCampaign?.html_content && (
-                    <p className="text-xs text-green-600 font-medium">Email generado. Continúa al editor para personalizarlo.</p>
+                    <p className="text-xs text-green-600 font-medium text-center">
+                      ✓ Email generado. Revisa los datos abajo y continúa al editor.
+                    </p>
                   )}
                 </CardContent>
               </Card>
+
+              {/* Campos manuales - editables (auto-rellenos por IA o manualmente) */}
+              <details className="group" open={!!editingCampaign?.html_content}>
+                <summary className="cursor-pointer flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground py-2 list-none">
+                  <ChevronRight className="w-4 h-4 transition-transform group-open:rotate-90" />
+                  {editingCampaign?.html_content ? 'Datos de la campaña (rellenados por Steve)' : 'Editar manualmente (avanzado)'}
+                </summary>
+                <div className="space-y-4 mt-3 pl-6">
+                  <div>
+                    <Label>Nombre de la campaña</Label>
+                    <Input
+                      value={editingCampaign?.name || ''}
+                      onChange={(e) => setEditingCampaign(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Lo rellena Steve, o escríbelo tú"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Asunto del email</Label>
+                      <Input
+                        value={editingCampaign?.subject || ''}
+                        onChange={(e) => setEditingCampaign(prev => ({ ...prev, subject: e.target.value }))}
+                        placeholder="Lo rellena Steve, o escríbelo tú"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Máx 50 caracteres recomendado.</p>
+                    </div>
+                    <div>
+                      <Label>Preview text</Label>
+                      <Input
+                        value={editingCampaign?.preview_text || ''}
+                        onChange={(e) => setEditingCampaign(prev => ({ ...prev, preview_text: e.target.value }))}
+                        placeholder="Lo rellena Steve, o escríbelo tú"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Nombre del remitente</Label>
+                      <Input
+                        value={editingCampaign?.from_name || ''}
+                        onChange={(e) => setEditingCampaign(prev => ({ ...prev, from_name: e.target.value }))}
+                        placeholder="Nombre de tu tienda o marca"
+                      />
+                    </div>
+                    <div>
+                      <Label>Email del remitente</Label>
+                      <Input
+                        value={editingCampaign?.from_email || ''}
+                        onChange={(e) => setEditingCampaign(prev => ({ ...prev, from_email: e.target.value }))}
+                        placeholder="noreply@tudominio.com"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </details>
 
               {/* Product Recommendations */}
               <Card className="border">

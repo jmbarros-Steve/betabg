@@ -41,6 +41,12 @@ export async function generateSteveMailContent(c: Context) {
     if (message === 'ANTHROPIC_API_KEY not configured') {
       return c.json({ error: 'AI service not configured. Contact support.' }, 503);
     }
+    if (message === 'INSTRUCTIONS_REQUIRED') {
+      return c.json({ error: 'Cuéntale a Steve sobre tu campaña (mínimo 30 caracteres) para que pueda generar el email.' }, 400);
+    }
+    if (message === 'AI_RESPONSE_TRUNCATED') {
+      return c.json({ error: 'El email salió muy largo y no se pudo terminar de generar. Intenta con instrucciones más concretas.' }, 502);
+    }
     if (message.includes('Rate limit')) {
       return c.json({ error: 'AI service busy. Try again in a moment.' }, 429);
     }
@@ -134,11 +140,20 @@ ${ctx.knowledgeBlock}${ctx.bugsBlock}`;
 async function handleGenerateCampaignHtml(body: any, ctx: BrandContext) {
   const { campaign_type, subject, instructions, products } = body;
 
+  // Instrucciones son obligatorias — sin contexto no podemos generar nombre,
+  // asunto ni MJML coherentes. Mínimo 30 chars para evitar prompts vacíos.
+  if (!instructions || typeof instructions !== 'string' || instructions.trim().length < 30) {
+    throw new Error('INSTRUCTIONS_REQUIRED');
+  }
+
   const selectedProducts = products || ctx.products.slice(0, 5);
 
   const prompt = `Genera un email MJML completo para una campana de tipo "${campaign_type || 'promotional'}" de "${ctx.brandName}".
-${subject ? `Subject: "${subject}"` : 'Genera tambien un subject line.'}
-${instructions ? `Instrucciones: ${instructions}` : ''}
+
+CONTEXTO DE LA CAMPAÑA (lo que el usuario te dijo):
+${instructions}
+
+${subject ? `Subject sugerido por el usuario: "${subject}". Puedes mejorarlo si tienes una idea mejor.` : ''}
 ${selectedProducts.length > 0 ? `Productos a destacar: ${truncateContext(JSON.stringify(selectedProducts), 1500)}` : ''}
 
 Genera MJML completo con esta estructura:
@@ -167,8 +182,9 @@ El email MJML debe incluir:
 
 Responde SOLO con JSON (sin markdown, sin backticks):
 {
-  "subject": "...",
-  "preview_text": "...",
+  "name": "Nombre interno de la campaña (max 60 chars, descriptivo, ej: 'Black Friday 2026 - 30% OFF colección invierno')",
+  "subject": "Asunto del email (max 50 chars)",
+  "preview_text": "Preview text (max 90 chars)",
   "mjml": "<mjml>..."
 }`;
 
@@ -261,7 +277,7 @@ async function callClaude(userMessage: string, systemPrompt: string): Promise<an
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 8000,
+      max_tokens: 16000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     }),
@@ -277,6 +293,13 @@ async function callClaude(userMessage: string, systemPrompt: string): Promise<an
   const data: any = await response.json();
   const text = data.content?.[0]?.text || '{}';
   const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+  // Si Claude truncó por límite de tokens, el JSON queda incompleto.
+  // Tiramos error específico para que el handler le dé mensaje útil al usuario.
+  if (data.stop_reason === 'max_tokens') {
+    console.error('AI response truncated by max_tokens. Length:', clean.length);
+    throw new Error('AI_RESPONSE_TRUNCATED');
+  }
 
   try {
     return JSON.parse(clean);
