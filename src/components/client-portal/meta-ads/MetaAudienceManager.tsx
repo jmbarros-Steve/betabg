@@ -843,7 +843,7 @@ function CreateCustomAudienceDialog({
                         setFormData((prev) => ({ ...prev, engagement_days: val }))
                       }
                       min={1}
-                      max={365}
+                      max={180}
                       step={1}
                       className="flex-1"
                     />
