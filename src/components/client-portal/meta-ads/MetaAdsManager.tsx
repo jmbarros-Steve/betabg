@@ -27,7 +27,6 @@ import {
   LayoutDashboard,
   Megaphone,
   Users,
-  FolderOpen,
   BarChart3,
   Zap,
   Swords,
@@ -56,7 +55,6 @@ import {
 // Existing components
 import { Coachmark } from '@/components/client-portal/Coachmark';
 import { MetaAdCreator } from '@/components/client-portal/MetaAdCreator';
-import { AdCreativesLibrary } from '@/components/client-portal/AdCreativesLibrary';
 import { CompetitorAdsPanel } from '@/components/client-portal/CompetitorAdsPanel';
 
 // Sub-module components
@@ -101,7 +99,6 @@ type SectionKey =
   | 'campaigns'
   | 'create-ad'
   | 'audiences'
-  | 'library'
   | 'analytics'
   | 'rules'
   | 'competitors'
@@ -163,7 +160,6 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'drafts', label: 'Borradores', icon: FileCheck },
   { key: 'audiences', label: 'Audiencias', icon: Users },
   { key: 'pixel', label: 'Pixel', icon: Crosshair },
-  { key: 'library', label: 'Biblioteca', icon: FolderOpen },
   { key: 'analytics', label: 'Análisis', icon: BarChart3 },
   { key: 'rules', label: 'Reglas', icon: Zap },
   { key: 'creative-perf', label: 'Creativos', icon: Sparkles },
@@ -1037,7 +1033,7 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
             <MetaAdCreator
               clientId={clientId}
               onBack={() => handleNavClick('dashboard')}
-              onGoToLibrary={() => handleNavClick('library')}
+              onGoToLibrary={() => handleNavClick('drafts')}
             />
           </PlanGate>
         )}
@@ -1046,7 +1042,6 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
             <MetaAudienceManager clientId={clientId} />
           </PlanGate>
         )}
-        {key === 'library' && <AdCreativesLibrary clientId={clientId} />}
         {key === 'analytics' && (
           <PlanGate feature="meta_ads.analysis" clientId={clientId}>
             <MetaAnalyticsDashboard
@@ -1310,15 +1305,12 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
                 const isActive = activeSection === item.key;
                 if (!visitedSections.has(item.key)) return null;
                 // Tabs that work without Meta connection
-                if (item.key === 'library' || item.key === 'competitors') {
+                if (item.key === 'competitors') {
                   return (
                     <div key={item.key} className={isActive ? 'block' : 'hidden'}>
-                      {item.key === 'library' && <AdCreativesLibrary clientId={clientId} />}
-                      {item.key === 'competitors' && (
-                        <PlanGate feature="competencia.ads" clientId={clientId}>
-                          <CompetitorAdsPanel clientId={clientId} />
-                        </PlanGate>
-                      )}
+                      <PlanGate feature="competencia.ads" clientId={clientId}>
+                        <CompetitorAdsPanel clientId={clientId} />
+                      </PlanGate>
                     </div>
                   );
                 }

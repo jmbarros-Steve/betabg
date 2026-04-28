@@ -32,6 +32,9 @@ import {
   Plus,
   Image as ImageIcon,
   FileText,
+  Film,
+  Sparkles,
+  Camera,
 } from 'lucide-react';
 import { useMetaBusiness } from './MetaBusinessContext';
 
@@ -65,9 +68,26 @@ function pickArray(v: any): string[] {
 interface DraftsManagerProps {
   clientId: string;
   onEditDraft?: (draftId: string) => void;
+  // Callback para que el wizard de "Crear" arranque con un asset reusado
+  // desde la biblioteca interna. Si no se pasa, mostramos un toast.
+  onCreateWithAsset?: (asset: { url: string; type: 'image' | 'video'; creativeId: string }) => void;
 }
 
 type DraftStatus = 'borrador' | 'aprobado' | 'en_pauta' | 'generando';
+type MainTab = 'anuncios' | 'videos' | 'fotos';
+
+interface AssetItem {
+  url: string;
+  type: 'image' | 'video';
+  creativeId: string;
+  creativeTitle: string;
+  funnel: string | null;
+  angulo: string | null;
+  estado: DraftStatus;
+  createdAt: string;
+}
+
+const isVideoUrl = (u: string): boolean => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u);
 
 interface BriefVisual {
   type?: string;
@@ -206,11 +226,12 @@ function relativeTime(date: Date): string {
   return `hace ${days}d`;
 }
 
-export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerProps) {
+export default function DraftsManager({ clientId, onEditDraft, onCreateWithAsset }: DraftsManagerProps) {
   const { connectionId: ctxConnectionId } = useMetaBusiness();
 
   const [drafts, setDrafts] = useState<DraftItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mainTab, setMainTab] = useState<MainTab>('anuncios');
   const [filter, setFilter] = useState<DraftStatus | 'all'>('all');
   const [deleteTarget, setDeleteTarget] = useState<DraftItem | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -219,6 +240,10 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
 
   // ── Fetch ──
+  // Antes filtrábamos por estado IN ('borrador','aprobado','generando') para
+  // mostrar solo "borradores en proceso". Ahora la pestaña unifica también
+  // Videos y Fotos reusables — esos pueden venir de creativos en pauta —
+  // así que traemos TODOS los estados y filtramos en el frontend según tab.
   const fetchDrafts = useCallback(async () => {
     setLoading(true);
     try {
@@ -226,14 +251,12 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
         .from('ad_creatives')
         .select('id, titulo, texto_principal, descripcion, cta, asset_url, formato, funnel, angulo, estado, created_at, updated_at, brief_visual, dct_copies, dct_titulos, dct_descripciones, dct_imagenes')
         .eq('client_id', clientId)
-        .in('estado', ['borrador', 'aprobado', 'generando'])
         .order('created_at', { ascending: false });
       if (error) throw error;
       setDrafts((data as DraftItem[]) || []);
       setLastFetched(new Date());
     } catch (err) {
-      // Drafts fetch error handled via toast
-      toast.error('Error cargando borradores');
+      toast.error('Error cargando biblioteca');
     } finally {
       setLoading(false);
     }
@@ -367,8 +390,62 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
     }
   };
 
+  // ── Use asset in new campaign ──
+  // El cliente puede reusar un video/foto de su biblioteca para arrancar una
+  // campaña sin tener que regenerar el creativo desde cero. El callback va al
+  // wizard de "Crear" con el asset prefilleado; si MetaAdsManager no provee
+  // el callback hacemos un fallback amable.
+  const handleUseAsset = (asset: AssetItem) => {
+    if (onCreateWithAsset) {
+      onCreateWithAsset({ url: asset.url, type: asset.type, creativeId: asset.creativeId });
+      toast.success(`Cargando ${asset.type === 'video' ? 'video' : 'foto'} en el wizard de Crear...`);
+    } else {
+      toast.info('Ve a "Crear" y selecciona este asset desde la galería del wizard.');
+    }
+  };
+
   // ── Helpers ──
-  const filtered = filter === 'all' ? drafts : drafts.filter((d) => d.estado === filter);
+  // Anuncios: solo creativos con copy + título (campañas DCT completas) en
+  // estado borrador/aprobado/generando. Los publicados (en_pauta) ya están
+  // vivos en Meta — no son borradores para "publicar de nuevo".
+  const draftAds = drafts.filter(
+    (d) => ['borrador', 'aprobado', 'generando'].includes(d.estado),
+  );
+  const filtered = filter === 'all' ? draftAds : draftAds.filter((d) => d.estado === filter);
+
+  // Videos y Fotos: extraemos todos los assets únicos de TODOS los creativos
+  // (incluso los publicados) para que el cliente pueda reusarlos.
+  const allAssets: AssetItem[] = (() => {
+    const seen = new Set<string>();
+    const out: AssetItem[] = [];
+    for (const d of drafts) {
+      const collect = (url: string | null | undefined) => {
+        if (!url || seen.has(url)) return;
+        seen.add(url);
+        out.push({
+          url,
+          type: isVideoUrl(url) ? 'video' : 'image',
+          creativeId: d.id,
+          creativeTitle: d.titulo || 'Sin nombre',
+          funnel: d.funnel,
+          angulo: d.angulo,
+          estado: d.estado,
+          createdAt: d.created_at,
+        });
+      };
+      collect(d.asset_url);
+      if (Array.isArray(d.dct_imagenes)) {
+        for (const img of d.dct_imagenes) {
+          collect(typeof img === 'string' ? img : (img as { url?: string })?.url);
+        }
+      }
+    }
+    return out;
+  })();
+
+  const videoAssets = allAssets.filter((a) => a.type === 'video');
+  const photoAssets = allAssets.filter((a) => a.type === 'image');
+
   const formatDate = (d: string) => new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   function getImages(draft: DraftItem): string[] {
@@ -421,9 +498,9 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Borradores</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Borradores y Biblioteca</h2>
           <p className="text-muted-foreground text-sm">
-            {drafts.length} borrador{drafts.length !== 1 ? 'es' : ''} &middot; Revisa estrategia y publica
+            Tus campañas en borrador, videos y fotos. Reusá lo que ya tenés para crear nuevas campañas.
           </p>
           {lastFetched && (
             <p className="text-muted-foreground text-xs mt-0.5">Actualizado: {relativeTime(lastFetched)}</p>
@@ -435,24 +512,50 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
         </Button>
       </div>
 
-      {/* Filter tabs */}
+      {/* Main tabs: Anuncios | Videos | Fotos */}
       <div className="flex gap-1 bg-muted/50 rounded-lg p-1 w-fit">
-        {(['all', 'borrador', 'aprobado', 'generando'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              filter === f ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {f === 'all' ? `Todos (${drafts.length})` : `${STATUS_CONFIG[f].label} (${drafts.filter(d => d.estado === f).length})`}
-          </button>
-        ))}
+        {([
+          { key: 'anuncios', label: 'Anuncios', icon: Sparkles, count: draftAds.length },
+          { key: 'videos', label: 'Videos', icon: Film, count: videoAssets.length },
+          { key: 'fotos', label: 'Fotos', icon: Camera, count: photoAssets.length },
+        ] as const).map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setMainTab(t.key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                mainTab === t.key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {t.label}
+              <span className="text-xs text-muted-foreground/70">({t.count})</span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Pending drafts banner */}
-      {(() => {
-        const pendingCount = drafts.filter((d) => d.estado === 'borrador').length;
+      {/* Status filter tabs — solo en pestaña Anuncios */}
+      {mainTab === 'anuncios' && (
+        <div className="flex gap-1 bg-muted/50 rounded-lg p-1 w-fit">
+          {(['all', 'borrador', 'aprobado', 'generando'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                filter === f ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {f === 'all' ? `Todos (${draftAds.length})` : `${STATUS_CONFIG[f].label} (${draftAds.filter(d => d.estado === f).length})`}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Pending drafts banner — solo en pestaña Anuncios */}
+      {mainTab === 'anuncios' && (() => {
+        const pendingCount = draftAds.filter((d) => d.estado === 'borrador').length;
         return pendingCount > 0 ? (
           <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
             <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
@@ -463,8 +566,103 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
         ) : null;
       })()}
 
-      {/* Empty state */}
-      {filtered.length === 0 ? (
+      {/* ════════ VIDEOS TAB ════════ */}
+      {mainTab === 'videos' && (
+        videoAssets.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="py-12 text-center">
+              <Film className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
+              <h3 className="text-base font-semibold mb-1">Sin videos en tu biblioteca</h3>
+              <p className="text-muted-foreground text-sm">
+                Genera videos desde "Crear" usando el Estudio Creativo. Aparecerán aquí para reusar en futuras campañas.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {videoAssets.map((asset) => (
+              <Card key={`${asset.creativeId}-${asset.url}`} className="overflow-hidden group">
+                <div className="aspect-square relative bg-black">
+                  <video src={asset.url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                  <span className="absolute top-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded">VIDEO</span>
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <Button size="sm" className="text-xs" onClick={() => handleUseAsset(asset)}>
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      Usar en campaña
+                    </Button>
+                  </div>
+                </div>
+                <CardContent className="p-3 space-y-1.5">
+                  <p className="text-sm font-medium line-clamp-1">{asset.creativeTitle}</p>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {asset.funnel && FUNNEL_INFO[asset.funnel] && (
+                      <Badge className={`text-[9px] ${FUNNEL_INFO[asset.funnel].color}`}>
+                        {FUNNEL_INFO[asset.funnel].label}
+                      </Badge>
+                    )}
+                    <Badge className={`text-[9px] ${STATUS_CONFIG[asset.estado].color}`}>
+                      {STATUS_CONFIG[asset.estado].label}
+                    </Badge>
+                  </div>
+                  {asset.angulo && (
+                    <p className="text-[10px] text-muted-foreground line-clamp-1">{asset.angulo}</p>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* ════════ FOTOS TAB ════════ */}
+      {mainTab === 'fotos' && (
+        photoAssets.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="py-12 text-center">
+              <Camera className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
+              <h3 className="text-base font-semibold mb-1">Sin fotos en tu biblioteca</h3>
+              <p className="text-muted-foreground text-sm">
+                Sube fotos o generá imágenes con IA desde "Crear". Aparecerán acá para reusar en cualquier campaña nueva.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {photoAssets.map((asset) => (
+              <Card key={`${asset.creativeId}-${asset.url}`} className="overflow-hidden group">
+                <div className="aspect-square relative">
+                  <SafeImage src={asset.url} className="w-full h-full" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <Button size="sm" className="text-xs" onClick={() => handleUseAsset(asset)}>
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      Usar en campaña
+                    </Button>
+                  </div>
+                </div>
+                <CardContent className="p-3 space-y-1.5">
+                  <p className="text-sm font-medium line-clamp-1">{asset.creativeTitle}</p>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {asset.funnel && FUNNEL_INFO[asset.funnel] && (
+                      <Badge className={`text-[9px] ${FUNNEL_INFO[asset.funnel].color}`}>
+                        {FUNNEL_INFO[asset.funnel].label}
+                      </Badge>
+                    )}
+                    <Badge className={`text-[9px] ${STATUS_CONFIG[asset.estado].color}`}>
+                      {STATUS_CONFIG[asset.estado].label}
+                    </Badge>
+                  </div>
+                  {asset.angulo && (
+                    <p className="text-[10px] text-muted-foreground line-clamp-1">{asset.angulo}</p>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* ════════ ANUNCIOS TAB (default) ════════ */}
+      {mainTab === 'anuncios' && (filtered.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center">
             <FileImage className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
@@ -754,7 +952,7 @@ export default function DraftsManager({ clientId, onEditDraft }: DraftsManagerPr
             );
           })}
         </div>
-      )}
+      ))}
 
       {/* Publish Confirmation Dialog */}
       <Dialog open={!!publishTarget} onOpenChange={() => setPublishTarget(null)}>
