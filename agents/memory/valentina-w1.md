@@ -6,6 +6,23 @@ Journal acumulativo: decisiones arquitecturales, patrones aprendidos, desacuerdo
 
 ## Decisiones arquitecturales
 
+### D-08 — Light theme para BlogPost.tsx en lugar de migrar todo a dark (28/04)
+**Decisión con JM:** A1 sobre A2. BlogPost.tsx mantiene la paleta del Blog.tsx existente (`bg-slate-50` + accent navy `#1E3A7B`).
+**Por qué:** el sitio entero es light. Migrar el blog a dark editorial implicaba rediseñar el sistema visual completo o quedar con inconsistencia. JM eligió coherencia con el resto.
+
+### D-09 — Slug en URL del blog en lugar de UUID (28/04)
+**Decisión:** B1. URLs `/blog/:slug` con kebab-case. Requirió migración con columna `slug TEXT` + partial unique index (allows NULLs).
+**Por qué:** SEO + legibilidad. UUID en URL es feo y no transmite contenido. La migración es trivial y backwards-compatible.
+
+### D-10 — Seed data del primer post en migration en lugar de script aparte (28/04)
+**Decisión:** Migration `20260428140100_blog_posts_seed_first.sql` con DO block que valida owner existe antes de insertar.
+**Por qué:** garantiza primer post disponible inmediatamente post-deploy en cualquier ambiente sin paso manual. Documentado explícitamente en comentario que es seed data y por qué.
+**Patrón:** DO $migration$ ... END $migration$ con RAISE NOTICE fail-safe y ORDER BY created_at ASC para determinismo.
+
+### D-11 — react-markdown + remark-gfm en lugar de HTML directo (28/04)
+**Decisión:** Contenido del post en markdown puro, renderizado con react-markdown + remark-gfm.
+**Por qué:** (1) editable a futuro sin tocar HTML escapado, (2) GFM soporta tablas que el artículo necesita, (3) react-markdown v9+ NO procesa HTML embebido por default → cero XSS sin esfuerzo.
+
 ### D-01 — Feature flag `use_send_queue` con rollout gradual (08/04, sesión mañana)
 **Decisión con JM:** Plan A. La cola de envío se activa por cliente vía `email_send_settings.use_send_queue` (default `false`). Preserva comportamiento legacy mientras se valida la cola.
 **Por qué:** el código de la cola estaba 100% huérfano (lib + tabla + rate limit + retry + smart send implementados, sin llamadores). Encender todo de una era inseguro.

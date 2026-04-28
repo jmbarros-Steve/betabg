@@ -1,8 +1,55 @@
 # Valentina W1 — Estado Actual
 
-**Última sesión:** 2026-04-09 (Audit Fix Email)
-**Sesión previa:** 2026-04-08 (8 mejoras Steve Mail)
-**Reviewed-By:** Claude self-review (Isidora W6 + Javiera W12 pendientes sobre ambas sesiones)
+**Última sesión:** 2026-04-28 (Blog público Steve + Portadas LinkedIn)
+**Sesión previa:** 2026-04-09 (Audit Fix Email)
+**Reviewed-By 28/04:** Isidora W6 — APROBADO CON OBSERVACIONES (HIGH 1+2 + MEDIUM 5+6 + LOW 9+10+12+13 fixes aplicados)
+**Reviewed-By 09/04 + 08/04:** pendientes (Isidora W6 + Javiera W12)
+
+---
+
+## Trabajo completado sesión 28/04 — Blog público + Portadas LinkedIn
+
+Sesión multi-output orientada a presencia pública de Steve. NO tocó Steve Mail core.
+
+### Blog público (5 archivos, commit 9543f38d)
+1. **Nuevo** `src/pages/BlogPost.tsx` — vista de artículo individual (light theme, prose tipográfico, react-markdown + remark-gfm, hero, CTA)
+2. **Modif** `src/pages/Blog.tsx` — cards navegables con `Link to /blog/${slug}` + aria-label + filter posts sin slug
+3. **Modif** `src/App.tsx` — ruta `/blog/:slug` arriba del catch-all
+4. **Nueva migración** `20260428140000_blog_posts_slug.sql` — columna slug + partial unique index (allows NULLs) + index para published lookup
+5. **Nueva migración seed** `20260428140100_blog_posts_seed_first.sql` — INSERT idempotente con DO block fail-safe (RAISE NOTICE si owner no existe) + ORDER BY created_at ASC determinístico
+
+**Live URLs:**
+- https://www.steve.cl/blog
+- https://www.steve.cl/blog/por-que-pymes-dejan-agencia-digital
+
+**Phantom migrations resueltas:** 6 phantoms (`20260321/22/25/0409/0427162317/0427164608`) con `migration repair --status reverted` (mismo patrón D-03 de 08/04).
+
+### Primer artículo publicado
+- Título: "Por qué tantas PYMEs chilenas dejan a su agencia digital al año (la matemática que nadie suma)"
+- Slug: `por-que-pymes-dejan-agencia-digital`
+- Categoría: Performance Marketing
+- Tono: sin insultos, data dura. Argumento estructural ("el modelo no fue diseñado para este segmento").
+- Segmento target: PYMEs chilenas e-commerce que venden $500K-$6M CLP/mes
+- Data: NPS 51 agencias, churn 49% PPC, ROAS Meta 2,19:1, costos agencias Chile $390K-$890K
+- ~1900 palabras + tablas matemáticas
+
+### Portadas LinkedIn
+- Personal 1584×396 — `~/Desktop/linkedin-cover-jm.png` (versión dark con stats técnicos)
+- Empresa 1128×191 — `~/Desktop/steve-linkedin-empresa.png` (versión sobria sin stats ni canales)
+
+### Cross-review Isidora W6 — fixes aplicados
+- HIGH 1: Seed migration con DO block fail-safe (no falla silente si user owner no existe)
+- HIGH 2: ORDER BY u.created_at ASC para reproducibilidad cross-environment
+- MEDIUM 5: calcReadTime con trim explícito antes de split
+- MEDIUM 6: console.error en fetch errors (separado de notFound)
+- LOW 9: flex-wrap en metadata para mobile <360px
+- LOW 10: WORDS_PER_MINUTE 220 → 200 (más realista para español denso)
+- LOW 12: aria-label en Link de cada card del listado
+- LOW 13: filter posts sin slug (no renderizar fallback hover-sin-acción)
+
+NO aplicados (deuda menor): MEDIUM 7 (interface Blog/BlogPost duplicada), LOW 8/11/14/15.
+
+---
 
 ---
 
