@@ -245,6 +245,24 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
   // accounts. Default off → mantiene comportamiento previo (cuenta única).
   const [showAllAccounts, setShowAllAccounts] = useState(false);
   const [allMetaConnectionIds, setAllMetaConnectionIds] = useState<string[]>([]);
+  // Tier 2B Breakdowns on-demand: el cliente elige un tipo de desglose
+  // (edad, género, país, dispositivo, placement, hora) y pegamos a Meta
+  // /insights con `breakdowns=X`. Lazy load — solo si abre la sección.
+  type BreakdownType = 'age,gender' | 'age' | 'gender' | 'country' | 'device_platform' | 'publisher_platform' | 'platform_position' | 'hourly_stats_aggregated_by_advertiser_time_zone';
+  type BreakdownRow = { label: string; impressions: number; reach: number; clicks: number; spend: number; conversions: number; conversion_value: number };
+  const [breakdownType, setBreakdownType] = useState<BreakdownType>('age,gender');
+  const [breakdownRows, setBreakdownRows] = useState<BreakdownRow[]>([]);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+  const [breakdownLoaded, setBreakdownLoaded] = useState(false);
+  // Tier 3 paginación campañas — 50 rows por página, default 1.
+  const [campaignPage, setCampaignPage] = useState(1);
+  const CAMPAIGNS_PER_PAGE = 50;
+
+  // Reset paginación al cambiar el sort, rango o cuentas (sino podría quedar
+  // en una página vacía cuando bajan los datos disponibles).
+  useEffect(() => {
+    setCampaignPage(1);
+  }, [sortField, sortAsc, from, to, showAllAccounts]);
 
   // Resolve date boundaries
   const { from, to, prevFrom, prevTo, days } = useMemo(() => {
@@ -380,6 +398,46 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
       setRefreshing(false);
     }
   }
+
+  // Fetch breakdowns on-demand. No persiste en DB — pega directo a Meta.
+  // Re-fetch cada vez que cambia el rango de fechas o el tipo de breakdown.
+  async function fetchBreakdowns() {
+    if (!ctxConnectionId) return;
+    setBreakdownLoading(true);
+    try {
+      const { data, error } = await callApi('get-meta-breakdowns', {
+        body: {
+          connection_id: ctxConnectionId,
+          breakdown: breakdownType,
+          date_from: from,
+          date_to: to,
+        },
+        timeoutMs: 60_000,
+      });
+      if (error) {
+        const msg = typeof error === 'string' ? error : (error as any)?.message || 'Error desconocido';
+        toast.error(`Error al cargar desglose: ${msg}`);
+        setBreakdownRows([]);
+        return;
+      }
+      const rows = (data?.rows || []) as BreakdownRow[];
+      setBreakdownRows(rows);
+      setBreakdownLoaded(true);
+    } catch (err: any) {
+      toast.error(`Error al cargar desglose: ${err?.message || 'desconocido'}`);
+      setBreakdownRows([]);
+    } finally {
+      setBreakdownLoading(false);
+    }
+  }
+
+  // Re-fetch breakdowns automáticamente cuando cambia el tipo (si ya cargó
+  // una vez) o el rango. Si todavía no abrió la sección, no hacemos nada.
+  useEffect(() => {
+    if (!breakdownLoaded) return;
+    fetchBreakdowns();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [breakdownType, from, to, ctxConnectionId]);
 
   // ------ Aggregations ------
 
@@ -1333,17 +1391,19 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedCampaigns.map((c) => {
-                    const isExpanded = expandedRows.has(c.campaign_id);
-                    return (
-                      <CampaignRow
-                        key={c.campaign_id}
-                        campaign={c}
-                        isExpanded={isExpanded}
-                        onToggle={() => toggleExpand(c.campaign_id)}
-                      />
-                    );
-                  })}
+                  {sortedCampaigns
+                    .slice((campaignPage - 1) * CAMPAIGNS_PER_PAGE, campaignPage * CAMPAIGNS_PER_PAGE)
+                    .map((c) => {
+                      const isExpanded = expandedRows.has(c.campaign_id);
+                      return (
+                        <CampaignRow
+                          key={c.campaign_id}
+                          campaign={c}
+                          isExpanded={isExpanded}
+                          onToggle={() => toggleExpand(c.campaign_id)}
+                        />
+                      );
+                    })}
                 </tbody>
                 {/* Table footer with totals */}
                 <tfoot className="border-t-2 border-border bg-muted/40">
@@ -1362,6 +1422,151 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                   </tr>
                 </tfoot>
               </table>
+            </div>
+          )}
+          {/* Pagination controls — solo si hay más de una página */}
+          {sortedCampaigns.length > CAMPAIGNS_PER_PAGE && (
+            <div className="flex items-center justify-between gap-2 mt-4 pt-4 border-t">
+              <p className="text-xs text-muted-foreground">
+                Mostrando {(campaignPage - 1) * CAMPAIGNS_PER_PAGE + 1}–
+                {Math.min(campaignPage * CAMPAIGNS_PER_PAGE, sortedCampaigns.length)} de{' '}
+                {sortedCampaigns.length} campañas
+              </p>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  disabled={campaignPage === 1}
+                  onClick={() => setCampaignPage((p) => Math.max(1, p - 1))}
+                >
+                  Anterior
+                </Button>
+                <span className="text-xs px-2 tabular-nums">
+                  {campaignPage} / {Math.ceil(sortedCampaigns.length / CAMPAIGNS_PER_PAGE)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  disabled={campaignPage * CAMPAIGNS_PER_PAGE >= sortedCampaigns.length}
+                  onClick={() => setCampaignPage((p) => p + 1)}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* 4.5 Breakdowns (Tier 2B) — desglose por edad, género, país, etc.   */}
+      {/* ------------------------------------------------------------------ */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">Desglose por segmento</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Quién está viendo tus ads y dónde convierten mejor.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Select value={breakdownType} onValueChange={(v) => setBreakdownType(v as BreakdownType)}>
+                <SelectTrigger className="w-[200px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-[100]">
+                  <SelectItem value="age,gender">Edad + Género</SelectItem>
+                  <SelectItem value="age">Solo Edad</SelectItem>
+                  <SelectItem value="gender">Solo Género</SelectItem>
+                  <SelectItem value="country">País</SelectItem>
+                  <SelectItem value="device_platform">Dispositivo (mobile/desktop)</SelectItem>
+                  <SelectItem value="publisher_platform">Plataforma (FB/IG/Audience Network)</SelectItem>
+                  <SelectItem value="platform_position">Placement (feed/stories/reels)</SelectItem>
+                  <SelectItem value="hourly_stats_aggregated_by_advertiser_time_zone">Hora del día</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                variant={breakdownLoaded ? 'outline' : 'default'}
+                onClick={fetchBreakdowns}
+                disabled={breakdownLoading || !ctxConnectionId}
+                className="h-8 text-xs"
+              >
+                {breakdownLoading ? (
+                  <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />Cargando...</>
+                ) : breakdownLoaded ? (
+                  <><RefreshCw className="w-3.5 h-3.5 mr-1" />Actualizar</>
+                ) : (
+                  <>Cargar desglose</>
+                )}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!breakdownLoaded && !breakdownLoading ? (
+            <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+              Click en "Cargar desglose" para ver performance segmentada.
+            </div>
+          ) : breakdownLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : breakdownRows.length === 0 ? (
+            <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+              Sin datos para este desglose en el período seleccionado.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b">
+                  <tr className="text-xs text-muted-foreground">
+                    <th className="text-left py-2 px-2 font-medium">Segmento</th>
+                    <th className="text-right py-2 px-2 font-medium">Gasto</th>
+                    <th className="text-right py-2 px-2 font-medium">Imp.</th>
+                    <th className="text-right py-2 px-2 font-medium">Reach</th>
+                    <th className="text-right py-2 px-2 font-medium">Clicks</th>
+                    <th className="text-right py-2 px-2 font-medium">CTR</th>
+                    <th className="text-right py-2 px-2 font-medium">Ventas</th>
+                    <th className="text-right py-2 px-2 font-medium">Ingresos</th>
+                    <th className="text-right py-2 px-2 font-medium">ROAS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {breakdownRows.slice(0, 50).map((row) => {
+                    const ctr = row.impressions > 0 ? (row.clicks / row.impressions) * 100 : 0;
+                    const roas = row.spend > 0 ? row.conversion_value / row.spend : 0;
+                    const isBestRoas = roas >= 3;
+                    return (
+                      <tr key={row.label} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                        <td className="py-2 px-2 font-medium">{row.label}</td>
+                        <td className="text-right py-2 px-2 tabular-nums">{formatCLP(row.spend)}</td>
+                        <td className="text-right py-2 px-2 tabular-nums">{formatNumber(row.impressions)}</td>
+                        <td className="text-right py-2 px-2 tabular-nums text-muted-foreground">
+                          {row.reach > 0 ? formatNumber(row.reach) : '—'}
+                        </td>
+                        <td className="text-right py-2 px-2 tabular-nums">{formatNumber(row.clicks)}</td>
+                        <td className="text-right py-2 px-2 tabular-nums">{ctr.toFixed(2)}%</td>
+                        <td className="text-right py-2 px-2 tabular-nums">{formatNumber(row.conversions)}</td>
+                        <td className="text-right py-2 px-2 tabular-nums">{formatCLP(row.conversion_value)}</td>
+                        <td className={`text-right py-2 px-2 tabular-nums font-medium ${
+                          isBestRoas ? 'text-green-600' : roas > 0 ? 'text-foreground' : 'text-muted-foreground'
+                        }`}>
+                          {row.spend > 0 ? formatRoas(roas) : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {breakdownRows.length > 50 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Mostrando los 50 segmentos con mayor gasto de {breakdownRows.length} totales.
+                </p>
+              )}
             </div>
           )}
         </CardContent>
