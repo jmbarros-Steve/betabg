@@ -190,23 +190,52 @@ async function handleCreateCustom(
       }
     }
 
+    // Meta v23 (error_subcode 1713098 "Formato JSON de regla no válido")
+    // exige que cada rule de engagement audience tenga un filter con el
+    // evento específico. Antes mandábamos rules sin filter para PAGE e
+    // INSTAGRAM, lo cual rechazaba Meta. Eventos válidos (según Meta
+    // Marketing API v23 docs):
+    //   - page_engaged: cualquier interacción con la Page de Facebook
+    //   - ig_business_profile_all: cualquier interacción con perfil IG
+    //   - video_view: visualización de video posteado por la Page
     const engagementRules: Record<string, any> = {
       PAGE: {
         inclusions: {
           operator: 'or',
-          rules: [{ event_sources: [{ type: 'page', id: page_id }], retention_seconds: retention_days * 86400 }],
+          rules: [{
+            event_sources: [{ type: 'page', id: page_id }],
+            retention_seconds: retention_days * 86400,
+            filter: {
+              operator: 'and',
+              filters: [{ field: 'event', operator: 'eq', value: 'page_engaged' }],
+            },
+          }],
         },
       },
       INSTAGRAM: {
         inclusions: {
           operator: 'or',
-          rules: [{ event_sources: [{ type: 'ig_business', id: ig_user_id }], retention_seconds: retention_days * 86400 }],
+          rules: [{
+            event_sources: [{ type: 'ig_business', id: ig_user_id }],
+            retention_seconds: retention_days * 86400,
+            filter: {
+              operator: 'and',
+              filters: [{ field: 'event', operator: 'eq', value: 'ig_business_profile_all' }],
+            },
+          }],
         },
       },
       VIDEO: {
         inclusions: {
           operator: 'or',
-          rules: [{ event_sources: [{ type: 'page', id: page_id }], retention_seconds: retention_days * 86400, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'video_watched' }] } }],
+          rules: [{
+            event_sources: [{ type: 'page', id: page_id }],
+            retention_seconds: retention_days * 86400,
+            filter: {
+              operator: 'and',
+              filters: [{ field: 'event', operator: 'eq', value: 'video_view' }],
+            },
+          }],
         },
       },
     };
