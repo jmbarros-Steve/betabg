@@ -57,14 +57,62 @@ interface CapiStatus {
 // ---------------------------------------------------------------------------
 
 const STANDARD_EVENTS = [
-  { name: 'PageView', icon: Eye, description: 'Cada vez que se carga una página', priority: 'basico' },
-  { name: 'ViewContent', icon: Search, description: 'Cuando un usuario ve un producto', priority: 'basico' },
-  { name: 'AddToCart', icon: ShoppingCart, description: 'Cuando se agrega al carrito', priority: 'critico' },
-  { name: 'InitiateCheckout', icon: CreditCard, description: 'Cuando se inicia el checkout', priority: 'critico' },
-  { name: 'Purchase', icon: CreditCard, description: 'Cuando se completa una compra', priority: 'critico' },
-  { name: 'Lead', icon: MousePointerClick, description: 'Cuando se captura un lead', priority: 'importante' },
-  { name: 'CompleteRegistration', icon: CheckCircle, description: 'Cuando se registra un usuario', priority: 'importante' },
-  { name: 'Search', icon: Search, description: 'Cuando se busca en el sitio', priority: 'opcional' },
+  {
+    name: 'PageView',
+    icon: Eye,
+    description: 'Cada vez que se carga una página',
+    example: 'Ej: alguien abre tu home o cualquier página de tu sitio.',
+    priority: 'basico',
+  },
+  {
+    name: 'ViewContent',
+    icon: Search,
+    description: 'Cuando un usuario ve un producto',
+    example: 'Ej: alguien hace click en "Zapatilla Roja Talla 42" y ve la ficha del producto.',
+    priority: 'basico',
+  },
+  {
+    name: 'AddToCart',
+    icon: ShoppingCart,
+    description: 'Cuando se agrega al carrito',
+    example: 'Ej: alguien aprieta el botón "Agregar al carrito" en una ficha de producto.',
+    priority: 'critico',
+  },
+  {
+    name: 'InitiateCheckout',
+    icon: CreditCard,
+    description: 'Cuando se inicia el checkout',
+    example: 'Ej: alguien aprieta "Comprar ahora" o "Ir al checkout" desde el carrito.',
+    priority: 'critico',
+  },
+  {
+    name: 'Purchase',
+    icon: CreditCard,
+    description: 'Cuando se completa una compra',
+    example: 'Ej: alguien paga con éxito y le llega el mail de confirmación de pedido.',
+    priority: 'critico',
+  },
+  {
+    name: 'Lead',
+    icon: MousePointerClick,
+    description: 'Cuando se captura un lead',
+    example: 'Ej: alguien deja su email en un pop-up "Recibe 10% de descuento" sin comprar.',
+    priority: 'importante',
+  },
+  {
+    name: 'CompleteRegistration',
+    icon: CheckCircle,
+    description: 'Cuando se registra un usuario',
+    example: 'Ej: alguien crea una cuenta con email + contraseña en tu tienda.',
+    priority: 'importante',
+  },
+  {
+    name: 'Search',
+    icon: Search,
+    description: 'Cuando se busca en el sitio',
+    example: 'Ej: alguien escribe "zapatilla negra" en el buscador de tu tienda.',
+    priority: 'opcional',
+  },
 ];
 
 const PRIORITY_BADGE: Record<string, { label: string; color: string }> = {
@@ -323,10 +371,24 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
                 </Badge>
               )}
             </CardTitle>
-            <CardDescription className="text-xs">
-              {capi.enabled
-                ? 'Tu servidor está enviando eventos directamente a Meta — esto mejora la precisión y evita pérdida de eventos por bloqueadores de anuncios.'
-                : 'No se detectaron eventos server-side en las últimas 48h. Activá CAPI desde Shopify (Settings → Customer events) para mejorar el matching.'}
+            <CardDescription className="text-xs leading-relaxed">
+              {capi.enabled ? (
+                <>
+                  <strong>Tu servidor le está reportando ventas a Meta directamente</strong>, sin pasar
+                  por el navegador del cliente. Esto te protege cuando la persona usa AdBlock, navega en
+                  modo incógnito o tiene cookies bloqueadas — Meta igual recibe el evento y lo atribuye a
+                  tu campaña. Resultado: menos ventas "perdidas" por privacidad y mejor optimización del
+                  algoritmo.
+                </>
+              ) : (
+                <>
+                  <strong>Solo el navegador del cliente le reporta a Meta</strong> (Pixel browser-side).
+                  Si la persona tiene AdBlock, iOS 14+, modo incógnito o cookies bloqueadas, Meta no recibe
+                  el evento y la venta no se atribuye a tu campaña. Activá la API de Conversiones desde
+                  Shopify (Settings → Customer events) para que tu servidor también le reporte
+                  directamente — recuperás ~20-40% de eventos perdidos.
+                </>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -404,9 +466,12 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">{evt.description}</p>
+                        <p className="text-[11px] text-muted-foreground/80 mt-0.5 italic leading-snug">
+                          {evt.example}
+                        </p>
                         {!isActive && (
-                          <p className="text-[11px] text-muted-foreground/70 mt-0.5 italic">
-                            Sin actividad en las últimas 48h
+                          <p className="text-[11px] text-yellow-600 mt-1">
+                            Sin actividad en las últimas 48h — revisá si está instalado correctamente.
                           </p>
                         )}
                       </div>
