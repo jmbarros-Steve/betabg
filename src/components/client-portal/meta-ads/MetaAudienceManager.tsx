@@ -1789,6 +1789,10 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
 
         // Convierte una PixelRule del frontend al shape exacto que Meta espera
         // dentro de rule.inclusions.rules / rule.exclusions.rules.
+        // CRITICO: Meta v23 (error_subcode 1713098 "Formato JSON de regla no
+        // válido") rechaza rules sin filter. Si el user elige "AllVisitors"
+        // sin filtro URL, agregamos un filtro URL que matchee todo el sitio
+        // (shopDomain o "/") para que el rule sea válido.
         const buildMetaRule = (r: typeof customForm.inclusions.rules[number]) => {
           const filters: any[] = [];
           if (r.event !== 'AllVisitors') {
@@ -1801,14 +1805,21 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
               value: r.url_filter.value.trim(),
             });
           }
-          const metaRule: any = {
+          // Fallback: si no hay ningún filter, Meta exige al menos uno.
+          // Usamos un i_contains genérico sobre shopDomain o "/" → matchea
+          // cualquier URL del sitio (efectivamente "todos los visitantes").
+          if (filters.length === 0) {
+            filters.push({
+              field: 'url',
+              operator: 'i_contains',
+              value: shopDomain || '/',
+            });
+          }
+          return {
             event_sources: [{ type: 'pixel', id: pixelId }],
             retention_seconds: r.retention_days * 86400,
+            filter: { operator: 'and', filters },
           };
-          if (filters.length > 0) {
-            metaRule.filter = { operator: 'and', filters };
-          }
-          return metaRule;
         };
 
         // Validación: al menos una regla en inclusions.
