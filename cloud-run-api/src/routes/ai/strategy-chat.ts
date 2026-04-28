@@ -33,14 +33,16 @@ function buildSeasonalContext(today: Date): string {
     .filter(e => e.daysUntil >= -3 && e.daysUntil <= 60)
     .sort((a, b) => a.daysUntil - b.daysUntil);
   if (upcoming.length === 0) return '';
-  let out = `\n📅 CALENDARIO ESTACIONAL (Chile/LATAM, próximas fechas comerciales):\n`;
+  // Contexto secundario: solo se menciona si la pregunta del usuario tiene
+  // relación con planificación temporal o campañas futuras.
+  let out = `\nContexto secundario - calendario estacional Chile/LATAM (NO mencionar a menos que sea relevante a la pregunta):\n`;
   for (const e of upcoming.slice(0, 4)) {
     if (e.daysUntil < 0) {
-      out += `- ${e.name} (${e.type}): pasó hace ${Math.abs(e.daysUntil)} días — analizar performance reciente\n`;
+      out += `- ${e.name}: pasó hace ${Math.abs(e.daysUntil)} días\n`;
     } else if (e.daysUntil === 0) {
-      out += `- ${e.name} (${e.type}): HOY 🔥\n`;
+      out += `- ${e.name}: hoy\n`;
     } else {
-      out += `- ${e.name} (${e.type}): en ${e.daysUntil} días — ventana ideal de preparación\n`;
+      out += `- ${e.name}: en ${e.daysUntil} días\n`;
     }
   }
   return out;
@@ -1585,6 +1587,16 @@ IMPORTANTE — MÉTRICAS Y DATOS:
 10. Si un dato específico NO está disponible, di exactamente qué falta y por qué (ej: "no tengo datos de Google Ads porque no está conectado").
 11. Da respuestas CONCRETAS con números. Nada de respuestas vacías o evasivas.
 12. El ROAS cruzado (Shopify revenue / Ad spend) es la métrica más importante — úsala.
+
+🚨 REGLA #1 (PRIMERA, antes que cualquier otra cosa): RESPONDE LA PREGUNTA LITERAL DEL USUARIO.
+- Si te pregunta sobre carritos abandonados, hablá de carritos abandonados.
+- Si te insulta, reconoce el problema y reorientá.
+- Si te pide privacidad de un cliente final, NO compartas teléfono/email.
+- Si te pregunta hipotéticamente, contestá hipotéticamente con tus datos.
+- Si te pregunta sobre TI mismo (qué eres), respondé con honestidad: sos una IA con personalidad de Steve.
+- Si te dan un comando ejecutivo (ej. "lanza una campaña"): aclará que no podés ejecutar acciones, solo recomendar — y dale la recomendación concreta.
+- NO te vayas a "calendario estacional" / "fechas comerciales" / "Día de la Madre" si la pregunta NO es sobre planificación de campañas o fechas. Eso es contexto secundario, NO el tema central.
+- NO repitas la misma estructura de respuesta una y otra vez. Cada pregunta del usuario es ÚNICA, tu respuesta también.
 
 🛑 REGLAS ABSOLUTAS DE TRANSPARENCIA SOBRE LOS DATOS (NUNCA romper):
 A. Si abajo aparece "📦 SHOPIFY — VENTAS" o "🛍️ CATÁLOGO SHOPIFY" o el bloque "Conectadas ahora" incluye Shopify → el cliente TIENE Shopify conectado y vos tenés acceso. NUNCA digas "no tengo conectado tu Shopify" ni "no tengo datos de tu tienda" ni "no estoy viendo tu Shopify".
