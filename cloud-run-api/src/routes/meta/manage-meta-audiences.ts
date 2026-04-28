@@ -473,25 +473,30 @@ async function handleListPixels(
   accessToken: string,
 ): Promise<{ body: any; status: number }> {
   try {
+    console.log(`[manage-meta-audiences] handleListPixels start account=${accountId} tokenLen=${accessToken?.length || 0}`);
     const result = await metaApiRequest(
       `act_${accountId}/adspixels`,
       accessToken,
       'GET',
       { fields: 'id,name', limit: '50' },
     );
-    if (result.error) {
+    if (!result.ok) {
+      console.error('[manage-meta-audiences] handleListPixels meta error:', result.error);
       return { body: { error: 'No se pudieron listar los pixels', details: result.error }, status: 502 };
     }
+    const pixelsArray: any[] = Array.isArray(result.data?.data) ? result.data.data : [];
+    console.log(`[manage-meta-audiences] handleListPixels found ${pixelsArray.length} pixels`);
     return {
       body: {
-        pixels: (result.data || []).map((p: any) => ({
-          id: String(p.id || ''),
-          name: String(p.name || ''),
+        pixels: pixelsArray.map((p: any) => ({
+          id: String(p?.id || ''),
+          name: String(p?.name || ''),
         })),
       },
       status: 200,
     };
   } catch (e: any) {
+    console.error('[manage-meta-audiences] handleListPixels exception:', e);
     return { body: { error: e?.message || 'unknown' }, status: 500 };
   }
 }

@@ -507,20 +507,14 @@ function CreateCustomAudienceDialog({
     engagementMissingAsset;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="sm:max-w-[580px] max-h-[90vh] overflow-y-auto"
-        // Fix Radix Dialog + Select bug: cuando un Select shadcn abre su
-        // Portal al body, el DialogContent intercepta el click como "click
-        // fuera" y cierra el Select inmediatamente. Si el target del
-        // pointerdown viene de un SelectContent / Popover Portal, no
-        // cerramos el Dialog.
-        onPointerDownOutside={(e) => {
-          const target = e.target as HTMLElement | null;
-          if (target?.closest('[role="listbox"], [data-radix-select-content], [data-radix-popper-content-wrapper]')) {
-            e.preventDefault();
-          }
-        }}
+        // Fix canónico Radix Dialog + Select: prevenir el auto-focus al abrir
+        // el Dialog evita que el focus trap del Dialog robe el focus del
+        // Select cuando se abre el dropdown. Combinado con z-[100] en
+        // SelectContent, los dropdowns dentro del Dialog funcionan correctamente.
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle>Crear Audiencia Personalizada</DialogTitle>
@@ -963,15 +957,10 @@ function CreateLookalikeDialog({
   const reach = estimateReach(formData.country, formData.lookalike_percent);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="sm:max-w-[500px]"
-        onPointerDownOutside={(e) => {
-          const target = e.target as HTMLElement | null;
-          if (target?.closest('[role="listbox"], [data-radix-select-content], [data-radix-popper-content-wrapper]')) {
-            e.preventDefault();
-          }
-        }}
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle>Crear Audiencia Similar (Lookalike)</DialogTitle>
