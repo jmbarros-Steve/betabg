@@ -102,9 +102,17 @@ async function handleCreateCustom(
 
   const payload: Record<string, any> = {
     name,
-    subtype,
     description,
   };
+
+  // Meta Marketing API v23 ya no acepta `subtype: WEBSITE` cuando se envía
+  // un `rule` — Meta infiere el subtype automáticamente del rule. Mandarlo
+  // produce: error_subcode 1870053 "El parámetro 'subtipo' no se admite en
+  // la versión actual de la API". Para customer_list y app_activity todavía
+  // hay que pasarlo. Para engagement Meta también lo infiere del rule.
+  if (source_type !== 'website' && source_type !== 'engagement') {
+    payload.subtype = subtype;
+  }
 
   // Add rule for website audiences (rule built by frontend with pixel_id embedded)
   if (rule) {
