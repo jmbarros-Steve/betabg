@@ -508,7 +508,20 @@ function CreateCustomAudienceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[580px] max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="sm:max-w-[580px] max-h-[90vh] overflow-y-auto"
+        // Fix Radix Dialog + Select bug: cuando un Select shadcn abre su
+        // Portal al body, el DialogContent intercepta el click como "click
+        // fuera" y cierra el Select inmediatamente. Si el target del
+        // pointerdown viene de un SelectContent / Popover Portal, no
+        // cerramos el Dialog.
+        onPointerDownOutside={(e) => {
+          const target = e.target as HTMLElement | null;
+          if (target?.closest('[role="listbox"], [data-radix-select-content], [data-radix-popper-content-wrapper]')) {
+            e.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Crear Audiencia Personalizada</DialogTitle>
         </DialogHeader>
@@ -951,7 +964,15 @@ function CreateLookalikeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent
+        className="sm:max-w-[500px]"
+        onPointerDownOutside={(e) => {
+          const target = e.target as HTMLElement | null;
+          if (target?.closest('[role="listbox"], [data-radix-select-content], [data-radix-popper-content-wrapper]')) {
+            e.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Crear Audiencia Similar (Lookalike)</DialogTitle>
         </DialogHeader>
