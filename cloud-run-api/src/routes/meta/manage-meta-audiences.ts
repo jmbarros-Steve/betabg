@@ -763,7 +763,7 @@ export async function manageMetaAudiences(c: Context) {
       return c.json({ error: 'Missing required field: connection_id' }, 400);
     }
 
-    const validActions: Action[] = ['create_custom', 'create_lookalike', 'create_retargeting', 'delete', 'list'];
+    const validActions: Action[] = ['create_custom', 'create_lookalike', 'create_retargeting', 'delete', 'list', 'list_pixels'];
     if (!validActions.includes(action)) {
       return c.json({ error: `Invalid action: ${action}. Valid actions: ${validActions.join(', ')}` }, 400);
     }
