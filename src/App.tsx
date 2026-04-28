@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import Steve from "./pages/Steve";
 import Dashboard from "./pages/Dashboard";
 import ClientPortal from "./pages/ClientPortal";
+import CampaignDraftReview from "./pages/CampaignDraftReview";
 import OAuthMetaCallback from "./pages/OAuthMetaCallback";
 import OAuthShopifyCallback from "./pages/OAuthShopifyCallback";
 import OAuthGoogleAdsCallback from "./pages/OAuthGoogleAdsCallback";
@@ -62,6 +63,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/portal" element={<ClientPortal />} />
             <Route path="/portal/:clientId" element={<ClientPortal />} />
+            <Route path="/portal/campaigns/draft/:draftId" element={<CampaignDraftReview />} />
             <Route path="/oauth/meta/callback" element={<OAuthMetaCallback />} />
             <Route path="/oauth/shopify/callback" element={<OAuthShopifyCallback />} />
             <Route path="/oauth/google-ads/callback" element={<OAuthGoogleAdsCallback />} />

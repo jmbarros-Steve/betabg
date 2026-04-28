@@ -116,7 +116,9 @@ import { fetchMetaAdAccounts } from './meta/fetch-meta-ad-accounts.js';
 import { fetchMetaBusinessHierarchy } from './meta/fetch-meta-business-hierarchy.js';
 import { manageMetaAudiences } from './meta/manage-meta-audiences.js';
 import { manageMetaCampaign } from './meta/manage-meta-campaign.js';
+import { manageMetaDraft } from './meta/manage-meta-draft.js';
 import { manageMetaPixel } from './meta/manage-meta-pixel.js';
+import { getMetaBreakdowns } from './meta/get-meta-breakdowns.js';
 import { metaSocialInbox } from './meta/meta-social-inbox.js';
 import { metaDataDeletion } from './meta/meta-data-deletion.js';
 import { syncMetaMetrics } from './meta/sync-meta-metrics.js';
@@ -408,7 +410,9 @@ export function registerRoutes(app: Hono) {
   app.post('/api/fetch-meta-business-hierarchy', authMiddleware, fetchMetaBusinessHierarchy);
   app.post('/api/manage-meta-audiences', authMiddleware, manageMetaAudiences);
   app.post('/api/manage-meta-campaign', authMiddleware, manageMetaCampaign);
+  app.post('/api/meta-draft', authMiddleware, manageMetaDraft);
   app.post('/api/manage-meta-pixel', authMiddleware, manageMetaPixel);
+  app.post('/api/get-meta-breakdowns', authMiddleware, getMetaBreakdowns);
   app.post('/api/meta-social-inbox', authMiddleware, metaSocialInbox);
   app.post('/api/meta-data-deletion', metaDataDeletion); // No JWT - called by Meta directly
   app.post('/api/sync-meta-metrics', authMiddleware, syncMetaMetrics);

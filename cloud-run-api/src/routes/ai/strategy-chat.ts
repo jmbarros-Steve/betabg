@@ -1661,6 +1661,15 @@ ${commitments && commitments.length > 0
 ${creativeHistoryCtx}
 Tienes herramientas para buscar información. Si el usuario pregunta algo que no sabes o sobre lo que no tienes reglas, usa buscar_youtube o buscar_web para encontrar información actualizada antes de responder. Si aprendes algo nuevo y valioso durante la búsqueda, usa guardar_regla para guardarlo.
 
+🚀 CREAR CAMPAÑA META (tools crear_draft_campana_meta + editar_draft_campana_meta): Si el cliente pide explícitamente lanzar/crear/armar/configurar una campaña Meta o de Instagram, NO la creás directamente en Meta. El flujo correcto es:
+  1. Si te falta CUALQUIERA de estos params mínimos, PREGUNTÁ uno por uno antes de crear: nombre de campaña, objetivo (CONVERSIONS/TRAFFIC/AWARENESS/ENGAGEMENT/CATALOG), presupuesto en CLP (daily o lifetime), audiencia básica (age_min, age_max, gender, países), placements (facebook/instagram), creativo (headline + body + cta + URL destino).
+  2. Inferí lo que puedas del brief (audiencia tipo del buyer persona, producto del catálogo, etc.) y usá esos valores como defaults razonables que el cliente puede ajustar después.
+  3. Cuando tengas todo, llamá crear_draft_campana_meta con name + spec completa.
+  4. Devolvele al cliente el link en markdown [Revisar campaña antes de subir a Meta](URL) y explicale: "podés editar en pantalla, pedirme cambios acá, o aprobar para subir como borrador a Meta".
+  5. Si después te pide cambios ("cambia el presupuesto a 300K"), usá editar_draft_campana_meta con el draft_id que recordás de tu respuesta anterior y mandá el link actualizado.
+  6. NUNCA llames manage-meta-campaign directamente. SIEMPRE vía draft.
+  7. NUNCA uses status=ACTIVE — el cliente decide cuándo activarla en Meta.
+
 📊 REPORTES PDF (tool generar_reporte_pdf): Si el usuario pide explícitamente un "reporte", "dashboard exportable", "resumen formal", "PDF", "documento", o frases similares — DISPARÁ la tool. Inferí el rango de fechas del lenguaje natural (ej. "últimos 30 días" → from = today - 30, to = today; "marzo" → from=2026-03-01, to=2026-03-31). HOY ES ${today}. Inferí los temas según lo que pida: Meta → ads_meta + creativos; Google → ads_google; Shopify/ventas → shopify; email/Klaviyo → email; WhatsApp → whatsapp; carritos abandonados → abandoned; competencia → competencia; catálogo/productos → catalogo; diagnóstico/Criterio → criterio. Si no especifica tema o pide "todo / completo / general" → temas=["all"]. Después de obtener la URL, respondé al cliente con el link en formato markdown [Ver reporte PDF](URL) y agregá 3 bullets resumen del contenido.
 
 Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accionables. Cuando hables de métricas, cita los números reales que tienes.`;
@@ -1711,6 +1720,39 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
             categoria: { type: 'string' as const, description: 'Categoría: meta_ads, google, seo, klaviyo, shopify, brief, anuncios, buyer_persona, analisis' },
           },
           required: ['titulo', 'contenido', 'categoria'],
+        },
+      },
+      {
+        name: 'crear_draft_campana_meta',
+        description: 'Crea un BORRADOR de campaña Meta (NO se sube a Meta todavía — queda en Steve Ads para que el cliente revise). Úsalo cuando el cliente pida lanzar/crear/armar una campaña Meta y ya tengas TODOS estos parámetros mínimos recolectados (preguntá uno por uno si faltan): name (nombre de campaña), objective (CONVERSIONS/TRAFFIC/AWARENESS/ENGAGEMENT/CATALOG), budget (amount_clp + type daily o lifetime), audience básica (age_min, age_max, gender, geo countries), placements (al menos uno: facebook/instagram), creative (al menos headline + body + cta + destination_url). Después de crearlo, devolvés al cliente el review_url en formato markdown [Revisar campaña](URL) y le explicás que puede editarla, pedirte cambios, o aprobar para que se suba a Meta como borrador. NUNCA llames a este action sin tener todos los params mínimos — preguntale primero al cliente lo que falta.',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            name: { type: 'string' as const, description: 'Nombre de la campaña (ej. "Día de la Madre — Conversiones")' },
+            spec: {
+              type: 'object' as const,
+              description: 'Spec completa: objective, budget {type, amount_clp}, schedule {start, end}, audience {age_min, age_max, gender, geo {countries[]}, interests[]}, placements {platforms[], positions[]}, creative {type, headline, body, cta, image_url, destination_url}, adset_name, ad_name',
+              additionalProperties: true,
+            },
+          },
+          required: ['name', 'spec'],
+        },
+      },
+      {
+        name: 'editar_draft_campana_meta',
+        description: 'Aplica cambios parciales a un draft existente. Úsalo cuando el cliente pidió cambios (ej. "cambia el presupuesto a 300K", "saca el interés X"). Devolvés el link actualizado al cliente.',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            draft_id: { type: 'string' as const, description: 'UUID del draft a editar (el último que creaste)' },
+            changes: {
+              type: 'object' as const,
+              description: 'Cambios parciales a aplicar a spec. Por ejemplo: { budget: { type: "daily", amount_clp: 300000 } } o { audience: { age_max: 60 } }',
+              additionalProperties: true,
+            },
+            notes: { type: 'string' as const, description: 'Nota opcional sobre el cambio' },
+          },
+          required: ['draft_id', 'changes'],
         },
       },
       {
@@ -1899,6 +1941,71 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
               toolResult = `Regla "${titulo}" guardada exitosamente (pendiente de aprobación).`;
             } catch (e) {
               toolResult = `Error guardando regla: ${e}`;
+            }
+            break;
+          }
+
+          case 'crear_draft_campana_meta': {
+            const { name, spec } = toolUseBlock.input as { name: string; spec: any };
+            try {
+              const baseUrl = process.env.SELF_URL || 'https://steve-api-850416724643.us-central1.run.app';
+              const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+              // Find a Meta connection for this client
+              const metaConn = (connections || []).find((c: any) => c.platform === 'meta');
+              const res = await fetch(`${baseUrl}/api/meta-draft`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${serviceKey}`,
+                  'X-Internal-Key': serviceKey,
+                },
+                body: JSON.stringify({
+                  action: 'create',
+                  client_id,
+                  connection_id: metaConn?.id,
+                  source_conversation_id: conversation_id,
+                  name,
+                  spec,
+                }),
+                signal: AbortSignal.timeout(30_000),
+              });
+              const body: any = await res.json().catch(() => ({}));
+              if (!res.ok || !body?.draft) {
+                toolResult = `Error creando draft: ${body?.error || `HTTP ${res.status}`}`;
+              } else {
+                const reviewUrl = `https://betabgnuevosupa.vercel.app${body.review_url}`;
+                toolResult = `Draft creado. ID: ${body.draft.id}. URL revisión: ${reviewUrl}. Devolvele al cliente este link en formato markdown [Revisar campaña antes de subir a Meta](${reviewUrl}) y explicale que ahí puede editar inline, pedirte cambios o aprobar para subir a Meta como borrador (status PAUSED).`;
+              }
+            } catch (e: any) {
+              toolResult = `Error invocando draft: ${e?.message?.slice(0, 200) || e}`;
+            }
+            break;
+          }
+
+          case 'editar_draft_campana_meta': {
+            const { draft_id, changes, notes } = toolUseBlock.input as { draft_id: string; changes: any; notes?: string };
+            try {
+              const baseUrl = process.env.SELF_URL || 'https://steve-api-850416724643.us-central1.run.app';
+              const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+              const res = await fetch(`${baseUrl}/api/meta-draft`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${serviceKey}`,
+                  'X-Internal-Key': serviceKey,
+                },
+                body: JSON.stringify({ action: 'update', draft_id, changes, notes }),
+                signal: AbortSignal.timeout(30_000),
+              });
+              const body: any = await res.json().catch(() => ({}));
+              if (!res.ok || !body?.draft) {
+                toolResult = `Error editando draft: ${body?.error || `HTTP ${res.status}`}`;
+              } else {
+                const reviewUrl = `https://betabgnuevosupa.vercel.app/portal/campaigns/draft/${draft_id}`;
+                toolResult = `Draft actualizado. Cambios aplicados: ${JSON.stringify(changes).slice(0, 200)}. Mandá al cliente el link actualizado: [Ver cambios](${reviewUrl})`;
+              }
+            } catch (e: any) {
+              toolResult = `Error editando draft: ${e?.message?.slice(0, 200) || e}`;
             }
             break;
           }
