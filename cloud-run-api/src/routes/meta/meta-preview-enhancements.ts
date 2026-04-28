@@ -14,7 +14,10 @@ const ADVANTAGE_FEATURES = [
   { key: 'image_touchups',                 label: 'Auto-crop por placement',        is_generative: false, default: true,  applies_to: ['image'] },
   { key: 'image_brightness_and_contrast',  label: 'Brillo y contraste',             is_generative: false, default: true,  applies_to: ['image'] },
   { key: 'image_uncrop',                   label: 'Adaptar a vertical 9:16',        is_generative: false, default: true,  applies_to: ['image'] },
-  { key: 'music_gen',                      label: 'Música de fondo (Stories/Reels)',is_generative: false, default: true,  applies_to: ['image', 'video'] },
+  // music_gen removido — Meta API v23 rechaza ese key con error "Param key
+  // 'music_gen' must be one of {IG_VIDEO_NATIVE_SUBTITLE, IMAGE_ANIMATION,
+  // PRODUCT_METADATA_AUTOMATION, PROFILE_CARD, STANDARD_ENHANCEMENTS_CATALOG,
+  // TEXT_OVERLAY_TRANSLATION}". Era una feature beta que Meta retiró.
   { key: 'product_extensions',             label: 'Etiquetas de producto',          is_generative: false, default: true,  applies_to: ['image', 'video', 'dpa'] },
   { key: 'site_extensions',                label: 'Site Links (4 enlaces extra)',   is_generative: false, default: true,  applies_to: ['image', 'video'] },
   { key: 'text_optimizations',             label: 'Reorganizar texto por placement',is_generative: false, default: true,  applies_to: ['image', 'video', 'dpa'] },

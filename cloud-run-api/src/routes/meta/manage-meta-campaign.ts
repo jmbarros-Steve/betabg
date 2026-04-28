@@ -756,9 +756,18 @@ async function handleCreate(
   }
 
   // Build degrees_of_freedom_spec from user-selected creative features (opt-in granular).
+  // Filtramos features no soportados en Meta v23 — `music_gen` es el principal
+  // ofensor: era una feature beta que Meta retiró y produce error #100
+  // "Param key 'music_gen' must be one of {IG_VIDEO_NATIVE_SUBTITLE,
+  // IMAGE_ANIMATION, PRODUCT_METADATA_AUTOMATION, PROFILE_CARD,
+  // STANDARD_ENHANCEMENTS_CATALOG, TEXT_OVERLAY_TRANSLATION}". El frontend
+  // ya no lo expone, pero borradores guardados antes pueden traerlo.
+  const META_V23_BLOCKED_FEATURES = new Set(['music_gen']);
   function buildDofSpec(): Record<string, any> | null {
     if (!creative_features || typeof creative_features !== 'object') return null;
-    const entries = Object.entries(creative_features).filter(([, v]) => v === 'OPT_IN' || v === 'OPT_OUT');
+    const entries = Object.entries(creative_features)
+      .filter(([k]) => !META_V23_BLOCKED_FEATURES.has(k))
+      .filter(([, v]) => v === 'OPT_IN' || v === 'OPT_OUT');
     if (entries.length === 0) return null;
     const spec: Record<string, any> = {};
     for (const [k, v] of entries) spec[k] = { enroll_status: v };
