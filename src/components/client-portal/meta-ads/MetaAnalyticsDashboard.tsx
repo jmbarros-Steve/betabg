@@ -59,6 +59,8 @@ interface CampaignMetricRow {
   campaign_status?: string;
   metric_date: string;
   impressions: number | null;
+  reach: number | null;
+  frequency: number | null;
   clicks: number | null;
   spend: number | null;
   conversions: number | null;
@@ -381,8 +383,26 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
 
   // ------ Aggregations ------
 
-  const sumField = (rows: CampaignMetricRow[], field: 'impressions' | 'clicks' | 'spend' | 'conversions' | 'conversion_value') =>
+  const sumField = (rows: CampaignMetricRow[], field: 'impressions' | 'clicks' | 'spend' | 'conversions' | 'conversion_value' | 'reach') =>
     rows.reduce((s, r) => s + (Number(r[field]) || 0), 0);
+
+  // Frecuencia ponderada por impresiones — más preciso que avg simple porque
+  // pondera campañas grandes. Si una campaña tiene 1000 imps con freq 5 y
+  // otra tiene 100 imps con freq 1, el promedio simple daría 3 pero la
+  // realidad ponderada es ≈4.6 (la audiencia grande sí ve mucha repetición).
+  const weightedFrequency = (rows: CampaignMetricRow[]): number => {
+    let totalImpressions = 0;
+    let weightedSum = 0;
+    for (const r of rows) {
+      const imp = Number(r.impressions) || 0;
+      const freq = Number(r.frequency) || 0;
+      if (imp > 0 && freq > 0) {
+        totalImpressions += imp;
+        weightedSum += freq * imp;
+      }
+    }
+    return totalImpressions > 0 ? weightedSum / totalImpressions : 0;
+  };
 
   // Current period totals
   const totals = useMemo(() => {
@@ -391,9 +411,11 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
     const clicks = sumField(metrics, 'clicks');
     const conversions = sumField(metrics, 'conversions');
     const revenue = sumField(metrics, 'conversion_value');
+    const reach = sumField(metrics, 'reach');
+    const frequency = weightedFrequency(metrics);
     const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
     const roas = spend > 0 ? revenue / spend : 0;
-    return { spend, impressions, clicks, ctr, conversions, revenue, roas };
+    return { spend, impressions, clicks, ctr, conversions, revenue, roas, reach, frequency };
   }, [metrics]);
 
   // Previous period totals
@@ -403,9 +425,11 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
     const clicks = sumField(prevMetrics, 'clicks');
     const conversions = sumField(prevMetrics, 'conversions');
     const revenue = sumField(prevMetrics, 'conversion_value');
+    const reach = sumField(prevMetrics, 'reach');
+    const frequency = weightedFrequency(prevMetrics);
     const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
     const roas = spend > 0 ? revenue / spend : 0;
-    return { spend, impressions, clicks, ctr, conversions, revenue, roas };
+    return { spend, impressions, clicks, ctr, conversions, revenue, roas, reach, frequency };
   }, [prevMetrics]);
 
   // Daily chart data
@@ -1091,6 +1115,72 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
           </CardContent>
         </Card>
       </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* 2.3 Reach + Frequency Row (Tier 2: fatiga creativa)                 */}
+      {/* ------------------------------------------------------------------ */}
+      {(totals.reach > 0 || totals.frequency > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <KpiCard
+            title="Reach (personas alcanzadas)"
+            value={formatNumber(totals.reach)}
+            change={pctChange(totals.reach, prevTotals.reach)}
+            icon={Users}
+            accent="indigo"
+          />
+          <Card className={`relative overflow-hidden border ${
+            totals.frequency > 3
+              ? 'bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/30'
+              : totals.frequency > 2
+                ? 'bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/30'
+                : 'bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20'
+          }`}>
+            <CardContent className="pt-5 pb-5 px-5">
+              <div className="flex items-start justify-between mb-3">
+                <span className="text-sm font-medium text-muted-foreground leading-tight">
+                  Frecuencia (impresiones por persona)
+                </span>
+                <div className={`p-2 rounded-lg ${
+                  totals.frequency > 3 ? 'text-red-500 bg-red-500/10'
+                    : totals.frequency > 2 ? 'text-amber-500 bg-amber-500/10'
+                    : 'text-green-500 bg-green-500/10'
+                }`}>
+                  <Eye className="w-4 h-4" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold tracking-tight leading-none mb-2">
+                {totals.frequency.toFixed(2)}
+              </p>
+              <ChangeIndicator value={pctChange(totals.frequency, prevTotals.frequency)} invertColors />
+              <p className="text-xs text-muted-foreground mt-2 leading-snug">
+                {totals.frequency > 3
+                  ? '⚠️ Fatiga alta: tu audiencia ya vio el ad >3 veces. Refresca creativos.'
+                  : totals.frequency > 2
+                    ? 'Frecuencia subiendo: planificá nuevos creativos pronto.'
+                    : 'Frecuencia saludable. La audiencia aún tiene espacio.'}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="relative overflow-hidden border bg-gradient-to-br from-indigo-500/10 to-indigo-500/5 border-indigo-500/20">
+            <CardContent className="pt-5 pb-5 px-5">
+              <div className="flex items-start justify-between mb-3">
+                <span className="text-sm font-medium text-muted-foreground leading-tight">
+                  Costo por mil personas únicas (CPMu)
+                </span>
+                <div className="p-2 rounded-lg text-indigo-500 bg-indigo-500/10">
+                  <Target className="w-4 h-4" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold tracking-tight leading-none mb-2">
+                {totals.reach > 0 ? formatCLP((totals.spend / totals.reach) * 1000) : '—'}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2 leading-snug">
+                Cuánto te cuesta llegar a 1.000 personas distintas (no impresiones).
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* ------------------------------------------------------------------ */}
       {/* 2.5 Proactive Alerts                                               */}
