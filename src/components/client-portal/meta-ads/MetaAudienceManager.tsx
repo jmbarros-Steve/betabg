@@ -507,7 +507,7 @@ function CreateCustomAudienceDialog({
     engagementMissingAsset;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogContent
         className="sm:max-w-[580px] max-h-[90vh] overflow-y-auto"
         // Fix Radix Dialog + Select bug: cuando un Select shadcn abre su
@@ -963,7 +963,7 @@ function CreateLookalikeDialog({
   const reach = estimateReach(formData.country, formData.lookalike_percent);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogContent
         className="sm:max-w-[500px]"
         onPointerDownOutside={(e) => {
