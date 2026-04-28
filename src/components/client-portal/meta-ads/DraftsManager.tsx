@@ -35,7 +35,11 @@ import {
   Film,
   Sparkles,
   Camera,
+  Pencil,
 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { useMetaBusiness } from './MetaBusinessContext';
 
 // ---------------------------------------------------------------------------
@@ -238,6 +242,22 @@ export default function DraftsManager({ clientId, onEditDraft, onGoToCreate }: D
   const [publishing, setPublishing] = useState<string | null>(null);
   const [publishTarget, setPublishTarget] = useState<DraftItem | null>(null);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  // Edición inline de borradores: dialog con los campos de copy + targeting
+  // que el cliente edita más seguido (título, copy, headline, descripción,
+  // CTA, URL, nombre de campaña, presupuesto). Para edits estructurales
+  // mayores (formato, audiencia compleja, segmentación) hay un botón que
+  // lleva al wizard completo.
+  const [editTarget, setEditTarget] = useState<DraftItem | null>(null);
+  const [editForm, setEditForm] = useState<{
+    titulo: string;
+    texto_principal: string;
+    descripcion: string;
+    cta: string;
+    campaign_name: string;
+    destination_url: string;
+    presupuesto_diario: string;
+  }>({ titulo: '', texto_principal: '', descripcion: '', cta: '', campaign_name: '', destination_url: '', presupuesto_diario: '' });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // ── Fetch ──
   // Antes filtrábamos por estado IN ('borrador','aprobado','generando') para
@@ -388,6 +408,80 @@ export default function DraftsManager({ clientId, onEditDraft, onGoToCreate }: D
     } finally {
       setPublishing(null);
     }
+  };
+
+  // ── Edit draft ──
+  const openEdit = (draft: DraftItem) => {
+    const bv = draft.brief_visual || {};
+    setEditTarget(draft);
+    setEditForm({
+      titulo: draft.titulo || '',
+      texto_principal: draft.texto_principal || '',
+      descripcion: draft.descripcion || '',
+      cta: draft.cta || 'SHOP_NOW',
+      campaign_name: bv.campaign_name || '',
+      destination_url: bv.destination_url || '',
+      presupuesto_diario: String(bv.plan_accion?.presupuesto_diario || bv.adset_budget || bv.campaign_budget || ''),
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editTarget) return;
+    setSavingEdit(true);
+    try {
+      // Mergeamos el brief_visual existente para no perder campos no editables
+      // acá (objective, funnel, ángulo, dolor, plan_accion completo, etc.).
+      const oldBv = (editTarget.brief_visual || {}) as Record<string, any>;
+      const newBv = {
+        ...oldBv,
+        campaign_name: editForm.campaign_name.trim() || oldBv.campaign_name,
+        destination_url: editForm.destination_url.trim() || oldBv.destination_url,
+        plan_accion: {
+          ...(oldBv.plan_accion || {}),
+          presupuesto_diario: editForm.presupuesto_diario.trim() || oldBv.plan_accion?.presupuesto_diario,
+        },
+      };
+      const { error } = await supabase
+        .from('ad_creatives')
+        .update({
+          titulo: editForm.titulo.trim() || null,
+          texto_principal: editForm.texto_principal.trim() || null,
+          descripcion: editForm.descripcion.trim() || null,
+          cta: editForm.cta.trim() || null,
+          brief_visual: newBv,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editTarget.id)
+        .eq('client_id', clientId);
+      if (error) throw error;
+      setDrafts((prev) =>
+        prev.map((d) =>
+          d.id === editTarget.id
+            ? {
+                ...d,
+                titulo: editForm.titulo.trim() || d.titulo,
+                texto_principal: editForm.texto_principal.trim() || null,
+                descripcion: editForm.descripcion.trim() || null,
+                cta: editForm.cta.trim() || null,
+                brief_visual: newBv,
+              }
+            : d,
+        ),
+      );
+      toast.success('Cambios guardados');
+      setEditTarget(null);
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al guardar');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleAdvancedEdit = () => {
+    if (editTarget && onEditDraft) {
+      onEditDraft(editTarget.id);
+    }
+    setEditTarget(null);
   };
 
   // ── Go to create wizard ──
@@ -958,6 +1052,10 @@ export default function DraftsManager({ clientId, onEditDraft, onGoToCreate }: D
                           Publicar en Meta
                         </Button>
                       )}
+                      <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => openEdit(draft)}>
+                        <Pencil className="w-3.5 h-3.5 mr-1" />
+                        Editar
+                      </Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label="Eliminar borrador" onClick={() => setDeleteTarget(draft)}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -989,6 +1087,122 @@ export default function DraftsManager({ clientId, onEditDraft, onGoToCreate }: D
             <Button onClick={() => publishTarget && handlePublish(publishTarget)}>
               <Send className="w-4 h-4 mr-2" />
               Publicar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Draft Dialog */}
+      <Dialog open={!!editTarget} onOpenChange={() => !savingEdit && setEditTarget(null)}>
+        <DialogContent
+          className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>Editar borrador</DialogTitle>
+          </DialogHeader>
+          {editTarget && (
+            <div className="space-y-4 py-2">
+              <div>
+                <Label htmlFor="edit-campaign-name">Nombre de campaña</Label>
+                <Input
+                  id="edit-campaign-name"
+                  value={editForm.campaign_name}
+                  onChange={(e) => setEditForm((p) => ({ ...p, campaign_name: e.target.value }))}
+                  placeholder="Ej: Black Friday 2026 - Retargeting"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-titulo">Título del anuncio (headline)</Label>
+                <Input
+                  id="edit-titulo"
+                  value={editForm.titulo}
+                  onChange={(e) => setEditForm((p) => ({ ...p, titulo: e.target.value }))}
+                  placeholder="Ej: Lo hecho a mano no se consigue en el mall"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-texto">Texto principal (copy del anuncio)</Label>
+                <Textarea
+                  id="edit-texto"
+                  value={editForm.texto_principal}
+                  onChange={(e) => setEditForm((p) => ({ ...p, texto_principal: e.target.value }))}
+                  placeholder="El cuerpo del anuncio que ve el cliente"
+                  className="mt-1 min-h-[80px]"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-descripcion">Descripción del enlace</Label>
+                <Input
+                  id="edit-descripcion"
+                  value={editForm.descripcion}
+                  onChange={(e) => setEditForm((p) => ({ ...p, descripcion: e.target.value }))}
+                  placeholder="Descripción corta debajo del título"
+                  className="mt-1"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="edit-cta">Botón CTA</Label>
+                  <Input
+                    id="edit-cta"
+                    value={editForm.cta}
+                    onChange={(e) => setEditForm((p) => ({ ...p, cta: e.target.value }))}
+                    placeholder="SHOP_NOW"
+                    className="mt-1"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Ej: SHOP_NOW, LEARN_MORE, BUY_NOW, SIGN_UP
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="edit-budget">Presupuesto diario (CLP)</Label>
+                  <Input
+                    id="edit-budget"
+                    type="number"
+                    value={editForm.presupuesto_diario}
+                    onChange={(e) => setEditForm((p) => ({ ...p, presupuesto_diario: e.target.value }))}
+                    placeholder="10000"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="edit-url">URL de destino</Label>
+                <Input
+                  id="edit-url"
+                  type="url"
+                  value={editForm.destination_url}
+                  onChange={(e) => setEditForm((p) => ({ ...p, destination_url: e.target.value }))}
+                  placeholder="https://tu-tienda.com/productos"
+                  className="mt-1"
+                />
+              </div>
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/40 border border-border/60">
+                <Lightbulb className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Para cambiar imágenes, audiencia, formato (DPA/carrusel/single), funnel u objetivo, usá el botón <strong>"Edición avanzada"</strong> abajo — abre el wizard completo.
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setEditTarget(null)} disabled={savingEdit}>
+              Cancelar
+            </Button>
+            {onEditDraft && (
+              <Button variant="outline" onClick={handleAdvancedEdit} disabled={savingEdit}>
+                Edición avanzada (wizard)
+              </Button>
+            )}
+            <Button onClick={handleSaveEdit} disabled={savingEdit}>
+              {savingEdit ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
+              ) : (
+                'Guardar cambios'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
