@@ -192,10 +192,16 @@
   }
 }
 
-[data-radix-portal] {
-  z-index: 999999 !important;
-}
-
-[role="dialog"] {
+/*
+  Forzar todos los portales de Radix (Dialog, Select, Popover, DropdownMenu,
+  Tooltip, etc.) por encima del resto del UI. CRÍTICO: incluir
+  data-radix-popper-content-wrapper porque Radix Select moderno NO usa
+  data-radix-portal — sin esto los dropdowns quedan detrás del Dialog
+  overlay (z-999999) y "no se despliegan" visualmente.
+*/
+[data-radix-portal],
+[data-radix-popper-content-wrapper],
+[role="dialog"],
+[role="listbox"] {
   z-index: 999999 !important;
 }
