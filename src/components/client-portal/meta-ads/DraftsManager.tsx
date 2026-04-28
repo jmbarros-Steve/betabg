@@ -68,9 +68,9 @@ function pickArray(v: any): string[] {
 interface DraftsManagerProps {
   clientId: string;
   onEditDraft?: (draftId: string) => void;
-  // Callback para que el wizard de "Crear" arranque con un asset reusado
-  // desde la biblioteca interna. Si no se pasa, mostramos un toast.
-  onCreateWithAsset?: (asset: { url: string; type: 'image' | 'video'; creativeId: string }) => void;
+  // Navegación al wizard de Crear (los assets se reusan automáticamente
+  // desde la galería interna del wizard, no hace falta pasar nada).
+  onGoToCreate?: () => void;
 }
 
 type DraftStatus = 'borrador' | 'aprobado' | 'en_pauta' | 'generando';
@@ -226,7 +226,7 @@ function relativeTime(date: Date): string {
   return `hace ${days}d`;
 }
 
-export default function DraftsManager({ clientId, onEditDraft, onCreateWithAsset }: DraftsManagerProps) {
+export default function DraftsManager({ clientId, onEditDraft, onGoToCreate }: DraftsManagerProps) {
   const { connectionId: ctxConnectionId } = useMetaBusiness();
 
   const [drafts, setDrafts] = useState<DraftItem[]>([]);
@@ -390,17 +390,15 @@ export default function DraftsManager({ clientId, onEditDraft, onCreateWithAsset
     }
   };
 
-  // ── Use asset in new campaign ──
-  // El cliente puede reusar un video/foto de su biblioteca para arrancar una
-  // campaña sin tener que regenerar el creativo desde cero. El callback va al
-  // wizard de "Crear" con el asset prefilleado; si MetaAdsManager no provee
-  // el callback hacemos un fallback amable.
-  const handleUseAsset = (asset: AssetItem) => {
-    if (onCreateWithAsset) {
-      onCreateWithAsset({ url: asset.url, type: asset.type, creativeId: asset.creativeId });
-      toast.success(`Cargando ${asset.type === 'video' ? 'video' : 'foto'} en el wizard de Crear...`);
+  // ── Go to create wizard ──
+  // Todos los assets generados/subidos viven automáticamente en la galería
+  // del wizard de Crear (CampaignCreateWizard tab "Galería"). El usuario no
+  // necesita seleccionar nada acá — solo navegar y elegir desde adentro.
+  const handleGoCreate = () => {
+    if (onGoToCreate) {
+      onGoToCreate();
     } else {
-      toast.info('Ve a "Crear" y selecciona este asset desde la galería del wizard.');
+      toast.info('Ve a "Crear" y selecciona desde el tab "Galería" del wizard.');
     }
   };
 
@@ -566,6 +564,25 @@ export default function DraftsManager({ clientId, onEditDraft, onCreateWithAsset
         ) : null;
       })()}
 
+      {/* Banner informativo para Videos/Fotos */}
+      {(mainTab === 'videos' || mainTab === 'fotos') && (mainTab === 'videos' ? videoAssets.length : photoAssets.length) > 0 && (
+        <div className="flex items-start gap-3 p-3 rounded-lg bg-[#1E3A7B]/5 border border-[#2A4F9E]/20">
+          <Lightbulb className="w-5 h-5 text-[#2A4F9E] shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-medium">
+              Estos {mainTab === 'videos' ? 'videos' : 'fotos'} están disponibles automáticamente en el wizard de Crear.
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Cuando crees una nueva campaña, ve al tab "Galería" en el step de creativos y elegí cualquiera de estos sin tener que volver a generar/subir.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" className="text-xs shrink-0" onClick={handleGoCreate}>
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            Crear campaña
+          </Button>
+        </div>
+      )}
+
       {/* ════════ VIDEOS TAB ════════ */}
       {mainTab === 'videos' && (
         videoAssets.length === 0 ? (
@@ -586,7 +603,7 @@ export default function DraftsManager({ clientId, onEditDraft, onCreateWithAsset
                   <video src={asset.url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
                   <span className="absolute top-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded">VIDEO</span>
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                    <Button size="sm" className="text-xs" onClick={() => handleUseAsset(asset)}>
+                    <Button size="sm" className="text-xs" onClick={handleGoCreate}>
                       <Plus className="w-3.5 h-3.5 mr-1" />
                       Usar en campaña
                     </Button>
@@ -633,7 +650,7 @@ export default function DraftsManager({ clientId, onEditDraft, onCreateWithAsset
                 <div className="aspect-square relative">
                   <SafeImage src={asset.url} className="w-full h-full" />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                    <Button size="sm" className="text-xs" onClick={() => handleUseAsset(asset)}>
+                    <Button size="sm" className="text-xs" onClick={handleGoCreate}>
                       <Plus className="w-3.5 h-3.5 mr-1" />
                       Usar en campaña
                     </Button>

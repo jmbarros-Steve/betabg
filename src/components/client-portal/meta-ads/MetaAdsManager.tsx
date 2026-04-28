@@ -1055,7 +1055,13 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
             <MetaAutomatedRules clientId={clientId} />
           </PlanGate>
         )}
-        {key === 'drafts' && <DraftsManager clientId={clientId} onEditDraft={() => { handleNavClick('create-wizard'); }} />}
+        {key === 'drafts' && (
+          <DraftsManager
+            clientId={clientId}
+            onEditDraft={() => { handleNavClick('create-wizard'); }}
+            onGoToCreate={() => { handleNavClick('create-wizard'); }}
+          />
+        )}
         {key === 'pixel' && <PixelSetupWizard clientId={clientId} />}
         {key === 'creative-perf' && <CreativePerformancePanel clientId={clientId} />}
         {key === 'competitors' && (

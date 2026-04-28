@@ -2334,13 +2334,39 @@ function AdFormMultiSlot({
   const loadGallery = useCallback(async () => {
     setLoadingGallery(true);
     try {
-      const [{ data: generated }, { data: uploaded }] = await Promise.all([
-        supabase.from('ad_assets').select('id, asset_url, tipo').eq('client_id', clientId).order('created_at', { ascending: false }).limit(20),
-        supabase.from('client_assets').select('id, url, tipo').eq('client_id', clientId).order('created_at', { ascending: false }).limit(20),
+      // 3 fuentes de assets reusables:
+      //   1. ad_assets — assets generados por Steve (legacy, mayormente vacío hoy)
+      //   2. client_assets — uploads del cliente vía wizard
+      //   3. ad_creatives — todo lo que pasó por el pipeline DCT (asset_url
+      //      principal + dct_imagenes array). Esta es la que llena Borradores
+      //      → Videos/Fotos y la que JM espera ver acá automáticamente.
+      const [{ data: generated }, { data: uploaded }, { data: creatives }] = await Promise.all([
+        supabase.from('ad_assets').select('id, asset_url, tipo').eq('client_id', clientId).order('created_at', { ascending: false }).limit(50),
+        supabase.from('client_assets').select('id, url, tipo').eq('client_id', clientId).order('created_at', { ascending: false }).limit(50),
+        supabase.from('ad_creatives').select('id, asset_url, dct_imagenes, foto_base_url, created_at').eq('client_id', clientId).order('created_at', { ascending: false }).limit(50),
       ]);
       const all: Array<{ id: string; url: string; tipo: string }> = [];
-      if (generated) for (const a of generated) all.push({ id: a.id, url: a.asset_url, tipo: a.tipo });
-      if (uploaded) for (const a of uploaded) all.push({ id: a.id, url: a.url, tipo: a.tipo });
+      const seen = new Set<string>();
+      const isVideo = (u: string) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u);
+      const push = (id: string, url: string | null | undefined, hint?: string) => {
+        if (!url || seen.has(url)) return;
+        seen.add(url);
+        all.push({ id, url, tipo: hint || (isVideo(url) ? 'video' : 'imagen') });
+      };
+      if (generated) for (const a of generated) push(a.id, a.asset_url, a.tipo);
+      if (uploaded) for (const a of uploaded) push(a.id, a.url, a.tipo);
+      if (creatives) {
+        for (const c of creatives) {
+          push(`creative-${c.id}-main`, c.asset_url);
+          push(`creative-${c.id}-base`, c.foto_base_url);
+          if (Array.isArray(c.dct_imagenes)) {
+            c.dct_imagenes.forEach((img: any, i: number) => {
+              const url = typeof img === 'string' ? img : img?.url;
+              push(`creative-${c.id}-dct-${i}`, url);
+            });
+          }
+        }
+      }
       setGalleryAssets(all);
     } catch { /* ignore */ }
     setLoadingGallery(false);
@@ -2983,17 +3009,37 @@ function AdFormMultiSlot({
         })()}
 
         {mediaTab === 'gallery' && (
-          <div>
+          <div className="space-y-2">
             {loadingGallery ? <div className="grid grid-cols-4 gap-2">{[...Array(8)].map((_, i) => <Skeleton key={i} className="aspect-square rounded" />)}</div>
             : galleryAssets.length > 0 ? (
-              <div className="grid grid-cols-4 gap-2 max-h-[200px] overflow-y-auto">
-                {galleryAssets.map((a) => (
-                  <button key={a.id} onClick={() => { setImageAtSlot(a.url); toast.success(`Imagen ${activeImageSlot + 1} seleccionada`); }} className={`aspect-square rounded overflow-hidden border-2 transition-all ${images[activeImageSlot] === a.url ? 'border-primary ring-2 ring-primary/20' : 'border-transparent hover:border-primary/30'}`}>
-                    <img src={a.url} alt="Vista previa" className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            ) : <p className="text-xs text-muted-foreground text-center py-4">No hay recursos disponibles</p>}
+              <>
+                <p className="text-[11px] text-muted-foreground">
+                  Click en cualquier imagen o video que ya hayas generado o subido para reusarlo en el slot {activeImageSlot + 1}.
+                </p>
+                <div className="grid grid-cols-4 gap-2 max-h-[280px] overflow-y-auto">
+                  {galleryAssets.map((a) => {
+                    const isVideo = /\.(mp4|mov|webm|m4v)(\?|$)/i.test(a.url) || a.tipo === 'video';
+                    const isSelected = images[activeImageSlot] === a.url;
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => { setImageAtSlot(a.url); toast.success(`${isVideo ? 'Video' : 'Imagen'} ${activeImageSlot + 1} seleccionado`); }}
+                        className={`aspect-square rounded overflow-hidden border-2 transition-all relative group ${isSelected ? 'border-primary ring-2 ring-primary/20' : 'border-transparent hover:border-primary/30'}`}
+                      >
+                        {isVideo ? (
+                          <>
+                            <video src={a.url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                            <span className="absolute top-1 right-1 bg-black/70 text-white text-[8px] px-1 py-0.5 rounded">VIDEO</span>
+                          </>
+                        ) : (
+                          <img src={a.url} alt="Vista previa" className="w-full h-full object-cover" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : <p className="text-xs text-muted-foreground text-center py-4">No hay recursos disponibles. Genera o sube imágenes/videos y aparecerán acá automáticamente.</p>}
           </div>
         )}
 
