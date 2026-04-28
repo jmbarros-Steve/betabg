@@ -1364,28 +1364,52 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
   // conexiones leadsie/bm_partner donde el sync inicial no pobló pixel_id.
   // Llamamos al action list_pixels y tomamos el primero. Mejora UX inmediata
   // sin requerir resync manual.
+  const [pixelDetectError, setPixelDetectError] = useState<string | null>(null);
+  const [pixelDetecting, setPixelDetecting] = useState(false);
+
+  const detectPixel = useCallback(async () => {
+    if (!ctxConnectionId) {
+      setPixelDetectError('Sin conexión Meta activa');
+      return;
+    }
+    setPixelDetecting(true);
+    setPixelDetectError(null);
+    console.log('[pixel-detect] llamando list_pixels con connection', ctxConnectionId);
+    try {
+      const { data, error } = await callApi<{ pixels?: Array<{ id: string; name: string }> }>(
+        'manage-meta-audiences',
+        {
+          body: { connection_id: ctxConnectionId, action: 'list_pixels' },
+          timeoutMs: 15_000,
+        },
+      );
+      console.log('[pixel-detect] response', { data, error });
+      if (error) {
+        setPixelDetectError(typeof error === 'string' ? error : 'Error al consultar Meta');
+        return;
+      }
+      const first = data?.pixels?.[0];
+      if (first?.id) {
+        setAutoFetchedPixelId(first.id);
+        toast.success(`Pixel detectado: ${first.name || first.id}`);
+      } else {
+        setPixelDetectError('No se encontraron pixels en esta cuenta de Meta');
+      }
+    } catch (err: any) {
+      console.error('[pixel-detect] excepción', err);
+      setPixelDetectError(err?.message || 'Error desconocido');
+    } finally {
+      setPixelDetecting(false);
+    }
+  }, [ctxConnectionId]);
+
+  // Auto-fire una vez al montar si no hay pixel
   useEffect(() => {
     if (ctxPixelId || dbPixelId || autoFetchedPixelId) return;
     if (!ctxConnectionId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await callApi<{ pixels?: Array<{ id: string; name: string }> }>(
-          'manage-meta-audiences',
-          {
-            body: { connection_id: ctxConnectionId, action: 'list_pixels' },
-            timeoutMs: 15_000,
-          },
-        );
-        if (cancelled) return;
-        const first = data?.pixels?.[0];
-        if (first?.id) setAutoFetchedPixelId(first.id);
-      } catch {
-        // silencioso — el banner "Conecta tu Pixel primero" sigue siendo el fallback
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [ctxConnectionId, ctxPixelId, dbPixelId, autoFetchedPixelId]);
+    detectPixel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctxConnectionId, ctxPixelId, dbPixelId]);
 
   // ---- Filtering ----
 
