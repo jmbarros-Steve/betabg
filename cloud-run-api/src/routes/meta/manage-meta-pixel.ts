@@ -108,28 +108,80 @@ async function handleGet(
   };
 }
 
-// Get pixel stats (events received)
+// Get pixel stats (events received) + CAPI status
+//
+// Meta v23 devuelve /stats con buckets POR HORA (start_time) y dentro de
+// cada bucket un array `data` con {value, count}. El bug anterior leía
+// `e.event` y `e.count` directo del nivel superior — siempre devolvía 0.
+// Ahora sumamos counts de TODOS los buckets de la ventana y devolvemos
+// total por evento + last_received timestamp.
+//
+// CAPI status: con aggregation=event_source Meta devuelve buckets con
+// {value: "SERVER" | "BROWSER", count}. Si SERVER > 0, la Conversions API
+// está enviando eventos. Útil para mostrar el badge "API Conexión activa".
 async function handleStats(
   pixelId: string,
   accessToken: string
 ): Promise<{ body: any; status: number }> {
   console.log(`[manage-meta-pixel] Getting stats for pixel ${pixelId}`);
 
-  const result = await metaApiRequest(`${pixelId}/stats`, accessToken, {
-    aggregation: 'event',
-  });
+  const [eventsResp, sourceResp] = await Promise.all([
+    metaApiRequest(`${pixelId}/stats`, accessToken, { aggregation: 'event' }),
+    metaApiRequest(`${pixelId}/stats`, accessToken, { aggregation: 'event_source' }),
+  ]);
 
-  if (!result.ok) {
-    return { body: { error: 'Failed to get pixel stats', details: result.error }, status: 502 };
+  // Eventos: si falla, devolvemos error (es lo crítico)
+  if (!eventsResp.ok) {
+    return { body: { error: 'Failed to get pixel stats', details: eventsResp.error }, status: 502 };
   }
 
-  const events = (result.data?.data || []).map((e: any) => ({
-    event: e.event,
-    count: e.count || 0,
-    last_received: e.timestamp || null,
-  }));
+  // Agregar counts por evento across all hour buckets + tomar bucket más reciente
+  const eventCounts: Record<string, number> = {};
+  let lastEventTimestamp: string | null = null;
+  for (const bucket of eventsResp.data?.data || []) {
+    const startTime = bucket.start_time as string | undefined;
+    if (startTime && (!lastEventTimestamp || startTime > lastEventTimestamp)) {
+      lastEventTimestamp = startTime;
+    }
+    for (const entry of bucket.data || []) {
+      const name = entry.value as string | undefined;
+      const count = Number(entry.count || 0);
+      if (name) {
+        eventCounts[name] = (eventCounts[name] || 0) + count;
+      }
+    }
+  }
 
-  return { body: { success: true, events }, status: 200 };
+  const events = Object.entries(eventCounts)
+    .map(([event, count]) => ({
+      event,
+      count,
+      last_received: lastEventTimestamp,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  // CAPI detection — sumar counts de BROWSER y SERVER. Si event_source falla
+  // (permisos limitados, pixel sin actividad) no es crítico, devolvemos null.
+  let capi: { enabled: boolean; server_events: number; browser_events: number } | null = null;
+  if (sourceResp.ok) {
+    let browserCount = 0;
+    let serverCount = 0;
+    for (const bucket of sourceResp.data?.data || []) {
+      for (const entry of bucket.data || []) {
+        const v = entry.value as string;
+        const c = Number(entry.count || 0);
+        if (v === 'BROWSER') browserCount += c;
+        else if (v === 'SERVER') serverCount += c;
+      }
+    }
+    capi = {
+      enabled: serverCount > 0,
+      server_events: serverCount,
+      browser_events: browserCount,
+    };
+  }
+
+  return { body: { success: true, events, capi }, status: 200 };
 }
 
 // --- Main handler ---

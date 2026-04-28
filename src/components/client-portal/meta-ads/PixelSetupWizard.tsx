@@ -46,6 +46,12 @@ interface PixelEvent {
   last_received: string | null;
 }
 
+interface CapiStatus {
+  enabled: boolean;
+  server_events: number;
+  browser_events: number;
+}
+
 // ---------------------------------------------------------------------------
 // Event config
 // ---------------------------------------------------------------------------
@@ -80,6 +86,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
   const [pixels, setPixels] = useState<PixelInfo[]>([]);
   const [selectedPixel, setSelectedPixel] = useState<PixelInfo | null>(null);
   const [events, setEvents] = useState<PixelEvent[]>([]);
+  const [capi, setCapi] = useState<CapiStatus | null>(null);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [noConnection, setNoConnection] = useState(false);
@@ -132,9 +139,11 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
 
       if (error) throw error;
       setEvents(data?.events || []);
+      setCapi(data?.capi || null);
     } catch {
       // Stats may fail if pixel hasn't fired - not critical
       setEvents([]);
+      setCapi(null);
     } finally {
       setLoadingEvents(false);
     }
@@ -161,8 +170,16 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
   const formatDate = (d: string | null) =>
     d ? new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Nunca';
 
-  // Active events set for quick lookup
-  const activeEventNames = new Set(events.map((e) => e.event));
+  // Active events set for quick lookup. Solo contamos como "activo" si el
+  // count es > 0 — Meta a veces devuelve eventos en la lista con count 0
+  // que son falsos positivos (eventos definidos pero sin tráfico real).
+  const activeEventNames = new Set(events.filter((e) => e.count > 0).map((e) => e.event));
+  const eventByName = new Map(events.map((e) => [e.event, e]));
+  const totalServerEvents = capi?.server_events ?? 0;
+  const totalBrowserEvents = capi?.browser_events ?? 0;
+  const totalEvents = totalServerEvents + totalBrowserEvents;
+  const formatCount = (n: number) =>
+    new Intl.NumberFormat('es-CL', { notation: n >= 10_000 ? 'compact' : 'standard' }).format(n);
 
   // Loading
   if (loading) {
@@ -289,13 +306,68 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
         </CardContent>
       </Card>
 
+      {/* CAPI (Conversions API) Status */}
+      {selectedPixel && !loadingEvents && capi && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Activity className="w-4 h-4" />
+              API de Conversiones (CAPI)
+              {capi.enabled ? (
+                <Badge className="bg-green-500/10 text-green-700 border-green-500/30 text-[10px]">
+                  Conectada
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                  No detectada
+                </Badge>
+              )}
+            </CardTitle>
+            <CardDescription className="text-xs">
+              {capi.enabled
+                ? 'Tu servidor está enviando eventos directamente a Meta — esto mejora la precisión y evita pérdida de eventos por bloqueadores de anuncios.'
+                : 'No se detectaron eventos server-side en las últimas 48h. Activá CAPI desde Shopify (Settings → Customer events) para mejorar el matching.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg border border-border/60 p-3 bg-muted/20">
+                <div className="text-xs text-muted-foreground mb-1">Servidor (CAPI)</div>
+                <div className="text-2xl font-bold tabular-nums">
+                  {formatCount(totalServerEvents)}
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-0.5">últimas 48h</div>
+              </div>
+              <div className="rounded-lg border border-border/60 p-3 bg-muted/20">
+                <div className="text-xs text-muted-foreground mb-1">Browser (Pixel)</div>
+                <div className="text-2xl font-bold tabular-nums">
+                  {formatCount(totalBrowserEvents)}
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-0.5">últimas 48h</div>
+              </div>
+              <div className="rounded-lg border border-border/60 p-3 bg-muted/20">
+                <div className="text-xs text-muted-foreground mb-1">% server-side</div>
+                <div className="text-2xl font-bold tabular-nums">
+                  {totalEvents > 0
+                    ? `${Math.round((totalServerEvents / totalEvents) * 100)}%`
+                    : '—'}
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-0.5">
+                  {totalServerEvents > totalBrowserEvents ? 'CAPI dominante ✓' : 'meta recomienda 50%+'}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Event Tracking Status */}
       {selectedPixel && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Eventos de Conversión</CardTitle>
             <CardDescription className="text-xs">
-              Estado de los eventos estándar para ecommerce. Los eventos marcados en verde están activos.
+              Estado de los eventos estándar para ecommerce — verde = activo en últimas 48h con conteo real desde Meta.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -307,7 +379,7 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {STANDARD_EVENTS.map((evt) => {
                   const isActive = activeEventNames.has(evt.name);
-                  const liveEvent = events.find((e) => e.event === evt.name);
+                  const liveEvent = eventByName.get(evt.name);
                   const Icon = evt.icon;
                   const priorityConf = PRIORITY_BADGE[evt.priority];
 
@@ -315,21 +387,26 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
                     <div
                       key={evt.name}
                       className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                        isActive ? 'border-green-500/20 bg-green-500/10' : 'border-border bg-muted/20'
+                        isActive ? 'border-green-500/30 bg-green-500/[0.06]' : 'border-border bg-muted/20'
                       }`}
                     >
-                      <div className={`p-1.5 rounded-md ${isActive ? 'bg-green-500/10' : 'bg-muted'}`}>
+                      <div className={`p-1.5 rounded-md ${isActive ? 'bg-green-500/15' : 'bg-muted'}`}>
                         <Icon className={`w-4 h-4 ${isActive ? 'text-green-600' : 'text-muted-foreground'}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium">{evt.name}</span>
                           <Badge className={`text-[9px] ${priorityConf.color}`}>{priorityConf.label}</Badge>
+                          {isActive && liveEvent && (
+                            <Badge className="text-[9px] bg-green-500/10 text-green-700 border-green-500/30">
+                              {formatCount(liveEvent.count)} eventos
+                            </Badge>
+                          )}
                         </div>
-                        <p className="text-xs text-muted-foreground">{evt.description}</p>
-                        {liveEvent && (
-                          <p className="text-xs text-green-600 mt-0.5">
-                            {liveEvent.count.toLocaleString()} eventos recibidos
+                        <p className="text-xs text-muted-foreground mt-0.5">{evt.description}</p>
+                        {!isActive && (
+                          <p className="text-[11px] text-muted-foreground/70 mt-0.5 italic">
+                            Sin actividad en las últimas 48h
                           </p>
                         )}
                       </div>
@@ -341,6 +418,35 @@ export default function PixelSetupWizard({ clientId }: PixelSetupWizardProps) {
                     </div>
                   );
                 })}
+
+                {/* Custom events recibidos pero no estándar */}
+                {events
+                  .filter((e) => e.count > 0 && !STANDARD_EVENTS.some((s) => s.name === e.event))
+                  .map((e) => (
+                    <div
+                      key={e.event}
+                      className="flex items-center gap-3 p-3 rounded-lg border border-[#1E3A7B]/20 bg-[#1E3A7B]/[0.04] transition-colors"
+                    >
+                      <div className="p-1.5 rounded-md bg-[#1E3A7B]/10">
+                        <Activity className="w-4 h-4 text-[#1E3A7B]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium">{e.event}</span>
+                          <Badge className="text-[9px] bg-[#1E3A7B]/10 text-[#1E3A7B] border-[#2A4F9E]/20">
+                            Custom
+                          </Badge>
+                          <Badge className="text-[9px] bg-green-500/10 text-green-700 border-green-500/30">
+                            {formatCount(e.count)} eventos
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Evento personalizado recibido por el Pixel
+                        </p>
+                      </div>
+                      <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                    </div>
+                  ))}
               </div>
             )}
           </CardContent>
