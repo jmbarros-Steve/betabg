@@ -34,6 +34,7 @@ import {
   ShoppingCart, Target, ArrowUpRight, ArrowDownRight,
   ChevronDown, ChevronRight, Sparkles, RefreshCw,
   FileDown, CalendarClock, Loader2, Settings2, AlertTriangle,
+  Users,
 } from 'lucide-react';
 import { useMetaBusiness } from './MetaBusinessContext';
 import { getTargetStatus, getTargetBgColor, getProgressPercent } from '@/lib/metric-utils';
@@ -236,6 +237,12 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
   const [sortField, setSortField] = useState<SortField>('spend');
   const [sortAsc, setSortAsc] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  // Tier 1 multi-account: toggle "ver todas las cuentas Meta del cliente"
+  // junta métricas de OAuth + Leadsie + cualquier conexión Meta activa,
+  // útil para clientes con BM Partner + cuenta personal o múltiples ad
+  // accounts. Default off → mantiene comportamiento previo (cuenta única).
+  const [showAllAccounts, setShowAllAccounts] = useState(false);
+  const [allMetaConnectionIds, setAllMetaConnectionIds] = useState<string[]>([]);
 
   // Resolve date boundaries
   const { from, to, prevFrom, prevTo, days } = useMemo(() => {
@@ -269,9 +276,29 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
 
   // ------ Data Fetching ------
 
+  // Cargar TODAS las conexiones Meta activas del cliente una vez al montar.
+  // Permite agregar métricas de varias cuentas cuando showAllAccounts=true.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('platform_connections')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('platform', 'meta')
+        .eq('is_active', true);
+      if (cancelled) return;
+      const ids = (data || []).map((c: any) => c.id).filter(Boolean);
+      setAllMetaConnectionIds(ids);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId]);
+
   useEffect(() => {
     fetchData();
-  }, [clientId, from, to, prevFrom, prevTo, lastSyncAt]);
+  }, [clientId, from, to, prevFrom, prevTo, lastSyncAt, showAllAccounts]);
 
   // Refresh when account changes (bg:sync-complete)
   useEffect(() => {
@@ -283,14 +310,22 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
   async function fetchData() {
     setLoading(true);
     try {
-      // Use connectionId from MetaBusinessContext
-      if (!ctxConnectionId) {
+      // Determine which Meta connections to fetch metrics for:
+      // - Default (showAllAccounts=false): solo la cuenta seleccionada en
+      //   MetaBusinessContext (la que el cliente está viendo en sidebar).
+      // - Toggle on (showAllAccounts=true): TODAS las conexiones Meta activas
+      //   del cliente — agregamos métricas de OAuth + Leadsie + cualquier BM
+      //   Partner. Útil para clientes con varios ad accounts.
+      const connectionIds = showAllAccounts && allMetaConnectionIds.length > 0
+        ? allMetaConnectionIds
+        : ctxConnectionId ? [ctxConnectionId] : [];
+
+      if (connectionIds.length === 0) {
         setMetrics([]);
         setPrevMetrics([]);
         setLoading(false);
         return;
       }
-      const connectionIds = [ctxConnectionId];
 
       // 2. Current period
       const { data: currentData, error: currentError } = await supabase
@@ -937,6 +972,21 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
             <CalendarClock className="w-4 h-4 mr-2" />
             Programar
           </Button>
+          {allMetaConnectionIds.length > 1 && (
+            <Button
+              variant={showAllAccounts ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowAllAccounts((v) => !v)}
+              title={showAllAccounts
+                ? `Agregando métricas de las ${allMetaConnectionIds.length} cuentas Meta del cliente`
+                : 'Mostrar métricas combinadas de todas las cuentas Meta del cliente'}
+            >
+              <Users className="w-4 h-4 mr-2" />
+              {showAllAccounts
+                ? `Todas (${allMetaConnectionIds.length})`
+                : 'Solo esta cuenta'}
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
