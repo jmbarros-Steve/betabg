@@ -45,6 +45,7 @@ import {
   AlertTriangle,
   Info,
   RefreshCw,
+  X,
 } from 'lucide-react';
 import MetaScopeAlert from './MetaScopeAlert';
 import AudienceOverlapViewer from './AudienceOverlapViewer';
@@ -60,6 +61,46 @@ type CustomAudienceSource = 'WEBSITE' | 'CUSTOMER_LIST' | 'ENGAGEMENT' | 'APP_AC
 type EngagementType = 'PAGE' | 'INSTAGRAM' | 'VIDEO';
 type AppActivityType = 'ADD_TO_CART' | 'PURCHASE' | 'VIEW_PRODUCT';
 type CustomerListSource = 'CSV' | 'KLAVIYO' | 'SHOPIFY';
+
+// Eventos estándar del Pixel de Meta — son los strings exactos que Meta espera
+// en el campo `value` del filter cuando operator='eq' y field='event'.
+// `AllVisitors` es un sentinel del frontend: si es seleccionado, no se agrega
+// filter de evento (audiencia matchea cualquier visitante del Pixel).
+type PixelEvent =
+  | 'AllVisitors'
+  | 'PageView'
+  | 'ViewContent'
+  | 'AddToCart'
+  | 'InitiateCheckout'
+  | 'AddPaymentInfo'
+  | 'Purchase'
+  | 'Lead'
+  | 'Search'
+  | 'CompleteRegistration'
+  | 'Subscribe'
+  | 'AddToWishlist'
+  | 'Contact'
+  | 'CustomizeProduct';
+
+interface PixelUrlFilter {
+  match_type: 'CONTAINS' | 'EQUALS' | 'STARTS_WITH';
+  value: string;
+}
+
+// Una regla individual del Pixel: un evento + retention + filtro URL opcional.
+interface PixelRule {
+  id: string; // uuid local para keys de React
+  event: PixelEvent;
+  retention_days: number;
+  url_filter?: PixelUrlFilter;
+}
+
+// Grupo de reglas con operador AND/OR. Meta acepta inclusions y exclusions
+// como dos grupos independientes, cada uno con su propio operator y array.
+interface RuleGroup {
+  operator: 'and' | 'or';
+  rules: PixelRule[];
+}
 
 interface AudienceRow {
   id: string;
@@ -80,10 +121,9 @@ interface CustomAudienceFormData {
   name: string;
   description: string;
   source: CustomAudienceSource;
-  // Website (Pixel)
-  url_rule: string;
-  url_match_type: 'CONTAINS' | 'EQUALS' | 'STARTS_WITH';
-  retention_days: number;
+  // Website (Pixel) — rule builder con eventos
+  inclusions: RuleGroup;
+  exclusions: RuleGroup;
   // Customer List
   customer_list_source: CustomerListSource;
   // Engagement
@@ -176,6 +216,26 @@ const TAB_CONFIG: { key: AudienceTab; label: string }[] = [
   { key: 'overlap', label: 'Overlap' },
 ];
 
+// Eventos estándar del Pixel ordenados por frecuencia de uso real en e-commerce.
+// El label es lo que ve el usuario; la key es el string exacto que Meta espera
+// en filter.value (case-sensitive según docs Meta Marketing API v23).
+const PIXEL_EVENT_LABELS: Record<PixelEvent, string> = {
+  AllVisitors: 'Cualquier visitante del sitio',
+  PageView: 'Visitó una página (PageView)',
+  ViewContent: 'Vio un producto (ViewContent)',
+  AddToCart: 'Agregó al carrito (AddToCart)',
+  InitiateCheckout: 'Inició checkout (InitiateCheckout)',
+  AddPaymentInfo: 'Agregó datos de pago (AddPaymentInfo)',
+  Purchase: 'Compró (Purchase)',
+  Lead: 'Generó un lead (Lead)',
+  Search: 'Realizó una búsqueda (Search)',
+  CompleteRegistration: 'Completó registro (CompleteRegistration)',
+  Subscribe: 'Se suscribió (Subscribe)',
+  AddToWishlist: 'Agregó a wishlist (AddToWishlist)',
+  Contact: 'Contactó (Contact)',
+  CustomizeProduct: 'Personalizó producto (CustomizeProduct)',
+};
+
 const COUNTRY_OPTIONS = [
   { value: 'CL', label: 'Chile' },
   { value: 'AR', label: 'Argentina' },
@@ -187,13 +247,20 @@ const COUNTRY_OPTIONS = [
   { value: 'ES', label: 'España' },
 ];
 
+// Helper para nuevas reglas del Pixel (uuid local para keys de React).
+const makePixelRule = (overrides?: Partial<PixelRule>): PixelRule => ({
+  id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+  event: 'AllVisitors',
+  retention_days: 30,
+  ...overrides,
+});
+
 const EMPTY_CUSTOM_FORM: CustomAudienceFormData = {
   name: '',
   description: '',
   source: 'WEBSITE',
-  url_rule: '',
-  url_match_type: 'CONTAINS',
-  retention_days: 30,
+  inclusions: { operator: 'or', rules: [makePixelRule()] },
+  exclusions: { operator: 'or', rules: [] },
   customer_list_source: 'CSV',
   engagement_type: 'PAGE',
   engagement_days: 30,
@@ -318,9 +385,8 @@ function AudienceSuggestions({
         name: 'Visitantes sin compra - 180 días',
         description: 'Visitantes del sitio web que no completaron una compra en los últimos 180 días.',
         source: 'WEBSITE',
-        url_rule: '/',
-        url_match_type: 'CONTAINS',
-        retention_days: 180,
+        inclusions: { operator: 'or', rules: [makePixelRule({ event: 'PageView', retention_days: 180 })] },
+        exclusions: { operator: 'or', rules: [makePixelRule({ event: 'Purchase', retention_days: 180 })] },
       },
     });
 
@@ -363,8 +429,8 @@ function AudienceSuggestions({
         name: 'Retargeting - Carrito Abandonado 30d',
         description: 'AddToCart sin Purchase en los últimos 30 días.',
         source: 'WEBSITE',
-        retargeting_type: 'abandoned_cart',
-        retention_days: 30,
+        inclusions: { operator: 'or', rules: [makePixelRule({ event: 'AddToCart', retention_days: 30 })] },
+        exclusions: { operator: 'or', rules: [makePixelRule({ event: 'Purchase', retention_days: 30 })] },
       },
     });
 
@@ -378,8 +444,8 @@ function AudienceSuggestions({
         name: 'Retargeting - Vio Productos 14d',
         description: 'ViewContent sin Purchase en los últimos 14 días.',
         source: 'WEBSITE',
-        retargeting_type: 'viewed_not_purchased',
-        retention_days: 14,
+        inclusions: { operator: 'or', rules: [makePixelRule({ event: 'ViewContent', retention_days: 14 })] },
+        exclusions: { operator: 'or', rules: [makePixelRule({ event: 'Purchase', retention_days: 14 })] },
       },
     });
 
@@ -456,6 +522,257 @@ function AudienceSuggestions({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pixel Rule Builder — eventos del Pixel + filtros URL + AND/OR + retention
+// ---------------------------------------------------------------------------
+
+/**
+ * Rule builder visual para audiencias website. Mapea 1:1 al shape que Meta
+ * espera en `rule.inclusions` y `rule.exclusions`:
+ *
+ *   {
+ *     operator: 'and' | 'or',           ← entre las reglas del grupo
+ *     rules: [
+ *       {
+ *         event_sources: [{ type: 'pixel', id: <pixel_id> }],
+ *         retention_seconds: <retention_days * 86400>,
+ *         filter: {                      ← opcional: omitir = AllVisitors
+ *           operator: 'and',
+ *           filters: [
+ *             { field: 'event', operator: 'eq', value: '<PixelEvent>' },
+ *             { field: 'url',   operator: 'i_contains', value: '<path>' }, ← opc.
+ *           ],
+ *         },
+ *       },
+ *       ...
+ *     ]
+ *   }
+ *
+ * En el grupo de exclusions, una sola regla vacía no se manda al backend.
+ */
+function PixelRuleBuilder({
+  title,
+  group,
+  onChange,
+  kind,
+}: {
+  title: string;
+  group: RuleGroup;
+  onChange: (next: RuleGroup) => void;
+  kind: 'inclusions' | 'exclusions';
+}) {
+  const updateRule = (idx: number, patch: Partial<PixelRule>) => {
+    const nextRules = group.rules.map((r, i) => (i === idx ? { ...r, ...patch } : r));
+    onChange({ ...group, rules: nextRules });
+  };
+
+  const removeRule = (idx: number) => {
+    const nextRules = group.rules.filter((_, i) => i !== idx);
+    onChange({ ...group, rules: nextRules });
+  };
+
+  const addRule = () => {
+    onChange({ ...group, rules: [...group.rules, makePixelRule()] });
+  };
+
+  const setOperator = (op: 'and' | 'or') => {
+    onChange({ ...group, operator: op });
+  };
+
+  const isEmpty = group.rules.length === 0;
+
+  return (
+    <div
+      className={`rounded-lg border p-3 space-y-3 ${
+        kind === 'exclusions'
+          ? 'border-red-500/20 bg-red-500/[0.02]'
+          : 'border-border/60 bg-background'
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-semibold">{title}</Label>
+        {group.rules.length >= 2 && (
+          <div className="flex items-center gap-1 rounded-md bg-muted p-0.5">
+            <button
+              type="button"
+              onClick={() => setOperator('or')}
+              className={`px-2 py-0.5 text-xs font-medium rounded ${
+                group.operator === 'or'
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              CUALQUIERA (O)
+            </button>
+            <button
+              type="button"
+              onClick={() => setOperator('and')}
+              className={`px-2 py-0.5 text-xs font-medium rounded ${
+                group.operator === 'and'
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              TODAS (Y)
+            </button>
+          </div>
+        )}
+      </div>
+
+      {isEmpty && kind === 'exclusions' && (
+        <p className="text-xs text-muted-foreground italic">
+          Sin exclusiones. Click en "Agregar condición" para excluir un evento.
+        </p>
+      )}
+
+      {group.rules.map((rule, idx) => {
+        const hasUrlFilter = !!rule.url_filter;
+        return (
+          <div
+            key={rule.id}
+            className="rounded-md border border-border/60 bg-background/60 p-3 space-y-2"
+          >
+            <div className="flex items-start gap-2">
+              <div className="flex-1 space-y-2">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Evento del Pixel</Label>
+                  <Select
+                    value={rule.event}
+                    onValueChange={(v) => updateRule(idx, { event: v as PixelEvent })}
+                  >
+                    <SelectTrigger className="mt-1 h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-[100]">
+                      {(Object.entries(PIXEL_EVENT_LABELS) as [PixelEvent, string][]).map(
+                        ([key, label]) => (
+                          <SelectItem key={key} value={key}>
+                            {label}
+                          </SelectItem>
+                        ),
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Filtro URL opcional */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-muted-foreground">
+                      Filtro de URL{' '}
+                      <span className="text-muted-foreground/70">(opcional)</span>
+                    </Label>
+                    {hasUrlFilter && (
+                      <button
+                        type="button"
+                        onClick={() => updateRule(idx, { url_filter: undefined })}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        Quitar filtro
+                      </button>
+                    )}
+                  </div>
+                  {hasUrlFilter ? (
+                    <div className="flex gap-2 mt-1">
+                      <Select
+                        value={rule.url_filter!.match_type}
+                        onValueChange={(v) =>
+                          updateRule(idx, {
+                            url_filter: {
+                              ...rule.url_filter!,
+                              match_type: v as 'CONTAINS' | 'EQUALS' | 'STARTS_WITH',
+                            },
+                          })
+                        }
+                      >
+                        <SelectTrigger className="w-[140px] h-9 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="z-[100]">
+                          <SelectItem value="CONTAINS">Contiene</SelectItem>
+                          <SelectItem value="EQUALS">Es igual a</SelectItem>
+                          <SelectItem value="STARTS_WITH">Empieza con</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        value={rule.url_filter!.value}
+                        onChange={(e) =>
+                          updateRule(idx, {
+                            url_filter: { ...rule.url_filter!, value: e.target.value },
+                          })
+                        }
+                        placeholder="Ej: /checkout, /productos"
+                        className="flex-1 h-9 text-sm"
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateRule(idx, {
+                          url_filter: { match_type: 'CONTAINS', value: '' },
+                        })
+                      }
+                      className="text-xs text-primary hover:underline mt-1"
+                    >
+                      + Agregar filtro de URL
+                    </button>
+                  )}
+                </div>
+
+                {/* Retention días por regla */}
+                <div>
+                  <Label className="text-xs text-muted-foreground">
+                    Días desde el evento (1-180)
+                  </Label>
+                  <div className="flex items-center gap-3 mt-1">
+                    <Slider
+                      value={[rule.retention_days]}
+                      onValueChange={([val]) => updateRule(idx, { retention_days: val })}
+                      min={1}
+                      max={180}
+                      step={1}
+                      className="flex-1"
+                    />
+                    <span className="text-xs font-medium w-14 text-right">
+                      {rule.retention_days} días
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => removeRule(idx)}
+                className="shrink-0 p-1.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-600 transition-colors"
+                aria-label="Eliminar condición"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {idx < group.rules.length - 1 && (
+              <div className="flex items-center justify-center pt-1">
+                <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                  {group.operator === 'and' ? 'Y' : 'O'}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <button
+        type="button"
+        onClick={addRule}
+        className="w-full text-xs font-medium text-primary hover:bg-primary/5 border border-dashed border-primary/30 rounded-md py-2 transition-colors"
+      >
+        + Agregar condición
+      </button>
+    </div>
   );
 }
 
@@ -626,59 +943,26 @@ function CreateCustomAudienceDialog({
                         </p>
                       </div>
                     )}
-                    <div>
-                      <Label>Filtro de URL <span className="text-muted-foreground font-normal">(opcional — deja vacío para todo el sitio)</span></Label>
-                      <div className="flex gap-2 mt-1">
-                        <Select
-                          value={formData.url_match_type}
-                          onValueChange={(v) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              url_match_type: v as 'CONTAINS' | 'EQUALS' | 'STARTS_WITH',
-                            }))
-                          }
-                        >
-                          <SelectTrigger className="w-[160px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="z-[100]">
-                            <SelectItem value="CONTAINS">Contiene</SelectItem>
-                            <SelectItem value="EQUALS">Es igual a</SelectItem>
-                            <SelectItem value="STARTS_WITH">Empieza con</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          value={formData.url_rule}
-                          onChange={(e) =>
-                            setFormData((prev) => ({ ...prev, url_rule: e.target.value }))
-                          }
-                          placeholder="Ej: /productos, /checkout (vacío = todo el sitio)"
-                          className="flex-1"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label>Días de retención (1-180)</Label>
-                      <div className="flex items-center gap-4 mt-2">
-                        <Slider
-                          value={[formData.retention_days]}
-                          onValueChange={([val]) =>
-                            setFormData((prev) => ({ ...prev, retention_days: val }))
-                          }
-                          min={1}
-                          max={180}
-                          step={1}
-                          className="flex-1"
-                        />
-                        <span className="text-sm font-medium w-16 text-right">
-                          {formData.retention_days} días
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Incluir visitantes de los últimos {formData.retention_days} día
-                        {formData.retention_days !== 1 ? 's' : ''}.
-                      </p>
-                    </div>
+
+                    {/* Rule builder: Incluir personas que... */}
+                    <PixelRuleBuilder
+                      title="Incluir personas que..."
+                      group={formData.inclusions}
+                      onChange={(next) =>
+                        setFormData((prev) => ({ ...prev, inclusions: next }))
+                      }
+                      kind="inclusions"
+                    />
+
+                    {/* Rule builder: Excluir personas que... */}
+                    <PixelRuleBuilder
+                      title="Excluir personas que..."
+                      group={formData.exclusions}
+                      onChange={(next) =>
+                        setFormData((prev) => ({ ...prev, exclusions: next }))
+                      }
+                      kind="exclusions"
+                    />
                   </>
                 )}
               </>
@@ -1497,32 +1781,78 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
       };
 
       if (customForm.source === 'WEBSITE') {
-        // If url_rule is empty, use the shopDomain (whole site) or fallback to '/'
-        const urlValue = customForm.url_rule.trim() || shopDomain || '/';
-        const urlOperator = customForm.url_rule.trim()
-          ? (customForm.url_match_type === 'CONTAINS' ? 'i_contains'
-            : customForm.url_match_type === 'STARTS_WITH' ? 'i_starts_with'
-            : 'eq')
-          : 'i_contains';
-        data.rule = {
+        // Mapeo de match_type del UI al operator de Meta API.
+        const urlOperatorOf = (mt: 'CONTAINS' | 'EQUALS' | 'STARTS_WITH'): string =>
+          mt === 'CONTAINS' ? 'i_contains'
+            : mt === 'STARTS_WITH' ? 'i_starts_with'
+              : 'eq';
+
+        // Convierte una PixelRule del frontend al shape exacto que Meta espera
+        // dentro de rule.inclusions.rules / rule.exclusions.rules.
+        const buildMetaRule = (r: typeof customForm.inclusions.rules[number]) => {
+          const filters: any[] = [];
+          if (r.event !== 'AllVisitors') {
+            filters.push({ field: 'event', operator: 'eq', value: r.event });
+          }
+          if (r.url_filter && r.url_filter.value.trim()) {
+            filters.push({
+              field: 'url',
+              operator: urlOperatorOf(r.url_filter.match_type),
+              value: r.url_filter.value.trim(),
+            });
+          }
+          const metaRule: any = {
+            event_sources: [{ type: 'pixel', id: pixelId }],
+            retention_seconds: r.retention_days * 86400,
+          };
+          if (filters.length > 0) {
+            metaRule.filter = { operator: 'and', filters };
+          }
+          return metaRule;
+        };
+
+        // Validación: al menos una regla en inclusions.
+        if (customForm.inclusions.rules.length === 0) {
+          toast.error('Agregá al menos una condición en "Incluir personas que..."');
+          setFormSubmitting(false);
+          return;
+        }
+
+        // Validación: si una regla tiene filtro de URL, el value no puede estar vacío.
+        const allRules = [...customForm.inclusions.rules, ...customForm.exclusions.rules];
+        for (const r of allRules) {
+          if (r.url_filter && !r.url_filter.value.trim()) {
+            toast.error('Tienes un filtro de URL sin valor. Quitálo o completalo.');
+            setFormSubmitting(false);
+            return;
+          }
+        }
+
+        const rule: any = {
           inclusions: {
-            operator: 'or',
-            rules: [{
-              event_sources: [{ type: 'pixel', id: pixelId }],
-              retention_seconds: customForm.retention_days * 86400,
-              filter: {
-                operator: 'and',
-                filters: [{
-                  field: 'url',
-                  operator: urlOperator,
-                  value: urlValue,
-                }],
-              },
-            }],
+            operator: customForm.inclusions.operator,
+            rules: customForm.inclusions.rules.map(buildMetaRule),
           },
         };
+        if (customForm.exclusions.rules.length > 0) {
+          rule.exclusions = {
+            operator: customForm.exclusions.operator,
+            rules: customForm.exclusions.rules.map(buildMetaRule),
+          };
+        }
+
+        data.rule = rule;
         data.pixel_id = pixelId;
-        data.retention_days = customForm.retention_days;
+        // El backend exige retention_days top-level — usamos el max entre
+        // todas las reglas (Meta usa este valor para subtype display, las
+        // retention_seconds individuales por regla son las que mandan).
+        const maxRetention = Math.max(
+          ...customForm.inclusions.rules.map((r) => r.retention_days),
+          ...(customForm.exclusions.rules.length > 0
+            ? customForm.exclusions.rules.map((r) => r.retention_days)
+            : [1]),
+        );
+        data.retention_days = maxRetention;
       } else if (customForm.source === 'CUSTOMER_LIST') {
         data.customer_file_source = customForm.customer_list_source === 'CSV'
           ? 'USER_PROVIDED_ONLY'
@@ -1554,17 +1884,13 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         data.retention_days = customForm.app_activity_days;
       }
 
-      // Use create_retargeting action if retargeting_type is set (from prefill)
-      const isRetargeting = !!(customForm as any).retargeting_type;
-      if (isRetargeting) {
-        data.retargeting_type = (customForm as any).retargeting_type;
-        data.pixel_id = pixelId;
-        data.retention_days = customForm.retention_days || (customForm as any).retention_days || 30;
-      }
-
+      // Las suggestions de retargeting (carrito abandonado, vio sin comprar)
+      // ahora se arman como inclusions+exclusions del rule builder, así que
+      // siempre usamos create_custom — el legacy create_retargeting quedó
+      // sin uso desde el sprint de eventos del Pixel.
       const { data: responseData, error } = await callApi('manage-meta-audiences', {
         body: {
-          action: isRetargeting ? 'create_retargeting' : 'create_custom',
+          action: 'create_custom',
           connection_id: metaConnectionId,
           data,
         },
@@ -1595,7 +1921,9 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
         source: SOURCE_LABELS[customForm.source],
         description: customForm.description.trim(),
         retention_days:
-          customForm.source === 'WEBSITE' ? customForm.retention_days : undefined,
+          customForm.source === 'WEBSITE'
+            ? Math.max(...customForm.inclusions.rules.map((r) => r.retention_days), 1)
+            : undefined,
       };
       setAudiences((prev) => [newAudience, ...prev]);
 
@@ -2025,9 +2353,11 @@ export default function MetaAudienceManager({ clientId }: MetaAudienceManagerPro
                             name: audience.name,
                             description: audience.description || '',
                             source: resolvedSource,
-                            url_rule: '',
-                            url_match_type: 'CONTAINS',
-                            retention_days: audience.retention_days || 30,
+                            inclusions: {
+                              operator: 'or',
+                              rules: [makePixelRule({ retention_days: audience.retention_days || 30 })],
+                            },
+                            exclusions: { operator: 'or', rules: [] },
                             customer_list_source: 'CSV',
                             engagement_type: 'PAGE',
                             engagement_days: 30,
