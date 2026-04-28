@@ -258,12 +258,6 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
   const [campaignPage, setCampaignPage] = useState(1);
   const CAMPAIGNS_PER_PAGE = 50;
 
-  // Reset paginación al cambiar el sort, rango o cuentas (sino podría quedar
-  // en una página vacía cuando bajan los datos disponibles).
-  useEffect(() => {
-    setCampaignPage(1);
-  }, [sortField, sortAsc, from, to, showAllAccounts]);
-
   // Resolve date boundaries
   const { from, to, prevFrom, prevTo, days } = useMemo(() => {
     const opt = DATE_RANGE_OPTIONS.find((o) => o.key === dateRange);
@@ -326,6 +320,14 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
     window.addEventListener('bg:sync-complete', handler);
     return () => window.removeEventListener('bg:sync-complete', handler);
   }, [clientId, from, to, prevFrom, prevTo, lastSyncAt]);
+
+  // Reset paginación al cambiar el sort, rango o cuentas (sino podría quedar
+  // en una página vacía cuando bajan los datos disponibles). Va DESPUÉS del
+  // useMemo de from/to porque referencia esas variables en deps — de lo
+  // contrario cae en TDZ y rompe el bundle minificado.
+  useEffect(() => {
+    setCampaignPage(1);
+  }, [sortField, sortAsc, from, to, showAllAccounts]);
 
   async function fetchData() {
     setLoading(true);
