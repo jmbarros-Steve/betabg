@@ -13,6 +13,7 @@ import OAuthMetaCallback from "./pages/OAuthMetaCallback";
 import OAuthShopifyCallback from "./pages/OAuthShopifyCallback";
 import OAuthGoogleAdsCallback from "./pages/OAuthGoogleAdsCallback";
 import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
 import CentroEstudios from "./pages/CentroEstudios";
 import ServiciosCorporativos from "./pages/ServiciosCorporativos";
 import TermsOfService from "./pages/TermsOfService";
@@ -65,6 +66,7 @@ const App = () => (
             <Route path="/oauth/shopify/callback" element={<OAuthShopifyCallback />} />
             <Route path="/oauth/google-ads/callback" element={<OAuthGoogleAdsCallback />} />
             <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
             <Route path="/centro-estudios" element={<CentroEstudios />} />
             <Route path="/servicios-corporativos" element={<ServiciosCorporativos />} />
             <Route path="/terminos" element={<TermsOfService />} />

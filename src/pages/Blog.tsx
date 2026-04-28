@@ -10,6 +10,7 @@ import { es } from 'date-fns/locale';
 
 interface BlogPost {
   id: string;
+  slug: string | null;
   title: string;
   excerpt: string | null;
   content: string | null;
@@ -29,12 +30,15 @@ export default function Blog() {
     // Use RPC or raw query to access the public view that excludes user_id
     const { data, error } = await supabase
       .from('blog_posts')
-      .select('id, title, excerpt, content, category, created_at')
+      .select('id, slug, title, excerpt, content, category, created_at')
       .eq('published', true)
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setPosts(data);
+    if (error) {
+      console.error('[Blog] fetch error:', error);
+    } else if (data) {
+      // Solo mostramos posts con slug (los sin slug no son navegables y son legacy/inválidos)
+      setPosts(data.filter((p) => !!p.slug));
     }
     setLoading(false);
   };
@@ -84,51 +88,70 @@ export default function Blog() {
             </div>
           ) : (
             <div className="grid md:grid-cols-2 gap-6">
-              {posts.map((post, index) => (
-                <motion.article
-                  key={post.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 + index * 0.1 }}
-                  className="group p-8 rounded-xl bg-white border border-slate-200 card-hover transition-all duration-300"
-                >
-                  <div className="flex items-center gap-4 mb-4">
-                    {post.category && (
-                      <span className="px-3 py-1 text-xs font-medium bg-[#F0F4FA] text-[#162D5F] rounded-full">
-                        {post.category}
-                      </span>
+              {posts.map((post, index) => {
+                const cardContent = (
+                  <>
+                    <div className="flex items-center gap-4 mb-4">
+                      {post.category && (
+                        <span className="px-3 py-1 text-xs font-medium bg-[#F0F4FA] text-[#162D5F] rounded-full">
+                          {post.category}
+                        </span>
+                      )}
+                    </div>
+
+                    <h2 className="text-xl font-medium mb-3 text-foreground group-hover:text-primary transition-colors">
+                      {post.title}
+                    </h2>
+
+                    {post.excerpt && (
+                      <p className="text-muted-foreground text-sm font-light mb-6 leading-relaxed">
+                        {post.excerpt}
+                      </p>
                     )}
-                  </div>
-                  
-                  <h2 className="text-xl font-medium mb-3 text-foreground group-hover:text-primary transition-colors">
-                    {post.title}
-                  </h2>
-                  
-                  {post.excerpt && (
-                    <p className="text-muted-foreground text-sm font-light mb-6 leading-relaxed">
-                      {post.excerpt}
-                    </p>
-                  )}
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <User className="w-3 h-3" />
-                        Steve
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {format(new Date(post.created_at), 'd MMM yyyy', { locale: es })}
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <User className="w-3 h-3" />
+                          Steve
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {format(new Date(post.created_at), 'd MMM yyyy', { locale: es })}
+                        </span>
+                      </div>
+
+                      <span className="flex items-center gap-1 text-sm text-primary group-hover:gap-2 transition-all">
+                        Leer más
+                        <ArrowRight className="w-4 h-4" />
                       </span>
                     </div>
-                    
-                    <button className="flex items-center gap-1 text-sm text-primary hover:gap-2 transition-all">
-                      Leer más
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </motion.article>
-              ))}
+                  </>
+                );
+
+                const cardClasses = "group p-8 rounded-xl bg-white border border-slate-200 card-hover transition-all duration-300 block";
+
+                return (
+                  <motion.article
+                    key={post.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 + index * 0.1 }}
+                  >
+                    {post.slug ? (
+                      <Link
+                        to={`/blog/${post.slug}`}
+                        className={cardClasses}
+                        aria-label={`Leer artículo: ${post.title}`}
+                      >
+                        {cardContent}
+                      </Link>
+                    ) : (
+                      <div className={`${cardClasses} cursor-default`}>{cardContent}</div>
+                    )}
+                  </motion.article>
+                );
+              })}
             </div>
           )}
         </div>
