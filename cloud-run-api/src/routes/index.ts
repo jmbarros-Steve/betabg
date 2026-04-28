@@ -19,6 +19,7 @@ import { processTranscription } from './utilities/process-transcription.js';
 import { onboardingBot } from './utilities/onboarding-bot.js';
 import { checkClientConnections } from './utilities/check-client-connections.js';
 import { creativeReviewFeed } from './utilities/creative-review-feed.js';
+import { serveHtml } from './utilities/serve-html.js';
 
 // Phase 2: AI
 import { steveChat } from './ai/steve-chat.js';
@@ -354,6 +355,7 @@ export function registerRoutes(app: Hono) {
   // ============================================================
   app.post('/api/steve-chat', authMiddleware, steveChat);
   app.post('/api/strategy-chat', authMiddleware, strategyChat);
+  app.get('/api/h', serveHtml); // Public HTML proxy for Storage files
   app.post('/api/strategy-report', authMiddleware, strategyReport);
   app.post('/api/steve-strategy', authMiddleware, steveStrategy);
   app.post('/api/steve-email-content', authMiddleware, steveEmailContent);
