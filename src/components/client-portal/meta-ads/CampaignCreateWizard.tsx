@@ -2575,14 +2575,41 @@ function AdFormMultiSlot({
             )}
           </div>
         </div>
-        {adSetFormat === 'flexible' && (
-          <div className="flex items-start gap-2 p-2.5 rounded-md bg-[#F0F4FA] dark:bg-[#0A1628]/20 border border-[#B5C8E0] dark:border-[#132448]">
-            <Sparkles className="w-3.5 h-3.5 text-[#2A4F9E] mt-0.5 shrink-0" />
-            <p className="text-[11px] text-[#162D5F] dark:text-[#7B9BCF] leading-relaxed">
-              <strong>Metodología 3:2:2:</strong> 3 imágenes x 2 textos x 2 títulos. Meta optimiza automáticamente las combinaciones ganadoras.
-            </p>
-          </div>
-        )}
+        {adSetFormat === 'flexible' && (() => {
+          // Conteo real de elementos cargados por el usuario. Solo cuenta los
+          // que tienen contenido (no slots vacíos). Si todos están en 1 (ej.
+          // editar borrador con un solo creativo), no decimos "3:2:2" como
+          // si fuera realidad — explicamos qué falta para activarlo.
+          const imgCount = images.filter((u) => u && u.trim()).length;
+          const txtCount = primaryTexts.filter((t) => t && t.trim()).length;
+          const hlCount = headlines.filter((h) => h && h.trim()).length;
+          const isFullDct = imgCount >= 3 && txtCount >= 2 && hlCount >= 2;
+          return (
+            <div className={`flex items-start gap-2 p-2.5 rounded-md ${
+              isFullDct
+                ? 'bg-[#F0F4FA] dark:bg-[#0A1628]/20 border border-[#B5C8E0] dark:border-[#132448]'
+                : 'bg-amber-500/5 border border-amber-500/30'
+            }`}>
+              <Sparkles className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${isFullDct ? 'text-[#2A4F9E]' : 'text-amber-600'}`} />
+              <p className={`text-[11px] leading-relaxed ${isFullDct ? 'text-[#162D5F] dark:text-[#7B9BCF]' : 'text-amber-800'}`}>
+                <strong>
+                  {isFullDct
+                    ? 'DCT 3:2:2 completo:'
+                    : `Tu setup actual: ${imgCount} ${imgCount === 1 ? 'imagen' : 'imágenes'} × ${txtCount} ${txtCount === 1 ? 'texto' : 'textos'} × ${hlCount} ${hlCount === 1 ? 'título' : 'títulos'}.`}
+                </strong>{' '}
+                {isFullDct
+                  ? 'Meta optimiza automáticamente las 12 combinaciones ganadoras.'
+                  : `Para activar testing DCT 3:2:2 (12 combinaciones) agregá ${
+                      Math.max(0, 3 - imgCount)
+                    } imágen${imgCount >= 2 ? '' : 'es'} más, ${
+                      Math.max(0, 2 - txtCount)
+                    } texto${txtCount >= 1 ? '' : 's'} más y ${
+                      Math.max(0, 2 - hlCount)
+                    } título${hlCount >= 1 ? '' : 's'} más.`}
+              </p>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ---- IMAGE SLOTS ----
