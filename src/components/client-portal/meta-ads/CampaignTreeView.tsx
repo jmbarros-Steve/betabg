@@ -40,6 +40,7 @@ import {
 import { useMetaBusiness } from './MetaBusinessContext';
 import { EmptyState } from '@/components/client-portal/EmptyState';
 import AdPreviewMockup from './AdPreviewMockup';
+import { EditCampaignDialog } from './EditCampaignDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -346,11 +347,13 @@ function CampaignRow({
   connectionIds,
   onToggleExpand,
   onAdClick,
+  onEditCampaign,
 }: {
   campaign: CampaignNode;
   connectionIds: string[];
   onToggleExpand: (campaignId: string) => void;
   onAdClick?: (adId: string) => void;
+  onEditCampaign?: (campaign: CampaignNode) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [toggling, setToggling] = useState(false);
@@ -505,6 +508,16 @@ function CampaignRow({
             >
               <DollarSign className="w-3 h-3 mr-1" />Presupuesto
             </Button>
+            {onEditCampaign && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={(e) => { e.stopPropagation(); onEditCampaign(campaign); }}
+              >
+                <Pencil className="w-3 h-3 mr-1" />Editar
+              </Button>
+            )}
           </div>
           {/* Budget inline panel */}
           {budgetOpen && (
@@ -574,6 +587,8 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
   const [connectionIds, setConnectionIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  // Edición de campañas activas con tabs (Campaña / Ad sets / Ads)
+  const [editingCampaign, setEditingCampaign] = useState<CampaignNode | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
 
@@ -955,6 +970,7 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
               connectionIds={connectionIds}
               onToggleExpand={fetchAdSets}
               onAdClick={handleAdClick}
+              onEditCampaign={(c) => setEditingCampaign(c)}
             />
           ))}
         </div>
@@ -1043,6 +1059,22 @@ export default function CampaignTreeView({ clientId, onCreateCampaign }: Campaig
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Editar campaña activa con tabs (Campaña / Ad sets / Ads) */}
+      {editingCampaign && connectionIds.length > 0 && (
+        <EditCampaignDialog
+          open={!!editingCampaign}
+          onOpenChange={(o) => { if (!o) setEditingCampaign(null); }}
+          connectionId={connectionIds[0]}
+          campaign={{
+            campaign_id: editingCampaign.campaign_id,
+            campaign_name: editingCampaign.campaign_name,
+            status: editingCampaign.status,
+            daily_budget: editingCampaign.daily_budget,
+          }}
+          onSaved={() => fetchCampaigns()}
+        />
+      )}
     </div>
   );
 }
