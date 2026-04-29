@@ -1048,7 +1048,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
             className="bg-gradient-to-r from-[#0B1F3A] to-[#1877F2] hover:from-[#06122A] hover:to-[#0E5BD0] text-white"
           >
             <Sparkles className="w-4 h-4 mr-2" />
-            Reporte Tier-1
+            Informe Ejecutivo
           </Button>
           <Button
             variant="outline"

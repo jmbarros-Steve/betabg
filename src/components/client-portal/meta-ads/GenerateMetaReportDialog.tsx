@@ -175,7 +175,7 @@ export function GenerateMetaReportDialog({ open, onOpenChange, clientId, primary
           if (recent?.signed_url) {
             setGeneratedUrl(recent.signed_url);
             window.open(recent.signed_url, '_blank');
-            toast.success('Informe listo');
+            toast.success('Informe ejecutivo listo');
             return;
           }
           toast.warning('La generación tardó más de lo esperado. Revisá el historial en unos minutos.');
@@ -189,8 +189,8 @@ export function GenerateMetaReportDialog({ open, onOpenChange, clientId, primary
         setGeneratedUrl(data.pdfUrl);
         toast.success(
           data.campaignsAnalyzed
-            ? `Informe listo · ${data.campaignsAnalyzed} campañas analizadas`
-            : 'Informe listo',
+            ? `Informe ejecutivo listo · ${data.campaignsAnalyzed} campañas analizadas`
+            : 'Informe ejecutivo listo',
         );
         window.open(data.pdfUrl, '_blank');
         fetchHistory();
@@ -211,10 +211,10 @@ export function GenerateMetaReportDialog({ open, onOpenChange, clientId, primary
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5" />
-            Reporte Meta Ads — Tier 1
+            Informe Ejecutivo de Meta Ads
           </DialogTitle>
           <DialogDescription>
-            Generá un PDF tipo agencia con análisis completo de tus campañas Meta. 12 secciones, gráficos visuales y recomendaciones IA listas para tomar acción.
+            Generá un PDF con análisis completo de tus campañas Meta — 12 secciones con gráficos, matriz BCG, análisis de fatiga creativa, breakdowns de audiencia y recomendaciones IA listas para tomar acción.
           </DialogDescription>
         </DialogHeader>
 
@@ -224,7 +224,7 @@ export function GenerateMetaReportDialog({ open, onOpenChange, clientId, primary
             <div className="text-center space-y-1">
               <p className="font-semibold flex items-center justify-center gap-2">
                 <Sparkles className="w-4 h-4" />
-                Felipe está armando tu reporte
+                Felipe está armando tu informe
               </p>
               <p className="text-sm text-muted-foreground">
                 Esto toma 2-3 minutos. Estoy analizando campañas, audiencias, fatiga creativa y armando recomendaciones.
@@ -235,7 +235,7 @@ export function GenerateMetaReportDialog({ open, onOpenChange, clientId, primary
           <div className="py-8 flex flex-col items-center gap-4">
             <CheckCircle2 className="w-12 h-12 text-green-600" />
             <div className="text-center space-y-1">
-              <p className="font-semibold">Reporte listo</p>
+              <p className="font-semibold">Informe listo</p>
               <p className="text-sm text-muted-foreground">Se abrió en una pestaña nueva. También podés descargarlo desde abajo.</p>
             </div>
             <div className="flex gap-2">
@@ -322,7 +322,7 @@ export function GenerateMetaReportDialog({ open, onOpenChange, clientId, primary
 
             {history.length > 0 && (
               <div>
-                <label className="text-sm font-medium mb-2 block">Reportes recientes</label>
+                <label className="text-sm font-medium mb-2 block">Informes recientes</label>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto">
                   {history.slice(0, 6).map((r) => (
                     <div key={r.id} className="flex items-center justify-between p-2 rounded border bg-background hover:bg-muted/50 text-sm">
@@ -350,7 +350,7 @@ export function GenerateMetaReportDialog({ open, onOpenChange, clientId, primary
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button onClick={handleGenerate} disabled={!canGenerate}>
               <FileText className="w-4 h-4 mr-2" />
-              Generar Reporte
+              Generar Informe
             </Button>
           </DialogFooter>
         )}
