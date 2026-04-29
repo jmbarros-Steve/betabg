@@ -39,6 +39,7 @@ import {
 import { useMetaBusiness } from './MetaBusinessContext';
 import { getTargetStatus, getTargetBgColor, getProgressPercent } from '@/lib/metric-utils';
 import MetaHealthBanner from './MetaHealthBanner';
+import { GenerateMetaReportDialog } from './GenerateMetaReportDialog';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -891,6 +892,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
   // ------ Report Schedule ------
 
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [metaReportOpen, setMetaReportOpen] = useState(false);
   const [scheduleFrequency, setScheduleFrequency] = useState<'weekly' | 'monthly'>('weekly');
   const [scheduleDay, setScheduleDay] = useState('1');
   const [scheduleEmail, setScheduleEmail] = useState('');
@@ -1040,13 +1042,23 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
             Metas
           </Button>
           <Button
+            variant="default"
+            size="sm"
+            onClick={() => setMetaReportOpen(true)}
+            className="bg-gradient-to-r from-[#0B1F3A] to-[#1877F2] hover:from-[#06122A] hover:to-[#0E5BD0] text-white"
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Reporte Tier-1
+          </Button>
+          <Button
             variant="outline"
             size="sm"
             onClick={handleExportPdf}
             disabled={generatingPdf || metrics.length === 0}
+            title="Export rápido del dashboard como PDF (sin análisis IA)"
           >
             {generatingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileDown className="w-4 h-4 mr-2" />}
-            Exportar PDF
+            PDF rápido
           </Button>
           <Button
             variant="outline"
@@ -1727,6 +1739,13 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
       {/* ------------------------------------------------------------------ */}
       {/* Report Schedule Dialog                                              */}
       {/* ------------------------------------------------------------------ */}
+      <GenerateMetaReportDialog
+        open={metaReportOpen}
+        onOpenChange={setMetaReportOpen}
+        clientId={clientId}
+        primaryConnectionId={ctxConnectionId}
+      />
+
       <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
