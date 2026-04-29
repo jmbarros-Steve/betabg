@@ -308,9 +308,23 @@ export async function manageMetaDraft(c: Context) {
       const creative = spec.creative || {};
       const creativeType: string = creative.type || 'image';
 
+      // Mapeo de objetivos legacy → ODAX (Meta Ads API 2023+).
+      // Meta deprecó TRAFFIC, REACH, etc. en favor de los OUTCOME_*.
+      const objectiveMap: Record<string, string> = {
+        'CONVERSIONS': 'OUTCOME_SALES',
+        'TRAFFIC': 'OUTCOME_TRAFFIC',
+        'AWARENESS': 'OUTCOME_AWARENESS',
+        'ENGAGEMENT': 'OUTCOME_ENGAGEMENT',
+        'LEAD_GENERATION': 'OUTCOME_LEADS',
+        'CATALOG': 'OUTCOME_SALES',  // CATALOG / DPA usa OUTCOME_SALES con product_catalog_id
+        'APP_INSTALLS': 'OUTCOME_APP_PROMOTION',
+      };
+      const rawObj = (spec.objective || 'CONVERSIONS').toUpperCase();
+      const mappedObjective = objectiveMap[rawObj] || rawObj;
+
       const innerData: any = {
         name: draft.name,
-        objective: (spec.objective || '').toUpperCase(),
+        objective: mappedObjective,
         // Budget: manage-meta-campaign espera daily_budget (en CLP * 100 microunits? o solo CLP int).
         // Pasamos como espera el shape del Wizard original — daily_budget en CLP.
         daily_budget: spec.budget?.type === 'daily' ? spec.budget?.amount_clp : undefined,
@@ -369,7 +383,7 @@ export async function manageMetaDraft(c: Context) {
         innerData.primary_text = creative.primary_text;
         innerData.cards = creative.cards;
       } else if (creativeType === 'catalog') {
-        innerData.objective = 'CATALOG';
+        innerData.objective = 'OUTCOME_SALES';
         innerData.product_catalog_id = creative.product_catalog_id;
         innerData.product_set_id = creative.product_set_id;
         innerData.primary_text = creative.primary_text;
