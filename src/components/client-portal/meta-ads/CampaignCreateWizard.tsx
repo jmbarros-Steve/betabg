@@ -2296,7 +2296,9 @@ function AdFormMultiSlot({
   const [aiPrompt, setAiPrompt] = useState(productContext || '');
   // Engine selector: 'imagen' = Gemini 2.5 Flash (fast, 2 credits), 'flux' = Flux
   // Kontext/1.1 Pro via Replicate (5 credits, ~2× better realism for product shots).
-  const [imageEngine, setImageEngine] = useState<'imagen' | 'flux'>('imagen');
+  // Steve siempre usa Flux internamente (mejor calidad fotorrealista, único
+  // motor estable hoy). El selector visible se removió — el motor es privado.
+  const [imageEngine] = useState<'flux'>('flux');
   const [galleryAssets, setGalleryAssets] = useState<Array<{ id: string; url: string; tipo: string }>>([]);
   const [loadingGallery, setLoadingGallery] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -2754,39 +2756,19 @@ function AdFormMultiSlot({
 
         {mediaTab === 'ai-image' && (
           <div className="space-y-2">
-            {/* Engine toggle: Gemini (fast, cheap) vs Flux Premium (realistic). */}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setImageEngine('imagen')}
-                className={`flex items-center gap-2 p-2 rounded-md border text-left transition-all ${
-                  imageEngine === 'imagen' ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
-                }`}
-              >
-                <Zap className={`w-4 h-4 ${imageEngine === 'imagen' ? 'text-primary' : 'text-muted-foreground'}`} />
-                <div className="leading-tight">
-                  <p className="text-[11px] font-semibold">Rápida</p>
-                  <p className="text-[9px] text-muted-foreground">Gemini · 2 créd · instantáneo</p>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setImageEngine('flux')}
-                className={`flex items-center gap-2 p-2 rounded-md border text-left transition-all ${
-                  imageEngine === 'flux' ? 'border-purple-500 bg-purple-50 ring-1 ring-purple-500/20' : 'border-border hover:border-primary/30'
-                }`}
-              >
-                <Sparkles className={`w-4 h-4 ${imageEngine === 'flux' ? 'text-purple-600' : 'text-muted-foreground'}`} />
-                <div className="leading-tight">
-                  <p className="text-[11px] font-semibold">Premium</p>
-                  <p className="text-[9px] text-muted-foreground">Flux · 5 créd · más fotorrealista</p>
-                </div>
-              </button>
+            {/* Steve genera imágenes fotorrealistas. El motor interno es
+                privado — el usuario solo ve costo en créditos. */}
+            <div className="flex items-start gap-2 p-2.5 rounded-md bg-purple-50 border border-purple-200">
+              <Sparkles className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+              <div className="leading-tight">
+                <p className="text-xs font-semibold text-purple-900">Steve genera la imagen por ti</p>
+                <p className="text-[10px] text-purple-700/80">5 créditos · resultado fotorrealista en ~30s</p>
+              </div>
             </div>
             <Textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder={`Describe la imagen ${activeImageSlot + 1}${selectedAngle ? ` (ángulo: ${selectedAngle})` : ''}...`} rows={2} />
             <div className="flex gap-2">
               <Button onClick={handleGenerateImage} disabled={generatingImage} className="flex-1">
-                {generatingImage ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Generando{imageEngine === 'flux' ? ' con Flux' : ''}...</> : <><Sparkles className="w-3 h-3 mr-1" />{aiPrompt.trim() ? 'Generar' : 'Auto-generar'}</>}
+                {generatingImage ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Generando...</> : <><Sparkles className="w-3 h-3 mr-1" />{aiPrompt.trim() ? 'Generar' : 'Auto-generar'}</>}
               </Button>
             </div>
           </div>

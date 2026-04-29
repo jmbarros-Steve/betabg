@@ -12,7 +12,7 @@ const sections = [
       { label: 'Frontend', value: 'React + TypeScript + Vite, desplegado en Vercel con CDN global.' },
       { label: 'Backend', value: 'API REST en Hono + Node.js sobre Google Cloud Run con auto-scaling.' },
       { label: 'Base de datos', value: 'Supabase (PostgreSQL) con Row Level Security y encriptación.' },
-      { label: 'IA', value: 'Modelos de lenguaje (Anthropic Claude, OpenAI) para generación de copias y asesoría.' },
+      { label: 'IA', value: 'Modelos de lenguaje de última generación para generación de copias, imágenes, videos y asesoría estratégica.' },
     ],
   },
   {

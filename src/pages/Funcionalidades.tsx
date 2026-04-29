@@ -56,7 +56,7 @@ const features = [
       'Respuestas basadas en datos reales de tus integraciones conectadas',
     ],
     highlights: [
-      { icon: Bot, label: 'IA Avanzada', desc: 'Claude + GPT' },
+      { icon: Bot, label: 'IA Avanzada', desc: 'Modelos de última generación' },
       { icon: Clock, label: '24/7', desc: 'Siempre activo' },
       { icon: FileText, label: 'Contexto', desc: 'Persistente' },
     ],

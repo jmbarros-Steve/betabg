@@ -189,7 +189,11 @@ export async function generateImage(c: Context) {
     fotoBaseUrl,
     formato,
     rechazoTexto,
-    engine = 'imagen',
+    // Default a 'flux' (Replicate) — Gemini API perdió acceso (403
+    // PERMISSION_DENIED) y el cliente no debe ver el motor interno. El
+    // selector visible en el wizard fue removido. 'imagen' queda como
+    // fallback override para super-admin cuando JM hace QA.
+    engine = 'flux',
     referenceImageUrls,
     userIntent: rawUserIntent,
     use_brand_logo_reference: forceBrandLogo,

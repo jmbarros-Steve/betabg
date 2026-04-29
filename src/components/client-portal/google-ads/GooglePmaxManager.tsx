@@ -1025,7 +1025,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                                           <button
                                             className="text-primary hover:underline flex items-center gap-1"
                                             onClick={() => openSteveSuggest(group.id, m.fieldType)}
-                                            title={canSteveImage ? 'Steve genera la imagen con Gemini' : 'Steve sugiere según tu brief'}
+                                            title={canSteveImage ? 'Steve genera la imagen por ti' : 'Steve sugiere según tu brief'}
                                           >
                                             <Sparkles className="w-3 h-3" />
                                             {canSteveImage ? 'Steve genera' : 'Steve sugiere'}
@@ -1127,7 +1127,7 @@ export default function GooglePmaxManager({ connectionId, clientId }: GooglePmax
                                 <button
                                   className="text-[11px] flex items-center gap-1 px-2 py-0.5 rounded border border-border hover:border-primary/60 text-primary transition-colors"
                                   onClick={() => openSteveSuggest(group.id, fieldType)}
-                                  title="Generar con Steve (Gemini)"
+                                  title="Generar con Steve"
                                 >
                                   <Sparkles className="w-3 h-3" />
                                   Steve
