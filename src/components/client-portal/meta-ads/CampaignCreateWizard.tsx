@@ -4963,12 +4963,91 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         setAdNameEdited(true);
       }
 
+      // Ad set format (single/carousel/flexible/catalog) — CRÍTICO
+      // Si el draft tiene catalog (DPA), el wizard arranca en modo catálogo
+      const fmt = (bv.ad_set_format as string) || draft.formato;
+      if (fmt === 'flexible' || fmt === 'single' || fmt === 'carousel' || fmt === 'catalog') {
+        setAdSetFormat(fmt as AdSetFormat);
+      }
+
+      // Targeting demographics — todo lo que el draft persistió
+      if (Array.isArray(bv.target_countries) && bv.target_countries.length > 0) {
+        setTargetCountries(bv.target_countries.filter((c: any) => typeof c === 'string'));
+      }
+      if (typeof bv.target_age_min === 'number' && bv.target_age_min >= 13 && bv.target_age_min <= 65) {
+        setTargetAgeMin(bv.target_age_min);
+      }
+      if (typeof bv.target_age_max === 'number' && bv.target_age_max >= 13 && bv.target_age_max <= 65) {
+        setTargetAgeMax(bv.target_age_max);
+      }
+      if (bv.target_gender === 0 || bv.target_gender === 1 || bv.target_gender === 2) {
+        setTargetGender(bv.target_gender);
+      }
+
+      // Special Ad Category (HOUSING/EMPLOYMENT/CREDIT/POLITICS/NONE)
+      const validSpecial = ['NONE', 'HOUSING', 'EMPLOYMENT', 'CREDIT', 'ISSUES_ELECTIONS_POLITICS'];
+      if (bv.special_ad_category && validSpecial.includes(bv.special_ad_category)) {
+        setSpecialAdCategory(bv.special_ad_category);
+      } else if (Array.isArray(bv.special_ad_categories) && bv.special_ad_categories.length > 0) {
+        const first = bv.special_ad_categories[0];
+        if (validSpecial.includes(first)) setSpecialAdCategory(first);
+      }
+
+      // Audiencias custom + excluidas (Meta-side IDs persistidos en bv)
+      if (Array.isArray(bv.selected_custom_audience_ids)) {
+        setSelectedCustomAudienceIds(bv.selected_custom_audience_ids.filter((id: any) => typeof id === 'string'));
+      }
+      if (Array.isArray(bv.excluded_audience_ids)) {
+        setExcludedAudienceIds(bv.excluded_audience_ids.filter((id: any) => typeof id === 'string'));
+      }
+      if (typeof bv.selected_saved_audience_id === 'string') {
+        setSelectedSavedAudienceId(bv.selected_saved_audience_id);
+      }
+
+      // Pixel + evento de conversión
+      if (typeof bv.pixel_id === 'string' && bv.pixel_id) {
+        setSelectedPixelId(bv.pixel_id);
+      }
+      if (typeof bv.custom_event_type === 'string' && bv.custom_event_type) {
+        setCustomEventType(bv.custom_event_type);
+      }
+
+      // Catálogo + product set (DPA)
+      if (typeof bv.product_catalog_id === 'string') setProductCatalogId(bv.product_catalog_id);
+      if (typeof bv.product_set_id === 'string') setProductSetId(bv.product_set_id);
+
+      // Placements
+      if (Array.isArray(bv.selected_platforms) && bv.selected_platforms.length > 0) {
+        setSelectedPlatforms(bv.selected_platforms.filter((p: any) => typeof p === 'string'));
+      }
+      if (Array.isArray(bv.fb_positions)) setFbPositions(bv.fb_positions.filter((p: any) => typeof p === 'string'));
+      if (Array.isArray(bv.ig_positions)) setIgPositions(bv.ig_positions.filter((p: any) => typeof p === 'string'));
+
+      // Country groups + idiomas + dispositivos (M3/M4/M6)
+      if (Array.isArray(bv.country_groups)) setCountryGroups(bv.country_groups.filter((g: any) => typeof g === 'string'));
+      if (Array.isArray(bv.target_languages)) setTargetLanguages(bv.target_languages);
+      if (Array.isArray(bv.device_platforms) && bv.device_platforms.length > 0) {
+        setDevicePlatforms(bv.device_platforms.filter((d: any) => typeof d === 'string'));
+      }
+
+      // Intereses (segmentación detallada)
+      if (Array.isArray(bv.target_interests)) setTargetInterests(bv.target_interests);
+      if (Array.isArray(bv.target_exclude_interests)) setTargetExcludeInterests(bv.target_exclude_interests);
+      if (Array.isArray(bv.target_locations)) setTargetLocations(bv.target_locations);
+
       setCreateNewCampaign(true);
       setCreateNewAdset(true);
       setWizardStarted(true);
 
-      console.log('[edit-draft] wizard populated successfully');
-      toast.success(`Borrador cargado: "${bv.campaign_name || draft.titulo || 'Sin nombre'}"`);
+      console.log('[edit-draft] wizard populated successfully', {
+        format: fmt,
+        copies: cps.length,
+        headlines: hls.length,
+        images: imgs.length,
+        custom_audiences: bv.selected_custom_audience_ids?.length || 0,
+        excluded_audiences: bv.excluded_audience_ids?.length || 0,
+      });
+      toast.success(`Borrador cargado: "${bv.campaign_name || draft.titulo || 'Sin nombre'}" — solo cambiá lo que necesites.`);
     };
 
     // 1. Mount path — leer sessionStorage si llegamos desde un refresh
@@ -5788,6 +5867,28 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
           product_set_id: adSetFormat === 'catalog' ? productSetId || undefined : undefined,
           content_source: contentSource,
           ad_name: adName.trim() || undefined,
+          // Targeting demográfico — para que "editar borrador" precargue todo
+          // y el cliente solo cambie lo que necesita en vez de re-hacer el set
+          target_countries: targetCountries,
+          target_age_min: targetAgeMin,
+          target_age_max: targetAgeMax,
+          target_gender: targetGender,
+          special_ad_category: specialAdCategory,
+          country_groups: countryGroups,
+          target_languages: targetLanguages,
+          device_platforms: devicePlatforms,
+          // Audiencias Meta seleccionadas (custom + saved + excluded)
+          selected_custom_audience_ids: selectedCustomAudienceIds,
+          selected_saved_audience_id: selectedSavedAudienceId,
+          excluded_audience_ids: excludedAudienceIds,
+          // Intereses + ubicaciones detalladas
+          target_interests: targetInterests,
+          target_exclude_interests: targetExcludeInterests,
+          target_locations: targetLocations,
+          // Placements
+          selected_platforms: selectedPlatforms,
+          fb_positions: fbPositions,
+          ig_positions: igPositions,
           // Advantage+ Creative opt-in map (merged from coarse toggles +
           // granular overrides). Same format manage-meta-campaign expects.
           creative_features: (() => {
