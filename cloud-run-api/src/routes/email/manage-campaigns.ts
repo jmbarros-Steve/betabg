@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault, safeMutateSingle } from '../../lib/safe-supabase.js';
 import { renderEmailTemplate, buildTemplateContext } from '../../lib/template-engine.js';
 import { processEmailHtml } from '../../lib/email-html-processor.js';
+import { compileMjmlIfNeeded } from '../../lib/mjml-compile.js';
 import { espejoEmail } from '../ai/espejo.js';
 import { detectAngle } from '../../lib/angle-detector.js';
 
@@ -352,7 +353,10 @@ export async function manageEmailCampaigns(c: Context) {
 
       // Product recommendations are now processed per-subscriber in processEmailHtml
       const recConfig = campaign.recommendation_config || null;
-      let baseHtml = campaign.html_content;
+      // Compilar MJML → HTML responsive con CSS inline. Si ya es HTML legacy,
+      // pasa intacto. Esto debe correr ANTES del rendering de Nunjucks para
+      // que las merge tags no se vean afectadas.
+      let baseHtml = compileMjmlIfNeeded(campaign.html_content);
 
       // Load brand info for nunjucks template rendering
       const brandClient = await safeQuerySingleOrDefault<any>(
@@ -390,7 +394,9 @@ export async function manageEmailCampaigns(c: Context) {
 
         // Variant B content (product recommendations processed per-subscriber)
         const variantBSubject = abTest.variant_b_subject || campaign.subject;
-        const variantBHtml = abTest.variant_b_html_content || baseHtml;
+        // Compilar variante B desde MJML si corresponde (puede traer MJML
+        // si fue creada por la IA, o HTML legacy).
+        const variantBHtml = compileMjmlIfNeeded(abTest.variant_b_html_content || baseHtml);
 
         // Update A/B test status
         await supabase

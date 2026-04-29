@@ -4,6 +4,7 @@ import { sendSingleEmail } from './send-email.js';
 import { renderEmailTemplate, buildTemplateContext } from '../../lib/template-engine.js';
 import { processEmailHtml } from '../../lib/email-html-processor.js';
 import { safeQueryOrDefault, safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
+import { compileMjmlIfNeeded } from '../../lib/mjml-compile.js';
 
 /**
  * Flow engine: executes flow steps when triggered by Cloud Tasks.
@@ -284,7 +285,9 @@ export async function emailFlowExecute(c: Context) {
     shop_url: flowClient?.website_url || (flowClient?.shop_domain ? `https://${flowClient.shop_domain}` : ''),
   };
 
-  let htmlContent = currentStep.html_content || '';
+  // Compilar MJML → HTML antes de procesar merge tags (si el contenido es
+  // MJML; si es HTML legacy, pasa intacto).
+  let htmlContent = compileMjmlIfNeeded(currentStep.html_content || '');
   let subject = currentStep.subject || '';
 
   htmlContent = replaceMergeTags(htmlContent, subscriber, { ...enrollment.metadata, brand: clientBrandInfo });

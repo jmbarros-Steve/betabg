@@ -27,6 +27,8 @@ import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { ConditionalBlockPanel, serializeConditionsToAttr, type BlockCondition } from './ConditionalBlockPanel';
 import { ABTestResultsPanel } from './ABTestResultsPanel';
 import { ProductBlockPanel } from './ProductBlockPanel';
+// @ts-ignore — mjml-browser no exporta types
+import mjml2html from 'mjml-browser';
 // Tipos y constantes extraídos a ./campaign-builder/ — ver README.md en esa carpeta
 // para el plan de refactor gradual del componente.
 import type { Campaign, CampaignBuilderProps } from './campaign-builder/types';
@@ -115,29 +117,20 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     return () => window.removeEventListener('beforeunload', handler);
   }, [showEditor, isDirty]);
 
-  // GrapeJS Studio parsea HTML como XML estricto; <!DOCTYPE> y comentarios
-  // HTML rompen el parser ("invalid element name"). Esta función limpia el
-  // HTML generado por la IA antes de pasarlo al editor.
-  const cleanHtmlForEditor = (html: string): string => {
-    if (!html) return '';
-    let cleaned = html;
-    // Quitar DOCTYPE (lo que dispara el "StartTag: invalid element name").
-    cleaned = cleaned.replace(/<!DOCTYPE[^>]*>/gi, '');
-    // Quitar comentarios HTML <!-- ... --> (pueden contener guiones que rompen XML).
-    cleaned = cleaned.replace(/<!--[\s\S]*?-->/g, '');
-    // Quitar <html>, </html>, <head>...</head> (preservando <style> que va dentro).
-    const styleMatch = cleaned.match(/<style[^>]*>[\s\S]*?<\/style>/gi);
-    const bodyMatch = cleaned.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    if (bodyMatch) {
-      const styles = styleMatch ? styleMatch.join('\n') : '';
-      cleaned = `${styles}\n${bodyMatch[1].trim()}`;
-    } else {
-      // No hay <body> — quitar solo wrappers <html>, <head> y dejar el resto.
-      cleaned = cleaned
-        .replace(/<\/?html[^>]*>/gi, '')
-        .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, styleMatch ? styleMatch.join('\n') : '');
+  // Si el contenido es MJML, lo compila a HTML responsive para preview.
+  // Si ya es HTML directo (templates legacy o importados), pasa intacto.
+  const compileForPreview = (content: string): string => {
+    if (!content) return '';
+    const trimmed = content.trim();
+    const looksLikeMjml = /^<mjml[\s>]/i.test(trimmed) || /<mj-body[\s>]/i.test(trimmed);
+    if (!looksLikeMjml) return content;
+    try {
+      const result = mjml2html(content, { validationLevel: 'soft' });
+      return result.html || content;
+    } catch (err) {
+      console.error('[mjml-browser] compile failed for preview:', err);
+      return content;
     }
-    return cleaned.trim();
   };
 
   // Poll email size every 3s while editor is open
@@ -261,14 +254,15 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }
   }, [editorStep]);
 
-  // Load stored AI HTML/MJML when editor becomes ready (after generación
-  // en Step 1 cuando todavía el editor no estaba montado).
+  // Load stored AI MJML/HTML when editor becomes ready (after generación
+  // en Step 1 cuando todavía el editor no estaba montado). MJML va native
+  // al editor GrapeJS Studio (project.type='email').
   useEffect(() => {
     if (!editorReady || !emailEditorRef.current) return;
     if (designJson) return; // design_json from existing campaign takes priority
-    const storedHtml = editingCampaign?.html_content;
-    if (storedHtml && storedHtml.trim().length > 0) {
-      emailEditorRef.current.setHtml(cleanHtmlForEditor(storedHtml));
+    const storedContent = editingCampaign?.html_content;
+    if (storedContent && storedContent.trim().length > 0) {
+      emailEditorRef.current.setHtml(storedContent);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editorReady]);
@@ -291,8 +285,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       const name = data?.name || editingCampaign?.name || '';
       const subject = data?.subject || editingCampaign?.subject || '';
       const previewText = data?.preview_text || '';
-      // AI returns email-compatible HTML directly. Fallback a mjml legacy.
-      const html = data?.html || data?.mjml || '';
+      // AI devuelve MJML (preferido). Fallback a html legacy.
+      const content = data?.mjml || data?.html || '';
 
       setEditingCampaign(prev => ({
         ...prev,
@@ -301,13 +295,13 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         preview_text: previewText,
       }));
 
-      // Load HTML into editor if ready, otherwise persist for later load.
-      if (editorReady && html && emailEditorRef.current) {
-        emailEditorRef.current.setHtml(cleanHtmlForEditor(html));
-        setEditingCampaign(prev => ({ ...prev, html_content: html }));
+      // MJML va directo al editor GrapeJS — no requiere limpieza.
+      if (editorReady && content && emailEditorRef.current) {
+        emailEditorRef.current.setHtml(content);
+        setEditingCampaign(prev => ({ ...prev, html_content: content }));
         toast.success('Email generado con Steve AI — puedes editarlo en el editor');
-      } else if (html) {
-        setEditingCampaign(prev => ({ ...prev, html_content: html }));
+      } else if (content) {
+        setEditingCampaign(prev => ({ ...prev, html_content: content }));
         toast.success('Email generado con Steve AI');
       }
     } catch (err: any) {
@@ -1831,7 +1825,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => { setPreviewHtml(campaign.html_content); setShowPreview(true); }}
+                          onClick={() => { setPreviewHtml(compileForPreview(campaign.html_content || '')); setShowPreview(true); }}
                           title="Vista previa"
                         >
                           <Eye className="w-4 h-4 mr-1" /> Ver

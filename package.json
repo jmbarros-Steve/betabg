@@ -65,6 +65,7 @@
     "input-otp": "^1.4.2",
     "jspdf": "^4.0.0",
     "lucide-react": "^0.462.0",
+    "mjml-browser": "^5.1.0",
     "next-themes": "^0.3.0",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
