@@ -27,8 +27,6 @@ import { EmailTemplateGallery } from './EmailTemplateGallery';
 import { ConditionalBlockPanel, serializeConditionsToAttr, type BlockCondition } from './ConditionalBlockPanel';
 import { ABTestResultsPanel } from './ABTestResultsPanel';
 import { ProductBlockPanel } from './ProductBlockPanel';
-// @ts-ignore — mjml-browser no exporta types
-import mjml2html from 'mjml-browser';
 // Tipos y constantes extraídos a ./campaign-builder/ — ver README.md en esa carpeta
 // para el plan de refactor gradual del componente.
 import type { Campaign, CampaignBuilderProps } from './campaign-builder/types';
@@ -117,21 +115,13 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     return () => window.removeEventListener('beforeunload', handler);
   }, [showEditor, isDirty]);
 
-  // Si el contenido es MJML, lo compila a HTML responsive para preview.
-  // Si ya es HTML directo (templates legacy o importados), pasa intacto.
-  const compileForPreview = (content: string): string => {
-    if (!content) return '';
-    const trimmed = content.trim();
-    const looksLikeMjml = /^<mjml[\s>]/i.test(trimmed) || /<mj-body[\s>]/i.test(trimmed);
-    if (!looksLikeMjml) return content;
-    try {
-      const result = mjml2html(content, { validationLevel: 'soft' });
-      return result.html || content;
-    } catch (err) {
-      console.error('[mjml-browser] compile failed for preview:', err);
-      return content;
-    }
-  };
+  // Compilación MJML→HTML para preview iframe deshabilitada en frontend
+  // (mjml-browser arrastra cheerio que rompe el bundle de Vite). El backend
+  // compila MJML→HTML antes de enviar real, y el editor GrapeJS lo entiende
+  // nativamente. Para preview manual del listado de campañas, mostramos el
+  // contenido tal cual; si es MJML el iframe lo verá como texto crudo (UX
+  // imperfecta pero el portal no se rompe).
+  const compileForPreview = (content: string): string => content || '';
 
   // Poll email size every 3s while editor is open
   useEffect(() => {
