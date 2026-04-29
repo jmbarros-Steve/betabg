@@ -115,6 +115,31 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     return () => window.removeEventListener('beforeunload', handler);
   }, [showEditor, isDirty]);
 
+  // GrapeJS Studio parsea HTML como XML estricto; <!DOCTYPE> y comentarios
+  // HTML rompen el parser ("invalid element name"). Esta función limpia el
+  // HTML generado por la IA antes de pasarlo al editor.
+  const cleanHtmlForEditor = (html: string): string => {
+    if (!html) return '';
+    let cleaned = html;
+    // Quitar DOCTYPE (lo que dispara el "StartTag: invalid element name").
+    cleaned = cleaned.replace(/<!DOCTYPE[^>]*>/gi, '');
+    // Quitar comentarios HTML <!-- ... --> (pueden contener guiones que rompen XML).
+    cleaned = cleaned.replace(/<!--[\s\S]*?-->/g, '');
+    // Quitar <html>, </html>, <head>...</head> (preservando <style> que va dentro).
+    const styleMatch = cleaned.match(/<style[^>]*>[\s\S]*?<\/style>/gi);
+    const bodyMatch = cleaned.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bodyMatch) {
+      const styles = styleMatch ? styleMatch.join('\n') : '';
+      cleaned = `${styles}\n${bodyMatch[1].trim()}`;
+    } else {
+      // No hay <body> — quitar solo wrappers <html>, <head> y dejar el resto.
+      cleaned = cleaned
+        .replace(/<\/?html[^>]*>/gi, '')
+        .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, styleMatch ? styleMatch.join('\n') : '');
+    }
+    return cleaned.trim();
+  };
+
   // Poll email size every 3s while editor is open
   useEffect(() => {
     if (!showEditor || !editorReady || editorStep !== 'design') return;
@@ -243,7 +268,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     if (designJson) return; // design_json from existing campaign takes priority
     const storedHtml = editingCampaign?.html_content;
     if (storedHtml && storedHtml.trim().length > 0) {
-      emailEditorRef.current.setHtml(storedHtml);
+      emailEditorRef.current.setHtml(cleanHtmlForEditor(storedHtml));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editorReady]);
@@ -278,7 +303,7 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
 
       // Load HTML into editor if ready, otherwise persist for later load.
       if (editorReady && html && emailEditorRef.current) {
-        emailEditorRef.current.setHtml(html);
+        emailEditorRef.current.setHtml(cleanHtmlForEditor(html));
         setEditingCampaign(prev => ({ ...prev, html_content: html }));
         toast.success('Email generado con Steve AI — puedes editarlo en el editor');
       } else if (html) {
