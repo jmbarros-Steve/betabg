@@ -61,6 +61,10 @@ interface BrandContext {
   briefSection: string;
   brandName: string;
   brandTone: string;
+  brandColor: string;
+  brandSecondaryColor: string;
+  brandFont: string;
+  logoUrl: string;
   products: any[];
   knowledgeBlock: string;
   bugsBlock: string;
@@ -80,12 +84,12 @@ async function loadBrandContext(supabase: any, clientId: string): Promise<BrandC
       .maybeSingle(),
     supabase
       .from('shopify_products')
-      .select('title, product_type, image_url, price')
+      .select('title, product_type, image_url, price_min, price_max, description')
       .eq('client_id', clientId)
       .limit(20),
     supabase
       .from('clients')
-      .select('name, company, shop_domain')
+      .select('name, company, shop_domain, brand_color, brand_secondary_color, brand_font, logo_url')
       .eq('id', clientId)
       .single(),
   ]);
@@ -111,6 +115,10 @@ async function loadBrandContext(supabase: any, clientId: string): Promise<BrandC
     briefSection,
     brandName,
     brandTone,
+    brandColor: client?.brand_color || '#18181b',
+    brandSecondaryColor: client?.brand_secondary_color || '#6366f1',
+    brandFont: client?.brand_font || 'Inter',
+    logoUrl: client?.logo_url || '',
     products: products || [],
     knowledgeBlock,
     bugsBlock,
@@ -118,22 +126,36 @@ async function loadBrandContext(supabase: any, clientId: string): Promise<BrandC
 }
 
 function buildSystemPrompt(ctx: BrandContext): string {
-  return `Eres Steve, experto en email marketing. Generas emails en formato MJML (MailJet Markup Language) profesionales, persuasivos y optimizados para conversion. Mobile-first, subjects < 50 chars, preview text < 90 chars, 1 CTA principal.
+  return `Eres Steve, experto en email marketing. Generas emails en HTML email-compatible (responsive, table-based, inline CSS). Mobile-first, subjects < 50 chars, preview text < 90 chars, 1 CTA principal.
 
 BRIEF DE MARCA:
 ${ctx.briefSection}
 
-NOMBRE DE MARCA: ${ctx.brandName}
-${ctx.brandTone ? `TONO: ${ctx.brandTone}` : ''}
-${ctx.products.length > 0 ? `PRODUCTOS: ${truncateContext(ctx.products.slice(0, 10).map((p: any) => p.title).join(', '), 500)}` : ''}
+IDENTIDAD VISUAL DE LA MARCA (USA SIEMPRE ESTOS VALORES):
+- Nombre: ${ctx.brandName}
+- Color primario: ${ctx.brandColor}
+- Color secundario: ${ctx.brandSecondaryColor}
+- Tipografía: ${ctx.brandFont}
+${ctx.logoUrl ? `- Logo URL: ${ctx.logoUrl}` : ''}
+${ctx.brandTone ? `- Tono de voz: ${ctx.brandTone}` : ''}
+
+${ctx.products.length > 0
+  ? `PRODUCTOS REALES DISPONIBLES (USA ESTOS, NO INVENTES):\n${ctx.products.slice(0, 10).map((p: any) =>
+      `- ${p.title} | precio: ${p.price_min || '—'} | imagen: ${p.image_url || '(sin imagen)'}`
+    ).join('\n')}`
+  : 'NO HAY PRODUCTOS DISPONIBLES — NO INVENTES NOMBRES NI PRECIOS DE PRODUCTOS. Genera un email sin sección de productos (puede ser newsletter, anuncio, bienvenida, etc).'}
 
 REGLAS:
-- Siempre en espanol
+- Siempre en español neutro LATAM
 - USA merge tags: {{ first_name }}, {{ email }}, {{ cart_url }}, {{ cart_total }}
-- Genera MJML valido (NO HTML puro) usando componentes mj-section, mj-column, mj-text, mj-image, mj-button, mj-divider
-- Colores neutros profesionales (se puede customizar despues en el editor)
-- Incluye siempre un CTA claro con mj-button
-- El MJML se cargara en un editor visual GrapeJS donde el usuario puede editarlo
+- HTML email-compatible: <!DOCTYPE html>, <html>, <head> con <meta viewport> y <style>, <body> con <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+- Layout 600px max-width centrado
+- font-family: '${ctx.brandFont}', Arial, sans-serif (en TODO el email)
+- Colores: usa ${ctx.brandColor} para CTA y headings, ${ctx.brandSecondaryColor} como acento. Fondos neutros (#ffffff, #f4f4f4)
+- Incluye siempre 1 CTA principal con botón <a> estilizado
+- ${ctx.logoUrl ? `Header con logo: <img src="${ctx.logoUrl}" alt="${ctx.brandName}" style="max-height:60px">` : 'Header con texto del nombre de marca destacado'}
+- Inline CSS para todo lo crítico (Gmail/Outlook strippean <style>); usar <style> solo para @media queries responsive
+- Footer con texto legal placeholder + unsubscribe placeholder {{unsubscribe_url}}
 ${ctx.knowledgeBlock}${ctx.bugsBlock}`;
 }
 
@@ -148,44 +170,68 @@ async function handleGenerateCampaignHtml(body: any, ctx: BrandContext) {
 
   const selectedProducts = products || ctx.products.slice(0, 5);
 
-  const prompt = `Genera un email MJML completo para una campana de tipo "${campaign_type || 'promotional'}" de "${ctx.brandName}".
+  const prompt = `Genera un email HTML completo para una campaña de tipo "${campaign_type || 'promotional'}" de "${ctx.brandName}".
 
 CONTEXTO DE LA CAMPAÑA (lo que el usuario te dijo):
 ${instructions}
 
-${subject ? `Subject sugerido por el usuario: "${subject}". Puedes mejorarlo si tienes una idea mejor.` : ''}
-${selectedProducts.length > 0 ? `Productos a destacar: ${truncateContext(JSON.stringify(selectedProducts), 1500)}` : ''}
+${subject ? `Subject sugerido: "${subject}". Puedes mejorarlo si tienes mejor idea.` : ''}
+${selectedProducts.length > 0
+  ? `Productos a destacar (USA ESTOS, no inventes):\n${selectedProducts.slice(0, 5).map((p: any) =>
+      `- ${p.title} (precio: ${p.price_min || p.price || '—'}, imagen: ${p.image_url || 'sin imagen'})`
+    ).join('\n')}`
+  : 'NO HAY PRODUCTOS — el email no debe incluir bloques de productos. Hazlo enfocado en mensaje, marca o CTA general.'}
 
-Genera MJML completo con esta estructura:
-<mjml>
-  <mj-head>
-    <mj-attributes>
-      <mj-all font-family="Arial, sans-serif" />
-      <mj-text font-size="16px" line-height="1.5" color="#333333" />
-      <mj-button background-color="#333333" color="#ffffff" border-radius="4px" font-size="16px" />
-    </mj-attributes>
-  </mj-head>
-  <mj-body background-color="#f4f4f4">
-    <!-- Contenido aqui con mj-section, mj-column, mj-text, mj-image, mj-button, mj-divider -->
-  </mj-body>
-</mjml>
+Genera HTML email-compatible con esta estructura:
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>...</title>
+  <style>
+    /* Solo @media queries responsive aquí. Resto del CSS va inline. */
+    @media only screen and (max-width: 600px) {
+      .stack-mobile { display: block !important; width: 100% !important; }
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background-color:#f4f4f4; font-family:'${ctx.brandFont}', Arial, sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f4f4f4;">
+    <tr>
+      <td align="center" style="padding:20px 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px; background-color:#ffffff; border-radius:8px; overflow:hidden;">
+          <!-- Header con logo o nombre de marca -->
+          <!-- Hero: titular grande -->
+          <!-- Saludo personalizado con {{ first_name }} -->
+          <!-- 3-5 secciones de contenido persuasivo -->
+          <!-- CTA principal estilizado con color ${ctx.brandColor} -->
+          <!-- ${selectedProducts.length > 0 ? 'Sección de productos con imagen, título y precio reales' : '(sin productos)'} -->
+          <!-- Footer con texto legal + unsubscribe -->
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
 
-El email MJML debe incluir:
-- Header section con nombre de marca
+El email debe incluir:
+- Header con ${ctx.logoUrl ? `logo (${ctx.logoUrl})` : `nombre de marca "${ctx.brandName}" destacado`}
 - Saludo personalizado con {{ first_name }}
-- Contenido persuasivo (5-6 secciones minimo usando mj-section/mj-column/mj-text)
-- Boton CTA con mj-button
-- Dividers con mj-divider donde sea apropiado
-- Footer section con texto legal placeholder
-- NO uses mj-raw ni HTML puro dentro de los componentes MJML
-- Cada parrafo debe ser un mj-text separado dentro de su mj-section > mj-column
+- 3-5 secciones de contenido persuasivo
+- 1 botón CTA principal con background-color:${ctx.brandColor} y color:#ffffff (no usar otro color para el CTA)
+- ${selectedProducts.length > 0 ? 'Sección con productos REALES (imagen + título + precio + link)' : 'NO incluir sección de productos'}
+- Dividers <hr style="border:none;border-top:1px solid #e0e0e0;"> donde corresponda
+- Footer con texto legal placeholder + link a {{unsubscribe_url}}
+- TODO el CSS crítico (colores, fonts, padding, márgenes) debe ser INLINE (Gmail strippea <style>)
+- font-family de cada texto debe ser '${ctx.brandFont}', Arial, sans-serif
 
 Responde SOLO con JSON (sin markdown, sin backticks):
 {
-  "name": "Nombre interno de la campaña (max 60 chars, descriptivo, ej: 'Black Friday 2026 - 30% OFF colección invierno')",
+  "name": "Nombre interno de la campaña (max 60 chars, descriptivo, ej: 'Black Friday 2026 - 30% OFF')",
   "subject": "Asunto del email (max 50 chars)",
   "preview_text": "Preview text (max 90 chars)",
-  "mjml": "<mjml>..."
+  "html": "<!DOCTYPE html>..."
 }`;
 
   return await callClaude(prompt, buildSystemPrompt(ctx));

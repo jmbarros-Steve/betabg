@@ -265,8 +265,8 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
       const name = data?.name || editingCampaign?.name || '';
       const subject = data?.subject || editingCampaign?.subject || '';
       const previewText = data?.preview_text || '';
-      // AI now returns MJML — use it to load into editor
-      const mjml = data?.mjml || data?.html || '';
+      // AI returns email-compatible HTML directly. Fallback a mjml legacy.
+      const html = data?.html || data?.mjml || '';
 
       setEditingCampaign(prev => ({
         ...prev,
@@ -275,18 +275,13 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
         preview_text: previewText,
       }));
 
-      // Load MJML directly into the GrapeJS editor so user can edit it
-      if (editorReady && mjml && emailEditorRef.current) {
-        emailEditorRef.current.setHtml(mjml);
-        // Also persist so downstream checks (send test, review) have content
-        setEditingCampaign(prev => ({ ...prev, html_content: mjml }));
+      // Load HTML into editor if ready, otherwise persist for later load.
+      if (editorReady && html && emailEditorRef.current) {
+        emailEditorRef.current.setHtml(html);
+        setEditingCampaign(prev => ({ ...prev, html_content: html }));
         toast.success('Email generado con Steve AI — puedes editarlo en el editor');
-      } else if (mjml) {
-        // Editor not ready yet — store MJML and it will load when ready
-        setEditingCampaign(prev => ({
-          ...prev,
-          html_content: mjml,
-        }));
+      } else if (html) {
+        setEditingCampaign(prev => ({ ...prev, html_content: html }));
         toast.success('Email generado con Steve AI');
       }
     } catch (err: any) {
