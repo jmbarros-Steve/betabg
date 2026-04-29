@@ -326,12 +326,19 @@ const cfStyles = StyleSheet.create({
 export function ConversionFunnelPage({ data }: { data: MetaReportData }) {
   const cf = data.conversionFunnel;
 
+  // ATC y Checkout solo se muestran si stagesEstimated=true (la heurística
+  // dio resultados razonables). Si stagesEstimated=false (purchase/clicks
+  // muy bajo), omitimos ATC/Checkout para no mostrar "1.0% pasa" absurdos.
   const stages = [
     { label: 'Impresiones', value: cf.impressions },
     { label: 'Clicks', value: cf.clicks, dropOffPct: cf.ctr },
-    { label: 'Add to Cart', value: cf.addToCart, dropOffPct: cf.clickToCart },
-    { label: 'Checkout', value: cf.initiatedCheckout, dropOffPct: cf.cartToCheckout },
-    { label: 'Compra', value: cf.purchase, dropOffPct: cf.checkoutToPurchase },
+    ...(cf.stagesEstimated && cf.addToCart > 0
+      ? [
+          { label: 'Add to Cart', value: cf.addToCart, dropOffPct: cf.clickToCart },
+          { label: 'Checkout', value: cf.initiatedCheckout, dropOffPct: cf.cartToCheckout },
+        ]
+      : []),
+    { label: 'Compra', value: cf.purchase, dropOffPct: cf.stagesEstimated ? cf.checkoutToPurchase : (cf.clicks > 0 ? (cf.purchase / cf.clicks) * 100 : 0) },
   ].filter((s) => s.value > 0);
 
   const ctrLow = cf.ctr > 0 && cf.ctr < 1;
@@ -374,7 +381,11 @@ export function ConversionFunnelPage({ data }: { data: MetaReportData }) {
           )}
 
           <Text style={baseStyle.disclaimer}>
-            Add to Cart y Checkout son estimados con benchmarks de la industria si Meta no expone Pixel events directos en este período. La compra y los clicks son siempre datos directos de Meta. Para tracking exacto, validá que Pixel + Conversions API estén configurados.
+            {cf.pixelDetected
+              ? cf.stagesEstimated
+                ? 'Pixel detectado y reportando compras correctamente. Add to Cart y Checkout son estimaciones derivadas de la compra real con benchmarks de la industria — para tracking exacto de cada paso, valida que Conversions API esté activa además del Pixel browser.'
+                : 'Pixel detectado y reportando compras. Omitimos Add to Cart y Checkout porque el ratio compra/clicks es bajo (típico de retargeting o tráfico ancho) — los benchmarks darían números engañosos. La compra y los clicks son datos directos de Meta.'
+              : 'No detectamos compras en este período. Si vendiste y no aparecen, validá que el Pixel + Conversions API estén configurados en Shopify (Settings → Customer events). Sin tracking de compras, este reporte solo muestra impresiones y clicks.'}
           </Text>
         </>
       )}
@@ -408,13 +419,17 @@ const creativesStyles = StyleSheet.create({
 
 export function TopCreativesPage({ data }: { data: MetaReportData }) {
   const creatives = data.topCreatives;
+  // Solo marcar GANADOR si el #1 tiene ROAS > 0 (matchó a una campaña con
+  // métricas reales). Si todos tienen 0, el ranking es arbitrario y poner
+  // GANADOR confunde al cliente.
+  const hasRealMetrics = creatives.length > 0 && (creatives[0].roas > 0 || creatives[0].spend > 0);
 
   return (
     <Page size="LETTER" style={baseStyle.page}>
       <Header shopName={data.client.name} logoUrl={data.client.logo_url} periodStart={data.period.start} periodEnd={data.period.end} />
 
       <Text style={baseStyle.subtitle}>Sección 08 · Creativos</Text>
-      <Text style={baseStyle.title}>Top Creativos del Período</Text>
+      <Text style={baseStyle.title}>{hasRealMetrics ? 'Top Creativos del Período' : 'Creativos del Catálogo'}</Text>
 
       {creatives.length === 0 ? (
         <Text style={baseStyle.emptyMsg}>
@@ -423,7 +438,9 @@ export function TopCreativesPage({ data }: { data: MetaReportData }) {
       ) : (
         <>
           <Text style={creativesStyles.intro}>
-            Los 3 creativos que mejor performaron en el período, rankeados por ROAS. El #1 es tu ganador — replicá su ángulo y formato en próximos ciclos. Si todos vienen del mismo cuadrante del funnel, conviene diversificar.
+            {hasRealMetrics
+              ? 'Los 3 creativos que mejor performaron en el período, rankeados por ROAS. El #1 es tu ganador — replicá su ángulo y formato en próximos ciclos. Si todos vienen del mismo cuadrante del funnel, conviene diversificar.'
+              : 'Los creativos más recientes de tu catálogo. Todavía no podemos linkearlos a métricas de campaña porque los nombres no matchean — en cuanto activen ad_id real vas a ver ranking por ROAS acá.'}
           </Text>
 
           {creatives.map((c, i) => (
@@ -437,7 +454,7 @@ export function TopCreativesPage({ data }: { data: MetaReportData }) {
               </View>
               <View style={creativesStyles.body}>
                 <View style={creativesStyles.badgeRow}>
-                  {i === 0 ? (
+                  {i === 0 && hasRealMetrics ? (
                     <Text style={creativesStyles.winnerBadge}>★ GANADOR</Text>
                   ) : (
                     <Text style={creativesStyles.rankBadge}>#{i + 1}</Text>
@@ -457,27 +474,31 @@ export function TopCreativesPage({ data }: { data: MetaReportData }) {
                 <Text style={creativesStyles.creativeCopy}>
                   {c.copy ? (c.copy.length > 180 ? c.copy.slice(0, 180) + '…' : c.copy) : 'Sin copy.'}
                 </Text>
-                <View style={creativesStyles.metricsRow}>
-                  <View style={creativesStyles.metric}>
-                    <Text style={creativesStyles.metricLabel}>ROAS</Text>
-                    <Text style={creativesStyles.metricValue}>{c.roas > 0 ? `${c.roas.toFixed(2)}x` : '—'}</Text>
+                {hasRealMetrics && (
+                  <View style={creativesStyles.metricsRow}>
+                    <View style={creativesStyles.metric}>
+                      <Text style={creativesStyles.metricLabel}>ROAS</Text>
+                      <Text style={creativesStyles.metricValue}>{c.roas > 0 ? `${c.roas.toFixed(2)}x` : '—'}</Text>
+                    </View>
+                    <View style={creativesStyles.metric}>
+                      <Text style={creativesStyles.metricLabel}>Inversión</Text>
+                      <Text style={creativesStyles.metricValue}>{formatCurrency(c.spend)}</Text>
+                    </View>
+                    <View style={creativesStyles.metric}>
+                      <Text style={creativesStyles.metricLabel}>Conversiones</Text>
+                      <Text style={creativesStyles.metricValue}>{formatNumber(c.conversions)}</Text>
+                    </View>
                   </View>
-                  <View style={creativesStyles.metric}>
-                    <Text style={creativesStyles.metricLabel}>Inversión</Text>
-                    <Text style={creativesStyles.metricValue}>{formatCurrency(c.spend)}</Text>
-                  </View>
-                  <View style={creativesStyles.metric}>
-                    <Text style={creativesStyles.metricLabel}>Conversiones</Text>
-                    <Text style={creativesStyles.metricValue}>{formatNumber(c.conversions)}</Text>
-                  </View>
-                </View>
+                )}
               </View>
             </View>
           ))}
 
-          <Text style={baseStyle.disclaimer}>
-            Match creativo→campaña por nombre fuzzy. En próximas iteraciones vamos a linkear cada creativo a su ad_id real para métricas exactas.
-          </Text>
+          {hasRealMetrics && (
+            <Text style={baseStyle.disclaimer}>
+              Match creativo→campaña por nombre fuzzy. En próximas iteraciones vamos a linkear cada creativo a su ad_id real para métricas exactas.
+            </Text>
+          )}
         </>
       )}
 

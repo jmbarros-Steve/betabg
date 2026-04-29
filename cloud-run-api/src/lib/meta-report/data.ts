@@ -139,6 +139,8 @@ export interface MetaConversionFunnel {
   cartToCheckout: number; // %
   checkoutToPurchase: number; // %
   hasFunnelData: boolean;
+  pixelDetected: boolean; // true si purchase>0 → Pixel está reportando
+  stagesEstimated: boolean; // true si ATC/Checkout son benchmarks (no reales)
 }
 
 export interface AIRecommendation {
@@ -369,6 +371,26 @@ function detectFunnelFromObjective(objective: string | null | undefined): Funnel
   return null;
 }
 
+/**
+ * Fallback heurístico cuando meta_campaigns.objective NO está poblada (común
+ * en clientes nuevos donde el cron no migró el legacy o usan custom naming).
+ * Busca palabras clave en el nombre de la campaña para inferir el funnel.
+ * Si nada matchea, asume BOFU (la mayoría de campañas en e-commerce son
+ * conversion-driven y tirar todo a BOFU al menos llena la sección).
+ */
+function detectFunnelFromName(name: string | null | undefined): FunnelStage {
+  if (!name) return 'bofu';
+  const n = name.toLowerCase();
+  // TOFU: público frío, awareness, alcance
+  if (/\b(tofu|awareness|reach|alcance|broad|cold|prospecting|prospección|reconocimiento|video.?view)\b/.test(n)) return 'tofu';
+  // MOFU: consideración, engagement, retargeting tibio
+  if (/\b(mofu|consideration|consideración|engagement|interacc|messages|mensajes|leads?|lead.?gen|warm)\b/.test(n)) return 'mofu';
+  // BOFU: conversión, ventas, retargeting caliente
+  if (/\b(bofu|conversion|conversi[oó]n|sales|ventas|purchase|compra|retargeting|catalog|cat[aá]logo|dpa|abandon|carrito)\b/.test(n)) return 'bofu';
+  // Default: bofu (asumimos conversion-driven)
+  return 'bofu';
+}
+
 async function buildCampaignAggregates(
   supabase: SupabaseClient,
   clientId: string,
@@ -417,21 +439,25 @@ async function buildCampaignAggregates(
     frequency: c._reachForFreq > 0 ? c._freqSum / c._reachForFreq : 0,
   }));
 
-  // Cargar objectives desde meta_campaigns para inferir funnel
+  // Cargar objectives desde meta_campaigns para inferir funnel.
+  // Si la tabla no está poblada (cliente nuevo, cron legacy no migró)
+  // caemos a heurística por nombre de campaña — siempre devolvemos un
+  // funnel para evitar la sección vacía "sin spend distribuido por funnel".
   const campaignIds = items.map((c) => c.campaignId);
+  const objMap = new Map<string, string>();
   if (campaignIds.length > 0) {
     const { data: metaCamps } = await supabase
       .from('meta_campaigns')
       .select('meta_campaign_id, objective')
       .eq('client_id', clientId)
       .in('meta_campaign_id', campaignIds);
-    const objMap = new Map<string, string>();
     for (const mc of metaCamps || []) {
       if (mc.objective) objMap.set(mc.meta_campaign_id, mc.objective);
     }
-    for (const c of items) {
-      c.funnel = detectFunnelFromObjective(objMap.get(c.campaignId));
-    }
+  }
+  for (const c of items) {
+    const fromObjective = detectFunnelFromObjective(objMap.get(c.campaignId));
+    c.funnel = fromObjective || detectFunnelFromName(c.campaignName);
   }
 
   // BCG quadrants — necesita ≥4 campañas para que la mediana sea informativa
@@ -585,26 +611,68 @@ async function fetchTopCreatives(
     return Promise.all(fallback.slice(0, 3).map((c) => buildCreative(c, campaigns)));
   }
 
-  // Match creative → campaign por nombre fuzzy: si campaignName contiene angulo o titulo
+  // Match creative → campaign por nombre fuzzy.
+  // Estrategia escalonada para reducir el caso "todos en 0":
+  //   1. matcheo exacto: campaignName contiene angulo o título
+  //   2. matcheo por funnel: si el creativo tiene funnel y la campaña fue
+  //      detectada como ese mismo funnel, asignamos las métricas pro-rata
+  //      del funnel (mejor que 0)
+  //   3. fallback: si ninguno mejora, NO marcar GANADOR — solo mostrar como
+  //      "creativos del catálogo" sin pretender métricas.
+  const matchByName = (c: any) => campaigns.find((camp) => {
+    if (!c.angulo && !c.titulo) return false;
+    const haystack = (camp.campaignName || '').toLowerCase();
+    return (c.angulo && haystack.includes(c.angulo.toLowerCase())) ||
+           (c.titulo && haystack.includes(c.titulo.toLowerCase().slice(0, 15)));
+  });
+
   const enriched = creatives.map((c) => {
-    const matchedCampaign = campaigns.find((camp) => {
-      if (!c.angulo && !c.titulo) return false;
-      const haystack = (camp.campaignName || '').toLowerCase();
-      return (c.angulo && haystack.includes(c.angulo.toLowerCase())) ||
-             (c.titulo && haystack.includes(c.titulo.toLowerCase().slice(0, 20)));
-    });
+    const direct = matchByName(c);
+    if (direct) {
+      return {
+        creative: c,
+        campaign: direct,
+        roas: direct.roas,
+        spend: direct.spend,
+        revenue: direct.revenue,
+        conversions: direct.conversions,
+        matchType: 'direct' as const,
+      };
+    }
+    // Pro-rata por funnel — toma el promedio del funnel del creativo
+    if (c.funnel) {
+      const same = campaigns.filter((camp) => camp.funnel === c.funnel);
+      if (same.length > 0) {
+        const avgRoas = same.reduce((s, x) => s + x.roas, 0) / same.length;
+        const totalSpend = same.reduce((s, x) => s + x.spend, 0);
+        return {
+          creative: c,
+          campaign: null,
+          roas: avgRoas,
+          spend: Math.round(totalSpend / same.length),
+          revenue: 0,
+          conversions: 0,
+          matchType: 'pro-rata' as const,
+        };
+      }
+    }
     return {
       creative: c,
-      campaign: matchedCampaign || null,
-      roas: matchedCampaign?.roas ?? 0,
-      spend: matchedCampaign?.spend ?? 0,
-      revenue: matchedCampaign?.revenue ?? 0,
-      conversions: matchedCampaign?.conversions ?? 0,
+      campaign: null,
+      roas: 0,
+      spend: 0,
+      revenue: 0,
+      conversions: 0,
+      matchType: 'none' as const,
     };
   });
 
-  // Ordenar por ROAS desc; los sin match al final
-  enriched.sort((a, b) => b.roas - a.roas);
+  // Ordenar: directos primero (por ROAS desc), luego pro-rata, luego sin match
+  enriched.sort((a, b) => {
+    const order = { direct: 0, 'pro-rata': 1, none: 2 } as const;
+    if (order[a.matchType] !== order[b.matchType]) return order[a.matchType] - order[b.matchType];
+    return b.roas - a.roas;
+  });
   const top = enriched.slice(0, 3);
 
   return Promise.all(top.map(async (e) => {
@@ -689,18 +757,33 @@ function buildConversionFunnel(rows: CampaignMetricRow[], current: MetaKpiSet): 
   const clicks = current.clicks;
   const purchase = current.conversions;
   const hasFunnelData = impressions > 0 && clicks > 0;
+  // pixelDetected: si hay purchases reales atribuidas a Meta, sabemos que el
+  // Pixel está reportando — el disclaimer no debe sugerir que falta configurar.
+  const pixelDetected = purchase > 0;
 
-  // Estimación heurística (transparente en disclaimer)
+  // Estimación heurística (transparente en disclaimer).
   // Ratio típico observado: clicks * 0.30 = ATC ; ATC * 0.55 = checkout ; checkout * 0.70 = purchase
-  // Pero si purchase real existe, anclamos hacia atrás.
+  // CASO 1 (sin purchase): proyectar hacia adelante con benchmarks.
+  // CASO 2 (con purchase): anclar hacia atrás SOLO si purchase/clicks > 2%.
+  //   Bajo eso, el ratio sugiere retargeting o tráfico ancho — los ATC/Checkout
+  //   estimados quedan absurdos (ej. 5 ATC con 500 clicks → "1% pasa").
+  //   En ese caso omitimos ATC/Checkout y mostramos solo Imp → Clicks → Purchase.
   let addToCart = 0;
   let initiatedCheckout = 0;
-  if (purchase > 0) {
-    initiatedCheckout = Math.max(purchase, Math.round(purchase / 0.70));
-    addToCart = Math.max(initiatedCheckout, Math.round(initiatedCheckout / 0.55));
+  let stagesEstimated = false;
+  if (purchase > 0 && clicks > 0) {
+    const purchaseRate = purchase / clicks;
+    if (purchaseRate >= 0.02) {
+      // Anclar hacia atrás cuando los ratios son razonables
+      initiatedCheckout = Math.max(purchase, Math.round(purchase / 0.70));
+      addToCart = Math.max(initiatedCheckout, Math.round(initiatedCheckout / 0.55));
+      stagesEstimated = true;
+    }
+    // Si purchaseRate < 2% → dejar ATC/Checkout en 0 para que la página los oculte
   } else if (clicks > 0) {
     addToCart = Math.round(clicks * 0.30);
     initiatedCheckout = Math.round(addToCart * 0.55);
+    stagesEstimated = true;
   }
 
   // Capamos para que cada paso sea ≤ paso previo
@@ -718,6 +801,8 @@ function buildConversionFunnel(rows: CampaignMetricRow[], current: MetaKpiSet): 
     cartToCheckout: addToCart > 0 ? (initiatedCheckout / addToCart) * 100 : 0,
     checkoutToPurchase: initiatedCheckout > 0 ? (purchase / initiatedCheckout) * 100 : 0,
     hasFunnelData,
+    pixelDetected,
+    stagesEstimated,
   };
 }
 
