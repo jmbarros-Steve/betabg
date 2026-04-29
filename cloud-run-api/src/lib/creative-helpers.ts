@@ -119,7 +119,10 @@ export function recommendCreativeFormat(input: RecommendInput): FormatRecommenda
 // GENERACIÓN DE IMAGEN — Gemini 2.5 Flash Image
 // ─────────────────────────────────────────────────────────────────
 
-const GEMINI_IMAGE_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent';
+// Imagen 4 fast (Gemini Predict API) — el endpoint que JM confirmó que funciona
+// según memoria del proyecto ($0.02/img). El otro endpoint gemini-2.5-flash-image
+// devolvió 403 en producción.
+const IMAGEN_4_URL = 'https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:predict';
 
 export async function generateImageViaGemini(
   prompt: string,
@@ -131,28 +134,31 @@ export async function generateImageViaGemini(
   if (!apiKey) return { ok: false, error: 'GEMINI_API_KEY missing' };
 
   try {
-    const res = await fetch(`${GEMINI_IMAGE_URL}?key=${apiKey}`, {
+    const res = await fetch(`${IMAGEN_4_URL}?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseModalities: ['IMAGE'] },
+        instances: [{ prompt }],
+        parameters: {
+          sampleCount: 1,
+          aspectRatio: '1:1',
+          personGeneration: 'allow_adult',
+        },
       }),
     });
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      return { ok: false, error: `Gemini ${res.status}: ${errText.slice(0, 150)}` };
+      console.error('[creative-helpers] Imagen 4 error:', res.status, errText.slice(0, 200));
+      return { ok: false, error: `Imagen ${res.status}: ${errText.slice(0, 200)}` };
     }
     const json: any = await res.json();
-    const parts = json.candidates?.[0]?.content?.parts || [];
-    let bytes: Uint8Array | null = null;
-    for (const p of parts) {
-      if (p.inlineData?.data) {
-        bytes = new Uint8Array(Buffer.from(p.inlineData.data, 'base64'));
-        break;
-      }
+    // Imagen 4 returns predictions[0].bytesBase64Encoded
+    const b64 = json?.predictions?.[0]?.bytesBase64Encoded;
+    if (!b64) {
+      console.error('[creative-helpers] No image in Imagen 4 response:', JSON.stringify(json).slice(0, 300));
+      return { ok: false, error: 'No image bytes in Imagen 4 response' };
     }
-    if (!bytes) return { ok: false, error: 'No image bytes in Gemini response' };
+    const bytes = new Uint8Array(Buffer.from(b64, 'base64'));
 
     const ts = Date.now();
     const storagePath = `creative-drafts/${clientId}/${ts}_${variantSuffix}.png`;
