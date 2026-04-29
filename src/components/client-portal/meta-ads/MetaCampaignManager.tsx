@@ -56,6 +56,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { useMetaBusiness } from './MetaBusinessContext';
+import { EditCampaignDialog } from './EditCampaignDialog';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -324,6 +325,10 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
   // Dialogs
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  // Nuevo dialog "Editar campaña activa" con tabs (Campaña / Ad Sets / Ads).
+  // Reemplaza el dialog legacy de edit que solo permitía cambiar nombre/budget.
+  const [metaEditOpen, setMetaEditOpen] = useState(false);
+  const [metaEditCampaign, setMetaEditCampaign] = useState<CampaignRow | null>(null);
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [analyticsDialogOpen, setAnalyticsDialogOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignRow | null>(null);
@@ -810,17 +815,10 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
   };
 
   const openEditDialog = (campaign: CampaignRow) => {
-    setSelectedCampaign(campaign);
-    setFormData({
-      campaign_name: campaign.campaign_name,
-      objective: campaign.objective,
-      daily_budget: String(campaign.daily_budget),
-      start_date: campaign.start_date || '',
-      end_date: campaign.end_date || '',
-      placements: campaign.placements,
-      optimization_goal: campaign.optimization_goal,
-    });
-    setEditDialogOpen(true);
+    // Nuevo dialog tabs (Campaña/Ad sets/Ads) — el legacy queda detrás de
+    // editDialogOpen pero ya no se abre desde el botón Editar de la fila.
+    setMetaEditCampaign(campaign);
+    setMetaEditOpen(true);
   };
 
   const openBudgetDialog = (campaign: CampaignRow) => {
@@ -2183,6 +2181,28 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Editar campaña activa — nuevo dialog con tabs Campaña/Ad sets/Ads */}
+      {metaEditCampaign && ctxConnectionId && (
+        <EditCampaignDialog
+          open={metaEditOpen}
+          onOpenChange={(o) => {
+            setMetaEditOpen(o);
+            if (!o) setMetaEditCampaign(null);
+          }}
+          connectionId={ctxConnectionId}
+          campaign={{
+            campaign_id: metaEditCampaign.campaign_id,
+            campaign_name: metaEditCampaign.campaign_name,
+            status: metaEditCampaign.status,
+            daily_budget: metaEditCampaign.daily_budget,
+          }}
+          onSaved={() => {
+            // Refrescar la lista de campañas para reflejar el cambio
+            fetchCampaigns();
+          }}
+        />
+      )}
     </div>
   );
 }
