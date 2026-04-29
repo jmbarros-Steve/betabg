@@ -70,6 +70,7 @@ import { computeCrossSell } from './shopify/compute-cross-sell.js';
 import { collectionRevenue } from './shopify/collection-revenue.js';
 import { createShopifyCombo } from './shopify/create-shopify-combo.js';
 import { generateShopifyReport, listShopifyReports } from './shopify/generate-shopify-report.js';
+import { generateMetaReport, listMetaReports } from './meta/generate-meta-report.js';
 
 // Phase 3: Google
 import { syncGoogleAdsMetrics } from './google/sync-google-ads-metrics.js';
@@ -258,6 +259,8 @@ import {
   syncBriefEstudioProducts,
   getBriefEstudioMusicLibrary,
   generateMusicPreviews,
+  getBrandKit,
+  saveBrandKit,
 } from './brief-estudio/index.js';
 // Brief Estudio — Fase 2 (narración + audio merge)
 import {
@@ -463,6 +466,8 @@ export function registerRoutes(app: Hono) {
   app.post('/api/generate-product-description', authMiddleware, generateProductDescription);
   app.post('/api/generate-shopify-report', authMiddleware, generateShopifyReport);
   app.post('/api/shopify-reports', authMiddleware, listShopifyReports);
+  app.post('/api/generate-meta-report', authMiddleware, generateMetaReport);
+  app.post('/api/meta-reports', authMiddleware, listMetaReports);
   app.post('/api/compute-cross-sell', authMiddleware, computeCrossSell);
   app.post('/api/collection-revenue', authMiddleware, collectionRevenue);
   app.post('/api/create-shopify-combo', authMiddleware, createShopifyCombo);
@@ -735,6 +740,10 @@ export function registerRoutes(app: Hono) {
   // Brief Estudio — Fase 2 (narración + audio merge)
   app.post('/api/brief-estudio/narration/script', authMiddleware, generateNarrationScript);
   app.post('/api/brief-estudio/narration/audio', authMiddleware, generateNarrationAudio);
+
+  // Brief Estudio — Identidad Visual (logo + paleta + tipografía)
+  app.get('/api/brief-estudio/brand-kit', authMiddleware, getBrandKit);
+  app.post('/api/brief-estudio/brand-kit', authMiddleware, saveBrandKit);
 
   // ============================================================
   // El Chino — Automated Check System (sub-router to avoid Hono RegExpRouter limit)

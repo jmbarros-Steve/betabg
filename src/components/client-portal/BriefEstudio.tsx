@@ -330,6 +330,8 @@ export default function BriefEstudio({ clientId }: BriefEstudioProps) {
         />
       )}
 
+      <SectionIdentidadVisual clientId={clientId} />
+
       <SectionElenco
         clientId={clientId}
         actors={actors}
@@ -394,7 +396,7 @@ function Header({
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Estudio Creativo</h1>
             <p className="text-sm text-slate-500">
-              Arma tu elenco, voz, productos y música para crear creatividades con Steve.
+              Identidad visual, elenco, voz, productos y música — la base con la que Steve crea tus piezas.
             </p>
           </div>
         </div>
@@ -2100,5 +2102,283 @@ function SaveBar({
         )}
       </div>
     </div>
+  );
+}
+
+// ─────────────────────────── Section: Identidad Visual ──────────────────────
+
+const FONT_OPTIONS = [
+  { label: 'Inter', value: 'Inter, sans-serif' },
+  { label: 'Roboto', value: 'Roboto, sans-serif' },
+  { label: 'Playfair Display', value: '"Playfair Display", serif' },
+  { label: 'Georgia', value: 'Georgia, serif' },
+  { label: 'Helvetica', value: 'Helvetica, Arial, sans-serif' },
+  { label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
+  { label: 'Verdana', value: 'Verdana, Geneva, sans-serif' },
+  { label: 'Times New Roman', value: '"Times New Roman", Times, serif' },
+  { label: 'Courier New', value: '"Courier New", monospace' },
+  { label: 'Lato', value: 'Lato, sans-serif' },
+  { label: 'Montserrat', value: 'Montserrat, sans-serif' },
+  { label: 'Open Sans', value: '"Open Sans", sans-serif' },
+  { label: 'Poppins', value: 'Poppins, sans-serif' },
+];
+
+const PALETTE_LABELS = [
+  'Primario',
+  'Secundario',
+  'Acento 1',
+  'Acento 2',
+  'Neutro claro',
+  'Neutro oscuro',
+];
+
+const DEFAULT_PALETTE = [
+  { name: 'Primario', hex: '#1E3A7B' },
+  { name: 'Secundario', hex: '#5C4A3A' },
+  { name: 'Acento 1', hex: '#F4E1C1' },
+  { name: 'Acento 2', hex: '#9B6B43' },
+  { name: 'Neutro claro', hex: '#F4F4F4' },
+  { name: 'Neutro oscuro', hex: '#18181B' },
+];
+
+interface BrandPaletteEntry {
+  name: string;
+  hex: string;
+}
+
+function SectionIdentidadVisual({ clientId }: { clientId: string }) {
+  const [logoUrl, setLogoUrl] = useState<string>('');
+  const [brandFont, setBrandFont] = useState<string>('Inter');
+  const [palette, setPalette] = useState<BrandPaletteEntry[]>(DEFAULT_PALETTE);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Cargar brand kit existente
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await callApi<{
+          logo_url: string;
+          brand_font: string;
+          brand_palette: BrandPaletteEntry[];
+        }>(`brief-estudio/brand-kit?client_id=${encodeURIComponent(clientId)}`, {
+          method: 'GET',
+        });
+        if (cancelled) return;
+        if (error) {
+          console.error('[brand-kit] load error:', error);
+          return;
+        }
+        if (data) {
+          setLogoUrl(data.logo_url || '');
+          setBrandFont(data.brand_font || 'Inter');
+          // Si hay paleta guardada, usarla; padding hasta 6 con defaults.
+          const stored = Array.isArray(data.brand_palette) ? data.brand_palette : [];
+          const hydrated = DEFAULT_PALETTE.map((def, i) => stored[i] || def);
+          setPalette(hydrated);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [clientId]);
+
+  const updateColor = (idx: number, hex: string) => {
+    setPalette(prev => prev.map((c, i) => i === idx ? { ...c, hex: hex.toUpperCase() } : c));
+  };
+
+  const handleLogoUpload = async (file: File) => {
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('El logo debe pesar menos de 5 MB');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      toast.error('Solo se aceptan imágenes (PNG, JPG, SVG)');
+      return;
+    }
+    setUploadingLogo(true);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+      const path = `brand-logos/${clientId}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from('client-assets')
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from('client-assets').getPublicUrl(path);
+      setLogoUrl(pub.publicUrl);
+      toast.success('Logo subido — recordá guardar para aplicarlo');
+    } catch (err) {
+      console.error('[brand-kit] logo upload:', err);
+      toast.error('No pudimos subir el logo');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { error } = await callApi('brief-estudio/brand-kit', {
+        body: {
+          client_id: clientId,
+          logo_url: logoUrl,
+          brand_font: brandFont,
+          brand_palette: palette,
+        },
+      });
+      if (error) {
+        toast.error(`No pudimos guardar la identidad visual: ${error}`);
+        return;
+      }
+      toast.success('Identidad visual guardada — Steve la usará en todos los emails y anuncios');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fontStack = FONT_OPTIONS.find(f => f.label === brandFont)?.value || 'Inter, sans-serif';
+
+  return (
+    <Card>
+      <CardHeader className="space-y-2">
+        <div className="flex items-start justify-between gap-2 flex-wrap">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-600" /> Identidad Visual
+            </CardTitle>
+            <CardDescription>
+              Logo, paleta y tipografía de tu marca. Steve los usa para generar emails, anuncios y creatividades coherentes.
+            </CardDescription>
+          </div>
+          <Button onClick={handleSave} disabled={saving || loading}>
+            {saving ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Guardando…</> : 'Guardar'}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {loading && (
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <Loader2 className="w-4 h-4 animate-spin" /> Cargando identidad visual…
+          </div>
+        )}
+
+        {!loading && (
+          <>
+            {/* Logo */}
+            <div>
+              <Label className="text-sm font-semibold">Logo</Label>
+              <p className="text-xs text-slate-500 mb-2">PNG, JPG o SVG hasta 5 MB. Idealmente fondo transparente.</p>
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="w-32 h-32 rounded-lg border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center overflow-hidden">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+                  ) : (
+                    <span className="text-xs text-slate-400">Sin logo</span>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleLogoUpload(f);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingLogo}
+                  >
+                    {uploadingLogo ? (
+                      <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Subiendo…</>
+                    ) : (
+                      <><Upload className="w-4 h-4 mr-1" /> {logoUrl ? 'Cambiar logo' : 'Subir logo'}</>
+                    )}
+                  </Button>
+                  {logoUrl && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setLogoUrl('')}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" /> Quitar
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Paleta */}
+            <div>
+              <Label className="text-sm font-semibold">Paleta de colores</Label>
+              <p className="text-xs text-slate-500 mb-3">6 colores hex que Steve usa en todas las piezas. Primario es el más usado (CTAs, headings).</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {palette.map((color, idx) => (
+                  <div key={idx} className="border rounded-lg p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={color.hex}
+                        onChange={(e) => updateColor(idx, e.target.value)}
+                        className="w-12 h-12 rounded cursor-pointer border"
+                        aria-label={`Color ${PALETTE_LABELS[idx]}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-slate-700">{PALETTE_LABELS[idx]}</p>
+                        <Input
+                          value={color.hex}
+                          onChange={(e) => updateColor(idx, e.target.value)}
+                          className="h-7 text-xs font-mono mt-0.5"
+                          maxLength={7}
+                          placeholder="#RRGGBB"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Tipografía */}
+            <div>
+              <Label className="text-sm font-semibold">Tipografía</Label>
+              <p className="text-xs text-slate-500 mb-2">La que se aplica a todos los emails y anuncios generados.</p>
+              <select
+                value={brandFont}
+                onChange={(e) => setBrandFont(e.target.value)}
+                className="w-full sm:w-72 border border-slate-300 rounded-md px-3 py-2 text-sm bg-white"
+              >
+                {FONT_OPTIONS.map(f => (
+                  <option key={f.label} value={f.label} style={{ fontFamily: f.value }}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+              <div
+                className="mt-3 p-4 rounded-lg border border-slate-200 bg-slate-50"
+                style={{ fontFamily: fontStack }}
+              >
+                <p className="text-xl font-semibold mb-1" style={{ color: palette[0]?.hex || '#1E3A7B' }}>
+                  El zorro marrón rápido
+                </p>
+                <p className="text-sm text-slate-700">
+                  salta sobre el perro perezoso. Esta es una vista previa de cómo se verán los textos de tu marca.
+                </p>
+              </div>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }

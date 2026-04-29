@@ -1930,3 +1930,134 @@ export async function generateMusicPreviews(c: Context) {
     return c.json({ error: message }, 500);
   }
 }
+
+// ─────────────────────────── Brand Kit ──────────────────────────────────────
+
+export interface BrandPaletteEntry {
+  name: string;
+  hex: string;
+}
+
+interface BrandKitInput {
+  client_id: string;
+  logo_url?: string | null;
+  brand_font?: string | null;
+  brand_palette?: BrandPaletteEntry[];
+}
+
+const HEX_RE = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/;
+
+function sanitizePalette(input: unknown): BrandPaletteEntry[] {
+  if (!Array.isArray(input)) return [];
+  // Hard cap a 6 entradas (decisión de producto JM 2026-04-28).
+  return input.slice(0, 6).flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return [];
+    const name = (entry as any).name;
+    const hex = (entry as any).hex;
+    if (typeof name !== 'string' || !name.trim()) return [];
+    if (typeof hex !== 'string' || !HEX_RE.test(hex)) return [];
+    return [{ name: name.trim().slice(0, 40), hex: hex.toUpperCase() }];
+  });
+}
+
+/**
+ * GET /api/brief-estudio/brand-kit?client_id={id}
+ * Devuelve logo, paleta, font y colores legacy del cliente.
+ */
+export async function getBrandKit(c: Context) {
+  try {
+    const clientId = c.req.query('client_id');
+    if (!isNonEmptyString(clientId)) {
+      return c.json({ error: 'client_id is required' }, 400);
+    }
+    const access = await assertClientAccess(c, clientId);
+    if (!access.userId) return c.json({ error: 'Unauthorized' }, 401);
+    if (!access.allowed) return c.json({ error: 'Forbidden' }, 403);
+
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('clients')
+      .select('logo_url, brand_color, brand_secondary_color, brand_font, brand_palette')
+      .eq('id', clientId)
+      .maybeSingle();
+
+    if (error) return c.json({ error: error.message }, 500);
+    if (!data) return c.json({ error: 'Client not found' }, 404);
+
+    return c.json({
+      logo_url: data.logo_url || '',
+      brand_font: data.brand_font || 'Inter',
+      brand_color: data.brand_color || '#18181B',
+      brand_secondary_color: data.brand_secondary_color || '#6366F1',
+      brand_palette: Array.isArray(data.brand_palette) ? data.brand_palette : [],
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[brief-estudio][brand-kit/get] error:', message);
+    return c.json({ error: message }, 500);
+  }
+}
+
+/**
+ * POST /api/brief-estudio/brand-kit
+ * Upsert parcial. Solo actualiza los campos que vienen en el body.
+ *
+ * Sincroniza brand_color y brand_secondary_color con brand_palette[0] y [1]
+ * para mantener compatibilidad con módulos que aún leen las columnas legacy
+ * (Steve Mail, Estudio Creativo, Wizard Meta Ads).
+ */
+export async function saveBrandKit(c: Context) {
+  try {
+    let body: BrandKitInput;
+    try {
+      body = (await c.req.json()) as BrandKitInput;
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+    const { client_id: clientId } = body;
+    if (!isNonEmptyString(clientId)) {
+      return c.json({ error: 'client_id is required' }, 400);
+    }
+    const access = await assertClientAccess(c, clientId);
+    if (!access.userId) return c.json({ error: 'Unauthorized' }, 401);
+    if (!access.allowed) return c.json({ error: 'Forbidden' }, 403);
+
+    const updates: Record<string, any> = {};
+
+    if (body.logo_url !== undefined) {
+      updates.logo_url = isNonEmptyString(body.logo_url) ? body.logo_url : null;
+    }
+
+    if (body.brand_font !== undefined) {
+      updates.brand_font = isNonEmptyString(body.brand_font)
+        ? body.brand_font.trim().slice(0, 80)
+        : 'Inter';
+    }
+
+    if (body.brand_palette !== undefined) {
+      const palette = sanitizePalette(body.brand_palette);
+      updates.brand_palette = palette;
+      // Sincronizar atajos legacy con palette[0] y [1] si existen.
+      if (palette[0]?.hex) updates.brand_color = palette[0].hex;
+      if (palette[1]?.hex) updates.brand_secondary_color = palette[1].hex;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return c.json({ error: 'No fields to update' }, 400);
+    }
+
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from('clients')
+      .update(updates)
+      .eq('id', clientId);
+
+    if (error) return c.json({ error: error.message }, 500);
+
+    return c.json({ ok: true, updated_fields: Object.keys(updates) });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[brief-estudio][brand-kit/save] error:', message);
+    return c.json({ error: message }, 500);
+  }
+}
