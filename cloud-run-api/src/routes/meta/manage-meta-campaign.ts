@@ -2130,17 +2130,30 @@ export async function manageMetaCampaign(c: Context) {
   try {
     const supabase = getSupabaseAdmin();
 
-    // Verify JWT and get user
+    // Verify JWT and get user (or accept internal service-role calls from manage-meta-draft publish flow)
     const authHeader = c.req.header('Authorization');
     if (!authHeader) {
       return c.json({ error: 'Missing authorization header' }, 401);
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const internalKey = c.req.header('X-Internal-Key')?.trim();
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-    if (authError || !user) {
-      return c.json({ error: 'Invalid token' }, 401);
+    let user: { id: string; email?: string };
+    let isInternalCall = false;
+
+    if (internalKey === serviceKey || token === serviceKey) {
+      // Internal service-role call (e.g. from manage-meta-draft publish flow).
+      // Ownership check below is bypassed for internal callers.
+      isInternalCall = true;
+      user = { id: 'internal', email: 'system@steve.cl' };
+    } else {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !authUser) {
+        return c.json({ error: 'Invalid token' }, 401);
+      }
+      user = authUser;
     }
 
     // Parse request body
@@ -2188,9 +2201,9 @@ export async function manageMetaCampaign(c: Context) {
       return c.json({ error: 'Connection not found' }, 404);
     }
 
-    // Verify user owns this connection OR is admin
+    // Verify user owns this connection OR is admin (skipped for internal calls)
     const clientData = connection.clients as unknown as { user_id: string; client_user_id: string | null };
-    const isOwner = clientData.user_id === user.id || clientData.client_user_id === user.id;
+    const isOwner = isInternalCall || clientData.user_id === user.id || clientData.client_user_id === user.id;
 
     if (!isOwner) {
       const adminRole = await safeQuerySingleOrDefault<any>(
