@@ -5,6 +5,17 @@ import { checkRateLimit } from '../../lib/rate-limiter.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.js';
 import { sanitizeMessagesForAnthropic, truncateMessages } from './steve-chat.js';
+import {
+  recommendCreativeFormat,
+  generateImageViaGemini,
+  generateCopyVariants,
+  buildImageCreativeSpec,
+  buildVideoCreativeSpec,
+  buildDctCreativeSpec,
+  buildCarouselCreativeSpec,
+  buildCatalogDpaSpec,
+  type CreativeFormat,
+} from '../../lib/creative-helpers.js';
 
 // Calendario de fechas comerciales relevantes para Chile/LATAM (#39)
 // Usadas para que Steve sepa qué evento se aproxima y pueda recomendar
@@ -1661,14 +1672,26 @@ ${commitments && commitments.length > 0
 ${creativeHistoryCtx}
 Tienes herramientas para buscar información. Si el usuario pregunta algo que no sabes o sobre lo que no tienes reglas, usa buscar_youtube o buscar_web para encontrar información actualizada antes de responder. Si aprendes algo nuevo y valioso durante la búsqueda, usa guardar_regla para guardarlo.
 
-🚀 CREAR CAMPAÑA META (tools crear_draft_campana_meta + editar_draft_campana_meta): Si el cliente pide explícitamente lanzar/crear/armar/configurar una campaña Meta o de Instagram, NO la creás directamente en Meta. El flujo correcto es:
-  1. Si te falta CUALQUIERA de estos params mínimos, PREGUNTÁ uno por uno antes de crear: nombre de campaña, objetivo (CONVERSIONS/TRAFFIC/AWARENESS/ENGAGEMENT/CATALOG), presupuesto en CLP (daily o lifetime), audiencia básica (age_min, age_max, gender, países), placements (facebook/instagram), creativo (headline + body + cta + URL destino).
-  2. Inferí lo que puedas del brief (audiencia tipo del buyer persona, producto del catálogo, etc.) y usá esos valores como defaults razonables que el cliente puede ajustar después.
-  3. Cuando tengas todo, llamá crear_draft_campana_meta con name + spec completa.
-  4. Devolvele al cliente el link en markdown [Revisar campaña antes de subir a Meta](URL) y explicale: "podés editar en pantalla, pedirme cambios acá, o aprobar para subir como borrador a Meta".
-  5. Si después te pide cambios ("cambia el presupuesto a 300K"), usá editar_draft_campana_meta con el draft_id que recordás de tu respuesta anterior y mandá el link actualizado.
-  6. NUNCA llames manage-meta-campaign directamente. SIEMPRE vía draft.
-  7. NUNCA uses status=ACTIVE — el cliente decide cuándo activarla en Meta.
+🚀 CREAR CAMPAÑA META — flujo completo en 4 fases:
+
+FASE 1 (Datos básicos): Si el cliente pide lanzar/crear una campaña Meta y te faltan datos mínimos, PREGUNTÁ uno por uno (no todos juntos): objetivo (CONVERSIONS/TRAFFIC/AWARENESS/ENGAGEMENT/CATALOG), presupuesto CLP (daily/lifetime), fechas (inicio/fin), audiencia (edad min/max, género, países, intereses). Inferí del brief lo que puedas — buyer persona da edad/género típico.
+
+FASE 2 (Recomendar formato): Una vez que tenés objective + budget + days + audience definidos, llamá la tool recomendar_formato_creativo. Te devuelve formato primario + alternativas. Presentale al cliente la recomendación EN LENGUAJE NATURAL con la razón concreta. Esperá que el cliente confirme formato (puede aceptar el recomendado o pedir alternativa).
+
+FASE 3 (Armar el creativo según formato elegido):
+  - 'image' → llamá generar_creativo_imagen con prompt visual descriptivo (50+ chars, usá detalles del brief y brand_research). n_variants=1 si es decisión rápida, 2-3 si querés ofrecer opciones.
+  - 'video' → llamá pedir_video_al_cliente con brief de grabación detallado (shots, duración 15-30s, narrativa). El cliente sube el video por su cuenta y vuelve. NO armes draft hasta tener video URL.
+  - 'dct' → llamá armar_dct_creativo con brief + destination_url. Genera 3 imágenes + 3 copies automáticamente.
+  - 'carousel' → preguntale al cliente qué productos quiere incluir (ofrecele top vendidos del catálogo) y llamá armar_carrusel_creativo con shopify_product_ids.
+  - 'catalog' → preguntale al cliente el product_catalog_id (o detectalo desde meta_catalogs si tenés acceso) y llamá armar_dpa_catalogo.
+
+FASE 4 (Crear draft + entregar link): Cuando tengas la spec del creativo lista, llamá crear_draft_campana_meta con name + spec completa (incluye todo: objective, budget, schedule, audience, placements, creative). Devolvele al cliente el link en markdown [Revisar campaña antes de subir a Meta](URL) y explicale: "podés editar en pantalla, pedirme cambios acá, o aprobar para subir como borrador a Meta". Si después pide cambios ("cambia el presupuesto a 300K"), usá editar_draft_campana_meta con el draft_id y mandá link actualizado.
+
+REGLAS DURAS:
+- NUNCA llames manage-meta-campaign directamente. SIEMPRE vía draft.
+- NUNCA crees draft sin haber recomendado formato primero (excepto si el cliente especifica formato él mismo).
+- NUNCA uses status=ACTIVE — el cliente decide cuándo activar en Meta desde la pantalla de revisión.
+- NUNCA ejecutes generación de imagen sin un prompt visual concreto y descriptivo. Si tu prompt es genérico ("una imagen de un vaso"), pedile más contexto al cliente o construilo del brief.
 
 📊 REPORTES PDF (tool generar_reporte_pdf): Si el usuario pide explícitamente un "reporte", "dashboard exportable", "resumen formal", "PDF", "documento", o frases similares — DISPARÁ la tool. Inferí el rango de fechas del lenguaje natural (ej. "últimos 30 días" → from = today - 30, to = today; "marzo" → from=2026-03-01, to=2026-03-31). HOY ES ${today}. Inferí los temas según lo que pida: Meta → ads_meta + creativos; Google → ads_google; Shopify/ventas → shopify; email/Klaviyo → email; WhatsApp → whatsapp; carritos abandonados → abandoned; competencia → competencia; catálogo/productos → catalogo; diagnóstico/Criterio → criterio. Si no especifica tema o pide "todo / completo / general" → temas=["all"]. Después de obtener la URL, respondé al cliente con el link en formato markdown [Ver reporte PDF](URL) y agregá 3 bullets resumen del contenido.
 
@@ -1720,6 +1743,91 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
             categoria: { type: 'string' as const, description: 'Categoría: meta_ads, google, seo, klaviyo, shopify, brief, anuncios, buyer_persona, analisis' },
           },
           required: ['titulo', 'contenido', 'categoria'],
+        },
+      },
+      {
+        name: 'recomendar_formato_creativo',
+        description: 'Recomienda el formato de creativo (image/video/dct/carousel/catalog) según objetivo de campaña, presupuesto, audiencia, catálogo del cliente y pixel health. ÚSALO ANTES de crear el draft, una vez que tengas objective + budget + audience definidos. Devuelve el formato primario recomendado con justificación + 1-2 alternativas. Esto va al cliente para que decida.',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            objective: { type: 'string' as const, description: 'CONVERSIONS, TRAFFIC, AWARENESS, ENGAGEMENT, CATALOG' },
+            budget_clp: { type: 'number' as const, description: 'Presupuesto total CLP del período' },
+            days: { type: 'number' as const, description: 'Días de la campaña' },
+            audience_size_estimate: { type: 'number' as const, description: 'Tamaño audiencia estimado (de Meta audience size)' },
+            funnel_stage: { type: 'string' as const, description: 'cold | warm | hot' },
+          },
+          required: ['objective', 'budget_clp', 'days'],
+        },
+      },
+      {
+        name: 'generar_creativo_imagen',
+        description: 'Genera N imágenes con Gemini AI basadas en un prompt visual detallado y las sube a Storage. Devuelve URLs públicas. Úsalo después de que el cliente eligió formato "image" o "dct". El prompt debe ser DESCRIPTIVO y específico (ej. "fotografía cenital de 3 vasos de cerámica gres color tierra sobre mesa de madera oscura con ramo de flores silvestres, luz natural cálida, estilo editorial revista de decoración"). Usá detalles del brief y brand_research.',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            prompt: { type: 'string' as const, description: 'Prompt visual descriptivo en español o inglés (mín 50 chars)' },
+            n_variants: { type: 'number' as const, description: 'Cantidad de variantes a generar (1-5, default 1)' },
+          },
+          required: ['prompt'],
+        },
+      },
+      {
+        name: 'armar_dct_creativo',
+        description: 'Arma un creativo DCT (Dynamic Creative Testing): genera N imágenes + N variantes de copy (headlines + bodies). Meta combina automáticamente todas las opciones para encontrar la ganadora. Úsalo cuando el cliente eligió formato "dct". Brief debe ser un párrafo descriptivo del producto y angulo de marketing.',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            brief: { type: 'string' as const, description: 'Brief del producto y ángulo de marketing (mín 80 chars)' },
+            destination_url: { type: 'string' as const, description: 'URL destino (producto Shopify)' },
+            n_images: { type: 'number' as const, description: 'Imágenes a generar (default 3, máx 5)' },
+            n_copy_variants: { type: 'number' as const, description: 'Variantes de copy (default 3, máx 5)' },
+            cta: { type: 'string' as const, description: 'Call to action: SHOP_NOW, LEARN_MORE, etc. (default SHOP_NOW)' },
+          },
+          required: ['brief', 'destination_url'],
+        },
+      },
+      {
+        name: 'armar_carrusel_creativo',
+        description: 'Arma un creativo carrusel con productos del Shopify del cliente. Lee shopify_products por sus IDs y crea cards (3-10). Úsalo cuando el cliente eligió formato "carousel" y te dió los productos a incluir.',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            shopify_product_ids: {
+              type: 'array' as const,
+              items: { type: 'string' as const },
+              description: 'IDs de Shopify products (3-10) a incluir en el carrusel',
+            },
+            primary_text: { type: 'string' as const, description: 'Texto principal del carrusel (sobre todas las cards)' },
+            cta: { type: 'string' as const, description: 'CTA: SHOP_NOW (default), VIEW_NOW, etc.' },
+          },
+          required: ['shopify_product_ids', 'primary_text'],
+        },
+      },
+      {
+        name: 'armar_dpa_catalogo',
+        description: 'Arma un creativo DPA (Dynamic Product Ads) que usa el catálogo Meta del cliente. Meta muestra el producto correcto a cada usuario según su comportamiento. Úsalo cuando el cliente eligió formato "catalog". Requiere que el cliente tenga catálogo Meta conectado al Shopify.',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            product_catalog_id: { type: 'string' as const, description: 'ID del catálogo Meta del cliente (puede pedirse al cliente o detectarse desde meta_catalogs)' },
+            product_set_id: { type: 'string' as const, description: 'Opcional: subset específico del catálogo (ej. solo productos de cerámica). Si no, usa todo el catálogo.' },
+            primary_text: { type: 'string' as const, description: 'Texto principal sobre los productos rotativos' },
+            cta: { type: 'string' as const, description: 'CTA: SHOP_NOW (default)' },
+          },
+          required: ['product_catalog_id', 'primary_text'],
+        },
+      },
+      {
+        name: 'pedir_video_al_cliente',
+        description: 'Cuando el formato elegido es "video" y el cliente no tiene un video subido todavía, devolvele un brief detallado de qué grabar + el link de upload. NO generamos video con AI (es lento y caro). El cliente sube manualmente el video y después vuelve al chat para continuar con el draft.',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            brief_grabacion: { type: 'string' as const, description: 'Brief detallado de qué grabar: shots, duración (15-30s ideal), narrativa, tono. Incluí ángulos del brand_research.' },
+            destination_url: { type: 'string' as const, description: 'URL destino del video' },
+          },
+          required: ['brief_grabacion', 'destination_url'],
         },
       },
       {
@@ -1942,6 +2050,157 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
             } catch (e) {
               toolResult = `Error guardando regla: ${e}`;
             }
+            break;
+          }
+
+          case 'recomendar_formato_creativo': {
+            const inp = toolUseBlock.input as any;
+            try {
+              const rec = recommendCreativeFormat({
+                objective: inp.objective,
+                budget_clp: Number(inp.budget_clp) || 0,
+                days: Number(inp.days) || 7,
+                audience_size_estimate: Number(inp.audience_size_estimate) || 0,
+                pixel_health: pixelHealth?.missing && pixelHealth.missing.length > 3 ? 'broken' : pixelHealth ? 'healthy' : 'unknown',
+                active_products_count: productsList.length,
+                has_winning_creative: (creativeHist || []).some((c: any) => Number(c.performance_score) >= 70),
+                brand_storytelling_strong: !!(persona?.persona_data && JSON.stringify(persona.persona_data).match(/proceso|artesan|tradici|hecho a mano|taller/i)),
+                funnel_stage: inp.funnel_stage || 'cold',
+              });
+              toolResult = `Recomendación de formato: ${JSON.stringify(rec)}. Presentale al cliente la recomendación primaria con la razón en lenguaje natural, y mencionale las alternativas. Después esperá su respuesta antes de seguir al armado del creativo.`;
+            } catch (e: any) {
+              toolResult = `Error recomendando formato: ${e?.message?.slice(0, 200)}`;
+            }
+            break;
+          }
+
+          case 'generar_creativo_imagen': {
+            const { prompt, n_variants } = toolUseBlock.input as any;
+            const n = Math.min(Math.max(Number(n_variants) || 1, 1), 5);
+            const urls: string[] = [];
+            const errors: string[] = [];
+            try {
+              for (let i = 0; i < n; i++) {
+                const result = await generateImageViaGemini(
+                  String(prompt),
+                  supabase,
+                  client_id,
+                  `v${i + 1}`,
+                );
+                if (result.ok) urls.push(result.url);
+                else errors.push(`v${i + 1}: ${result.error}`);
+              }
+              if (urls.length > 0) {
+                toolResult = `Generadas ${urls.length}/${n} imágenes:\n${urls.map((u, i) => `  - Variante ${i + 1}: ${u}`).join('\n')}\n${errors.length ? `Errores: ${errors.join(' | ')}` : ''}\nMostrale las URLs al cliente y guardá la(s) que use para el draft.`;
+              } else {
+                toolResult = `No se pudo generar imagen. Errores: ${errors.join(' | ')}`;
+              }
+            } catch (e: any) {
+              toolResult = `Error generando imagen: ${e?.message?.slice(0, 200)}`;
+            }
+            break;
+          }
+
+          case 'armar_dct_creativo': {
+            const { brief, destination_url, n_images, n_copy_variants, cta } = toolUseBlock.input as any;
+            const nImg = Math.min(Math.max(Number(n_images) || 3, 2), 5);
+            const nCopy = Math.min(Math.max(Number(n_copy_variants) || 3, 2), 5);
+            try {
+              // Generate images in parallel
+              const imagePromises = [];
+              for (let i = 0; i < nImg; i++) {
+                imagePromises.push(generateImageViaGemini(String(brief), supabase, client_id, `dct${i + 1}`));
+              }
+              const imageResults = await Promise.all(imagePromises);
+              const images = imageResults.filter((r: any) => r.ok).map((r: any) => r.url);
+
+              // Generate copy variants in parallel
+              const copyVariants = await generateCopyVariants(String(brief), nCopy);
+              const headlines = copyVariants.map(v => v.headline).filter(Boolean);
+              const bodies = copyVariants.map(v => v.body).filter(Boolean);
+
+              if (images.length < 2 || headlines.length < 2 || bodies.length < 2) {
+                toolResult = `Insuficiente para DCT: ${images.length} imágenes, ${headlines.length} headlines, ${bodies.length} bodies. Mínimo 2 de cada uno.`;
+                break;
+              }
+              const dctSpec = buildDctCreativeSpec({
+                destination_url: String(destination_url),
+                cta: String(cta || 'SHOP_NOW'),
+                images,
+                headlines,
+                bodies,
+              });
+              toolResult = `DCT armado: ${images.length} imágenes × ${headlines.length} headlines × ${bodies.length} bodies = ${(dctSpec as any).primary_count.total_combinations} combinaciones que Meta va a rotar. Spec: ${JSON.stringify(dctSpec).slice(0, 600)}. Pasale este spec a crear_draft_campana_meta como creative.`;
+            } catch (e: any) {
+              toolResult = `Error armando DCT: ${e?.message?.slice(0, 200)}`;
+            }
+            break;
+          }
+
+          case 'armar_carrusel_creativo': {
+            const { shopify_product_ids, primary_text, cta } = toolUseBlock.input as any;
+            try {
+              const ids = (Array.isArray(shopify_product_ids) ? shopify_product_ids : []).slice(0, 10);
+              if (ids.length < 2) {
+                toolResult = 'Carrusel requiere al menos 2 productos. Pedile al cliente más IDs.';
+                break;
+              }
+              const { data: prods } = await supabase
+                .from('shopify_products')
+                .select('shopify_product_id, title, image_url, price_min, handle, shop_domain')
+                .eq('client_id', client_id)
+                .in('shopify_product_id', ids);
+              if (!prods || prods.length < 2) {
+                toolResult = `Solo encontré ${prods?.length || 0} productos en shopify_products con esos IDs. Verificá los IDs con el cliente.`;
+                break;
+              }
+              const cards = prods.map((p: any) => ({
+                title: p.title || 'Sin título',
+                description: p.price_min ? `$${Number(p.price_min).toLocaleString('es-CL')} CLP` : '',
+                image_url: p.image_url || '',
+                link: p.handle && p.shop_domain ? `https://${p.shop_domain}/products/${p.handle}` : '',
+              })).filter((c: any) => c.image_url && c.link);
+
+              if (cards.length < 2) {
+                toolResult = `Productos encontrados pero sin imagen o handle válido (necesarios para carrusel). Productos OK: ${cards.length}/${prods.length}.`;
+                break;
+              }
+              const spec = buildCarouselCreativeSpec({
+                cards,
+                primary_text: String(primary_text || ''),
+                cta: String(cta || 'SHOP_NOW'),
+              });
+              toolResult = `Carrusel armado con ${cards.length} cards. Spec: ${JSON.stringify(spec).slice(0, 600)}. Pasale este spec a crear_draft_campana_meta como creative.`;
+            } catch (e: any) {
+              toolResult = `Error armando carrusel: ${e?.message?.slice(0, 200)}`;
+            }
+            break;
+          }
+
+          case 'armar_dpa_catalogo': {
+            const { product_catalog_id, product_set_id, primary_text, cta } = toolUseBlock.input as any;
+            try {
+              if (!product_catalog_id) {
+                toolResult = 'Falta product_catalog_id. Buscá en meta_catalogs del cliente o preguntale al cliente.';
+                break;
+              }
+              const spec = buildCatalogDpaSpec({
+                product_catalog_id: String(product_catalog_id),
+                product_set_id: product_set_id ? String(product_set_id) : undefined,
+                primary_text: String(primary_text || ''),
+                cta: String(cta || 'SHOP_NOW'),
+              });
+              toolResult = `DPA armado. Spec: ${JSON.stringify(spec)}. Pasale este spec a crear_draft_campana_meta como creative.`;
+            } catch (e: any) {
+              toolResult = `Error armando DPA: ${e?.message?.slice(0, 200)}`;
+            }
+            break;
+          }
+
+          case 'pedir_video_al_cliente': {
+            const { brief_grabacion, destination_url } = toolUseBlock.input as any;
+            const uploadUrl = `https://betabgnuevosupa.vercel.app/portal/${client_id}?tab=campaigns&action=upload-video`;
+            toolResult = `Para video, devolvele al cliente este brief de grabación + link de upload:\n\nBRIEF DE GRABACIÓN:\n${brief_grabacion}\n\nDestino: ${destination_url}\n\nLINK DE UPLOAD: ${uploadUrl}\n\nUna vez que el cliente suba el video, vuelve al chat con la URL del video y armás el draft con creative.type='video'. Mientras tanto NO crees el draft.`;
             break;
           }
 

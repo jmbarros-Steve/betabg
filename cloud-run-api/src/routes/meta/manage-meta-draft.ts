@@ -302,7 +302,10 @@ export async function manageMetaDraft(c: Context) {
       const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
       const spec = (draft.spec || {}) as DraftSpec;
 
-      const createBody = {
+      // Map creative.type → manage-meta-campaign expected shape
+      const creative = spec.creative || {};
+      const creativeType: string = creative.type || 'image';
+      const createBody: any = {
         action: 'create',
         connection_id: draft.connection_id,
         client_id: draft.client_id,
@@ -312,12 +315,50 @@ export async function manageMetaDraft(c: Context) {
         schedule: spec.schedule,
         audience: spec.audience,
         placements: spec.placements,
-        creative: spec.creative,
         adset_name: spec.adset_name,
         ad_name: spec.ad_name,
-        // CRITICAL: queremos que se cree pausada para que el cliente apruebe en Meta
         initial_status: 'PAUSED',
       };
+
+      if (creativeType === 'image') {
+        createBody.ad_set_format = 'single';
+        createBody.headline = creative.headline;
+        createBody.primary_text = creative.body;
+        createBody.cta = creative.cta || 'SHOP_NOW';
+        createBody.destination_url = creative.destination_url;
+        createBody.image_url = creative.image_url;
+      } else if (creativeType === 'video') {
+        createBody.ad_set_format = 'single';
+        createBody.headline = creative.headline;
+        createBody.primary_text = creative.body;
+        createBody.cta = creative.cta || 'SHOP_NOW';
+        createBody.destination_url = creative.destination_url;
+        createBody.video_url = creative.video_url;
+        createBody.thumbnail_url = creative.thumbnail_url;
+      } else if (creativeType === 'dct') {
+        createBody.ad_set_format = 'flexible';
+        createBody.cta = creative.cta || 'SHOP_NOW';
+        createBody.destination_url = creative.destination_url;
+        const afs = creative.asset_feed_spec || {};
+        createBody.image_urls = (afs.images || []).map((i: any) => i.url);
+        createBody.headlines = (afs.titles || []).map((t: any) => t.text);
+        createBody.descriptions = (afs.bodies || []).map((b: any) => b.text);
+        createBody.texts = createBody.descriptions; // alias
+      } else if (creativeType === 'carousel') {
+        createBody.ad_set_format = 'carousel';
+        createBody.cta = creative.cta || 'SHOP_NOW';
+        createBody.primary_text = creative.primary_text;
+        createBody.cards = creative.cards;
+      } else if (creativeType === 'catalog') {
+        createBody.objective = 'CATALOG';
+        createBody.product_catalog_id = creative.product_catalog_id;
+        createBody.product_set_id = creative.product_set_id;
+        createBody.primary_text = creative.primary_text;
+        createBody.cta = creative.cta || 'SHOP_NOW';
+      } else {
+        // Unknown type — pass creative as-is and hope manage-meta-campaign handles it
+        createBody.creative = creative;
+      }
 
       try {
         const res = await fetch(`${baseUrl}/api/manage-meta-campaign`, {
