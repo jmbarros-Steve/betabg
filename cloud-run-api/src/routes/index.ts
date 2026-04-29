@@ -20,6 +20,7 @@ import { onboardingBot } from './utilities/onboarding-bot.js';
 import { checkClientConnections } from './utilities/check-client-connections.js';
 import { creativeReviewFeed } from './utilities/creative-review-feed.js';
 import { serveHtml } from './utilities/serve-html.js';
+import { uploadCreativeAsset } from './utilities/upload-creative-asset.js';
 
 // Phase 2: AI
 import { steveChat } from './ai/steve-chat.js';
@@ -361,6 +362,7 @@ export function registerRoutes(app: Hono) {
   app.post('/api/steve-chat', authMiddleware, steveChat);
   app.post('/api/strategy-chat', authMiddleware, strategyChat);
   app.get('/api/h', serveHtml); // Public HTML proxy for Storage files
+  app.post('/api/upload-creative-asset', authMiddleware, uploadCreativeAsset);
   app.post('/api/strategy-report', authMiddleware, strategyReport);
   app.post('/api/steve-strategy', authMiddleware, steveStrategy);
   app.post('/api/steve-email-content', authMiddleware, steveEmailContent);

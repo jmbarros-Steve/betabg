@@ -10,7 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { ArrowLeft, Rocket, MessageSquare, Save, X, Eye, Loader2, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Rocket, MessageSquare, Save, X, Eye, Loader2, CheckCircle2, Image as ImageIcon } from 'lucide-react';
+import { CreativeImagePicker } from '@/components/client-portal/CreativeImagePicker';
 
 interface Draft {
   id: string;
@@ -36,6 +37,7 @@ export default function CampaignDraftReview() {
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
 
   useEffect(() => {
     if (!draftId) return;
@@ -292,12 +294,25 @@ export default function CampaignDraftReview() {
           <FieldRow label="Body" fieldKey="creative.body" value={spec.creative?.body} />
           <FieldRow label="Call to action" fieldKey="creative.cta" value={spec.creative?.cta} />
           <FieldRow label="URL destino" fieldKey="creative.destination_url" value={spec.creative?.destination_url} />
-          {spec.creative?.image_url && (
-            <div className="mt-3">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Imagen</Label>
-              <img src={spec.creative.image_url} alt="creative" className="mt-2 max-h-64 rounded border" />
+          <div className="mt-4 pt-3 border-t">
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Imagen del ad</Label>
+              {!isPublished && !isRejected && (
+                <Button size="sm" variant="outline" onClick={() => setImagePickerOpen(true)}>
+                  <ImageIcon className="h-4 w-4 mr-1" /> {spec.creative?.image_url && !String(spec.creative.image_url).startsWith('PENDIENTE') ? 'Cambiar imagen' : 'Elegir imagen'}
+                </Button>
+              )}
             </div>
-          )}
+            {spec.creative?.image_url && !String(spec.creative.image_url).startsWith('PENDIENTE') ? (
+              <img src={spec.creative.image_url} alt="creative" className="max-h-64 rounded border" />
+            ) : (
+              <div className="border-2 border-dashed rounded-lg p-8 text-center bg-muted/30">
+                <ImageIcon className="h-10 w-10 mx-auto text-muted-foreground/50" />
+                <p className="mt-2 text-sm text-muted-foreground">Sin imagen aún</p>
+                <p className="mt-1 text-xs text-muted-foreground">Hacé click en "Elegir imagen" para subir, usar del catálogo, o pegar URL.</p>
+              </div>
+            )}
+          </div>
           {previewUrl && (
             <div className="mt-4">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1"><Eye className="h-3 w-3" /> Preview oficial Meta</Label>
@@ -317,6 +332,16 @@ export default function CampaignDraftReview() {
           </CardContent>
         </Card>
       )}
+
+      {/* Image Picker Modal */}
+      <CreativeImagePicker
+        clientId={draft.client_id}
+        open={imagePickerOpen}
+        onOpenChange={setImagePickerOpen}
+        onPick={(url) => {
+          applyChange({ creative: { ...spec.creative, image_url: url } });
+        }}
+      />
 
       {!isPublished && !isRejected && (
         <div className="sticky bottom-4 bg-background/95 backdrop-blur p-4 border rounded-lg shadow-lg flex flex-col sm:flex-row gap-2 justify-end">
