@@ -398,7 +398,12 @@ export async function manageMetaDraft(c: Context) {
         });
         const respBody: any = await res.json().catch(() => ({}));
         if (!res.ok || !respBody?.success) {
-          const errDetails = respBody?.error || respBody?.details || `HTTP ${res.status}`;
+          // Concatenar error + details para no perder el error real de Meta API
+          const errParts: string[] = [];
+          if (respBody?.error) errParts.push(String(respBody.error));
+          if (respBody?.details) errParts.push(String(respBody.details));
+          const errDetails = errParts.join(' — ') || `HTTP ${res.status}`;
+          console.error('[meta-draft] Publish failed. Full response:', JSON.stringify(respBody).slice(0, 500));
           // Mejorar mensajes para errores comunes
           let userFacingMessage = errDetails;
           if (typeof errDetails === 'string' && /invalid token|expired|access[_ ]token/i.test(errDetails)) {
