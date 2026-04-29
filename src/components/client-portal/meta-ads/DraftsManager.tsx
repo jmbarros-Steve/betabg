@@ -917,141 +917,185 @@ export default function DraftsManager({ clientId, onEditDraft, onGoToCreate }: D
                     </div>
                   </div>
 
-                  {/* ───── DCT 3:2:2 MATRIX ───── */}
-                  <div className="mx-5 mb-4 rounded-lg border p-4 space-y-4">
-                    <div>
-                      <h4 className="text-sm font-bold flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-violet-500" />
-                        <JargonTooltip term="DCT" label="DCT 3:2:2" /> — Matriz de Variaciones
-                      </h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        3 imágenes × 2 copies × 2 headlines = 12 combinaciones de anuncios para testear
-                      </p>
-                    </div>
+                  {/* ───── CREATIVE MATRIX (formato-aware) ───── */}
+                  {(() => {
+                    // Detectar formato del borrador. Soporta:
+                    //   - flexible: DCT 3:2:2 (default histórico, 3 imágenes × 2 copies × 2 títulos)
+                    //   - single: 1 imagen o video × 1 copy × 1 título
+                    //   - carousel: hasta 10 tarjetas × 1 copy × 1 título
+                    //   - catalog (DPA): Meta usa catálogo Shopify, sin slots locales
+                    const formato = (bv?.ad_set_format as string) || draft.formato || 'flexible';
+                    const isCatalog = formato === 'catalog';
+                    const isSingle = formato === 'single';
+                    const isCarousel = formato === 'carousel';
+                    const slotCount = isSingle ? 1 : isCarousel ? Math.max(3, images.length) : 3;
+                    const reqCopies = isSingle || isCarousel ? 1 : 2;
+                    const reqHeadlines = isSingle || isCarousel ? 1 : 2;
 
-                    {/* Creatives (3 slots) — detects video vs image per slot */}
-                    {(() => {
-                      const isVideo = (u: string) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u);
-                      const videoCount = images.filter((u) => u && isVideo(u)).length;
-                      const imgCount = images.filter((u) => u && !isVideo(u)).length;
-                      const label = videoCount > 0 && imgCount > 0
-                        ? `Creativos (${imgCount} img + ${videoCount} video)`
-                        : videoCount > 0
-                          ? `Videos (${videoCount}/3)`
-                          : `Imágenes (${imgCount}/3)`;
-                      return (
+                    const isVideoUrl = (u: string) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u);
+                    const videoCount = images.filter((u) => u && isVideoUrl(u)).length;
+                    const imgCount = images.filter((u) => u && !isVideoUrl(u)).length;
+                    const slotsLabel = videoCount > 0 && imgCount > 0
+                      ? `Creativos (${imgCount} img + ${videoCount} video)`
+                      : videoCount > 0
+                        ? `Videos (${videoCount}/${slotCount})`
+                        : `Imágenes (${imgCount}/${slotCount})`;
+                    const gridCols = slotCount === 1 ? 'grid-cols-1 max-w-[200px]' : 'grid-cols-3';
+
+                    return (
+                      <div className="mx-5 mb-4 rounded-lg border p-4 space-y-4">
+                        <div>
+                          <h4 className="text-sm font-bold flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-violet-500" />
+                            {isCatalog
+                              ? 'Catálogo Dinámico (DPA)'
+                              : isSingle
+                                ? 'Anuncio Único'
+                                : isCarousel
+                                  ? 'Carrusel'
+                                  : <><JargonTooltip term="DCT" label="DCT 3:2:2" /> — Matriz de Variaciones</>}
+                          </h4>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {isCatalog
+                              ? 'Meta usa tu catálogo Shopify automáticamente — no necesitás subir imágenes acá.'
+                              : isSingle
+                                ? '1 imagen o video × 1 copy × 1 título — formato simple para testear un mensaje específico.'
+                                : isCarousel
+                                  ? `${slotCount} tarjetas × 1 copy × 1 título — historia secuencial o multi-producto.`
+                                  : '3 imágenes × 2 copies × 2 títulos = 12 combinaciones de anuncios para testear.'}
+                          </p>
+                        </div>
+
+                        {/* Slots de creativos — ocultos en catálogo (Meta los toma del catalog) */}
+                        {!isCatalog && (
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                              <ImageIcon className="w-3.5 h-3.5" />
+                              {slotsLabel}
+                            </p>
+                            <div className={`grid ${gridCols} gap-3`}>
+                              {Array.from({ length: slotCount }).map((_, i) => {
+                                const url = images[i];
+                                const slotIsVideo = !!url && isVideoUrl(url);
+                                return (
+                                  <div key={i} className="aspect-square rounded-lg overflow-hidden border-2 border-border relative">
+                                    {url ? (
+                                      slotIsVideo ? (
+                                        <>
+                                          <video src={url} className="w-full h-full object-cover" muted playsInline />
+                                          <span className="absolute top-1 right-1 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded">VIDEO</span>
+                                        </>
+                                      ) : (
+                                        <SafeImage src={url} className="w-full h-full" />
+                                      )
+                                    ) : (
+                                      <div className="w-full h-full bg-muted/30 flex flex-col items-center justify-center gap-1.5 p-2">
+                                        <Plus className="w-6 h-6 text-muted-foreground/25" />
+                                        <span className="text-[11px] text-muted-foreground/50 text-center">
+                                          Slot {i + 1}
+                                        </span>
+                                        <span className="text-[9px] text-muted-foreground/40">Pendiente</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {isCatalog && (
+                          <div className="flex items-start gap-2 p-3 rounded-lg bg-[#1E3A7B]/5 border border-[#2A4F9E]/20">
+                            <Lightbulb className="w-4 h-4 text-[#2A4F9E] shrink-0 mt-0.5" />
+                            <p className="text-xs text-[#162D5F]">
+                              Las imágenes vienen automáticamente de tu catálogo Shopify cuando Meta entrega el anuncio. Solo necesitás definir copy y título.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Copies — cantidad dinámica según formato */}
                         <div>
                           <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
-                            <ImageIcon className="w-3.5 h-3.5" />
-                            {label}
+                            <FileText className="w-3.5 h-3.5" />
+                            {reqCopies > 1 ? `Copies — Texto Principal (${copies.length}/${reqCopies})` : `Copy — Texto Principal (${copies.length}/1)`}
                           </p>
-                          <div className="grid grid-cols-3 gap-3">
-                            {[0, 1, 2].map((i) => {
-                              const url = images[i];
-                              const slotIsVideo = !!url && isVideo(url);
-                              return (
-                                <div key={i} className="aspect-square rounded-lg overflow-hidden border-2 border-border relative">
-                                  {url ? (
-                                    slotIsVideo ? (
-                                      <>
-                                        <video src={url} className="w-full h-full object-cover" muted playsInline />
-                                        <span className="absolute top-1 right-1 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded">VIDEO</span>
-                                      </>
-                                    ) : (
-                                      <SafeImage src={url} className="w-full h-full" />
-                                    )
-                                  ) : (
-                                    <div className="w-full h-full bg-muted/30 flex flex-col items-center justify-center gap-1.5 p-2">
-                                      <Plus className="w-6 h-6 text-muted-foreground/25" />
-                                      <span className="text-[11px] text-muted-foreground/50 text-center">
-                                        Slot {i + 1}
-                                      </span>
-                                      <span className="text-[9px] text-muted-foreground/40">Pendiente</span>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                          <div className="space-y-2">
+                            {Array.from({ length: reqCopies }).map((_, i) => (
+                              <div key={i} className={`rounded-lg border p-3 ${copies[i] ? 'bg-background' : 'bg-muted/20 border-dashed'}`}>
+                                {copies[i] ? (
+                                  <>
+                                    <span className="text-sm font-medium text-emerald-600">Copy {i + 1} ✓</span>
+                                    <p className="mt-1 text-xs leading-relaxed">{copies[i]}</p>
+                                  </>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground/50">
+                                    Copy {i + 1} — Pendiente. Crea otra variación desde "Crear".
+                                  </span>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      );
-                    })()}
 
-                    {/* Copies (2 slots) */}
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5" />
-                        Copies — Texto Principal ({copies.length}/2)
-                      </p>
-                      <div className="space-y-2">
-                        {[0, 1].map((i) => (
-                          <div key={i} className={`rounded-lg border p-3 ${copies[i] ? 'bg-background' : 'bg-muted/20 border-dashed'}`}>
-                            {copies[i] ? (
-                              <>
-                                <span className="text-sm font-medium text-emerald-600">Copy {i + 1} ✓</span>
-                                <p className="mt-1 text-xs leading-relaxed">{copies[i]}</p>
-                              </>
-                            ) : (
-                              <span className="text-xs text-muted-foreground/50">
-                                Copy {i + 1} — Pendiente. Crea otra variación desde "Crear".
-                              </span>
-                            )}
+                        {/* Headlines — cantidad dinámica según formato */}
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                            <FileText className="w-3.5 h-3.5" />
+                            {reqHeadlines > 1 ? `Títulos (${headlines.length}/${reqHeadlines})` : `Título (${headlines.length}/1)`}
+                          </p>
+                          <div className="space-y-2">
+                            {Array.from({ length: reqHeadlines }).map((_, i) => (
+                              <div key={i} className={`rounded-lg border p-3 ${headlines[i] ? 'bg-background' : 'bg-muted/20 border-dashed'}`}>
+                                {headlines[i] ? (
+                                  <>
+                                    <span className="text-sm font-medium text-emerald-600">Título {i + 1} ✓</span>
+                                    <p className="mt-1 text-sm font-semibold">{headlines[i]}</p>
+                                  </>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground/50">
+                                    Título {i + 1} — Pendiente. Crea otra variación desde "Crear".
+                                  </span>
+                                )}
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </div>
+                        </div>
 
-                    {/* Headlines (2 slots) */}
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5" />
-                        Títulos ({headlines.length}/2)
-                      </p>
-                      <div className="space-y-2">
-                        {[0, 1].map((i) => (
-                          <div key={i} className={`rounded-lg border p-3 ${headlines[i] ? 'bg-background' : 'bg-muted/20 border-dashed'}`}>
-                            {headlines[i] ? (
-                              <>
-                                <span className="text-sm font-medium text-emerald-600">Título {i + 1} ✓</span>
-                                <p className="mt-1 text-sm font-semibold">{headlines[i]}</p>
-                              </>
-                            ) : (
-                              <span className="text-xs text-muted-foreground/50">
-                                Título {i + 1} — Pendiente. Crea otra variación desde "Crear".
-                              </span>
-                            )}
+                        {/* Description if exists */}
+                        {draft.descripcion && (
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground mb-2">
+                              Descripción del enlace
+                            </p>
+                            <div className="rounded-lg border bg-background p-3">
+                              <p className="text-xs text-muted-foreground italic">{draft.descripcion}</p>
+                            </div>
                           </div>
-                        ))}
+                        )}
                       </div>
-                    </div>
+                    );
+                  })()}
 
-                    {/* Description if exists */}
-                    {draft.descripcion && (
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-2">
-                          Descripción del enlace
-                        </p>
-                        <div className="rounded-lg border bg-background p-3">
-                          <p className="text-xs text-muted-foreground italic">{draft.descripcion}</p>
+                  {/* ───── METHODOLOGY NOTE — solo para DCT flexible ───── */}
+                  {(() => {
+                    const formato = (bv?.ad_set_format as string) || draft.formato || 'flexible';
+                    if (formato !== 'flexible') return null;
+                    return (
+                      <div className="mx-5 mb-4 flex items-start gap-2.5 p-3 rounded-lg bg-violet-500/5 border border-violet-500/20">
+                        <Lightbulb className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" />
+                        <div className="text-xs leading-relaxed">
+                          <span className="font-semibold">Metodología DCT 3:2:2 (Charles Tichener):</span>{' '}
+                          Cada Ad Set tiene 1 solo anuncio para aislar variables. No tocar por 7 días.
+                          Día 7, Steve clasifica en ganadores, potenciales y perdedores según Hook Rate ({'>'}25%), Hold Rate ({'>'}15%) y CTR ({'>'}1.5%).
+                          {bv?.plan_accion?.regla_kill && (
+                            <span className="block mt-1 text-muted-foreground">
+                              Kill rule: {bv.plan_accion.regla_kill}
+                            </span>
+                          )}
                         </div>
                       </div>
-                    )}
-                  </div>
-
-                  {/* ───── METHODOLOGY NOTE ───── */}
-                  <div className="mx-5 mb-4 flex items-start gap-2.5 p-3 rounded-lg bg-violet-500/5 border border-violet-500/20">
-                    <Lightbulb className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" />
-                    <div className="text-xs leading-relaxed">
-                      <span className="font-semibold">Metodología DCT 3:2:2 (Charles Tichener):</span>{' '}
-                      Cada Ad Set tiene 1 solo anuncio para aislar variables. No tocar por 7 días.
-                      Día 7, Steve clasifica en ganadores, potenciales y perdedores según Hook Rate ({'>'}25%), Hold Rate ({'>'}15%) y CTR ({'>'}1.5%).
-                      {bv?.plan_accion?.regla_kill && (
-                        <span className="block mt-1 text-muted-foreground">
-                          Kill rule: {bv.plan_accion.regla_kill}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   {/* ───── ACTIONS FOOTER ───── */}
                   <div className="px-5 py-3 border-t bg-muted/10 flex items-center justify-between flex-wrap gap-2">
