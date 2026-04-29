@@ -303,62 +303,87 @@ export async function manageMetaDraft(c: Context) {
       const spec = (draft.spec || {}) as DraftSpec;
 
       // Map creative.type → manage-meta-campaign expected shape
+      // IMPORTANTE: manage-meta-campaign espera { action, connection_id, data: {...} }
+      // Todos los params de la campaña van DENTRO de `data`, no en top-level.
       const creative = spec.creative || {};
       const creativeType: string = creative.type || 'image';
-      const createBody: any = {
-        action: 'create',
-        connection_id: draft.connection_id,
-        client_id: draft.client_id,
+
+      const innerData: any = {
         name: draft.name,
-        objective: spec.objective,
-        budget: spec.budget,
-        schedule: spec.schedule,
-        audience: spec.audience,
+        objective: (spec.objective || '').toUpperCase(),
+        // Budget: manage-meta-campaign espera daily_budget (en CLP * 100 microunits? o solo CLP int).
+        // Pasamos como espera el shape del Wizard original — daily_budget en CLP.
+        daily_budget: spec.budget?.type === 'daily' ? spec.budget?.amount_clp : undefined,
+        lifetime_budget: spec.budget?.type === 'lifetime' ? spec.budget?.amount_clp : undefined,
+        budget_type: spec.budget?.type,
+        start_time: spec.schedule?.start,
+        end_time: spec.schedule?.end,
+        // Targeting / audience
+        targeting: spec.audience ? {
+          age_min: spec.audience.age_min,
+          age_max: spec.audience.age_max,
+          genders: spec.audience.gender === 'male' ? [1] : spec.audience.gender === 'female' ? [2] : undefined,
+          geo_locations: spec.audience.geo ? { countries: spec.audience.geo.countries } : undefined,
+          interests: spec.audience.interests,
+          custom_audiences: spec.audience.custom_audiences,
+          excluded_custom_audiences: spec.audience.exclusions?.custom_audiences,
+        } : undefined,
         placements: spec.placements,
         adset_name: spec.adset_name,
         ad_name: spec.ad_name,
+        // Status: queremos PAUSED para que el cliente apruebe en Meta
         initial_status: 'PAUSED',
+        currency: 'CLP',
       };
 
       if (creativeType === 'image') {
-        createBody.ad_set_format = 'single';
-        createBody.headline = creative.headline;
-        createBody.primary_text = creative.body;
-        createBody.cta = creative.cta || 'SHOP_NOW';
-        createBody.destination_url = creative.destination_url;
-        createBody.image_url = creative.image_url;
+        innerData.ad_set_format = 'single';
+        innerData.headline = creative.headline;
+        innerData.primary_text = creative.body;
+        innerData.headlines = creative.headline ? [creative.headline] : undefined;
+        innerData.texts = creative.body ? [creative.body] : undefined;
+        innerData.cta = creative.cta || 'SHOP_NOW';
+        innerData.destination_url = creative.destination_url;
+        innerData.image_url = creative.image_url;
+        innerData.image_urls = creative.image_url ? [creative.image_url] : undefined;
       } else if (creativeType === 'video') {
-        createBody.ad_set_format = 'single';
-        createBody.headline = creative.headline;
-        createBody.primary_text = creative.body;
-        createBody.cta = creative.cta || 'SHOP_NOW';
-        createBody.destination_url = creative.destination_url;
-        createBody.video_url = creative.video_url;
-        createBody.thumbnail_url = creative.thumbnail_url;
+        innerData.ad_set_format = 'single';
+        innerData.headline = creative.headline;
+        innerData.primary_text = creative.body;
+        innerData.cta = creative.cta || 'SHOP_NOW';
+        innerData.destination_url = creative.destination_url;
+        innerData.video_url = creative.video_url;
+        innerData.thumbnail_url = creative.thumbnail_url;
       } else if (creativeType === 'dct') {
-        createBody.ad_set_format = 'flexible';
-        createBody.cta = creative.cta || 'SHOP_NOW';
-        createBody.destination_url = creative.destination_url;
+        innerData.ad_set_format = 'flexible';
+        innerData.cta = creative.cta || 'SHOP_NOW';
+        innerData.destination_url = creative.destination_url;
         const afs = creative.asset_feed_spec || {};
-        createBody.image_urls = (afs.images || []).map((i: any) => i.url);
-        createBody.headlines = (afs.titles || []).map((t: any) => t.text);
-        createBody.descriptions = (afs.bodies || []).map((b: any) => b.text);
-        createBody.texts = createBody.descriptions; // alias
+        innerData.image_urls = (afs.images || []).map((i: any) => i.url);
+        innerData.headlines = (afs.titles || []).map((t: any) => t.text);
+        innerData.descriptions = (afs.bodies || []).map((b: any) => b.text);
+        innerData.texts = innerData.descriptions; // alias para variantes de body
       } else if (creativeType === 'carousel') {
-        createBody.ad_set_format = 'carousel';
-        createBody.cta = creative.cta || 'SHOP_NOW';
-        createBody.primary_text = creative.primary_text;
-        createBody.cards = creative.cards;
+        innerData.ad_set_format = 'carousel';
+        innerData.cta = creative.cta || 'SHOP_NOW';
+        innerData.primary_text = creative.primary_text;
+        innerData.cards = creative.cards;
       } else if (creativeType === 'catalog') {
-        createBody.objective = 'CATALOG';
-        createBody.product_catalog_id = creative.product_catalog_id;
-        createBody.product_set_id = creative.product_set_id;
-        createBody.primary_text = creative.primary_text;
-        createBody.cta = creative.cta || 'SHOP_NOW';
+        innerData.objective = 'CATALOG';
+        innerData.product_catalog_id = creative.product_catalog_id;
+        innerData.product_set_id = creative.product_set_id;
+        innerData.primary_text = creative.primary_text;
+        innerData.cta = creative.cta || 'SHOP_NOW';
       } else {
-        // Unknown type — pass creative as-is and hope manage-meta-campaign handles it
-        createBody.creative = creative;
+        // Unknown type — pass creative as-is
+        Object.assign(innerData, creative);
       }
+
+      const createBody: any = {
+        action: 'create',
+        connection_id: draft.connection_id,
+        data: innerData,
+      };
 
       try {
         const res = await fetch(`${baseUrl}/api/manage-meta-campaign`, {
