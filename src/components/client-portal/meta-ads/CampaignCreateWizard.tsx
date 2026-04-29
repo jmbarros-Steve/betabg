@@ -4846,35 +4846,28 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   const [destinationUrl, setDestinationUrl] = useState('');
 
   // Edit-from-draft: si DraftsManager guardó un draft en sessionStorage,
-  // lo levantamos al montar y precargamos los states. Esto hace que
-  // "Edición avanzada (wizard)" desde Borradores arranque con todo cargado
-  // en vez de obligar al cliente a re-armar la campaña desde cero.
+  // lo levantamos y precargamos los states. Soporta 2 entry points:
+  //   1. Mount: si llegás directo al wizard (refresh), levanta de sessionStorage
+  //   2. Custom event 'bg:edit-meta-draft': MetaAdsManager mantiene este
+  //      componente montado con keep-alive — al volver desde Borradores el
+  //      mount NO se re-dispara. DraftsManager dispatcha el evento en window
+  //      después de navegar; este listener lo escucha y precarga.
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      let stored: { id: string } | null = null;
-      try {
-        const raw = sessionStorage.getItem('betabg:edit-meta-draft');
-        if (raw) stored = JSON.parse(raw);
-      } catch {
-        return;
-      }
-      if (!stored?.id) return;
-      // Limpiamos el storage AHORA para que un refresh accidental no quede
-      // atrapado en loop de "siempre cargo el mismo draft".
-      try { sessionStorage.removeItem('betabg:edit-meta-draft'); } catch { /* ignore */ }
-
+    const loadDraftIntoWizard = async (draftId: string) => {
       const { data: draft, error } = await supabase
         .from('ad_creatives')
         .select('id, titulo, texto_principal, descripcion, cta, asset_url, formato, funnel, angulo, brief_visual, dct_copies, dct_titulos, dct_descripciones, dct_imagenes')
-        .eq('id', stored.id)
+        .eq('id', draftId)
         .eq('client_id', clientId)
         .maybeSingle();
-      if (cancelled || error || !draft) return;
+      if (cancelled || error || !draft) {
+        if (error) console.warn('[edit-draft] fetch error:', error.message);
+        return;
+      }
 
       const bv = (draft.brief_visual || {}) as Record<string, any>;
 
-      // Campaign name (desde brief_visual o titulo del creativo)
       if (bv.campaign_name) {
         setCampName(bv.campaign_name);
         setCampNameEdited(true);
@@ -4883,22 +4876,17 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         setCampNameEdited(true);
       }
 
-      // Objective
       const validObj = ['CONVERSIONS', 'TRAFFIC', 'AWARENESS', 'ENGAGEMENT', 'CATALOG'];
       if (bv.objective && validObj.includes(bv.objective)) {
         setObjective(bv.objective as Objective);
       }
 
-      // Budget — preferir plan_accion.presupuesto_diario, fallback a adset_budget
       const budget = bv.plan_accion?.presupuesto_diario || bv.adset_budget || bv.campaign_budget;
       if (budget) {
         const numBudget = String(budget).replace(/[^\d]/g, '');
-        if (numBudget) {
-          setCampBudget(numBudget);
-        }
+        if (numBudget) setCampBudget(numBudget);
       }
 
-      // Headlines — primero dct_titulos, fallback a draft.titulo
       const hls: string[] = [];
       if (Array.isArray(draft.dct_titulos)) {
         for (const t of draft.dct_titulos) {
@@ -4908,7 +4896,6 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       if (hls.length === 0 && draft.titulo) hls.push(draft.titulo);
       if (hls.length > 0) setHeadlines(hls.filter(Boolean));
 
-      // Primary texts — dct_copies, fallback a texto_principal
       const cps: string[] = [];
       if (Array.isArray(draft.dct_copies)) {
         for (const c of draft.dct_copies) {
@@ -4918,7 +4905,6 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       if (cps.length === 0 && draft.texto_principal) cps.push(draft.texto_principal);
       if (cps.length > 0) setPrimaryTexts(cps.filter(Boolean));
 
-      // Descriptions
       const descs: string[] = [];
       if (Array.isArray(draft.dct_descripciones)) {
         for (const d of draft.dct_descripciones) {
@@ -4928,7 +4914,6 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       if (descs.length === 0 && draft.descripcion) descs.push(draft.descripcion);
       if (descs.length > 0) setDescriptions(descs.filter(Boolean));
 
-      // Images — asset_url principal + dct_imagenes
       const imgs: string[] = [];
       if (draft.asset_url) imgs.push(draft.asset_url);
       if (Array.isArray(draft.dct_imagenes)) {
@@ -4939,11 +4924,9 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       }
       if (imgs.length > 0) setImages(imgs);
 
-      // CTA + URL destino
       if (draft.cta) setCta(draft.cta);
       if (bv.destination_url) setDestinationUrl(bv.destination_url);
 
-      // Funnel + ángulo
       if (draft.funnel === 'tofu' || draft.funnel === 'mofu' || draft.funnel === 'bofu') {
         setFunnelStage(draft.funnel);
       }
@@ -4951,14 +4934,41 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         setSelectedAngle(draft.angulo);
       }
 
-      // Arrancar el wizard directo (skip el step de "Crear nueva o usar existente")
       setCreateNewCampaign(true);
       setCreateNewAdset(true);
       setWizardStarted(true);
 
       toast.success(`Borrador cargado: "${bv.campaign_name || draft.titulo || 'Sin nombre'}"`);
+    };
+
+    // 1. Mount path — leer sessionStorage si llegamos desde un refresh
+    (async () => {
+      let stored: { id: string } | null = null;
+      try {
+        const raw = sessionStorage.getItem('betabg:edit-meta-draft');
+        if (raw) stored = JSON.parse(raw);
+      } catch { return; }
+      if (!stored?.id) return;
+      try { sessionStorage.removeItem('betabg:edit-meta-draft'); } catch { /* ignore */ }
+      await loadDraftIntoWizard(stored.id);
     })();
-    return () => { cancelled = true; };
+
+    // 2. Custom event path — MetaAdsManager keep-alive: cuando JM hace click
+    //    "Edición avanzada (wizard)" desde Borradores y este componente ya
+    //    estaba montado, el mount no re-dispara. DraftsManager emite el
+    //    evento, lo escuchamos acá y precargamos sin re-mount.
+    const handleEditEvent = (e: Event) => {
+      const ev = e as CustomEvent<{ id: string }>;
+      const id = ev.detail?.id;
+      if (!id) return;
+      try { sessionStorage.removeItem('betabg:edit-meta-draft'); } catch { /* ignore */ }
+      loadDraftIntoWizard(id);
+    };
+    window.addEventListener('bg:edit-meta-draft', handleEditEvent);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('bg:edit-meta-draft', handleEditEvent);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 

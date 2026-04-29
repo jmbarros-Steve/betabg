@@ -479,11 +479,8 @@ export default function DraftsManager({ clientId, onEditDraft, onGoToCreate }: D
 
   const handleAdvancedEdit = () => {
     if (!editTarget) return;
-    // Persistimos el draft en sessionStorage para que CampaignCreateWizard lo
-    // levante al montar y precargue todos los states (copy, headlines, images,
-    // descripciones, brief_visual, funnel, ángulo, presupuesto, CTA, URL).
-    // El TTL es la sesión del navegador — si el cliente abre otra tab y el
-    // wizard no levantó, queda hasta cerrar el browser.
+    // 1. Persistimos el draft en sessionStorage por si el wizard se monta
+    //    fresh (primera vez que el cliente entra a Crear en esta sesión).
     try {
       sessionStorage.setItem(
         'betabg:edit-meta-draft',
@@ -492,13 +489,20 @@ export default function DraftsManager({ clientId, onEditDraft, onGoToCreate }: D
           savedAt: new Date().toISOString(),
         }),
       );
-    } catch {
-      // sessionStorage puede fallar (modo incógnito strict, etc.) — no es crítico
-    }
+    } catch { /* sessionStorage may fail in strict-incognito */ }
+    const draftId = editTarget.id;
     if (onEditDraft) {
-      onEditDraft(editTarget.id);
+      onEditDraft(draftId);
     }
     setEditTarget(null);
+    // 2. CRÍTICO: MetaAdsManager usa lazy-mount + keep-alive — si el wizard
+    //    ya fue visitado antes, NO se re-monta al volver, solo cambia
+    //    display:none→block. El useEffect mount del wizard no vuelve a
+    //    correr. Disparamos un CustomEvent en window para que el wizard
+    //    (montado o no) escuche y precargue el draft.
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('bg:edit-meta-draft', { detail: { id: draftId } }));
+    }, 50);
   };
 
   // ── Go to create wizard ──
