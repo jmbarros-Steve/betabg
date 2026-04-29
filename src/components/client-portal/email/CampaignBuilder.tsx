@@ -236,13 +236,14 @@ export function CampaignBuilder({ clientId }: CampaignBuilderProps) {
     }
   }, [editorStep]);
 
-  // Load stored AI MJML when editor becomes ready
+  // Load stored AI HTML/MJML when editor becomes ready (after generación
+  // en Step 1 cuando todavía el editor no estaba montado).
   useEffect(() => {
     if (!editorReady || !emailEditorRef.current) return;
     if (designJson) return; // design_json from existing campaign takes priority
-    const storedMjml = editingCampaign?.html_content;
-    if (storedMjml && storedMjml.includes('<mjml')) {
-      emailEditorRef.current.setHtml(storedMjml);
+    const storedHtml = editingCampaign?.html_content;
+    if (storedHtml && storedHtml.trim().length > 0) {
+      emailEditorRef.current.setHtml(storedHtml);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editorReady]);
