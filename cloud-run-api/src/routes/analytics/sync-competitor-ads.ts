@@ -231,6 +231,34 @@ function buildAdLibraryUrlWithPageId(pageId: string): string {
 }
 
 /**
+ * Sanitize a competitor query for Ad Library keyword search.
+ * Strips TLDs (.cl, .com, .co, .mx, .es, .net, .org), dashes, dots, and
+ * @ prefix. "manosdelalma.cl" → "manos del alma" / "@good_gres" → "good gres".
+ * Apify scrapeará Ad Library con esa query.
+ */
+function sanitizeForSearch(query: string): string {
+  let q = query.trim().toLowerCase();
+  if (q.startsWith('@')) q = q.slice(1);
+  // Strip common TLDs
+  q = q.replace(/\.(cl|com|co|mx|es|net|org|ar|pe|br|ec|uy|py|bo|ve|us)(\.[a-z]{2})?$/i, '');
+  // Replace dashes/underscores/dots with spaces
+  q = q.replace(/[-_.]+/g, ' ');
+  // Collapse multiple spaces
+  q = q.replace(/\s+/g, ' ').trim();
+  return q;
+}
+
+/**
+ * Build Ad Library URL with a keyword search query. Apify scraper acepta esta
+ * URL y devuelve los ads activos que matcheen. Usado cuando NO tenemos page_id
+ * resuelto (ej. el cliente ingresó dominio o nombre crudo).
+ */
+function buildAdLibrarySearchUrl(query: string): string {
+  const sanitized = sanitizeForSearch(query);
+  return `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=CL&is_targeted_country=false&media_type=all&search_type=keyword_unordered&q=${encodeURIComponent(sanitized)}`;
+}
+
+/**
  * Classify input type: 'fb_url' | 'ig_handle' | 'name'
  */
 function classifyInput(input: string): 'fb_url' | 'ig_handle' | 'name' {
@@ -705,30 +733,27 @@ export async function syncCompetitorAds(c: Context) {
 
         const effectiveFbUrl = tracking.fb_page_url || fbUrl;
 
-        // Build Apify source based on input type:
-        // 1. FB URL → use directly
-        // 2. Name → resolve via Meta Pages Search → page_id → Apify with view_all_page_id
-        // 3. @handle → no Apify source (falls through to Meta API fallback)
+        // Build Apify source URL — TODO va por Apify ahora. Meta Ad Library
+        // API directa fue removida (ya no devuelve datos para nuestra app —
+        // requiere business verification que no tenemos). Apify scrapea la
+        // Ad Library pública sin esos límites.
+        //
+        // Estrategia:
+        // 1. FB URL directa → Apify
+        // 2. Page ID cacheado → Apify con view_all_page_id (más preciso)
+        // 3. @handle / nombre / dominio → sanear y Apify con keyword search
         let apifySource: string | null = null;
-        if (effectiveFbUrl && isFacebookUrl(effectiveFbUrl)) {
+        if (effectiveFbUrl && (isFacebookUrl(effectiveFbUrl) || effectiveFbUrl.includes('ads/library'))) {
           apifySource = effectiveFbUrl;
-        } else if (effectiveFbUrl && effectiveFbUrl.includes('ads/library')) {
-          apifySource = effectiveFbUrl;
-        } else if (inputType === 'name' && accessToken) {
-          // Resolve name → page_id via Meta Pages Search, then build Apify URL
-          console.log(`[sync-competitor-ads] ${handle}: Resolving name "${input}" via Pages Search...`);
-          const resolved = await resolvePageId(input.trim());
-          if (resolved) {
-            console.log(`[sync-competitor-ads] ${handle}: Resolved to page_id=${resolved.pageId} (${resolved.pageName})`);
-            apifySource = buildAdLibraryUrlWithPageId(resolved.pageId);
-            // Also store the resolved page_id for future use
-            await supabase.from('competitor_tracking').update({
-              meta_page_id: resolved.pageId,
-              display_name: resolved.pageName,
-            }).eq('id', tracking.id);
-          } else {
-            console.log(`[sync-competitor-ads] ${handle}: Could not resolve name, will try Meta API fallback`);
-          }
+        } else if (tracking.meta_page_id) {
+          // Si ya resolvimos el page_id en sync previa, usalo directo
+          apifySource = buildAdLibraryUrlWithPageId(tracking.meta_page_id);
+          console.log(`[sync-competitor-ads] ${handle}: Using cached page_id ${tracking.meta_page_id}`);
+        } else {
+          // Sanear input y armar URL de búsqueda por keyword. Apify la
+          // scrapeará y devolverá los ads que matcheen.
+          apifySource = buildAdLibrarySearchUrl(input);
+          console.log(`[sync-competitor-ads] ${handle}: Using keyword search URL with sanitized query "${sanitizeForSearch(input)}"`);
         }
 
         // Check if we already have Apify metrics for this competitor
@@ -771,12 +796,20 @@ export async function syncCompetitorAds(c: Context) {
 
           if (apifyResult.error) {
             console.warn(`[sync-competitor-ads] ${handle}: Apify failed: ${apifyResult.error}`);
-            // Don't fail hard — fall through to Meta API fallback if token available
-            if (!accessToken) {
-              results.push({ handle, ads_found: 0, status: apifyResult.error });
-              continue;
-            }
-            console.log(`[sync-competitor-ads] ${handle}: Falling back to Meta API`);
+            results.push({ handle, ads_found: 0, status: apifyResult.error });
+            continue;
+          } else if (apifyResult.ads.length === 0) {
+            // Apify corrió OK pero no encontró ads activos. Esto puede ser:
+            // 1. La marca no está corriendo ads en Meta hoy (Ad Library solo
+            //    muestra ads ACTIVOS en este momento).
+            // 2. La búsqueda por keyword no matcheó ningún resultado.
+            // 3. El page_id cacheado quedó obsoleto.
+            console.log(`[sync-competitor-ads] ${handle}: Apify returned 0 ads (no active campaigns or query mismatch)`);
+            await supabase.from('competitor_tracking').update({
+              last_sync_at: new Date().toISOString(),
+            }).eq('id', tracking.id);
+            results.push({ handle, ads_found: 0, status: 'no_active_ads' });
+            continue;
           } else if (apifyResult.ads.length > 0) {
             // Success — map and save Apify ads
             const adsToUpsert = apifyResult.ads.map(ad => mapApifyAdToRow(ad, tracking.id, client_id));
@@ -828,143 +861,14 @@ export async function syncCompetitorAds(c: Context) {
 
             continue;
           }
-          // If Apify returned 0 ads, fall through to Meta API
-        }
-
-        // ==========================================
-        // FALLBACK PATH: Meta Ad Library API (ig_handle only, or Apify failed)
-        // ==========================================
-        if (!accessToken) {
-          results.push({ handle, ads_found: 0, status: 'no_meta_token' });
+        } else {
+          // No tenemos Apify token configurado — no hay forma de buscar ads.
+          // Meta Ad Library API directa fue removida (no devuelve datos para
+          // nuestra app sin business verification).
+          results.push({ handle, ads_found: 0, status: 'apify_not_configured' });
           continue;
         }
 
-        console.log(`[sync-competitor-ads] ${handle}: Using Meta API fallback (${tokenSource})`);
-
-        let ads: AdLibraryAd[] = [];
-        let searchMethod = '';
-        let resolvedPageId = tracking.meta_page_id || null;
-        let resolvedPageName = '';
-        let fatalTokenError = false;
-
-        // Strategy 1: Use cached page_id
-        if (resolvedPageId) {
-          const result = await fetchAdLibrary({ search_page_ids: resolvedPageId });
-          if (result.error) {
-            if (result.error.startsWith('token_expired') || result.error.startsWith('permission_denied')) {
-              results.push({ handle, ads_found: 0, status: result.error });
-              fatalTokenError = true;
-            } else {
-              resolvedPageId = null;
-            }
-          } else {
-            ads = result.ads;
-            searchMethod = 'cached_page_id';
-          }
-        }
-
-        // Strategy 2: Resolve handle -> page_id
-        if (!fatalTokenError && ads.length === 0 && !resolvedPageId) {
-          const variations = [...new Set([
-            handle,
-            handle.replace(/_/g, ' '),
-            handle.replace(/([a-z])([A-Z])/g, '$1 $2'),
-            handle.replace(/(\d+)/g, ' $1 ').trim(),
-          ])];
-
-          for (const variation of variations) {
-            const page = await resolvePageId(variation);
-            if (page) {
-              resolvedPageId = page.pageId;
-              resolvedPageName = page.pageName;
-              const result = await fetchAdLibrary({ search_page_ids: page.pageId });
-              if (result.error) {
-                if (result.error.startsWith('token_expired') || result.error.startsWith('permission_denied')) {
-                  results.push({ handle, ads_found: 0, status: result.error });
-                  fatalTokenError = true;
-                }
-                break;
-              }
-              ads = result.ads;
-              searchMethod = `resolved_page_id:${variation}`;
-              break;
-            }
-          }
-        }
-
-        if (!fatalTokenError && ads.length === 0) {
-          console.log(`[sync-competitor-ads] ${handle}: No ads found via Meta API`);
-        }
-
-        if (results.find(r => r.handle === handle)) continue;
-
-        // Update tracking
-        const updateData: Record<string, any> = { last_sync_at: new Date().toISOString() };
-        if (ads.length > 0 && ads[0].page_id) {
-          updateData.meta_page_id = ads[0].page_id;
-          updateData.display_name = ads[0].page_name || handle;
-        } else if (resolvedPageId && !tracking.meta_page_id) {
-          updateData.meta_page_id = resolvedPageId;
-          if (resolvedPageName) updateData.display_name = resolvedPageName;
-        }
-        await supabase.from('competitor_tracking').update(updateData).eq('id', tracking.id);
-
-        // Clear old ads and insert fresh ones
-        if (ads.length > 0) {
-          await supabase.from('competitor_ads').delete().eq('tracking_id', tracking.id);
-        }
-
-        const adsToUpsert = ads.map((ad) => {
-          const startDate = ad.ad_delivery_start_time ? new Date(ad.ad_delivery_start_time) : null;
-          const endDate = ad.ad_delivery_stop_time ? new Date(ad.ad_delivery_stop_time) : null;
-          const isActive = !endDate || endDate > new Date();
-          const daysRunning = startDate
-            ? Math.floor((Date.now() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-            : null;
-
-          let adType = 'image';
-          if (ad.collation_count && ad.collation_count > 1) adType = 'carousel';
-
-          const ctaMap: Record<string, string> = {
-            'comprar': 'SHOP_NOW', 'shop': 'SHOP_NOW',
-            'learn more': 'LEARN_MORE', 'más información': 'LEARN_MORE',
-            'sign up': 'SIGN_UP', 'registrarse': 'SIGN_UP',
-            'descargar': 'DOWNLOAD', 'download': 'DOWNLOAD',
-          };
-          let ctaType = 'OTHER';
-          const linkTitle = (ad.ad_creative_link_titles?.[0] || '').toLowerCase();
-          for (const [key, value] of Object.entries(ctaMap)) {
-            if (linkTitle.includes(key)) { ctaType = value; break; }
-          }
-
-          return {
-            tracking_id: tracking.id,
-            client_id,
-            ad_library_id: ad.id,
-            ad_text: ad.ad_creative_bodies?.[0] || null,
-            ad_headline: ad.ad_creative_link_titles?.[0] || null,
-            ad_description: ad.ad_creative_link_descriptions?.[0] || null,
-            image_url: ad.ad_snapshot_url || null,
-            ad_type: adType,
-            cta_type: ctaType,
-            started_at: ad.ad_delivery_start_time || null,
-            is_active: isActive,
-            days_running: daysRunning,
-          };
-        });
-
-        if (adsToUpsert.length > 0) {
-          const { error: upsertError } = await supabase
-            .from('competitor_ads')
-            .upsert(adsToUpsert, { onConflict: 'tracking_id,ad_library_id', ignoreDuplicates: false });
-
-          if (upsertError) {
-            results.push({ handle, ads_found: 0, status: 'upsert_error: ' + upsertError.message });
-            continue;
-          }
-        }
-
-        results.push({ handle, ads_found: adsToUpsert.length, status: 'synced_meta' });
       } catch (err: any) {
         console.error(`Error processing ${handle}:`, err);
         results.push({ handle, ads_found: 0, status: 'error: ' + err.message });
