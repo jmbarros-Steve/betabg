@@ -67,6 +67,14 @@ export function EditCampaignDialog({
   const [active, setActive] = useState(campaign.status === 'ACTIVE');
   const [endDate, setEndDate] = useState(''); // YYYY-MM-DD
   const [savingCampaign, setSavingCampaign] = useState(false);
+  // Detalles reales de Meta — distingue CBO (presupuesto a nivel campaña)
+  // vs ABO (presupuesto vive en cada ad set). Loading hasta que llega.
+  const [campaignDetails, setCampaignDetails] = useState<{
+    budget_mode: 'CBO' | 'CBO_LIFETIME' | 'ABO';
+    daily_budget: number | null;
+    objective: string | null;
+  } | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   // ── Tab Ad Sets ──
   const [adsets, setAdsets] = useState<AdSet[]>([]);
@@ -78,18 +86,43 @@ export function EditCampaignDialog({
   const [loadingAds, setLoadingAds] = useState(false);
   const [togglingAd, setTogglingAd] = useState<string | null>(null);
 
-  // Reset state al abrir con nueva campaña
+  // Reset state al abrir con nueva campaña + fetch detalles reales de Meta
   useEffect(() => {
-    if (open) {
-      setTab('campaign');
-      setName(campaign.campaign_name);
-      setBudget(String(campaign.daily_budget || 0));
-      setActive(campaign.status === 'ACTIVE');
-      setEndDate('');
-      setAdsets([]);
-      setAds([]);
-    }
-  }, [open, campaign.campaign_id, campaign.campaign_name, campaign.daily_budget, campaign.status]);
+    if (!open) return;
+    setTab('campaign');
+    setName(campaign.campaign_name);
+    setActive(campaign.status === 'ACTIVE');
+    setEndDate('');
+    setAdsets([]);
+    setAds([]);
+    setCampaignDetails(null);
+
+    // Fetch budget/mode/objetivo REALES de Meta. El campaign.daily_budget
+    // que llega como prop es un CÁLCULO local (spend_30d / días) y no
+    // refleja el presupuesto seteado en Meta — por eso desincronizaba con
+    // el ad set (10000 real vs 8227 calculado).
+    setLoadingDetails(true);
+    callApi<{ campaign: { daily_budget: number | null; budget_mode: 'CBO' | 'CBO_LIFETIME' | 'ABO'; objective: string | null } }>(
+      'edit-meta-campaign',
+      {
+        body: { action: 'get_campaign_details', connection_id: connectionId, campaign_id: campaign.campaign_id },
+        timeoutMs: 12_000,
+      },
+    ).then(({ data, error }) => {
+      if (error) {
+        console.warn('[edit-campaign] no pude leer detalles:', error);
+        // Fallback: usar el cálculo local
+        setBudget(String(campaign.daily_budget || 0));
+      } else if (data?.campaign) {
+        setCampaignDetails({
+          budget_mode: data.campaign.budget_mode,
+          daily_budget: data.campaign.daily_budget,
+          objective: data.campaign.objective,
+        });
+        setBudget(String(data.campaign.daily_budget || 0));
+      }
+    }).finally(() => setLoadingDetails(false));
+  }, [open, campaign.campaign_id, campaign.campaign_name, campaign.daily_budget, campaign.status, connectionId]);
 
   // ── Fetchers ──
 
@@ -143,8 +176,13 @@ export function EditCampaignDialog({
     setSavingCampaign(true);
     const changes: Record<string, any> = {};
     if (name.trim() && name.trim() !== campaign.campaign_name) changes.name = name.trim();
+    // daily_budget solo si es CBO (en ABO el campo está disabled y vive en ad sets)
+    const isCbo = campaignDetails?.budget_mode !== 'ABO';
+    const realBudget = campaignDetails?.daily_budget ?? campaign.daily_budget;
     const budgetNum = Number(budget);
-    if (budgetNum > 0 && budgetNum !== campaign.daily_budget) changes.daily_budget = budgetNum;
+    if (isCbo && budgetNum > 0 && budgetNum !== realBudget) {
+      changes.daily_budget = budgetNum;
+    }
     const newStatus = active ? 'ACTIVE' : 'PAUSED';
     if (newStatus !== campaign.status) changes.status = newStatus;
     if (endDate) changes.end_time = `${endDate}T23:59:59-0300`;
@@ -328,15 +366,35 @@ export function EditCampaignDialog({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="edit-budget">Presupuesto diario (CLP)</Label>
+                <Label htmlFor="edit-budget">
+                  Presupuesto diario (CLP)
+                  {campaignDetails && (
+                    <span className={`ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                      campaignDetails.budget_mode === 'ABO'
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-[#1E3A7B]/10 text-[#1E3A7B]'
+                    }`}>
+                      {campaignDetails.budget_mode === 'ABO' ? 'ABO · vive en ad sets' : 'CBO · gestionado en campaña'}
+                    </span>
+                  )}
+                </Label>
                 <Input
                   id="edit-budget"
                   type="number"
                   value={budget}
                   onChange={(e) => setBudget(e.target.value)}
-                  placeholder="10000"
+                  placeholder={campaignDetails?.budget_mode === 'ABO' ? 'Edita en cada Ad Set' : '10000'}
                   className="mt-1"
+                  disabled={loadingDetails || campaignDetails?.budget_mode === 'ABO'}
                 />
+                {campaignDetails?.budget_mode === 'ABO' && (
+                  <p className="text-[10px] text-amber-700 mt-1 leading-tight">
+                    Esta campaña usa <strong>ABO</strong> — el presupuesto está en cada ad set. Cambialo en el tab "Ad Sets".
+                  </p>
+                )}
+                {loadingDetails && (
+                  <p className="text-[10px] text-muted-foreground mt-1">Leyendo presupuesto real de Meta...</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="edit-end-date">Fecha de fin (opcional)</Label>

@@ -6,6 +6,7 @@ import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 const META_API_BASE = 'https://graph.facebook.com/v23.0';
 
 type Action =
+  | 'get_campaign_details'  // Lee daily_budget REAL de Meta (CBO vs ABO)
   | 'list_adsets'           // Lista ad sets de una campaña
   | 'list_ads'              // Lista ads de un ad set (o de toda la campaña)
   | 'update_campaign'       // name, daily_budget, status, end_time, special_ad_categories
@@ -62,6 +63,51 @@ async function metaApiRequest(
 // ---------------------------------------------------------------------------
 // Action handlers
 // ---------------------------------------------------------------------------
+
+async function handleGetCampaignDetails(campaignId: string, accessToken: string) {
+  // Lee los datos reales de la campaña en Meta — distingue CBO (daily_budget
+  // a nivel campaña) vs ABO (budget vive en cada ad set, daily_budget=null).
+  // Esto permite a la UI mostrar el campo correcto y no confundir al cliente
+  // con el "promedio de gasto" calculado localmente.
+  const result = await metaApiRequest(
+    campaignId,
+    accessToken,
+    'GET',
+    {
+      fields: 'id,name,status,daily_budget,lifetime_budget,bid_strategy,buying_type,objective,special_ad_categories,start_time,stop_time',
+    },
+  );
+  if (!result.ok) {
+    return { body: { error: 'Failed to get campaign', details: result.error }, status: 502 };
+  }
+  const c = result.data || {};
+  // Meta devuelve daily_budget en la unidad base de la moneda (sin centavos
+  // para CLP/JPY, con centavos para USD/EUR). Para CLP el número es directo.
+  const dailyBudget = c.daily_budget ? Number(c.daily_budget) : null;
+  const lifetimeBudget = c.lifetime_budget ? Number(c.lifetime_budget) : null;
+  // CBO si tiene budget a nivel campaña, ABO si no (vive en ad sets)
+  const budgetMode = dailyBudget && dailyBudget > 0 ? 'CBO' : (lifetimeBudget && lifetimeBudget > 0 ? 'CBO_LIFETIME' : 'ABO');
+
+  return {
+    body: {
+      campaign: {
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        objective: c.objective || null,
+        buying_type: c.buying_type || null,
+        bid_strategy: c.bid_strategy || null,
+        daily_budget: dailyBudget,
+        lifetime_budget: lifetimeBudget,
+        budget_mode: budgetMode, // CBO | CBO_LIFETIME | ABO
+        special_ad_categories: c.special_ad_categories || [],
+        start_time: c.start_time || null,
+        stop_time: c.stop_time || null,
+      },
+    },
+    status: 200,
+  };
+}
 
 async function handleListAdsets(campaignId: string, accessToken: string) {
   // Lista ad sets activos de una campaña con métricas básicas
@@ -275,6 +321,10 @@ export async function editMetaCampaign(c: Context) {
     let result: { body: any; status: number };
 
     switch (action) {
+      case 'get_campaign_details':
+        if (!campaign_id) return c.json({ error: 'Missing campaign_id' }, 400);
+        result = await handleGetCampaignDetails(campaign_id, decryptedToken);
+        break;
       case 'list_adsets':
         if (!campaign_id) return c.json({ error: 'Missing campaign_id' }, 400);
         result = await handleListAdsets(campaign_id, decryptedToken);
