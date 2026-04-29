@@ -373,7 +373,15 @@ export async function manageMetaDraft(c: Context) {
         });
         const respBody: any = await res.json().catch(() => ({}));
         if (!res.ok || !respBody?.success) {
-          return c.json({ error: 'Failed to publish to Meta', details: respBody?.error || respBody?.details || `HTTP ${res.status}` }, 502);
+          const errDetails = respBody?.error || respBody?.details || `HTTP ${res.status}`;
+          // Mejorar mensajes para errores comunes
+          let userFacingMessage = errDetails;
+          if (typeof errDetails === 'string' && /invalid token|expired|access[_ ]token/i.test(errDetails)) {
+            userFacingMessage = 'El token de tu cuenta Meta no es válido o expiró. Reconectá tu cuenta de Meta desde Conexiones para volver a publicar campañas.';
+          } else if (typeof errDetails === 'string' && /permission|scope/i.test(errDetails)) {
+            userFacingMessage = 'Falta un permiso de Meta para crear campañas. Reconectá tu cuenta otorgando todos los permisos solicitados.';
+          }
+          return c.json({ error: 'Failed to publish to Meta', details: userFacingMessage, raw: errDetails }, 502);
         }
 
         const metaCampaignId = respBody.campaign_id || respBody.data?.campaign_id;
