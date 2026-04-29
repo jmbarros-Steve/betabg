@@ -478,7 +478,24 @@ export default function DraftsManager({ clientId, onEditDraft, onGoToCreate }: D
   };
 
   const handleAdvancedEdit = () => {
-    if (editTarget && onEditDraft) {
+    if (!editTarget) return;
+    // Persistimos el draft en sessionStorage para que CampaignCreateWizard lo
+    // levante al montar y precargue todos los states (copy, headlines, images,
+    // descripciones, brief_visual, funnel, ángulo, presupuesto, CTA, URL).
+    // El TTL es la sesión del navegador — si el cliente abre otra tab y el
+    // wizard no levantó, queda hasta cerrar el browser.
+    try {
+      sessionStorage.setItem(
+        'betabg:edit-meta-draft',
+        JSON.stringify({
+          id: editTarget.id,
+          savedAt: new Date().toISOString(),
+        }),
+      );
+    } catch {
+      // sessionStorage puede fallar (modo incógnito strict, etc.) — no es crítico
+    }
+    if (onEditDraft) {
       onEditDraft(editTarget.id);
     }
     setEditTarget(null);
