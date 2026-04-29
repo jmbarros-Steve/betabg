@@ -333,15 +333,30 @@ export async function manageMetaDraft(c: Context) {
         start_time: spec.schedule?.start,
         end_time: spec.schedule?.end,
         // Targeting / audience
-        targeting: spec.audience ? {
-          age_min: spec.audience.age_min,
-          age_max: spec.audience.age_max,
-          genders: spec.audience.gender === 'male' ? [1] : spec.audience.gender === 'female' ? [2] : undefined,
-          geo_locations: spec.audience.geo ? { countries: spec.audience.geo.countries } : undefined,
-          interests: spec.audience.interests,
-          custom_audiences: spec.audience.custom_audiences,
-          excluded_custom_audiences: spec.audience.exclusions?.custom_audiences,
-        } : undefined,
+        targeting: spec.audience ? (() => {
+          // Meta API espera interests como objetos {id, name} con ID numérico real.
+          // Si el cliente/Steve pasó solo strings (nombres), los omitimos para que
+          // el publish no falle. Cliente puede agregarlos después desde Meta Ads
+          // Manager o vía meta-targeting-search.
+          const rawInterests = spec.audience.interests;
+          let validInterests: any[] | undefined;
+          if (Array.isArray(rawInterests)) {
+            validInterests = rawInterests.filter((i: any) => i && typeof i === 'object' && i.id);
+            if (validInterests.length === 0 && rawInterests.length > 0) {
+              console.warn('[meta-draft] Omitting interests — strings without IDs cannot be sent to Meta. Use meta-targeting-search to resolve names to IDs first.');
+              validInterests = undefined;
+            }
+          }
+          return {
+            age_min: spec.audience.age_min,
+            age_max: spec.audience.age_max,
+            genders: spec.audience.gender === 'male' ? [1] : spec.audience.gender === 'female' ? [2] : undefined,
+            geo_locations: spec.audience.geo ? { countries: spec.audience.geo.countries } : undefined,
+            interests: validInterests,
+            custom_audiences: spec.audience.custom_audiences,
+            excluded_custom_audiences: spec.audience.exclusions?.custom_audiences,
+          };
+        })() : undefined,
         placements: spec.placements,
         adset_name: spec.adset_name,
         ad_name: spec.ad_name,
