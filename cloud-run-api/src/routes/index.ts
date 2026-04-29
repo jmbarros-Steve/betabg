@@ -50,6 +50,12 @@ import { espejoHandler } from './ai/espejo.js';
 
 // Phase 2: Analytics
 import { syncCompetitorAds } from './analytics/sync-competitor-ads.js';
+
+// Phase 2: Competitor Intelligence (deep dive)
+import { scrapePaidAds } from './competitor/scrape-paid-ads.js';
+import { generateScorecard } from './competitor/generate-scorecard.js';
+import { webCrawl } from './competitor/web-crawl.js';
+import { scrapeSeo } from './competitor/scrape-seo.js';
 import { analyzeCompetitorAds } from './analytics/analyze-competitor-ads.js';
 import { deepDiveCompetitor } from './analytics/deep-dive-competitor.js';
 import { fetchCampaignAdsets } from './analytics/fetch-campaign-adsets.js';
@@ -389,6 +395,12 @@ export function registerRoutes(app: Hono) {
   app.post('/api/espejo', authMiddleware, espejoHandler);
   app.post('/api/sync-competitor-ads', authMiddleware, syncCompetitorAds);
   app.post('/api/analyze-competitor-ads', authMiddleware, analyzeCompetitorAds);
+
+  // Competitor Intelligence (deep dive)
+  app.post('/api/competitor/scrape-paid-ads', authMiddleware, scrapePaidAds);
+  app.post('/api/competitor/generate-scorecard', authMiddleware, generateScorecard);
+  app.post('/api/competitor/web-crawl', authMiddleware, webCrawl);
+  app.post('/api/competitor/scrape-seo', authMiddleware, scrapeSeo);
   app.post('/api/deep-dive-competitor', authMiddleware, deepDiveCompetitor);
   app.post('/api/fetch-campaign-adsets', authMiddleware, fetchCampaignAdsets);
   app.post('/api/sync-campaign-metrics', authMiddleware, syncCampaignMetrics);
