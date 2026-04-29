@@ -1398,6 +1398,7 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                     <SortHeader field="revenue" label="Ingresos" />
                     <SortHeader field="roas" label={<JargonTooltip term="ROAS" />} />
                     <SortHeader field="ctr" label={<JargonTooltip term="CTR" />} />
+                    <SortHeader field="cpm" label={<JargonTooltip term="CPM" />} />
                     <SortHeader field="cpa" label={<JargonTooltip term="CPA" />} />
                     <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider w-20">
                       Tendencia
@@ -1429,6 +1430,9 @@ export default function MetaAnalyticsDashboard({ clientId }: MetaAnalyticsDashbo
                     <td className="px-4 py-3 text-right">{formatCLP(totals.revenue)}</td>
                     <td className={`px-4 py-3 text-right ${roasColor(totals.roas)}`}>{formatRoas(totals.roas)}</td>
                     <td className="px-4 py-3 text-right">{formatPercent(totals.ctr)}</td>
+                    <td className="px-4 py-3 text-right">
+                      {totals.impressions > 0 ? formatCLP((totals.spend / totals.impressions) * 1000) : '--'}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       {totals.conversions > 0 ? formatCLP(totals.spend / totals.conversions) : '--'}
                     </td>
@@ -1910,6 +1914,9 @@ function CampaignRow({
           </Badge>
         </td>
         <td className="px-4 py-3 text-right tabular-nums">{formatPercent(c.ctr)}</td>
+        <td className="px-4 py-3 text-right tabular-nums">
+          {c.impressions > 0 ? formatCLP(c.cpm) : '--'}
+        </td>
         <td className="px-4 py-3 text-right tabular-nums">
           {c.conversions > 0 ? formatCLP(c.cpa) : '--'}
         </td>

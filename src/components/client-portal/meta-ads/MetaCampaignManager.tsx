@@ -74,6 +74,7 @@ type SortField =
   | 'roas'
   | 'cpa'
   | 'ctr'
+  | 'cpm'
   | 'conversions';
 type SortDirection = 'asc' | 'desc';
 
@@ -87,6 +88,7 @@ interface CampaignRow {
   roas: number;
   cpa: number;
   ctr: number;
+  cpm: number;
   conversions: number;
   impressions: number;
   clicks: number;
@@ -409,6 +411,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
             roas: 0,
             cpa: 0,
             ctr: 0,
+            cpm: 0,
             conversions: Number(m.conversions) || 0,
             impressions: Number(m.impressions) || 0,
             clicks: Number(m.clicks) || 0,
@@ -426,6 +429,7 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
         c.roas = c.spend_30d > 0 ? c.revenue / c.spend_30d : 0;
         c.cpa = c.conversions > 0 ? c.spend_30d / c.conversions : 0;
         c.ctr = c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0;
+        c.cpm = c.impressions > 0 ? (c.spend_30d / c.impressions) * 1000 : 0;
         // Infer daily budget from average daily spend
         const uniqueDays = new Set(
           metricsData
@@ -1357,6 +1361,21 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                       </button>
                     </th>
 
+                    {/* CPM */}
+                    <th className="text-right py-3 px-3">
+                      <button
+                        className="flex items-center justify-end text-xs uppercase tracking-wider font-bold text-foreground hover:text-foreground transition-colors w-full"
+                        onClick={() => handleSort('cpm')}
+                      >
+                        <JargonTooltip term="CPM" />
+                        <SortIcon
+                          field="cpm"
+                          currentField={sortField}
+                          direction={sortDirection}
+                        />
+                      </button>
+                    </th>
+
                     {/* Conversions */}
                     <th className="text-right py-3 px-3">
                       <button
@@ -1464,6 +1483,12 @@ export default function MetaCampaignManager({ clientId }: MetaCampaignManagerPro
                         <td className="py-4 px-3 text-right">
                           <span className="block text-[10px] text-muted-foreground mb-0.5">CTR</span>
                           <span>{campaign.ctr > 0 ? formatPercent(campaign.ctr) : '--'}</span>
+                        </td>
+
+                        {/* CPM */}
+                        <td className="py-4 px-3 text-right">
+                          <span className="block text-[10px] text-muted-foreground mb-0.5">CPM</span>
+                          <span>{campaign.cpm > 0 ? formatCLP(campaign.cpm) : '--'}</span>
                         </td>
 
                         {/* Conversions */}
