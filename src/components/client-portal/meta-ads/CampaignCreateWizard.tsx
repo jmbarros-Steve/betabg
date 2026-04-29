@@ -4855,6 +4855,7 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
   useEffect(() => {
     let cancelled = false;
     const loadDraftIntoWizard = async (draftId: string) => {
+      console.log('[edit-draft] loading draft', draftId);
       const { data: draft, error } = await supabase
         .from('ad_creatives')
         .select('id, titulo, texto_principal, descripcion, cta, asset_url, formato, funnel, angulo, brief_visual, dct_copies, dct_titulos, dct_descripciones, dct_imagenes')
@@ -4863,8 +4864,10 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         .maybeSingle();
       if (cancelled || error || !draft) {
         if (error) console.warn('[edit-draft] fetch error:', error.message);
+        if (!draft) console.warn('[edit-draft] no draft found for id', draftId);
         return;
       }
+      console.log('[edit-draft] draft fetched, populating wizard...', { titulo: draft.titulo, has_bv: !!draft.brief_visual });
 
       const bv = (draft.brief_visual || {}) as Record<string, any>;
 
@@ -4876,6 +4879,20 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         setCampNameEdited(true);
       }
 
+      // Ad set name
+      if (bv.adset_name) {
+        setAdsetName(bv.adset_name);
+      } else if (bv.campaign_name) {
+        setAdsetName(`${bv.campaign_name} - Ad Set 1`);
+      } else if (draft.titulo) {
+        setAdsetName(`${draft.titulo} - Ad Set 1`);
+      }
+
+      // Budget type (ABO/CBO/ADVANTAGE)
+      if (bv.budget_type === 'ABO' || bv.budget_type === 'CBO' || bv.budget_type === 'ADVANTAGE') {
+        setBudgetType(bv.budget_type);
+      }
+
       const validObj = ['CONVERSIONS', 'TRAFFIC', 'AWARENESS', 'ENGAGEMENT', 'CATALOG'];
       if (bv.objective && validObj.includes(bv.objective)) {
         setObjective(bv.objective as Objective);
@@ -4884,7 +4901,12 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
       const budget = bv.plan_accion?.presupuesto_diario || bv.adset_budget || bv.campaign_budget;
       if (budget) {
         const numBudget = String(budget).replace(/[^\d]/g, '');
-        if (numBudget) setCampBudget(numBudget);
+        if (numBudget) {
+          setCampBudget(numBudget);
+          // ABO budget vive a nivel ad set, CBO a nivel campaña — seteamos
+          // ambos para que el wizard tenga el dato sin importar el modo.
+          setAdsetBudget(numBudget);
+        }
       }
 
       const hls: string[] = [];
@@ -4934,10 +4956,18 @@ export default function CampaignCreateWizard({ clientId, onBack, onComplete, sta
         setSelectedAngle(draft.angulo);
       }
 
+      // Ad name — Meta lo muestra en Ads Manager. Si el draft no tiene
+      // ad_name explícito, derivamos del primer headline.
+      if (bv.ad_name) {
+        setAdName(bv.ad_name);
+        setAdNameEdited(true);
+      }
+
       setCreateNewCampaign(true);
       setCreateNewAdset(true);
       setWizardStarted(true);
 
+      console.log('[edit-draft] wizard populated successfully');
       toast.success(`Borrador cargado: "${bv.campaign_name || draft.titulo || 'Sin nombre'}"`);
     };
 

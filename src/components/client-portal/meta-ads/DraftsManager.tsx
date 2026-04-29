@@ -500,9 +500,13 @@ export default function DraftsManager({ clientId, onEditDraft, onGoToCreate }: D
     //    display:none→block. El useEffect mount del wizard no vuelve a
     //    correr. Disparamos un CustomEvent en window para que el wizard
     //    (montado o no) escuche y precargue el draft.
+    // 200ms da margen suficiente para que MetaAdsManager monte el wizard si
+    // es la primera vez. Si el wizard ya estaba montado, el listener ya
+    // está registrado y reacciona inmediatamente.
     setTimeout(() => {
+      console.log('[edit-draft] dispatching bg:edit-meta-draft for', draftId);
       window.dispatchEvent(new CustomEvent('bg:edit-meta-draft', { detail: { id: draftId } }));
-    }, 50);
+    }, 200);
   };
 
   // ── Go to create wizard ──
