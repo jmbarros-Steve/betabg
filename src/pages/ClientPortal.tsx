@@ -25,6 +25,7 @@ import { FinancialConfigPanel } from '@/components/client-portal/FinancialConfig
 import { ChongaSupport } from '@/components/client-portal/ChongaSupport';
 import { CampaignAnalyticsPanel } from '@/components/client-portal/CampaignAnalyticsPanel';
 import { ComingSoon } from '@/components/client-portal/ComingSoon';
+import { CompetitorIntelligenceView } from '@/components/client-portal/CompetitorIntelligenceView';
 import MetaAdsManager from '@/components/client-portal/meta-ads/MetaAdsManager';
 import { CreativosGallery } from '@/components/client-portal/creativos/CreativosGallery';
 import { FloatingDiscountButton } from '@/components/client-portal/FloatingDiscountButton';
@@ -554,12 +555,7 @@ export default function ClientPortal() {
           {visitedTabs.has('deepdive') && effectiveClientId && (
             <div className={activeTab !== 'deepdive' || !userCanAccessTab('deepdive') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Inteligencia">
-                <div className="max-w-3xl mx-auto">
-                  <ComingSoon
-                    title="Inteligencia de Competencia"
-                    description="Análisis profundo: ads activos, SEO, web, catálogo, social y reviews de tus competidores en un solo informe. Estamos puliendo la resolución automática de cuentas Meta antes de abrirlo."
-                  />
-                </div>
+                <CompetitorIntelligenceView clientId={effectiveClientId} />
               </TabErrorBoundary>
             </div>
           )}
