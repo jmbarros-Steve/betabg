@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Users, Send, GitBranch, BarChart3, FileText, Globe, Activity } from 'lucide-react';
+import { Users, Send, GitBranch, BarChart3, FileText, Globe, Activity, Blocks } from 'lucide-react';
 import { SubscribersList } from './SubscribersList';
 import { CampaignBuilder } from './CampaignBuilder';
 import { FlowBuilder } from './FlowBuilder';
@@ -10,6 +10,7 @@ import { EmailAnalytics } from './EmailAnalytics';
 import { DomainSetup } from './DomainSetup';
 import { FormBuilder } from './FormBuilder';
 import { QueueHealthDashboard } from './QueueHealthDashboard';
+import { BlockComposer } from './BlockComposer';
 import { useUserRole } from '@/hooks/useUserRole';
 
 interface EmailMarketingProps {
@@ -89,6 +90,15 @@ export function EmailMarketing({ clientId }: EmailMarketingProps) {
               </div>
             </TabsTrigger>
           )}
+          {isSuperAdmin && (
+            <TabsTrigger value="composer" className="flex items-center gap-1.5 text-xs flex-1">
+              <Blocks className="w-3.5 h-3.5" />
+              <div className="flex flex-col items-start">
+                <span>Composer</span>
+                <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Drag & drop bloques (beta)</span>
+              </div>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="campaigns">
@@ -114,6 +124,12 @@ export function EmailMarketing({ clientId }: EmailMarketingProps) {
         {isSuperAdmin && (
           <TabsContent value="queue">
             <QueueHealthDashboard />
+          </TabsContent>
+        )}
+
+        {isSuperAdmin && (
+          <TabsContent value="composer">
+            <BlockComposer />
           </TabsContent>
         )}
       </Tabs>
