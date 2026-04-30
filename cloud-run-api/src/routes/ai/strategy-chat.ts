@@ -1712,9 +1712,15 @@ FASE 4 (Preguntar jerarquía + crear draft): ANTES de llamar crear_draft_campana
        (C) "Crear campaña nueva desde cero" (todo nuevo)
   4.3) Esperá que el cliente elija. Solo entonces llamá crear_draft_campana_meta con jerarquia=A|B|C + parent_campaign_id (A,B) + parent_adset_id (solo A) + spec apropiada.
   4.4) Si el cliente NO tiene Meta conectado o no tiene campañas activas, asumí jerarquia=C automáticamente.
+  4.4.1) IMPORTANTE: Si listar_estructura_meta_activa devuelve un error técnico (5xx, 502, etc.), JAMÁS le digas al cliente "no estás conectado" o "reconectá Meta". El draft se persiste a la DB sin tocar Meta — proceder con jerarquia=C es seguro siempre. Solo cuando el cliente apruebe el draft se intenta subir a Meta. Si la conexión está rota, ese error aparece DESPUÉS, no ahora.
   4.5) Después de crear, devolvele el link [Revisar campaña antes de subir a Meta](URL) explicando: "podés editar inline, pedirme cambios acá, o aprobar para subir como borrador a Meta". Si pide cambios ("cambia el presupuesto a 300K"), usá editar_draft_campana_meta con el draft_id.
 
 📎 CREATIVOS ADJUNTADOS POR EL CLIENTE: Si en algún mensaje el cliente adjunta una imagen o video (vas a ver tags como "📸 Imagen adjuntada por el cliente: https://..." o "🎬 Video adjuntada por el cliente: https://..."), USÁ esa URL como image_url o video_url en el campo creative de la spec. NO generes con IA si el cliente ya subió. Estos archivos quedan automáticamente guardados en la galería de Creativos del cliente, así que en futuros chats podés referirlos. Mencionale al cliente que el archivo quedó guardado y que lo va a ver en la pestaña "Creativos".
+
+🚫 NUNCA INVENTES URLs DE IMÁGENES (regla dura): si el cliente dice "usá la foto del producto en Shopify" o similar, JAMÁS construyas la URL del CDN de Shopify de memoria. Las URLs reales tienen hashes aleatorios y prefijos /products/ con sufijos randomizados, no son predecibles. Lo correcto es:
+  1) Si en shopifyProducts (data inyectada arriba) hay productos con image_url match al que pide el cliente → usá ESA URL exacta del campo image_url.
+  2) Si no hay match exacto, decile al cliente: "no veo esa foto exacta en tu catálogo. Subila con el botón adjuntar acá en el chat o desde la pantalla de revisión del draft, y armo el creativo." NO crees el draft con image_url inventado — dejá creative.image_url ausente y avisá al cliente que en la pantalla de revisión va a poder elegir/subir/generar.
+Si no tenés image_url confirmada, dejá creative.image_url ausente o vacío en la spec — la pantalla de revisión muestra un placeholder y el cliente puede elegir desde ahí (subir, IA, catálogo Shopify, URL externa).
 
 REGLAS DURAS:
 - NUNCA llames manage-meta-campaign directamente. SIEMPRE vía draft.
@@ -2253,6 +2259,7 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${serviceKey}`,
                   'X-Internal-Key': serviceKey,
                 },
                 body: JSON.stringify({ client_id }),
@@ -2260,7 +2267,12 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
               });
               const body: any = await res.json().catch(() => ({}));
               if (!res.ok) {
-                toolResult = `No pude listar estructura Meta: ${body?.error || `HTTP ${res.status}`}. Si el cliente no tiene Meta conectado, ofrecele crear una campaña nueva desde cero (jerarquia=C).`;
+                // CRÍTICO: NO le digas al cliente que no está conectado. La conexión PUEDE
+                // existir pero este endpoint nuevo todavía tiene gaps con SUAT/leadsie.
+                // Procedé con jerarquia=C silenciosamente — el draft solo persiste a DB,
+                // no necesita listar la estructura.
+                console.warn(`[strategy-chat] list-active-structure falló (HTTP ${res.status}): ${body?.error}. Procediendo con jerarquia=C.`);
+                toolResult = `No pude leer la estructura existente del cliente en Meta (problema técnico interno, NO falta de conexión). PROCEDÉ con jerarquia=C (campaña nueva desde cero) sin mencionarle al cliente nada sobre conexiones — el draft se persiste igual y se podrá subir a Meta cuando el cliente apruebe. Continuá al siguiente paso del flow.`;
               } else {
                 const campaigns = body?.campaigns || [];
                 if (campaigns.length === 0) {
@@ -2270,7 +2282,8 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
                 }
               }
             } catch (e: any) {
-              toolResult = `Error listando estructura Meta: ${e?.message?.slice(0, 200) || e}. Asumí jerarquia=C (todo nuevo) si seguís adelante.`;
+              console.warn(`[strategy-chat] list-active-structure exception: ${e?.message}. Procediendo con jerarquia=C.`);
+              toolResult = `No pude leer estructura Meta por problema técnico interno (NO es falta de conexión). PROCEDÉ con jerarquia=C silenciosamente sin mencionar nada al cliente sobre conexiones — continuá al draft.`;
             }
             break;
           }
@@ -2286,6 +2299,7 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${serviceKey}`,
                   'X-Internal-Key': serviceKey,
                 },
                 body: JSON.stringify({
@@ -2324,6 +2338,7 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${serviceKey}`,
                   'X-Internal-Key': serviceKey,
                 },
                 body: JSON.stringify({ action: 'update', draft_id, changes, notes }),

@@ -3,12 +3,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { Upload, ShoppingBag, Link as LinkIcon, Loader2, Check } from 'lucide-react';
+import { Upload, ShoppingBag, Link as LinkIcon, Loader2, Check, Sparkles, Images } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { CreativosGallery } from '@/components/client-portal/creativos/CreativosGallery';
 
 interface ShopifyProduct {
   shopify_product_id: string;
@@ -26,12 +28,49 @@ interface CreativeImagePickerProps {
 }
 
 export function CreativeImagePicker({ clientId, open, onOpenChange, onPick }: CreativeImagePickerProps) {
-  const [tab, setTab] = useState<'upload' | 'shopify' | 'url'>('upload');
+  const [tab, setTab] = useState<'gallery' | 'upload' | 'ai' | 'shopify' | 'url'>('gallery');
   const [uploading, setUploading] = useState(false);
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [urlInput, setUrlInput] = useState('');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiPreviewUrl, setAiPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function generateWithAI() {
+    const trimmed = aiPrompt.trim();
+    if (trimmed.length < 20) {
+      toast.error('Describí la imagen con más detalle (mínimo 20 caracteres). Ej: "vasos de cerámica gres color tierra sobre mesa de madera oscura, luz natural, estilo editorial".');
+      return;
+    }
+    setAiGenerating(true);
+    setAiPreviewUrl(null);
+    try {
+      const { data, error } = await callApi('generate-image', {
+        body: { clientId, promptGeneracion: trimmed },
+      });
+      if (error || !data?.asset_url) {
+        toast.error('Falló la generación: ' + (error?.message || 'unknown'));
+        return;
+      }
+      setAiPreviewUrl(data.asset_url);
+      toast.success('Imagen generada — revisala y confirmá si te gusta');
+    } catch (err: any) {
+      toast.error('Error: ' + (err?.message || 'unknown'));
+    } finally {
+      setAiGenerating(false);
+    }
+  }
+
+  function confirmAIImage() {
+    if (!aiPreviewUrl) return;
+    onPick(aiPreviewUrl);
+    setAiPreviewUrl(null);
+    setAiPrompt('');
+    onOpenChange(false);
+    toast.success('Imagen IA seleccionada ✓');
+  }
 
   useEffect(() => {
     if (open && tab === 'shopify' && products.length === 0) {
@@ -130,11 +169,59 @@ export function CreativeImagePicker({ clientId, open, onOpenChange, onPick }: Cr
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="mt-2">
-          <TabsList className="grid grid-cols-3 w-full">
-            <TabsTrigger value="upload"><Upload className="h-4 w-4 mr-1" /> Subir archivo</TabsTrigger>
-            <TabsTrigger value="shopify"><ShoppingBag className="h-4 w-4 mr-1" /> Catálogo Shopify</TabsTrigger>
-            <TabsTrigger value="url"><LinkIcon className="h-4 w-4 mr-1" /> URL externa</TabsTrigger>
+          <TabsList className="grid grid-cols-5 w-full">
+            <TabsTrigger value="gallery"><Images className="h-4 w-4 mr-1" /> Mis creativos</TabsTrigger>
+            <TabsTrigger value="upload"><Upload className="h-4 w-4 mr-1" /> Subir</TabsTrigger>
+            <TabsTrigger value="ai"><Sparkles className="h-4 w-4 mr-1" /> IA</TabsTrigger>
+            <TabsTrigger value="shopify"><ShoppingBag className="h-4 w-4 mr-1" /> Shopify</TabsTrigger>
+            <TabsTrigger value="url"><LinkIcon className="h-4 w-4 mr-1" /> URL</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="gallery" className="mt-4">
+            <CreativosGallery
+              clientId={clientId}
+              mode="picker"
+              onSelectAsset={(url, type) => {
+                if (type !== 'photo') {
+                  toast.error('Para creativo de imagen elegí una foto, no un video.');
+                  return;
+                }
+                onPick(url);
+                onOpenChange(false);
+                toast.success('Imagen seleccionada ✓');
+              }}
+            />
+          </TabsContent>
+
+          <TabsContent value="ai" className="mt-4">
+            <div className="space-y-3">
+              <Label htmlFor="ai-prompt">Describí la imagen que querés generar</Label>
+              <Textarea
+                id="ai-prompt"
+                rows={4}
+                placeholder='Ej: "fotografía cenital de 3 vasos de cerámica gres color tierra sobre mesa de madera oscura con flores silvestres, luz natural cálida, estilo editorial revista de decoración"'
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                disabled={aiGenerating}
+              />
+              <p className="text-xs text-muted-foreground">Mientras más específico, mejor. Mencioná: producto, fondo, iluminación, ángulo y mood. Mín. 20 caracteres.</p>
+              {!aiPreviewUrl && (
+                <Button onClick={generateWithAI} disabled={aiGenerating || aiPrompt.trim().length < 20}>
+                  {aiGenerating ? (<><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Generando…</>) : (<><Sparkles className="h-4 w-4 mr-1" /> Generar imagen</>)}
+                </Button>
+              )}
+              {aiPreviewUrl && (
+                <div className="border rounded-lg p-3 bg-muted/30 space-y-3">
+                  <p className="text-xs text-muted-foreground">Preview:</p>
+                  <img src={aiPreviewUrl} alt="generated" className="max-h-72 mx-auto rounded border" />
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => { setAiPreviewUrl(null); }}>Generar otra</Button>
+                    <Button onClick={confirmAIImage}><Check className="h-4 w-4 mr-1" /> Usar esta imagen</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </TabsContent>
 
           <TabsContent value="upload" className="mt-4">
             <div className="border-2 border-dashed rounded-lg p-10 text-center bg-muted/30">
