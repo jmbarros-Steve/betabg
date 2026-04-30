@@ -45,3 +45,23 @@
 - API keys Klaviyo no verificadas — no se sabe si las keys actuales funcionan
 - `klaviyo-manage-flows` es 54KB — archivo enorme, dificil de mantener
 - Sin crons propios: la sincronizacion depende de llamadas manuales o triggers externos
+
+## Steve Tools (consumidas por Michael W25)
+Patrón en `_shared.md`. Doc del contrato en `docs/STEVE-PROPOSALS-CONTRACT.md`.
+
+### 🟦 Acción Directa
+| Tool name | Endpoint subyacente | Inputs | Confirmación |
+|-----------|---------------------|--------|--------------|
+| `enviar_test_klaviyo` | POST /api/email/send-test | `{ email_address, template_ref }` | No |
+| `sync_segment_klaviyo_to_meta` | POST /api/sync-klaviyo-to-meta-audience | `{ segment_id }` | No |
+| `lanzar_campania_klaviyo_simple` | POST /api/klaviyo/send-campaign | `{ campaign_id }` (campaña ya creada) | Sí (revisión final) |
+
+### 🟪 Propuesta + Wizard precargable
+| proposal_type | Wizard | Endpoint status | Schema |
+|---------------|--------|-----------------|--------|
+| `klaviyo_flow` | flow canvas en `src/components/client-portal/email/` (acepta `?proposal=<id>`) | POST /api/proposals/:id/status | [contract](../../docs/STEVE-PROPOSALS-CONTRACT.md#klaviyo_flow) |
+| `klaviyo_campaign` | `CampaignBuilder.tsx` (acepta `?proposal=<id>`) | POST /api/proposals/:id/status | [contract](../../docs/STEVE-PROPOSALS-CONTRACT.md#klaviyo_campaign) |
+
+**Pendientes para Rodrigo:**
+- [ ] Habilitar parser `?proposal=<id>` en flow canvas y CampaignBuilder
+- [ ] Validación previa: requiere `platform_connections.klaviyo` activa

@@ -50,3 +50,25 @@
 - Webhooks no registrados (requiere SHOPIFY_WEBHOOK_SECRET)
 - Sin crons activos — toda la pipeline Shopify esta inerte
 - platform_metrics sin datos Shopify frescos
+
+## Steve Tools (consumidas por Michael W25)
+Patrón en `_shared.md`. Doc del contrato en `docs/STEVE-PROPOSALS-CONTRACT.md`.
+
+### 🟦 Acción Directa
+| Tool name | Endpoint subyacente | Inputs | Confirmación |
+|-----------|---------------------|--------|--------------|
+| `editar_precio_shopify` | PATCH /api/shopify/update-shopify-product | `{ product_id, new_price }` | Sí (delta >10%) |
+| `crear_descuento_shopify` | POST /api/shopify/create-shopify-discount | `{ code, type, value, starts_at, ends_at, target }` | Sí (siempre) |
+| `generar_descripcion_producto` | POST /api/shopify/generate-product-description | `{ product_id, tone }` | No |
+| `cross_sell_recomendaciones` | POST /api/shopify/compute-cross-sell | `{ product_id }` | No |
+| `sincronizar_metricas_shopify` | POST /api/shopify/sync-shopify-metrics | `{ client_id }` | No |
+
+### 🟪 Propuesta + Wizard precargable
+| proposal_type | Wizard | Endpoint status | Schema |
+|---------------|--------|-----------------|--------|
+| `shopify_promotion` | UI Shopify promociones (acepta `?proposal=<id>`) | POST /api/proposals/:id/status | [contract](../../docs/STEVE-PROPOSALS-CONTRACT.md#shopify_promotion) |
+
+**Pendientes para Matías:**
+- [ ] La mayoría de Shopify es acción directa, no propuesta. Solo `shopify_promotion` (descuento + creative bundle) amerita wizard
+- [ ] Habilitar parser `?proposal=<id>` en UI de promociones
+- [ ] Validación previa: requiere `platform_connections.shopify` activa

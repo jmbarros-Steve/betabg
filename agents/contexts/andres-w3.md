@@ -55,3 +55,25 @@
 - **Alta (5):** Display Creator, Remarketing, PMax Asset Groups, Shopify→Merchant Center, Performance Tracker → PMAX avanzado en Tier 3
 - **Media (5):** Quality Score, Placements, CRITERIO Google, Experiments, Bid Strategy → pendientes
 - **Normal (5):** Asset Library, Shopping por producto, Klaviyo→Customer Match, Report semanal, Copy Generator → pendientes
+
+## Steve Tools (consumidas por Michael W25)
+Patrón en `_shared.md`. Doc del contrato en `docs/STEVE-PROPOSALS-CONTRACT.md`.
+
+### 🟦 Acción Directa
+| Tool name | Endpoint subyacente | Inputs | Confirmación |
+|-----------|---------------------|--------|--------------|
+| `pausar_campana_google` | POST /api/google-campaign-action | `{ campaign_id, action: 'pause' }` | No |
+| `ajustar_presupuesto_google` | PATCH /api/manage-google-campaign | `{ campaign_id, daily_budget_clp }` | Si delta >20% |
+| `editar_keywords_google` | POST /api/manage-google-keywords | `{ ad_group_id, changes: [{ keyword, action }] }` | No |
+| `sincronizar_metricas_google` | POST /api/sync-google-metrics | `{ client_id }` | No |
+
+### 🟪 Propuesta + Wizard precargable
+| proposal_type | Wizard | Endpoint status | Schema |
+|---------------|--------|-----------------|--------|
+| `google_campaign` | TBD — definir ubicación del wizard Google | POST /api/proposals/:id/status | [contract](../../docs/STEVE-PROPOSALS-CONTRACT.md#google_campaign) |
+| `google_pmax` | TBD | POST /api/proposals/:id/status | [contract](../../docs/STEVE-PROPOSALS-CONTRACT.md#google_pmax) |
+
+**Pendientes para Andrés:**
+- [ ] Crear o nombrar wizard de Google que acepte `?proposal=<id>`
+- [ ] Decidir si `google_campaign` y `google_pmax` comparten wizard o se separan
+- [ ] Validación previa: requiere `platform_connections.google_ads` activa

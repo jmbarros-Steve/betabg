@@ -47,3 +47,27 @@
 - Silent failures en sync: el cron corre pero no reporta errores cuando falla la API
 - `CampaignCreateWizard.tsx` es 141KB — archivo monstruoso, candidato a refactor
 - `MetaCampaignManager.tsx` es 86KB — mismo problema
+
+## Steve Tools (consumidas por Michael W25)
+Patrón en `_shared.md`. Doc del contrato en `docs/STEVE-PROPOSALS-CONTRACT.md`.
+
+### 🟦 Acción Directa
+| Tool name | Endpoint subyacente | Inputs | Confirmación |
+|-----------|---------------------|--------|--------------|
+| `pausar_campana_meta` | POST /api/meta-adset-action | `{ campaign_id, action: 'pause' }` | No |
+| `activar_campana_meta` | POST /api/meta-adset-action | `{ campaign_id, action: 'resume' }` | No |
+| `ajustar_presupuesto_meta` | PATCH /api/manage-meta-campaign | `{ campaign_id, daily_budget_clp }` | Si delta >20% |
+| `ver_breakdowns_meta` | GET /api/get-meta-breakdowns | `{ campaign_id, breakdown, from, to }` | No |
+| `sincronizar_metricas_meta` | POST /api/sync-meta-metrics | `{ client_id }` | No |
+| `detectar_overlap_publicos` | POST /api/detect-audience-overlap | `{ audience_ids[] }` | No |
+
+### 🟪 Propuesta + Wizard precargable
+| proposal_type | Wizard | Endpoint status | Schema |
+|---------------|--------|-----------------|--------|
+| `meta_campaign` | `CampaignCreateWizard.tsx` (acepta `?proposal=<id>`) | POST /api/proposals/:id/status | [contract](../../docs/STEVE-PROPOSALS-CONTRACT.md#meta_campaign) |
+| `meta_audience` | `MetaAudienceManager.tsx` (acepta `?proposal=<id>`) | POST /api/proposals/:id/status | [contract](../../docs/STEVE-PROPOSALS-CONTRACT.md#meta_audience) |
+
+**Pendientes para Felipe:**
+- [ ] Agregar parser de `?proposal=<id>` en `CampaignCreateWizard.tsx` y precargar campos
+- [ ] Endpoint `POST /api/proposals/:id/status` (compartido para todos los dueños — coordinar con Diego W8)
+- [ ] Validación previa: si `meta_campaign` propuesto y `platform_connections.meta` no activa → mostrar prompt de conexión

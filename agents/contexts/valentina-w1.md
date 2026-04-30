@@ -53,3 +53,24 @@
 - `CampaignBuilder.tsx` es 81KB — componente frontend monstruoso
 - `email-html-processor.ts` es 25KB — lib compleja
 - Tablas compartidas con Rodrigo W0 (`email_campaigns`, `email_send_queue`, `email_templates`) — riesgo de conflictos de ownership
+
+## Steve Tools (consumidas por Michael W25)
+Patrón en `_shared.md`. Doc del contrato en `docs/STEVE-PROPOSALS-CONTRACT.md`.
+
+### 🟦 Acción Directa
+| Tool name | Endpoint subyacente | Inputs | Confirmación |
+|-----------|---------------------|--------|--------------|
+| `generar_contenido_email` | POST /api/email/generate-email-content | `{ target_audience, subject_type, tone }` | No |
+| `enviar_test_email` | POST /api/email/send-test | `{ email, template_ref }` | No |
+| `gestionar_lista_email` | POST /api/email/manage-email-lists | `{ action: 'create'\|'rename'\|'delete', list_id?, name? }` | No |
+
+### 🟪 Propuesta + Wizard precargable
+| proposal_type | Wizard | Endpoint status | Schema |
+|---------------|--------|-----------------|--------|
+| `email_ab_test` | `CampaignBuilder.tsx` modo A/B (acepta `?proposal=<id>`) | POST /api/proposals/:id/status | [contract](../../docs/STEVE-PROPOSALS-CONTRACT.md#email_ab_test) |
+| `email_template` | builder visual (acepta `?proposal=<id>`) | POST /api/proposals/:id/status | [contract](../../docs/STEVE-PROPOSALS-CONTRACT.md#email_template) |
+
+**Pendientes para Valentina:**
+- [ ] Habilitar parser `?proposal=<id>` en CampaignBuilder y builder visual
+- [ ] Coordinar con Rodrigo W0 cuando proposal afecta tablas compartidas (`email_campaigns`, `email_templates`)
+- [ ] Boundary clara: Valentina = templates/A-B/builder. Rodrigo = flows/segmentos/Klaviyo nativo

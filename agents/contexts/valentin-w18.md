@@ -43,3 +43,25 @@
 - Angulos repetidos — falta variedad en generacion
 - `generate-meta-copy.ts` es >70KB — LEER ANTES DE TOCAR, archivo gigante
 - `creative-context.ts` existe en 2 rutas distintas — posible duplicacion/inconsistencia
+
+## Steve Tools (consumidas por Michael W25)
+Patrón en `_shared.md`. Doc del contrato en `docs/STEVE-PROPOSALS-CONTRACT.md`.
+
+### 🟦 Acción Directa
+| Tool name | Endpoint subyacente | Inputs | Confirmación |
+|-----------|---------------------|--------|--------------|
+| `generar_imagen_ia` | POST /api/ai/generate-image | `{ prompt, style, brand_colors, aspect_ratio }` | No |
+| `editar_imagen_ia` | POST /api/ai/edit-image-gemini | `{ image_url, instructions }` | No |
+| `generar_video_ia` | POST /api/ai/generate-video | `{ script, duration, music_style, aspect_ratio }` | Sí (costo alto) |
+| `generar_script_video` | POST /api/ai/generate-video-script | `{ product, tone, duration }` | No |
+| `narracion_ia` | POST /api/brief-estudio/narration | `{ text, voice_type }` | No |
+
+### 🟪 Propuesta + Wizard precargable
+| proposal_type | Wizard | Endpoint status | Schema |
+|---------------|--------|-----------------|--------|
+| `creative_brief` | Brief Estudio canvas (acepta `?proposal=<id>`) | POST /api/proposals/:id/status | [contract](../../docs/STEVE-PROPOSALS-CONTRACT.md#creative_brief) |
+
+**Pendientes para Valentín:**
+- [ ] Habilitar parser `?proposal=<id>` en canvas de Brief Estudio
+- [ ] Validación previa: si producto referenciado, `shopify_products` debe tener al menos 1 imagen disponible
+- [ ] La generación pesada (video) siempre pasa por confirmación, costo significativo

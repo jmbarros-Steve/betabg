@@ -82,3 +82,35 @@ Cuando encuentres un bug severity critical/major/high → insertar INMEDIATAMENT
 
 ## Super Admin
 - Email: jmbarros@bgconsult.cl
+
+## Steve Tools — Patrón "Steve propone, merchant ejecuta"
+
+Steve (cerebro = Michael W25) actúa de dos formas. Cada **dueño de canal** debe declarar en SU context cuáles tools expone:
+
+### 🟦 Tools de acción directa
+Operaciones simples, reversibles, de bajo riesgo. Steve las invoca y reporta resultado.
+**Cada dueño declara** en su context:
+```markdown
+## Steve Tools — Acción Directa
+| Tool name | Endpoint subyacente | Inputs | Confirmación | Notas |
+|-----------|---------------------|--------|--------------|-------|
+| `pausar_campana_meta` | POST /api/meta-adset-action | { campaign_id, action: 'pause' } | No | Reversible |
+| `ajustar_presupuesto_meta` | PATCH /api/meta-campaign | { campaign_id, daily_budget_clp } | Si delta >20% | Plata en juego |
+```
+
+### 🟪 Generadores de propuesta + Wizard precargable
+Operaciones complejas/creativas. Steve genera JSON, lo persiste en `steve_proposals`, manda link.
+**Cada dueño declara** en su context:
+```markdown
+## Steve Tools — Propuesta + Link
+| proposal_type | Wizard que la consume | Endpoint patch status | Schema JSON |
+|---------------|----------------------|-----------------------|-------------|
+| `meta_campaign` | CampaignCreateWizard.tsx (?proposal=) | POST /api/proposals/{id}/status | docs/STEVE-PROPOSALS-CONTRACT.md#meta_campaign |
+```
+
+### Quién hace qué
+- **Michael W25** consume las tools y genera las propuestas según las firmas que declares.
+- **Dueño de canal** mantiene el endpoint subyacente, el wizard que lee `?proposal=`, y el schema JSON.
+- Cambio de firma de tool/proposal → coordinar con Michael ANTES (rompe `steve-tools.ts` y `proposal-builders/`).
+
+Detalle del contrato: `docs/STEVE-PROPOSALS-CONTRACT.md`. Schema: `supabase/migrations/20260430130000_steve_proposals.sql`.

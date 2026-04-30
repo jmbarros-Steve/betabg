@@ -52,3 +52,23 @@
 - weekly report que nadie lee — verificar si se envia y a quien
 - Google data completamente missing (Andres W3 muerto)
 - campaign_metrics puede tener huecos por falta de fuentes Google + Shopify
+
+## Steve Tools (consumidas por Michael W25)
+Patrón en `_shared.md`. Doc del contrato en `docs/STEVE-PROPOSALS-CONTRACT.md`.
+
+### 🟦 Acción Directa
+| Tool name | Endpoint subyacente | Inputs | Confirmación |
+|-----------|---------------------|--------|--------------|
+| `espiar_ads_competencia` | POST /api/analytics/analyze-competitor-ads | `{ competitor_url }` | No |
+| `deep_dive_competidor` | POST /api/analytics/deep-dive-competitor | `{ competitor_id, scope }` | No |
+| `web_crawl_competidor` | POST /api/competitor/web-crawl | `{ domain }` | No |
+| `seo_competidor` | POST /api/competitor/scrape-seo | `{ domain }` | No |
+| `scorecard_competitivo` | POST /api/competitor/generate-scorecard | `{ competitor_ids[] }` | No |
+
+### 🟪 Propuesta + Wizard precargable
+Ignacio **no genera propuestas estructuradas** — sus tools son todas de inteligencia/lectura. Sin embargo, sus outputs **alimentan** propuestas de otros dueños:
+- Output de `espiar_ads_competencia` → puede inspirar `meta_campaign` (Felipe) o `creative_brief` (Valentín)
+- Output de `seo_competidor` → puede inspirar `google_campaign` (Andrés)
+
+**Pendientes para Ignacio:**
+- [ ] Asegurar que outputs sean estructurados (JSON) y no solo prosa, para que Michael los pueda inyectar en proposal-builders de otros dueños
