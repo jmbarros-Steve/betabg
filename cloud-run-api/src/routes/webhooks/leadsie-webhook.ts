@@ -147,7 +147,7 @@ export async function leadsieWebhook(c: Context) {
     }
 
     // ── 3. Map Meta assets ─────────────────────────────
-    const meta = mapMetaAssets(assets);
+    const meta = await mapMetaAssets(assets);
 
     // ── 4. Map Google Ads assets ─────────────────────
     const google = mapGoogleAssets(assets);
@@ -316,7 +316,27 @@ export async function leadsieWebhook(c: Context) {
 // Helpers
 // ─────────────────────────────────────────────────────────
 
-function mapMetaAssets(assets: LeadsieAsset[]): MetaAssets {
+/**
+ * Validates that the SUAT (META_SYSTEM_TOKEN) actually has access to a given
+ * ad account. Leadsie sends every Meta Ad Account the end user has access to,
+ * including personal ones never shared with the BM Partner — picking the first
+ * blindly leaves the connection broken.
+ */
+async function suatCanAccessAdAccount(adAccountId: string): Promise<boolean> {
+  const suat = process.env.META_SYSTEM_TOKEN;
+  if (!suat) return false;
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v23.0/act_${adAccountId}?fields=id,account_status`,
+      { headers: { Authorization: `Bearer ${suat}` }, signal: AbortSignal.timeout(8000) },
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function mapMetaAssets(assets: LeadsieAsset[]): Promise<MetaAssets> {
   const result: MetaAssets = {
     account_id: null,
     page_id: null,
@@ -325,10 +345,14 @@ function mapMetaAssets(assets: LeadsieAsset[]): MetaAssets {
     catalog_id: null,
   };
 
+  // First pass — capture non-ad-account assets (Page, IG, Pixel, Catalog).
+  // For these we keep "first wins" since they don't have the same multi-asset
+  // ambiguity as Ad Accounts (a user typically owns 1 Page + 1 IG per business).
+  const adAccountCandidates: string[] = [];
   for (const a of assets) {
     const type = a.type;
-    if (!result.account_id && type === 'Meta Ad Account') {
-      result.account_id = a.id.replace(/^act_/, '');
+    if (type === 'Meta Ad Account') {
+      adAccountCandidates.push(a.id.replace(/^act_/, ''));
     } else if (!result.page_id && type === 'Facebook Page') {
       result.page_id = a.id;
     } else if (!result.ig_account_id && type === 'Instagram Account') {
@@ -338,6 +362,24 @@ function mapMetaAssets(assets: LeadsieAsset[]): MetaAssets {
     } else if (!result.catalog_id && type === 'Facebook Catalog') {
       result.catalog_id = a.id;
     }
+  }
+
+  // Validate ad accounts against the SUAT — accept the first one the BM
+  // System User can actually access. Avoids picking a personal ad account the
+  // end user has but never shared with our Business Manager.
+  for (const candidate of adAccountCandidates) {
+    if (await suatCanAccessAdAccount(candidate)) {
+      result.account_id = candidate;
+      break;
+    }
+    console.warn(
+      `[leadsie-webhook] SUAT no tiene acceso a act_${candidate} — descarto y sigo buscando`,
+    );
+  }
+  if (!result.account_id && adAccountCandidates.length > 0) {
+    console.warn(
+      `[leadsie-webhook] Ningún ad account del payload (${adAccountCandidates.join(', ')}) está compartido con el BM. Preservando account_id existente.`,
+    );
   }
 
   return result;
