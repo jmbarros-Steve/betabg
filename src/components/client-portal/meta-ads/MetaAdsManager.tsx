@@ -55,14 +55,13 @@ import {
 // Existing components
 import { Coachmark } from '@/components/client-portal/Coachmark';
 import { MetaAdCreator } from '@/components/client-portal/MetaAdCreator';
-import { CompetitorAdsPanel } from '@/components/client-portal/CompetitorAdsPanel';
+import { ComingSoon } from '@/components/client-portal/ComingSoon';
 
 // Sub-module components
 import MetaCampaignManager from './MetaCampaignManager';
 import MetaAudienceManager from './MetaAudienceManager';
 import MetaAnalyticsDashboard from './MetaAnalyticsDashboard';
 import MetaHealthBanner from './MetaHealthBanner';
-import MetaAutomatedRules from './MetaAutomatedRules';
 
 // New professional components
 import CampaignTreeView from './CampaignTreeView';
@@ -1051,9 +1050,10 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
           </PlanGate>
         )}
         {key === 'rules' && (
-          <PlanGate feature="meta_ads.rules" clientId={clientId}>
-            <MetaAutomatedRules clientId={clientId} />
-          </PlanGate>
+          <ComingSoon
+            title="Reglas Automatizadas"
+            description="Configurá reglas para pausar, escalar o ajustar campañas según ROAS, CPA o gasto. Estamos afinando el motor para que las reglas se ejecuten sin sustos."
+          />
         )}
         {key === 'drafts' && (
           <DraftsManager
@@ -1065,9 +1065,10 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
         {key === 'pixel' && <PixelSetupWizard clientId={clientId} />}
         {key === 'creative-perf' && <CreativePerformancePanel clientId={clientId} />}
         {key === 'competitors' && (
-          <PlanGate feature="competencia.ads" clientId={clientId}>
-            <CompetitorAdsPanel clientId={clientId} />
-          </PlanGate>
+          <ComingSoon
+            title="Análisis de Competencia"
+            description="Espiamos los anuncios activos, landings y formatos de tus competidores en Meta Ad Library. Estamos calibrando la detección de cuentas para que no se pierda ninguna marca."
+          />
         )}
       </div>
     );
@@ -1314,9 +1315,10 @@ export default function MetaAdsManager({ clientId }: MetaAdsManagerProps) {
                 if (item.key === 'competitors') {
                   return (
                     <div key={item.key} className={isActive ? 'block' : 'hidden'}>
-                      <PlanGate feature="competencia.ads" clientId={clientId}>
-                        <CompetitorAdsPanel clientId={clientId} />
-                      </PlanGate>
+                      <ComingSoon
+                        title="Análisis de Competencia"
+                        description="Espiamos los anuncios activos, landings y formatos de tus competidores en Meta Ad Library. Estamos calibrando la detección de cuentas para que no se pierda ninguna marca."
+                      />
                     </div>
                   );
                 }
