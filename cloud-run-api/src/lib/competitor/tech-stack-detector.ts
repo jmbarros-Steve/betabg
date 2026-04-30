@@ -28,9 +28,14 @@ export interface DetectedPlatform {
 
 export interface DetectedTrackingScripts {
   meta_pixel: boolean;
+  /** Numeric pixel ID extracted from `fbq('init', NNN)` if present in HTML.   */
+  meta_pixel_id?: string | null;
   google_tag_manager: boolean;
+  /** GTM container ID (`GTM-XXXXXX`) — used to expand the public container.   */
+  google_tag_manager_id?: string | null;
   google_analytics: boolean;
-  google_analytics_id?: string | null;   // First UA-* / G-* ID found
+  /** First UA-* / G-* ID found.                                               */
+  google_analytics_id?: string | null;
   tiktok_pixel: boolean;
   klaviyo: boolean;
   hotjar: boolean;
@@ -176,6 +181,17 @@ export function detectTrackingScripts(html: string, markdown: string): DetectedT
   // ship the ID inline without `gtag(` — common in legacy Bootic stores).
   const gaDetected = ga || !!gaId;
 
+  // GTM container ID — used by the orchestrator to expand the public GTM JS
+  // and enumerate every tag wired up inside it.
+  const gtmIdMatch = combinedRaw.match(/GTM-[A-Z0-9]{4,12}/);
+  const gtmId = gtmIdMatch ? gtmIdMatch[0] : null;
+
+  // Meta pixel ID extraction — only meaningful when we observe an `fbq('init', NUM)`
+  // in the page itself; otherwise GTM lookup is the canonical source.
+  let metaPixelId: string | null = null;
+  const fbqInitMatch = combinedRaw.match(/fbq\(\s*['"]init['"]\s*,\s*['"](\d{14,17})['"]/);
+  if (fbqInitMatch) metaPixelId = fbqInitMatch[1];
+
   const tiktok = combined.includes('analytics.tiktok.com') || combined.includes('ttq.load');
   const klaviyo = combined.includes('klaviyo.com') || combined.includes('_learnq');
   const hotjar = combined.includes('hotjar.com') || combined.includes('hj(');
@@ -197,7 +213,9 @@ export function detectTrackingScripts(html: string, markdown: string): DetectedT
 
   return {
     meta_pixel: metaPixel,
+    meta_pixel_id: metaPixelId,
     google_tag_manager: gtm,
+    google_tag_manager_id: gtmId,
     google_analytics: gaDetected,
     google_analytics_id: gaId,
     tiktok_pixel: tiktok,
@@ -224,7 +242,9 @@ export interface MappedTechStack {
   analytics_stack: string[];
   tracking_pixels: {
     meta_pixel: boolean;
+    meta_pixel_id?: string;
     google_tag_manager: boolean;
+    google_tag_manager_id?: string;
     google_analytics: boolean;
     google_analytics_id?: string;
     tiktok_pixel: boolean;
@@ -266,7 +286,9 @@ export function buildTechStack(html: string, markdown: string): MappedTechStack 
     analytics_stack: analyticsStack,
     tracking_pixels: {
       meta_pixel: tracking.meta_pixel,
+      meta_pixel_id: tracking.meta_pixel_id ?? undefined,
       google_tag_manager: tracking.google_tag_manager,
+      google_tag_manager_id: tracking.google_tag_manager_id ?? undefined,
       google_analytics: tracking.google_analytics,
       google_analytics_id: tracking.google_analytics_id ?? undefined,
       tiktok_pixel: tracking.tiktok_pixel,
@@ -278,4 +300,72 @@ export function buildTechStack(html: string, markdown: string): MappedTechStack 
     marketing_sophistication: tracking.marketing_sophistication,
     evidence,
   };
+}
+
+/**
+ * Async enrichment: when `buildTechStack` detects a GTM container ID, fetch
+ * the public GTM container body and merge any pixel IDs / tags discovered
+ * inside it. This recovers pixels that GTM injects dynamically (and thus
+ * never appear in the page HTML).
+ *
+ * Returns the original stack with `tracking_pixels.*_id` fields filled in
+ * when applicable, plus extra entries appended to `other`.
+ */
+export async function enrichTechStackFromGtm(
+  stack: MappedTechStack,
+): Promise<MappedTechStack> {
+  const gtmId = stack.tracking_pixels.google_tag_manager_id;
+  if (!gtmId) return stack;
+
+  // Imported lazily to avoid a circular dep with direct-fetch.ts.
+  const { gtmContainerLookup, extractPixelsFromGtm } = await import('./direct-fetch.js');
+  const lookup = await gtmContainerLookup(gtmId);
+  if (!lookup.ok || !lookup.body) return stack;
+
+  const ids = extractPixelsFromGtm(lookup.body);
+
+  const enriched: MappedTechStack = {
+    ...stack,
+    tracking_pixels: {
+      ...stack.tracking_pixels,
+      meta_pixel:
+        stack.tracking_pixels.meta_pixel || ids.meta_pixel.length > 0,
+      meta_pixel_id:
+        stack.tracking_pixels.meta_pixel_id ?? ids.meta_pixel[0] ?? undefined,
+      google_analytics:
+        stack.tracking_pixels.google_analytics ||
+        ids.ga4.length > 0 ||
+        ids.ga_universal.length > 0,
+      google_analytics_id:
+        stack.tracking_pixels.google_analytics_id ??
+        ids.ga4[0] ??
+        ids.ga_universal[0] ??
+        undefined,
+      tiktok_pixel:
+        stack.tracking_pixels.tiktok_pixel || ids.tiktok_pixel.length > 0,
+      other: [
+        ...stack.tracking_pixels.other,
+        ...(ids.google_ads.length > 0 ? [`Google Ads (${ids.google_ads[0]})`] : []),
+      ],
+    },
+    evidence: {
+      ...stack.evidence,
+      gtm_container_size_bytes: String(lookup.bytes),
+      ...(ids.meta_pixel[0] ? { gtm_meta_pixel_id: ids.meta_pixel[0] } : {}),
+      ...(ids.ga4[0] ? { gtm_ga4_id: ids.ga4[0] } : {}),
+      ...(ids.tiktok_pixel[0] ? { gtm_tiktok_pixel_id: ids.tiktok_pixel[0] } : {}),
+      ...(ids.google_ads[0] ? { gtm_google_ads_id: ids.google_ads[0] } : {}),
+    },
+  };
+
+  // Sophistication may bump up if GTM revealed extra pixels.
+  if (
+    enriched.tracking_pixels.meta_pixel &&
+    enriched.tracking_pixels.google_analytics &&
+    enriched.tracking_pixels.tiktok_pixel
+  ) {
+    enriched.marketing_sophistication = 'advanced';
+  }
+
+  return enriched;
 }

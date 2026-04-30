@@ -16,6 +16,7 @@
  */
 
 import { validateUrlForSSRF } from '../url-validator.js';
+import { directFetch, waybackFetch } from './direct-fetch.js';
 
 const BASE_URL = 'https://api.firecrawl.dev';
 const SCRAPE_TIMEOUT_MS = 90_000;
@@ -156,22 +157,62 @@ async function getJson<T>(
 // ---------------------------------------------------------------------------
 
 /**
- * Scrape a single URL. Returns markdown + html (and screenshot if requested).
- * Defaults to waitFor=3000ms and onlyMainContent=false.
+ * Scrape a single URL with a 3-tier cascade:
+ *
+ *   1. Direct fetch with a real Chrome User-Agent (free, ~500ms).
+ *      Beats Cloudflare basic mode. Handles ~80% of mid-tier sites.
+ *   2. Firecrawl `/v1/scrape` (paid). Handles JS-heavy sites and CF JS challenges.
+ *   3. Wayback Machine snapshot (free, may be 1-30d old).
+ *
+ * The result is normalised to the existing `FirecrawlScrapeResult` shape so
+ * callers don't care which tier produced the HTML. We expose the source via
+ * `metadata.source` ('direct' | 'firecrawl' | 'wayback') for telemetry.
+ *
+ * `options.screenshot` forces tier 2 (Firecrawl) since neither direct fetch
+ * nor Wayback produce images.
  */
 export async function scrapePage(
   url: string,
   options: FirecrawlScrapeOptions = {}
 ): Promise<FirecrawlResponse<FirecrawlScrapeResult>> {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    return { data: null, cost: 0, error: 'Firecrawl not configured' };
-  }
-
   const ssrf = validateUrlForSSRF(url);
   if (!ssrf.safe) {
     console.log(`[firecrawl] scrapePage SSRF blocked: ${ssrf.reason} url=${url}`);
     return { data: null, cost: 0, error: `SSRF blocked: ${ssrf.reason}` };
+  }
+
+  // ---- TIER 1: direct fetch ----------------------------------------------
+  // Always run, even when caller asked for a screenshot. We treat screenshot
+  // as a *nice-to-have*: if tier 1 produces useful HTML, we return immediately
+  // without a screenshot (callers already handle a missing screenshot field).
+  // Firecrawl is reserved for cases where direct fetch fails — there we get
+  // both HTML and screenshot in the same paid call.
+  const direct = await directFetch(url);
+  if (direct.ok && direct.html) {
+    console.log(
+      `[scraper] tier1 direct OK url=${url} bytes=${direct.bytes} ms=${direct.durationMs} screenshot_skipped=${!!options.screenshot}`,
+    );
+    return {
+      data: {
+        url: direct.finalUrl || url,
+        html: direct.html,
+        rawHtml: direct.html,
+        markdown: '', // markdown conversion happens downstream from html
+        metadata: { source: 'direct', status: direct.status, bytes: direct.bytes },
+      },
+      cost: 0,
+      error: null,
+    };
+  }
+  console.log(
+    `[scraper] tier1 direct miss url=${url} reason=${direct.notUsefulReason ?? direct.error}`,
+  );
+
+  // ---- TIER 2: Firecrawl -------------------------------------------------
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    // No Firecrawl key — try Wayback before giving up.
+    return await tryWayback(url);
   }
 
   const formats: string[] = ['markdown', 'html'];
@@ -184,12 +225,48 @@ export async function scrapePage(
     onlyMainContent: options.onlyMainContent ?? false,
   };
 
-  console.log(`[firecrawl] scrapePage: ${url}`);
+  console.log(`[firecrawl] scrapePage tier2: ${url}`);
   const res = await postJson<FirecrawlScrapeResult>('/v1/scrape', body, apiKey, SCRAPE_TIMEOUT_MS);
-  if (!res.ok || !res.json?.data) {
-    return { data: null, cost: 0, error: res.error ?? 'no data' };
+  if (res.ok && res.json?.data) {
+    const enriched: FirecrawlScrapeResult = {
+      ...res.json.data,
+      metadata: { ...(res.json.data.metadata ?? {}), source: 'firecrawl' },
+    };
+    return { data: enriched, cost: COST_PER_PAGE_USD, error: null };
   }
-  return { data: res.json.data, cost: COST_PER_PAGE_USD, error: null };
+
+  // ---- TIER 3: Wayback ---------------------------------------------------
+  console.log(`[firecrawl] tier2 firecrawl failed: ${res.error} — trying wayback`);
+  return await tryWayback(url);
+}
+
+/**
+ * Wayback Machine fallback wrapped in the FirecrawlResponse shape.
+ */
+async function tryWayback(
+  url: string,
+): Promise<FirecrawlResponse<FirecrawlScrapeResult>> {
+  const wb = await waybackFetch(url);
+  if (wb.ok && wb.html) {
+    console.log(
+      `[scraper] tier3 wayback OK url=${url} bytes=${wb.bytes} ms=${wb.durationMs}`,
+    );
+    return {
+      data: {
+        url: wb.finalUrl || url,
+        html: wb.html,
+        rawHtml: wb.html,
+        markdown: '',
+        metadata: { source: 'wayback', status: wb.status, bytes: wb.bytes },
+      },
+      cost: 0,
+      error: null,
+    };
+  }
+  console.log(
+    `[scraper] tier3 wayback miss url=${url} reason=${wb.notUsefulReason ?? wb.error}`,
+  );
+  return { data: null, cost: 0, error: wb.error ?? 'all tiers failed' };
 }
 
 /**

@@ -31,7 +31,7 @@ import {
   buildWebUxAnalysisPrompt,
   type WebUxPageType,
 } from '../../lib/competitor/prompts.js';
-import { buildTechStack } from '../../lib/competitor/tech-stack-detector.js';
+import { buildTechStack, enrichTechStackFromGtm } from '../../lib/competitor/tech-stack-detector.js';
 import type {
   WebCrawlRequest,
   WebIntelligence,
@@ -872,22 +872,26 @@ export async function webCrawl(c: Context) {
   const homepageHtml = homepage.html ?? '';
   const homepageMd = homepage.markdown ?? '';
   const techStackBuilt = buildTechStack(homepageHtml, homepageMd);
+  // GTM enrichment: when a container ID was detected, fetch its public JS to
+  // recover dynamically-injected pixels (Meta, GA4, TikTok, Google Ads). Only
+  // adds latency (~1s) when GTM is present; skipped silently otherwise.
+  const techStackEnriched = await enrichTechStackFromGtm(techStackBuilt);
   const techStack: TechStack = {
-    ecommerce_platform: techStackBuilt.ecommerce_platform,
-    cms: techStackBuilt.cms,
-    cdn: techStackBuilt.cdn,
-    reviews_provider: techStackBuilt.reviews_provider,
-    email_provider: techStackBuilt.email_provider,
-    chat_tool: techStackBuilt.chat_tool,
-    ab_testing_tool: techStackBuilt.ab_testing_tool,
-    personalization_tool: techStackBuilt.personalization_tool,
-    analytics_stack: techStackBuilt.analytics_stack,
-    tracking_pixels: techStackBuilt.tracking_pixels,
-    marketing_sophistication: techStackBuilt.marketing_sophistication,
-    evidence: techStackBuilt.evidence,
+    ecommerce_platform: techStackEnriched.ecommerce_platform,
+    cms: techStackEnriched.cms,
+    cdn: techStackEnriched.cdn,
+    reviews_provider: techStackEnriched.reviews_provider,
+    email_provider: techStackEnriched.email_provider,
+    chat_tool: techStackEnriched.chat_tool,
+    ab_testing_tool: techStackEnriched.ab_testing_tool,
+    personalization_tool: techStackEnriched.personalization_tool,
+    analytics_stack: techStackEnriched.analytics_stack,
+    tracking_pixels: techStackEnriched.tracking_pixels,
+    marketing_sophistication: techStackEnriched.marketing_sophistication,
+    evidence: techStackEnriched.evidence,
   };
   console.log(
-    `[web-crawl] tech_stack platform=${techStack.ecommerce_platform ?? 'unknown'} sophistication=${techStack.marketing_sophistication}`,
+    `[web-crawl] tech_stack platform=${techStack.ecommerce_platform ?? 'unknown'} sophistication=${techStack.marketing_sophistication} pixels=meta=${techStack.tracking_pixels.meta_pixel}/ga=${techStack.tracking_pixels.google_analytics}/tiktok=${techStack.tracking_pixels.tiktok_pixel}`,
   );
 
   // ---------------------------------------------------------------------
