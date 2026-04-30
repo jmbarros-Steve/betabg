@@ -45,6 +45,8 @@ interface DraftSpec {
   [key: string]: any;
 }
 
+type Jerarquia = 'A' | 'B' | 'C';
+
 interface RequestBody {
   action: Action;
   draft_id?: string;
@@ -55,6 +57,13 @@ interface RequestBody {
   source_conversation_id?: string;
   notes?: string;
   changes?: Partial<DraftSpec>;
+  // Jerarquía A/B/C — alineado con Michael W25 (estrategia).
+  //   A: nuevo ad dentro de adset existente → requires parent_campaign_id + parent_adset_id
+  //   B: nuevo adset (+ ad) dentro de campaña existente → requires parent_campaign_id
+  //   C: campaña completa nueva (default histórico)
+  jerarquia?: Jerarquia;
+  parent_campaign_id?: string;
+  parent_adset_id?: string;
 }
 
 export async function manageMetaDraft(c: Context) {
@@ -107,6 +116,28 @@ export async function manageMetaDraft(c: Context) {
       const auth = await assertClientOwner(client_id);
       if (!auth.ok) return c.json({ error: auth.error }, auth.status as any);
 
+      // ── Jerarquía A/B/C ── (Michael W25 contract)
+      const jerarquia: Jerarquia = (body.jerarquia as Jerarquia) || 'C';
+      if (!['A', 'B', 'C'].includes(jerarquia)) {
+        return c.json({ error: `Invalid jerarquia "${jerarquia}". Must be A, B, or C.` }, 400);
+      }
+      const parent_campaign_id = body.parent_campaign_id?.trim() || null;
+      const parent_adset_id = body.parent_adset_id?.trim() || null;
+      if (jerarquia === 'A') {
+        if (!parent_campaign_id || !parent_adset_id) {
+          return c.json({
+            error: 'jerarquia=A requiere parent_campaign_id y parent_adset_id (nuevo ad en adset existente).',
+          }, 400);
+        }
+      } else if (jerarquia === 'B') {
+        if (!parent_campaign_id) {
+          return c.json({
+            error: 'jerarquia=B requiere parent_campaign_id (nuevo adset en campaña existente).',
+          }, 400);
+        }
+      }
+      // jerarquia=C → no parents required
+
       const { data, error } = await supabase
         .from('meta_campaign_drafts')
         .insert({
@@ -117,6 +148,9 @@ export async function manageMetaDraft(c: Context) {
           source_conversation_id: source_conversation_id || null,
           status: 'draft',
           created_by: 'steve',
+          jerarquia,
+          parent_campaign_id,
+          parent_adset_id,
         })
         .select()
         .single();
@@ -167,7 +201,7 @@ export async function manageMetaDraft(c: Context) {
       if (!body.draft_id) return c.json({ error: 'update requires draft_id' }, 400);
       const { data: existing } = await supabase
         .from('meta_campaign_drafts')
-        .select('client_id, status, spec')
+        .select('client_id, status, spec, jerarquia, parent_campaign_id, parent_adset_id')
         .eq('id', body.draft_id)
         .single();
       if (!existing) return c.json({ error: 'Draft not found' }, 404);
@@ -182,6 +216,29 @@ export async function manageMetaDraft(c: Context) {
       if (body.spec) patch.spec = body.spec;
       if (body.changes) patch.spec = { ...(existing.spec as any), ...body.changes };
       if (body.notes !== undefined) patch.notes = body.notes;
+      // Jerarquía: solo permitir cambiar si el client manda al menos uno de los 3 campos.
+      // Validamos coherencia A/B/C al final usando el valor resultante (existente + patch).
+      if (body.jerarquia !== undefined || body.parent_campaign_id !== undefined || body.parent_adset_id !== undefined) {
+        const nextJerarquia: Jerarquia = (body.jerarquia as Jerarquia) || ((existing as any).jerarquia as Jerarquia) || 'C';
+        if (!['A', 'B', 'C'].includes(nextJerarquia)) {
+          return c.json({ error: `Invalid jerarquia "${nextJerarquia}". Must be A, B, or C.` }, 400);
+        }
+        const nextCampaignId = body.parent_campaign_id !== undefined
+          ? (body.parent_campaign_id?.trim() || null)
+          : ((existing as any).parent_campaign_id || null);
+        const nextAdsetId = body.parent_adset_id !== undefined
+          ? (body.parent_adset_id?.trim() || null)
+          : ((existing as any).parent_adset_id || null);
+        if (nextJerarquia === 'A' && (!nextCampaignId || !nextAdsetId)) {
+          return c.json({ error: 'jerarquia=A requiere parent_campaign_id y parent_adset_id.' }, 400);
+        }
+        if (nextJerarquia === 'B' && !nextCampaignId) {
+          return c.json({ error: 'jerarquia=B requiere parent_campaign_id.' }, 400);
+        }
+        patch.jerarquia = nextJerarquia;
+        patch.parent_campaign_id = nextCampaignId;
+        patch.parent_adset_id = nextAdsetId;
+      }
       if (Object.keys(patch).length === 0) {
         return c.json({ error: 'Nothing to update' }, 400);
       }
@@ -322,9 +379,33 @@ export async function manageMetaDraft(c: Context) {
       const rawObj = (spec.objective || 'CONVERSIONS').toUpperCase();
       const mappedObjective = objectiveMap[rawObj] || rawObj;
 
+      // ── Jerarquía A/B/C ── usar parents existentes si están seteados.
+      // handleCreate de manage-meta-campaign ya soporta campaign_id/adset_id existentes
+      // (líneas 463–739): si recibe campaign_id, no crea campaña; si recibe adset_id,
+      // no crea adset; siempre crea el ad. Validamos coherencia antes de invocar.
+      const draftJerarquia: Jerarquia = ((draft as any).jerarquia as Jerarquia) || 'C';
+      const draftParentCampaignId = (draft as any).parent_campaign_id || null;
+      const draftParentAdsetId = (draft as any).parent_adset_id || null;
+      if (draftJerarquia === 'A' && (!draftParentCampaignId || !draftParentAdsetId)) {
+        return c.json({
+          error: 'Draft jerarquia=A pero falta parent_campaign_id o parent_adset_id. Editá el draft antes de publicar.',
+        }, 400);
+      }
+      if (draftJerarquia === 'B' && !draftParentCampaignId) {
+        return c.json({
+          error: 'Draft jerarquia=B pero falta parent_campaign_id. Editá el draft antes de publicar.',
+        }, 400);
+      }
+
       const innerData: any = {
         name: draft.name,
         objective: mappedObjective,
+        // Jerarquía A o B: pasamos parents para que manage-meta-campaign los reuse.
+        // En 'A' pasamos ambos → handleCreate crea SOLO el ad.
+        // En 'B' pasamos solo campaign_id → handleCreate crea adset + ad (skip campaign).
+        // En 'C' los dejamos en undefined → handleCreate crea todo.
+        campaign_id: (draftJerarquia === 'A' || draftJerarquia === 'B') ? draftParentCampaignId : undefined,
+        adset_id: draftJerarquia === 'A' ? draftParentAdsetId : undefined,
         // Budget: manage-meta-campaign espera daily_budget (en CLP * 100 microunits? o solo CLP int).
         // Pasamos como espera el shape del Wizard original — daily_budget en CLP.
         daily_budget: spec.budget?.type === 'daily' ? spec.budget?.amount_clp : undefined,

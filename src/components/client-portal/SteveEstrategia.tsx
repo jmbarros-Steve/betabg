@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api';
 import { toast } from 'sonner';
-import { Send, User, Lightbulb, AlertTriangle, Activity, WifiOff } from 'lucide-react';
+import { Send, User, Lightbulb, AlertTriangle, Activity, WifiOff, Paperclip, X, Loader2, Image as ImageIcon, Film } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import avatarSteve from '@/assets/avatar-steve.png';
@@ -52,9 +52,12 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [briefComplete, setBriefComplete] = useState<boolean | null>(null);
   const [hasConnections, setHasConnections] = useState<boolean | null>(null);
+  const [pendingAsset, setPendingAsset] = useState<{ url: string; type: 'photo' | 'video'; name: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const initRef = useRef(false);
   const activeRequestId = useRef<string | null>(null);
 
@@ -70,6 +73,19 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
     initRef.current = true;
     initializeConversation();
   }, [clientId]);
+
+  // Listener para "Usar en chat Estrategia" desde el tab Creativos (CreativosGallery)
+  useEffect(() => {
+    function handleUseAsset(e: Event) {
+      const detail = (e as CustomEvent).detail as { url: string; type: 'photo' | 'video'; name: string } | undefined;
+      if (!detail?.url) return;
+      setPendingAsset({ url: detail.url, type: detail.type === 'video' ? 'video' : 'photo', name: detail.name || 'asset' });
+      toast.success('Asset cargado. Escribí qué hacer con él.');
+      inputRef.current?.focus();
+    }
+    window.addEventListener('use-asset-in-strategy', handleUseAsset as EventListener);
+    return () => window.removeEventListener('use-asset-in-strategy', handleUseAsset as EventListener);
+  }, []);
 
   useEffect(() => {
     // Scroll to bottom when messages change
@@ -145,9 +161,60 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
     }
   }
 
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    if (!isImage && !isVideo) { toast.error('Solo imágenes y videos'); return; }
+    if (file.size > 20 * 1024 * 1024) { toast.error('Archivo máximo 20MB'); return; }
+
+    setUploading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No hay sesión activa');
+      const ext = file.name.split('.').pop() || (isImage ? 'png' : 'mp4');
+      const path = `${user.id}/strategy-uploads/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('client-assets').upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from('client-assets').getPublicUrl(path);
+
+      // Persistir el asset en client_assets para que aparezca en la galería de Creativos
+      const tipo = isImage ? 'photo' : 'video';
+      const { error: insertErr } = await supabase.from('client_assets').insert({
+        client_id: clientId,
+        url: publicUrl,
+        asset_url: publicUrl,
+        nombre: file.name,
+        tipo,
+        asset_type: tipo,
+        source: 'strategy_chat_upload',
+        active: true,
+        asset_metadata: { size: file.size, mime: file.type },
+      });
+      if (insertErr) {
+        // Storage upload OK pero registro DB falló — el archivo queda accesible vía URL
+        // pero NO aparecerá en tab Creativos. Steve puede usarlo igual en este chat.
+        console.error('[EST] client_assets insert failed:', insertErr.message);
+      }
+
+      setPendingAsset({ url: publicUrl, type: tipo, name: file.name });
+      toast.success(`${isImage ? 'Imagen' : 'Video'} listo. Steve lo verá al enviar tu próximo mensaje.`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al subir archivo');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
   async function sendMessage(messageText: string) {
-    if (!messageText.trim() || isLoading) return;
-    const userMessage = messageText.trim();
+    if ((!messageText.trim() && !pendingAsset) || isLoading) return;
+    let userMessage = messageText.trim();
+    if (pendingAsset) {
+      const tag = pendingAsset.type === 'photo' ? '📸 Imagen' : '🎬 Video';
+      userMessage = `${userMessage ? userMessage + '\n\n' : ''}${tag} adjuntada por el cliente: ${pendingAsset.url}\n(Archivo: ${pendingAsset.name}. Está disponible en la galería de Creativos del cliente y se puede usar como image_url/video_url en drafts Meta.)`;
+    }
     setInput('');
 
     // Track request to prevent race conditions with safety timeout
@@ -418,16 +485,53 @@ export function SteveEstrategia({ clientId }: SteveEstrategiaProps) {
 
       {/* Input */}
       <div className="p-4 border-t border-border bg-muted/50 flex-shrink-0">
+        {pendingAsset && (
+          <div className="mb-2 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+            {pendingAsset.type === 'photo' ? (
+              <ImageIcon className="h-4 w-4 text-primary flex-shrink-0" />
+            ) : (
+              <Film className="h-4 w-4 text-primary flex-shrink-0" />
+            )}
+            <span className="truncate flex-1">{pendingAsset.name}</span>
+            <span className="text-muted-foreground flex-shrink-0">— se enviará con tu próximo mensaje</span>
+            <button
+              type="button"
+              onClick={() => setPendingAsset(null)}
+              className="text-muted-foreground hover:text-foreground flex-shrink-0"
+              aria-label="Descartar adjunto"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
         <form onSubmit={handleSendMessage} className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || isLoading}
+            className="rounded-full flex-shrink-0"
+            aria-label="Adjuntar foto o video"
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+          </Button>
           <Input
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Pregunta sobre estrategia, marketing, competencia..."
+            placeholder={pendingAsset ? 'Describe qué hacer con el adjunto…' : 'Pregunta sobre estrategia, marketing, competencia…'}
             disabled={isLoading}
             className="flex-1"
           />
-          <Button type="submit" disabled={!input.trim() || isLoading} size="icon" className="bg-primary rounded-full">
+          <Button type="submit" disabled={(!input.trim() && !pendingAsset) || isLoading} size="icon" className="bg-primary rounded-full">
             <Send className="h-4 w-4" />
           </Button>
         </form>

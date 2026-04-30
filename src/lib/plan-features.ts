@@ -175,6 +175,7 @@ export const TAB_MIN_PLAN: Record<string, PlanSlug> = {
   steve: 'estrategia',
   brief: 'estrategia',
   brief_estudio: 'estrategia',
+  creativos: 'visual',
   metrics: 'visual',
   connections: 'visual',
   config: 'visual',

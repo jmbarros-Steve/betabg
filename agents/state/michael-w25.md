@@ -1,7 +1,16 @@
 # Michael W25 — Estrategia (Comunicación Cliente)
-Squad: Producto | Última sesión: 2026-04-27 (creación + extracción strategy-chat)
+Squad: Producto | Última sesión: 2026-04-29 (inventario completo módulo Estrategia)
 
-## Estado actual: agente independiente del Brief, dueño de strategy-chat.ts
+## Estado actual: agente independiente del Brief, dueño de strategy-chat.ts + strategy-report.ts + steve-strategy.ts
+
+### Sesión 29/04/2026 — Inventario completo del módulo Estrategia
+- [x] Auditoría línea-por-línea de 5365 líneas en 5 archivos (sub-agente Explore)
+- [x] Mapeo de 3 endpoints, 20 tablas Supabase, 6 APIs externas, 13 tools agenticas, 14 piezas de lógica de negocio
+- [x] Documentación de reglas hardcoded del system prompt y limitaciones actuales
+- [x] Notion sesión creada bajo hub `34f9af51b58d81329355dc5b3997bc28`
+- [x] Memory journal creado en `agents/memory/michael-w25.md`
+- [x] Hallazgo: `strategy-chat.ts` creció ~870 → 2442 líneas entre 27/04 y 29/04 (state desactualizado)
+- [x] Trabajo posterior 27/04 documentado: drafts review flow (`d60bcf05`), 5 agentes coordinados (`c6524b27`), creativos 5 formatos (`ee22538b`), customer intel + ROAS margen + calendario (`310c11e5`), strategy-report premium (`73d7b887`), regla privacidad (`4e9e70c5` + `05427010`), regla #1 anti-loop (`770ced06`), objetivo siempre se pregunta (`fcd7bb9e`), anti-meta-referencias (`fc650e22`)
 
 ### Sesión 27/04/2026 (parte 2) — Extracción de strategy-chat.ts [BRIEF-APPROVED-BY-JM]
 - [x] Creado `cloud-run-api/src/routes/ai/strategy-chat.ts` (~870 líneas) — handler independiente

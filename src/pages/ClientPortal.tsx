@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare, Home, Share2, GraduationCap, Lock, Clapperboard } from 'lucide-react';
+import { LogOut, BarChart3, Link2, Loader2, ArrowLeft, Bot, FileText, Sparkles, Mail, MailCheck, Target, Settings, PieChart, ShieldAlert, Code, ShoppingBag, Lightbulb, ChevronDown, MessageSquare, Home, Share2, GraduationCap, Lock, Clapperboard, Images } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -26,6 +26,7 @@ import { ChongaSupport } from '@/components/client-portal/ChongaSupport';
 import { CampaignAnalyticsPanel } from '@/components/client-portal/CampaignAnalyticsPanel';
 import { CompetitorDeepDivePanel } from '@/components/client-portal/CompetitorDeepDivePanel';
 import MetaAdsManager from '@/components/client-portal/meta-ads/MetaAdsManager';
+import { CreativosGallery } from '@/components/client-portal/creativos/CreativosGallery';
 import { FloatingDiscountButton } from '@/components/client-portal/FloatingDiscountButton';
 import { TabErrorBoundary } from '@/components/client-portal/TabErrorBoundary';
 import { ShopifyDashboard } from '@/components/client-portal/ShopifyDashboard';
@@ -54,7 +55,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import logo from '@/assets/logo.jpg';
 
-type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'brief_estudio' | 'competitors' | 'deepdive' | 'steve' | 'estrategia' | 'copies' | 'social' | 'google' | 'klaviyo' | 'email' | 'config' | 'wa_credits' | 'academy';
+type TabType = 'metrics' | 'shopify' | 'campaigns' | 'connections' | 'brief' | 'brief_estudio' | 'creativos' | 'competitors' | 'deepdive' | 'steve' | 'estrategia' | 'copies' | 'social' | 'google' | 'klaviyo' | 'email' | 'config' | 'wa_credits' | 'academy';
 interface ClientInfo {
   id: string;
   name: string;
@@ -213,7 +214,7 @@ export default function ClientPortal() {
 
         // Read ?tab= from URL (e.g. after OAuth redirect: /portal?tab=connections)
         const urlTab = searchParams.get('tab') as TabType | null;
-        const validTabs: Set<string> = new Set(['metrics', 'shopify', 'campaigns', 'connections', 'brief', 'brief_estudio', 'competitors', 'deepdive', 'steve', 'estrategia', 'copies', 'social', 'google', 'klaviyo', 'email', 'config', 'wa_credits', 'academy']);
+        const validTabs: Set<string> = new Set(['metrics', 'shopify', 'campaigns', 'connections', 'brief', 'brief_estudio', 'creativos', 'competitors', 'deepdive', 'steve', 'estrategia', 'copies', 'social', 'google', 'klaviyo', 'email', 'config', 'wa_credits', 'academy']);
         if (urlTab && validTabs.has(urlTab)) {
           setActiveTab(urlTab);
           setVisitedTabs(new Set([urlTab]));
@@ -325,6 +326,7 @@ export default function ClientPortal() {
 
   const secondaryTabs = [
     { id: 'brief_estudio', label: 'Estudio Creativo', icon: Clapperboard },
+    { id: 'creativos', label: 'Creativos', icon: Images },
     { id: 'shopify', label: 'Shopify', icon: ShoppingBag },
     { id: 'campaigns', label: 'Campañas', icon: PieChart },
     { id: 'deepdive', label: 'Deep Dive', icon: Code },
@@ -537,6 +539,15 @@ export default function ClientPortal() {
             <div className={activeTab !== 'brief_estudio' || !userCanAccessTab('brief_estudio') ? 'hidden' : ''}>
               <TabErrorBoundary tabName="Estudio Creativo">
                 <BriefEstudio clientId={effectiveClientId} />
+              </TabErrorBoundary>
+            </div>
+          )}
+          {visitedTabs.has('creativos') && effectiveClientId && (
+            <div className={activeTab !== 'creativos' || !userCanAccessTab('creativos') ? 'hidden' : ''}>
+              <TabErrorBoundary tabName="Creativos">
+                <div className="max-w-6xl mx-auto">
+                  <CreativosGallery clientId={effectiveClientId} mode="standalone" />
+                </div>
               </TabErrorBoundary>
             </div>
           )}

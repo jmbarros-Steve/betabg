@@ -1704,7 +1704,17 @@ FASE 3 (Armar el creativo según formato elegido):
   - 'carousel' → preguntale al cliente qué productos quiere incluir (ofrecele top vendidos del catálogo) y llamá armar_carrusel_creativo con shopify_product_ids.
   - 'catalog' → preguntale al cliente el product_catalog_id (o detectalo desde meta_catalogs si tenés acceso) y llamá armar_dpa_catalogo.
 
-FASE 4 (Crear draft + entregar link): Cuando tengas la spec del creativo lista, llamá crear_draft_campana_meta con name + spec completa (incluye todo: objective, budget, schedule, audience, placements, creative). Devolvele al cliente el link en markdown [Revisar campaña antes de subir a Meta](URL) y explicale: "podés editar en pantalla, pedirme cambios acá, o aprobar para subir como borrador a Meta". Si después pide cambios ("cambia el presupuesto a 300K"), usá editar_draft_campana_meta con el draft_id y mandá link actualizado.
+FASE 4 (Preguntar jerarquía + crear draft): ANTES de llamar crear_draft_campana_meta, hacé esto:
+  4.1) Llamá listar_estructura_meta_activa para ver campañas y adsets activos del cliente.
+  4.2) Si tiene estructura activa, ofrecele AL CLIENTE 3 opciones EXPLÍCITAS con los nombres reales:
+       (A) "Meterlo dentro de un adset existente — ej. dentro de Campaña X > Adset Y" (le ahorra config, hereda audience+budget)
+       (B) "Crear un adset nuevo dentro de una campaña existente — ej. en Campaña X" (define audience+placement nuevo, hereda budget de campaña)
+       (C) "Crear campaña nueva desde cero" (todo nuevo)
+  4.3) Esperá que el cliente elija. Solo entonces llamá crear_draft_campana_meta con jerarquia=A|B|C + parent_campaign_id (A,B) + parent_adset_id (solo A) + spec apropiada.
+  4.4) Si el cliente NO tiene Meta conectado o no tiene campañas activas, asumí jerarquia=C automáticamente.
+  4.5) Después de crear, devolvele el link [Revisar campaña antes de subir a Meta](URL) explicando: "podés editar inline, pedirme cambios acá, o aprobar para subir como borrador a Meta". Si pide cambios ("cambia el presupuesto a 300K"), usá editar_draft_campana_meta con el draft_id.
+
+📎 CREATIVOS ADJUNTADOS POR EL CLIENTE: Si en algún mensaje el cliente adjunta una imagen o video (vas a ver tags como "📸 Imagen adjuntada por el cliente: https://..." o "🎬 Video adjuntada por el cliente: https://..."), USÁ esa URL como image_url o video_url en el campo creative de la spec. NO generes con IA si el cliente ya subió. Estos archivos quedan automáticamente guardados en la galería de Creativos del cliente, así que en futuros chats podés referirlos. Mencionale al cliente que el archivo quedó guardado y que lo va a ver en la pestaña "Creativos".
 
 REGLAS DURAS:
 - NUNCA llames manage-meta-campaign directamente. SIEMPRE vía draft.
@@ -1850,15 +1860,27 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
         },
       },
       {
+        name: 'listar_estructura_meta_activa',
+        description: 'Lista las campañas y conjuntos de anuncios (adsets) ACTIVOS o PAUSADOS del cliente en Meta. Úsalo ANTES de crear un draft nuevo para preguntarle al cliente la jerarquía: "¿Querés que el anuncio vaya dentro de una campaña existente, en un adset nuevo de una campaña existente, o todo nuevo desde cero?". Devuelve la estructura jerárquica para que puedas ofrecer opciones concretas con nombres reales. Si el cliente NO tiene Meta conectado, devuelve campaigns vacío.',
+        input_schema: {
+          type: 'object' as const,
+          properties: {},
+          required: [],
+        },
+      },
+      {
         name: 'crear_draft_campana_meta',
-        description: 'Crea un BORRADOR de campaña Meta (NO se sube a Meta todavía — queda en Steve Ads para que el cliente revise). Úsalo cuando el cliente pida lanzar/crear/armar una campaña Meta y ya tengas TODOS estos parámetros mínimos recolectados (preguntá uno por uno si faltan): name (nombre de campaña), objective (CONVERSIONS/TRAFFIC/AWARENESS/ENGAGEMENT/CATALOG), budget (amount_clp + type daily o lifetime), audience básica (age_min, age_max, gender, geo countries), placements (al menos uno: facebook/instagram), creative (al menos headline + body + cta + destination_url). Después de crearlo, devolvés al cliente el review_url en formato markdown [Revisar campaña](URL) y le explicás que puede editarla, pedirte cambios, o aprobar para que se suba a Meta como borrador. NUNCA llames a este action sin tener todos los params mínimos — preguntale primero al cliente lo que falta.',
+        description: 'Crea un BORRADOR de campaña Meta (NO se sube a Meta todavía — queda en Steve Ads para que el cliente revise). FLUJO OBLIGATORIO antes de llamar este tool: 1) llamá listar_estructura_meta_activa, 2) preguntale al cliente con las 3 opciones: (A) anuncio nuevo dentro de un adset existente, (B) adset nuevo dentro de una campaña existente, (C) todo nuevo desde cero. Según la elección: si A → pasá parent_campaign_id + parent_adset_id; si B → pasá parent_campaign_id (adset nuevo se crea); si C → no pasés parents. Parámetros mínimos según jerarquía: name (siempre obligatorio), spec (obligatorio para C, parcial para A/B según lo que se reuse del padre). Para opción C necesitás: objective (CONVERSIONS/TRAFFIC/AWARENESS/ENGAGEMENT/CATALOG), budget {amount_clp, type}, audience (age_min, age_max, gender, geo countries), placements, creative (headline + body + cta + destination_url + image_url o video_url). Para A/B, audience/placements/budget se heredan del padre salvo que se pisen. Después de crear, devolvele al cliente el review_url en markdown [Revisar campaña](URL).',
         input_schema: {
           type: 'object' as const,
           properties: {
-            name: { type: 'string' as const, description: 'Nombre de la campaña (ej. "Día de la Madre — Conversiones")' },
+            name: { type: 'string' as const, description: 'Nombre del nivel que se crea: si jerarquía=A es nombre del ad, si B es nombre del adset, si C es nombre de campaña' },
+            jerarquia: { type: 'string' as const, description: 'A = anuncio nuevo en adset existente | B = adset nuevo en campaña existente | C = todo nuevo (default)' },
+            parent_campaign_id: { type: 'string' as const, description: 'ID de campaña Meta existente (cuando jerarquia=A o B). Tomalo del output de listar_estructura_meta_activa.' },
+            parent_adset_id: { type: 'string' as const, description: 'ID de adset Meta existente (solo cuando jerarquia=A). Tomalo del output de listar_estructura_meta_activa.' },
             spec: {
               type: 'object' as const,
-              description: 'Spec completa: objective, budget {type, amount_clp}, schedule {start, end}, audience {age_min, age_max, gender, geo {countries[]}, interests[]}, placements {platforms[], positions[]}, creative {type, headline, body, cta, image_url, destination_url}, adset_name, ad_name',
+              description: 'Spec completa o parcial: objective, budget {type, amount_clp}, schedule {start, end}, audience {age_min, age_max, gender, geo {countries[]}, interests[]}, placements {platforms[], positions[]}, creative {type, headline, body, cta, image_url, video_url, destination_url}, adset_name, ad_name. Para jerarquia=A solo es necesario el creative. Para B necesitás creative + audience. Para C es completa.',
               additionalProperties: true,
             },
           },
@@ -2223,8 +2245,38 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
             break;
           }
 
+          case 'listar_estructura_meta_activa': {
+            try {
+              const baseUrl = process.env.SELF_URL || 'https://steve-api-850416724643.us-central1.run.app';
+              const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+              const res = await fetch(`${baseUrl}/api/meta/list-active-structure`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Internal-Key': serviceKey,
+                },
+                body: JSON.stringify({ client_id }),
+                signal: AbortSignal.timeout(15_000),
+              });
+              const body: any = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                toolResult = `No pude listar estructura Meta: ${body?.error || `HTTP ${res.status}`}. Si el cliente no tiene Meta conectado, ofrecele crear una campaña nueva desde cero (jerarquia=C).`;
+              } else {
+                const campaigns = body?.campaigns || [];
+                if (campaigns.length === 0) {
+                  toolResult = `Sin campañas activas en Meta. Único camino: crear todo nuevo (jerarquia=C). Pasá al siguiente paso preguntando objetivo + presupuesto.`;
+                } else {
+                  toolResult = `Estructura Meta activa del cliente:\n${JSON.stringify(campaigns, null, 2).slice(0, 3500)}\n\nMostrale al cliente las 3 opciones con nombres reales:\nA) Anuncio nuevo dentro de un adset existente (eligí campaña + adset de la lista)\nB) Adset nuevo dentro de una campaña existente (eligí solo campaña)\nC) Todo nuevo desde cero\n\nEsperá que elija antes de llamar crear_draft_campana_meta. La elección determina qué params son obligatorios.`;
+                }
+              }
+            } catch (e: any) {
+              toolResult = `Error listando estructura Meta: ${e?.message?.slice(0, 200) || e}. Asumí jerarquia=C (todo nuevo) si seguís adelante.`;
+            }
+            break;
+          }
+
           case 'crear_draft_campana_meta': {
-            const { name, spec } = toolUseBlock.input as { name: string; spec: any };
+            const { name, spec, jerarquia, parent_campaign_id, parent_adset_id } = toolUseBlock.input as { name: string; spec: any; jerarquia?: string; parent_campaign_id?: string; parent_adset_id?: string };
             try {
               const baseUrl = process.env.SELF_URL || 'https://steve-api-850416724643.us-central1.run.app';
               const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -2234,7 +2286,6 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${serviceKey}`,
                   'X-Internal-Key': serviceKey,
                 },
                 body: JSON.stringify({
@@ -2244,6 +2295,9 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
                   source_conversation_id: conversation_id,
                   name,
                   spec,
+                  jerarquia: jerarquia || 'C',
+                  parent_campaign_id,
+                  parent_adset_id,
                 }),
                 signal: AbortSignal.timeout(30_000),
               });
@@ -2252,7 +2306,8 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
                 toolResult = `Error creando draft: ${body?.error || `HTTP ${res.status}`}`;
               } else {
                 const reviewUrl = `https://betabgnuevosupa.vercel.app${body.review_url}`;
-                toolResult = `Draft creado. ID: ${body.draft.id}. URL revisión: ${reviewUrl}. Devolvele al cliente este link en formato markdown [Revisar campaña antes de subir a Meta](${reviewUrl}) y explicale que ahí puede editar inline, pedirte cambios o aprobar para subir a Meta como borrador (status PAUSED).`;
+                const jerarquiaTexto = jerarquia === 'A' ? 'anuncio nuevo en adset existente' : jerarquia === 'B' ? 'adset nuevo en campaña existente' : 'campaña nueva desde cero';
+                toolResult = `Draft creado (${jerarquiaTexto}). ID: ${body.draft.id}. URL revisión: ${reviewUrl}. Devolvele al cliente este link en formato markdown [Revisar campaña antes de subir a Meta](${reviewUrl}) y explicale que ahí puede editar inline, pedirte cambios o aprobar para subir a Meta como borrador (status PAUSED).`;
               }
             } catch (e: any) {
               toolResult = `Error invocando draft: ${e?.message?.slice(0, 200) || e}`;
@@ -2269,7 +2324,6 @@ Responde SIEMPRE en español. Sé directo, concreto, y da recomendaciones accion
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${serviceKey}`,
                   'X-Internal-Key': serviceKey,
                 },
                 body: JSON.stringify({ action: 'update', draft_id, changes, notes }),

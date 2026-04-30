@@ -226,3 +226,115 @@ Leadsie manda múltiples webhooks `PARTIAL_SUCCESS` en ráfaga (<100ms). Cada un
 3. **Los IDs de Leadsie son del merchant, no del BM.** Para SUAT, los IDs útiles son los que `/me/accounts` y `/act_X/adspixels` devuelven. El webhook debería validar.
 4. **Sin audit trail para webhooks exitosos** — solo guardamos raw_payload para orphans. Si el webhook matchea, perdemos el payload original. Debería guardarse siempre para debugging.
 
+
+## Sesión 2026-04-22 — Wizard Meta v23.0 + Video universal + Veo 3.1 + Conexión Goodgres
+
+**Contexto**: Sesión marathón del wizard de creación de anuncios Meta. Upgrade de Graph API v21→v23, agregué video universal (single/carousel/DCT), Veo 3.1 para generación de video con IA, y arreglé la conexión Leadsie del cliente nuevo Goodgres (Ignacia Maturana).
+
+**Trabajo hecho**:
+- **Graph API v21.0 → v23.0** en 25 archivos. `instagram_actor_id` → `instagram_user_id` (deprecated sep/2025). `standard_enhancements` deprecated en v22 → reemplazado por 4 switches granulares de Advantage+ Creative.
+- **Pixel selector + evento conversión** (10 opciones, auto-fetch si solo hay 1)
+- **Placements**: Advantage+ vs manual, con checkboxes por plataforma (FB/IG/AN/Messenger)
+- **Saved Audiences listing** extendido en `manage-meta-audiences.handleList`
+- **Page + Instagram selector** en step creative
+- **UTM builder** con 5 macros oficiales + preview live de URL final
+- **Advantage+ Creative**: 4 switches granulares
+- **Nuevo tipo "Advantage+ Catálogo (DPA)"** (antes "Shopping", renombrado)
+- **Reach estimate en vivo** con color coding (verde >100K, amarillo 10K-100K, rojo <10K)
+- **Botón "🤖 Que Steve arme toda la campaña"** — Claude Sonnet llena todos los steps en 1 call
+- **Endpoint `/api/steve-suggest-interests`** (Claude + Meta `/search?type=adinterest`)
+- **ReviewStep** muestra todos los campos nuevos antes de publicar
+- **Sprint Final Video Universal**:
+  - Helper `uploadVideoFromUrl` con polling `?fields=status` hasta `ready` (4 min timeout)
+  - Helper `looksLikeVideoUrl` por extensión
+  - SINGLE: rama `video_data` vs `link_data` con thumbnail del primer slot image
+  - CAROUSEL: `child_attachments` mixed image_hash + video_id (sin `picture` para videos — Meta auto-extrae)
+  - DCT: `asset_feed_spec.videos[]` + `images[]` mezclados, `ad_formats: ['AUTOMATIC_FORMAT']`
+- **Veo 3.1 Preview (Google Gemini)**:
+  - Rewrite completo de `generate-video.ts` → Gemini API (mismo key de Imagen 4)
+  - 8s 1080p con audio nativo, `VIDEO_USD_COST=3.20`, `VIDEO_CREDIT_COST=30`
+  - Long-running operation + polling inline 4.5 min
+  - `refundVideoCreditsOnce` helper idempotente con marker en `credit_transactions.accion`
+  - Endpoint `GET /api/generate-video-status` para client polling post-timeout
+  - Frontend: Tab "IA Video" en MEDIA_TABS, warning de costo, polling cada 20s × 3 min, aspect ratio dinámico 9:16/16:9 (Veo 3.1 no soporta 1:1)
+- **Conexión Goodgres (Ignacia Maturana)**:
+  - `LEADSIE_WEBHOOK_SECRET` estaba desincronizado entre Cloud Run (`7e9f9abb...`) y Admatic (`a695871a...`) — rompía TODOS los webhooks desde siempre
+  - Fix: extraído secret real de logs → actualizado env var Cloud Run
+  - Webhook procesó con `PARTIAL_SUCCESS` (Ignacia no autorizó ad account)
+  - UPDATE manual `platform_connections.account_id='39053602'`
+- **RLS fix bucket `client-assets`**: policy esperaba `auth.uid()` como primer folder. Wizard usaba `assets/{clientId}` → fail. Fix: `${user.id}/meta-uploads/`
+- **Hotfixes UX**: botón "X" en slots ahora clear-in-place (no remove), preview avanzado muestra campos faltantes, previews por placement vía `/act/adimages` + `image_hash` (Supabase rate-limitaba 13 paralelos), input editable `ad_name`, "Claude está pensando" → "Steve", DCT `ad_formats: ['AUTOMATIC_FORMAT']` (antes SINGLE_IMAGE hacía que Meta Ads Manager lo mostrara como "Una sola imagen o video")
+
+**Archivos tocados** (principales):
+- `src/components/client-portal/meta-ads/CampaignCreateWizard.tsx` — wizard completo (141KB, leer antes)
+- `src/components/client-portal/meta-ads/MetaCampaignManager.tsx` — pixel, placements, Advantage+ Creative
+- `cloud-run-api/src/routes/meta/manage-meta-campaign.ts` — video universal single/carousel/DCT
+- `cloud-run-api/src/routes/meta/manage-meta-audiences.ts` — handleList extendido
+- `cloud-run-api/src/routes/meta/meta-targeting-search.ts` — `/search?type=adinterest`
+- `cloud-run-api/src/routes/ai/generate-video.ts` — rewrite completo Veo 3.1
+- `cloud-run-api/src/routes/ai/generate-video-status.ts` — nuevo endpoint polling
+- `cloud-run-api/src/routes/ai/steve-suggest-interests.ts` — nuevo
+- `cloud-run-api/src/routes/ai/steve-suggest-campaign.ts` — botón 🤖 armar campaña
+- `cloud-run-api/src/routes/oauth/leadsie-webhook.ts` — revisado (secret sync)
+- 25 archivos migrados Graph v21→v23
+
+**Gotchas para sesiones futuras**:
+1. **Graph API v22+**: `standard_enhancements` deprecated → usar 4 switches granulares de Advantage+ Creative.
+2. **Veo 3.1 NO soporta aspect ratio 1:1** — solo 9:16 y 16:9. Forzar UI a elegir.
+3. **Meta `/act/advideos` requiere polling `?fields=status`** hasta `status.video_status=ready`. Timeout razonable: 4 min.
+4. **CAROUSEL con videos**: NO mandar `picture` en el child_attachment — Meta auto-extrae thumbnail.
+5. **DCT con mix video+image**: `ad_formats` debe ser `['AUTOMATIC_FORMAT']`, NO `SINGLE_IMAGE`.
+6. **Bucket `client-assets` RLS**: primer folder DEBE ser `auth.uid()`, no arbitrario.
+7. **Previews por placement**: Supabase rate-limit si son 13 paralelos. Subir a `/act/adimages` primero y usar `image_hash`.
+8. **Leadsie webhook**: validar shared secret con `crypto.timingSafeEqual`. Cuando cambia el secret en la plataforma, hay que sincronizar manualmente en Cloud Run env vars (pendiente: healthcheck automático).
+9. **PARTIAL_SUCCESS de Leadsie**: puede producir múltiples webhooks. Código debe ser resiliente a ráfagas.
+10. **SUAT en Goodgres**: nunca usar `/me/adaccounts` — usar `account_id` persistido en DB.
+11. **`refundVideoCreditsOnce`**: el nombre `operationName` generado con `Date.now()` NO es idempotente en `launch-fail` y `no-op` paths. Task #31 tiene fix pendiente (unique constraint en `credit_transactions`).
+
+**Decisiones de JM en este día**:
+- Video cost pool compartido con imagen + warning educativo en UI (30 créditos = $3.20 USD = 15 imágenes)
+- Client-side polling para Veo (no background worker) — más simple y suficiente
+- Aspect ratio video: solo 9:16 y 16:9 (cliente entiende la limitación)
+- IA en todos los steps del wizard con meta de ≤5 min total para campaña
+- Botón "🤖 Que Steve arme toda la campaña" es feature estrella — invertir en mejorarlo
+- Renombrar "Shopping" → "Advantage+ Catálogo (DPA)" para claridad del cliente
+- UX: botón X en slots debe clear-in-place, no remove (preserva 3:2:2)
+
+**Deploys**: 8+ deploys backend Cloud Run. Revision final: **steve-api-00615-f6t** (SUCCESS, 100% traffic). 10+ pushes frontend. Último commit: **37e82c50**. Bundle prod: `index-DyPz-KzT.js`.
+
+---
+
+## Sesión 2026-04-23 — DPA como 4º formato + Advantage+ preview individual + Publish drafts fix
+
+**Cambios (Meta Ads):**
+- **Grupo B — errores de acceso**: `meta-catalogs.ts` fallback a `/{bm_id}/owned_product_catalogs` + `client_product_catalogs` cuando no hay match en ad account (devuelve diagnostics + hint). `manage-meta-campaign.ts handleGeneratePreviews` ahora devuelve `success:false + error` cuando los 13 placements fallan (antes: grid vacío silencioso). Banner azul en frontend explica que "no tengo acceso" del iframe solo afecta preview, no publicación.
+- **Grupo C — features**: Botón "3 variaciones desde esta" en creativos. Banner DPA con tokens `{{product.name}}`, `{{product.price}}`, `{{product.current_price}}`, `{{product.description}}`, `{{product.brand}}` click-to-copy.
+- **DPA como 4º formato del Ad Set**: además de Flexible/Carrusel/Única. `budgetType=ADVANTAGE` fuerza `adSetFormat='catalog'`. Cuando `adSetFormat=catalog` → banner verde bloqueado + oculta 4 formatos + oculta selector foto/video + salta steps Funnel/Ángulo/Enfoque + oculta sección Creativos en step Anuncio.
+- **Preview DPA con tokens resueltos**: fetch live de Shopify del primer producto, reemplaza tokens con datos reales. Fallback genérico si no hay productos sincronizados. (scope raíz del componente para compartir entre sub-steps).
+- **Validación DPA**: NO exige imagen, SÍ exige `catalog_id` + `product_set`.
+- **Advantage+ Creative — panel preview individual**: nuevo endpoint `POST /api/meta-preview-enhancements`. Por cada feature llama `/generatepreviews` con `creative_features_spec` override (solo esa feature `OPT_IN`). Retorna eligibility + iframe por feature. 12 features: image_touchups, image_brightness_and_contrast, image_uncrop, music_gen, product_extensions, site_extensions, text_optimizations, dynamic_media (standard) + image_expansion, image_generation_background, text_generation, enhance_cta (generative/IA).
+- **UI AdvantagePreviewPanel**: expandible con baseline "original" + iframe por cada feature + toggles. Separados Standard vs Generative (badge IA amarillo). Features no elegibles grayed-out. Submit integration: `creative_features` override map pisa los 5 coarse toggles del `AdvantageCreativeToggles` al submit.
+- **Publicar desde borradores (DraftsManager)**: antes mandaba payload mínimo (name+budget). Ahora rebuilds payload completo desde `brief_visual`: imágenes DCT, copy DCT, targeting, funnel, angle, page/IG/pixel, catalog, creative_features. Validación pre-submit con issues detallados.
+- **Wizard handleSaveDraft**: persiste en `brief_visual` todos los campos necesarios para republicar (page_id, pixel_id, catalog_id, creative_features, etc).
+
+**Archivos modificados:**
+- `cloud-run-api/src/routes/meta/meta-catalogs.ts` (fallback BM owned/client catalogs)
+- `cloud-run-api/src/routes/meta/manage-meta-campaign.ts` (handleGeneratePreviews error flag)
+- `cloud-run-api/src/routes/meta/meta-preview-enhancements.ts` (NUEVO endpoint per-feature)
+- `src/components/client-portal/meta-ads/CampaignCreateWizard.tsx` (DPA UI + TDZ fix + dpaSampleProduct scope raíz)
+- `src/components/client-portal/meta-ads/AdvantagePreviewPanel.tsx` (NUEVO componente)
+- `src/components/client-portal/meta-ads/DraftsManager.tsx` (payload rebuild completo)
+
+**Decisiones clave:**
+- **DPA ↔ Advantage ↔ catalog es sync forzado**: budgetType=ADVANTAGE sin producto seleccionado → fuerza catalog. Justificación: Advantage+ shopping campaign exige catálogo; inconsistencia antes causaba rechazo silencioso de Meta.
+- **Preview per-feature**: único modo de testear eligibility real de Meta sin publicar. `/generatepreviews` con override es barato y devuelve iframe previsualizable por feature.
+- **Validación DPA sin imagen**: catalog + product_set son la "imagen" dinámica — exigir static image bloqueaba el flujo.
+- **Drafts republicables**: persistir TODO el estado del wizard en brief_visual (no solo name+budget). Republicar = reconstruir el contexto original.
+
+**Deploys**: 11 revisions Cloud Run hoy (steve-api-00617-fch → 00628-nm2). Commits principales: `1005e733`, `9a52a9b5`, `02faaed7`, `84e4be33`, `0f87df03`, `ba2ccaf6`, `59afed01`, `ffc7fddd`, `95080d0a`, `4eada524`.
+
+**Pendiente:**
+- Tasks #9 in_progress: verificación end-to-end JM de DPA publish + Advantage+ preview + drafts republish
+- Task #31 pending: unique constraint credit_transactions
+
+---
