@@ -259,6 +259,89 @@ function buildAdLibrarySearchUrl(query: string): string {
 }
 
 /**
+ * Resolver dominio → Facebook Page URL haciendo fetch del sitio del competidor
+ * y extrayendo links a facebook.com con regex. La mayoría de los e-commerce
+ * tiene el link de FB en el footer o header.
+ *
+ * Filtra:
+ *   - facebook.com/sharer / tr / plugins / dialog (botones de share, no la page)
+ *   - facebook.com/profile.php?id=X (perfiles personales, no business pages)
+ *
+ * Acepta:
+ *   - https://www.facebook.com/<slug>
+ *   - https://facebook.com/<slug>
+ *   - facebook.com/pages/<name>/<id>
+ *
+ * Returns null si no encuentra link o el sitio no responde.
+ */
+async function findFacebookFromWebsite(domain: string): Promise<string | null> {
+  let url = domain.trim().toLowerCase();
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = `https://${url}`;
+  }
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SteveAdsBot/1.0; +https://steve.ads/bot)',
+      },
+    });
+    if (!res.ok) {
+      console.warn(`[findFacebookFromWebsite] ${url} → HTTP ${res.status}`);
+      return null;
+    }
+    const html = await res.text();
+
+    // Buscar URLs de Facebook Page en el HTML. Prioriza www.facebook.com sobre
+    // m.facebook.com. Excluye sharer, tr, plugins, dialog (mecánicas de share).
+    const fbPatterns = [
+      // facebook.com/<slug>?ref=... o /posts/...
+      /https?:\/\/(?:www\.)?facebook\.com\/(?!sharer|tr\?|tr\.|plugins|dialog|profile\.php|share\.php|share\/p\/)([a-zA-Z0-9._-]+)/gi,
+    ];
+
+    const found = new Set<string>();
+    for (const pattern of fbPatterns) {
+      let match;
+      while ((match = pattern.exec(html)) !== null) {
+        const slug = match[1];
+        if (slug && slug.length >= 3 && slug.length <= 80) {
+          found.add(`https://www.facebook.com/${slug}`);
+        }
+      }
+    }
+
+    if (found.size === 0) {
+      console.log(`[findFacebookFromWebsite] ${url}: no FB link found`);
+      return null;
+    }
+
+    // Devolver el primero (suele ser el del header/footer principal).
+    // En sitios con múltiples FB links elegir el de mayor frecuencia sería
+    // mejor pero el primero suele acertar.
+    const fbUrl = Array.from(found)[0];
+    console.log(`[findFacebookFromWebsite] ${url} → ${fbUrl}`);
+    return fbUrl;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown';
+    console.warn(`[findFacebookFromWebsite] ${url} failed: ${msg}`);
+    return null;
+  }
+}
+
+/**
+ * Detectar si un input parece dominio (manosdelalma.cl, https://shop.com,
+ * www.brand.com.ar). Distinto de isFacebookUrl().
+ */
+function isDomainLike(input: string): boolean {
+  const trimmed = input.trim().toLowerCase();
+  if (trimmed.startsWith('@')) return false;
+  if (isFacebookUrl(trimmed)) return false;
+  // Match TLD + optional country (.cl, .com, .com.ar, etc.)
+  return /\b[a-z0-9-]+\.(cl|com|co|mx|es|net|org|ar|pe|br|ec|uy|py|bo|ve|us|io)(\.[a-z]{2})?(\/|$|\?)/i.test(trimmed);
+}
+
+/**
  * Classify input type: 'fb_url' | 'ig_handle' | 'name'
  */
 function classifyInput(input: string): 'fb_url' | 'ig_handle' | 'name' {
@@ -734,26 +817,48 @@ export async function syncCompetitorAds(c: Context) {
         const effectiveFbUrl = tracking.fb_page_url || fbUrl;
 
         // Build Apify source URL — TODO va por Apify ahora. Meta Ad Library
-        // API directa fue removida (ya no devuelve datos para nuestra app —
-        // requiere business verification que no tenemos). Apify scrapea la
-        // Ad Library pública sin esos límites.
+        // API directa fue removida (ya no devuelve datos sin business
+        // verification). Apify scrapea la Ad Library pública sin esos límites.
         //
-        // Estrategia:
-        // 1. FB URL directa → Apify
-        // 2. Page ID cacheado → Apify con view_all_page_id (más preciso)
-        // 3. @handle / nombre / dominio → sanear y Apify con keyword search
+        // Estrategia escalonada (cae al siguiente si el anterior falla):
+        // 1. FB URL directa del input → Apify
+        // 2. FB URL cacheada en competitor_tracking → Apify
+        // 3. Page ID cacheado en competitor_tracking → Apify con view_all_page_id
+        // 4. Si input es dominio (foo.cl) → fetch del sitio + extraer FB link
+        //    del HTML (footer/header) → Apify con esa URL real (PRECISO)
+        // 5. Fallback: keyword search en Ad Library (puede dar falsos positivos)
         let apifySource: string | null = null;
+        let resolutionMethod = '';
+
         if (effectiveFbUrl && (isFacebookUrl(effectiveFbUrl) || effectiveFbUrl.includes('ads/library'))) {
           apifySource = effectiveFbUrl;
+          resolutionMethod = 'fb_url_direct';
         } else if (tracking.meta_page_id) {
-          // Si ya resolvimos el page_id en sync previa, usalo directo
           apifySource = buildAdLibraryUrlWithPageId(tracking.meta_page_id);
+          resolutionMethod = 'cached_page_id';
           console.log(`[sync-competitor-ads] ${handle}: Using cached page_id ${tracking.meta_page_id}`);
+        } else if (isDomainLike(input)) {
+          // Resolver dominio → FB Page haciendo fetch del sitio del competidor
+          console.log(`[sync-competitor-ads] ${handle}: Resolving domain "${input}" via website scrape...`);
+          const fbFromWeb = await findFacebookFromWebsite(input);
+          if (fbFromWeb) {
+            apifySource = fbFromWeb;
+            resolutionMethod = 'website_scrape';
+            // Persistir el FB URL resuelto para syncs futuros (skip el fetch)
+            await supabase.from('competitor_tracking').update({
+              fb_page_url: fbFromWeb,
+            }).eq('id', tracking.id);
+          } else {
+            // Sitio sin FB link visible o sitio caído → fallback keyword search
+            apifySource = buildAdLibrarySearchUrl(input);
+            resolutionMethod = 'keyword_search_fallback';
+            console.log(`[sync-competitor-ads] ${handle}: No FB link in website, falling back to keyword search`);
+          }
         } else {
-          // Sanear input y armar URL de búsqueda por keyword. Apify la
-          // scrapeará y devolverá los ads que matcheen.
+          // @handle o nombre crudo → keyword search
           apifySource = buildAdLibrarySearchUrl(input);
-          console.log(`[sync-competitor-ads] ${handle}: Using keyword search URL with sanitized query "${sanitizeForSearch(input)}"`);
+          resolutionMethod = 'keyword_search';
+          console.log(`[sync-competitor-ads] ${handle}: Using keyword search "${sanitizeForSearch(input)}"`);
         }
 
         // Check if we already have Apify metrics for this competitor

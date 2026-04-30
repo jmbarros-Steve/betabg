@@ -842,8 +842,32 @@ export async function generateMetaCopy(c: Context) {
         messages: [{ role: 'user', content: `${clientSection}${brandSection}${briefSection}${shopifySection}${bugSection}${knowledgeSection}${antiRepetition}${creativeCtx}\nREGLA ANTI-ALUCINACIÓN: SOLO escribe sobre los productos y marca listados arriba. NO inventes productos ni temas que no aparezcan en los datos del cliente.\n\n${sanitizeForPrompt(body.instruction, 2000)}` }],
       }),
     });
+
+    // Loggear y propagar errores de Anthropic en lugar de devolver string vacío
+    // (causa del bug "Steve no devolvió copy" reportado por JM 2026-04-27).
+    if (!resp.ok) {
+      const errBody = await resp.text();
+      console.error(`[generate-meta-copy:instruction] Anthropic ${resp.status}: ${errBody.slice(0, 500)}`);
+      return c.json(
+        { error: `Claude error ${resp.status}`, details: errBody.slice(0, 400) },
+        502,
+      );
+    }
+
     const aiData: any = await resp.json();
     const text = aiData?.content?.[0]?.text || '';
+
+    if (!text) {
+      console.error(`[generate-meta-copy:instruction] Anthropic OK pero respuesta vacía. Stop reason: ${aiData?.stop_reason}, content[0]: ${JSON.stringify(aiData?.content?.[0])?.slice(0, 300)}`);
+      return c.json(
+        {
+          error: 'Claude devolvió respuesta vacía',
+          stop_reason: aiData?.stop_reason,
+          content_type: aiData?.content?.[0]?.type,
+        },
+        502,
+      );
+    }
 
     // D.6: Save to creative_history with detected angle + scores placeholder
     if (text) {

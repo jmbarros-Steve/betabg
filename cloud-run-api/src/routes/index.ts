@@ -140,6 +140,8 @@ import { metaCatalogs } from './meta/meta-catalogs.js';
 import { metaPreviewEnhancements } from './meta/meta-preview-enhancements.js';
 import { metaAdsetAction } from './meta/meta-adset-action.js';
 import { discoverClientAssets } from './meta/discover-client-assets.js';
+import { listActiveStructure } from './meta/list-active-structure.js';
+import { importExistingCreatives } from './meta/import-existing-creatives.js';
 
 // Webhooks
 import { leadsieWebhook } from './webhooks/leadsie-webhook.js';
@@ -443,6 +445,8 @@ export function registerRoutes(app: Hono) {
   app.post('/api/meta-preview-enhancements', authMiddleware, metaPreviewEnhancements);
   app.post('/api/meta-adset-action', authMiddleware, metaAdsetAction);
   app.post('/api/discover-client-assets', authMiddleware, discoverClientAssets);
+  app.post('/api/meta/list-active-structure', authMiddleware, listActiveStructure);
+  app.post('/api/meta/import-existing-creatives', authMiddleware, importExistingCreatives);
   app.post('/api/manage-report-schedule', authMiddleware, manageReportSchedule);
 
   // Leadsie webhooks (public — validated via shared secret)

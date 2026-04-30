@@ -52,7 +52,7 @@ interface IntelligenceWithClient {
     id: string;
     user_id: string | null;
     client_user_id: string | null;
-    website?: string | null;
+    website_url?: string | null;
   } | null;
 }
 
@@ -128,7 +128,7 @@ export async function scrapeSeo(c: Context) {
   const intel = await safeQuerySingleOrDefault<IntelligenceWithClient>(
     supabase
       .from('competitor_intelligence')
-      .select('id, client_id, competitor_url, clients(id, user_id, client_user_id, website)')
+      .select('id, client_id, competitor_url, clients(id, user_id, client_user_id, website_url)')
       .eq('id', intelligence_id)
       .single(),
     null,
@@ -138,17 +138,20 @@ export async function scrapeSeo(c: Context) {
   if (!intel) return c.json({ error: 'Intelligence record not found' }, 404);
   const client = intel.clients;
   if (!client) return c.json({ error: 'Unauthorized' }, 403);
-  const { isSuperAdmin } = await getUserClientIds(supabase, user.id);
-  if (
-    !isSuperAdmin &&
-    client.user_id !== user.id &&
-    client.client_user_id !== user.id
-  ) {
-    return c.json({ error: 'Unauthorized' }, 403);
+  const isInternal = c.get('isInternal') === true;
+  if (!isInternal) {
+    const { isSuperAdmin } = await getUserClientIds(supabase, user.id);
+    if (
+      !isSuperAdmin &&
+      client.user_id !== user.id &&
+      client.client_user_id !== user.id
+    ) {
+      return c.json({ error: 'Unauthorized' }, 403);
+    }
   }
 
   const competitorDomain = extractDomain(providedDomain || intel.competitor_url);
-  const clientDomain = client.website ? extractDomain(client.website) : null;
+  const clientDomain = client.website_url ? extractDomain(client.website_url) : null;
   const locationCode = location_code ?? CHILE_LOCATION_CODE;
   const languageCode = language_code ?? DEFAULT_LANGUAGE;
 

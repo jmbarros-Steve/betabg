@@ -2,6 +2,11 @@ import { Context } from 'hono';
 import { getSupabaseAdmin } from '../../lib/supabase.js';
 import { safeQuerySingleOrDefault } from '../../lib/safe-supabase.js';
 import { loadKnowledge } from '../../lib/knowledge-loader.js';
+import { validateUrlForSSRF } from '../../lib/url-validator.js';
+import {
+  detectPlatform as sharedDetectPlatform,
+  detectTrackingScripts as sharedDetectTrackingScripts,
+} from '../../lib/competitor/tech-stack-detector.js';
 
 interface DeepDiveResult {
   tech_stack: {
@@ -46,128 +51,28 @@ interface DeepDiveResult {
   html_source?: 'direct' | 'apify' | 'none';
 }
 
+// Platform detection extracted to ../../lib/competitor/tech-stack-detector.ts
+// (shared with the WebCrawl endpoint). Local wrapper preserves the original
+// `DeepDiveResult['tech_stack']` shape used by competitor_tracking.deep_dive_data.
 function detectPlatform(html: string, markdown: string): DeepDiveResult['tech_stack'] {
-  const htmlLower = html.toLowerCase();
-
-  if (htmlLower.includes('myshopify.com') || htmlLower.includes('cdn.shopify.com') || htmlLower.includes('shopify.com/s/')) {
-    return { platform: 'shopify', platform_evidence: 'cdn.shopify.com / myshopify.com detected', cms_detected: 'Shopify' };
-  }
-  if (htmlLower.includes('magento') || htmlLower.includes('mage/cookies')) {
-    return { platform: 'magento', platform_evidence: 'Magento JS/cookies detected', cms_detected: 'Magento' };
-  }
-  if (htmlLower.includes('vtex') || htmlLower.includes('vteximg.com') || htmlLower.includes('vtexcommercestable')) {
-    return { platform: 'vtex', platform_evidence: 'VTEX scripts/CDN detected', cms_detected: 'VTEX' };
-  }
-  if (htmlLower.includes('woocommerce') || htmlLower.includes('wc-ajax') || htmlLower.includes('wp-content')) {
-    return { platform: 'woocommerce', platform_evidence: 'WooCommerce/WordPress detected', cms_detected: 'WooCommerce' };
-  }
-  if (htmlLower.includes('prestashop') || htmlLower.includes('prestashop.js')) {
-    return { platform: 'prestashop', platform_evidence: 'PrestaShop detected', cms_detected: 'PrestaShop' };
-  }
-  if (htmlLower.includes('tiendanube') || htmlLower.includes('nuvemshop')) {
-    return { platform: 'tiendanube', platform_evidence: 'Tienda Nube detected', cms_detected: 'Tienda Nube' };
-  }
-  if (htmlLower.includes('jumpseller')) {
-    return { platform: 'jumpseller', platform_evidence: 'Jumpseller detected', cms_detected: 'Jumpseller' };
-  }
-  // New platforms
-  if (htmlLower.includes('static.wixstatic.com') || htmlLower.includes('wix.com')) {
-    return { platform: 'wix', platform_evidence: 'Wix static assets detected', cms_detected: 'Wix' };
-  }
-  if (htmlLower.includes('squarespace.com') || htmlLower.includes('static1.squarespace.com')) {
-    return { platform: 'squarespace', platform_evidence: 'Squarespace CDN detected', cms_detected: 'Squarespace' };
-  }
-  if (htmlLower.includes('bigcommerce.com') || htmlLower.includes('cdn11.bigcommerce.com')) {
-    return { platform: 'bigcommerce', platform_evidence: 'BigCommerce CDN detected', cms_detected: 'BigCommerce' };
-  }
-  if (htmlLower.includes('webflow.com') || htmlLower.includes('assets.website-files.com')) {
-    return { platform: 'webflow', platform_evidence: 'Webflow assets detected', cms_detected: 'Webflow' };
-  }
-  if (htmlLower.includes('bootic.io')) {
-    return { platform: 'bootic', platform_evidence: 'Bootic platform detected', cms_detected: 'Bootic' };
-  }
-
-  // Fallback: search in markdown when HTML is empty/blocked
-  if (markdown) {
-    const mdLower = markdown.toLowerCase();
-    if (mdLower.includes('shopify') || mdLower.includes('myshopify')) {
-      return { platform: 'shopify', platform_evidence: 'Shopify reference found in page content', cms_detected: 'Shopify' };
-    }
-    if (mdLower.includes('woocommerce') || mdLower.includes('wordpress') || mdLower.includes('wp-content')) {
-      return { platform: 'woocommerce', platform_evidence: 'WooCommerce/WordPress reference in content', cms_detected: 'WooCommerce' };
-    }
-    if (mdLower.includes('wix.com') || mdLower.includes('wixstatic')) {
-      return { platform: 'wix', platform_evidence: 'Wix reference found in content', cms_detected: 'Wix' };
-    }
-    if (mdLower.includes('squarespace')) {
-      return { platform: 'squarespace', platform_evidence: 'Squarespace reference in content', cms_detected: 'Squarespace' };
-    }
-    if (mdLower.includes('magento')) {
-      return { platform: 'magento', platform_evidence: 'Magento reference in content', cms_detected: 'Magento' };
-    }
-    if (mdLower.includes('vtex')) {
-      return { platform: 'vtex', platform_evidence: 'VTEX reference in content', cms_detected: 'VTEX' };
-    }
-    if (mdLower.includes('tiendanube') || mdLower.includes('nuvemshop')) {
-      return { platform: 'tiendanube', platform_evidence: 'Tienda Nube reference in content', cms_detected: 'Tienda Nube' };
-    }
-    if (mdLower.includes('jumpseller')) {
-      return { platform: 'jumpseller', platform_evidence: 'Jumpseller reference in content', cms_detected: 'Jumpseller' };
-    }
-    if (mdLower.includes('prestashop')) {
-      return { platform: 'prestashop', platform_evidence: 'PrestaShop reference in content', cms_detected: 'PrestaShop' };
-    }
-    if (mdLower.includes('bigcommerce')) {
-      return { platform: 'bigcommerce', platform_evidence: 'BigCommerce reference in content', cms_detected: 'BigCommerce' };
-    }
-    if (mdLower.includes('webflow')) {
-      return { platform: 'webflow', platform_evidence: 'Webflow reference in content', cms_detected: 'Webflow' };
-    }
-    if (mdLower.includes('bootic')) {
-      return { platform: 'bootic', platform_evidence: 'Bootic reference in content', cms_detected: 'Bootic' };
-    }
-  }
-
-  return { platform: 'custom', platform_evidence: 'No known platform signature found', cms_detected: null };
+  const r = sharedDetectPlatform(html, markdown);
+  return { platform: r.platform, platform_evidence: r.platform_evidence, cms_detected: r.cms_detected };
 }
 
+// Tracking scripts detection extracted to the same shared lib. We strip the
+// optional `google_analytics_id` field to keep the legacy DeepDiveResult shape
+// stable; the WebCrawl endpoint uses `buildTechStack()` to surface it.
 function detectTrackingScripts(html: string, markdown: string): DeepDiveResult['tracking_scripts'] {
-  // Combine HTML + markdown for broader detection (markdown captures links/references when HTML is empty)
-  const combined = (html + ' ' + markdown).toLowerCase();
-  const other: string[] = [];
-
-  const metaPixel = combined.includes('fbq(') || combined.includes('facebook.com/tr') || combined.includes('connect.facebook.net');
-  const gtm = combined.includes('googletagmanager.com') || combined.includes('gtm.js');
-  const ga = combined.includes('google-analytics.com') || combined.includes('gtag(') || combined.includes('analytics.js');
-  const tiktok = combined.includes('analytics.tiktok.com') || combined.includes('ttq.load');
-  const klaviyo = combined.includes('klaviyo.com') || combined.includes('_learnq');
-  const hotjar = combined.includes('hotjar.com') || combined.includes('hj(');
-
-  // Additional detections
-  if (combined.includes('snap.licdn.com') || combined.includes('linkedin.com/px')) other.push('LinkedIn Pixel');
-  if (combined.includes('ads.pinterest.com') || combined.includes('pintrk(')) other.push('Pinterest Tag');
-  if (combined.includes('twitter.com/i/adsct') || combined.includes('twq(')) other.push('Twitter/X Pixel');
-  if (combined.includes('criteo.com') || combined.includes('criteo.net')) other.push('Criteo');
-  if (combined.includes('clarity.ms')) other.push('Microsoft Clarity');
-  if (combined.includes('segment.com') || combined.includes('analytics.js')) other.push('Segment');
-  if (combined.includes('intercom.com') || combined.includes('intercomsettings')) other.push('Intercom');
-  if (combined.includes('zendesk.com')) other.push('Zendesk');
-
-  // Calculate sophistication
-  const trackerCount = [metaPixel, gtm, ga, tiktok, klaviyo, hotjar].filter(Boolean).length + other.length;
-  let sophistication: 'basic' | 'intermediate' | 'advanced' = 'basic';
-  if (trackerCount >= 5 || (gtm && klaviyo)) sophistication = 'advanced';
-  else if (trackerCount >= 3) sophistication = 'intermediate';
-
+  const r = sharedDetectTrackingScripts(html, markdown);
   return {
-    meta_pixel: metaPixel,
-    google_tag_manager: gtm,
-    google_analytics: ga,
-    tiktok_pixel: tiktok,
-    klaviyo,
-    hotjar,
-    other,
-    marketing_sophistication: sophistication,
+    meta_pixel: r.meta_pixel,
+    google_tag_manager: r.google_tag_manager,
+    google_analytics: r.google_analytics,
+    tiktok_pixel: r.tiktok_pixel,
+    klaviyo: r.klaviyo,
+    hotjar: r.hotjar,
+    other: r.other,
+    marketing_sophistication: r.marketing_sophistication,
   };
 }
 
@@ -293,58 +198,8 @@ const USER_AGENTS = [
 // Maximum response size: 5 MB
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024;
 
-/**
- * SSRF protection: validate that a URL is safe to fetch.
- * Rejects private/internal IPs, non-HTTP(S) protocols, and known metadata endpoints.
- */
-function validateUrlForSSRF(urlString: string): { safe: boolean; reason?: string } {
-  let parsed: URL;
-  try {
-    parsed = new URL(urlString);
-  } catch {
-    return { safe: false, reason: 'Invalid URL' };
-  }
-
-  // Only allow HTTP and HTTPS
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    return { safe: false, reason: `Protocol not allowed: ${parsed.protocol}` };
-  }
-
-  const hostname = parsed.hostname.toLowerCase();
-
-  // Block cloud metadata endpoints
-  if (hostname === '169.254.169.254' || hostname === 'metadata.google.internal') {
-    return { safe: false, reason: 'Cloud metadata endpoint blocked' };
-  }
-
-  // Block localhost variants
-  if (hostname === 'localhost' || hostname === '0.0.0.0' || hostname === '[::1]') {
-    return { safe: false, reason: 'Localhost not allowed' };
-  }
-
-  // Check if hostname is an IP address and block private/internal ranges
-  // IPv4 pattern
-  const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (ipv4Match) {
-    const octets = [parseInt(ipv4Match[1]), parseInt(ipv4Match[2]), parseInt(ipv4Match[3]), parseInt(ipv4Match[4])];
-    const [a, b] = octets;
-
-    // 127.0.0.0/8 — loopback
-    if (a === 127) return { safe: false, reason: 'Loopback address blocked' };
-    // 10.0.0.0/8 — private
-    if (a === 10) return { safe: false, reason: 'Private IP (10.x) blocked' };
-    // 172.16.0.0/12 — private
-    if (a === 172 && b >= 16 && b <= 31) return { safe: false, reason: 'Private IP (172.16-31.x) blocked' };
-    // 192.168.0.0/16 — private
-    if (a === 192 && b === 168) return { safe: false, reason: 'Private IP (192.168.x) blocked' };
-    // 169.254.0.0/16 — link-local
-    if (a === 169 && b === 254) return { safe: false, reason: 'Link-local address blocked' };
-    // 0.0.0.0/8
-    if (a === 0) return { safe: false, reason: 'Zero network blocked' };
-  }
-
-  return { safe: true };
-}
+// validateUrlForSSRF was extracted to ../../lib/url-validator.ts so it can be
+// reused by the competitor intelligence helper libraries.
 
 async function fetchDirectHtml(url: string): Promise<string> {
   // SSRF protection: validate URL before fetching
