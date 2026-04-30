@@ -104,7 +104,8 @@ export default function CampaignDraftReview() {
         body: { action: 'publish', draft_id: draft.id },
       });
       if (error || !data?.ok) {
-        toast.error('Falló la publicación: ' + (error?.message || data?.error || 'unknown'));
+        const detail = (data as any)?.details || error?.message || data?.error || 'unknown';
+        toast.error('Falló la publicación: ' + detail, { duration: 12000 });
         return;
       }
       toast.success(`Campaña creada en Meta (ID ${data.meta_campaign_id}) como BORRADOR. Para activarla entrá a Meta Ads Manager o vuelve a Steve y dile "activá la campaña".`);
