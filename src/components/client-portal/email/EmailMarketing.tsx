@@ -90,15 +90,13 @@ export function EmailMarketing({ clientId }: EmailMarketingProps) {
               </div>
             </TabsTrigger>
           )}
-          {isSuperAdmin && (
-            <TabsTrigger value="composer" className="flex items-center gap-1.5 text-xs flex-1">
-              <Blocks className="w-3.5 h-3.5" />
-              <div className="flex flex-col items-start">
-                <span>Composer</span>
-                <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Drag & drop bloques (beta)</span>
-              </div>
-            </TabsTrigger>
-          )}
+          <TabsTrigger value="composer" className="flex items-center gap-1.5 text-xs flex-1">
+            <Blocks className="w-3.5 h-3.5" />
+            <div className="flex flex-col items-start">
+              <span>Composer</span>
+              <span className="hidden lg:block text-[10px] text-muted-foreground font-normal">Arma emails con bloques</span>
+            </div>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="campaigns">
@@ -127,11 +125,9 @@ export function EmailMarketing({ clientId }: EmailMarketingProps) {
           </TabsContent>
         )}
 
-        {isSuperAdmin && (
-          <TabsContent value="composer">
-            <BlockComposer />
-          </TabsContent>
-        )}
+        <TabsContent value="composer">
+          <BlockComposer />
+        </TabsContent>
       </Tabs>
     </div>
   );
